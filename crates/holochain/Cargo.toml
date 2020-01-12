@@ -1,7 +1,7 @@
 [package]
-name = "skunkworx_conductor_lib"
+name = "skunkworx_holochain"
 version = "0.0.1"
-description = "holochain core"
+description = "holochain skunkworx"
 license = "GPL-3.0-only"
 homepage = "https://github.com/holochain/holochain-rust"
 documentation = "https://github.com/holochain/holochain-rust"
@@ -9,12 +9,6 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
-crossbeam-channel = "0.4.0"
-holochain_persistence_api = "=0.0.11"
-skunkworx_core = { path = "../core"}
-holochain_core_types = "=0.0.42-alpha1"
-holochain_json_api = "=0.0.17"
-lib3h_protocol = "=0.0.25"
-# tokio = "0.2.6"
 futures = "0.3.1"
-
+crossbeam-channel = "0.4.0"
+skunkworx_conductor_lib = { path = "../conductor_lib"}

@@ -10,16 +10,25 @@ use holochain_core_types::{agent::AgentId, dna::Dna};
 use holochain_persistence_api::cas::content::Address;
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol};
 
+/// TODO: consider a newtype for this
 pub type DnaAddress = Address;
 
+/// The unique identifier for a running Cell.
+/// Cells are uniquely determined by this pair - this pair is necessary
+/// and sufficient to refer to a cell in a conductor
 pub type CellId = (DnaAddress, AgentId);
-type NetSender = Sender<Lib3hClientProtocol>;
+
+/// Simplification of holochain_net::connection::NetSend
+/// Could use the trait instead, but we will want an impl of it
+/// for just a basic crossbeam_channel::Sender, so I'm simplifying
+/// to avoid making a change to holochain_net
+pub type NetSend = Sender<Lib3hClientProtocol>;
 
 pub struct CellBuilder {
     pub cell_id: CellId,
-    pub network_tx: NetSender,
-    pub signal_tx: Sender<Signal>,
-    pub zome_tx: Sender<ZomeInvocation>,
+    pub tx_network: NetSend,
+    pub tx_signal: Sender<Signal>,
+    pub tx_zome: Sender<ZomeInvocation>,
 }
 
 impl From<CellBuilder> for Cell {
@@ -27,31 +36,26 @@ impl From<CellBuilder> for Cell {
         Self {
             active: true,
             cell_id: builder.cell_id,
-            network_tx: builder.network_tx,
-            signal_tx: builder.signal_tx,
-            zome_tx: builder.zome_tx,
+            tx_network: builder.tx_network,
+            tx_signal: builder.tx_signal,
+            tx_zome: builder.tx_zome,
         }
     }
 }
 
 #[derive(Clone)]
 pub struct Cell {
-    /// Whether or not to process queues associated with this Cell
-    /// (whether or not to poll futures).
-    /// Maybe doesn't belong here?
-    active: bool,
-
     /// Unique identifier for this Cell in this Conductor
     cell_id: CellId,
 
     /// Send a network message
-    network_tx: Sender<Lib3hClientProtocol>,
+    tx_network: Sender<Lib3hClientProtocol>,
 
     /// Send a Signal out through a Conductor Interface
-    signal_tx: Sender<Signal>,
+    tx_signal: Sender<Signal>,
 
     /// Send a ZomeInvocation up to the Conductor
-    zome_tx: Sender<ZomeInvocation>,
+    tx_zome: Sender<ZomeInvocation>,
 }
 
 impl Cell {
@@ -65,7 +69,7 @@ impl Cell {
     }
 
     pub async fn handle_network_msg(&self, msg: Lib3hServerProtocol) -> Result<(), Never> {
-        workflow::network_handler(msg, self.network_tx.clone()).await
+        workflow::network_handler(msg, self.tx_network.clone()).await
     }
 
     /// Get source chain handle for this Cell, or create one if not yet initialized

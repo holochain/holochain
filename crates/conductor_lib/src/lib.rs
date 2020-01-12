@@ -1,6 +1,7 @@
 extern crate skunkworx_core;
 
-mod api;
-mod error;
-mod conductor;
-mod config;
+pub mod api;
+pub mod conductor;
+pub mod config;
+pub mod error;
+
