@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+  "crates/core",
+  "crates/conductor_lib",
+]

@@ -1,0 +1,19 @@
+[package]
+name = "skunkworx_core"
+version = "0.0.1"
+description = "holochain core skunkworx"
+license = "GPL-3.0-only"
+homepage = "https://github.com/holochain/holochain-rust"
+documentation = "https://github.com/holochain/holochain-rust"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+
+[dependencies]
+crossbeam-channel = "0.4.0"
+holochain_persistence_api = "=0.0.11"
+holochain_core = "=0.0.42-alpha1"
+holochain_core_types = "=0.0.42-alpha1"
+holochain_json_api = "=0.0.17"
+lib3h_protocol = "=0.0.25"
+tokio = "0.2.6"
+futures = "0.3.1"
