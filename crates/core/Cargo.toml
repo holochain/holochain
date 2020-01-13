@@ -9,12 +9,14 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1.22"
 crossbeam-channel = "0.4.0"
 holochain_persistence_api = "=0.0.11"
 holochain_core = "=0.0.42-alpha1"
 holochain_core_types = "=0.0.42-alpha1"
 # holochain_net = "=0.0.42-alpha1"
 holochain_json_api = "=0.0.17"
+skunkworx_core_types = { path = "../core_types"}
 lib3h_protocol = "=0.0.25"
 tokio = "0.2.6"
 futures = "0.3.1"

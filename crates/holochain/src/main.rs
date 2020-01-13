@@ -1,9 +1,12 @@
 extern crate crossbeam_channel;
 
+use skunkworx_core::cell::Cell;
 use futures::executor::ThreadPool;
 use futures::prelude::*;
-use skunkworx_conductor_lib::config::Config;
-use skunkworx_conductor_lib::{api, conductor::Conductor};
+use skunkworx_conductor_lib::{
+    config::Config,
+    {api, conductor::Conductor},
+};
 
 fn main() {
     let (tx_api, rx_api) = crossbeam_channel::unbounded();
@@ -11,7 +14,7 @@ fn main() {
     let executor = ThreadPool::new().expect("Couldn't create thread pool for conductor");
     // executor.spawn_obj_ok()
 
-    let conductor = Conductor::new(executor, rx_api, rx_net);
+    let conductor = Conductor::<Cell, _>::new(executor, rx_api, rx_net);
 }
 
 // trait Interface {
@@ -31,4 +34,3 @@ fn main() {
 // }
 
 // struct ConductorFuture;
-

@@ -12,6 +12,8 @@ pub struct ZomeInvocation {
     pub as_at: Address,
 }
 
+pub struct ZomeInvocationResult;
+
 pub enum Signal {
     Trace,
     // Consistency(ConsistencySignal<String>),

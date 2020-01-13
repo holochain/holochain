@@ -8,10 +8,10 @@ use futures::executor::ThreadPool;
 use futures::task::Spawn;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 use skunkworx_core::{
-    cell::{Cell, CellId},
+    cell::{CellApi, CellId},
     types::ZomeInvocation,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
@@ -24,14 +24,15 @@ pub struct CellState {
 
 type NetReceive = Receiver<Lib3hServerProtocol>;
 
-pub struct Conductor<E: Spawn> {
-    cells: HashMap<CellHandle, CellState>,
+pub struct Conductor<Cell: CellApi, E: Spawn> {
+    cells: HashMap<Cell, CellState>,
+    handle_map: HashMap<CellHandle, Cell>,
     executor: E,
     rx_api: Receiver<api::ConductorApi>,
     rx_net: Receiver<NetReceive>,
 }
 
-impl<E: Spawn> Conductor<E> {
+impl<Cell: CellApi, E: Spawn> Conductor<Cell, E> {
     pub fn new(
         executor: E,
         rx_api: Receiver<api::ConductorApi>,
@@ -39,6 +40,7 @@ impl<E: Spawn> Conductor<E> {
     ) -> Self {
         Self {
             cells: HashMap::new(),
+            handle_map: HashMap::new(),
             executor,
             rx_api,
             rx_net,
@@ -48,12 +50,16 @@ impl<E: Spawn> Conductor<E> {
     async fn handle_api_message(&mut self, msg: api::ConductorApi) -> ConductorResult<()> {
         match msg {
             api::ConductorApi::ZomeInvocation(handle, invocation) => {
+                let cell = self
+                    .handle_map
+                    .get(&handle)
+                    .ok_or_else(|| ConductorError::NoSuchCell(handle.clone()))?;
                 let state = self
                     .cells
-                    .get(&handle)
+                    .get(&cell)
                     .ok_or_else(|| ConductorError::NoSuchCell(handle))?;
                 if state.active {
-                    Cell::new(cell_id).invoke_zome(invocation);
+                    cell.invoke_zome(invocation);
                     Ok(())
                 } else {
                     Err(ConductorError::CellNotActive)
