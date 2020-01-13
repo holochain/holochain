@@ -14,7 +14,9 @@ use skunkworx_core_types::error::SkunkResult;
 use std::sync::Arc;
 
 #[derive(Clone)]
-struct ConductorHandle<Cell: CellApi>(Arc<RwLock<Conductor<Cell>>>);
+struct ConductorHandle<Cell: CellApi> {
+    lock: Arc<RwLock<Conductor<Cell>>>,
+}
 
 type ConductorImmutable<'c, Cell> = RwLockReadGuard<'c, Conductor<Cell>>;
 type ConductorMutable<'c, Cell> = RwLockWriteGuard<'c, Conductor<Cell>>;
@@ -27,49 +29,52 @@ pub trait ConductorApiMutable<Cell: CellApi>: ConductorApiImmutable<Cell> {
     fn conductor_mut(&mut self) -> ConductorMutable<Cell>;
 }
 
+/// An interface for referencing a shared conductor state, used by workflows within a Cell
 #[async_trait]
 pub trait ConductorApiInternal<Cell: CellApi>: ConductorApiImmutable<Cell> {
-    async fn invoke_zome(&self, cell: Cell, invocation: ZomeInvocation) -> ZomeInvocationResult;
-    async fn net_send(&self, message: Lib3hClientProtocol) -> SkunkResult<()>;
-    async fn net_request(&self, message: Lib3hClientProtocol) -> SkunkResult<Lib3hServerProtocol>;
+    async fn invoke_zome(&self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
+    async fn network_send(&self, message: Lib3hClientProtocol) -> SkunkResult<()>;
+    async fn network_request(&self, message: Lib3hClientProtocol) -> SkunkResult<Lib3hServerProtocol>;
 }
 
+/// An interface for referencing a shared *mutable* conductor state, used by external sources
+/// like interfaces. It may be the case that this is unneeded if we can make the Conductor state completely
+/// immutable, meaning we simply throw it away and load a new one whenever we need to change its state
 #[async_trait]
 pub trait ConductorApiExternal<Cell: CellApi>: ConductorApiMutable<Cell> {
     async fn admin(&mut self, method: AdminMethod) -> SkunkResult<JsonString>;
-    async fn test(&mut self, cell: Cell, invocation: ZomeInvocation) -> ZomeInvocationResult;
+    async fn test(&mut self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<JsonString>;
 }
 
 impl<Cell: CellApi> ConductorApiImmutable<Cell> for ConductorHandle<Cell> {
     fn conductor(&self) -> ConductorImmutable<Cell> {
-        self.0.read()
+        self.lock.read()
     }
 }
 
 impl<Cell: CellApi> ConductorApiMutable<Cell> for ConductorHandle<Cell> {
     fn conductor_mut(&mut self) -> ConductorMutable<Cell> {
-        self.0.write()
+        self.lock.write()
     }
 }
 
 #[async_trait]
 impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
-    async fn invoke_zome(&self, cell: Cell, invocation: ZomeInvocation) -> ZomeInvocationResult
+    async fn invoke_zome(&self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>
     where
         Cell: 'async_trait,
     {
-        self.conductor().blah();
-        unimplemented!()
+        cell.invoke_zome(invocation).await
     }
 
-    async fn net_send(&self, message: Lib3hClientProtocol) -> SkunkResult<()>
+    async fn network_send(&self, message: Lib3hClientProtocol) -> SkunkResult<()>
     where
         Cell: 'async_trait,
     {
-        unimplemented!()
+        self.conductor().tx_network().send(message).map_err(|e| e.to_string())
     }
 
-    async fn net_request(&self, message: Lib3hClientProtocol) -> SkunkResult<Lib3hServerProtocol>
+    async fn network_request(&self, message: Lib3hClientProtocol) -> SkunkResult<Lib3hServerProtocol>
     where
         Cell: 'async_trait,
     {
@@ -86,7 +91,7 @@ impl<Cell: CellApi> ConductorApiExternal<Cell> for ConductorHandle<Cell> {
         unimplemented!()
     }
 
-    async fn test(&mut self, cell: Cell, invocation: ZomeInvocation) -> ZomeInvocationResult
+    async fn test(&mut self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<JsonString>
     where
         Cell: 'async_trait,
     {

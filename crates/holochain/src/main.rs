@@ -11,8 +11,8 @@ use skunkworx_conductor_lib::{
 fn main() {
     let executor = ThreadPool::new().expect("Couldn't create thread pool for conductor");
     // executor.spawn_obj_ok()
-
-    let conductor = Conductor::<Cell>::new(executor);
+    let (tx_network, rx_network) = crossbeam_channel::unbounded();
+    let conductor = Conductor::<Cell>::new(tx_network);
 }
 
 // trait Interface {

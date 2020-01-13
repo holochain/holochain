@@ -1,3 +1,4 @@
+use skunkworx_core::cell::NetSender;
 use crate::config::Config;
 use crate::{
     error::{ConductorError, ConductorResult},
@@ -21,8 +22,11 @@ use std::collections::{HashMap, HashSet};
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
 pub type CellHandle = String;
-type Executor = ThreadPool;
 
+/// Conductor-specific Cell state, this can probably be stored in a database.
+/// Hypothesis: If nothing remains in this struct, then the Conductor state is
+/// essentially immutable, and perhaps we just throw it out and make a new one
+/// when we need to load new config, etc.
 pub struct CellState {
     /// Whether or not we should call any methods on the cell
     active: bool,
@@ -31,38 +35,23 @@ pub struct CellState {
 type NetReceive = Receiver<Lib3hServerProtocol>;
 
 pub struct Conductor<Cell: CellApi> {
+    tx_network: NetSender,
     cells: HashMap<Cell, CellState>,
     handle_map: HashMap<CellHandle, Cell>,
-    executor: Executor,
 }
 
 impl<Cell: CellApi> Conductor<Cell> {
-    pub fn new(
-        executor: Executor,
-    ) -> Self {
+    pub fn new(tx_network: NetSender) -> Self {
         Self {
             cells: HashMap::new(),
             handle_map: HashMap::new(),
-            executor,
+            tx_network,
         }
     }
 
-    pub async fn blah(&self) {
-
+    pub fn tx_network(&self) -> &NetSender {
+        &self.tx_network
     }
-
-    pub async fn invoke_zome(&self, cell: Cell, invocation: ZomeInvocation) -> ConductorResult<()> {
-        unimplemented!()
-    }
-
-    // fn build_cell(cell_id: CellId) -> Cell {
-    //     CellBuilder {
-    //         cell_id,
-    //         tx_network,
-    //         tx_signal,
-    //         tx_zome,
-    //     }.into()
-    // }
 }
 
 mod builder {
