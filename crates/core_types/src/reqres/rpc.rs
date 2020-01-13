@@ -1,44 +1,34 @@
-//! Patterns for making channel-based RPC calls and awaiting for the response via a future.
-//!
-//! ```
-//! use std::thread;
-//!
-//! let (req, res) = skunkworx_core_types::rpc::Request::new("hello".into());
-//! thread::spawn(move || {
-//!     let response = format!("{}!!!", req);
-//!     req.respond(response);
-//! });
-//!
-//! ```
 
-
+use crate::reqres::{Request, Response};
 use crossbeam_channel::{Receiver, SendError, Sender};
 use futures::task::Poll;
 use futures::Future;
 use snowflake::ProcessUniqueId;
 
-pub fn request<Req: Send, Res: Send>(
-    payload: Req,
-) -> (Request<Req, Res>, ResponseFuture<Res>) {
-    Request::new(payload)
-}
+// pub fn request<Req: Send, Res: Send>(
+//     payload: Req,
+// ) -> (RpcRequest<Req, Res>, ResponseFuture<Res>) {
+//     RpcRequest::new(payload)
+// }
 
 #[derive(Shrinkwrap)]
-pub struct Request<Req, Res> {
+pub struct RpcRequest<Req, Res> {
     #[shrinkwrap(main_field)]
     payload: Req,
     request_id: ProcessUniqueId,
-    tx_response: Sender<Response<Res>>,
+    tx_response: Sender<RpcResponse<Res>>,
 }
 
 #[derive(Shrinkwrap)]
-pub struct Response<Res> {
+pub struct RpcResponse<Res> {
     #[shrinkwrap(main_field)]
-    payload: Res,
+    payload: Res,Response
     request_id: ProcessUniqueId,
 }
 
-impl<Req: Send, Res: Send> Request<Req, Res> {
+impl<Res> Response<Res> for RpcResponse<Res> {}
+
+impl<Req: Send, Res: Send> RpcRequest<Req, Res> {
     pub fn new(payload: Req) -> (Self, ResponseFuture<Res>) {
         let (tx_response, rx_response) = crossbeam_channel::bounded(0);
         let req = Self {
@@ -49,16 +39,19 @@ impl<Req: Send, Res: Send> Request<Req, Res> {
         let res = ResponseFuture::new(rx_response);
         (req, res)
     }
+}
 
-    pub fn respond(self, payload: Res) -> Result<(), SendError<Response<Res>>> {
+impl<Req: Send, Res: Send> Request<Req, Res, RpcResponse<Res>> for RpcRequest<Req, Res> {
+
+    fn respond(self, payload: Res) -> Result<(), SendError<RpcResponse<Res>>> {
         let request_id = self.request_id.clone();
-        self.respond_raw(Response {
+        self.respond_raw(RpcResponse {
             payload,
             request_id,
         })
     }
 
-    fn respond_raw(self, response: Response<Res>) -> Result<(), SendError<Response<Res>>> {
+    fn respond_raw(self, response: RpcResponse<Res>) -> Result<(), SendError<RpcResponse<Res>>> {
         self.tx_response.send(response)
     }
 }
@@ -66,17 +59,17 @@ impl<Req: Send, Res: Send> Request<Req, Res> {
 /// Wait for a response to be sent on a pre-established channel
 /// (Don't know what I'm doing here, just trying stuff)
 pub struct ResponseFuture<Res> {
-    rx: Receiver<Response<Res>>,
+    rx: Receiver<RpcResponse<Res>>,
 }
 
 impl<Res> ResponseFuture<Res> {
-    pub fn new(rx: Receiver<Response<Res>>) -> Self {
+    pub fn new(rx: Receiver<RpcResponse<Res>>) -> Self {
         Self { rx }
     }
 }
 
 impl<Res> Future for ResponseFuture<Res> {
-    type Output = Response<Res>;
+    type Output = RpcResponse<Res>;
 
     fn poll(self: std::pin::Pin<&mut Self>, ctx: &mut std::task::Context) -> Poll<Self::Output> {
         if let Ok(val) = self.rx.try_recv() {
@@ -92,11 +85,11 @@ impl<Res> Future for ResponseFuture<Res> {
 
 use std::collections::HashMap;
 
-type TxResponse<T> = Sender<Response<T>>;
-type RxResponse<T> = Receiver<Response<T>>;
+type TxResponse<T> = Sender<RpcResponse<T>>;
+type RxResponse<T> = Receiver<RpcResponse<T>>;
 
 struct RpcSystem<Payload> {
-    pending: HashMap<ProcessUniqueId, Request<Payload, Payload>>,
+    pending: HashMap<ProcessUniqueId, RpcRequest<Payload, Payload>>,
 }
 
 impl<Payload: Send> RpcSystem<Payload> {
@@ -114,7 +107,7 @@ impl<Payload: Send> RpcSystem<Payload> {
         (fut, tx_response)
     }
 
-    async fn run(mut self, rx_response: Receiver<Response<Payload>>) {
+    async fn run(mut self, rx_response: Receiver<RpcResponse<Payload>>) {
         loop {
             if let Ok(response) = rx_response.try_recv() {
                 let request_id = &response.request_id;
