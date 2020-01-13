@@ -1,6 +1,7 @@
 use crate::config::Config;
+use async_trait::async_trait;
 use crate::{
-    api,
+    protocol::{self, ConductorApiInternal, ConductorApiExternal},
     error::{ConductorError, ConductorResult},
 };
 use crossbeam_channel::Receiver;
@@ -12,6 +13,8 @@ use skunkworx_core::{
     types::ZomeInvocation,
 };
 use std::collections::{HashMap, HashSet};
+use skunkworx_core::types::ZomeInvocationResult;
+use skunkworx_core_types::error::SkunkResult;
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
@@ -28,14 +31,29 @@ pub struct Conductor<Cell: CellApi, E: Spawn> {
     cells: HashMap<Cell, CellState>,
     handle_map: HashMap<CellHandle, Cell>,
     executor: E,
-    rx_api: Receiver<api::ConductorApi>,
+    rx_api: Receiver<protocol::ConductorProtocol>,
     rx_net: Receiver<NetReceive>,
+}
+
+#[async_trait]
+impl<Cell: CellApi, E: Spawn> ConductorApiInternal<Cell> for Conductor<Cell, E> {
+    async fn invoke_zome(cell: Cell, invocation: ZomeInvocation) -> ZomeInvocationResult {
+        unimplemented!()
+    }
+
+    async fn net_send(message: Lib3hClientProtocol) -> SkunkResult<()> {
+        unimplemented!()
+    }
+
+    async fn net_request(message: Lib3hClientProtocol) -> SkunkResult<Lib3hServerProtocol> {
+        unimplemented!()
+    }
 }
 
 impl<Cell: CellApi, E: Spawn> Conductor<Cell, E> {
     pub fn new(
         executor: E,
-        rx_api: Receiver<api::ConductorApi>,
+        rx_api: Receiver<protocol::ConductorProtocol>,
         rx_net: Receiver<NetReceive>,
     ) -> Self {
         Self {
@@ -47,9 +65,9 @@ impl<Cell: CellApi, E: Spawn> Conductor<Cell, E> {
         }
     }
 
-    async fn handle_api_message(&mut self, msg: api::ConductorApi) -> ConductorResult<()> {
+    pub async fn handle_message(&mut self, msg: protocol::ConductorProtocol) -> ConductorResult<()> {
         match msg {
-            api::ConductorApi::ZomeInvocation(handle, invocation) => {
+            protocol::ConductorProtocol::ZomeInvocation(handle, invocation) => {
                 let cell = self
                     .handle_map
                     .get(&handle)
@@ -65,14 +83,17 @@ impl<Cell: CellApi, E: Spawn> Conductor<Cell, E> {
                     Err(ConductorError::CellNotActive)
                 }
             }
-            api::ConductorApi::Admin(msg) => match msg {},
-            api::ConductorApi::Crypto(msg) => match msg {
-                api::Crypto::Sign(payload) => unimplemented!(),
-                api::Crypto::Encrypt(payload) => unimplemented!(),
-                api::Crypto::Decrypt(payload) => unimplemented!(),
+            protocol::ConductorProtocol::Admin(msg) => match msg {},
+            protocol::ConductorProtocol::Crypto(msg) => match msg {
+                protocol::Crypto::Sign(payload) => unimplemented!(),
+                protocol::Crypto::Encrypt(payload) => unimplemented!(),
+                protocol::Crypto::Decrypt(payload) => unimplemented!(),
             },
-            api::ConductorApi::Test(msg) => match msg {
-                api::Test::AddAgent(args) => unimplemented!(),
+            protocol::ConductorProtocol::Network(msg) => match msg {
+                _ => unimplemented!()
+            },
+            protocol::ConductorProtocol::Test(msg) => match msg {
+                protocol::Test::AddAgent(args) => unimplemented!(),
             },
         }
     }

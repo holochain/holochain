@@ -21,8 +21,9 @@ pub type DnaAddress = Address;
 /// and sufficient to refer to a cell in a conductor
 pub type CellId = (DnaAddress, AgentId);
 
+/// Might be overkill to have a trait
 #[async_trait]
-pub trait CellApi: PartialEq + std::hash::Hash + Eq {
+pub trait CellApi: Send + PartialEq + std::hash::Hash + Eq {
     fn dna_address(&self) -> &DnaAddress;
     fn agent_id(&self) -> &AgentId;
     fn cell_id(&self) -> CellId {
@@ -56,8 +57,11 @@ impl CellApi for Cell {
     }
 }
 
+// These are possibly composable traits that describe how to get a resource,
+// so instead of explicitly building resources, we can downcast a Cell to exactly
+// the right set of resource getter traits
 trait NetSend {
-    fn network_send(&self, msg: Lib3hClientProtocol) -> Result<(), Never>;
+    fn network_send(&self, msg: Lib3hClientProtocol) -> SkunkResult<()>;
 }
 
 trait ChainRead {

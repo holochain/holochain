@@ -11,5 +11,6 @@ pub async fn invoke_zome(
     // let ribosome = get_ribosome()
     // ribosome.call_zome_function(invocation, source_chain);
     // source_chain.try_commit(cursor);
+
     Ok(ZomeInvocationResult)
 }
