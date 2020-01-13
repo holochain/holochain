@@ -9,12 +9,10 @@ use skunkworx_conductor_lib::{
 };
 
 fn main() {
-    let (tx_api, rx_api) = crossbeam_channel::unbounded();
-    let (tx_net, rx_net) = crossbeam_channel::unbounded();
     let executor = ThreadPool::new().expect("Couldn't create thread pool for conductor");
     // executor.spawn_obj_ok()
 
-    let conductor = Conductor::<Cell, _>::new(executor, rx_api, rx_net);
+    let conductor = Conductor::<Cell>::new(executor);
 }
 
 // trait Interface {

@@ -23,7 +23,7 @@ pub type CellId = (DnaAddress, AgentId);
 
 /// Might be overkill to have a trait
 #[async_trait]
-pub trait CellApi: Send + PartialEq + std::hash::Hash + Eq {
+pub trait CellApi: Send + Sync + PartialEq + std::hash::Hash + Eq {
     fn dna_address(&self) -> &DnaAddress;
     fn agent_id(&self) -> &AgentId;
     fn cell_id(&self) -> CellId {
