@@ -18,5 +18,5 @@ holochain_core_types = "=0.0.42-alpha1"
 holochain_json_api = "=0.0.17"
 skunkworx_core_types = { path = "../core_types"}
 lib3h_protocol = "=0.0.25"
-tokio = "0.2.6"
+# tokio = "0.2.6"
 futures = "0.3.1"

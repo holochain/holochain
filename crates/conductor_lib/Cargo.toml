@@ -10,14 +10,13 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.22"
-crossbeam-channel = "0.4.0"
+# crossbeam-channel = "0.4.0"
 holochain_persistence_api = "=0.0.11"
 skunkworx_core = { path = "../core"}
 skunkworx_core_types = { path = "../core_types"}
 holochain_core_types = "=0.0.42-alpha1"
 holochain_json_api = "=0.0.17"
 lib3h_protocol = "=0.0.25"
-# tokio = "0.2.6"
 futures = "0.3.1"
 parking_lot = "0.10.0"
 

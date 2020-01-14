@@ -4,10 +4,12 @@
 //! use std::thread;
 //!
 //! let (req, res) = skunkworx_core_types::rpc::RpcRequest::new("hello".into());
-//! thread::spawn(move || {
-//!     let response = format!("{}!!!", req);
-//!     req.respond(response);
-//! });
+//! self.network_send(req).unwrap();
+//! let response = res.await;
+//!
+//!
+//! let req = "hello";
+//! let response = self.network_send(req.into()).await.unwrap();
 //!
 //! ```
 

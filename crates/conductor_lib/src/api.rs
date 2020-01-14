@@ -1,7 +1,7 @@
 use crate::conductor::CellHandle;
 use crate::conductor::Conductor;
 use async_trait::async_trait;
-use crossbeam_channel::Sender;
+use futures::sink::SinkExt;
 use holochain_json_api::json::JsonString;
 use lib3h_protocol::protocol_client::Lib3hClientProtocol;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
@@ -14,14 +14,20 @@ use skunkworx_core_types::error::SkunkResult;
 use std::sync::Arc;
 
 #[derive(Clone)]
-struct ConductorHandle<Cell: CellApi> {
+pub struct ConductorHandle<Cell: CellApi> {
     lock: Arc<RwLock<Conductor<Cell>>>,
+}
+
+impl<Cell: CellApi> ConductorHandle<Cell> {
+    pub fn new(lock: Arc<RwLock<Conductor<Cell>>>) -> Self {
+        Self { lock }
+    }
 }
 
 type ConductorImmutable<'c, Cell> = RwLockReadGuard<'c, Conductor<Cell>>;
 type ConductorMutable<'c, Cell> = RwLockWriteGuard<'c, Conductor<Cell>>;
 
-pub trait ConductorApiImmutable<Cell: CellApi> {
+pub trait ConductorApiImmutable<Cell: CellApi>: Send {
     fn conductor(&self) -> ConductorImmutable<Cell>;
 }
 
@@ -32,9 +38,16 @@ pub trait ConductorApiMutable<Cell: CellApi>: ConductorApiImmutable<Cell> {
 /// An interface for referencing a shared conductor state, used by workflows within a Cell
 #[async_trait]
 pub trait ConductorApiInternal<Cell: CellApi>: ConductorApiImmutable<Cell> {
-    async fn invoke_zome(&self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
+    async fn invoke_zome(
+        &self,
+        cell: Cell,
+        invocation: ZomeInvocation,
+    ) -> SkunkResult<ZomeInvocationResult>;
     async fn network_send(&self, message: Lib3hClientProtocol) -> SkunkResult<()>;
-    async fn network_request(&self, message: Lib3hClientProtocol) -> SkunkResult<Lib3hServerProtocol>;
+    async fn network_request(
+        &self,
+        message: Lib3hClientProtocol,
+    ) -> SkunkResult<Lib3hServerProtocol>;
 }
 
 /// An interface for referencing a shared *mutable* conductor state, used by external sources
@@ -60,7 +73,11 @@ impl<Cell: CellApi> ConductorApiMutable<Cell> for ConductorHandle<Cell> {
 
 #[async_trait]
 impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
-    async fn invoke_zome(&self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>
+    async fn invoke_zome(
+        &self,
+        cell: Cell,
+        invocation: ZomeInvocation,
+    ) -> SkunkResult<ZomeInvocationResult>
     where
         Cell: 'async_trait,
     {
@@ -71,10 +88,14 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
     where
         Cell: 'async_trait,
     {
-        self.conductor().tx_network().send(message).map_err(|e| e.to_string())
+        let mut tx = self.conductor().tx_network().clone();
+        tx.send(message).await.map_err(|e| e.to_string())
     }
 
-    async fn network_request(&self, message: Lib3hClientProtocol) -> SkunkResult<Lib3hServerProtocol>
+    async fn network_request(
+        &self,
+        message: Lib3hClientProtocol,
+    ) -> SkunkResult<Lib3hServerProtocol>
     where
         Cell: 'async_trait,
     {
@@ -112,7 +133,10 @@ pub enum ConductorProtocol {
     ZomeInvocation(CellHandle, ZomeInvocation),
 }
 
-pub enum AdminMethod {}
+pub enum AdminMethod {
+    Start(CellHandle),
+    Stop(CellHandle),
+}
 
 pub enum Crypto {
     Sign(String),

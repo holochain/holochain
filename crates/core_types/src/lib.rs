@@ -12,4 +12,4 @@ extern crate shrinkwraprs;
 
 pub mod agent;
 pub mod error;
-pub mod reqres;
+// pub mod reqres;

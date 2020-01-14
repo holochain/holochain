@@ -5,7 +5,6 @@ use crate::{
     api::{self, ConductorApiExternal, ConductorApiInternal},
 };
 use async_trait::async_trait;
-use crossbeam_channel::Receiver;
 use futures::executor::ThreadPool;
 use futures::task::Spawn;
 use holochain_json_api::json::JsonString;
@@ -31,8 +30,6 @@ pub struct CellState {
     /// Whether or not we should call any methods on the cell
     active: bool,
 }
-
-type NetReceive = Receiver<Lib3hServerProtocol>;
 
 pub struct Conductor<Cell: CellApi> {
     tx_network: NetSender,

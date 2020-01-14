@@ -22,7 +22,7 @@ pub struct RpcRequest<Req, Res> {
 #[derive(Shrinkwrap)]
 pub struct RpcResponse<Res> {
     #[shrinkwrap(main_field)]
-    payload: Res,Response
+    payload: Res,
     request_id: ProcessUniqueId,
 }
 

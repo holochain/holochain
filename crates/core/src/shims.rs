@@ -3,6 +3,9 @@ use crate::{cell::CellId, types::ZomeInvocation};
 use holochain_persistence_api::cas::content::Address;
 
 pub struct CascadingCursor;
+pub struct CapToken;
+pub struct Lib3hClientProtocol;
+pub struct Lib3hServerProtocol;
 
 pub fn get_cascading_cursor(_cid: &CellId) -> CascadingCursor {
     unimplemented!()

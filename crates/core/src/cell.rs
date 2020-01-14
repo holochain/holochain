@@ -1,3 +1,5 @@
+use lib3h_protocol::protocol::Lib3hToClient;
+use lib3h_protocol::protocol::Lib3hToClientResponse;
 use crate::types::ZomeInvocationResult;
 use crate::{
     agent::SourceChain,
@@ -31,13 +33,14 @@ pub trait CellApi: Send + Sync + PartialEq + std::hash::Hash + Eq {
     }
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
-    async fn handle_network_message(&self, msg: Lib3hServerProtocol, tx_network: NetSender) -> SkunkResult<()>;
+    async fn handle_network_message(&self, msg: Lib3hToClient) -> SkunkResult<Option<Lib3hToClientResponse>>;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Cell(DnaAddress, AgentId);
 
 #[async_trait]
+
 impl CellApi for Cell {
     fn dna_address(&self) -> &DnaAddress {
         &self.0
@@ -49,11 +52,12 @@ impl CellApi for Cell {
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
         let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
-        workflow::invoke_zome(invocation, source_chain).await
+        let cursor = CascadingCursor;
+        workflow::invoke_zome(invocation, source_chain, cursor).await
     }
 
-    async fn handle_network_message(&self, msg: Lib3hServerProtocol, tx_network: NetSender) -> SkunkResult<()> {
-        workflow::network_handler(msg, tx_network).await
+    async fn handle_network_message(&self, msg: Lib3hToClient) -> SkunkResult<Option<Lib3hToClientResponse>> {
+        workflow::handle_network_message(msg).await
     }
 }
 
@@ -77,4 +81,4 @@ trait ChainWrite {
 /// Could use the trait instead, but we will want an impl of it
 /// for just a basic crossbeam_channel::Sender, so I'm simplifying
 /// to avoid making a change to holochain_net
-pub type NetSender = Sender<Lib3hClientProtocol>;
+pub type NetSender = futures::channel::mpsc::Sender<Lib3hClientProtocol>;
