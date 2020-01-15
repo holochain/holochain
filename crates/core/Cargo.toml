@@ -11,5 +11,4 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1.22"
 crossbeam-channel = "0.4.0"
-lib3h_protocol = "=0.0.25"
 futures = "0.3.1"

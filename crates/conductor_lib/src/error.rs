@@ -67,7 +67,7 @@ impl From<ConductorError> for SkunkError {
 pub mod tests {
 
     use crate::error::ConductorError;
-    use holochain_core_types::error::SkunkError;
+    use super::*;
 
     #[test]
     /// show From<SkunkError> for ConductorError
