@@ -1,4 +1,4 @@
-use crate::{cell::Cell, shims::CascadingCursor};
+use crate::{cell::Cell, shims::*};
 use holochain_persistence_api::cas::content::Address;
 use skunkworx_core_types::error::SkunkResult;
 
@@ -30,6 +30,10 @@ impl SourceChain {
     pub fn as_at_head(self) -> SkunkResult<Self> {
         let actual_head = self.persisted_head_address();
         self.as_at(actual_head)
+    }
+
+    pub fn get_dna(&self) -> SkunkResult<Dna> {
+        Ok(Dna)
     }
 
     // pub fn _head_address(&self) -> Address {

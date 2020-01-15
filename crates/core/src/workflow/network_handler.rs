@@ -17,12 +17,21 @@ pub async fn handle_network_message(
     }
 }
 
-// #[async_trait]
-// trait HandleNetworkMessage {
+#[async_trait]
+trait HandleNetworkMessage {
 //     async fn handle_send_direct_message(data: DirectMessageData) -> SkunkResult<ZomeInvocationResult>;
-//     async fn handle_store_dht_transform(transform: DhtItem) -> SkunkResult<()>;
+    async fn handle_store_dht_transform(transform: DhtItem) -> SkunkResult<()>;
 //     async fn handle_query_entry(requester: AgentId, query: QueryData) -> SkunkResult<QueryEntryResultData>;
-// }
+}
 
-// struct DhtItem;
+pub struct NetworkMessageHandler;
+
+#[async_trait]
+impl NetworkMessageHandler {
+    async fn handle_store_dht_transform(transform: DhtItem) -> SkunkResult<()> {
+        Ok(())
+    }
+}
+
+struct DhtItem;
 // struct QueryData;
