@@ -1,14 +1,25 @@
-use skunkworx_core_types::error::SkunkResult;
+use crate::error::SkunkResult;
 use crate::agent::SourceChain;
+use crate::types::ZomeInvocationResult;
 use crate::{cell::CellId, types::ZomeInvocation};
-use holochain_persistence_api::cas::content::Address;
 
+pub type Address = String;
+#[derive(Clone, PartialEq, Hash, Eq)]
+pub struct AgentId;
 pub struct CascadingCursor;
 pub struct CapToken;
-pub struct Lib3hClientProtocol;
-pub struct Lib3hServerProtocol;
+pub struct CapabilityRequest;
 pub struct DhtTransform;
 pub struct Dna;
+pub struct Entry;
+pub type JsonString = String;
+
+pub struct Lib3hToClient;
+pub struct Lib3hToClientResponse;
+pub struct Lib3hClientProtocol;
+pub struct Lib3hToServer;
+pub struct Lib3hToServerResponse;
+pub struct Lib3hServerProtocol;
 
 pub enum ValidationResult {
     Valid,
@@ -23,11 +34,13 @@ impl Ribosome {
         Self
     }
 
-    pub fn run_validation(self, DhtTransform) -> ValidationResult {
+    pub fn run_validation(self, entry: Entry) -> ValidationResult {
         unimplemented!()
     }
 
-    pub fn call_zome_function(self, invocation: ZomeInvocation, source_chain: SourceChain) -> SkunkResult<ZomeInvocationResult> {
+    /// Runs the specified zome fn. Returns the cursor used by HDK,
+    /// so that it can be passed on to source chain manager for transactional writes
+    pub fn call_zome_function(self, invocation: ZomeInvocation, source_chain: SourceChain) -> SkunkResult<(ZomeInvocationResult, CascadingCursor)> {
         unimplemented!()
     }
 }

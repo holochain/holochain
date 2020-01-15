@@ -1,7 +1,4 @@
-use holochain_persistence_api::cas::content::Address;
-use holochain_core_types::agent::AgentId;
-use holochain_json_api::json::JsonString;
-use holochain_core_types::{dna::capabilities::CapabilityRequest};
+use crate::shims::*;
 
 pub struct ZomeInvocation {
     pub zome_name: String,
@@ -20,4 +17,4 @@ pub enum Signal {
     User(UserSignal),
 }
 
-type UserSignal = ();
+pub struct UserSignal;

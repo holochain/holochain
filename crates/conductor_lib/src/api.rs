@@ -2,15 +2,13 @@ use crate::conductor::CellHandle;
 use crate::conductor::Conductor;
 use async_trait::async_trait;
 use futures::sink::SinkExt;
-use holochain_json_api::json::JsonString;
-use lib3h_protocol::protocol_client::Lib3hClientProtocol;
-use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use skunkworx_core::cell::Cell;
 use skunkworx_core::cell::CellApi;
+use skunkworx_core::shims::*;
 use skunkworx_core::types::ZomeInvocation;
 use skunkworx_core::types::ZomeInvocationResult;
-use skunkworx_core_types::error::SkunkResult;
+use skunkworx_core::error::SkunkResult;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -89,7 +87,7 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
         Cell: 'async_trait,
     {
         let mut tx = self.conductor().tx_network().clone();
-        tx.send(message).await.map_err(|e| e.to_string())
+        tx.send(message).await.map_err(|e| e.to_string().into())
     }
 
     async fn network_request(

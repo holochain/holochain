@@ -1,11 +1,11 @@
 use crate::{cell::Cell, shims::*};
-use holochain_persistence_api::cas::content::Address;
-use skunkworx_core_types::error::SkunkResult;
+use crate::error::SkunkResult;
 
 /// Representation of a Cell's source chain.
 /// TODO: work out the details of what's needed for as_at
 /// to make sure the right balance is struck between
 /// creating as_at snapshots and having access to the actual current source chain
+#[derive(Clone)]
 pub struct SourceChain {
     cell: Cell,
     as_at: Option<Address>,

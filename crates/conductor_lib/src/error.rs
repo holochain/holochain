@@ -1,12 +1,12 @@
 use crate::conductor::CellHandle;
-use holochain_core_types::error::HolochainError;
+use skunkworx_core::error::SkunkError;
 use std::{error::Error, fmt};
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConductorError {
-    InternalFailure(HolochainError),
+    InternalFailure(SkunkError),
     CellNotActive,
     CellAlreadyActive,
     CellNotInitialized,
@@ -19,7 +19,7 @@ impl Error for ConductorError {
     #[rustfmt::skip]
     fn cause(&self) -> Option<&dyn Error> {
         match self {
-            ConductorError::InternalFailure(ref err)  => Some(err),
+            ConductorError::InternalFailure(ref err) => Some(err),
             ConductorError::CellNotActive => None,
             ConductorError::CellAlreadyActive => None,
             ConductorError::CellNotInitialized => None,
@@ -51,15 +51,15 @@ impl fmt::Display for ConductorError {
     }
 }
 
-impl From<HolochainError> for ConductorError {
-    fn from(error: HolochainError) -> Self {
+impl From<SkunkError> for ConductorError {
+    fn from(error: SkunkError) -> Self {
         ConductorError::InternalFailure(error)
     }
 }
 
-impl From<ConductorError> for HolochainError {
+impl From<ConductorError> for SkunkError {
     fn from(error: ConductorError) -> Self {
-        HolochainError::new(&error.to_string())
+        SkunkError::new(error.to_string())
     }
 }
 
@@ -67,14 +67,14 @@ impl From<ConductorError> for HolochainError {
 pub mod tests {
 
     use crate::error::ConductorError;
-    use holochain_core_types::error::HolochainError;
+    use holochain_core_types::error::SkunkError;
 
     #[test]
-    /// show From<HolochainError> for ConductorError
+    /// show From<SkunkError> for ConductorError
     fn holochain_instance_error_from_holochain_error_test() {
         assert_eq!(
-            ConductorError::InternalFailure(HolochainError::DnaMissing),
-            ConductorError::from(HolochainError::DnaMissing),
+            ConductorError::InternalFailure(SkunkError::DnaMissing),
+            ConductorError::from(SkunkError::DnaMissing),
         );
     }
 }

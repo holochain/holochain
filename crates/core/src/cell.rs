@@ -1,5 +1,5 @@
-use lib3h_protocol::protocol::Lib3hToClient;
-use lib3h_protocol::protocol::Lib3hToClientResponse;
+use crate::error::SkunkResult;
+use crate::shims::*;
 use crate::types::ZomeInvocationResult;
 use crate::{
     agent::SourceChain,
@@ -10,10 +10,6 @@ use crate::{
 use async_trait::async_trait;
 use crossbeam_channel::Sender;
 use futures::never::Never;
-use holochain_core_types::{dna::Dna};
-use skunkworx_core_types::{agent::AgentId, error::SkunkResult};
-use holochain_persistence_api::cas::content::Address;
-use lib3h_protocol::{protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol};
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = Address;
@@ -33,7 +29,10 @@ pub trait CellApi: Send + Sync + PartialEq + std::hash::Hash + Eq {
     }
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
-    async fn handle_network_message(&self, msg: Lib3hToClient) -> SkunkResult<Option<Lib3hToClientResponse>>;
+    async fn handle_network_message(
+        &self,
+        msg: Lib3hToClient,
+    ) -> SkunkResult<Option<Lib3hToClientResponse>>;
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -56,7 +55,10 @@ impl CellApi for Cell {
         workflow::invoke_zome(invocation, source_chain, cursor).await
     }
 
-    async fn handle_network_message(&self, msg: Lib3hToClient) -> SkunkResult<Option<Lib3hToClientResponse>> {
+    async fn handle_network_message(
+        &self,
+        msg: Lib3hToClient,
+    ) -> SkunkResult<Option<Lib3hToClientResponse>> {
         workflow::handle_network_message(msg).await
     }
 }
@@ -75,7 +77,6 @@ trait ChainRead {
 trait ChainWrite {
     fn chain_write_cursor(&self) -> CascadingCursor;
 }
-
 
 /// Simplification of holochain_net::connection::NetSend
 /// Could use the trait instead, but we will want an impl of it

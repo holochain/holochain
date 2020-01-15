@@ -3,7 +3,7 @@
 //! ```
 //! use std::thread;
 //!
-//! let (req, res) = skunkworx_core_types::rpc::RpcRequest::new("hello".into());
+//! let (req, res) = skunkworx_core::rpc::RpcRequest::new("hello".into());
 //! self.network_send(req).unwrap();
 //! let response = res.await;
 //!

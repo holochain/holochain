@@ -1,8 +1,7 @@
 [workspace]
 
 members = [
-  "crates/core",
-  "crates/core_types",
   "crates/conductor_lib",
+  "crates/core",
   "crates/holochain",
 ]
