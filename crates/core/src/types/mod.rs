@@ -1,5 +1,8 @@
 use crate::shims::*;
 
+pub mod cursor;
+pub mod net;
+
 pub struct ZomeInvocation {
     pub zome_name: String,
     pub cap: CapabilityRequest,

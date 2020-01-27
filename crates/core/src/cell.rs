@@ -1,9 +1,12 @@
+use crate::types::cursor::CursorR;
+use crate::types::cursor::CursorRw;
+use crate::types::cursor::CasCursorX;
 use crate::error::SkunkResult;
 use crate::shims::*;
 use crate::types::ZomeInvocationResult;
 use crate::{
     agent::SourceChain,
-    shims::{get_cascading_cursor, initialize_source_chain, CascadingCursor},
+    shims::*,
     types::{Signal, ZomeInvocation},
     workflow,
 };
@@ -51,7 +54,7 @@ impl CellApi for Cell {
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
         let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
-        let cursor = CascadingCursor;
+        let cursor = CasCursorX;
         workflow::invoke_zome(invocation, source_chain, cursor).await
     }
 
@@ -71,11 +74,11 @@ trait NetSend {
 }
 
 trait ChainRead {
-    fn chain_read_cursor(&self) -> CascadingCursor;
+    fn chain_read_cursor<C: CursorR>(&self) -> C;
 }
 
 trait ChainWrite {
-    fn chain_write_cursor(&self) -> CascadingCursor;
+    fn chain_write_cursor<C: CursorRw>(&self) -> C;
 }
 
 /// Simplification of holochain_net::connection::NetSend

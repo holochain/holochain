@@ -3,7 +3,6 @@ use crate::conductor::Conductor;
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use skunkworx_core::cell::Cell;
 use skunkworx_core::cell::CellApi;
 use skunkworx_core::shims::*;
 use skunkworx_core::types::ZomeInvocation;

@@ -1,12 +1,10 @@
 
 use skunkworx_core::cell::NetSender;
 use skunkworx_core::shims::*;
-use skunkworx_core::types::ZomeInvocationResult;
 use skunkworx_core::{
-    cell::{CellApi, CellId},
-    types::ZomeInvocation,
+    cell::{CellApi},
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)

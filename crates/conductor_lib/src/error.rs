@@ -62,19 +62,3 @@ impl From<ConductorError> for SkunkError {
         SkunkError::new(error.to_string())
     }
 }
-
-#[cfg(test)]
-pub mod tests {
-
-    use crate::error::ConductorError;
-    use super::*;
-
-    #[test]
-    /// show From<SkunkError> for ConductorError
-    fn holochain_instance_error_from_holochain_error_test() {
-        assert_eq!(
-            ConductorError::InternalFailure(SkunkError::DnaMissing),
-            ConductorError::from(SkunkError::DnaMissing),
-        );
-    }
-}

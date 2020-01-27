@@ -1,3 +1,4 @@
+use crate::types::cursor::CursorRw;
 use crate::{cell::Cell, shims::*};
 use crate::error::SkunkResult;
 
@@ -48,7 +49,7 @@ impl SourceChain {
     }
 
     /// Use the SCHH to attempt to write a bundle of changes
-    pub fn try_commit(&self, cursor: CascadingCursor) -> SkunkResult<()> {
+    pub fn try_commit<C: CursorRw>(&self, cursor: C) -> SkunkResult<()> {
         unimplemented!()
     }
 }
