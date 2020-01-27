@@ -1,8 +1,8 @@
 use crate::error::SkunkResult;
 use sx_types::shims::*;
-use crate::types::cursor::CasCursorX;
+use crate::cursor::CasCursorX;
 use crate::types::ZomeInvocationResult;
-use crate::{agent::SourceChain, types::ZomeInvocation};
+use crate::{agent::SourceChain, types::ZomeInvocation, ribosome::Ribosome};
 
 pub async fn invoke_zome(
     invocation: ZomeInvocation,
