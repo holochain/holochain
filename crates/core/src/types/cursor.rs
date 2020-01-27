@@ -1,4 +1,4 @@
-use crate::shims::*;
+use sx_types::shims::*;
 
 pub trait CursorR {
     fn contains(&self, address: &Address) -> PersistenceResult<bool>;

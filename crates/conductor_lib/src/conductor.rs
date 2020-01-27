@@ -1,7 +1,7 @@
 
-use skunkworx_core::cell::NetSender;
-use skunkworx_core::shims::*;
-use skunkworx_core::{
+use sx_core::cell::NetSender;
+use sx_core::shims::*;
+use sx_core::{
     cell::{CellApi},
 };
 use std::collections::{HashMap};

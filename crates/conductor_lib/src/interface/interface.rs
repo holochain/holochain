@@ -1,5 +1,5 @@
 use crate::api::ConductorApiExternal;
-use skunkworx_core::cell::CellApi;
+use sx_core::cell::CellApi;
 use async_trait::async_trait;
 
 #[async_trait]

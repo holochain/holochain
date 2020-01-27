@@ -1,5 +1,5 @@
 use crate::conductor::CellHandle;
-use skunkworx_core::error::SkunkError;
+use sx_core::error::SkunkError;
 use std::{error::Error, fmt};
 
 pub type ConductorResult<T> = Result<T, ConductorError>;

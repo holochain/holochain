@@ -1,5 +1,5 @@
 use crate::types::cursor::CasCursorX;
-use crate::shims::*;
+use sx_types::shims::*;
 
 pub async fn run_validation(dna: Dna, cursor: CasCursorX, entry: Entry) -> ValidationResult {
     let ribosome = Ribosome::new(dna);

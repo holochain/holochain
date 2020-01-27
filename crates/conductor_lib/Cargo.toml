@@ -1,5 +1,5 @@
 [package]
-name = "skunkworx_conductor_lib"
+name = "sx_conductor_lib"
 version = "0.0.1"
 description = "holochain core"
 license = "GPL-3.0-only"
@@ -10,6 +10,6 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.22"
-skunkworx_core = { path = "../core"}
+sx_core = { path = "../core"}
 futures = "0.3.1"
 parking_lot = "0.10.0"

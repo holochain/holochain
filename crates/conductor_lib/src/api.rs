@@ -3,11 +3,11 @@ use crate::conductor::Conductor;
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use skunkworx_core::cell::CellApi;
-use skunkworx_core::shims::*;
-use skunkworx_core::types::ZomeInvocation;
-use skunkworx_core::types::ZomeInvocationResult;
-use skunkworx_core::error::SkunkResult;
+use sx_core::cell::CellApi;
+use sx_core::shims::*;
+use sx_core::types::ZomeInvocation;
+use sx_core::types::ZomeInvocationResult;
+use sx_core::error::SkunkResult;
 use std::sync::Arc;
 
 #[derive(Clone)]

@@ -1,5 +1,5 @@
 use crate::error::SkunkResult;
-use crate::shims::*;
+use sx_types::shims::*;
 use crate::types::cursor::CasCursorX;
 use crate::types::ZomeInvocationResult;
 use crate::{agent::SourceChain, types::ZomeInvocation};

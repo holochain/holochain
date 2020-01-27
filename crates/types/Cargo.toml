@@ -1,15 +1,15 @@
 [package]
-name = "sx_core"
+name = "sx_types"
 version = "0.0.1"
-description = "holochain core skunkworx"
+description = "holochain skunkworx common types"
 license = "GPL-3.0-only"
 homepage = "https://github.com/holochain/holochain-rust"
 documentation = "https://github.com/holochain/holochain-rust"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
-async-trait = "0.1.22"
-crossbeam-channel = "0.4.0"
-futures = "0.3.1"
-sx_types = { path = "../types" }
+serde = "1.0.104"
+serde_derive = "1.0.104"

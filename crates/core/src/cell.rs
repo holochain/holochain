@@ -2,7 +2,7 @@ use crate::types::cursor::CursorR;
 use crate::types::cursor::CursorRw;
 use crate::types::cursor::CasCursorX;
 use crate::error::SkunkResult;
-use crate::shims::*;
+use sx_types::shims::*;
 use crate::types::ZomeInvocationResult;
 use crate::{
     agent::SourceChain,
