@@ -1,8 +1,5 @@
 use holochain_json_api::{error::JsonError, json::JsonString};
 use holochain_persistence_api::cas::content::Address;
-
-use crate::{agent::AgentId, chain_header::ChainHeader, entry::Entry, link::link_data::LinkData};
-use holochain_persistence_api::cas::content::AddressableContent;
 use regex::Regex;
 
 type LinkType = String;
@@ -42,21 +39,6 @@ impl Link {
     pub fn tag(&self) -> &LinkTag {
         &self.tag
     }
-
-    pub fn add_entry(&self, top_chain_header: ChainHeader, agent_id: AgentId) -> Entry {
-        Entry::LinkAdd(LinkData::add_from_link(self, top_chain_header, agent_id))
-    }
-
-    pub fn remove_entry(&self, top_chain_header: ChainHeader, agent_id: AgentId) -> Entry {
-        Entry::LinkAdd(LinkData::remove_from_link(self, top_chain_header, agent_id))
-    }
-}
-
-// HC.LinkAction sync with hdk-rust
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum LinkActionKind {
-    ADD,
-    REMOVE,
 }
 
 pub enum LinkMatch<S: Into<String>> {
@@ -86,6 +68,7 @@ pub mod tests {
 
     use super::*;
     use crate::entry::tests::*;
+    use crate::*;
 
     pub fn example_link() -> Link {
         Link::new(
@@ -102,9 +85,5 @@ pub mod tests {
 
     pub fn example_link_tag() -> LinkTag {
         LinkTag::from("foo-link-tag")
-    }
-
-    pub fn example_link_action_kind() -> LinkActionKind {
-        LinkActionKind::ADD
     }
 }

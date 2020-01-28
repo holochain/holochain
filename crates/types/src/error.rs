@@ -1,6 +1,7 @@
 //! Just enough to get us rolling for now.
 //! Definitely not even close to the intended final struct for Errors.
 
+use holochain_json_api::error::JsonError;
 use serde_json::Error as SerdeError;
 use std::fmt;
 
@@ -37,6 +38,12 @@ impl From<hcid::HcidError> for SkunkError {
 
 impl From<SerdeError> for SkunkError {
     fn from(error: SerdeError) -> Self {
+        SkunkError::new(error.to_string())
+    }
+}
+
+impl From<JsonError> for SkunkError {
+    fn from(error: JsonError) -> Self {
         SkunkError::new(error.to_string())
     }
 }

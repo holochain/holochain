@@ -1,6 +1,6 @@
 use sx_types::agent::AgentId;
 use sx_types::shims::*;
-use sx_types::*;
+use sx_types::prelude::*;
 
 pub mod net;
 

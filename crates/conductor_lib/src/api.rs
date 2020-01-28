@@ -9,7 +9,7 @@ use sx_core::types::ZomeInvocation;
 use sx_core::types::ZomeInvocationResult;
 use sx_types::error::SkunkResult;
 use sx_types::shims::*;
-use sx_types::JsonString;
+use sx_types::prelude::*;
 
 #[derive(Clone)]
 pub struct ConductorHandle<Cell: CellApi> {

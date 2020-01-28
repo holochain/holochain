@@ -1,4 +1,4 @@
-use sx_types::*;
+use sx_types::prelude::*;
 use sx_types::agent::AgentId;
 use crate::cursor::CasCursorX;
 use crate::cursor::CursorR;
