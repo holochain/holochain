@@ -1,15 +1,12 @@
-use crate::{entry::Entry, error::HcResult};
-
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
-
+use crate::entry::Entry;
+use crate::error::SkunkResult;
+use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-
+use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use std::{convert::TryFrom, str};
-
-use hcid::*;
 
 pub type Base32 = String;
 
@@ -40,7 +37,7 @@ impl AgentId {
     }
 
     /// initialize an Agent struct with `nick` and `key` that will be encoded with HCID.
-    pub fn new_with_raw_key(nick: &str, key: &str) -> HcResult<Self> {
+    pub fn new_with_raw_key(nick: &str, key: &str) -> SkunkResult<Self> {
         let codec = HcidEncoding::with_kind("hcs0")?;
         let key_b32 = codec.encode(key.as_bytes())?;
         Ok(AgentId::new(nick, key_b32))
@@ -55,7 +52,7 @@ impl AgentId {
     }
 
     /// Get the key decoded with HCID
-    pub fn decoded_key(&self) -> HcResult<String> {
+    pub fn decoded_key(&self) -> SkunkResult<String> {
         let codec = HcidEncoding::with_kind("hcs0")?;
         let key_b32 = codec.decode(&self.pub_sign_key)?;
         Ok(str::from_utf8(&key_b32).unwrap().to_owned())

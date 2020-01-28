@@ -11,5 +11,12 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1.22"
 crossbeam-channel = "0.4.0"
+hcid = "=0.0.6"
 futures = "0.3.1"
 sx_types = { path = "../types" }
+serde = "=1.0.89"
+serde_json = "=1.0.39"
+serde_derive = "=1.0.89"
+holochain_persistence_api = { git = "https://github.com/holochain/holochain-persistence.git", branch = "upgrade-to-real-futures" }
+holochain_json_api = { git = "https://github.com/holochain/holochain-serialization.git", branch = "upgrade-to-real-futures" }
+holochain_json_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "upgrade-to-real-futures" }

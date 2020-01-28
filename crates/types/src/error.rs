@@ -27,3 +27,10 @@ impl SkunkError {
 }
 
 pub type SkunkResult<T> = Result<T, SkunkError>;
+
+
+impl From<hcid::HcidError> for SkunkError {
+    fn from(error: hcid::HcidError) -> Self {
+        SkunkError::new(format!("{:?}", error))
+    }
+}

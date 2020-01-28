@@ -3,6 +3,12 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
+use holochain_persistence_api::cas::content::Content;
+use crate::shims::Dna;
+use holochain_persistence_api::cas::content::Address;
+use crate::agent::AgentId;
+use holochain_json_api::error::JsonResult;
+use holochain_persistence_api::cas::content::AddressableContent;
 use crate::entry::entry_type::AppEntryType;
 use crate::entry::entry_type::EntryType;
 use crate::link::link_data::LinkData;
@@ -10,7 +16,7 @@ use crate::entry::{
     cap_entries::{CapTokenClaim, CapTokenGrant},
     deletion_entry::DeletionEntry,
 };
-use crate::shims::*;
+// use crate::shims::*;
 use holochain_json_api::{error::JsonError, json::JsonString};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
@@ -61,8 +67,8 @@ pub enum Entry {
     Deletion(DeletionEntry),
     LinkAdd(LinkData),
     LinkRemove((LinkData, Vec<Address>)),
-    ChainHeader(ChainHeader),
-    ChainMigrate(ChainMigrate),
+    // ChainHeader(ChainHeader),
+    // ChainMigrate(ChainMigrate),
     CapTokenClaim(CapTokenClaim),
     CapTokenGrant(CapTokenGrant),
 }
@@ -76,9 +82,9 @@ impl Entry {
             Entry::Deletion(_) => EntryType::Deletion,
             Entry::LinkAdd(_) => EntryType::LinkAdd,
             Entry::LinkRemove(_) => EntryType::LinkRemove,
-            Entry::LinkList(_) => EntryType::LinkList,
-            Entry::ChainHeader(_) => EntryType::ChainHeader,
-            Entry::ChainMigrate(_) => EntryType::ChainMigrate,
+            // Entry::LinkList(_) => EntryType::LinkList,
+            // Entry::ChainHeader(_) => EntryType::ChainHeader,
+            // Entry::ChainMigrate(_) => EntryType::ChainMigrate,
             Entry::CapTokenClaim(_) => EntryType::CapTokenClaim,
             Entry::CapTokenGrant(_) => EntryType::CapTokenGrant,
         }
@@ -95,35 +101,21 @@ impl AddressableContent for Entry {
     fn address(&self) -> Address {
         match &self {
             Entry::AgentId(agent_id) => agent_id.address(),
-            Entry::ChainHeader(chain_header) => chain_header.address(),
             _ => Address::encode_from_str(&String::from(self.content()), Hash::SHA2256),
         }
     }
 
+
     fn content(&self) -> Content {
         match &self {
-            Entry::ChainHeader(chain_header) => chain_header.into(),
+            // Entry::ChainHeader(chain_header) => chain_header.into(),
             _ => self.into(),
         }
     }
 
     fn try_from_content(content: &Content) -> JsonResult<Entry> {
         Entry::try_from(content.to_owned())
-            .or_else(|_| ChainHeader::try_from(content).map(Entry::ChainHeader))
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, DefaultJson)]
-pub struct EntryWithMeta {
-    pub entry: Entry,
-    pub crud_status: CrudStatus,
-    pub maybe_link_update_delete: Option<Address>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, DefaultJson)]
-pub struct EntryWithMetaAndHeader {
-    pub entry_with_meta: EntryWithMeta,
-    pub headers: Vec<ChainHeader>,
 }
 
 /// dummy entry value
@@ -217,102 +209,102 @@ pub fn test_unpublishable_entry() -> Entry {
     Entry::Dna(Box::new(Dna::new()))
 }
 
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use crate::entry::{expected_entry_address, Entry};
-    use holochain_persistence_api::cas::{
-        content::{AddressableContent, AddressableContentTestSuite},
-        storage::{test_content_addressable_storage, ExampleContentAddressableStorage},
-    };
+// #[cfg(test)]
+// pub mod tests {
+//     use super::*;
+//     use crate::entry::{expected_entry_address, Entry};
+//     use holochain_persistence_api::cas::{
+//         content::{AddressableContent, AddressableContentTestSuite},
+//         storage::{test_content_addressable_storage, ExampleContentAddressableStorage},
+//     };
 
-    #[test]
-    /// tests for PartialEq
-    fn eq() {
-        let entry_a = test_entry_a();
-        let entry_b = test_entry_b();
+//     #[test]
+//     /// tests for PartialEq
+//     fn eq() {
+//         let entry_a = test_entry_a();
+//         let entry_b = test_entry_b();
 
-        // same content is equal
-        assert_eq!(entry_a, entry_a);
+//         // same content is equal
+//         assert_eq!(entry_a, entry_a);
 
-        // different content is not equal
-        assert_ne!(entry_a, entry_b);
-    }
+//         // different content is not equal
+//         assert_ne!(entry_a, entry_b);
+//     }
 
-    #[test]
-    /// test entry.address() against a known value
-    fn known_address() {
-        assert_eq!(expected_entry_address(), test_entry().address());
-    }
+//     #[test]
+//     /// test entry.address() against a known value
+//     fn known_address() {
+//         assert_eq!(expected_entry_address(), test_entry().address());
+//     }
 
-    #[test]
-    /// show From<Entry> for JsonString
-    fn json_string_from_entry_test() {
-        assert_eq!(
-            test_entry().content(),
-            JsonString::from(Entry::from(test_entry()))
-        );
-    }
+//     #[test]
+//     /// show From<Entry> for JsonString
+//     fn json_string_from_entry_test() {
+//         assert_eq!(
+//             test_entry().content(),
+//             JsonString::from(Entry::from(test_entry()))
+//         );
+//     }
 
-    #[test]
-    /// show From<Content> for Entry
-    fn entry_from_content_test() {
-        assert_eq!(
-            test_entry(),
-            Entry::try_from(test_entry().content()).unwrap()
-        );
-    }
+//     #[test]
+//     /// show From<Content> for Entry
+//     fn entry_from_content_test() {
+//         assert_eq!(
+//             test_entry(),
+//             Entry::try_from(test_entry().content()).unwrap()
+//         );
+//     }
 
-    #[test]
-    /// tests for entry.content()
-    fn content_test() {
-        let content = test_entry_content();
-        let entry = Entry::try_from_content(&content).unwrap();
+//     #[test]
+//     /// tests for entry.content()
+//     fn content_test() {
+//         let content = test_entry_content();
+//         let entry = Entry::try_from_content(&content).unwrap();
 
-        assert_eq!(content, entry.content());
-    }
+//         assert_eq!(content, entry.content());
+//     }
 
-    #[test]
-    /// test that we can round trip through JSON
-    fn json_round_trip() {
-        let entry = test_entry();
-        let expected = expected_serialized_entry_content();
-        assert_eq!(expected, JsonString::from(Entry::from(entry.clone())));
-        assert_eq!(entry, Entry::try_from(expected.clone()).unwrap());
-        assert_eq!(entry, Entry::from(entry.clone()));
+//     #[test]
+//     /// test that we can round trip through JSON
+//     fn json_round_trip() {
+//         let entry = test_entry();
+//         let expected = expected_serialized_entry_content();
+//         assert_eq!(expected, JsonString::from(Entry::from(entry.clone())));
+//         assert_eq!(entry, Entry::try_from(expected.clone()).unwrap());
+//         assert_eq!(entry, Entry::from(entry.clone()));
 
-        let sys_entry = test_sys_entry();
-        let expected = JsonString::from_json(&format!(
-            "{{\"AgentId\":{{\"nick\":\"{}\",\"pub_sign_key\":\"{}\"}}}}",
-            "bob",
-            crate::agent::GOOD_ID,
-        ));
-        assert_eq!(expected, JsonString::from(Entry::from(sys_entry.clone())));
-        assert_eq!(
-            &sys_entry,
-            &Entry::from(Entry::try_from(expected.clone()).unwrap())
-        );
-        assert_eq!(&sys_entry, &Entry::from(Entry::from(sys_entry.clone())),);
-    }
+//         let sys_entry = test_sys_entry();
+//         let expected = JsonString::from_json(&format!(
+//             "{{\"AgentId\":{{\"nick\":\"{}\",\"pub_sign_key\":\"{}\"}}}}",
+//             "bob",
+//             crate::agent::GOOD_ID,
+//         ));
+//         assert_eq!(expected, JsonString::from(Entry::from(sys_entry.clone())));
+//         assert_eq!(
+//             &sys_entry,
+//             &Entry::from(Entry::try_from(expected.clone()).unwrap())
+//         );
+//         assert_eq!(&sys_entry, &Entry::from(Entry::from(sys_entry.clone())),);
+//     }
 
-    #[test]
-    /// show AddressableContent implementation
-    fn addressable_content_test() {
-        // from_content()
-        AddressableContentTestSuite::addressable_content_trait_test::<Entry>(
-            test_entry_content(),
-            test_entry(),
-            expected_entry_address(),
-        );
-    }
+//     #[test]
+//     /// show AddressableContent implementation
+//     fn addressable_content_test() {
+//         // from_content()
+//         AddressableContentTestSuite::addressable_content_trait_test::<Entry>(
+//             test_entry_content(),
+//             test_entry(),
+//             expected_entry_address(),
+//         );
+//     }
 
-    #[test]
-    /// show CAS round trip
-    fn cas_round_trip_test() {
-        let entries = vec![test_entry()];
-        AddressableContentTestSuite::addressable_content_round_trip::<
-            Entry,
-            ExampleContentAddressableStorage,
-        >(entries, test_content_addressable_storage());
-    }
-}
+//     #[test]
+//     /// show CAS round trip
+//     fn cas_round_trip_test() {
+//         let entries = vec![test_entry()];
+//         AddressableContentTestSuite::addressable_content_round_trip::<
+//             Entry,
+//             ExampleContentAddressableStorage,
+//         >(entries, test_content_addressable_storage());
+//     }
+// }

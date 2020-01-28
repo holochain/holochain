@@ -1,3 +1,7 @@
+#[macro_use]
+extern crate holochain_json_derive;
+#[macro_use]
+extern crate serde_derive;
 
 mod workflow;
 
