@@ -1,6 +1,6 @@
-use holochain_persistence_api::cas::content::Address;
 use crate::cell::Cell;
 use crate::cursor::CursorRw;
+use holochain_persistence_api::cas::content::Address;
 use sx_types::error::SkunkResult;
 use sx_types::shims::*;
 

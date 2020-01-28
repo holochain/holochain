@@ -1,4 +1,3 @@
-
 mod interface;
 
 pub mod puppet;

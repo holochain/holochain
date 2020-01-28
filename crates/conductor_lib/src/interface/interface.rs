@@ -1,6 +1,6 @@
 use crate::api::ConductorApiExternal;
-use sx_core::cell::CellApi;
 use async_trait::async_trait;
+use sx_core::cell::CellApi;
 
 #[async_trait]
 pub trait Interface<Cell: CellApi, Api: ConductorApiExternal<Cell>> {

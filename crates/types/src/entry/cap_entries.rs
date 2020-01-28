@@ -1,5 +1,5 @@
+use crate::entry::Entry;
 use crate::error::SkunkError;
-use crate::{entry::Entry};
 
 use holochain_persistence_api::cas::content::{Address, AddressableContent};
 

@@ -1,4 +1,3 @@
-
 /// Represents an opaque vector of bytes. Lib3h will
 /// store or transfer this data but will never inspect
 /// or interpret its contents

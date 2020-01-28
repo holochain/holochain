@@ -3,7 +3,6 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::link::Link;
 use crate::agent::AgentId;
 use crate::entry::entry_type::AppEntryType;
 use crate::entry::entry_type::EntryType;
@@ -11,6 +10,7 @@ use crate::entry::{
     cap_entries::{CapTokenClaim, CapTokenGrant},
     deletion_entry::DeletionEntry,
 };
+use crate::link::Link;
 use crate::shims::Dna;
 use holochain_json_api::error::JsonResult;
 use holochain_persistence_api::cas::content::Address;

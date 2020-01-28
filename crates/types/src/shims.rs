@@ -1,4 +1,4 @@
-use holochain_json_api::{json::JsonString, error::JsonError};
+use holochain_json_api::{error::JsonError, json::JsonString};
 
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct AgentPubKey;
@@ -34,4 +34,3 @@ pub enum ValidationResult {
     Invalid,
     Pending,
 }
-

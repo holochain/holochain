@@ -1,5 +1,3 @@
-
-
 use sx_types::prelude::*;
 
 trait NetRequester {
