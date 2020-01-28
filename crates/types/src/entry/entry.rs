@@ -3,22 +3,15 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use self::{
+use crate::entry::entry_type::AppEntryType;
+use crate::entry::entry_type::EntryType;
+use crate::link::link_data::LinkData;
+use crate::entry::{
     cap_entries::{CapTokenClaim, CapTokenGrant},
     deletion_entry::DeletionEntry,
 };
-use agent::{test_agent_id, AgentId};
-use chain_header::ChainHeader;
-use chain_migrate::ChainMigrate;
-use crud_status::CrudStatus;
-use dna::Dna;
-use entry::entry_type::{test_app_entry_type, test_app_entry_type_b, AppEntryType, EntryType};
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::{JsonString, RawString},
-};
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
-use link::{link_data::LinkData, link_list::LinkList};
+use crate::shims::*;
+use holochain_json_api::{error::JsonError, json::JsonString};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
 use snowflake;
@@ -68,7 +61,6 @@ pub enum Entry {
     Deletion(DeletionEntry),
     LinkAdd(LinkData),
     LinkRemove((LinkData, Vec<Address>)),
-    LinkList(LinkList),
     ChainHeader(ChainHeader),
     ChainMigrate(ChainMigrate),
     CapTokenClaim(CapTokenClaim),

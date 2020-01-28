@@ -1,4 +1,5 @@
-use crate::{entry::Entry, error::HolochainError};
+use crate::error::SkunkError;
+use crate::{entry::Entry};
 
 use holochain_persistence_api::cas::content::{Address, AddressableContent};
 
@@ -107,7 +108,7 @@ impl CapTokenGrant {
         cap_type: CapabilityType,
         assignees: Option<Vec<Address>>,
         functions: CapFunctions,
-    ) -> Result<Self, HolochainError> {
+    ) -> Result<Self, SkunkError> {
         let assignees = CapTokenGrant::valid(cap_type, assignees)?;
         Ok(CapTokenGrant::new(id, assignees, functions))
     }
@@ -116,18 +117,18 @@ impl CapTokenGrant {
     fn valid(
         cap_type: CapabilityType,
         assignees: Option<Vec<Address>>,
-    ) -> Result<Option<Vec<Address>>, HolochainError> {
+    ) -> Result<Option<Vec<Address>>, SkunkError> {
         if (cap_type == CapabilityType::Public || cap_type == CapabilityType::Transferable)
             && (assignees.is_some() && !assignees.clone().unwrap().is_empty())
         {
-            return Err(HolochainError::new(
+            return Err(SkunkError::new(
                 "there must be no assignees for public or transferable grants",
             ));
         }
         match cap_type {
             CapabilityType::Assigned => {
                 if assignees.is_none() || assignees.clone().unwrap().is_empty() {
-                    return Err(HolochainError::new(
+                    return Err(SkunkError::new(
                         "Assigned grant must have 1 or more assignees",
                     ));
                 }

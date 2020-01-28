@@ -1,17 +1,24 @@
 
 pub type Address = String;
-pub trait AddressableContent {}
-#[derive(Clone, PartialEq, Hash, Eq)]
-pub struct AgentId;
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct AgentPubKey;
-pub struct CapToken;
-pub struct CapabilityRequest;
-pub struct DhtTransform;
-pub struct Dna;
-pub struct Entry;
-pub type JsonString = String;
 pub type Content = JsonString;
+pub type JsonString = String;
+
+pub trait AddressableContent {}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgentId;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgentPubKey;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CapToken;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CapabilityRequest;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DhtTransform;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Dna;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Entry;
 
 pub struct Lib3hToClient;
 pub struct Lib3hToClientResponse;

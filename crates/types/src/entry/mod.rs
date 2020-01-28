@@ -1,5 +1,7 @@
 
-mod cap_entries;
-mod deletion_entry;
-mod entry_type;
+pub(crate) mod cap_entries;
+pub(crate) mod deletion_entry;
+pub(crate) mod entry_type;
 mod entry;
+
+pub use entry::*;
