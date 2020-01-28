@@ -4,8 +4,8 @@ extern crate serde_derive;
 mod opaque;
 
 use async_trait::async_trait;
-use sx_types::shims::*;
 use opaque::Opaque;
+use sx_types::shims::*;
 
 type SpaceHash = String;
 type EntryHash = String;
@@ -29,8 +29,6 @@ trait ClientHandlerProtocol {
     fn handle_get_authoring_list();
     fn handle_get_gossiping_list();
 }
-
-
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct QueryEntryRequest {

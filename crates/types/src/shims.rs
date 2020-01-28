@@ -1,4 +1,3 @@
-
 pub type Address = String;
 pub trait AddressableContent {}
 #[derive(Clone, PartialEq, Hash, Eq)]

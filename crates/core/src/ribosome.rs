@@ -1,6 +1,6 @@
 use crate::agent::SourceChain;
-use crate::error::SkunkResult;
 use crate::cursor::{CursorR, CursorRw};
+use crate::error::SkunkResult;
 use crate::types::ZomeInvocation;
 use crate::types::ZomeInvocationResult;
 use sx_types::shims::*;

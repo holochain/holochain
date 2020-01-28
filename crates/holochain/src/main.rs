@@ -4,13 +4,13 @@ use futures::executor::ThreadPool;
 use futures::prelude::*;
 use futures::task::SpawnExt;
 use parking_lot::RwLock;
+use std::sync::Arc;
 use sx_conductor_lib::api::{self, ConductorApiExternal, ConductorHandle};
 use sx_conductor_lib::interface::puppet::PuppetInterface;
 use sx_conductor_lib::interface::Interface;
 use sx_conductor_lib::{conductor::Conductor, config::Config};
 use sx_core::cell::Cell;
 use sx_core::cell::CellApi;
-use std::sync::Arc;
 
 fn main() {
     println!("Running silly PuppetInterface example");

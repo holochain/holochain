@@ -1,6 +1,6 @@
 use crate::cell::Cell;
-use crate::error::SkunkResult;
 use crate::cursor::CursorRw;
+use crate::error::SkunkResult;
 use sx_types::shims::*;
 
 /// Representation of a Cell's source chain.
