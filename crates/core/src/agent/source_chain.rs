@@ -1,6 +1,7 @@
-use crate::types::cursor::CursorRw;
-use crate::{cell::Cell, shims::*};
+use crate::cell::Cell;
 use crate::error::SkunkResult;
+use crate::cursor::CursorRw;
+use sx_types::shims::*;
 
 /// Representation of a Cell's source chain.
 /// TODO: work out the details of what's needed for as_at

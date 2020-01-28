@@ -1,18 +1,11 @@
-use crate::types::cursor::CursorR;
-use crate::types::cursor::CursorRw;
-use crate::types::cursor::CasCursorX;
 use crate::error::SkunkResult;
-use sx_types::shims::*;
+use crate::cursor::CasCursorX;
+use crate::cursor::CursorR;
+use crate::cursor::CursorRw;
 use crate::types::ZomeInvocationResult;
-use crate::{
-    agent::SourceChain,
-    shims::*,
-    types::{Signal, ZomeInvocation},
-    workflow,
-};
+use crate::{agent::SourceChain, types::ZomeInvocation, workflow};
 use async_trait::async_trait;
-use crossbeam_channel::Sender;
-use futures::never::Never;
+use sx_types::shims::*;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = Address;

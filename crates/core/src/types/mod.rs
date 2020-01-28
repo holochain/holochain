@@ -1,8 +1,6 @@
 use sx_types::shims::*;
 
-pub mod cursor;
 pub mod net;
-pub mod ribosome;
 
 pub struct ZomeInvocation {
     pub zome_name: String,

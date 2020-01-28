@@ -1,6 +1,6 @@
 
 use sx_core::cell::NetSender;
-use sx_core::shims::*;
+use sx_types::shims::*;
 use sx_core::{
     cell::{CellApi},
 };
