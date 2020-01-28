@@ -3,13 +3,13 @@ use crate::conductor::Conductor;
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use skunkworx_core::cell::Cell;
-use skunkworx_core::cell::CellApi;
-use skunkworx_core::shims::*;
-use skunkworx_core::types::ZomeInvocation;
-use skunkworx_core::types::ZomeInvocationResult;
-use skunkworx_core::error::SkunkResult;
 use std::sync::Arc;
+use sx_core::cell::CellApi;
+use sx_core::types::ZomeInvocation;
+use sx_core::types::ZomeInvocationResult;
+use sx_types::error::SkunkResult;
+use sx_types::prelude::*;
+use sx_types::shims::*;
 
 #[derive(Clone)]
 pub struct ConductorHandle<Cell: CellApi> {

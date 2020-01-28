@@ -1,6 +1,6 @@
 use crate::conductor::CellHandle;
-use skunkworx_core::error::SkunkError;
 use std::{error::Error, fmt};
+use sx_types::error::SkunkError;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -60,21 +60,5 @@ impl From<SkunkError> for ConductorError {
 impl From<ConductorError> for SkunkError {
     fn from(error: ConductorError) -> Self {
         SkunkError::new(error.to_string())
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-
-    use crate::error::ConductorError;
-    use super::*;
-
-    #[test]
-    /// show From<SkunkError> for ConductorError
-    fn holochain_instance_error_from_holochain_error_test() {
-        assert_eq!(
-            ConductorError::InternalFailure(SkunkError::DnaMissing),
-            ConductorError::from(SkunkError::DnaMissing),
-        );
     }
 }

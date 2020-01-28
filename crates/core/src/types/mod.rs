@@ -1,4 +1,8 @@
-use crate::shims::*;
+use sx_types::agent::AgentId;
+use sx_types::prelude::*;
+use sx_types::shims::*;
+
+pub mod net;
 
 pub struct ZomeInvocation {
     pub zome_name: String,

@@ -1,16 +1,20 @@
 [package]
-name = "sx_conductor_lib"
+name = "sx_lib3h_protocol"
 version = "0.0.1"
-description = "holochain core"
+description = "holochain skunkworx lib3h protocol"
 license = "GPL-3.0-only"
 homepage = "https://github.com/holochain/holochain-rust"
 documentation = "https://github.com/holochain/holochain-rust"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
 async-trait = "0.1.22"
-sx_core = { path = "../core"}
+base64 = "=0.10.1"
 sx_types = { path = "../types"}
-futures = "0.3.1"
-parking_lot = "0.10.0"
+rmp-serde = "=0.13.7"
+serde = "=1.0.89"
+serde_derive = "=1.0.89"
+url = { version = "=2.1.0", features = ["serde"] }

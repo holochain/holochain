@@ -1,15 +1,13 @@
-use crate::error::SkunkResult;
-use crate::shims::*;
+use crate::cursor::CasCursorX;
+use crate::cursor::CursorR;
+use crate::cursor::CursorRw;
 use crate::types::ZomeInvocationResult;
-use crate::{
-    agent::SourceChain,
-    shims::{get_cascading_cursor, initialize_source_chain, CascadingCursor},
-    types::{Signal, ZomeInvocation},
-    workflow,
-};
+use crate::{agent::SourceChain, types::ZomeInvocation, workflow};
 use async_trait::async_trait;
-use crossbeam_channel::Sender;
-use futures::never::Never;
+use sx_types::agent::AgentId;
+use sx_types::error::SkunkResult;
+use sx_types::prelude::*;
+use sx_types::shims::*;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = Address;
@@ -51,7 +49,7 @@ impl CellApi for Cell {
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
         let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
-        let cursor = CascadingCursor;
+        let cursor = CasCursorX;
         workflow::invoke_zome(invocation, source_chain, cursor).await
     }
 
@@ -71,11 +69,11 @@ trait NetSend {
 }
 
 trait ChainRead {
-    fn chain_read_cursor(&self) -> CascadingCursor;
+    fn chain_read_cursor<C: CursorR>(&self) -> C;
 }
 
 trait ChainWrite {
-    fn chain_write_cursor(&self) -> CascadingCursor;
+    fn chain_write_cursor<C: CursorRw>(&self) -> C;
 }
 
 /// Simplification of holochain_net::connection::NetSend

@@ -3,7 +3,7 @@ use crate::interface::interface::Interface;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
-use skunkworx_core::cell::CellApi;
+use sx_core::cell::CellApi;
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
