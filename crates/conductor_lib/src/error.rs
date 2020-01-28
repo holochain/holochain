@@ -1,6 +1,6 @@
 use crate::conductor::CellHandle;
 use std::{error::Error, fmt};
-use sx_core::error::SkunkError;
+use sx_types::error::SkunkError;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 

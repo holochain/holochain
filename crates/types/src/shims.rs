@@ -1,16 +1,23 @@
-pub type Address = String;
-pub trait AddressableContent {}
-#[derive(Clone, PartialEq, Hash, Eq)]
-pub struct AgentId;
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+use holochain_json_api::{error::JsonError, json::JsonString};
+
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct AgentPubKey;
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct CapToken;
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct CapabilityRequest;
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct DhtTransform;
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct Dna;
+impl Dna {
+    pub fn new() -> Self {
+        unimplemented!()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct Entry;
-pub type JsonString = String;
-pub type Content = JsonString;
 
 pub struct Lib3hToClient;
 pub struct Lib3hToClientResponse;

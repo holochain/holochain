@@ -1,8 +1,8 @@
 use crate::agent::SourceChain;
 use crate::cursor::{CursorR, CursorRw};
-use crate::error::SkunkResult;
 use crate::types::ZomeInvocation;
 use crate::types::ZomeInvocationResult;
+use sx_types::error::SkunkResult;
 use sx_types::shims::*;
 
 /// Total hack just to have something to look at
