@@ -11,3 +11,4 @@ pub mod cursor;
 pub mod ribosome;
 pub mod types;
 pub mod validation;
+pub mod wasm_engine;

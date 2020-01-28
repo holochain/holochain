@@ -20,8 +20,3 @@ serde_derive = "=1.0.89"
 holochain_persistence_api = "=0.0.13"
 holochain_json_api = "=0.0.17"
 holochain_json_derive = "=0.0.17"
-
-[patch.crates-io]
-holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence.git", branch = "upgrade-to-real-futures" }
-holochain_json_api = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "upgrade-to-real-futures" }
-holochain_json_derive = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "upgrade-to-real-futures" }

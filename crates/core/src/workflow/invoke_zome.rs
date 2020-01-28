@@ -11,7 +11,7 @@ pub async fn invoke_zome(
 ) -> SkunkResult<ZomeInvocationResult> {
     let dna = source_chain.get_dna()?;
     let ribosome = Ribosome::new(dna);
-    let (result, cursor) = ribosome.call_zome_function(cursor, invocation, source_chain.clone())?;
+    let (result, cursor) = ribosome.invoke_zome(cursor, invocation, source_chain.clone())?;
     source_chain.try_commit(cursor)?;
     Ok(result)
 }
