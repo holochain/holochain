@@ -4,10 +4,7 @@
 
 use crate::{
     agent::test_agent_id,
-    entry::{
-        entry_type::{test_entry_type, EntryType},
-        test_entry,
-    },
+    entry::entry_type::EntryType,
     signature::{Provenance, Signature},
     time::{test_iso_8601, Iso8601},
 };
@@ -128,42 +125,41 @@ impl AddressableContent for ChainHeader {
     }
 }
 
-/// returns a dummy header for use in tests
-pub fn test_chain_header() -> ChainHeader {
-    test_chain_header_with_sig("sig")
-}
-
-/// returns a dummy header for use in tests
-pub fn test_chain_header_with_sig(sig: &'static str) -> ChainHeader {
-    ChainHeader::new(
-        &test_entry_type(),
-        &test_entry().address(),
-        &test_provenances(sig),
-        &None,
-        &None,
-        &None,
-        &test_iso_8601(),
-    )
-}
-
-pub fn test_provenances(sig: &'static str) -> Vec<Provenance> {
-    vec![Provenance::new(
-        test_agent_id().address(),
-        Signature::from(sig),
-    )]
-}
-
 #[cfg(test)]
 pub mod tests {
+    use super::*;
     use crate::{
-        chain_header::{test_chain_header, test_provenances, ChainHeader},
-        entry::{
-            entry_type::{test_entry_type, test_entry_type_a, test_entry_type_b},
-            test_entry, test_entry_a, test_entry_b,
-        },
+        chain_header::ChainHeader,
+        entry::entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
+        entry::tests::{test_entry, test_entry_a, test_entry_b},
         time::test_iso_8601,
     };
     use holochain_persistence_api::cas::content::{Address, AddressableContent};
+
+    /// returns a dummy header for use in tests
+    pub fn test_chain_header() -> ChainHeader {
+        test_chain_header_with_sig("sig")
+    }
+
+    /// returns a dummy header for use in tests
+    pub fn test_chain_header_with_sig(sig: &'static str) -> ChainHeader {
+        ChainHeader::new(
+            &test_entry_type(),
+            &test_entry().address(),
+            &test_provenances(sig),
+            &None,
+            &None,
+            &None,
+            &test_iso_8601(),
+        )
+    }
+
+    pub fn test_provenances(sig: &'static str) -> Vec<Provenance> {
+        vec![Provenance::new(
+            test_agent_id().address(),
+            Signature::from(sig),
+        )]
+    }
 
     /// returns a dummy header for use in tests
     pub fn test_chain_header_a() -> ChainHeader {

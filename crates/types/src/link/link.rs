@@ -1,15 +1,8 @@
-
 use holochain_json_api::{error::JsonError, json::JsonString};
 use holochain_persistence_api::cas::content::Address;
 
-use crate::{
-    agent::AgentId,
-    chain_header::ChainHeader,
-    entry::{test_entry_a, test_entry_b},
-};
-use entry::Entry;
+use crate::{agent::AgentId, chain_header::ChainHeader, entry::Entry, link::link_data::LinkData};
 use holochain_persistence_api::cas::content::AddressableContent;
-use link::link_data::LinkData;
 use regex::Regex;
 
 type LinkType = String;
@@ -88,23 +81,30 @@ impl<S: Into<String>> LinkMatch<S> {
     }
 }
 
-pub fn example_link() -> Link {
-    Link::new(
-        &test_entry_a().address(),
-        &test_entry_b().address(),
-        &example_link_type(),
-        &example_link_tag(),
-    )
-}
+#[cfg(test)]
+pub mod tests {
 
-pub fn example_link_type() -> LinkType {
-    LinkType::from("foo-link-type")
-}
+    use super::*;
+    use crate::entry::tests::*;
 
-pub fn example_link_tag() -> LinkTag {
-    LinkTag::from("foo-link-tag")
-}
+    pub fn example_link() -> Link {
+        Link::new(
+            &test_entry_a().address(),
+            &test_entry_b().address(),
+            &example_link_type(),
+            &example_link_tag(),
+        )
+    }
 
-pub fn example_link_action_kind() -> LinkActionKind {
-    LinkActionKind::ADD
+    pub fn example_link_type() -> LinkType {
+        LinkType::from("foo-link-type")
+    }
+
+    pub fn example_link_tag() -> LinkTag {
+        LinkTag::from("foo-link-tag")
+    }
+
+    pub fn example_link_action_kind() -> LinkActionKind {
+        LinkActionKind::ADD
+    }
 }

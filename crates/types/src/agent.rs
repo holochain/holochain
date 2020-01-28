@@ -13,7 +13,7 @@ pub type Base32 = String;
 /// AgentId represents an agent in the Holochain framework.
 /// This data struct is meant be stored in the CAS and source-chain.
 /// Its key is the public signing key, and is also used as its address.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, DefaultJson, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, DefaultJson, Eq, Hash)]
 pub struct AgentId {
     /// a nickname for referencing this agent
     pub nick: String,

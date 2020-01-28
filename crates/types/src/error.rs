@@ -1,6 +1,7 @@
 //! Just enough to get us rolling for now.
 //! Definitely not even close to the intended final struct for Errors.
 
+use serde_json::Error as SerdeError;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -28,9 +29,20 @@ impl SkunkError {
 
 pub type SkunkResult<T> = Result<T, SkunkError>;
 
-
 impl From<hcid::HcidError> for SkunkError {
     fn from(error: hcid::HcidError) -> Self {
         SkunkError::new(format!("{:?}", error))
+    }
+}
+
+impl From<SerdeError> for SkunkError {
+    fn from(error: SerdeError) -> Self {
+        SkunkError::new(error.to_string())
+    }
+}
+
+impl From<base64::DecodeError> for SkunkError {
+    fn from(error: base64::DecodeError) -> Self {
+        SkunkError::new(format!("base64 decode error: {}", error.to_string()))
     }
 }

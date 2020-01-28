@@ -1,3 +1,4 @@
+use sx_types::*;
 use sx_types::shims::*;
 
 pub trait CursorR {
