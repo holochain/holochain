@@ -37,6 +37,12 @@ impl From<hcid::HcidError> for SkunkError {
     }
 }
 
+impl From<std::io::Error> for SkunkError {
+    fn from(error: std::io::Error) -> Self {
+        SkunkError::new(format!("{:?}", error))
+    }
+}
+
 impl From<SerdeError> for SkunkError {
     fn from(error: SerdeError) -> Self {
         SkunkError::new(error.to_string())

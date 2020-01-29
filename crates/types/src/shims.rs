@@ -15,6 +15,10 @@ impl Dna {
         unimplemented!()
     }
 }
+#[derive(Clone, Debug, Default, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
+pub struct LogRules;
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
+pub struct Sim2hConfig;
 
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct Entry;
@@ -25,6 +29,7 @@ pub struct Lib3hClientProtocol;
 pub struct Lib3hToServer;
 pub struct Lib3hToServerResponse;
 pub struct Lib3hServerProtocol;
+
 
 pub enum ValidationResult {
     Valid,

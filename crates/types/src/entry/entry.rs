@@ -124,9 +124,10 @@ impl AddressableContent for Entry {
 pub mod tests {
 
     use super::*;
-    use crate::prelude::*;
+    use crate::agent::test_agent_id;
     use crate::entry::entry_type::tests::test_app_entry_type;
     use crate::entry::entry_type::tests::test_app_entry_type_b;
+    use crate::prelude::*;
     use holochain_persistence_api::cas::{
         content::{AddressableContent, AddressableContentTestSuite},
         storage::{test_content_addressable_storage, ExampleContentAddressableStorage},

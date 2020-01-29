@@ -10,7 +10,15 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.22"
+serde = "=1.0.89"
+serde_derive = "=1.0.89"
+serde_json = "=1.0.39"
 sx_core = { path = "../core"}
 sx_types = { path = "../types"}
+holochain_common = "=0.0.42-alpha5"
 futures = "0.3.1"
 parking_lot = "0.10.0"
+toml = "0.5.0"
+
+# TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
+# holochain_metrics = { version = "=0.0.42-alpha5" }

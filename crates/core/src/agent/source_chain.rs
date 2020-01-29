@@ -6,9 +6,9 @@ use crate::cell::Cell;
 use crate::cell::CellApi;
 use crate::cursor::CursorR;
 use crate::cursor::CursorRw;
-use holochain_persistence_api::cas::content::Address;
 use sx_types::agent::AgentId;
 use sx_types::error::SkunkResult;
+use sx_types::prelude::*;
 use sx_types::shims::*;
 
 pub struct SourceChain<'a> {
