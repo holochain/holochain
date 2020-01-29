@@ -1,6 +1,7 @@
 //! Just enough to get us rolling for now.
 //! Definitely not even close to the intended final struct for Errors.
 
+use crate::prelude::*;
 use holochain_json_api::error::JsonError;
 use serde_json::Error as SerdeError;
 use std::fmt;
@@ -44,6 +45,12 @@ impl From<SerdeError> for SkunkError {
 
 impl From<JsonError> for SkunkError {
     fn from(error: JsonError) -> Self {
+        SkunkError::new(error.to_string())
+    }
+}
+
+impl From<PersistenceError> for SkunkError {
+    fn from(error: PersistenceError) -> Self {
         SkunkError::new(error.to_string())
     }
 }

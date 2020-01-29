@@ -1,3 +1,4 @@
+use crate::cursor::ChainCursorManagerX;
 use crate::cursor::CasCursorX;
 use crate::cursor::CursorR;
 use crate::cursor::CursorRw;
@@ -19,12 +20,14 @@ pub type CellId = (DnaAddress, AgentId);
 
 /// Might be overkill to have a trait
 #[async_trait]
-pub trait CellApi: Send + Sync + PartialEq + std::hash::Hash + Eq {
+pub trait CellApi: Send + Sync {
     fn dna_address(&self) -> &DnaAddress;
     fn agent_id(&self) -> &AgentId;
     fn cell_id(&self) -> CellId {
         (self.dna_address().clone(), self.agent_id().clone())
     }
+
+    fn source_chain(&self) -> SourceChain;
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
     async fn handle_network_message(
@@ -33,24 +36,34 @@ pub trait CellApi: Send + Sync + PartialEq + std::hash::Hash + Eq {
     ) -> SkunkResult<Option<Lib3hToClientResponse>>;
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Cell(DnaAddress, AgentId);
+// #[derive(Clone, PartialEq, Eq, Hash)]
+// pub struct CellId(DnaAddress, AgentId);
+
+// #[derive(PartialEq, Eq, Hash)]
+pub struct Cell {
+    id: CellId,
+    chain_cursor_manager: ChainCursorManagerX,
+}
 
 #[async_trait]
-
 impl CellApi for Cell {
     fn dna_address(&self) -> &DnaAddress {
-        &self.0
+        &self.id.0
     }
 
     fn agent_id(&self) -> &AgentId {
-        &self.1
+        &self.id.1
+    }
+
+    fn source_chain(&self) -> SourceChain {
+        SourceChain::new(&self.chain_cursor_manager)
     }
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
-        let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
-        let cursor = CasCursorX;
-        workflow::invoke_zome(invocation, source_chain, cursor).await
+        unimplemented!()
+        // let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
+        // let cursor = CasCursorX;
+        // workflow::invoke_zome(invocation, source_chain, cursor).await
     }
 
     async fn handle_network_message(
@@ -68,13 +81,13 @@ trait NetSend {
     fn network_send(&self, msg: Lib3hClientProtocol) -> SkunkResult<()>;
 }
 
-trait ChainRead {
-    fn chain_read_cursor<C: CursorR>(&self) -> C;
-}
+// trait ChainRead {
+//     fn chain_read_cursor<C: CursorR>(&self) -> C;
+// }
 
-trait ChainWrite {
-    fn chain_write_cursor<C: CursorRw>(&self) -> C;
-}
+// trait ChainWrite {
+//     fn chain_write_cursor<C: CursorRw>(&self) -> C;
+// }
 
 /// Simplification of holochain_net::connection::NetSend
 /// Could use the trait instead, but we will want an impl of it

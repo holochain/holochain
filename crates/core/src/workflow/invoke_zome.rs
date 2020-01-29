@@ -1,4 +1,4 @@
-use crate::cursor::CasCursorX;
+use crate::cursor::ChainCursorX;
 use crate::types::ZomeInvocationResult;
 use crate::{agent::SourceChain, ribosome::Ribosome, types::ZomeInvocation};
 use sx_types::error::SkunkResult;
@@ -6,12 +6,12 @@ use sx_types::shims::*;
 
 pub async fn invoke_zome(
     invocation: ZomeInvocation,
-    source_chain: SourceChain,
-    cursor: CasCursorX,
+    source_chain: SourceChain<'_>,
+    cursor: ChainCursorX,
 ) -> SkunkResult<ZomeInvocationResult> {
-    let dna = source_chain.get_dna()?;
+    let dna = source_chain.dna()?;
     let ribosome = Ribosome::new(dna);
-    let (result, cursor) = ribosome.invoke_zome(cursor, invocation, source_chain.clone())?;
+    let (result, cursor) = ribosome.invoke_zome(cursor, invocation, source_chain.now())?;
     source_chain.try_commit(cursor)?;
     Ok(result)
 }

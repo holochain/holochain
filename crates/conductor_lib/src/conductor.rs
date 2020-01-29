@@ -1,3 +1,4 @@
+use sx_core::cell::CellId;
 use std::collections::HashMap;
 use sx_core::cell::CellApi;
 use sx_core::cell::NetSender;
@@ -11,14 +12,15 @@ pub type CellHandle = String;
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
 /// essentially immutable, and perhaps we just throw it out and make a new one
 /// when we need to load new config, etc.
-pub struct CellState {
+pub struct CellState<Cell: CellApi> {
     /// Whether or not we should call any methods on the cell
     active: bool,
+    cell: Cell,
 }
 
 pub struct Conductor<Cell: CellApi> {
     tx_network: NetSender,
-    cells: HashMap<Cell, CellState>,
+    cells: HashMap<CellId, CellState<Cell>>,
     handle_map: HashMap<CellHandle, Cell>,
 }
 
