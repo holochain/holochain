@@ -2,6 +2,7 @@ use crate::cursor::CasCursorX;
 use crate::types::ZomeInvocationResult;
 use crate::{agent::SourceChain, ribosome::Ribosome, types::ZomeInvocation};
 use sx_types::error::SkunkResult;
+#[allow(unused_imports)]
 use sx_types::shims::*;
 
 pub async fn invoke_zome(

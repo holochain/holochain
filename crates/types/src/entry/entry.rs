@@ -19,11 +19,10 @@ use holochain_persistence_api::cas::content::Content;
 // use crate::shims::*;
 use holochain_json_api::{
     error::JsonError,
-    json::{JsonString, RawString},
+    json::{JsonString},
 };
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
-use snowflake;
 use std::convert::TryFrom;
 
 pub type AppEntryValue = JsonString;

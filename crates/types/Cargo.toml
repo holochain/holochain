@@ -14,7 +14,7 @@ edition = "2018"
 base64 = "=0.10.1"
 chrono = "=0.4.6"
 hcid = "=0.0.6"
-holochain_persistence_api = "=0.0.13"
+holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+real-futures" }
 holochain_json_api = "=0.0.17"
 holochain_json_derive = "=0.0.17"
 regex = "=1.1.2"
@@ -26,6 +26,7 @@ multihash = "0.8.0"
 snowflake = "1.3.0"
 
 [patch.crates-io]
-holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence.git", branch = "upgrade-to-real-futures" }
 holochain_json_api = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "upgrade-to-real-futures" }
 holochain_json_derive = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "upgrade-to-real-futures" }
+holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+real-futures" }
+
