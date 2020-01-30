@@ -7,6 +7,7 @@ use crate::cursor::CursorR;
 use crate::cursor::CursorRw;
 use crate::cursor::SourceChainAttribute;
 use sx_types::agent::AgentId;
+use sx_types::chain_header::ChainHeader;
 use sx_types::dna::Dna;
 use sx_types::error::SkunkResult;
 use sx_types::prelude::*;
@@ -74,5 +75,39 @@ impl SourceChainSnapshot {
 
     pub fn is_initialized(&self) -> bool {
         unimplemented!()
+    }
+}
+
+pub struct SourceChainBackwardIterator {
+    reader: ChainCursorX,
+    current: Option<Address>,
+}
+
+/// Follows ChainHeader.link through every previous Entry (of any EntryType) in the chain
+// #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
+impl Iterator for SourceChainBackwardIterator {
+    type Item = ChainHeader;
+
+    /// May panic if there is an underlying error in the table
+    fn next(&mut self) -> Option<ChainHeader> {
+        match &self.current {
+            None => None,
+            Some(address) => {
+                let content = self
+                    .reader
+                    .get_content(address)
+                    .expect("Could not access source chain store!")
+                    .expect(&format!(
+                        "No content found in source chain store at address {}",
+                        address
+                    ));
+                let header = ChainHeader::try_from_content(&content).expect(&format!(
+                    "Invalid content in source chain store at address {}",
+                    address
+                ));
+                self.current = header.link();
+                Some(header)
+            }
+        }
     }
 }

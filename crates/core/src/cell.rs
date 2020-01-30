@@ -74,6 +74,26 @@ impl CellApi for Cell {
     }
 }
 
+impl Cell {
+    pub fn new(id: CellId) -> SkunkResult<Self> {
+        let manager = ChainCursorManagerX;
+        let mut cell = Cell {
+            id,
+            chain_cursor_manager: manager
+        };
+        // cell.source_chain().now()
+        unimplemented!()
+    }
+
+    fn is_chain_initialized(&self) -> bool {
+        unimplemented!()
+    }
+
+    fn initialize_chain(&mut self) -> SkunkResult<bool> {
+        unimplemented!()
+    }
+}
+
 // These are possibly composable traits that describe how to get a resource,
 // so instead of explicitly building resources, we can downcast a Cell to exactly
 // the right set of resource getter traits
