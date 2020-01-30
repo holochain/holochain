@@ -7,11 +7,15 @@ use serde_json::Error as SerdeError;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct SkunkError(String);
+pub enum SkunkError {
+    Todo(String),
+    IoError(String),
+    ConfigError(String),
+}
 
 impl fmt::Display for SkunkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{:?}", self)
     }
 }
 
@@ -19,13 +23,13 @@ impl std::error::Error for SkunkError {}
 
 impl From<String> for SkunkError {
     fn from(s: String) -> Self {
-        Self(s)
+        SkunkError::Todo(s)
     }
 }
 
 impl SkunkError {
     pub fn new<S: Into<String>>(s: S) -> Self {
-        Self(s.into())
+        SkunkError::Todo(s.into())
     }
 }
 
@@ -33,6 +37,12 @@ pub type SkunkResult<T> = Result<T, SkunkError>;
 
 impl From<hcid::HcidError> for SkunkError {
     fn from(error: hcid::HcidError) -> Self {
+        SkunkError::new(format!("{:?}", error))
+    }
+}
+
+impl From<std::io::Error> for SkunkError {
+    fn from(error: std::io::Error) -> Self {
         SkunkError::new(format!("{:?}", error))
     }
 }

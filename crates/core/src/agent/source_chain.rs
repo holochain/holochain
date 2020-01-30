@@ -1,14 +1,15 @@
-use crate::cursor::ChainCursorX;
-use crate::cursor::SourceChainAttribute;
 use crate::agent::error::{SourceChainError, SourceChainResult};
-use crate::cursor::ChainCursorManagerX;
 use crate::cell::Cell;
 use crate::cell::CellApi;
+use crate::cursor::ChainCursorManagerX;
+use crate::cursor::ChainCursorX;
 use crate::cursor::CursorR;
 use crate::cursor::CursorRw;
-use holochain_persistence_api::cas::content::Address;
+use crate::cursor::SourceChainAttribute;
 use sx_types::agent::AgentId;
+use sx_types::dna::Dna;
 use sx_types::error::SkunkResult;
+use sx_types::prelude::*;
 use sx_types::shims::*;
 
 pub struct SourceChain<'a> {
@@ -25,18 +26,21 @@ impl<'a> SourceChain<'a> {
         let head = unimplemented!(); // reader.query_eav(());
         SourceChainSnapshot {
             reader: self.manager.reader(),
-            head
+            head,
         }
     }
 
     pub fn as_at(&self, head: Address) -> SourceChainSnapshot {
         SourceChainSnapshot {
             reader: self.manager.reader(),
-            head
+            head,
         }
     }
     /// Use the SCHH to attempt to write a bundle of changes
-    pub fn try_commit<Writer: CursorRw<SourceChainAttribute>>(&self, writer: Writer) -> SkunkResult<()> {
+    pub fn try_commit<Writer: CursorRw<SourceChainAttribute>>(
+        &self,
+        writer: Writer,
+    ) -> SkunkResult<()> {
         unimplemented!()
     }
 
@@ -47,7 +51,6 @@ impl<'a> SourceChain<'a> {
     pub fn agent_id(&self) -> SkunkResult<AgentId> {
         unimplemented!()
     }
-
 }
 
 /// Representation of a Cell's source chain.
@@ -65,7 +68,7 @@ impl SourceChainSnapshot {
         match reader.contains_content(&head) {
             Ok(true) => Ok(Self { reader, head }),
             Ok(false) => Err(SourceChainError::MissingHead),
-            Err(_) => Err(SourceChainError::ChainNotInitialized)
+            Err(_) => Err(SourceChainError::ChainNotInitialized),
         }
     }
 

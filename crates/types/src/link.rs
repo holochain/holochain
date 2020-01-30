@@ -65,10 +65,9 @@ impl<S: Into<String>> LinkMatch<S> {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::*;
     use crate::entry::tests::*;
-    use crate::*;
+    use crate::prelude::*;
 
     pub fn example_link() -> Link {
         Link::new(
