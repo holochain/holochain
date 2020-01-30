@@ -8,13 +8,6 @@ pub struct CapToken;
 pub struct CapabilityRequest;
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct DhtTransform;
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
-pub struct Dna;
-impl Dna {
-    pub fn new() -> Self {
-        unimplemented!()
-    }
-}
 #[derive(Clone, Debug, Default, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct LogRules;
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]

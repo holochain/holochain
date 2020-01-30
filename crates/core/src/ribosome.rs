@@ -1,11 +1,12 @@
-use crate::cursor::SourceChainAttribute;
 use crate::agent::SourceChain;
 use crate::agent::SourceChainSnapshot;
 use crate::cursor::ChainCursorX;
+use crate::cursor::SourceChainAttribute;
 use crate::cursor::{CursorR, CursorRw};
 use crate::types::ZomeInvocation;
 use crate::types::ZomeInvocationResult;
 use crate::wasm_engine::WasmEngine;
+use sx_types::dna::Dna;
 use sx_types::error::SkunkResult;
 use sx_types::shims::*;
 
@@ -32,7 +33,11 @@ impl Ribosome {
 }
 
 impl Ribosome {
-    pub fn run_validation<C: CursorR<SourceChainAttribute>>(self, cursor: &C, entry: Entry) -> ValidationResult {
+    pub fn run_validation<C: CursorR<SourceChainAttribute>>(
+        self,
+        cursor: &C,
+        entry: Entry,
+    ) -> ValidationResult {
         unimplemented!()
     }
 

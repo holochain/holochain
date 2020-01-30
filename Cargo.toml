@@ -8,3 +8,17 @@ members = [
   "crates/holochain",
   "crates/types",
 ]
+
+exclude = [
+  "test_utils",
+]
+
+[patch.crates-io]
+hdk = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+holochain_net = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+holochain_core = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+holochain_conductor_lib = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+# holochain_core_types = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+holochain_dpki = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+holochain_wasm_utils = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+holochain_locksmith = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
