@@ -6,6 +6,7 @@ extern crate serde_derive;
 mod workflow;
 
 pub mod agent;
+pub mod attr;
 pub mod cell;
 pub mod cursor;
 pub mod ribosome;

@@ -1,8 +1,6 @@
 use crate::agent::SourceChain;
 use crate::agent::SourceChainSnapshot;
-use crate::cursor::ChainCursorX;
-use crate::cursor::SourceChainAttribute;
-use crate::cursor::{CursorR, CursorRw};
+use crate::cursor::{ChainCursor, ChainCursorRw};
 use crate::types::ZomeInvocation;
 use crate::types::ZomeInvocationResult;
 use crate::wasm_engine::WasmEngine;
@@ -33,9 +31,9 @@ impl Ribosome {
 }
 
 impl Ribosome {
-    pub fn run_validation<C: CursorR<SourceChainAttribute>>(
+    pub fn run_validation<Cursor: ChainCursor>(
         self,
-        cursor: &C,
+        cursor: &Cursor,
         entry: Entry,
     ) -> ValidationResult {
         unimplemented!()
@@ -43,12 +41,12 @@ impl Ribosome {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    pub fn invoke_zome(
+    pub fn invoke_zome<Cursor: ChainCursorRw>(
         self,
-        cursor: ChainCursorX,
+        cursor: Cursor,
         invocation: ZomeInvocation,
-        chain: SourceChainSnapshot,
-    ) -> SkunkResult<(ZomeInvocationResult, ChainCursorX)> {
+        chain: SourceChainSnapshot<Cursor>,
+    ) -> SkunkResult<(ZomeInvocationResult, Cursor)> {
         unimplemented!()
     }
 }

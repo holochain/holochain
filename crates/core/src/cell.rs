@@ -1,7 +1,4 @@
-use crate::cursor::ChainCursorManagerX;
-use crate::cursor::CasCursorX;
-use crate::cursor::CursorR;
-use crate::cursor::CursorRw;
+use crate::cursor::ChainPersistenceManager;
 use crate::types::ZomeInvocationResult;
 use crate::{agent::SourceChain, types::ZomeInvocation, workflow};
 use async_trait::async_trait;
@@ -27,7 +24,7 @@ pub trait CellApi: Send + Sync {
         (self.dna_address().clone(), self.agent_id().clone())
     }
 
-    fn source_chain(&self) -> SourceChain;
+    fn source_chain<C>(&self) -> SourceChain<C>;
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
     async fn handle_network_message(
@@ -42,7 +39,7 @@ pub trait CellApi: Send + Sync {
 // #[derive(PartialEq, Eq, Hash)]
 pub struct Cell {
     id: CellId,
-    chain_cursor_manager: ChainCursorManagerX,
+    persistence: ChainPersistenceManager,
 }
 
 #[async_trait]
@@ -55,8 +52,8 @@ impl CellApi for Cell {
         &self.id.1
     }
 
-    fn source_chain(&self) -> SourceChain {
-        SourceChain::new(&self.chain_cursor_manager)
+    fn source_chain<C>(&self) -> SourceChain<C> {
+        SourceChain::new(&self.persistence)
     }
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
@@ -76,10 +73,10 @@ impl CellApi for Cell {
 
 impl Cell {
     pub fn new(id: CellId) -> SkunkResult<Self> {
-        let manager = ChainCursorManagerX;
+        let manager = ChainPersistenceManager::new();
         let mut cell = Cell {
             id,
-            chain_cursor_manager: manager
+            persistence: manager
         };
         // cell.source_chain().now()
         unimplemented!()
