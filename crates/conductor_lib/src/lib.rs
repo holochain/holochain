@@ -1,3 +1,5 @@
+#![ allow( dead_code, unused_imports ) ]
+
 pub mod api;
 pub mod conductor;
 pub mod config;

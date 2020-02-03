@@ -1,3 +1,6 @@
+// TODO: re-enable all warnings after skunkworx
+#![ allow( dead_code, unused_imports ) ]
+
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
