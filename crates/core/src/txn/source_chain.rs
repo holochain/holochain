@@ -32,7 +32,7 @@ impl holochain_persistence_api::eav::Attribute for Attribute {}
 pub struct SourceChainPersistence(pub LmdbManager<Attribute>);
 
 impl SourceChainPersistence {
-    pub fn new_manager(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
+    pub fn new(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
         let db_path : DatabasePath = (dna, agent).into();
         let staging_path : Option<String> = None;
   
@@ -48,4 +48,6 @@ impl SourceChainPersistence {
 }
 
 
+pub type Cursor = <LmdbManager<Attribute> as CursorProvider<Attribute>>::Cursor;
+pub type CursorRw = <LmdbManager<Attribute> as CursorProvider<Attribute>>::CursorRw;
 

@@ -26,9 +26,6 @@ pub struct Lib3hToServer;
 pub struct Lib3hToServerResponse;
 pub struct Lib3hServerProtocol;
 
-pub struct PersistenceError;
-pub type PersistenceResult<T> = Result<T, PersistenceError>;
-
 pub enum ValidationResult {
     Valid,
     Invalid,

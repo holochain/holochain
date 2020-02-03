@@ -31,5 +31,6 @@ impl DhtPersistence {
     }
 }
 
-
+pub type Cursor = <LmdbManager<Attribute> as CursorProvider<Attribute>>::Cursor;
+pub type CursorRw = <LmdbManager<Attribute> as CursorProvider<Attribute>>::CursorRw;
 
