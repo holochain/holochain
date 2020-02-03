@@ -14,14 +14,14 @@ use crate::entry::{
 use crate::link::Link;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
-    json::{JsonString, RawString},
+    json::{JsonString},
 };
 use holochain_persistence_api::cas::content::Address;
 use holochain_persistence_api::cas::content::AddressableContent;
 use holochain_persistence_api::cas::content::Content;
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
-use snowflake;
+
 use std::convert::TryFrom;
 
 pub type AppEntryValue = JsonString;
@@ -125,7 +125,7 @@ pub mod tests {
     use crate::agent::test_agent_id;
     use crate::entry::entry_type::tests::test_app_entry_type;
     use crate::entry::entry_type::tests::test_app_entry_type_b;
-    use crate::prelude::*;
+    
     use holochain_persistence_api::cas::{
         content::{AddressableContent, AddressableContentTestSuite},
         storage::{test_content_addressable_storage, ExampleContentAddressableStorage},

@@ -6,7 +6,7 @@ use crate::{
     agent::test_agent_id,
     entry::entry_type::EntryType,
     signature::{Provenance, Signature},
-    time::{test_iso_8601, Iso8601},
+    time::{Iso8601},
 };
 
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};

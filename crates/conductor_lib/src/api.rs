@@ -92,7 +92,7 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
 
     async fn network_request(
         &self,
-        message: Lib3hClientProtocol,
+        _message: Lib3hClientProtocol,
     ) -> SkunkResult<Lib3hServerProtocol>
     where
         Cell: 'async_trait,
@@ -103,14 +103,14 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
 
 #[async_trait]
 impl<Cell: CellApi> ConductorApiExternal<Cell> for ConductorHandle<Cell> {
-    async fn admin(&mut self, method: AdminMethod) -> SkunkResult<JsonString>
+    async fn admin(&mut self, _method: AdminMethod) -> SkunkResult<JsonString>
     where
         Cell: 'async_trait,
     {
         unimplemented!()
     }
 
-    async fn test(&mut self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<JsonString>
+    async fn test(&mut self, _cell: Cell, _invocation: ZomeInvocation) -> SkunkResult<JsonString>
     where
         Cell: 'async_trait,
     {

@@ -2,7 +2,7 @@ use sx_core::cell::CellId;
 use std::collections::HashMap;
 use sx_core::cell::CellApi;
 use sx_core::cell::NetSender;
-use sx_types::shims::*;
+
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
