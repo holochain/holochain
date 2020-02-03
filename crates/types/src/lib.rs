@@ -9,6 +9,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 #[macro_use]
+#[cfg(test)]
 extern crate maplit;
 
 pub mod agent;

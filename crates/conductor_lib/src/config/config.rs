@@ -50,9 +50,10 @@ pub struct Config {
     #[serde(default)]
     pub bridges: Vec<Bridge>,
 
-    /// Configures how logging should behave. Optional.
-    #[serde(default)]
-    pub logger: LoggerConfig,
+    // /// Configures how logging should behave. Optional.
+    // #[serde(default)]
+    // pub logger: LoggerConfig,
+
     /// Config options for the network module. Optional.
     #[serde(default)]
     pub network: Option<NetworkConfig>,
@@ -122,49 +123,49 @@ pub fn default_persistence_dir() -> PathBuf {
     holochain_common::paths::config_root().join("conductor")
 }
 
-/// This is a config helper structure used to interface with the holochain logging subcrate.
-/// Custom rules/filter can be applied to logging, in fact they are used by default in Holochain to
-/// filter the logs from its dependencies.
-///
-/// ```rust
-/// extern crate holochain_conductor_lib;
-/// use holochain_conductor_lib::{logger,config};
-/// let mut rules = logger::LogRules::new();
-/// // Filtering out all the logs from our dependencies
-/// rules
-///     .add_rule(".*", true, None)
-///     .expect("Invalid logging rule.");
-/// // And logging back all Holochain logs
-/// rules
-///     .add_rule("^holochain", false, None)
-///     .expect("Invalid logging rule.");
-///
-/// let lc = config::LoggerConfig {
-///     logger_level: "debug".to_string(),
-///     rules: rules,
-///     state_dump: true,
-///     };
-/// ```
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct LoggerConfig {
-    #[serde(rename = "type")]
-    pub logger_level: String,
-    #[serde(default)]
-    pub rules: LogRules,
-    //    pub file: Option<String>,
-    #[serde(default)]
-    pub state_dump: bool,
-}
+// /// This is a config helper structure used to interface with the holochain logging subcrate.
+// /// Custom rules/filter can be applied to logging, in fact they are used by default in Holochain to
+// /// filter the logs from its dependencies.
+// ///
+// /// ```rust
+// /// extern crate sx_conductor_lib;
+// /// use sx_conductor_lib::{logger, config};
+// /// let mut rules = logger::LogRules::new();
+// /// // Filtering out all the logs from our dependencies
+// /// rules
+// ///     .add_rule(".*", true, None)
+// ///     .expect("Invalid logging rule.");
+// /// // And logging back all Holochain logs
+// /// rules
+// ///     .add_rule("^holochain", false, None)
+// ///     .expect("Invalid logging rule.");
+// ///
+// /// let lc = config::LoggerConfig {
+// ///     logger_level: "debug".to_string(),
+// ///     rules: rules,
+// ///     state_dump: true,
+// ///     };
+// /// ```
+// #[derive(Deserialize, Serialize, Clone, Debug)]
+// pub struct LoggerConfig {
+//     #[serde(rename = "type")]
+//     pub logger_level: String,
+//     #[serde(default)]
+//     pub rules: LogRules,
+//     //    pub file: Option<String>,
+//     #[serde(default)]
+//     pub state_dump: bool,
+// }
 
-impl Default for LoggerConfig {
-    fn default() -> LoggerConfig {
-        LoggerConfig {
-            logger_level: "debug".into(),
-            rules: Default::default(),
-            state_dump: false,
-        }
-    }
-}
+// impl Default for LoggerConfig {
+//     fn default() -> LoggerConfig {
+//         LoggerConfig {
+//             logger_level: "debug".into(),
+//             rules: Default::default(),
+//             state_dump: false,
+//         }
+//     }
+// }
 
 /// Check for duplicate items in a list of strings
 fn detect_dupes<'a, I: Iterator<Item = &'a String>>(

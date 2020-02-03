@@ -15,7 +15,10 @@ pub enum SkunkError {
 
 impl fmt::Display for SkunkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            SkunkError::Todo(reason) => write!(f, "{}", reason),
+            _ => write!(f, "{:?}", self)
+        }
     }
 }
 
