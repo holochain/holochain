@@ -1,5 +1,5 @@
 use sx_types::prelude::*;
 
-trait NetRequester {
+pub trait NetRequester {
     fn fetch_entry(address: Address);
 }

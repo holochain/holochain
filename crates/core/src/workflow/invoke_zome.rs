@@ -1,6 +1,5 @@
 use crate::cursor::ChainCursorX;
-use crate::types::ZomeInvocationResult;
-use crate::{agent::SourceChain, ribosome::Ribosome, types::ZomeInvocation};
+use crate::{agent::SourceChain, ribosome::Ribosome, nucleus::{ZomeInvocation, ZomeInvocationResult}};
 use sx_types::error::SkunkResult;
 use sx_types::shims::*;
 
