@@ -1,9 +1,9 @@
 //! holochain_core_types::dna::zome is a set of structs for working with holochain dna.
 
-use crate::dna::entry_types::{self, deserialize_entry_types, serialize_entry_types, EntryTypeDef};
 use crate::{
     dna::{
         bridges::{Bridge, BridgePresence},
+        entry_types::{self, deserialize_entry_types, serialize_entry_types, EntryTypeDef},
         fn_declarations::{FnDeclaration, FnParameter, TraitFns},
         traits::ReservedTraitNames,
         wasm::DnaWasm,

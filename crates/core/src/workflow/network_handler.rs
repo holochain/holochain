@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use sx_types::error::SkunkResult;
-use sx_types::shims::*;
+use sx_types::{error::SkunkResult, shims::*};
 
 pub async fn handle_network_message(
     msg: Lib3hToClient,

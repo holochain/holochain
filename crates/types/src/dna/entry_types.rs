@@ -1,7 +1,6 @@
 //! File holding all the structs for handling entry types defined by DNA.
 
-use crate::dna::zome::ZomeEntryTypes;
-use crate::entry::entry_type::EntryType;
+use crate::{dna::zome::ZomeEntryTypes, entry::entry_type::EntryType};
 use holochain_json_api::{error::JsonError, json::JsonString};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serializer};
 use std::collections::BTreeMap;

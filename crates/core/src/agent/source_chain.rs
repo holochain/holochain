@@ -1,14 +1,13 @@
-use crate::agent::error::{SourceChainError, SourceChainResult};
-use crate::cell::Cell;
-use crate::txn::source_chain;
-use holochain_persistence_api::cas::content::Address;
-use holochain_persistence_api::txn::CursorProvider;
-use holochain_persistence_api::txn::Writer;
-use sx_types::agent::AgentId;
-use sx_types::dna::Dna;
-use sx_types::error::SkunkResult;
-use sx_types::prelude::*;
-use sx_types::shims::*;
+use crate::{
+    agent::error::{SourceChainError, SourceChainResult},
+    cell::Cell,
+    txn::source_chain,
+};
+use holochain_persistence_api::{
+    cas::content::Address,
+    txn::{CursorProvider, Writer},
+};
+use sx_types::{agent::AgentId, dna::Dna, error::SkunkResult, prelude::*, shims::*};
 
 pub struct SourceChain<'a> {
     persistence: &'a source_chain::SourceChainPersistence,

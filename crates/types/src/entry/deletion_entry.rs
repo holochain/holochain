@@ -25,8 +25,7 @@ impl DeletionEntry {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::entry::entry::tests::test_entry_a;
-    use crate::prelude::*;
+    use crate::{entry::entry::tests::test_entry_a, prelude::*};
 
     pub fn test_deletion_entry() -> DeletionEntry {
         let entry = test_entry_a();

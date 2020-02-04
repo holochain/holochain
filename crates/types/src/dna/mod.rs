@@ -30,9 +30,6 @@ pub mod traits;
 pub mod wasm;
 pub mod zome;
 
-use crate::error::SkunkResult;
-use crate::error::SkunkError;
-use crate::entry::entry_type::AppEntryType;
 use crate::{
     dna::{
         bridges::Bridge,
@@ -40,7 +37,8 @@ use crate::{
         error::DnaError,
         fn_declarations::{FnDeclaration, TraitFns},
     },
-    entry::entry_type::EntryType,
+    entry::entry_type::{AppEntryType, EntryType},
+    error::{SkunkError, SkunkResult},
 };
 use holochain_json_api::{
     error::{JsonError, JsonResult},
@@ -268,10 +266,7 @@ impl Dna {
                 if zome.code.code.len() > 0 {
                     Ok(())
                 } else {
-                    Err(SkunkError::new(format!(
-                        "Zome {} has no code!",
-                        zome_name
-                    )))
+                    Err(SkunkError::new(format!("Zome {} has no code!", zome_name)))
                 }
             })
             .filter_map(|r| r.err())
@@ -279,10 +274,7 @@ impl Dna {
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(SkunkError::new(format!(
-                "invalid DNA: {:?}",
-                errors
-            )))
+            Err(SkunkError::new(format!("invalid DNA: {:?}", errors)))
         }
     }
 }

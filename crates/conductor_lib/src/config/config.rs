@@ -11,16 +11,16 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use sx_types::agent::AgentId;
-use sx_types::agent::Base32;
-use sx_types::dna::{
-    bridges::{BridgePresence, BridgeReference},
-    Dna,
+use sx_types::{
+    agent::{AgentId, Base32},
+    dna::{
+        bridges::{BridgePresence, BridgeReference},
+        Dna,
+    },
+    error::{SkunkError, SkunkResult},
+    prelude::*,
+    shims::*,
 };
-use sx_types::error::SkunkError;
-use sx_types::error::SkunkResult;
-use sx_types::prelude::*;
-use sx_types::shims::*;
 use toml;
 // use crate::{conductor::base::DnaLoader, logger::LogRules};
 // use holochain_metrics::MetricPublisherConfig;
@@ -53,7 +53,6 @@ pub struct Config {
     // /// Configures how logging should behave. Optional.
     // #[serde(default)]
     // pub logger: LoggerConfig,
-
     /// Config options for the network module. Optional.
     #[serde(default)]
     pub network: Option<NetworkConfig>,

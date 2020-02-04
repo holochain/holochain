@@ -1,5 +1,3 @@
-
-
 #[derive(Debug)]
 pub enum SourceChainError {
     ChainNotInitialized,
@@ -13,6 +11,5 @@ impl std::fmt::Display for SourceChainError {
         write!(f, "{:?}", self)
     }
 }
-
 
 pub type SourceChainResult<T> = Result<T, SourceChainError>;

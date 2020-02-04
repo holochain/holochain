@@ -3,22 +3,21 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::agent::AgentId;
-use crate::dna::Dna;
-use crate::entry::entry_type::AppEntryType;
-use crate::entry::entry_type::EntryType;
-use crate::entry::{
-    cap_entries::{CapTokenClaim, CapTokenGrant},
-    deletion_entry::DeletionEntry,
+use crate::{
+    agent::AgentId,
+    dna::Dna,
+    entry::{
+        cap_entries::{CapTokenClaim, CapTokenGrant},
+        deletion_entry::DeletionEntry,
+        entry_type::{AppEntryType, EntryType},
+    },
+    link::Link,
 };
-use crate::link::Link;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
-    json::{JsonString},
+    json::JsonString,
 };
-use holochain_persistence_api::cas::content::Address;
-use holochain_persistence_api::cas::content::AddressableContent;
-use holochain_persistence_api::cas::content::Content;
+use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
 
@@ -122,10 +121,11 @@ impl AddressableContent for Entry {
 pub mod tests {
 
     use super::*;
-    use crate::prelude::*;
-    use crate::agent::test_agent_id;
-    use crate::entry::entry_type::tests::test_app_entry_type;
-    use crate::entry::entry_type::tests::test_app_entry_type_b;
+    use crate::{
+        agent::test_agent_id,
+        entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
+        prelude::*,
+    };
 
     use holochain_persistence_api::cas::{
         content::{AddressableContent, AddressableContentTestSuite},

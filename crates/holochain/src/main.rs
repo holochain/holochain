@@ -1,16 +1,12 @@
-
-use futures::channel;
-use futures::executor::ThreadPool;
-use futures::prelude::*;
-use futures::task::SpawnExt;
+use futures::{channel, executor::ThreadPool, prelude::*, task::SpawnExt};
 use parking_lot::RwLock;
 use std::sync::Arc;
-use sx_conductor_lib::api::{ConductorHandle};
-use sx_conductor_lib::interface::puppet::PuppetInterface;
-use sx_conductor_lib::interface::Interface;
-use sx_conductor_lib::{conductor::Conductor};
+use sx_conductor_lib::{
+    api::ConductorHandle,
+    conductor::Conductor,
+    interface::{puppet::PuppetInterface, Interface},
+};
 use sx_core::cell::Cell;
-
 
 fn main() {
     println!("Running silly PuppetInterface example");

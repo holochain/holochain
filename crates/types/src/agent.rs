@@ -1,5 +1,4 @@
-use crate::entry::Entry;
-use crate::error::SkunkResult;
+use crate::{entry::Entry, error::SkunkResult};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},

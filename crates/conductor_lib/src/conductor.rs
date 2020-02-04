@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use sx_core::cell::{CellApi, CellId};
-use sx_core::cell::NetSender;
+use sx_core::cell::{CellApi, CellId, NetSender};
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
@@ -17,7 +16,7 @@ pub struct CellState {
 
 pub struct CellItem<Cell: CellApi> {
     cell: Cell,
-    state: CellState
+    state: CellState,
 }
 
 pub struct Conductor<Cell: CellApi> {

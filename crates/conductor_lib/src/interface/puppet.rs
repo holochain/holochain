@@ -1,8 +1,9 @@
-use crate::api::{self, ConductorApiExternal};
-use crate::interface::interface::Interface;
+use crate::{
+    api::{self, ConductorApiExternal},
+    interface::interface::Interface,
+};
 use async_trait::async_trait;
-use futures::channel::mpsc;
-use futures::stream::StreamExt;
+use futures::{channel::mpsc, stream::StreamExt};
 use sx_core::cell::CellApi;
 
 /// A trivial Interface, used for proof of concept only,

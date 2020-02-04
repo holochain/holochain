@@ -1,15 +1,13 @@
-use crate::conductor::CellHandle;
-use crate::conductor::Conductor;
+use crate::conductor::{CellHandle, Conductor};
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::Arc;
-use sx_core::cell::CellApi;
-use sx_core::nucleus::ZomeInvocation;
-use sx_core::nucleus::ZomeInvocationResult;
-use sx_types::error::SkunkResult;
-use sx_types::prelude::*;
-use sx_types::shims::*;
+use sx_core::{
+    cell::CellApi,
+    nucleus::{ZomeInvocation, ZomeInvocationResult},
+};
+use sx_types::{error::SkunkResult, prelude::*, shims::*};
 
 #[derive(Clone)]
 pub struct ConductorHandle<Cell: CellApi> {

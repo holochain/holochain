@@ -5,7 +5,7 @@
 use crate::{
     entry::entry_type::EntryType,
     signature::{Provenance, Signature},
-    time::{Iso8601},
+    time::Iso8601,
 };
 
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
@@ -129,8 +129,10 @@ pub mod tests {
     use super::*;
     use crate::{
         chain_header::ChainHeader,
-        entry::entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
-        entry::tests::{test_entry, test_entry_a, test_entry_b},
+        entry::{
+            entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
+            tests::{test_entry, test_entry_a, test_entry_b},
+        },
         time::test_iso_8601,
     };
     use holochain_persistence_api::cas::content::{Address, AddressableContent};

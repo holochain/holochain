@@ -18,7 +18,7 @@ impl fmt::Display for SkunkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SkunkError::Todo(reason) => write!(f, "{}", reason),
-            _ => write!(f, "{:?}", self)
+            _ => write!(f, "{:?}", self),
         }
     }
 }
