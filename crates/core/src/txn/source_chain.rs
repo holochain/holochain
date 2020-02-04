@@ -1,6 +1,6 @@
-/// Authority for current HEAD of source chain. Logs each header hash with 
+/// Authority for current HEAD of source chain. Logs each header hash with
 /// sequential numeric index and  tx_index to group entries by bundle. Also
-/// flagged as to whether the DHT transforms have been put into 
+/// flagged as to whether the DHT transforms have been put into
 /// Authoried/Publish queue.
 
 #[allow(unused_imports)]
@@ -25,14 +25,14 @@ pub enum Attribute {
     Queued(QueuedType)
 }
 
-#[derive(Clone, Debug, Shrinkwrap, PartialEq, Eq)]
+#[derive(Clone, Debug, Shrinkwrap)]
 pub struct SourceChainPersistence(pub LmdbManager<Attribute>);
 
 impl SourceChainPersistence {
     pub fn new(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
         let db_path : DatabasePath = (dna, agent).into();
         let staging_path : Option<String> = None;
-  
+
         let manager = new_manager(
             db_path,
             staging_path,

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use sx_core::cell::CellApi;
+use sx_core::cell::{CellApi, CellId};
 use sx_core::cell::NetSender;
 use sx_types::shims::*;
 
@@ -18,8 +18,8 @@ pub struct CellState {
 
 pub struct Conductor<Cell: CellApi> {
     tx_network: NetSender,
-    cells: HashMap<Cell, CellState>,
-    handle_map: HashMap<CellHandle, Cell>,
+    cells: HashMap<CellId, Cell>,
+    handle_map: HashMap<CellHandle, CellId>,
 }
 
 impl<Cell: CellApi> Conductor<Cell> {

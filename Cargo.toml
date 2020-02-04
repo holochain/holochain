@@ -7,3 +7,16 @@ members = [
   "crates/holochain",
   "crates/types",
 ]
+
+
+[patch.crates-io]
+holochain_json_api = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+holochain_json_derive = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional" }
+holochain_persistence_lmdb = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence", branch = "transactional" }
+
+# holochain_json_api = { version = "=0.0.17", path = "../holochain-serialization/crates/holochain_json_api" }
+# holochain_json_derive = { version = "=0.0.17", path = "../holochain-serialization/crates/holochain_json_derive" }
+# holochain_persistence_api = { version = "=0.0.13", path = "../holochain-persistence/crates/holochain_persistence_api" }
+# holochain_persistence_lmdb = { version = "=0.0.13", path = "../holochain-persistence/crates/holochain_persistence_lmdb" }
+

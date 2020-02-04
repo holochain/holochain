@@ -21,7 +21,7 @@ pub type CellId = (DnaAddress, AgentId);
 
 /// Might be overkill to have a trait
 #[async_trait]
-pub trait CellApi: Send + Sync + PartialEq + std::hash::Hash + Eq {
+pub trait CellApi: Send + Sync {
     fn dna_address(&self) -> &DnaAddress;
     fn agent_id(&self) -> &AgentId;
     fn cell_id(&self) -> CellId {
@@ -48,11 +48,11 @@ impl PartialEq for Cell {
     }
 }
 
-#[derive(Clone,Eq)]
+#[derive(Clone)]
 pub struct Cell {
-    dna_address: DnaAddress, 
-    agent_id: AgentId, 
-    source_chain_persistence : source_chain::SourceChainPersistence,
+    dna_address: DnaAddress,
+    agent_id: AgentId,
+    source_chain_persistence: source_chain::SourceChainPersistence,
     dht_persistence: DhtPersistence
 }
 
