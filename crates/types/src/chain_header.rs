@@ -128,6 +128,7 @@ impl AddressableContent for ChainHeader {
 pub mod tests {
     use super::*;
     use crate::{
+        agent::test_agent_id,
         chain_header::ChainHeader,
         entry::{
             entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},

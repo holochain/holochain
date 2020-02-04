@@ -38,6 +38,7 @@ impl<'a> SourceChain<'a> {
     pub fn agent_id(&self) -> SkunkResult<AgentId> {
         unimplemented!()
     }
+
     /// Use the SCHH to attempt to write a bundle of changes
     pub fn try_commit(&self, cursor_rw: source_chain::CursorRw) -> SkunkResult<()> {
         Ok(cursor_rw.commit()?)
