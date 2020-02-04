@@ -1,15 +1,17 @@
-use crate::types::ZomeInvocationResult;
-use crate::{agent::SourceChain, types::ZomeInvocation, workflow};
+use crate::txn::dht::DhtPersistence;
+use crate::txn::source_chain;
+use crate::{
+    agent::SourceChain,
+    nucleus::{ZomeInvocation, ZomeInvocationResult},
+    workflow,
+};
 use async_trait::async_trait;
+use holochain_persistence_api::txn::CursorProvider;
+use std::hash::{Hash, Hasher};
 use sx_types::agent::AgentId;
 use sx_types::error::SkunkResult;
 use sx_types::prelude::*;
 use sx_types::shims::*;
-use crate::txn::source_chain;
-use crate::txn::dht::DhtPersistence;
-use std::hash::{Hash, Hasher};
-use holochain_persistence_api::txn::CursorProvider;
-
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = Address;
@@ -28,6 +30,8 @@ pub trait CellApi: Send + Sync {
         (self.dna_address().clone(), self.agent_id().clone())
     }
 
+    fn source_chain(&self) -> SourceChain;
+
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
     async fn handle_network_message(
         &self,
@@ -35,41 +39,45 @@ pub trait CellApi: Send + Sync {
     ) -> SkunkResult<Option<Lib3hToClientResponse>>;
 }
 
-
 impl Hash for Cell {
-    fn hash<H>(&self, state: &mut H) where H: Hasher {
-        (&self.dna_address, &self.agent_id).hash(state);
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        (self.dna_address(), self.agent_id()).hash(state);
     }
 }
 
 impl PartialEq for Cell {
     fn eq(&self, other: &Self) -> bool {
-        (&self.dna_address, &self.agent_id) == (&other.dna_address, &other.agent_id)
+        self.id == other.id
     }
 }
 
 #[derive(Clone)]
 pub struct Cell {
-    dna_address: DnaAddress,
-    agent_id: AgentId,
-    source_chain_persistence: source_chain::SourceChainPersistence,
-    dht_persistence: DhtPersistence
+    id: CellId,
+    persistence: source_chain::SourceChainPersistence,
+    dht_persistence: DhtPersistence,
 }
 
 #[async_trait]
-
 impl CellApi for Cell {
     fn dna_address(&self) -> &DnaAddress {
-        &self.dna_address
+        &self.id.0
     }
 
     fn agent_id(&self) -> &AgentId {
-        &self.agent_id
+        &self.id.1
+    }
+
+    fn source_chain(&self) -> SourceChain {
+        SourceChain::new(&self.persistence)
     }
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
-        let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
-        let cursor_rw = self.source_chain_persistence.create_cursor_rw()?;
+        let source_chain = SourceChain::new(&self.persistence);
+        let cursor_rw = self.persistence.create_cursor_rw()?;
         workflow::invoke_zome(invocation, source_chain, cursor_rw).await
     }
 

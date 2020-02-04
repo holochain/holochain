@@ -1,18 +1,20 @@
-use crate::types::ZomeInvocationResult;
-use crate::{agent::SourceChain, ribosome::Ribosome, types::ZomeInvocation};
-use sx_types::error::SkunkResult;
-#[allow(unused_imports)]
-use sx_types::shims::*;
 use crate::txn::source_chain;
+use crate::{
+    agent::SourceChain,
+    nucleus::{ZomeInvocation, ZomeInvocationResult},
+    ribosome::Ribosome,
+};
+use sx_types::error::SkunkResult;
+use sx_types::shims::*;
 
 pub async fn invoke_zome(
     invocation: ZomeInvocation,
-    source_chain: SourceChain,
+    source_chain: SourceChain<'_>,
     cursor_rw: source_chain::CursorRw,
 ) -> SkunkResult<ZomeInvocationResult> {
-    let dna = source_chain.get_dna()?;
+    let dna = source_chain.dna()?;
     let ribosome = Ribosome::new(dna);
-    let (result, cursor_rw) = ribosome.call_zome_function(cursor_rw, invocation, source_chain.clone())?;
+    let (result, cursor_rw) = ribosome.call_zome_function(cursor_rw, invocation)?;
     source_chain.try_commit(cursor_rw)?;
     Ok(result)
 }

@@ -4,6 +4,7 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::agent::AgentId;
+use crate::dna::Dna;
 use crate::entry::entry_type::AppEntryType;
 use crate::entry::entry_type::EntryType;
 use crate::entry::{
@@ -11,18 +12,16 @@ use crate::entry::{
     deletion_entry::DeletionEntry,
 };
 use crate::link::Link;
-use crate::shims::Dna;
-use holochain_json_api::error::JsonResult;
+use holochain_json_api::{
+    error::{JsonError, JsonResult},
+    json::{JsonString},
+};
 use holochain_persistence_api::cas::content::Address;
 use holochain_persistence_api::cas::content::AddressableContent;
 use holochain_persistence_api::cas::content::Content;
-// use crate::shims::*;
-use holochain_json_api::{
-    error::JsonError,
-    json::{JsonString},
-};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
+
 use std::convert::TryFrom;
 
 pub type AppEntryValue = JsonString;
@@ -123,8 +122,11 @@ impl AddressableContent for Entry {
 pub mod tests {
 
     use super::*;
+    use crate::prelude::*;
+    use crate::agent::test_agent_id;
     use crate::entry::entry_type::tests::test_app_entry_type;
     use crate::entry::entry_type::tests::test_app_entry_type_b;
+
     use holochain_persistence_api::cas::{
         content::{AddressableContent, AddressableContentTestSuite},
         storage::{test_content_addressable_storage, ExampleContentAddressableStorage},

@@ -2,7 +2,7 @@ use sx_types::agent::AgentId;
 use sx_types::prelude::*;
 use sx_types::shims::*;
 
-pub mod net;
+pub mod zome_api;
 
 pub struct ZomeInvocation {
     pub zome_name: String,
@@ -14,11 +14,3 @@ pub struct ZomeInvocation {
 }
 
 pub struct ZomeInvocationResult;
-
-pub enum Signal {
-    Trace,
-    // Consistency(ConsistencySignal<String>),
-    User(UserSignal),
-}
-
-pub struct UserSignal;

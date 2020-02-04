@@ -1,59 +1,70 @@
+use crate::agent::error::{SourceChainError, SourceChainResult};
 use crate::cell::Cell;
-use holochain_persistence_api::cas::content::Address;
-use sx_types::error::SkunkResult;
-use sx_types::shims::*;
 use crate::txn::source_chain;
+use holochain_persistence_api::cas::content::Address;
+use holochain_persistence_api::txn::CursorProvider;
 use holochain_persistence_api::txn::Writer;
+use sx_types::agent::AgentId;
+use sx_types::dna::Dna;
+use sx_types::error::SkunkResult;
+use sx_types::prelude::*;
+use sx_types::shims::*;
 
-
-/// Representation of a Cell's source chain.
-/// TODO: work out the details of what's needed for as_at
-/// to make sure the right balance is struck between
-/// creating as_at snapshots and having access to the actual current source chain
-#[derive(Clone)]
-pub struct SourceChain {
-    cell: Cell,
-    as_at: Option<Address>,
+pub struct SourceChain<'a> {
+    persistence: &'a source_chain::SourceChainPersistence,
 }
 
-impl SourceChain {
-    /// Fails if a source chain has not yet been created for this CellId.
-    pub fn from_cell(cell: Cell) -> SkunkResult<Self> {
-        // TODO: fail if non existant
-        Ok(Self { cell, as_at: None })
+impl<'a> SourceChain<'a> {
+    pub(crate) fn new(persistence: &'a source_chain::SourceChainPersistence) -> Self {
+        Self { persistence }
     }
 
-    /// Return new SourceChain with head address `as_at` specified address
-    /// This is a potentially truncated snapshot of the actual source chain
-    /// Fails if `as_at` is not in the CAS
-    pub fn as_at(mut self, as_at: Address) -> SkunkResult<Self> {
-        // TODO: check if as_at is in CAS
-        self.as_at = Some(as_at);
-        Ok(self)
+    pub fn now(&self) -> SkunkResult<SourceChainSnapshot> {
+        let reader = self.persistence.create_cursor()?;
+        let head = unimplemented!(); // reader.query_eav(());
+        Ok(SourceChainSnapshot { reader, head })
     }
 
-    pub fn as_at_head(self) -> SkunkResult<Self> {
-        let actual_head = self.persisted_head_address();
-        self.as_at(actual_head)
+    pub fn as_at(&self, head: Address) -> SkunkResult<SourceChainSnapshot> {
+        Ok(SourceChainSnapshot {
+            reader: self.persistence.create_cursor()?,
+            head,
+        })
     }
 
-    pub fn get_dna(&self) -> SkunkResult<Dna> {
-        Ok(Dna)
-    }
-
-    // pub fn _head_address(&self) -> Address {
-    //     self.as_at
-    //         .clone()
-    //         .unwrap_or_else(|| self.persisted_head_address())
-    // }
-
-    fn persisted_head_address(&self) -> Address {
-        // TODO: read persisted head address from CAS
+    pub fn dna(&self) -> SkunkResult<Dna> {
         unimplemented!()
     }
 
+    pub fn agent_id(&self) -> SkunkResult<AgentId> {
+        unimplemented!()
+    }
     /// Use the SCHH to attempt to write a bundle of changes
     pub fn try_commit(&self, cursor_rw: source_chain::CursorRw) -> SkunkResult<()> {
         Ok(cursor_rw.commit()?)
+    }
+}
+
+/// Representation of a Cell's source chain.
+/// TODO: work out the details of what's needed for as-at
+/// to make sure the right balance is struck between
+/// creating as-at snapshots and having access to the actual current source chain
+pub struct SourceChainSnapshot {
+    reader: source_chain::CursorRw,
+    head: Address,
+}
+
+impl SourceChainSnapshot {
+    /// Fails if a source chain has not yet been created for this CellId.
+    fn new(reader: source_chain::Cursor, head: Address) -> SourceChainResult<Self> {
+        match reader.contains(&head) {
+            Ok(true) => Ok(Self { reader, head }),
+            Ok(false) => Err(SourceChainError::MissingHead),
+            Err(_) => Err(SourceChainError::ChainNotInitialized),
+        }
+    }
+
+    pub fn is_initialized(&self) -> bool {
+        unimplemented!()
     }
 }

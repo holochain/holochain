@@ -4,7 +4,7 @@
 
 use crate::{
     entry::entry_type::EntryType,
-    signature::{Provenance},
+    signature::{Provenance, Signature},
     time::{Iso8601},
 };
 
