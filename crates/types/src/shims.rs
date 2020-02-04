@@ -23,7 +23,6 @@ pub struct Lib3hToServer;
 pub struct Lib3hToServerResponse;
 pub struct Lib3hServerProtocol;
 
-
 pub enum ValidationResult {
     Valid,
     Invalid,

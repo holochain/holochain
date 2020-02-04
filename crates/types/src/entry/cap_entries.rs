@@ -51,6 +51,7 @@ impl FromStr for ReservedCapabilityId {
 }
 
 impl ReservedCapabilityId {
+    #[allow(dead_code)]
     pub fn as_str(&self) -> &'static str {
         match *self {
             ReservedCapabilityId::Public => "hc_public",

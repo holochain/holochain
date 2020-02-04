@@ -1,5 +1,5 @@
-use crate::cursor::ChainCursorX;
 use crate::net::NetRequester;
+use sx_types::prelude::*;
 
 pub trait ZomeApi {
     fn call();
@@ -39,12 +39,12 @@ pub trait ZomeApi {
 }
 
 pub struct ZomeEnvironment<N: NetRequester> {
-    chain_cursor: ChainCursorX,
+    chain_cursor: Todo,
     net_requester: N,
 }
 
 impl<N: NetRequester> ZomeEnvironment<N> {
-    pub fn new(chain_cursor: ChainCursorX, net_requester: N) -> Self {
+    pub fn new(chain_cursor: Todo, net_requester: N) -> Self {
         Self {
             chain_cursor,
             net_requester,

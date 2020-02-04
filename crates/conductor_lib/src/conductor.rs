@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use sx_core::cell::CellApi;
-use sx_core::cell::CellId;
+use sx_core::cell::{CellApi, CellId};
 use sx_core::cell::NetSender;
 
 /// A conductor-specific name for a Cell
@@ -11,16 +10,20 @@ pub type CellHandle = String;
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
 /// essentially immutable, and perhaps we just throw it out and make a new one
 /// when we need to load new config, etc.
-pub struct CellState<Cell: CellApi> {
+pub struct CellState {
     /// Whether or not we should call any methods on the cell
     active: bool,
+}
+
+pub struct CellItem<Cell: CellApi> {
     cell: Cell,
+    state: CellState
 }
 
 pub struct Conductor<Cell: CellApi> {
     tx_network: NetSender,
-    cells: HashMap<CellId, CellState<Cell>>,
-    handle_map: HashMap<CellHandle, Cell>,
+    cells: HashMap<CellId, CellItem<Cell>>,
+    handle_map: HashMap<CellHandle, CellId>,
 }
 
 impl<Cell: CellApi> Conductor<Cell> {

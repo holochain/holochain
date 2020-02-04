@@ -21,7 +21,7 @@ pub struct NetworkMessageHandler;
 
 #[async_trait]
 impl NetworkMessageHandlerT for NetworkMessageHandler {
-    async fn handle_store_dht_transform(transform: DhtItem) -> SkunkResult<()> {
+    async fn handle_store_dht_transform(_transform: DhtItem) -> SkunkResult<()> {
         Ok(())
     }
 }

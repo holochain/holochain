@@ -3,7 +3,6 @@
 //! are then used to check the integrity of data using cryptographic hash functions.
 
 use crate::{
-    agent::test_agent_id,
     entry::entry_type::EntryType,
     signature::{Provenance, Signature},
     time::{Iso8601},

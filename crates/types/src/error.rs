@@ -3,6 +3,7 @@
 
 use crate::prelude::*;
 use holochain_json_api::error::JsonError;
+use holochain_persistence_api::error::PersistenceError;
 use serde_json::Error as SerdeError;
 use std::fmt;
 

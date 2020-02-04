@@ -1,4 +1,5 @@
-target
+target/
+.cargo/
 Cargo.lock
 *.log
 *~

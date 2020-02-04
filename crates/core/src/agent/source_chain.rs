@@ -1,11 +1,9 @@
 use crate::agent::error::{SourceChainError, SourceChainResult};
 use crate::cell::Cell;
-use crate::cell::CellApi;
-use crate::cursor::ChainCursorManagerX;
-use crate::cursor::ChainCursorX;
-use crate::cursor::CursorR;
-use crate::cursor::CursorRw;
-use crate::cursor::SourceChainAttribute;
+use crate::txn::source_chain;
+use holochain_persistence_api::cas::content::Address;
+use holochain_persistence_api::txn::CursorProvider;
+use holochain_persistence_api::txn::Writer;
 use sx_types::agent::AgentId;
 use sx_types::dna::Dna;
 use sx_types::error::SkunkResult;
@@ -13,35 +11,25 @@ use sx_types::prelude::*;
 use sx_types::shims::*;
 
 pub struct SourceChain<'a> {
-    manager: &'a ChainCursorManagerX,
+    persistence: &'a source_chain::SourceChainPersistence,
 }
 
 impl<'a> SourceChain<'a> {
-    pub(crate) fn new(manager: &'a ChainCursorManagerX) -> Self {
-        Self { manager }
+    pub(crate) fn new(persistence: &'a source_chain::SourceChainPersistence) -> Self {
+        Self { persistence }
     }
 
-    pub fn now(&self) -> SourceChainSnapshot {
-        let reader = self.manager.reader();
+    pub fn now(&self) -> SkunkResult<SourceChainSnapshot> {
+        let reader = self.persistence.create_cursor()?;
         let head = unimplemented!(); // reader.query_eav(());
-        SourceChainSnapshot {
-            reader: self.manager.reader(),
-            head,
-        }
+        Ok(SourceChainSnapshot { reader, head })
     }
 
-    pub fn as_at(&self, head: Address) -> SourceChainSnapshot {
-        SourceChainSnapshot {
-            reader: self.manager.reader(),
+    pub fn as_at(&self, head: Address) -> SkunkResult<SourceChainSnapshot> {
+        Ok(SourceChainSnapshot {
+            reader: self.persistence.create_cursor()?,
             head,
-        }
-    }
-    /// Use the SCHH to attempt to write a bundle of changes
-    pub fn try_commit<Writer: CursorRw<SourceChainAttribute>>(
-        &self,
-        writer: Writer,
-    ) -> SkunkResult<()> {
-        unimplemented!()
+        })
     }
 
     pub fn dna(&self) -> SkunkResult<Dna> {
@@ -51,6 +39,10 @@ impl<'a> SourceChain<'a> {
     pub fn agent_id(&self) -> SkunkResult<AgentId> {
         unimplemented!()
     }
+    /// Use the SCHH to attempt to write a bundle of changes
+    pub fn try_commit(&self, cursor_rw: source_chain::CursorRw) -> SkunkResult<()> {
+        Ok(cursor_rw.commit()?)
+    }
 }
 
 /// Representation of a Cell's source chain.
@@ -58,14 +50,14 @@ impl<'a> SourceChain<'a> {
 /// to make sure the right balance is struck between
 /// creating as-at snapshots and having access to the actual current source chain
 pub struct SourceChainSnapshot {
-    reader: ChainCursorX,
+    reader: source_chain::CursorRw,
     head: Address,
 }
 
 impl SourceChainSnapshot {
     /// Fails if a source chain has not yet been created for this CellId.
-    fn new(reader: ChainCursorX, head: Address) -> SourceChainResult<Self> {
-        match reader.contains_content(&head) {
+    fn new(reader: source_chain::Cursor, head: Address) -> SourceChainResult<Self> {
+        match reader.contains(&head) {
             Ok(true) => Ok(Self { reader, head }),
             Ok(false) => Err(SourceChainError::MissingHead),
             Err(_) => Err(SourceChainError::ChainNotInitialized),

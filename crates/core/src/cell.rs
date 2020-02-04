@@ -1,10 +1,13 @@
-use crate::cursor::ChainCursorManagerX;
-use crate::cursor::CasCursorX;
-use crate::cursor::CursorR;
-use crate::cursor::CursorRw;
-use crate::nucleus::ZomeInvocationResult;
-use crate::{agent::SourceChain, nucleus::ZomeInvocation, workflow};
+use crate::txn::dht::DhtPersistence;
+use crate::txn::source_chain;
+use crate::{
+    agent::SourceChain,
+    nucleus::{ZomeInvocation, ZomeInvocationResult},
+    workflow,
+};
 use async_trait::async_trait;
+use holochain_persistence_api::txn::CursorProvider;
+use std::hash::{Hash, Hasher};
 use sx_types::agent::AgentId;
 use sx_types::error::SkunkResult;
 use sx_types::prelude::*;
@@ -36,13 +39,26 @@ pub trait CellApi: Send + Sync {
     ) -> SkunkResult<Option<Lib3hToClientResponse>>;
 }
 
-// #[derive(Clone, PartialEq, Eq, Hash)]
-// pub struct CellId(DnaAddress, AgentId);
+impl Hash for Cell {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        (self.dna_address(), self.agent_id()).hash(state);
+    }
+}
 
-// #[derive(PartialEq, Eq, Hash)]
+impl PartialEq for Cell {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+#[derive(Clone)]
 pub struct Cell {
     id: CellId,
-    chain_cursor_manager: ChainCursorManagerX,
+    persistence: source_chain::SourceChainPersistence,
+    dht_persistence: DhtPersistence,
 }
 
 #[async_trait]
@@ -56,14 +72,13 @@ impl CellApi for Cell {
     }
 
     fn source_chain(&self) -> SourceChain {
-        SourceChain::new(&self.chain_cursor_manager)
+        SourceChain::new(&self.persistence)
     }
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
-        unimplemented!()
-        // let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
-        // let cursor = CasCursorX;
-        // workflow::invoke_zome(invocation, source_chain, cursor).await
+        let source_chain = SourceChain::new(&self.persistence);
+        let cursor_rw = self.persistence.create_cursor_rw()?;
+        workflow::invoke_zome(invocation, source_chain, cursor_rw).await
     }
 
     async fn handle_network_message(
@@ -80,14 +95,6 @@ impl CellApi for Cell {
 trait NetSend {
     fn network_send(&self, msg: Lib3hClientProtocol) -> SkunkResult<()>;
 }
-
-// trait ChainRead {
-//     fn chain_read_cursor<C: CursorR>(&self) -> C;
-// }
-
-// trait ChainWrite {
-//     fn chain_write_cursor<C: CursorRw>(&self) -> C;
-// }
 
 /// Simplification of holochain_net::connection::NetSend
 /// Could use the trait instead, but we will want an impl of it

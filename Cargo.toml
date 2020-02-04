@@ -9,21 +9,15 @@ members = [
   "crates/types",
 ]
 
-exclude = [
-  "test_utils",
-]
 
 [patch.crates-io]
-# hdk = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-# holochain_net = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-# holochain_core = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-# holochain_conductor_lib = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-# # holochain_core_types = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-# holochain_dpki = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-# holochain_wasm_utils = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-# holochain_locksmith = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
-
-# holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence", branch = "develop" }
+holochain_json_api = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+holochain_json_derive = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional" }
+holochain_persistence_lmdb = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence", branch = "transactional" }
 
 # holochain_json_api = { version = "=0.0.17", path = "../holochain-serialization/crates/holochain_json_api" }
+# holochain_json_derive = { version = "=0.0.17", path = "../holochain-serialization/crates/holochain_json_derive" }
 # holochain_persistence_api = { version = "=0.0.13", path = "../holochain-persistence/crates/holochain_persistence_api" }
+# holochain_persistence_lmdb = { version = "=0.0.13", path = "../holochain-persistence/crates/holochain_persistence_lmdb" }
+
