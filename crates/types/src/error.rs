@@ -2,6 +2,7 @@
 //! Definitely not even close to the intended final struct for Errors.
 
 use holochain_json_api::error::JsonError;
+use holochain_persistence_api::error::PersistenceError;
 use serde_json::Error as SerdeError;
 use std::fmt;
 
@@ -53,3 +54,11 @@ impl From<base64::DecodeError> for SkunkError {
         SkunkError::new(format!("base64 decode error: {}", error.to_string()))
     }
 }
+
+
+impl From<PersistenceError> for SkunkError {
+    fn from(error: PersistenceError) -> Self {
+        SkunkError::new(format!("{:?}", error))
+    }
+}
+

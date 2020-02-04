@@ -6,11 +6,9 @@ use sx_types::error::SkunkResult;
 use sx_types::prelude::*;
 use sx_types::shims::*;
 use crate::txn::source_chain;
-use crate::txn::source_chain::Attribute;
 use crate::txn::dht::DhtPersistence;
 use std::hash::{Hash, Hasher};
 use holochain_persistence_api::txn::CursorProvider;
-use holochain_persistence_api::error::*;
 
 
 /// TODO: consider a newtype for this
@@ -50,7 +48,7 @@ impl PartialEq for Cell {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Eq)]
 pub struct Cell {
     dna_address: DnaAddress, 
     agent_id: AgentId, 
@@ -71,7 +69,7 @@ impl CellApi for Cell {
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
         let source_chain = SourceChain::from_cell(self.clone())?.as_at_head()?;
-        let cursor_rw = self.create_cursor_rw()?;
+        let cursor_rw = self.source_chain_persistence.create_cursor_rw()?;
         workflow::invoke_zome(invocation, source_chain, cursor_rw).await
     }
 
@@ -80,17 +78,6 @@ impl CellApi for Cell {
         msg: Lib3hToClient,
     ) -> SkunkResult<Option<Lib3hToClientResponse>> {
         workflow::handle_network_message(msg).await
-    }
-}
-
-impl CursorProvider<Attribute> for Cell {
-
-    fn create_cursor(&self) -> PersistenceResult<source_chain::Cursor> {
-        self.source_chain_persistence.create_cursor() 
-    }
-
-    fn create_cursor_rw(&self) -> PersistenceResult<source_chain::CursorRw> {
-        self.source_chain_persistence.create_cursor_rw() 
     }
 }
 

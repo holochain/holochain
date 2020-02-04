@@ -11,7 +11,6 @@ use crate::cell::DnaAddress;
 use sx_types::agent::AgentId;
 use crate::txn::common::DatabasePath;
 
-
 // Sequential index == I in the EAVI
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd)]
@@ -25,10 +24,8 @@ pub enum Attribute {
     TransactionIndex(u64),
     Queued(QueuedType)
 }
-impl holochain_persistence_api::eav::Attribute for Attribute {}
 
-
-#[derive(Clone, Debug, Shrinkwrap)]
+#[derive(Clone, Debug, Shrinkwrap, PartialEq, Eq)]
 pub struct SourceChainPersistence(pub LmdbManager<Attribute>);
 
 impl SourceChainPersistence {

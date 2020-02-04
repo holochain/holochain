@@ -4,8 +4,6 @@ use sx_types::error::SkunkResult;
 #[allow(unused_imports)]
 use sx_types::shims::*;
 use crate::txn::source_chain;
-use source_chain::Attribute;
-
 
 pub async fn invoke_zome(
     invocation: ZomeInvocation,

@@ -3,6 +3,8 @@ use holochain_persistence_api::cas::content::Address;
 use sx_types::error::SkunkResult;
 use sx_types::shims::*;
 use crate::txn::source_chain;
+use holochain_persistence_api::txn::Writer;
+
 
 /// Representation of a Cell's source chain.
 /// TODO: work out the details of what's needed for as_at
@@ -52,6 +54,6 @@ impl SourceChain {
 
     /// Use the SCHH to attempt to write a bundle of changes
     pub fn try_commit(&self, cursor_rw: source_chain::CursorRw) -> SkunkResult<()> {
-        cursor_rw.commit()?
+        Ok(cursor_rw.commit()?)
     }
 }

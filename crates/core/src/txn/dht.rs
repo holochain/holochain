@@ -9,9 +9,6 @@ use sx_types::agent::AgentId;
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, PartialOrd)]
 pub enum Attribute { Unimplemented }
 
-
-impl holochain_persistence_api::eav::Attribute for Attribute {}
-
 #[derive(Clone, Debug, Shrinkwrap)]
 pub struct DhtPersistence(pub LmdbManager<Attribute>);
 
