@@ -1,3 +1,4 @@
+use crate::txn::common::LmdbSettings;
 use crate::{cell::DnaAddress, txn::common::DatabasePath};
 /// Holds Content addressable entries from chains and DHT operational transforms
 #[allow(unused_imports)]
@@ -14,11 +15,27 @@ pub enum Attribute {
 pub struct DhtPersistence(pub LmdbManager<Attribute>);
 
 impl DhtPersistence {
-    pub fn new_manager(dna: DnaAddress, agent: AgentId) -> DhtPersistence {
+    fn create(dna: DnaAddress, agent: AgentId, settings: LmdbSettings) -> DhtPersistence {
         let db_path: DatabasePath = (dna, agent).into();
         let staging_path: Option<String> = None;
-        let manager = new_manager(db_path, staging_path, None, None, None, None);
+        let manager = new_manager(
+            db_path,
+            staging_path,
+            None,
+            None,
+            None,
+            Some(settings.into()),
+        );
         DhtPersistence(manager)
+    }
+
+    pub fn new(dna: DnaAddress, agent: AgentId) -> DhtPersistence {
+        Self::create(dna, agent, LmdbSettings::Normal)
+    }
+
+    #[cfg(test)]
+    pub fn test(dna: DnaAddress, agent: AgentId) -> DhtPersistence {
+        Self::create(dna, agent, LmdbSettings::Test)
     }
 }
 

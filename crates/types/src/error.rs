@@ -1,5 +1,5 @@
 //! Just enough to get us rolling for now.
-//! Definitely not even close to the intended final struct for Errors.
+//! Not the intended final struct for Errors.
 
 use crate::prelude::*;
 use holochain_json_api::error::JsonError;

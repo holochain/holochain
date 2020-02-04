@@ -4,6 +4,7 @@
 /// Authoried/Publish queue.
 
 #[allow(unused_imports)]
+use crate::txn::common::LmdbSettings;
 use holochain_persistence_api::txn::*;
 use holochain_persistence_lmdb::txn::*;
 
@@ -28,12 +29,27 @@ pub enum Attribute {
 pub struct SourceChainPersistence(pub LmdbManager<Attribute>);
 
 impl SourceChainPersistence {
-    pub fn new(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
+    fn create(dna: DnaAddress, agent: AgentId, settings: LmdbSettings) -> SourceChainPersistence {
         let db_path: DatabasePath = (dna, agent).into();
         let staging_path: Option<String> = None;
-
-        let manager = new_manager(db_path, staging_path, None, None, None, None);
+        let manager = new_manager(
+            db_path,
+            staging_path,
+            None,
+            None,
+            None,
+            Some(settings.into()),
+        );
         SourceChainPersistence(manager)
+    }
+
+    pub fn new(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
+        Self::create(dna, agent, LmdbSettings::Normal)
+    }
+
+    #[cfg(test)]
+    pub fn test(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
+        Self::create(dna, agent, LmdbSettings::Test)
     }
 }
 

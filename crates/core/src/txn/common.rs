@@ -1,3 +1,4 @@
+use lmdb::EnvironmentFlags;
 use holochain_persistence_api::cas::content::{Address, AddressableContent};
 use std::path::{Path, PathBuf};
 use sx_types::agent::AgentId;
@@ -17,5 +18,27 @@ impl From<(Address, AgentId)> for DatabasePath {
 impl AsRef<Path> for DatabasePath {
     fn as_ref(&self) -> &Path {
         self.as_path()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum LmdbSettings {
+    Normal,
+    Test
+}
+
+impl From<LmdbSettings> for EnvironmentFlags {
+    fn from(settings: LmdbSettings) -> EnvironmentFlags {
+        match settings {
+            // Note that MAP_ASYNC is absent here, because it degrades data integrity guarantees
+            LmdbSettings::Normal => EnvironmentFlags::WRITE_MAP,
+            LmdbSettings::Test => EnvironmentFlags::WRITE_MAP | EnvironmentFlags::NO_SYNC,
+        }
+    }
+}
+
+impl Default for LmdbSettings {
+    fn default() -> Self {
+        LmdbSettings::Normal
     }
 }
