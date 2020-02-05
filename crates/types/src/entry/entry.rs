@@ -220,7 +220,7 @@ pub mod tests {
 
     #[cfg_attr(tarpaulin, skip)]
     pub fn test_unpublishable_entry() -> Entry {
-        Entry::Dna(Box::new(Dna::new()))
+        Entry::Dna(Box::new(Dna::empty()))
     }
 
     #[test]

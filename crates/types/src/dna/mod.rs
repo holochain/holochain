@@ -12,7 +12,7 @@
 //!
 //! let name = String::from("My Holochain DNA");
 //!
-//! let mut dna = Dna::new();
+//! let mut dna = Dna::empty();
 //! dna.name = name.clone();
 //!
 //! let json = JsonString::from(dna.clone());
@@ -107,10 +107,21 @@ impl AddressableContent for Dna {
 
 impl Eq for Dna {}
 
-impl Default for Dna {
-    /// Provide defaults for a dna object.
-    fn default() -> Self {
-        Dna {
+impl Dna {
+    /// Create a new in-memory dna structure with some default values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sx_types::dna::Dna;
+    ///
+    /// let dna = Dna::empty();
+    /// assert_eq!("", dna.name);
+    ///
+    /// ```
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Self {
             name: String::new(),
             description: String::new(),
             version: String::new(),
@@ -120,23 +131,6 @@ impl Default for Dna {
             zomes: BTreeMap::new(),
         }
     }
-}
-
-impl Dna {
-    /// Create a new in-memory dna structure with some default values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sx_types::dna::Dna;
-    ///
-    /// let dna = Dna::new();
-    /// assert_eq!("", dna.name);
-    ///
-    /// ```
-    pub fn new() -> Self {
-        Default::default()
-    }
 
     /// Generate a pretty-printed json string from an in-memory dna struct.
     ///
@@ -145,7 +139,7 @@ impl Dna {
     /// ```
     /// use sx_types::dna::Dna;
     ///
-    /// let dna = Dna::new();
+    /// let dna = Dna::empty();
     /// println!("json: {}", dna.to_json_pretty().expect("DNA should serialize"));
     ///
     /// ```
@@ -305,71 +299,21 @@ pub mod tests {
             zome::tests::test_zome,
         },
         entry::entry_type::{AppEntryType, EntryType},
+        test_utils::test_dna,
     };
     use holochain_json_api::json::JsonString;
     use holochain_persistence_api::cas::content::Address;
     use std::convert::TryFrom;
 
-    pub fn test_dna() -> Dna {
-        let fixture = String::from(
-            r#"{
-                "name": "test",
-                "description": "test",
-                "version": "test",
-                "uuid": "00000000-0000-0000-0000-000000000000",
-                "dna_spec_version": "2.0",
-                "properties": {
-                    "test": "test"
-                },
-                "zomes": {
-                    "test": {
-                        "description": "test",
-                        "config": {},
-                        "entry_types": {
-                            "test": {
-                                "description": "test",
-                                "sharing": "public",
-                                "links_to": [
-                                    {
-                                        "target_type": "test",
-                                        "link_type": "test"
-                                    }
-                                ],
-                                "linked_from": []
-                            }
-                        },
-                        "traits": {
-                            "hc_public": {
-                                "functions": ["test"]
-                            }
-                        },
-                        "fn_declarations": [
-                            {
-                                "name": "test",
-                                "inputs": [],
-                                "outputs": []
-                            }
-                        ],
-                        "code": {
-                            "code": "AAECAw=="
-                        },
-                        "bridges": []
-                    }
-                }
-            }"#,
-        );
-        Dna::try_from(JsonString::from_json(&fixture)).unwrap()
-    }
-
     #[test]
     fn test_dna_new() {
-        let dna = Dna::new();
+        let dna = Dna::empty();
         assert_eq!(format!("{:?}",dna),"Dna { name: \"\", description: \"\", version: \"\", uuid: \"00000000-0000-0000-0000-000000000000\", dna_spec_version: \"2.0\", properties: Object({}), zomes: {} }")
     }
 
     #[test]
     fn test_dna_to_json_pretty() {
-        let dna = Dna::new();
+        let dna = Dna::empty();
         assert_eq!(format!("{:?}",dna.to_json_pretty()),"Ok(\"{\\n  \\\"name\\\": \\\"\\\",\\n  \\\"description\\\": \\\"\\\",\\n  \\\"version\\\": \\\"\\\",\\n  \\\"uuid\\\": \\\"00000000-0000-0000-0000-000000000000\\\",\\n  \\\"dna_spec_version\\\": \\\"2.0\\\",\\n  \\\"properties\\\": {},\\n  \\\"zomes\\\": {}\\n}\")")
     }
 
@@ -466,7 +410,7 @@ pub mod tests {
     static UNIT_UUID: &'static str = "00000000-0000-0000-0000-000000000000";
 
     fn test_empty_dna() -> Dna {
-        Dna::new()
+        Dna::empty()
     }
 
     #[test]
@@ -568,10 +512,9 @@ pub mod tests {
 
     #[test]
     fn default_value_test() {
-        let mut dna = Dna {
-            uuid: String::from(UNIT_UUID),
-            ..Default::default()
-        };
+        let mut dna = Dna::empty();
+        dna.uuid = String::from(UNIT_UUID);
+
         let mut zome = zome::Zome::empty();
         zome.entry_types
             .insert("".into(), entry_types::EntryTypeDef::new());

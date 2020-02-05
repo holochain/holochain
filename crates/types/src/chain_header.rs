@@ -38,7 +38,7 @@ pub struct ChainHeader {
     /// Key to the most recent header of the same type, None is valid only for the first of that type
     link_same_type: Option<Address>,
     /// Key to the header of the previous version of this chain header's entry
-    link_update_delete: Option<Address>,
+    link_crud: Option<Address>,
     /// ISO8601 time stamp
     timestamp: Iso8601,
 }
@@ -59,22 +59,22 @@ impl ChainHeader {
     ///
     /// @see chain::entry::Entry
     pub fn new(
-        entry_type: &EntryType,
-        entry_address: &Address,
+        entry_type: EntryType,
+        entry_address: Address,
         provenances: &[Provenance],
-        link: &Option<Address>,
-        link_same_type: &Option<Address>,
-        link_update_delete: &Option<Address>,
-        timestamp: &Iso8601,
+        link: Option<Address>,
+        link_same_type: Option<Address>,
+        link_crud: Option<Address>,
+        timestamp: Iso8601,
     ) -> Self {
         ChainHeader {
-            entry_type: entry_type.to_owned(),
-            entry_address: entry_address.to_owned(),
+            entry_type: entry_type,
+            entry_address: entry_address,
             provenances: provenances.to_owned(),
-            link: link.to_owned(),
-            link_same_type: link_same_type.to_owned(),
-            link_update_delete: link_update_delete.to_owned(),
-            timestamp: timestamp.to_owned(),
+            link: link,
+            link_same_type: link_same_type,
+            link_crud: link_crud,
+            timestamp: timestamp,
         }
     }
 
@@ -84,7 +84,7 @@ impl ChainHeader {
     }
 
     /// timestamp getter
-    pub fn timestamp(&self) -> &Iso8601 {
+    fn timestamp(&self) -> &Iso8601 {
         &self.timestamp
     }
 
@@ -94,22 +94,22 @@ impl ChainHeader {
     }
 
     /// entry_address getter
-    pub fn entry_address(&self) -> &Address {
+    fn entry_address(&self) -> &Address {
         &self.entry_address
     }
 
     /// link_same_type getter
-    pub fn link_same_type(&self) -> Option<Address> {
+    fn link_same_type(&self) -> Option<Address> {
         self.link_same_type.clone()
     }
 
-    /// link_update_delete getter
-    pub fn link_update_delete(&self) -> Option<Address> {
-        self.link_update_delete.clone()
+    /// link_crud getter
+    fn link_crud(&self) -> Option<Address> {
+        self.link_crud.clone()
     }
 
     /// entry_signature getter
-    pub fn provenances(&self) -> &Vec<Provenance> {
+    fn provenances(&self) -> &Vec<Provenance> {
         &self.provenances
     }
 }
@@ -146,13 +146,13 @@ pub mod tests {
     /// returns a dummy header for use in tests
     pub fn test_chain_header_with_sig(sig: &'static str) -> ChainHeader {
         ChainHeader::new(
-            &test_entry_type(),
-            &test_entry().address(),
+            test_entry_type(),
+            test_entry().address(),
             &test_provenances(sig),
-            &None,
-            &None,
-            &None,
-            &test_iso_8601(),
+            None,
+            None,
+            None,
+            test_iso_8601(),
         )
     }
 
@@ -171,13 +171,13 @@ pub mod tests {
     /// returns a dummy header for use in tests. different from test_chain_header_a.
     pub fn test_chain_header_b() -> ChainHeader {
         ChainHeader::new(
-            &test_entry_type_b(),
-            &test_entry_b().address(),
+            test_entry_type_b(),
+            test_entry_b().address(),
             &test_provenances("sig"),
-            &None,
-            &None,
-            &None,
-            &test_iso_8601(),
+            None,
+            None,
+            None,
+            test_iso_8601(),
         )
     }
 
@@ -199,22 +199,22 @@ pub mod tests {
         let entry_b = test_entry_b();
         assert_ne!(
             ChainHeader::new(
-                &entry_a.entry_type(),
-                &entry_a.address(),
+                entry_a.entry_type(),
+                entry_a.address(),
                 &test_provenances("sig"),
-                &None,
-                &None,
-                &None,
-                &test_iso_8601(),
+                None,
+                None,
+                None,
+                test_iso_8601(),
             ),
             ChainHeader::new(
-                &entry_b.entry_type(),
-                &entry_a.address(),
+                entry_b.entry_type(),
+                entry_a.address(),
                 &test_provenances("sig"),
-                &None,
-                &None,
-                &None,
-                &test_iso_8601(),
+                None,
+                None,
+                None,
+                test_iso_8601(),
             ),
         );
 
@@ -222,28 +222,28 @@ pub mod tests {
         let entry = test_entry();
         assert_ne!(
             ChainHeader::new(
-                &entry.entry_type(),
-                &entry.address(),
+                entry.entry_type(),
+                entry.address(),
                 &test_provenances("sig"),
-                &None,
-                &None,
-                &None,
-                &test_iso_8601(),
+                None,
+                None,
+                None,
+                test_iso_8601(),
             ),
             ChainHeader::new(
-                &entry.entry_type(),
-                &entry.address(),
+                entry.entry_type(),
+                entry.address(),
                 &test_provenances("sig"),
-                &Some(test_chain_header().address()),
-                &None,
-                &None,
-                &test_iso_8601(),
+                Some(test_chain_header().address()),
+                None,
+                None,
+                test_iso_8601(),
             ),
         );
     }
 
     #[test]
-    /// tests for ChainHeader::new()
+    /// tests for ChainHeader::new
     fn new() {
         let chain_header = test_chain_header();
 
@@ -269,13 +269,13 @@ pub mod tests {
         let chain_header_a = test_chain_header();
         let entry_b = test_entry();
         let chain_header_b = ChainHeader::new(
-            &entry_b.entry_type(),
-            &entry_b.address(),
+            entry_b.entry_type(),
+            entry_b.address(),
             &test_provenances("sig"),
-            &Some(chain_header_a.address()),
-            &None,
-            &None,
-            &test_iso_8601(),
+            Some(chain_header_a.address()),
+            None,
+            None,
+            test_iso_8601(),
         );
         assert_eq!(None, chain_header_a.link());
         assert_eq!(Some(chain_header_a.address()), chain_header_b.link());
@@ -291,23 +291,23 @@ pub mod tests {
         let chain_header_a = test_chain_header();
         let entry_b = test_entry_b();
         let chain_header_b = ChainHeader::new(
-            &entry_b.entry_type(),
-            &entry_b.address(),
+            entry_b.entry_type(),
+            entry_b.address(),
             &test_provenances("sig"),
-            &Some(chain_header_a.address()),
-            &None,
-            &None,
-            &test_iso_8601(),
+            Some(chain_header_a.address()),
+            None,
+            None,
+            test_iso_8601(),
         );
         let entry_c = test_entry_a();
         let chain_header_c = ChainHeader::new(
-            &entry_c.entry_type(),
-            &entry_c.address(),
+            entry_c.entry_type(),
+            entry_c.address(),
             &test_provenances("sig"),
-            &Some(chain_header_b.address()),
-            &Some(chain_header_a.address()),
-            &None,
-            &test_iso_8601(),
+            Some(chain_header_b.address()),
+            Some(chain_header_a.address()),
+            None,
+            test_iso_8601(),
         );
 
         assert_eq!(None, chain_header_a.link_same_type());
@@ -341,23 +341,23 @@ pub mod tests {
     fn address_entry_type() {
         assert_ne!(
             ChainHeader::new(
-                &test_entry_type_a(),
-                &test_entry().address(),
+                test_entry_type_a(),
+                test_entry().address(),
                 &test_provenances("sig"),
-                &None,
-                &None,
-                &None,
-                &test_iso_8601(),
+                None,
+                None,
+                None,
+                test_iso_8601(),
             )
             .address(),
             ChainHeader::new(
-                &test_entry_type_b(),
-                &test_entry().address(),
+                test_entry_type_b(),
+                test_entry().address(),
                 &test_provenances("sig"),
-                &None,
-                &None,
-                &None,
-                &test_iso_8601(),
+                None,
+                None,
+                None,
+                test_iso_8601(),
             )
             .address(),
         );
@@ -370,13 +370,13 @@ pub mod tests {
         assert_ne!(
             test_chain_header().address(),
             ChainHeader::new(
-                &entry.entry_type(),
-                &entry.address(),
+                entry.entry_type(),
+                entry.address(),
                 &test_provenances("sig"),
-                &Some(test_chain_header().address()),
-                &None,
-                &None,
-                &test_iso_8601(),
+                Some(test_chain_header().address()),
+                None,
+                None,
+                test_iso_8601(),
             )
             .address(),
         );
@@ -389,13 +389,13 @@ pub mod tests {
         assert_ne!(
             test_chain_header().address(),
             ChainHeader::new(
-                &entry.entry_type(),
-                &entry.address(),
+                entry.entry_type(),
+                entry.address(),
                 &test_provenances("sig"),
-                &None,
-                &Some(test_chain_header().address()),
-                &None,
-                &test_iso_8601(),
+                None,
+                Some(test_chain_header().address()),
+                None,
+                test_iso_8601(),
             )
             .address(),
         );

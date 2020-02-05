@@ -2,15 +2,12 @@
 /// sequential numeric index and  tx_index to group entries by bundle. Also
 /// flagged as to whether the DHT transforms have been put into
 /// Authoried/Publish queue.
-
-#[allow(unused_imports)]
-use crate::cell::CellId;
-use crate::txn::common::LmdbSettings;
+use crate::{cell::CellId, txn::common::LmdbSettings};
+use crate::{cell::DnaAddress, txn::common::DatabasePath};
 use holochain_persistence_api::txn::*;
 use holochain_persistence_lmdb::txn::*;
-
-use crate::{cell::DnaAddress, txn::common::DatabasePath};
-use sx_types::agent::AgentId;
+use std::convert::{TryFrom, TryInto};
+use sx_types::{agent::AgentId, prelude::*};
 
 // Sequential index == I in the EAVI
 
@@ -52,7 +49,6 @@ impl SourceChainPersistence {
         );
         SourceChainPersistence(manager)
     }
-
 }
 
 pub type Cursor = <LmdbManager<Attribute> as CursorProvider<Attribute>>::Cursor;

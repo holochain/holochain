@@ -1,3 +1,4 @@
+use sx_types::entry::Entry;
 use crate::{
     agent::SourceChain,
     nucleus::{ZomeInvocation, ZomeInvocationResult},

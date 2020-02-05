@@ -432,7 +432,7 @@ impl Config {
     pub fn update_agent_address_by_id(&mut self, id: &str, agent_id: &AgentId) {
         self.agents.iter_mut().for_each(|ac| {
             if &ac.id == id {
-                ac.public_address = agent_id.pub_sign_key.clone()
+                ac.public_address = agent_id.pub_sign_key().clone()
             }
         })
     }

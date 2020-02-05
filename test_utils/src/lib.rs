@@ -562,7 +562,7 @@ pub fn example_valid_entry_result() -> GetEntryResult {
     let entry_with_meta = &EntryWithMeta {
         entry: entry.clone(),
         crud_status: CrudStatus::Live,
-        maybe_link_update_delete: None,
+        maybe_link_crud: None,
     };
     GetEntryResult::new(StatusRequestKind::Latest, Some((entry_with_meta, vec![])))
 }

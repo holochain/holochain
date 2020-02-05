@@ -1,8 +1,17 @@
 use crate::cell::CellId;
-use holochain_persistence_api::cas::content::{Address, AddressableContent};
+use holochain_persistence_api::{
+    cas::content::{Address, AddressableContent},
+    txn::*,
+};
+use holochain_persistence_lmdb::txn::*;
 use lmdb::EnvironmentFlags;
-use std::path::{Path, PathBuf};
-use sx_types::agent::AgentId;
+use std::{
+    convert::TryFrom,
+    fmt::Debug,
+    hash::Hash,
+    path::{Path, PathBuf},
+};
+use sx_types::{agent::AgentId, prelude::*};
 
 #[derive(Clone, Debug, Shrinkwrap)]
 pub struct DatabasePath(PathBuf);
@@ -41,5 +50,27 @@ impl From<LmdbSettings> for EnvironmentFlags {
 impl Default for LmdbSettings {
     fn default() -> Self {
         LmdbSettings::Normal
+    }
+}
+
+#[cfg(hey_carmelo)] // ;)
+mod nice_to_have {
+    pub type Cursor<A: Attribute> = <LmdbManager<A> as CursorProvider<A>>::Cursor;
+    pub type CursorRw<A: Attribute> = <LmdbManager<A> as CursorProvider<A>>::CursorRw;
+
+    pub trait TypedCursor<A: Attribute, T: TryFrom<Content>>:
+        PartialEq + Eq + PartialOrd + Hash + Clone + serde::Serialize + Debug + Sync + Send
+    {
+        type Error: From<PersistenceError>;
+        fn cursor(&self) -> &Cursor<A>;
+        fn fetch(&self, address: &Address) -> Result<Option<T>, Self::Error> {
+            unimplemented!()
+            // self.cursor().fetch(address)?.map(|c| c.try_into())
+        }
+        fn contains(&self, address: &Address) -> Result<bool, Self::Error> {
+            unimplemented!()
+        }
+
+        // and so on...
     }
 }

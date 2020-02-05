@@ -1,5 +1,5 @@
 use crate::ribosome::Ribosome;
-use sx_types::{dna::Dna, shims::*};
+use sx_types::{dna::Dna, entry::Entry, shims::*};
 
 /// TODO Determine cursor type
 pub type Cursor = crate::txn::source_chain::Cursor;

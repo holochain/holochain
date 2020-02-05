@@ -10,7 +10,7 @@ use holochain_json_api::{error::JsonError, json::JsonString};
 /// this type is used in headers and in capability requests where the item being signed
 /// is implicitly known by context
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Hash, Eq, DefaultJson)]
-pub struct Provenance(pub Address, pub Signature);
+pub struct Provenance(Address, Signature);
 
 impl Provenance {
     /// Creates a new provenance instance with source typically

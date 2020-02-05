@@ -3,10 +3,10 @@
 
 #[macro_use]
 extern crate holochain_json_derive;
-#[allow(unused_imports)]
 #[macro_use]
 extern crate serde_derive;
-
+#[macro_use]
+extern crate log;
 #[macro_use]
 extern crate shrinkwraprs;
 
@@ -21,3 +21,6 @@ pub mod ribosome;
 pub mod txn;
 pub mod validation;
 pub mod wasm_engine;
+
+#[cfg(test)]
+pub mod test_utils;

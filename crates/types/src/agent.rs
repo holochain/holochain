@@ -15,9 +15,9 @@ pub type Base32 = String;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, DefaultJson, Eq, Hash)]
 pub struct AgentId {
     /// a nickname for referencing this agent
-    pub nick: String,
+    nick: String,
     /// the encoded public signing key of this agent (the magnifier)
-    pub pub_sign_key: Base32,
+    pub_sign_key: Base32,
     // TODO: Add the encoded public encrypting key (the safe / padlock)
     // pub pub_enc_key: Base32,
 }
@@ -55,6 +55,14 @@ impl AgentId {
         let codec = HcidEncoding::with_kind("hcs0")?;
         let key_b32 = codec.decode(&self.pub_sign_key)?;
         Ok(str::from_utf8(&key_b32).unwrap().to_owned())
+    }
+
+    pub fn nick(&self) -> &String {
+        &self.nick
+    }
+
+    pub fn pub_sign_key(&self) -> &Base32 {
+        &self.pub_sign_key
     }
 }
 

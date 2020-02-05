@@ -1,5 +1,6 @@
 use crate::{
     agent::SourceChain,
+    cell::error::{CellError, CellResult},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     txn::{dht::DhtPersistence, source_chain, source_chain::SourceChainPersistence},
     workflow,
@@ -87,23 +88,21 @@ impl CellApi for Cell {
 
 impl Cell {
     /// Checks if Cell has been initialized already
-    pub fn from_id(id: CellId) -> SkunkResult<Self> {
+    pub fn from_id(id: CellId) -> CellResult<Self> {
         let chain_persistence = SourceChainPersistence::new(id.clone());
         let dht_persistence = DhtPersistence::new(id.clone());
-        unimplemented!()
+        SourceChain::new(&chain_persistence).validate()?;
+        Ok(Cell {
+            id,
+            chain_persistence,
+            dht_persistence,
+        })
     }
 
     pub fn from_dna(agent_id: AgentId, dna: Dna) -> SkunkResult<Self> {
         unimplemented!()
     }
 }
-
-
-pub enum CellInitializationError {
-    UninitializedChain,
-    CorruptChain
-}
-
 
 pub struct CellBuilder {
     id: CellId,
@@ -162,14 +161,11 @@ pub type NetSender = futures::channel::mpsc::Sender<Lib3hClientProtocol>;
 pub mod tests {
 
     use super::*;
-
-    fn fake_id(name: &str) -> CellId {
-        (unimplemented!(), AgentId::generate_fake(name))
-    }
+    use crate::test_utils::fake_cell_id;
 
     #[test]
     fn can_create_cell() {
-        let cell: Cell = CellBuilder::new(fake_id("a"))
+        let cell: Cell = CellBuilder::new(fake_cell_id("a"))
             .with_test_persistence()
             .build();
     }

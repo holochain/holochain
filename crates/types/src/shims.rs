@@ -13,9 +13,6 @@ pub struct LogRules;
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct Sim2hConfig;
 
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
-pub struct Entry;
-
 pub struct Lib3hToClient;
 pub struct Lib3hToClientResponse;
 pub struct Lib3hClientProtocol;
