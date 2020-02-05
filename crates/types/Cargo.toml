@@ -29,3 +29,4 @@ backtrace = "0.3.27"
 
 # possibly dispensable
 maplit = "=1.0.2"
+thiserror = "1.0.10"

@@ -1,5 +1,7 @@
-use crate::txn::common::LmdbSettings;
-use crate::{cell::DnaAddress, txn::common::DatabasePath};
+use crate::{
+    cell::DnaAddress,
+    txn::common::{DatabasePath, LmdbSettings},
+};
 /// Holds Content addressable entries from chains and DHT operational transforms
 #[allow(unused_imports)]
 use holochain_persistence_api::txn::*;

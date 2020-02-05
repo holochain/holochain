@@ -1,3 +1,4 @@
+use crate::error::ConductorError;
 use boolinator::Boolinator;
 use petgraph::{algo::toposort, graph::DiGraph, prelude::NodeIndex};
 use serde::{Deserialize, Serialize};
@@ -195,7 +196,7 @@ pub type DnaLoader = Arc<Box<dyn FnMut(&PathBuf) -> Result<Dna, SkunkError> + Se
 impl Config {
     /// This function basically checks if self is a semantically valid configuration.
     /// This mainly means checking for consistency between config structs that reference others.
-    pub fn check_consistency(&self, mut dna_loader: &mut DnaLoader) -> Result<(), SkunkError> {
+    pub fn check_consistency(&self, mut dna_loader: &mut DnaLoader) -> Result<(), ConductorError> {
         detect_dupes("agent", self.agents.iter().map(|c| &c.id))?;
         detect_dupes("dna", self.dnas.iter().map(|c| &c.id))?;
 
@@ -474,7 +475,9 @@ impl Config {
     /// such that this ordering of instances can be used to spawn them and simultaneously create
     /// initialize the bridges and be able to assert that any callee already exists (which makes
     /// this task much easier).
-    pub fn instance_ids_sorted_by_bridge_dependencies(&self) -> Result<Vec<String>, SkunkError> {
+    pub fn instance_ids_sorted_by_bridge_dependencies(
+        &self,
+    ) -> Result<Vec<String>, ConductorError> {
         let mut graph = DiGraph::<&str, &str>::new();
 
         // Add instance ids to the graph which returns the indices the graph is using.
@@ -495,14 +498,14 @@ impl Config {
         // Create vector of edges (with node indices) from bridges:
         let edges: Vec<(&NodeIndex<u32>, &NodeIndex<u32>)> = self.bridges
             .iter()
-            .map(|bridge| -> Result<(&NodeIndex<u32>, &NodeIndex<u32>), SkunkError> {
+            .map(|bridge| -> Result<(&NodeIndex<u32>, &NodeIndex<u32>), ConductorError> {
                 let start = index_map.get(&bridge.caller_id);
                 let end = index_map.get(&bridge.callee_id);
                 if let (Some(start_inner), Some(end_inner)) = (start, end) {
                     Ok((start_inner, end_inner))
                 }
                 else {
-                    Err(SkunkError::ConfigError(format!(
+                    Err(ConductorError::ConfigError(format!(
                         "Instance configuration not found, mentioned in bridge configuration: {} -> {}",
                         bridge.caller_id, bridge.callee_id,
                     )))
@@ -517,7 +520,7 @@ impl Config {
 
         // Sort with petgraph::algo::toposort
         let mut sorted_nodes = toposort(&graph, None).map_err(|_cycle_error| {
-            SkunkError::ConfigError("Cyclic dependency in bridge configuration".to_string())
+            ConductorError::ConfigError("Cyclic dependency in bridge configuration".to_string())
         })?;
 
         // REVERSE order because we want to get the instance with NO dependencies first
@@ -861,19 +864,19 @@ where
     T: Deserialize<'a>,
 {
     toml::from_str::<T>(toml)
-        .map_err(|e| SkunkError::IoError(format!("Error loading configuration: {}", e.to_string())))
+        .map_err(|e| SkunkError::Todo(format!("Error loading configuration: {}", e.to_string())))
 }
 
 pub fn serialize_configuration(config: &Config) -> SkunkResult<String> {
     // see https://github.com/alexcrichton/toml-rs/issues/142
     let config_toml = toml::Value::try_from(config).map_err(|e| {
-        SkunkError::IoError(format!(
+        SkunkError::Todo(format!(
             "Could not serialize configuration: {}",
             e.to_string()
         ))
     })?;
     toml::to_string_pretty(&config_toml).map_err(|e| {
-        SkunkError::IoError(format!(
+        SkunkError::Todo(format!(
             "Could not convert toml to string: {}",
             e.to_string()
         ))

@@ -6,12 +6,17 @@ use holochain_json_api::error::JsonError;
 use holochain_persistence_api::error::PersistenceError;
 use serde_json::Error as SerdeError;
 use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Error, Debug)]
 pub enum SkunkError {
     Todo(String),
-    IoError(String),
-    ConfigError(String),
+    IoError(#[from] std::io::Error),
+    HcidError(#[from] hcid::HcidError),
+    SerdeError(#[from] SerdeError),
+    JsonError(#[from] JsonError),
+    PersistenceError(#[from] PersistenceError),
+    Base64DecodeError(#[from] base64::DecodeError),
 }
 
 impl fmt::Display for SkunkError {
@@ -22,8 +27,6 @@ impl fmt::Display for SkunkError {
         }
     }
 }
-
-impl std::error::Error for SkunkError {}
 
 impl From<String> for SkunkError {
     fn from(s: String) -> Self {
@@ -38,39 +41,3 @@ impl SkunkError {
 }
 
 pub type SkunkResult<T> = Result<T, SkunkError>;
-
-impl From<hcid::HcidError> for SkunkError {
-    fn from(error: hcid::HcidError) -> Self {
-        SkunkError::new(format!("{:?}", error))
-    }
-}
-
-impl From<std::io::Error> for SkunkError {
-    fn from(error: std::io::Error) -> Self {
-        SkunkError::new(format!("{:?}", error))
-    }
-}
-
-impl From<SerdeError> for SkunkError {
-    fn from(error: SerdeError) -> Self {
-        SkunkError::new(error.to_string())
-    }
-}
-
-impl From<JsonError> for SkunkError {
-    fn from(error: JsonError) -> Self {
-        SkunkError::new(error.to_string())
-    }
-}
-
-impl From<PersistenceError> for SkunkError {
-    fn from(error: PersistenceError) -> Self {
-        SkunkError::new(error.to_string())
-    }
-}
-
-impl From<base64::DecodeError> for SkunkError {
-    fn from(error: base64::DecodeError) -> Self {
-        SkunkError::new(format!("base64 decode error: {}", error.to_string()))
-    }
-}

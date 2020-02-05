@@ -1,5 +1,5 @@
-use lmdb::EnvironmentFlags;
 use holochain_persistence_api::cas::content::{Address, AddressableContent};
+use lmdb::EnvironmentFlags;
 use std::path::{Path, PathBuf};
 use sx_types::agent::AgentId;
 
@@ -24,7 +24,7 @@ impl AsRef<Path> for DatabasePath {
 #[derive(Clone, Debug)]
 pub enum LmdbSettings {
     Normal,
-    Test
+    Test,
 }
 
 impl From<LmdbSettings> for EnvironmentFlags {
