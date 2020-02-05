@@ -28,6 +28,22 @@ impl fmt::Display for SkunkError {
     }
 }
 
+impl PartialEq for SkunkError {
+    fn eq(&self, other: &Self) -> bool {
+        use SkunkError::*;
+        match (self, other) {
+            (Todo(a), Todo(b)) => a == b,
+            (IoError(a), IoError(b)) => a.to_string() == b.to_string(),
+            (HcidError(a), HcidError(b)) => a.to_string() == b.to_string(),
+            (SerdeError(a), SerdeError(b)) => a.to_string() == b.to_string(),
+            (JsonError(a), JsonError(b)) => a == b,
+            (PersistenceError(a), PersistenceError(b)) => a == b,
+            (Base64DecodeError(a), Base64DecodeError(b)) => a == b,
+            _ => false
+        }
+    }
+}
+
 impl From<String> for SkunkError {
     fn from(s: String) -> Self {
         SkunkError::Todo(s)

@@ -1,13 +1,13 @@
 use crate::{
     agent::SourceChain,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
-    txn::{dht::DhtPersistence, source_chain},
+    txn::{dht::DhtPersistence, source_chain, source_chain::SourceChainPersistence},
     workflow,
 };
 use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
 use std::hash::{Hash, Hasher};
-use sx_types::{agent::AgentId, error::SkunkResult, prelude::*, shims::*};
+use sx_types::{agent::AgentId, dna::Dna, error::SkunkResult, prelude::*, shims::*};
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = Address;
@@ -53,7 +53,7 @@ impl PartialEq for Cell {
 #[derive(Clone)]
 pub struct Cell {
     id: CellId,
-    persistence: source_chain::SourceChainPersistence,
+    chain_persistence: SourceChainPersistence,
     dht_persistence: DhtPersistence,
 }
 
@@ -68,12 +68,12 @@ impl CellApi for Cell {
     }
 
     fn source_chain(&self) -> SourceChain {
-        SourceChain::new(&self.persistence)
+        SourceChain::new(&self.chain_persistence)
     }
 
     async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
-        let source_chain = SourceChain::new(&self.persistence);
-        let cursor_rw = self.persistence.create_cursor_rw()?;
+        let source_chain = SourceChain::new(&self.chain_persistence);
+        let cursor_rw = self.chain_persistence.create_cursor_rw()?;
         workflow::invoke_zome(invocation, source_chain, cursor_rw).await
     }
 
@@ -82,6 +82,66 @@ impl CellApi for Cell {
         msg: Lib3hToClient,
     ) -> SkunkResult<Option<Lib3hToClientResponse>> {
         workflow::handle_network_message(msg).await
+    }
+}
+
+impl Cell {
+    /// Checks if Cell has been initialized already
+    pub fn from_id(id: CellId) -> SkunkResult<Self> {
+        let chain_persistence = SourceChainPersistence::new(id.clone());
+        let dht_persistence = DhtPersistence::new(id.clone());
+        unimplemented!()
+    }
+
+    pub fn from_dna(agent_id: AgentId, dna: Dna) -> SkunkResult<Self> {
+        unimplemented!()
+    }
+}
+
+
+pub enum CellInitializationError {
+    UninitializedChain,
+    CorruptChain
+}
+
+
+pub struct CellBuilder {
+    id: CellId,
+    chain_persistence: Option<SourceChainPersistence>,
+    dht_persistence: Option<DhtPersistence>,
+}
+
+impl CellBuilder {
+    pub fn new(id: CellId) -> Self {
+        Self {
+            id,
+            chain_persistence: None,
+            dht_persistence: None,
+        }
+    }
+
+    pub fn with_dna(self, dna: Dna) -> Self {
+        unimplemented!()
+    }
+
+    #[cfg(test)]
+    pub fn with_test_persistence(mut self) -> Self {
+        self.chain_persistence = Some(SourceChainPersistence::test(self.id.clone()));
+        self.dht_persistence = Some(DhtPersistence::test(self.id.clone()));
+        self
+    }
+
+    pub fn build(self) -> Cell {
+        let id = self.id.clone();
+        Cell {
+            id: self.id,
+            chain_persistence: self
+                .chain_persistence
+                .unwrap_or_else(|| SourceChainPersistence::new(id.clone())),
+            dht_persistence: self
+                .dht_persistence
+                .unwrap_or_else(|| DhtPersistence::new(id.clone())),
+        }
     }
 }
 
@@ -97,3 +157,20 @@ trait NetSend {
 /// for just a basic crossbeam_channel::Sender, so I'm simplifying
 /// to avoid making a change to holochain_net
 pub type NetSender = futures::channel::mpsc::Sender<Lib3hClientProtocol>;
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::*;
+
+    fn fake_id(name: &str) -> CellId {
+        (unimplemented!(), AgentId::generate_fake(name))
+    }
+
+    #[test]
+    fn can_create_cell() {
+        let cell: Cell = CellBuilder::new(fake_id("a"))
+            .with_test_persistence()
+            .build();
+    }
+}

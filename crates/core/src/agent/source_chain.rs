@@ -1,3 +1,4 @@
+use sx_types::chain_header::ChainHeader;
 use crate::{
     agent::error::{SourceChainError, SourceChainResult},
     cell::Cell,
@@ -50,7 +51,7 @@ impl<'a> SourceChain<'a> {
 /// to make sure the right balance is struck between
 /// creating as-at snapshots and having access to the actual current source chain
 pub struct SourceChainSnapshot {
-    reader: source_chain::CursorRw,
+    reader: source_chain::Cursor,
     head: Address,
 }
 
@@ -66,5 +67,51 @@ impl SourceChainSnapshot {
 
     pub fn is_initialized(&self) -> bool {
         unimplemented!()
+        // for header in self.iter_back() {
+
+        // }
+    }
+
+    pub fn iter_back(&self) -> SourceChainBackwardIterator {
+        SourceChainBackwardIterator {
+            reader: self.reader.clone(),
+            current: Some(self.head.clone()),
+        }
+    }
+}
+
+pub struct SourceChainBackwardIterator {
+    reader: source_chain::Cursor,
+    current: Option<Address>,
+}
+
+/// Follows ChainHeader.link through every previous Entry (of any EntryType) in the chain
+// #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
+impl Iterator for SourceChainBackwardIterator {
+    type Item = ChainHeader;
+
+    /// May panic if there is an underlying bad entry in the CAS
+    /// This is a pretty major problem, but we shouldn't crash the entire conductor for it.
+    /// TODO: could use fallible iterator
+    fn next(&mut self) -> Option<ChainHeader> {
+        match &self.current {
+            None => None,
+            Some(address) => {
+                let content = self
+                    .reader
+                    .fetch(address)
+                    .expect("Could not access source chain store!")
+                    .expect(&format!(
+                        "No content found in source chain store at address {}",
+                        address
+                    ));
+                let header = ChainHeader::try_from_content(&content).expect(&format!(
+                    "Invalid content in source chain store at address {}",
+                    address
+                ));
+                self.current = header.link();
+                Some(header)
+            }
+        }
     }
 }

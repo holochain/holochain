@@ -1,5 +1,5 @@
 use crate::{
-    cell::DnaAddress,
+    cell::{CellId, DnaAddress},
     txn::common::{DatabasePath, LmdbSettings},
 };
 /// Holds Content addressable entries from chains and DHT operational transforms
@@ -17,8 +17,8 @@ pub enum Attribute {
 pub struct DhtPersistence(pub LmdbManager<Attribute>);
 
 impl DhtPersistence {
-    fn create(dna: DnaAddress, agent: AgentId, settings: LmdbSettings) -> DhtPersistence {
-        let db_path: DatabasePath = (dna, agent).into();
+    fn create(cell_id: CellId, settings: LmdbSettings) -> DhtPersistence {
+        let db_path: DatabasePath = cell_id.into();
         let staging_path: Option<String> = None;
         let manager = new_manager(
             db_path,
@@ -31,13 +31,13 @@ impl DhtPersistence {
         DhtPersistence(manager)
     }
 
-    pub fn new(dna: DnaAddress, agent: AgentId) -> DhtPersistence {
-        Self::create(dna, agent, LmdbSettings::Normal)
+    pub fn new(cell_id: CellId) -> DhtPersistence {
+        Self::create(cell_id, LmdbSettings::Normal)
     }
 
     #[cfg(test)]
-    pub fn test(dna: DnaAddress, agent: AgentId) -> DhtPersistence {
-        Self::create(dna, agent, LmdbSettings::Test)
+    pub fn test(cell_id: CellId) -> DhtPersistence {
+        Self::create(cell_id, LmdbSettings::Test)
     }
 }
 

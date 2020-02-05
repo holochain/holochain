@@ -5,7 +5,7 @@ use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
-#[derive(Error, Debug)]
+#[derive(Error, PartialEq, Debug)]
 pub enum ConductorError {
     InternalCellError(#[from] SkunkError),
     CellNotActive,

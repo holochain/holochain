@@ -4,6 +4,7 @@
 /// Authoried/Publish queue.
 
 #[allow(unused_imports)]
+use crate::cell::CellId;
 use crate::txn::common::LmdbSettings;
 use holochain_persistence_api::txn::*;
 use holochain_persistence_lmdb::txn::*;
@@ -29,8 +30,17 @@ pub enum Attribute {
 pub struct SourceChainPersistence(pub LmdbManager<Attribute>);
 
 impl SourceChainPersistence {
-    fn create(dna: DnaAddress, agent: AgentId, settings: LmdbSettings) -> SourceChainPersistence {
-        let db_path: DatabasePath = (dna, agent).into();
+    pub fn new(cell_id: CellId) -> SourceChainPersistence {
+        Self::create(cell_id, LmdbSettings::Normal)
+    }
+
+    #[cfg(test)]
+    pub fn test(cell_id: CellId) -> SourceChainPersistence {
+        Self::create(cell_id, LmdbSettings::Test)
+    }
+
+    fn create(cell_id: CellId, settings: LmdbSettings) -> SourceChainPersistence {
+        let db_path: DatabasePath = cell_id.into();
         let staging_path: Option<String> = None;
         let manager = new_manager(
             db_path,
@@ -43,14 +53,6 @@ impl SourceChainPersistence {
         SourceChainPersistence(manager)
     }
 
-    pub fn new(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
-        Self::create(dna, agent, LmdbSettings::Normal)
-    }
-
-    #[cfg(test)]
-    pub fn test(dna: DnaAddress, agent: AgentId) -> SourceChainPersistence {
-        Self::create(dna, agent, LmdbSettings::Test)
-    }
 }
 
 pub type Cursor = <LmdbManager<Attribute> as CursorProvider<Attribute>>::Cursor;
