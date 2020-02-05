@@ -119,7 +119,6 @@ impl Dna {
     /// assert_eq!("", dna.name);
     ///
     /// ```
-    #[cfg(test)]
     pub fn empty() -> Self {
         Self {
             name: String::new(),
@@ -133,6 +132,16 @@ impl Dna {
     }
 
     /// Generate a pretty-printed json string from an in-memory dna struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sx_types::dna::Dna;
+    ///
+    /// let dna = Dna::empty();
+    /// println!("json: {}", dna.to_json_pretty().expect("DNA should serialize"));
+    ///
+    /// ```
     pub fn to_json_pretty(&self) -> serde_json::Result<String> {
         serde_json::to_string_pretty(self)
     }

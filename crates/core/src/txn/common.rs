@@ -42,7 +42,7 @@ impl From<LmdbSettings> for EnvironmentFlags {
         match settings {
             // Note that MAP_ASYNC is absent here, because it degrades data integrity guarantees
             LmdbSettings::Normal => EnvironmentFlags::WRITE_MAP,
-            LmdbSettings::Test => EnvironmentFlags::WRITE_MAP | EnvironmentFlags::NO_SYNC,
+            LmdbSettings::Test => EnvironmentFlags::NO_SYNC,
         }
     }
 }
