@@ -25,6 +25,12 @@ impl From<CellId> for DatabasePath {
     }
 }
 
+impl From<&Path> for DatabasePath {
+    fn from(path: &Path) -> Self {
+        DatabasePath(path.into())
+    }
+}
+
 impl AsRef<Path> for DatabasePath {
     fn as_ref(&self) -> &Path {
         self.as_path()

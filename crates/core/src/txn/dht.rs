@@ -7,6 +7,7 @@ use crate::{
 use holochain_persistence_api::txn::*;
 use holochain_persistence_lmdb::txn::{new_manager, LmdbManager};
 use sx_types::agent::AgentId;
+use std::path::Path;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, PartialOrd)]
 pub enum Attribute {
@@ -17,8 +18,17 @@ pub enum Attribute {
 pub struct DhtPersistence(pub LmdbManager<Attribute>);
 
 impl DhtPersistence {
-    fn create(cell_id: CellId, settings: LmdbSettings) -> DhtPersistence {
-        let db_path: DatabasePath = cell_id.into();
+
+    pub fn new(cell_id: CellId) -> DhtPersistence {
+        Self::create(cell_id.into(), LmdbSettings::Normal)
+    }
+
+    #[cfg(test)]
+    pub fn test(path: &Path) -> DhtPersistence {
+        Self::create(path.into(), LmdbSettings::Test)
+    }
+
+    fn create(db_path: DatabasePath, settings: LmdbSettings) -> DhtPersistence {
         let staging_path: Option<String> = None;
         let manager = new_manager(
             db_path,
@@ -31,14 +41,6 @@ impl DhtPersistence {
         DhtPersistence(manager)
     }
 
-    pub fn new(cell_id: CellId) -> DhtPersistence {
-        Self::create(cell_id, LmdbSettings::Normal)
-    }
-
-    #[cfg(test)]
-    pub fn test(cell_id: CellId) -> DhtPersistence {
-        Self::create(cell_id, LmdbSettings::Test)
-    }
 }
 
 pub type Cursor = <LmdbManager<Attribute> as CursorProvider<Attribute>>::Cursor;

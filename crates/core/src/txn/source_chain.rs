@@ -6,7 +6,7 @@ use crate::{cell::CellId, txn::common::LmdbSettings};
 use crate::{cell::DnaAddress, txn::common::DatabasePath};
 use holochain_persistence_api::txn::*;
 use holochain_persistence_lmdb::txn::*;
-use std::convert::{TryFrom, TryInto};
+use std::{path::Path, convert::{TryFrom, TryInto}};
 use sx_types::{agent::AgentId, prelude::*};
 
 // Sequential index == I in the EAVI
@@ -28,16 +28,15 @@ pub struct SourceChainPersistence(pub LmdbManager<Attribute>);
 
 impl SourceChainPersistence {
     pub fn new(cell_id: CellId) -> SourceChainPersistence {
-        Self::create(cell_id, LmdbSettings::Normal)
+        Self::create(cell_id.into(), LmdbSettings::Normal)
     }
 
     #[cfg(test)]
-    pub fn test(cell_id: CellId) -> SourceChainPersistence {
-        Self::create(cell_id, LmdbSettings::Test)
+    pub fn test(path: &Path) -> SourceChainPersistence {
+        Self::create(path.into(), LmdbSettings::Test)
     }
 
-    fn create(cell_id: CellId, settings: LmdbSettings) -> SourceChainPersistence {
-        let db_path: DatabasePath = cell_id.into();
+    fn create(db_path: DatabasePath, settings: LmdbSettings) -> SourceChainPersistence {
         let staging_path: Option<String> = None;
         let manager = new_manager(
             db_path,

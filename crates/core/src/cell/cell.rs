@@ -7,7 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
-use std::hash::{Hash, Hasher};
+use std::{path::Path, hash::{Hash, Hasher}};
 use sx_types::{agent::AgentId, dna::Dna, error::SkunkResult, prelude::*, shims::*};
 
 /// TODO: consider a newtype for this
@@ -124,9 +124,9 @@ impl CellBuilder {
     }
 
     #[cfg(test)]
-    pub fn with_test_persistence(mut self) -> Self {
-        self.chain_persistence = Some(SourceChainPersistence::test(self.id.clone()));
-        self.dht_persistence = Some(DhtPersistence::test(self.id.clone()));
+    pub fn with_test_persistence(mut self, dir: &Path) -> Self {
+        self.chain_persistence = Some(SourceChainPersistence::test(&dir.join("chain")));
+        self.dht_persistence = Some(DhtPersistence::test(&dir.join("dht")));
         self
     }
 
@@ -165,8 +165,9 @@ pub mod tests {
 
     #[test]
     fn can_create_cell() {
+        let tmpdir = tempdir::TempDir::new("skunkworx").unwrap();
         let cell: Cell = CellBuilder::new(fake_cell_id("a"))
-            .with_test_persistence()
+            .with_test_persistence(tmpdir.path())
             .build();
     }
 }
