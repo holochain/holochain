@@ -2,18 +2,40 @@ use crate::conductor::CellHandle;
 use std::fmt;
 use sx_types::error::SkunkError;
 use thiserror::Error;
+use sx_core::cell::error::CellError;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
-#[derive(Error, PartialEq, Debug)]
+#[derive(Error, Debug)]
 pub enum ConductorError {
-    InternalCellError(#[from] SkunkError),
+    #[error(transparent)]
+    SkunkError(#[from] SkunkError),
+
+    #[error("Internal Cell error: {0}")]
+    InternalCellError(#[from] CellError),
+
+    #[error("Conductor API error: {0}")]
+    ApiError(#[from] ConductorApiError),
+
+    #[error("Cell is not active yet.")]
     CellNotActive,
+
+    #[error("Cell is already active.")]
     CellAlreadyActive,
+
+    #[error("Cell is not initialized.")]
     CellNotInitialized,
+
+    #[error("No such cell: {0}")]
     NoSuchCell(CellHandle),
+
+    #[error("Required bridge missing. Detail: {0}")]
     RequiredBridgeMissing(String),
+
+    #[error("Configuration error: {0}")]
     ConfigError(String),
+
+    #[error("Miscellaneous error: {0}")]
     Misc(String),
 }
 
@@ -23,32 +45,21 @@ impl From<String> for ConductorError {
     }
 }
 
-impl fmt::Display for ConductorError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let prefix = "Holochain Conductor Error";
-        match self {
-            ConductorError::InternalCellError(e) => {
-                write!(f, "{}: Internal Cell error: {:?}", prefix, e)
-            }
-            ConductorError::CellNotActive => write!(f, "{}: Cell is not active yet.", prefix),
-            ConductorError::CellAlreadyActive => write!(f, "{}: Cell is already active.", prefix),
-            ConductorError::CellNotInitialized => write!(f, "{}: Cell is not initialized.", prefix),
-            ConductorError::NoSuchCell(handle) => write!(
-                f,
-                "{}: Cell with handle '{}' does not exist",
-                prefix, handle
-            ),
-            ConductorError::RequiredBridgeMissing(handle) => write!(
-                f,
-                "{}: Required bridge is not present/started: {}",
-                prefix, handle
-            ),
-            ConductorError::ConfigError(reason) => {
-                write!(f, "{}: Configuration error: {}", prefix, reason)
-            }
-            ConductorError::Misc(reason) => {
-                write!(f, "{}: Miscellaneous error: {}", prefix, reason)
-            }
+
+impl PartialEq for ConductorError {
+    fn eq(&self, other: &Self) -> bool {
+        use ConductorError::*;
+        match (self, other) {
+            (InternalCellError(a), InternalCellError(b)) => a.to_string() == b.to_string(),
+            (InternalCellError(_), _) => false,
+            (_, InternalCellError(_)) => false,
+            (a, b) => a == b
         }
     }
 }
+
+
+#[derive(Error, PartialEq, Debug)]
+pub enum ConductorApiError {}
+
+pub type ConductorApiResult<T> = Result<T, ConductorApiError>;

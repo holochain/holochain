@@ -1,4 +1,7 @@
-use crate::conductor::{CellHandle, Conductor};
+use crate::{
+    conductor::{CellHandle, Conductor},
+    error::ConductorResult,
+};
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -7,7 +10,7 @@ use sx_core::{
     cell::CellApi,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
 };
-use sx_types::{error::SkunkResult, prelude::*, shims::*};
+use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
 
 #[derive(Clone)]
 pub struct ConductorHandle<Cell: CellApi> {
@@ -38,12 +41,18 @@ pub trait ConductorApiInternal<Cell: CellApi>: ConductorApiImmutable<Cell> {
         &self,
         cell: Cell,
         invocation: ZomeInvocation,
-    ) -> SkunkResult<ZomeInvocationResult>;
-    async fn network_send(&self, message: Lib3hClientProtocol) -> SkunkResult<()>;
+    ) -> ConductorResult<ZomeInvocationResult>;
+
+    async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorResult<()>;
+
     async fn network_request(
         &self,
         message: Lib3hClientProtocol,
-    ) -> SkunkResult<Lib3hServerProtocol>;
+    ) -> ConductorResult<Lib3hServerProtocol>;
+
+    async fn crypto_sign(&self, payload: String) -> ConductorResult<Signature>;
+    async fn crypto_encrypt(&self, payload: String) -> ConductorResult<String>;
+    async fn crypto_decrypt(&self, payload: String) -> ConductorResult<String>;
 }
 
 /// An interface for referencing a shared *mutable* conductor state, used by external sources
@@ -51,8 +60,9 @@ pub trait ConductorApiInternal<Cell: CellApi>: ConductorApiImmutable<Cell> {
 /// immutable, meaning we simply throw it away and load a new one whenever we need to change its state
 #[async_trait]
 pub trait ConductorApiExternal<Cell: CellApi>: ConductorApiMutable<Cell> {
-    async fn admin(&mut self, method: AdminMethod) -> SkunkResult<JsonString>;
-    async fn test(&mut self, cell: Cell, invocation: ZomeInvocation) -> SkunkResult<JsonString>;
+    async fn admin(&mut self, method: AdminMethod) -> ConductorResult<JsonString>;
+    async fn test(&mut self, cell: Cell, invocation: ZomeInvocation)
+        -> ConductorResult<JsonString>;
 }
 
 impl<Cell: CellApi> ConductorApiImmutable<Cell> for ConductorHandle<Cell> {
@@ -73,14 +83,14 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
         &self,
         cell: Cell,
         invocation: ZomeInvocation,
-    ) -> SkunkResult<ZomeInvocationResult>
+    ) -> ConductorResult<ZomeInvocationResult>
     where
         Cell: 'async_trait,
     {
-        cell.invoke_zome(invocation).await
+        Ok(cell.invoke_zome(invocation).await?)
     }
 
-    async fn network_send(&self, message: Lib3hClientProtocol) -> SkunkResult<()>
+    async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorResult<()>
     where
         Cell: 'async_trait,
     {
@@ -91,24 +101,40 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
     async fn network_request(
         &self,
         _message: Lib3hClientProtocol,
-    ) -> SkunkResult<Lib3hServerProtocol>
+    ) -> ConductorResult<Lib3hServerProtocol>
     where
         Cell: 'async_trait,
     {
+        unimplemented!()
+    }
+
+    async fn crypto_sign(&self, _payload: String) -> ConductorResult<Signature> {
+        unimplemented!()
+    }
+
+    async fn crypto_encrypt(&self, _payload: String) -> ConductorResult<String> {
+        unimplemented!()
+    }
+
+    async fn crypto_decrypt(&self, _payload: String) -> ConductorResult<String> {
         unimplemented!()
     }
 }
 
 #[async_trait]
 impl<Cell: CellApi> ConductorApiExternal<Cell> for ConductorHandle<Cell> {
-    async fn admin(&mut self, _method: AdminMethod) -> SkunkResult<JsonString>
+    async fn admin(&mut self, _method: AdminMethod) -> ConductorResult<JsonString>
     where
         Cell: 'async_trait,
     {
         unimplemented!()
     }
 
-    async fn test(&mut self, _cell: Cell, _invocation: ZomeInvocation) -> SkunkResult<JsonString>
+    async fn test(
+        &mut self,
+        _cell: Cell,
+        _invocation: ZomeInvocation,
+    ) -> ConductorResult<JsonString>
     where
         Cell: 'async_trait,
     {
