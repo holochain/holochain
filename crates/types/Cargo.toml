@@ -17,6 +17,8 @@ hcid = "=0.0.6"
 holochain_persistence_api = "=0.0.13"
 holochain_json_api = "=0.0.17"
 holochain_json_derive = "=0.0.17"
+holochain_locksmith = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+lib3h_crypto_api = "=0.0.31"
 regex = "=1.1.2"
 serde = "=1.0.89"
 serde_derive = "=1.0.89"

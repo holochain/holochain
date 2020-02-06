@@ -141,39 +141,6 @@ impl<'a> SourceChain<'a> {
     }
 }
 
-lazy_static! {
-    static ref CHAIN_HEAD_ADDRESS: HashString = HashString::from("chain-head");
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ChainTop(Address);
-
-impl ChainTop {
-    pub fn address(&self) -> &Address {
-        &self.0
-    }
-}
-
-// impl From<Address> for ChainTop {
-//     fn from(x: Address) -> ChainTop {
-//         ChainTop(x)
-//     }
-// }
-
-impl AddressableContent for ChainTop {
-    fn address(&self) -> Address {
-        CHAIN_HEAD_ADDRESS.clone()
-    }
-
-    fn content(&self) -> Content {
-        self.0.clone().into()
-    }
-
-    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
-        Ok(Self(HashString::try_from(content.clone())?))
-    }
-}
-
 /// Representation of a Cell's source chain.
 /// TODO: work out the details of what's needed for as-at
 /// to make sure the right balance is struck between
@@ -211,8 +178,14 @@ impl SourceChainSnapshot {
     /// - Starts with Dna
     /// - Agent follows immediately after
     pub fn validate(&self) -> SourceChainResult<()> {
-        // TODO
-        unimplemented!()
+        // TODO more refined checking of chain structure after SourceChainForwardIterator is built
+        if !self.is_initialized()? {
+            Err(SourceChainError::InvalidStructure(
+                ChainInvalidReason::MissingGenesis,
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn iter_back(&self) -> SourceChainBackwardIterator {
@@ -260,6 +233,33 @@ impl FallibleIterator for SourceChainBackwardIterator {
     }
 }
 
+lazy_static! {
+    static ref CHAIN_HEAD_ADDRESS: HashString = HashString::from("chain-head");
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ChainTop(Address);
+
+impl ChainTop {
+    pub fn address(&self) -> &Address {
+        &self.0
+    }
+}
+
+impl AddressableContent for ChainTop {
+    fn address(&self) -> Address {
+        CHAIN_HEAD_ADDRESS.clone()
+    }
+
+    fn content(&self) -> Content {
+        self.0.clone().into()
+    }
+
+    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
+        Ok(Self(HashString::try_from(content.clone())?))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum ChainInitDetectionState {
     NoneFound,
@@ -268,6 +268,7 @@ enum ChainInitDetectionState {
     BothFound,
 }
 
+use super::error::ChainInvalidReason;
 use ChainInitDetectionState::*;
 
 impl ChainInitDetectionState {
@@ -296,6 +297,7 @@ pub mod tests {
         cell::CellId, test_utils::fake_cell_id, txn::source_chain::SourceChainPersistence,
     };
     use sx_types::test_utils::test_dna;
+    use tempdir::TempDir;
 
     #[test]
     fn chain_init_detection_state() {
@@ -319,7 +321,8 @@ pub mod tests {
         let dna: Dna = test_dna();
         let agent = AgentId::generate_fake("a");
         let id: CellId = (dna.address(), agent.clone());
-        let persistence = SourceChainPersistence::test(id);
+        let tmpdir = TempDir::new("skunkworx").unwrap();
+        let persistence = SourceChainPersistence::test(tmpdir.path());
         let chain = SourceChain::new(&persistence);
         let writer = persistence.create_cursor_rw().unwrap();
 

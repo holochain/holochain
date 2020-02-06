@@ -1,4 +1,4 @@
-//! holochain_core_types::dna::zome is a set of structs for working with holochain dna.
+//! sx_types::dna::zome is a set of structs for working with holochain dna.
 
 use crate::{
     dna::{

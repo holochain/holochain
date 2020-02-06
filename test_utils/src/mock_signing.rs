@@ -1,4 +1,4 @@
-use holochain_dpki::{key_bundle::KeyBundle, SEED_SIZE};
+use sx_dpki::{key_bundle::KeyBundle, SEED_SIZE};
 use holochain_locksmith::Mutex;
 use holochain_persistence_api::cas::content::{Address, AddressableContent};
 use jsonrpc_ws_server::jsonrpc_core::{self, types::params::Params, IoHandler};
