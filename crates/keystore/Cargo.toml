@@ -1,5 +1,5 @@
 [package]
-name = "sx_conductor_lib"
+name = "sx_keystore"
 version = "0.0.1"
 description = "holochain core"
 license = "GPL-3.0-only"
@@ -15,9 +15,11 @@ serde_derive = "1.0.89"
 serde_json = "1.0.39"
 sx_core = { path = "../core"}
 sx_dpki = { path = "../dpki" }
-sx_keystore = { path = "../keystore"}
 sx_types = { path = "../types"}
+lib3h_sodium = "=0.0.31"
 holochain_common = "0.0.42-alpha5"
+# sx_dpki = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
+holochain_locksmith = { version = "=0.0.42-alpha5", git = "https://github.com/holochain/holochain-rust", branch = "develop" }
 futures = "0.3.1"
 parking_lot = "0.10.0"
 toml = "0.5.0"
@@ -26,6 +28,8 @@ boolinator = "2.4.0"
 thiserror = "1.0.10"
 log = "0.4.8"
 base64 = "=0.10.1"
+rpassword = "=2.1.0"
+crossbeam-channel = "=0.3.8"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "=0.0.42-alpha5" }

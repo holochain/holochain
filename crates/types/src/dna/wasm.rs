@@ -1,4 +1,4 @@
-//! holochain_core_types::dna::wasm is a module for managing webassembly code
+//! sx_types::dna::wasm is a module for managing webassembly code
 //!  - within the in-memory dna struct
 //!  - and serialized to json
 use crate::error::SkunkError;
@@ -169,7 +169,7 @@ impl DnaWasm {
         //         e
         //     );
         //     debug!("Unparsable bytes: {:?}", *self.code);
-        //     SkunkError::ErrorGeneric(e.into())
+        //     SkunkError::Todo(e.into())
         // })?;
         // let module_arc = ModuleArc::new(module);
         // let mut lock = self.module.write().unwrap();

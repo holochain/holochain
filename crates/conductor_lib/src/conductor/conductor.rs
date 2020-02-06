@@ -23,6 +23,7 @@ pub struct Conductor<Cell: CellApi> {
     tx_network: NetSender,
     cells: HashMap<CellId, CellItem<Cell>>,
     handle_map: HashMap<CellHandle, CellId>,
+    agent_keys: HashMap<AgentId, Keystore>,
 }
 
 impl<Cell: CellApi> Conductor<Cell> {
@@ -31,11 +32,16 @@ impl<Cell: CellApi> Conductor<Cell> {
             cells: HashMap::new(),
             handle_map: HashMap::new(),
             tx_network,
+            agent_keys: HashMap::new(),
         }
     }
 
     pub fn tx_network(&self) -> &NetSender {
         &self.tx_network
+    }
+
+    pub fn load_config(config: Config) -> ConductorResult<()> {
+        Ok(())
     }
 }
 
@@ -72,3 +78,6 @@ mod builder {
 }
 
 pub use builder::*;
+use crate::{error::ConductorResult, config::Config};
+use sx_types::agent::AgentId;
+use sx_keystore::keystore::Keystore;

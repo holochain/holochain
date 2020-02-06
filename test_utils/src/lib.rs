@@ -19,7 +19,7 @@ use holochain_core::{
     nucleus::actions::call_zome_function::make_cap_request_for_call,
     signal::{signal_channel, Signal, SignalReceiver},
 };
-use holochain_core_types::{
+use sx_types::{
     crud_status::CrudStatus,
     dna::{
         entry_types::{EntryTypeDef, LinkedFrom, LinksTo, Sharing},

@@ -141,33 +141,6 @@ impl<'a> SourceChain<'a> {
     }
 }
 
-lazy_static! {
-    static ref CHAIN_HEAD_ADDRESS: HashString = HashString::from("chain-head");
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ChainTop(Address);
-
-impl ChainTop {
-    pub fn address(&self) -> &Address {
-        &self.0
-    }
-}
-
-impl AddressableContent for ChainTop {
-    fn address(&self) -> Address {
-        CHAIN_HEAD_ADDRESS.clone()
-    }
-
-    fn content(&self) -> Content {
-        self.0.clone().into()
-    }
-
-    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
-        Ok(Self(HashString::try_from(content.clone())?))
-    }
-}
-
 /// Representation of a Cell's source chain.
 /// TODO: work out the details of what's needed for as-at
 /// to make sure the right balance is struck between
@@ -207,7 +180,9 @@ impl SourceChainSnapshot {
     pub fn validate(&self) -> SourceChainResult<()> {
         // TODO more refined checking of chain structure after SourceChainForwardIterator is built
         if !self.is_initialized()? {
-            Err(SourceChainError::InvalidStructure(ChainInvalidReason::MissingGenesis))
+            Err(SourceChainError::InvalidStructure(
+                ChainInvalidReason::MissingGenesis,
+            ))
         } else {
             Ok(())
         }
@@ -258,6 +233,33 @@ impl FallibleIterator for SourceChainBackwardIterator {
     }
 }
 
+lazy_static! {
+    static ref CHAIN_HEAD_ADDRESS: HashString = HashString::from("chain-head");
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ChainTop(Address);
+
+impl ChainTop {
+    pub fn address(&self) -> &Address {
+        &self.0
+    }
+}
+
+impl AddressableContent for ChainTop {
+    fn address(&self) -> Address {
+        CHAIN_HEAD_ADDRESS.clone()
+    }
+
+    fn content(&self) -> Content {
+        self.0.clone().into()
+    }
+
+    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
+        Ok(Self(HashString::try_from(content.clone())?))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum ChainInitDetectionState {
     NoneFound,
@@ -266,8 +268,8 @@ enum ChainInitDetectionState {
     BothFound,
 }
 
-use ChainInitDetectionState::*;
 use super::error::ChainInvalidReason;
+use ChainInitDetectionState::*;
 
 impl ChainInitDetectionState {
     fn found_dna(self) -> Self {
