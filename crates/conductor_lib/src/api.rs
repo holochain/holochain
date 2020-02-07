@@ -1,13 +1,13 @@
 use crate::{
     conductor::{CellHandle, Conductor},
-    error::ConductorResult,
+    error::{ConductorError, ConductorResult},
 };
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::Arc;
 use sx_core::{
-    cell::CellApi,
+    cell::{autonomic::AutonomicCue, CellApi, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
 };
 use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
@@ -15,11 +15,12 @@ use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
 #[derive(Clone)]
 pub struct ConductorHandle<Cell: CellApi> {
     lock: Arc<RwLock<Conductor<Cell>>>,
+    cell_id: CellId,
 }
 
 impl<Cell: CellApi> ConductorHandle<Cell> {
-    pub fn new(lock: Arc<RwLock<Conductor<Cell>>>) -> Self {
-        Self { lock }
+    pub fn new(cell_id: CellId, lock: Arc<RwLock<Conductor<Cell>>>) -> Self {
+        Self { cell_id, lock }
     }
 }
 
@@ -49,6 +50,8 @@ pub trait ConductorApiInternal<Cell: CellApi>: ConductorApiImmutable<Cell> {
         &self,
         message: Lib3hClientProtocol,
     ) -> ConductorResult<Lib3hServerProtocol>;
+
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorResult<()>;
 
     async fn crypto_sign(&self, payload: String) -> ConductorResult<Signature>;
     async fn crypto_encrypt(&self, payload: String) -> ConductorResult<String>;
@@ -107,6 +110,13 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
     {
         unimplemented!()
     }
+
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorResult<()> {
+        let conductor = self.lock.write();
+        let cell = conductor.cell_by_id(&self.cell_id)?;
+        Ok(cell.handle_autonomic_process(cue.into()).await?)
+    }
+
 
     async fn crypto_sign(&self, _payload: String) -> ConductorResult<Signature> {
         unimplemented!()

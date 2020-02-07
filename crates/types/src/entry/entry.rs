@@ -117,6 +117,8 @@ impl AddressableContent for Entry {
     }
 }
 
+pub struct EntryAddress(Address);
+
 #[cfg(test)]
 pub mod tests {
 

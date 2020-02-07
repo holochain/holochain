@@ -2,7 +2,7 @@ use crate::conductor::CellHandle;
 use std::fmt;
 use sx_types::error::SkunkError;
 use thiserror::Error;
-use sx_core::cell::error::CellError;
+use sx_core::cell::{CellId, error::CellError};
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -25,6 +25,9 @@ pub enum ConductorError {
 
     #[error("Cell is not initialized.")]
     CellNotInitialized,
+
+    #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
+    CellMissing(CellId),
 
     #[error("No such cell: {0}")]
     NoSuchCell(CellHandle),
