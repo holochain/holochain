@@ -28,24 +28,6 @@ pub type DnaAddress = Address;
 /// and sufficient to refer to a cell in a conductor
 pub type CellId = (DnaAddress, AgentId);
 
-/// Might be overkill to have a trait
-#[async_trait]
-pub trait CellApi: Send + Sync {
-    fn dna_address(&self) -> &DnaAddress;
-    fn agent_id(&self) -> &AgentId;
-    fn cell_id(&self) -> CellId {
-        (self.dna_address().clone(), self.agent_id().clone())
-    }
-
-    fn source_chain(&self) -> SourceChain;
-
-    async fn invoke_zome(&self, invocation: ZomeInvocation) -> CellResult<ZomeInvocationResult>;
-    async fn handle_network_message(
-        &self,
-        msg: Lib3hToClient,
-    ) -> CellResult<Option<Lib3hToClientResponse>>;
-    async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()>;
-}
 
 impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)
@@ -69,8 +51,7 @@ pub struct Cell {
     dht_persistence: DhtPersistence,
 }
 
-#[async_trait]
-impl CellApi for Cell {
+impl Cell {
     fn dna_address(&self) -> &DnaAddress {
         &self.id.0
     }
@@ -83,7 +64,7 @@ impl CellApi for Cell {
         SourceChain::new(&self.chain_persistence)
     }
 
-    async fn invoke_zome(&self, invocation: ZomeInvocation) -> CellResult<ZomeInvocationResult> {
+    pub async fn invoke_zome(&self, invocation: ZomeInvocation) -> CellResult<ZomeInvocationResult> {
         let source_chain = SourceChain::new(&self.chain_persistence);
         let cursor_rw = self
             .chain_persistence
@@ -92,14 +73,14 @@ impl CellApi for Cell {
         Ok(workflow::invoke_zome(invocation, source_chain, cursor_rw).await?)
     }
 
-    async fn handle_network_message(
+    pub async fn handle_network_message(
         &self,
         msg: Lib3hToClient,
     ) -> CellResult<Option<Lib3hToClientResponse>> {
         Ok(workflow::handle_network_message(msg).await?)
     }
 
-    async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
+    pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
         match process {
             AutonomicProcess::FastPush(entries) => workflow::publish(entries).await,
             AutonomicProcess::SlowHeal => unimplemented!(),
