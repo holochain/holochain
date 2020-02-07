@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use sx_core::cell::{CellApi, CellId, NetSender};
+use sx_core::cell::{Cell, CellId, NetSender};
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
@@ -14,19 +14,19 @@ pub struct CellState {
     active: bool,
 }
 
-pub struct CellItem<Cell: CellApi> {
+pub struct CellItem {
     cell: Cell,
     state: CellState,
 }
 
-pub struct Conductor<Cell: CellApi> {
+pub struct Conductor {
     tx_network: NetSender,
-    cells: HashMap<CellId, CellItem<Cell>>,
+    cells: HashMap<CellId, CellItem>,
     handle_map: HashMap<CellHandle, CellId>,
     agent_keys: HashMap<AgentId, Keystore>,
 }
 
-impl<Cell: CellApi> Conductor<Cell> {
+impl Conductor {
     pub fn new(tx_network: NetSender) -> Self {
         Self {
             cells: HashMap::new(),
@@ -37,7 +37,10 @@ impl<Cell: CellApi> Conductor<Cell> {
     }
 
     pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
-        let item = self.cells.get(cell_id).ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
+        let item = self
+            .cells
+            .get(cell_id)
+            .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
         Ok(&item.cell)
     }
 
@@ -82,7 +85,10 @@ mod builder {
     // }
 }
 
+use crate::{
+    config::Config,
+    error::{ConductorError, ConductorResult},
+};
 pub use builder::*;
-use crate::{error::{ConductorError, ConductorResult}, config::Config};
-use sx_types::agent::AgentId;
 use sx_keystore::keystore::Keystore;
+use sx_types::agent::AgentId;
