@@ -1,3 +1,4 @@
+use super::autonomic::AutonomicProcess;
 use crate::{
     agent::SourceChain,
     cell::error::{CellError, CellResult},
@@ -7,8 +8,17 @@ use crate::{
 };
 use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
-use std::{path::Path, hash::{Hash, Hasher}};
-use sx_types::{agent::AgentId, dna::Dna, error::SkunkResult, prelude::*, shims::*};
+use std::{
+    hash::{Hash, Hasher},
+    path::Path,
+};
+use sx_types::{
+    agent::AgentId,
+    dna::Dna,
+    error::{SkunkError, SkunkResult},
+    prelude::*,
+    shims::*,
+};
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = Address;
@@ -29,11 +39,12 @@ pub trait CellApi: Send + Sync {
 
     fn source_chain(&self) -> SourceChain;
 
-    async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult>;
+    async fn invoke_zome(&self, invocation: ZomeInvocation) -> CellResult<ZomeInvocationResult>;
     async fn handle_network_message(
         &self,
         msg: Lib3hToClient,
-    ) -> SkunkResult<Option<Lib3hToClientResponse>>;
+    ) -> CellResult<Option<Lib3hToClientResponse>>;
+    async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()>;
 }
 
 impl Hash for Cell {
@@ -72,17 +83,28 @@ impl CellApi for Cell {
         SourceChain::new(&self.chain_persistence)
     }
 
-    async fn invoke_zome(&self, invocation: ZomeInvocation) -> SkunkResult<ZomeInvocationResult> {
+    async fn invoke_zome(&self, invocation: ZomeInvocation) -> CellResult<ZomeInvocationResult> {
         let source_chain = SourceChain::new(&self.chain_persistence);
-        let cursor_rw = self.chain_persistence.create_cursor_rw()?;
-        workflow::invoke_zome(invocation, source_chain, cursor_rw).await
+        let cursor_rw = self
+            .chain_persistence
+            .create_cursor_rw()
+            .map_err(SkunkError::from)?;
+        Ok(workflow::invoke_zome(invocation, source_chain, cursor_rw).await?)
     }
 
     async fn handle_network_message(
         &self,
         msg: Lib3hToClient,
-    ) -> SkunkResult<Option<Lib3hToClientResponse>> {
-        workflow::handle_network_message(msg).await
+    ) -> CellResult<Option<Lib3hToClientResponse>> {
+        Ok(workflow::handle_network_message(msg).await?)
+    }
+
+    async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
+        match process {
+            AutonomicProcess::FastPush(entries) => workflow::publish(entries).await,
+            AutonomicProcess::SlowHeal => unimplemented!(),
+            AutonomicProcess::HealthCheck => unimplemented!(),
+        }
     }
 }
 

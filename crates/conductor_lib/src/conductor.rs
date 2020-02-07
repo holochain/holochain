@@ -36,6 +36,11 @@ impl<Cell: CellApi> Conductor<Cell> {
         }
     }
 
+    pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
+        let item = self.cells.get(cell_id).ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
+        Ok(&item.cell)
+    }
+
     pub fn tx_network(&self) -> &NetSender {
         &self.tx_network
     }
@@ -78,6 +83,6 @@ mod builder {
 }
 
 pub use builder::*;
-use crate::{error::ConductorResult, config::Config};
+use crate::{error::{ConductorError, ConductorResult}, config::Config};
 use sx_types::agent::AgentId;
 use sx_keystore::keystore::Keystore;

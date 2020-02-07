@@ -2,7 +2,7 @@ use futures::{channel, executor::ThreadPool, prelude::*, task::SpawnExt};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use sx_conductor_lib::{
-    api::ConductorHandle,
+    api::ConductorHandleExternal,
     conductor::Conductor,
     interface::{puppet::PuppetInterface, Interface},
 };
@@ -19,7 +19,7 @@ async fn example(executor: ThreadPool) {
     let (mut tx_dummy, rx_dummy) = channel::mpsc::unbounded();
     let conductor = Conductor::<Cell>::new(tx_network);
     let lock = Arc::new(RwLock::new(conductor));
-    let handle = ConductorHandle::new(lock);
+    let handle = ConductorHandleExternal::new(lock);
     let interface_fut = executor
         .spawn_with_handle(PuppetInterface::new(rx_dummy).spawn(handle))
         .unwrap();

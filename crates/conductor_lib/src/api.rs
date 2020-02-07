@@ -1,25 +1,37 @@
 use crate::{
     conductor::{CellHandle, Conductor},
-    error::ConductorResult,
+    error::{ConductorError, ConductorResult},
 };
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::Arc;
 use sx_core::{
-    cell::CellApi,
+    cell::{autonomic::AutonomicCue, CellApi, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
 };
 use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
 
 #[derive(Clone)]
-pub struct ConductorHandle<Cell: CellApi> {
+pub struct ConductorHandleExternal<Cell: CellApi> {
     lock: Arc<RwLock<Conductor<Cell>>>,
 }
 
-impl<Cell: CellApi> ConductorHandle<Cell> {
+#[derive(Clone)]
+pub struct ConductorHandleInternal<Cell: CellApi> {
+    lock: Arc<RwLock<Conductor<Cell>>>,
+    cell_id: CellId,
+}
+
+impl<Cell: CellApi> ConductorHandleExternal<Cell> {
     pub fn new(lock: Arc<RwLock<Conductor<Cell>>>) -> Self {
         Self { lock }
+    }
+}
+
+impl<Cell: CellApi> ConductorHandleInternal<Cell> {
+    pub fn new(lock: Arc<RwLock<Conductor<Cell>>>, cell_id: CellId) -> Self {
+        Self { cell_id, lock }
     }
 }
 
@@ -35,7 +47,7 @@ pub trait ConductorApiMutable<Cell: CellApi>: ConductorApiImmutable<Cell> {
 }
 
 /// An interface for referencing a shared conductor state, used by workflows within a Cell
-#[async_trait]
+#[async_trait(?Send)]
 pub trait ConductorApiInternal<Cell: CellApi>: ConductorApiImmutable<Cell> {
     async fn invoke_zome(
         &self,
@@ -49,6 +61,8 @@ pub trait ConductorApiInternal<Cell: CellApi>: ConductorApiImmutable<Cell> {
         &self,
         message: Lib3hClientProtocol,
     ) -> ConductorResult<Lib3hServerProtocol>;
+
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorResult<()>;
 
     async fn crypto_sign(&self, payload: String) -> ConductorResult<Signature>;
     async fn crypto_encrypt(&self, payload: String) -> ConductorResult<String>;
@@ -65,20 +79,32 @@ pub trait ConductorApiExternal<Cell: CellApi>: ConductorApiMutable<Cell> {
         -> ConductorResult<JsonString>;
 }
 
-impl<Cell: CellApi> ConductorApiImmutable<Cell> for ConductorHandle<Cell> {
+impl<Cell: CellApi> ConductorApiImmutable<Cell> for ConductorHandleExternal<Cell> {
     fn conductor(&self) -> ConductorImmutable<Cell> {
         self.lock.read()
     }
 }
 
-impl<Cell: CellApi> ConductorApiMutable<Cell> for ConductorHandle<Cell> {
+impl<Cell: CellApi> ConductorApiMutable<Cell> for ConductorHandleExternal<Cell> {
     fn conductor_mut(&mut self) -> ConductorMutable<Cell> {
         self.lock.write()
     }
 }
 
-#[async_trait]
-impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
+impl<Cell: CellApi> ConductorApiImmutable<Cell> for ConductorHandleInternal<Cell> {
+    fn conductor(&self) -> ConductorImmutable<Cell> {
+        self.lock.read()
+    }
+}
+
+impl<Cell: CellApi> ConductorApiMutable<Cell> for ConductorHandleInternal<Cell> {
+    fn conductor_mut(&mut self) -> ConductorMutable<Cell> {
+        self.lock.write()
+    }
+}
+
+#[async_trait(?Send)]
+impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandleInternal<Cell> {
     async fn invoke_zome(
         &self,
         cell: Cell,
@@ -108,6 +134,14 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
         unimplemented!()
     }
 
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorResult<()> {
+        let conductor = self.lock.write();
+        let cell = conductor.cell_by_id(&self.cell_id)?;
+        let _ = cell.handle_autonomic_process(cue.into()).await;
+        Ok(())
+    }
+
+
     async fn crypto_sign(&self, _payload: String) -> ConductorResult<Signature> {
         unimplemented!()
     }
@@ -122,7 +156,7 @@ impl<Cell: CellApi> ConductorApiInternal<Cell> for ConductorHandle<Cell> {
 }
 
 #[async_trait]
-impl<Cell: CellApi> ConductorApiExternal<Cell> for ConductorHandle<Cell> {
+impl<Cell: CellApi> ConductorApiExternal<Cell> for ConductorHandleExternal<Cell> {
     async fn admin(&mut self, _method: AdminMethod) -> ConductorResult<JsonString>
     where
         Cell: 'async_trait,
