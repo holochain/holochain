@@ -35,7 +35,7 @@ impl<'a> SourceChain<'a> {
     }
 
     pub fn now(&self) -> SourceChainResult<SourceChainSnapshot> {
-        let reader = self.persistence.create_cursor().map_err(SkunkError::from)?;
+        let reader = self.persistence.create_cursor()?;
         let head = Self::head_inner(&reader)?.ok_or(SourceChainError::ChainEmpty)?;
         Ok(SourceChainSnapshot { reader, head })
     }
@@ -76,15 +76,15 @@ impl<'a> SourceChain<'a> {
     }
 
     fn reader(&self) -> SourceChainResult<Cursor> {
-        Ok(self.persistence.create_cursor().map_err(SkunkError::from)?)
+        Ok(self.persistence.create_cursor()?)
     }
 
+    /// TODO: rewrite once we have the multi-LMDB cursors sorted out, so that we can
+    /// read the chain head from a different DB
     fn head_inner(reader: &Cursor) -> SourceChainResult<Option<ChainTop>> {
-        let maybe_content = reader
-            .fetch(&CHAIN_HEAD_ADDRESS)
-            .map_err(SkunkError::from)?;
+        let maybe_content = reader.fetch(&CHAIN_HEAD_ADDRESS)?;
         let maybe_address = match maybe_content {
-            Some(content) => Some(HashString::try_from(content).map_err(SkunkError::from)?),
+            Some(content) => Some(HashString::try_from(content)?),
             None => None,
         };
         Ok(maybe_address.map(ChainTop))
@@ -92,7 +92,7 @@ impl<'a> SourceChain<'a> {
 
     pub fn as_at(&self, head: ChainTop) -> SourceChainResult<SourceChainSnapshot> {
         Ok(SourceChainSnapshot {
-            reader: self.persistence.create_cursor().map_err(SkunkError::from)?,
+            reader: self.persistence.create_cursor()?,
             head,
         })
     }
@@ -106,9 +106,9 @@ impl<'a> SourceChain<'a> {
             chrono::Utc::now().timestamp().into(),
         )?;
         let head = ChainTop(dna_header.address());
-        writer.add(&dna_entry).map_err(SkunkError::from)?;
-        writer.add(&dna_header).map_err(SkunkError::from)?;
-        writer.add(&head).map_err(SkunkError::from)?;
+        writer.add(&dna_entry)?;
+        writer.add(&dna_header)?;
+        writer.add(&head)?;
 
         let agent_entry = Entry::AgentId(agent.clone());
         let agent_header = self.header_for_entry(
@@ -119,10 +119,10 @@ impl<'a> SourceChain<'a> {
         )?;
         let head = ChainTop(agent_header.address());
 
-        writer.add(&agent_entry).map_err(SkunkError::from)?;
-        writer.add(&agent_header).map_err(SkunkError::from)?;
-        writer.add(&head).map_err(SkunkError::from)?;
-        writer.commit().map_err(SkunkError::from)?;
+        writer.add(&agent_entry)?;
+        writer.add(&agent_header)?;
+        writer.add(&head)?;
+        writer.commit()?;
 
         Ok(())
     }
@@ -216,13 +216,8 @@ impl FallibleIterator for SourceChainBackwardIterator {
         match &self.current {
             None => Ok(None),
             Some(head) => {
-                if let Some(content) = self
-                    .reader
-                    .fetch(head.address())
-                    .map_err(SkunkError::from)?
-                {
-                    let header: ChainHeader =
-                        ChainHeader::try_from_content(&content).map_err(SkunkError::from)?;
+                if let Some(content) = self.reader.fetch(head.address())? {
+                    let header: ChainHeader = ChainHeader::try_from_content(&content)?;
                     self.current = header.link().map(ChainTop);
                     Ok(Some(header))
                 } else {

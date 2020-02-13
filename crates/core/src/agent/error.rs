@@ -1,6 +1,7 @@
 use sx_types::error::SkunkError;
 use sx_types::prelude::*;
 use thiserror::Error;
+use holochain_json_api::error::JsonError;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum SourceChainError {
@@ -15,6 +16,12 @@ pub enum SourceChainError {
 
     #[error("The content at address {0} is malformed and can't be deserialized.")]
     MalformedEntry(Address),
+
+    #[error("Persistence error: {0}")]
+    PersistenceError(#[from] PersistenceError),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] JsonError),
 
     #[error(transparent)]
     Generic(#[from] SkunkError),
