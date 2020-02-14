@@ -12,13 +12,18 @@ members = [
 
 
 [patch.crates-io]
-holochain_json_api = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
-holochain_json_derive = { version = "=0.0.17", git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
-holochain_persistence_api = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional" }
-holochain_persistence_lmdb = { version = "=0.0.13", git = "https://github.com/holochain/holochain-persistence", branch = "transactional" }
+holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_persistence_api = { version = "0.0.17", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+unpinned" }
+holochain_persistence_lmdb = { version = "0.0.17", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+unpinned" }
 
-# holochain_json_api = { version = "=0.0.17", path = "../holochain-serialization/crates/holochain_json_api" }
-# holochain_json_derive = { version = "=0.0.17", path = "../holochain-serialization/crates/holochain_json_derive" }
-# holochain_persistence_api = { version = "=0.0.13", path = "../holochain-persistence/crates/holochain_persistence_api" }
-# holochain_persistence_lmdb = { version = "=0.0.13", path = "../holochain-persistence/crates/holochain_persistence_lmdb" }
+# holochain_json_api = { version = "0.0.23", path = "../holochain-serialization/crates/holochain_json_api" }
+# holochain_json_derive = { version = "0.0.23", path = "../holochain-serialization/crates/holochain_json_derive" }
+# holochain_persistence_api = { version = "0.0.17", path = "../holochain-persistence/crates/holochain_persistence_api" }
+# holochain_persistence_lmdb = { version = "0.0.17", path = "../holochain-persistence/crates/holochain_persistence_lmdb" }
 
+lib3h_crypto_api = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }
+lib3h_sodium = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }
+
+holochain_tracing = { version = "0.0.20", git = "https://github.com/holochain/holochain-tracing.git", branch = "unpinned" }
+holochain_tracing_macros = { version = "0.0.20", git = "https://github.com/holochain/holochain-tracing.git", branch = "unpinned" }

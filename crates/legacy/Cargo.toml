@@ -9,16 +9,16 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
-serde = "=1.0.89"
-serde_derive = "=1.0.89"
-serde_json = "=1.0.39"
+serde = "1.0.89"
+serde_derive = "1.0.89"
+serde_json = "1.0.39"
 parking_lot = "0.10.0"
 toml = "0.5.0"
-holochain_json_derive = "=0.0.17"
-holochain_json_api = "=0.0.17"
-holochain_metrics = { version = "=0.0.42-alpha5" }
-holochain_common = { version = "=0.0.42-alpha5" }
-lib3h = "=0.0.31"
-lib3h_sodium = "=0.0.31"
-boolinator = "=2.4.0"
+holochain_json_derive = "0.0.23"
+holochain_json_api = "0.0.23"
+holochain_metrics = { version = "0.0.42-alpha5" }
+holochain_common = { version = "0.0.42-alpha5" }
+lib3h = "0.0.31"
+lib3h_sodium = "0.0.38"
+boolinator = "2.4.0"
 sx_types = { path = "../types"}

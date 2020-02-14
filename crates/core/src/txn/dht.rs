@@ -9,7 +9,7 @@ use holochain_persistence_lmdb::txn::{new_manager, LmdbManager};
 use sx_types::agent::AgentId;
 use std::path::Path;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Attribute {
     Unimplemented,
 }

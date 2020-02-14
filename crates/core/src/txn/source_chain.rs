@@ -11,13 +11,13 @@ use sx_types::{agent::AgentId, prelude::*};
 
 // Sequential index == I in the EAVI
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum QueuedType {
     Authoring,
     Publishing,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Attribute {
     TransactionIndex(u64),
     Queued(QueuedType),

@@ -9,16 +9,16 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
-lazy_static = "=1.4.0"
-base64 = "=0.10.1"
+lazy_static = "1.4.0"
+base64 = "0.10.1"
 sx_types = { path = "../types" }
-holochain_tracing_macros = "0.0.16"
-newrelic="0.2"
-lib3h_sodium = "=0.0.31"
-holochain_persistence_api = "=0.0.13"
-serde = "=1.0.89"
-serde_derive = "=1.0.89"
-serde_json = { version = "=1.0.39", features = ["preserve_order"] }
-hcid = "=0.0.6"
-bip39 = "=0.6.0-beta.1"
-holochain_common = { version = "=0.0.42-alpha5" }
+holochain_tracing_macros = "0.0.20"
+newrelic = "0.2"
+lib3h_sodium = "0.0.38"
+holochain_persistence_api = "0.0.17"
+serde = "1.0.89"
+serde_derive = "1.0.89"
+serde_json = { version = "1.0.39", features = ["preserve_order"] }
+hcid = "0.0.6"
+bip39 = "0.6.0-beta.1"
+holochain_common = { version = "0.0.42-alpha5" }

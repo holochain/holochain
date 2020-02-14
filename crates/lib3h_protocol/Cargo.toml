@@ -12,9 +12,9 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.22"
-base64 = "=0.10.1"
+base64 = "0.10.1"
 sx_types = { path = "../types"}
-rmp-serde = "=0.13.7"
-serde = "=1.0.89"
-serde_derive = "=1.0.89"
-url = { version = "=2.1.0", features = ["serde"] }
+rmp-serde = "0.13.7"
+serde = "1.0.89"
+serde_derive = "1.0.89"
+url = { version = "2.1.0", features = ["serde"] }
