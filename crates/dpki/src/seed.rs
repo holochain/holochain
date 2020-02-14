@@ -7,7 +7,7 @@ use crate::{
 use bip39::{Language, Mnemonic, MnemonicType};
 use sx_types::error::{SkunkResult, SkunkError};
 use lib3h_sodium::{kdf, pwhash, secbuf::SecBuf};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::str;
 
 //--------------------------------------------------------------------------------------------------

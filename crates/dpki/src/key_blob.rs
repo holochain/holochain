@@ -14,7 +14,7 @@ use sx_types::{
 };
 use std::str;
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// The data includes a base64 encoded, json serialized string of the EncryptedData that
 /// was created by concatenating all the keys in one SecBuf

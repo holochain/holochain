@@ -23,9 +23,8 @@ holochain_json_derive = "0.0.23"
 lib3h_sodium = "0.0.38"
 wabt = "0.7.4"
 tempfile = "3.0.7"
-serde = "1.0.89"
-serde_json = { version = "1.0.39", features = ["preserve_order"] }
-serde_derive = "1.0.89"
+serde = { version = "1.0.104", features = ["derive"] }
+serde_json = { version = "1.0.48", features = ["preserve_order"] }
 crossbeam-channel = "0.3.8"
 lazy_static = "1.4.0"
 jsonrpc-ws-server = "14.0.1"

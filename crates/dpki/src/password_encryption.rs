@@ -3,7 +3,7 @@ pub use aead::{ABYTES, NONCEBYTES};
 use sx_types::error::SkunkResult;
 use lib3h_sodium::{aead, kx, pwhash, secbuf::SecBuf};
 pub use pwhash::SALTBYTES;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 pub type OpsLimit = u64;
 pub type MemLimit = usize;
