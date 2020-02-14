@@ -94,7 +94,7 @@ impl ChainHeader {
     }
 
     /// entry_address getter
-    fn entry_address(&self) -> &Address {
+    pub fn entry_address(&self) -> &Address {
         &self.entry_address
     }
 

@@ -3,7 +3,7 @@
 members = [
   "crates/conductor_lib",
   "crates/core",
-  "crates/lib3h_protocol",
+  # "crates/lib3h_protocol",
   "crates/keystore",
   # "crates/legacy",
   "crates/holochain",

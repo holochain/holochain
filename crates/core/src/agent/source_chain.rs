@@ -1,3 +1,4 @@
+use super::error::ChainInvalidReason;
 use crate::{
     agent::error::{SourceChainError, SourceChainResult},
     cell::Cell,
@@ -24,7 +25,6 @@ use sx_types::{
     signature::{Provenance, Signature},
     time::Iso8601,
 };
-use super::error::ChainInvalidReason;
 
 pub struct SourceChain<'a> {
     persistence: &'a source_chain::SourceChainPersistence,
@@ -39,6 +39,13 @@ impl<'a> SourceChain<'a> {
         let reader = self.persistence.create_cursor()?;
         let head = Self::head_inner(&reader)?.ok_or(SourceChainError::ChainEmpty)?;
         Ok(SourceChainSnapshot { reader, head })
+    }
+
+    pub fn as_at(&self, head: ChainTop) -> SourceChainResult<SourceChainSnapshot> {
+        Ok(SourceChainSnapshot {
+            reader: self.persistence.create_cursor()?,
+            head,
+        })
     }
 
     pub fn validate(&self) -> SourceChainResult<()> {
@@ -91,13 +98,6 @@ impl<'a> SourceChain<'a> {
         Ok(maybe_address.map(ChainTop))
     }
 
-    pub fn as_at(&self, head: ChainTop) -> SourceChainResult<SourceChainSnapshot> {
-        Ok(SourceChainSnapshot {
-            reader: self.persistence.create_cursor()?,
-            head,
-        })
-    }
-
     pub fn initialize(&self, writer: CursorRw, dna: Dna, agent: AgentId) -> SourceChainResult<()> {
         let dna_entry = Entry::Dna(Box::new(dna));
         let dna_header = self.header_for_entry(
@@ -128,13 +128,42 @@ impl<'a> SourceChain<'a> {
         Ok(())
     }
 
-    pub fn dna(&self) -> SkunkResult<Dna> {
-        unimplemented!()
+    pub fn dna(&self) -> SourceChainResult<Dna> {
+        let snapshot = self.now()?;
+        let header = snapshot
+            .iter_back()
+            .find(|h| Ok(*h.entry_type() == EntryType::Dna))?
+            .expect("An initialized chain must have a DNA entry header");
+        let entry_address = header.entry_address();
+        if let Some(content) = snapshot.reader.fetch(entry_address)? {
+            let entry = Entry::try_from(content)?;
+            if let Entry::Dna(dna) = entry {
+                Ok(*dna)
+            } else {
+                Err(SourceChainError::InvalidStructure(
+                    ChainInvalidReason::HeaderAndEntryMismatch(header.address()),
+                ))
+            }
+        } else {
+            Err(SourceChainError::InvalidStructure(
+                ChainInvalidReason::MissingData(entry_address.clone()),
+            ))
+        }
     }
 
-    pub fn agent_id(&self) -> SkunkResult<AgentId> {
-        unimplemented!()
-    }
+    // pub fn agent_id(&self) -> SourceChainResult<AgentId> {
+    //     let snapshot = self.now()?;
+    //     let header = snapshot
+    //         .iter_back()
+    //         .find(|h| h.entry_type == EntryType::AgentId)
+    //         .expect("An initialized chain must have an AgentId entry header");
+    //     let entry = Entry::try_from(snapshot.reader.fetch(header.entry_address())?);
+    //     if let Entry::AgentId(agent) = entry {
+    //         agent
+    //     } else {
+    //         Err(SkunkError::Todo("No Agent found in chain"));
+    //     }
+    // }
 
     /// Use the SCHH to attempt to write a bundle of changes
     pub fn try_commit(&self, cursor_rw: source_chain::CursorRw) -> SkunkResult<()> {
@@ -210,7 +239,9 @@ impl SourceChainSnapshot {
         if self.is_initialized()? {
             Ok(())
         } else {
-            Err(SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing))
+            Err(SourceChainError::InvalidStructure(
+                ChainInvalidReason::GenesisMissing,
+            ))
         }
     }
 
@@ -225,6 +256,25 @@ impl SourceChainSnapshot {
     // pub fn iter_forth(&self) -> SourceChainForwardIterator {
     //     unimplemented!()
     // }
+
+    fn latest_entry_of_type(&self, entry_type: EntryType) -> SourceChainResult<Option<Entry>> {
+        if let Some(header) = self
+            .iter_back()
+            .find(|h| Ok(*h.entry_type() == entry_type))?
+        {
+            let entry_address = header.entry_address();
+            if let Some(content) = self.reader.fetch(entry_address)? {
+                let entry = Entry::try_from(content)?;
+                Ok(Some(entry))
+            } else {
+                Err(SourceChainError::InvalidStructure(
+                    ChainInvalidReason::MissingData(entry_address.clone()),
+                ))
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 pub struct SourceChainBackwardIterator {
@@ -261,8 +311,25 @@ pub mod tests {
     use crate::{
         cell::CellId, test_utils::fake_cell_id, txn::source_chain::SourceChainPersistence,
     };
+    use std::collections::BTreeMap;
     use sx_types::test_utils::test_dna;
     use tempdir::TempDir;
+    use Entry;
+
+    fn test_initialized_chain(
+        dna: Dna,
+        agent: AgentId,
+        persistence: &SourceChainPersistence,
+    ) -> SourceChain {
+        let dna: Dna = test_dna();
+        let agent = AgentId::generate_fake("a");
+        let id: CellId = (dna.address(), agent.clone());
+        let chain = SourceChain::new(&persistence);
+        let writer = persistence.create_cursor_rw().unwrap();
+        chain.initialize(writer, dna, agent).unwrap();
+        assert!(chain.validate().is_ok());
+        chain
+    }
 
     #[test]
     fn detect_chain_initialized() {
@@ -279,5 +346,31 @@ pub mod tests {
         chain.initialize(writer, dna, agent).unwrap();
 
         assert!(chain.validate().is_ok());
+    }
+
+    #[test]
+    fn chain_writes_are_protected() {
+        let tmpdir = TempDir::new("skunkworx").unwrap();
+        let persistence = SourceChainPersistence::test(tmpdir.path());
+        let chain = test_initialized_chain(test_dna(), AgentId::generate_fake("a"), &persistence);
+        let post_init_head = chain.head().unwrap();
+        let writer1 = persistence.create_cursor_rw().unwrap();
+
+        let entry1 = Entry::App("type".into(), "content".into());
+        let header1 = chain
+            .header_for_entry(
+                Some(&post_init_head),
+                &entry1,
+                &[Provenance::new(
+                    chain.agent_id().unwrap().address(),
+                    Signature::fake(),
+                )],
+                chrono::Utc::now().timestamp().into(),
+            )
+            .unwrap();
+
+        writer1.add(&entry1).unwrap();
+        writer1.add(&header1).unwrap();
+        chain.try_commit(writer1).unwrap();
     }
 }

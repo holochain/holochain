@@ -1,16 +1,17 @@
 use crate::{
     agent::SourceChain,
+    cell::error::CellResult,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::Ribosome,
     txn::source_chain,
 };
-use sx_types::{error::SkunkResult, shims::*};
+use sx_types::shims::*;
 
 pub async fn invoke_zome(
     invocation: ZomeInvocation,
     source_chain: SourceChain<'_>,
     cursor_rw: source_chain::CursorRw,
-) -> SkunkResult<ZomeInvocationResult> {
+) -> CellResult<ZomeInvocationResult> {
     let dna = source_chain.dna()?;
     let ribosome = Ribosome::new(dna);
     let (result, cursor_rw) = ribosome.call_zome_function(cursor_rw, invocation)?;

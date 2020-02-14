@@ -31,6 +31,12 @@ pub enum SourceChainError {
 pub enum ChainInvalidReason {
     #[error("A valid chain always begins with a Dna entry, followed by an Agent entry.")]
     GenesisMissing,
+
+    #[error("A chain header and its corresponding entry have a discrepancy. Header address: {0}")]
+    HeaderAndEntryMismatch(Address),
+
+    #[error("Content was expected to definitely exist at this address, but didn't: {0}")]
+    MissingData(Address),
 }
 
 pub type SourceChainResult<T> = Result<T, SourceChainError>;
