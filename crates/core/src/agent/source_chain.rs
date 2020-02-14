@@ -130,40 +130,27 @@ impl<'a> SourceChain<'a> {
 
     pub fn dna(&self) -> SourceChainResult<Dna> {
         let snapshot = self.now()?;
-        let header = snapshot
-            .iter_back()
-            .find(|h| Ok(*h.entry_type() == EntryType::Dna))?
-            .expect("An initialized chain must have a DNA entry header");
-        let entry_address = header.entry_address();
-        if let Some(content) = snapshot.reader.fetch(entry_address)? {
-            let entry = Entry::try_from(content)?;
-            if let Entry::Dna(dna) = entry {
-                Ok(*dna)
-            } else {
-                Err(SourceChainError::InvalidStructure(
-                    ChainInvalidReason::HeaderAndEntryMismatch(header.address()),
-                ))
-            }
+        let entry = snapshot.latest_entry_of_type(EntryType::Dna)?.ok_or(SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing))?;
+        if let Entry::Dna(dna) = entry {
+            Ok(*dna)
         } else {
             Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(entry_address.clone()),
+                ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
             ))
         }
     }
 
-    // pub fn agent_id(&self) -> SourceChainResult<AgentId> {
-    //     let snapshot = self.now()?;
-    //     let header = snapshot
-    //         .iter_back()
-    //         .find(|h| h.entry_type == EntryType::AgentId)
-    //         .expect("An initialized chain must have an AgentId entry header");
-    //     let entry = Entry::try_from(snapshot.reader.fetch(header.entry_address())?);
-    //     if let Entry::AgentId(agent) = entry {
-    //         agent
-    //     } else {
-    //         Err(SkunkError::Todo("No Agent found in chain"));
-    //     }
-    // }
+    pub fn agent_id(&self) -> SourceChainResult<AgentId> {
+        let snapshot = self.now()?;
+        let entry = snapshot.latest_entry_of_type(EntryType::AgentId)?.ok_or(SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing))?;
+        if let Entry::AgentId(agent) = entry {
+            Ok(agent)
+        } else {
+            Err(SourceChainError::InvalidStructure(
+                ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
+            ))
+        }
+    }
 
     /// Use the SCHH to attempt to write a bundle of changes
     pub fn try_commit(&self, cursor_rw: source_chain::CursorRw) -> SkunkResult<()> {
@@ -331,6 +318,24 @@ pub mod tests {
         chain
     }
 
+    fn fake_header_for_entry(chain: &SourceChain, entry: &Entry, head: &ChainTop) -> ChainHeader {
+        let provenances = &[Provenance::new(
+            chain.agent_id().unwrap().address(),
+            Signature::fake(),
+        )];
+        let timestamp = chrono::Utc::now().timestamp().into();
+
+        ChainHeader::new(
+            entry.entry_type(),
+            entry.address(),
+            provenances,
+            Some(head.address().clone()),
+            None,
+            None,
+            timestamp,
+        )
+    }
+
     #[test]
     fn detect_chain_initialized() {
         let dna: Dna = test_dna();
@@ -354,23 +359,21 @@ pub mod tests {
         let persistence = SourceChainPersistence::test(tmpdir.path());
         let chain = test_initialized_chain(test_dna(), AgentId::generate_fake("a"), &persistence);
         let post_init_head = chain.head().unwrap();
+
         let writer1 = persistence.create_cursor_rw().unwrap();
-
-        let entry1 = Entry::App("type".into(), "content".into());
-        let header1 = chain
-            .header_for_entry(
-                Some(&post_init_head),
-                &entry1,
-                &[Provenance::new(
-                    chain.agent_id().unwrap().address(),
-                    Signature::fake(),
-                )],
-                chrono::Utc::now().timestamp().into(),
-            )
-            .unwrap();
-
+        let entry1 = Entry::App("type".into(), "content 1".into());
+        let header1 = fake_header_for_entry(&chain, &entry1, &post_init_head);
         writer1.add(&entry1).unwrap();
         writer1.add(&header1).unwrap();
-        chain.try_commit(writer1).unwrap();
+
+        let writer2 = persistence.create_cursor_rw().unwrap();
+        let entry2 = Entry::App("type".into(), "content 2".into());
+        let header2 = fake_header_for_entry(&chain, &entry2, &post_init_head);
+        writer2.add(&entry1).unwrap();
+        writer2.add(&header1).unwrap();
+
+        assert_eq!(chain.try_commit(writer1), Ok(()));
+        // TODO: replace this assertion with the actual error issuing from multiple writes, once we know what it is
+        assert_ne!(chain.try_commit(writer2), Ok(()));
     }
 }
