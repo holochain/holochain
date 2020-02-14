@@ -30,7 +30,7 @@ pub enum SourceChainError {
 #[derive(Error, Debug, PartialEq)]
 pub enum ChainInvalidReason {
     #[error("A valid chain always begins with a Dna entry, followed by an Agent entry.")]
-    MissingGenesis,
+    GenesisMissing,
 }
 
 pub type SourceChainResult<T> = Result<T, SourceChainError>;

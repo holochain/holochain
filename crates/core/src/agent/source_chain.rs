@@ -24,6 +24,7 @@ use sx_types::{
     signature::{Provenance, Signature},
     time::Iso8601,
 };
+use super::error::ChainInvalidReason;
 
 pub struct SourceChain<'a> {
     persistence: &'a source_chain::SourceChainPersistence,
@@ -141,6 +142,36 @@ impl<'a> SourceChain<'a> {
     }
 }
 
+lazy_static! {
+    static ref CHAIN_HEAD_ADDRESS: HashString = HashString::from("chain-head");
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ChainTop(Address);
+
+impl ChainTop {
+    pub fn address(&self) -> &Address {
+        &self.0
+    }
+}
+
+/// Temporary bastardization until we have LMDB transactions across even more DBs,
+/// so that we can store the chain head in a different DB
+/// TODO: remove once we've got that
+impl AddressableContent for ChainTop {
+    fn address(&self) -> Address {
+        CHAIN_HEAD_ADDRESS.clone()
+    }
+
+    fn content(&self) -> Content {
+        self.0.clone().into()
+    }
+
+    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
+        Ok(Self(HashString::try_from(content.clone())?))
+    }
+}
+
 /// Representation of a Cell's source chain.
 /// TODO: work out the details of what's needed for as-at
 /// to make sure the right balance is struck between
@@ -160,31 +191,26 @@ impl SourceChainSnapshot {
         }
     }
 
+    /// Check that the chain is structured properly:
+    /// - Starts with Dna
+    /// - Agent follows immediately after
     pub fn is_initialized(&self) -> SourceChainResult<bool> {
-        use ChainInitDetectionState::*;
+        use crate::agent::validity::ChainStructureInspectorState::{BothFound, NoneFound};
 
-        let final_state = self.iter_back().fold(NoneFound, |s, header| {
-            Ok(match header.entry_type() {
-                EntryType::Dna => s.found_dna(),
-                EntryType::AgentId => s.found_agent(),
-                _ => s,
-            })
-        })?;
+        let final_state = self
+            .iter_back()
+            .fold(NoneFound, |s, header| Ok(s.check(&header)))?;
 
         Ok(final_state == BothFound)
     }
 
-    /// Check that the chain is structured properly:
-    /// - Starts with Dna
-    /// - Agent follows immediately after
+    /// Perform a more rigorous check of the chain structure to see that it is valid
+    /// TODO: check for missing CAS entries, etc., but for now just check for initialization
     pub fn validate(&self) -> SourceChainResult<()> {
-        // TODO more refined checking of chain structure after SourceChainForwardIterator is built
-        if !self.is_initialized()? {
-            Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingGenesis,
-            ))
-        } else {
+        if self.is_initialized()? {
             Ok(())
+        } else {
+            Err(SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing))
         }
     }
 
@@ -228,62 +254,6 @@ impl FallibleIterator for SourceChainBackwardIterator {
     }
 }
 
-lazy_static! {
-    static ref CHAIN_HEAD_ADDRESS: HashString = HashString::from("chain-head");
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ChainTop(Address);
-
-impl ChainTop {
-    pub fn address(&self) -> &Address {
-        &self.0
-    }
-}
-
-impl AddressableContent for ChainTop {
-    fn address(&self) -> Address {
-        CHAIN_HEAD_ADDRESS.clone()
-    }
-
-    fn content(&self) -> Content {
-        self.0.clone().into()
-    }
-
-    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
-        Ok(Self(HashString::try_from(content.clone())?))
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum ChainInitDetectionState {
-    NoneFound,
-    AgentFound,
-    DnaFound,
-    BothFound,
-}
-
-use super::error::ChainInvalidReason;
-use ChainInitDetectionState::*;
-
-impl ChainInitDetectionState {
-    fn found_dna(self) -> Self {
-        match self {
-            NoneFound => DnaFound,
-            AgentFound => BothFound,
-            s => s,
-        }
-    }
-
-    fn found_agent(self) -> Self {
-        match self {
-            NoneFound => AgentFound,
-            DnaFound => BothFound,
-            s => s,
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
 
@@ -293,23 +263,6 @@ pub mod tests {
     };
     use sx_types::test_utils::test_dna;
     use tempdir::TempDir;
-
-    #[test]
-    fn chain_init_detection_state() {
-        use ChainInitDetectionState::*;
-
-        assert_eq!(NoneFound.found_agent(), AgentFound);
-        assert_eq!(NoneFound.found_dna(), DnaFound);
-
-        assert_eq!(AgentFound.found_agent(), AgentFound);
-        assert_eq!(DnaFound.found_dna(), DnaFound);
-
-        assert_eq!(AgentFound.found_dna(), BothFound);
-        assert_eq!(DnaFound.found_agent(), BothFound);
-
-        assert_eq!(BothFound.found_agent(), BothFound);
-        assert_eq!(BothFound.found_dna(), BothFound);
-    }
 
     #[test]
     fn detect_chain_initialized() {
