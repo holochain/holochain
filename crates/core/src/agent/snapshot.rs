@@ -188,8 +188,8 @@ impl SourceChainCommitBundle {
         Ok(header)
     }
 
-    fn snapshot(&self) -> SourceChainResult<SourceChainSnapshot> {
-        SourceChainSnapshot::new(self.readonly_cursor(), self.original_head().clone())
+    pub fn snapshot(&self) -> SourceChainResult<SourceChainSnapshot> {
+        SourceChainSnapshot::new(self.readonly_cursor(), self.new_head.clone())
     }
 }
 

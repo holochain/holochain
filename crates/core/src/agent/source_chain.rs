@@ -255,6 +255,39 @@ pub mod tests {
     }
 
     #[test]
+    fn chains_can_have_new_entries_committed_in_bundles() {
+        let tmpdir = TempDir::new("skunkworx").unwrap();
+        let persistence = SourceChainPersistence::test(tmpdir.path());
+        let chain = test_initialized_chain(test_dna(), AgentId::generate_fake("a"), &persistence);
+        let post_init_head = chain.head().unwrap();
+
+        let mut bundle = chain.bundle().unwrap();
+        let headers: Vec<ChainHeader> = [
+            Entry::App("type".into(), "content 1".into()),
+            Entry::App("type".into(), "content 2".into()),
+            Entry::App("type".into(), "content 3".into()),
+        ]
+        .iter()
+        .map(|entry| bundle.add_entry(&entry).unwrap())
+        .collect();
+
+        // See that the uncommitted new entries are accessible through the iterator
+        assert!(bundle
+            .snapshot()
+            .unwrap()
+            .iter_back()
+            .find(|h| Ok(h.address() == headers[1].address()))
+            .unwrap()
+            .is_some());
+
+        // But also see that the new entries aren't actually committed yet!
+        assert_eq!(chain.now().unwrap().iter_back().count().unwrap(), 2);
+        bundle.commit().unwrap();
+        // Only now should they be
+        assert_eq!(chain.now().unwrap().iter_back().count().unwrap(), 5);
+    }
+
+    #[test]
     fn chains_are_protected_from_concurrent_transactional_writes_aka_as_at() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
         let persistence = SourceChainPersistence::test(tmpdir.path());
