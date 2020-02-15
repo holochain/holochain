@@ -2,11 +2,15 @@ use sx_types::error::SkunkError;
 use sx_types::prelude::*;
 use thiserror::Error;
 use holochain_json_api::error::JsonError;
+use super::ChainTop;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum SourceChainError {
     #[error("The source chain is empty: it needs to be initialized before using")]
     ChainEmpty,
+
+    #[error("Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}")]
+    HeadMismatch(ChainTop, ChainTop),
 
     #[error("The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}")]
     InvalidStructure(ChainInvalidReason),

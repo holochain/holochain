@@ -14,7 +14,8 @@ pub async fn invoke_zome(
 ) -> CellResult<ZomeInvocationResult> {
     let dna = source_chain.dna()?;
     let ribosome = Ribosome::new(dna);
-    let (result, cursor_rw) = ribosome.call_zome_function(cursor_rw, invocation)?;
-    source_chain.try_commit(cursor_rw)?;
+    let bundle = source_chain.bundle()?;
+    let (result, bundle) = ribosome.call_zome_function(bundle, invocation)?;
+    source_chain.try_commit(bundle)?;
     Ok(result)
 }

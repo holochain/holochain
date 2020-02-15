@@ -1,4 +1,4 @@
-use super::{SourceChainSnapshot, error::ChainInvalidReason, SourceChainCommitBundle};
+use super::{error::ChainInvalidReason, SourceChainCommitBundle, SourceChainSnapshot};
 use crate::{
     agent::error::{SourceChainError, SourceChainResult},
     cell::Cell,
@@ -46,10 +46,7 @@ impl<'a> SourceChain<'a> {
     }
 
     pub fn as_at(&self, head: ChainTop) -> SourceChainResult<SourceChainSnapshot> {
-        SourceChainSnapshot::new(
-            self.persistence.create_cursor()?,
-            head,
-        )
+        SourceChainSnapshot::new(self.persistence.create_cursor()?, head)
     }
 
     pub fn bundle(&self) -> SourceChainResult<SourceChainCommitBundle> {
@@ -147,8 +144,17 @@ impl<'a> SourceChain<'a> {
     }
 
     /// Use the SCHH to attempt to write a bundle of changes
-    pub fn try_commit(&self, cursor_rw: source_chain::CursorRw) -> SkunkResult<()> {
-        Ok(cursor_rw.commit()?)
+    pub fn try_commit(&self, bundle: SourceChainCommitBundle) -> SourceChainResult<()> {
+        let bundle_head = bundle.original_head();
+        let self_head = self.head()?;
+        if *bundle_head == self_head {
+            Ok(bundle.commit()?)
+        } else {
+            Err(SourceChainError::HeadMismatch(
+                bundle_head.clone(),
+                self_head,
+            ))
+        }
     }
 }
 
@@ -185,7 +191,6 @@ impl AddressableContent for ChainTop {
         Ok(Self(HashString::try_from(content.clone())?))
     }
 }
-
 
 #[cfg(test)]
 pub mod tests {
@@ -250,26 +255,38 @@ pub mod tests {
     }
 
     #[test]
-    fn chain_writes_are_protected() {
+    fn chains_are_protected_from_concurrent_transactional_writes_aka_as_at() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
         let persistence = SourceChainPersistence::test(tmpdir.path());
         let chain = test_initialized_chain(test_dna(), AgentId::generate_fake("a"), &persistence);
         let post_init_head = chain.head().unwrap();
 
-        let writer1 = persistence.create_cursor_rw().unwrap();
+        let mut bundle1 = chain.bundle().unwrap();
         let entry1 = Entry::App("type".into(), "content 1".into());
-        let header1 = fake_header_for_entry(&chain, &entry1, &post_init_head);
-        writer1.add(&entry1).unwrap();
-        writer1.add(&header1).unwrap();
+        let entry1 = Entry::App("type".into(), "content 2".into());
+        let header1 = bundle1.add_entry(&entry1).unwrap();
 
-        let writer2 = persistence.create_cursor_rw().unwrap();
-        let entry2 = Entry::App("type".into(), "content 2".into());
-        let header2 = fake_header_for_entry(&chain, &entry2, &post_init_head);
-        writer2.add(&entry1).unwrap();
-        writer2.add(&header1).unwrap();
+        let mut bundle2 = chain.bundle().unwrap();
+        let entry2 = Entry::App("type".into(), "content 3".into());
+        let entry2 = Entry::App("type".into(), "content 4".into());
+        let header2 = bundle2.add_entry(&entry1).unwrap();
 
-        assert_eq!(chain.try_commit(writer1), Ok(()));
+        let commit_attempt_1 = chain.try_commit(bundle1);
+        let new_chain_head = chain.head().unwrap();
+
+        assert_eq!(commit_attempt_1, Ok(()));
+        assert_eq!(*new_chain_head.address(), header1.address());
+
+        let commit_attempt_2 = chain.try_commit(bundle2);
+
         // TODO: replace this assertion with the actual error issuing from multiple writes, once we know what it is
-        assert_ne!(chain.try_commit(writer2), Ok(()));
+        assert_eq!(
+            commit_attempt_2,
+            Err(SourceChainError::HeadMismatch(
+                post_init_head,
+                new_chain_head
+            ))
+        );
+        assert_eq!(*chain.head().unwrap().address(), header1.address());
     }
 }

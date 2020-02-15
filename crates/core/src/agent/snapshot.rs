@@ -16,6 +16,7 @@ use holochain_persistence_api::{
     txn::{CursorProvider, Writer},
 };
 use lazy_static::*;
+use std::fmt;
 use sx_types::{
     agent::AgentId,
     chain_header::ChainHeader,
@@ -132,22 +133,37 @@ impl SourceChainSnapshot {
 
 pub struct SourceChainCommitBundle {
     writer: source_chain::CursorRw,
-    head: ChainTop,
+    original_head: ChainTop,
+    new_head: ChainTop,
 }
 
 impl SourceChainCommitBundle {
     pub(super) fn new(writer: source_chain::CursorRw, head: ChainTop) -> SourceChainResult<Self> {
         // Just ensure that a snapshot can be created, mainly to perform the chain head integrity check
         let _ = SourceChainSnapshot::new(writer.clone(), head.clone())?;
-        Ok(Self { writer, head })
+        Ok(Self {
+            writer,
+            original_head: head.clone(),
+            new_head: head,
+        })
     }
 
-    pub fn add_entry(&self, entry: &Entry) -> PersistenceResult<()> {
-        self.writer.add(entry)
+    pub fn add_entry(&mut self, entry: &Entry) -> SourceChainResult<ChainHeader> {
+        self.writer.add(entry)?;
+        let header = self.header_for_entry(entry)?;
+        self.writer.add(&header)?;
+        self.new_head = ChainTop::new(header.address());
+        self.writer.add(&self.new_head)?; // update the chain top
+        Ok(header)
     }
 
-    pub fn head(&self) -> &ChainTop {
-        &self.head
+    pub fn original_head(&self) -> &ChainTop {
+        &self.original_head
+    }
+
+
+    pub fn commit(self) -> SourceChainResult<()> {
+        Ok(self.writer.commit()?)
     }
 
     pub fn readonly_cursor(&self) -> source_chain::Cursor {
@@ -164,7 +180,7 @@ impl SourceChainCommitBundle {
             entry.entry_type(),
             entry.address(),
             provenances,
-            Some(self.head.address().clone()),
+            Some(self.new_head.address().clone()),
             None,
             None,
             timestamp,
@@ -173,7 +189,7 @@ impl SourceChainCommitBundle {
     }
 
     fn snapshot(&self) -> SourceChainResult<SourceChainSnapshot> {
-        SourceChainSnapshot::new(self.readonly_cursor(), self.head().clone())
+        SourceChainSnapshot::new(self.readonly_cursor(), self.original_head().clone())
     }
 }
 
@@ -201,5 +217,15 @@ impl FallibleIterator for SourceChainBackwardIterator {
                 }
             }
         }
+    }
+}
+
+impl fmt::Debug for SourceChainSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut iter = self.iter_back();
+        while let Some(header) = iter.next().map_err(|_| fmt::Error)? {
+            write!(f, "{}\n", header.address())?;
+        }
+        Ok(())
     }
 }

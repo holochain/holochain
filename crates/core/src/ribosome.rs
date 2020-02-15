@@ -1,6 +1,6 @@
 use sx_types::entry::Entry;
 use crate::{
-    agent::SourceChain,
+    agent::{SourceChainCommitBundle, SourceChain},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     txn::source_chain,
     wasm_engine::WasmEngine,
@@ -27,10 +27,10 @@ impl Ribosome {
     /// so that it can be passed on to source chain manager for transactional writes
     pub fn call_zome_function(
         self,
-        cursor: source_chain::CursorRw,
+        bundle: SourceChainCommitBundle,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<(ZomeInvocationResult, source_chain::CursorRw)> {
+    ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)> {
         unimplemented!()
     }
 }
