@@ -1,4 +1,4 @@
-use super::error::ChainInvalidReason;
+use super::{SourceChainSnapshot, error::ChainInvalidReason, SourceChainCommitBundle};
 use crate::{
     agent::error::{SourceChainError, SourceChainResult},
     cell::Cell,
@@ -26,6 +26,10 @@ use sx_types::{
     time::Iso8601,
 };
 
+/// Interface to the source chain as accessed through persistent storage.
+/// From a SourceChain, you can construct a SourceChainSnapshot to make queries,
+/// or a SourceChainCommitBundle, to start a write transaction and potentially commit
+/// the changes later with `try_commit`.
 pub struct SourceChain<'a> {
     persistence: &'a source_chain::SourceChainPersistence,
 }
@@ -38,14 +42,20 @@ impl<'a> SourceChain<'a> {
     pub fn now(&self) -> SourceChainResult<SourceChainSnapshot> {
         let reader = self.persistence.create_cursor()?;
         let head = Self::head_inner(&reader)?.ok_or(SourceChainError::ChainEmpty)?;
-        Ok(SourceChainSnapshot { reader, head })
+        SourceChainSnapshot::new(reader, head)
     }
 
     pub fn as_at(&self, head: ChainTop) -> SourceChainResult<SourceChainSnapshot> {
-        Ok(SourceChainSnapshot {
-            reader: self.persistence.create_cursor()?,
+        SourceChainSnapshot::new(
+            self.persistence.create_cursor()?,
             head,
-        })
+        )
+    }
+
+    pub fn bundle(&self) -> SourceChainResult<SourceChainCommitBundle> {
+        let cursor = self.persistence.create_cursor_rw()?;
+        let head = Self::head_inner(&cursor)?.ok_or(SourceChainError::ChainEmpty)?;
+        SourceChainCommitBundle::new(cursor, head)
     }
 
     pub fn validate(&self) -> SourceChainResult<()> {
@@ -129,27 +139,11 @@ impl<'a> SourceChain<'a> {
     }
 
     pub fn dna(&self) -> SourceChainResult<Dna> {
-        let snapshot = self.now()?;
-        let entry = snapshot.latest_entry_of_type(EntryType::Dna)?.ok_or(SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing))?;
-        if let Entry::Dna(dna) = entry {
-            Ok(*dna)
-        } else {
-            Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
-            ))
-        }
+        self.now()?.dna()
     }
 
     pub fn agent_id(&self) -> SourceChainResult<AgentId> {
-        let snapshot = self.now()?;
-        let entry = snapshot.latest_entry_of_type(EntryType::AgentId)?.ok_or(SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing))?;
-        if let Entry::AgentId(agent) = entry {
-            Ok(agent)
-        } else {
-            Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
-            ))
-        }
+        self.now()?.agent_id()
     }
 
     /// Use the SCHH to attempt to write a bundle of changes
@@ -166,6 +160,10 @@ lazy_static! {
 pub struct ChainTop(Address);
 
 impl ChainTop {
+    pub fn new(address: Address) -> Self {
+        Self(address)
+    }
+
     pub fn address(&self) -> &Address {
         &self.0
     }
@@ -188,108 +186,6 @@ impl AddressableContent for ChainTop {
     }
 }
 
-/// Representation of a Cell's source chain.
-/// TODO: work out the details of what's needed for as-at
-/// to make sure the right balance is struck between
-/// creating as-at snapshots and having access to the actual current source chain
-pub struct SourceChainSnapshot {
-    reader: source_chain::Cursor,
-    head: ChainTop,
-}
-
-impl SourceChainSnapshot {
-    /// Fails if a source chain has not yet been created for this CellId.
-    fn new(reader: source_chain::Cursor, head: ChainTop) -> SourceChainResult<Self> {
-        match reader.contains(head.address()) {
-            Ok(true) => Ok(Self { reader, head }),
-            Ok(false) => Err(SourceChainError::MissingHead),
-            Err(e) => Err(SkunkError::from(e).into()),
-        }
-    }
-
-    /// Check that the chain is structured properly:
-    /// - Starts with Dna
-    /// - Agent follows immediately after
-    pub fn is_initialized(&self) -> SourceChainResult<bool> {
-        use crate::agent::validity::ChainStructureInspectorState::{BothFound, NoneFound};
-
-        let final_state = self
-            .iter_back()
-            .fold(NoneFound, |s, header| Ok(s.check(&header)))?;
-
-        Ok(final_state == BothFound)
-    }
-
-    /// Perform a more rigorous check of the chain structure to see that it is valid
-    /// TODO: check for missing CAS entries, etc., but for now just check for initialization
-    pub fn validate(&self) -> SourceChainResult<()> {
-        if self.is_initialized()? {
-            Ok(())
-        } else {
-            Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::GenesisMissing,
-            ))
-        }
-    }
-
-    pub fn iter_back(&self) -> SourceChainBackwardIterator {
-        SourceChainBackwardIterator {
-            reader: self.reader.clone(),
-            current: Some(self.head.clone()),
-        }
-    }
-
-    // TODO
-    // pub fn iter_forth(&self) -> SourceChainForwardIterator {
-    //     unimplemented!()
-    // }
-
-    fn latest_entry_of_type(&self, entry_type: EntryType) -> SourceChainResult<Option<Entry>> {
-        if let Some(header) = self
-            .iter_back()
-            .find(|h| Ok(*h.entry_type() == entry_type))?
-        {
-            let entry_address = header.entry_address();
-            if let Some(content) = self.reader.fetch(entry_address)? {
-                let entry = Entry::try_from(content)?;
-                Ok(Some(entry))
-            } else {
-                Err(SourceChainError::InvalidStructure(
-                    ChainInvalidReason::MissingData(entry_address.clone()),
-                ))
-            }
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-pub struct SourceChainBackwardIterator {
-    reader: source_chain::Cursor,
-    current: Option<ChainTop>,
-}
-
-/// Follows ChainHeader.link through every previous Entry (of any EntryType) in the chain
-// #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
-impl FallibleIterator for SourceChainBackwardIterator {
-    type Item = ChainHeader;
-    type Error = SourceChainError;
-
-    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        match &self.current {
-            None => Ok(None),
-            Some(head) => {
-                if let Some(content) = self.reader.fetch(head.address())? {
-                    let header: ChainHeader = ChainHeader::try_from_content(&content)?;
-                    self.current = header.link().map(ChainTop);
-                    Ok(Some(header))
-                } else {
-                    Ok(None)
-                }
-            }
-        }
-    }
-}
 
 #[cfg(test)]
 pub mod tests {
