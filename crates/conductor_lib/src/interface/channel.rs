@@ -10,18 +10,18 @@ use log::*;
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
 /// interact with a ConductorApiExternal
-pub struct PuppetInterface {
+pub struct ChannelInterface {
     rx: mpsc::UnboundedReceiver<bool>,
 }
 
-impl PuppetInterface {
+impl ChannelInterface {
     pub fn new(rx: mpsc::UnboundedReceiver<bool>) -> Self {
         Self { rx }
     }
 }
 
 #[async_trait]
-impl Interface for PuppetInterface {
+impl Interface for ChannelInterface {
     async fn spawn(mut self, mut api: ConductorApiExternal)
     {
         dbg!("spawn start");

@@ -1,5 +1,6 @@
 mod interface;
 
-pub mod puppet;
+pub mod channel;
+mod handler;
 
 pub use interface::*;

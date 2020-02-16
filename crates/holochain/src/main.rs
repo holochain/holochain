@@ -4,11 +4,11 @@ use std::sync::Arc;
 use sx_conductor_lib::{
     api::ConductorApiExternal,
     conductor::Conductor,
-    interface::{puppet::PuppetInterface, Interface},
+    interface::{channel::ChannelInterface, Interface},
 };
 
 fn main() {
-    println!("Running silly PuppetInterface example");
+    println!("Running silly ChannelInterface example");
     let executor = ThreadPool::new().unwrap();
     futures::executor::block_on(example(executor));
 }
@@ -20,7 +20,7 @@ async fn example(executor: ThreadPool) {
     let lock = Arc::new(RwLock::new(conductor));
     let handle = ConductorApiExternal::new(lock);
     let interface_fut = executor
-        .spawn_with_handle(PuppetInterface::new(rx_dummy).spawn(handle))
+        .spawn_with_handle(ChannelInterface::new(rx_dummy).spawn(handle))
         .unwrap();
     let driver_fut = executor
         .spawn_with_handle(async move {
