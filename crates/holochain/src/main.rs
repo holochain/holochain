@@ -2,7 +2,7 @@ use futures::{channel, executor::ThreadPool, prelude::*, task::SpawnExt};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use sx_conductor_lib::{
-    api::ConductorApiExternal,
+    api::ConductorExternalApi,
     conductor::Conductor,
     interface::{channel::ChannelInterface, Interface},
 };
@@ -18,7 +18,7 @@ async fn example(executor: ThreadPool) {
     let (mut tx_dummy, rx_dummy) = channel::mpsc::unbounded();
     let conductor = Conductor::new(tx_network);
     let lock = Arc::new(RwLock::new(conductor));
-    let handle = ConductorApiExternal::new(lock);
+    let handle = ConductorExternalApi::new(lock);
     let interface_fut = executor
         .spawn_with_handle(ChannelInterface::new(rx_dummy).spawn(handle))
         .unwrap();

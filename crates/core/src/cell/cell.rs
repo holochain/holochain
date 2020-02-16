@@ -70,7 +70,7 @@ impl Cell {
             .chain_persistence
             .create_cursor_rw()
             .map_err(SkunkError::from)?;
-        Ok(workflow::invoke_zome(invocation, source_chain, cursor_rw).await?)
+        Ok(workflow::invoke_zome(invocation, source_chain).await?)
     }
 
     pub async fn handle_network_message(

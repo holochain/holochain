@@ -10,7 +10,6 @@ use sx_types::shims::*;
 pub async fn invoke_zome(
     invocation: ZomeInvocation,
     source_chain: SourceChain<'_>,
-    cursor_rw: source_chain::CursorRw,
 ) -> CellResult<ZomeInvocationResult> {
     let dna = source_chain.dna()?;
     let ribosome = Ribosome::new(dna);
