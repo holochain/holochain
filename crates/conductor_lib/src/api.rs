@@ -116,51 +116,72 @@ impl ConductorApiExternal {
     }
 }
 
-
+// Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
+// The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
+// by delegating each async trait method to its sync counterpart
 // See https://github.com/asomers/mockall/issues/75
-
-#[async_trait]
-pub trait TestT {
-    async fn invoke_zome(
-        &self, cell: Cell, invocation: ZomeInvocation
-    ) -> ConductorResult<ZomeInvocationResult>;
-}
-
 mock! {
-    pub Imp {
+    pub ConductorApiInternal {
         fn sync_invoke_zome(
-            &self, cell: Cell, invocation: ZomeInvocation
+            &self,
+            cell: Cell,
+            invocation: ZomeInvocation,
         ) -> ConductorResult<ZomeInvocationResult>;
+
+        fn sync_network_send(&self, message: Lib3hClientProtocol) -> ConductorResult<()>;
+
+        fn sync_network_request(
+            &self,
+            _message: Lib3hClientProtocol,
+        ) -> ConductorResult<Lib3hServerProtocol>;
+
+        fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorResult<()>;
+
+        fn sync_crypto_sign(&self, _payload: String) -> ConductorResult<Signature>;
+
+        fn sync_crypto_encrypt(&self, _payload: String) -> ConductorResult<String>;
+
+        fn sync_crypto_decrypt(&self, _payload: String) -> ConductorResult<String>;
     }
 }
 
-#[async_trait]
-impl TestT for MockImp {
+#[async_trait(?Send)]
+impl ConductorApiInternalT for MockConductorApiInternal {
     async fn invoke_zome(
-        &self, cell: Cell, invocation: ZomeInvocation
+        &self,
+        cell: Cell,
+        invocation: ZomeInvocation,
     ) -> ConductorResult<ZomeInvocationResult> {
         self.sync_invoke_zome(cell, invocation)
     }
+
+    async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorResult<()> {
+        self.sync_network_send(message)
+    }
+
+    async fn network_request(
+        &self,
+        _message: Lib3hClientProtocol,
+    ) -> ConductorResult<Lib3hServerProtocol> {
+        self.sync_network_request(_message)
+    }
+
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorResult<()> {
+        self.sync_autonomic_cue(cue)
+    }
+
+    async fn crypto_sign(&self, _payload: String) -> ConductorResult<Signature> {
+        self.sync_crypto_sign(_payload)
+    }
+
+    async fn crypto_encrypt(&self, _payload: String) -> ConductorResult<String> {
+        self.sync_crypto_encrypt(_payload)
+    }
+
+    async fn crypto_decrypt(&self, _payload: String) -> ConductorResult<String> {
+        self.sync_crypto_decrypt(_payload)
+    }
 }
-
-
-
-// macro_rules! async_return_type {
-//     ($t:ty) => {
-//         Pin<Box<dyn std::future::Future<Output = $t> >>
-//     }
-// }
-
-// macro_rules! async_return_val {
-//     ($v:expr) => {
-//         Box::pin( async { $v })
-//     };
-//     ($v:block) => {
-//         Box::pin( async { $v })
-//     }
-// }
-
-
 
 
 //////////////////////////////////////////////////////////////////////////////////
