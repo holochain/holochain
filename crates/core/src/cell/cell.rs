@@ -4,7 +4,7 @@ use crate::{
     cell::error::{CellError, CellResult},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     txn::{dht::DhtPersistence, source_chain, source_chain::SourceChainPersistence},
-    workflow,
+    workflow, conductor_api::ConductorCellApiT,
 };
 use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
@@ -29,7 +29,7 @@ pub type DnaAddress = Address;
 pub type CellId = (DnaAddress, AgentId);
 
 
-impl Hash for Cell {
+impl<Api: ConductorCellApiT> Hash for Cell<Api> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -38,20 +38,21 @@ impl Hash for Cell {
     }
 }
 
-impl PartialEq for Cell {
+impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
 #[derive(Clone)]
-pub struct Cell {
+pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
     chain_persistence: SourceChainPersistence,
     dht_persistence: DhtPersistence,
+    conductor_api: Api,
 }
 
-impl Cell {
+impl<Api: ConductorCellApiT> Cell<Api> {
     fn dna_address(&self) -> &DnaAddress {
         &self.id.0
     }
@@ -82,43 +83,44 @@ impl Cell {
 
     pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
         match process {
-            AutonomicProcess::FastPush(entries) => workflow::publish(entries).await,
             AutonomicProcess::SlowHeal => unimplemented!(),
             AutonomicProcess::HealthCheck => unimplemented!(),
         }
     }
 }
 
-impl Cell {
-    /// Checks if Cell has been initialized already
-    pub fn from_id(id: CellId) -> CellResult<Self> {
-        let chain_persistence = SourceChainPersistence::new(id.clone());
-        let dht_persistence = DhtPersistence::new(id.clone());
-        SourceChain::new(&chain_persistence).validate()?;
-        Ok(Cell {
-            id,
-            chain_persistence,
-            dht_persistence,
-        })
-    }
+// impl<Api: ConductorCellApiT> Cell<Api> {
+//     /// Checks if Cell has been initialized already
+//     pub fn from_id(id: CellId) -> CellResult<Self> {
+//         let chain_persistence = SourceChainPersistence::new(id.clone());
+//         let dht_persistence = DhtPersistence::new(id.clone());
+//         SourceChain::new(&chain_persistence).validate()?;
+//         Ok(Cell {
+//             id,
+//             chain_persistence,
+//             dht_persistence,
+//         })
+//     }
 
-    pub fn from_dna(agent_id: AgentId, dna: Dna) -> SkunkResult<Self> {
-        unimplemented!()
-    }
-}
+//     pub fn from_dna(agent_id: AgentId, dna: Dna) -> SkunkResult<Self> {
+//         unimplemented!()
+//     }
+// }
 
-pub struct CellBuilder {
+pub struct CellBuilder<Api: ConductorCellApiT> {
     id: CellId,
     chain_persistence: Option<SourceChainPersistence>,
     dht_persistence: Option<DhtPersistence>,
+    conductor_api: Api,
 }
 
-impl CellBuilder {
-    pub fn new(id: CellId) -> Self {
+impl<Api: ConductorCellApiT> CellBuilder<Api> {
+    pub fn new(id: CellId, conductor_api: Api) -> Self {
         Self {
             id,
             chain_persistence: None,
             dht_persistence: None,
+            conductor_api
         }
     }
 
@@ -133,7 +135,7 @@ impl CellBuilder {
         self
     }
 
-    pub fn build(self) -> Cell {
+    pub fn build(self) -> Cell<Api> {
         let id = self.id.clone();
         Cell {
             id: self.id,
@@ -143,6 +145,7 @@ impl CellBuilder {
             dht_persistence: self
                 .dht_persistence
                 .unwrap_or_else(|| DhtPersistence::new(id.clone())),
+            conductor_api: self.conductor_api,
         }
     }
 }
@@ -165,11 +168,12 @@ pub mod tests {
 
     use super::*;
     use crate::test_utils::fake_cell_id;
+    use crate::conductor_api::MockConductorCellApi;
 
     #[test]
     fn can_create_cell() {
         let tmpdir = tempdir::TempDir::new("skunkworx").unwrap();
-        let cell: Cell = CellBuilder::new(fake_cell_id("a"))
+        let cell: Cell<MockConductorCellApi> = CellBuilder::new(fake_cell_id("a"), MockConductorCellApi::new())
             .with_test_persistence(tmpdir.path())
             .build();
     }

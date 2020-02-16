@@ -1,9 +1,9 @@
 use crate::{
     agent::SourceChain,
-    cell::error::CellResult,
+    cell::{autonomic::AutonomicCue, error::CellResult},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::Ribosome,
-    txn::source_chain,
+    txn::source_chain, conductor_api::ConductorCellApiT,
 };
 use sx_types::shims::*;
 

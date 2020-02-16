@@ -2,7 +2,7 @@ use crate::{
     api::{self},
     interface::interface::Interface,
 };
-use api::ConductorExternalApi;
+use api::{ConductorCellApi, ConductorExternalApi};
 use async_trait::async_trait;
 use futures::{channel::mpsc, stream::StreamExt};
 use log::*;
@@ -22,7 +22,7 @@ impl ChannelInterface {
 
 #[async_trait]
 impl Interface for ChannelInterface {
-    async fn spawn(mut self, mut api: ConductorExternalApi)
+    async fn spawn(mut self, mut api: ConductorExternalApi<ConductorCellApi>)
     {
         dbg!("spawn start");
         while let Some(true) = self.rx.next().await {

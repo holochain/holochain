@@ -1,6 +1,6 @@
 use crate::cell::error::CellResult;
-use sx_types::entry::EntryAddress;
+use sx_types::prelude::*;
 
-pub async fn publish(entries: Vec<EntryAddress>) -> CellResult<()> {
+pub async fn publish(entries: Vec<Address>) -> CellResult<()> {
     unimplemented!()
 }

@@ -12,24 +12,24 @@ use sx_core::{
 use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
 
 #[derive(Clone)]
-pub struct ConductorExternalApi {
-    lock: Arc<RwLock<Conductor>>,
+pub struct ConductorExternalApi<Api: ConductorCellApiT> {
+    lock: Arc<RwLock<Conductor<Api>>>,
 }
 
-impl ConductorExternalApi {
-    pub fn new(lock: Arc<RwLock<Conductor>>) -> Self {
+impl<Api: ConductorCellApiT> ConductorExternalApi<Api> {
+    pub fn new(lock: Arc<RwLock<Conductor<Api>>>) -> Self {
         Self { lock }
     }
 }
 
-impl ConductorExternalApi {
+impl<Api: ConductorCellApiT> ConductorExternalApi<Api> {
     pub async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
         unimplemented!()
     }
 
     pub async fn test(
         &mut self,
-        _cell: Cell,
+        _cell: Cell<Api>,
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<JsonString> {
         unimplemented!()

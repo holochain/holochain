@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use sx_core::cell::{Cell, CellId, NetSender};
+use sx_core::{conductor_api::ConductorCellApiT, cell::{Cell, CellId, NetSender}};
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
@@ -14,19 +14,19 @@ pub struct CellState {
     active: bool,
 }
 
-pub struct CellItem {
-    cell: Cell,
+pub struct CellItem<Api: ConductorCellApiT> {
+    cell: Cell<Api>,
     state: CellState,
 }
 
-pub struct Conductor {
+pub struct Conductor<Api: ConductorCellApiT> {
     tx_network: NetSender,
-    cells: HashMap<CellId, CellItem>,
+    cells: HashMap<CellId, CellItem<Api>>,
     handle_map: HashMap<CellHandle, CellId>,
     agent_keys: HashMap<AgentId, Keystore>,
 }
 
-impl Conductor {
+impl<Api: ConductorCellApiT> Conductor<Api> {
     pub fn new(tx_network: NetSender) -> Self {
         Self {
             cells: HashMap::new(),
@@ -36,7 +36,7 @@ impl Conductor {
         }
     }
 
-    pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
+    pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell<Api>> {
         let item = self
             .cells
             .get(cell_id)
