@@ -2,7 +2,7 @@ use crate::conductor::CellHandle;
 use std::fmt;
 use sx_types::error::SkunkError;
 use thiserror::Error;
-use sx_core::cell::{CellId, error::CellError};
+use sx_core::{conductor_api::ConductorApiError, cell::{CellId, error::CellError}};
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -60,9 +60,3 @@ impl PartialEq for ConductorError {
         }
     }
 }
-
-
-#[derive(Error, PartialEq, Debug)]
-pub enum ConductorApiError {}
-
-pub type ConductorApiResult<T> = Result<T, ConductorApiError>;

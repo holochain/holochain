@@ -2,7 +2,9 @@ use super::autonomic::AutonomicProcess;
 use crate::{
     agent::SourceChain,
     cell::error::{CellError, CellResult},
+    conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
+    ribosome::Ribosome,
     txn::{dht::DhtPersistence, source_chain, source_chain::SourceChainPersistence},
     workflow,
 };
@@ -27,9 +29,10 @@ pub type DnaAddress = Address;
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 pub type CellId = (DnaAddress, AgentId);
+pub type ZomeId = (CellId, ZomeName);
+pub type ZomeName = String;
 
-
-impl Hash for Cell {
+impl<Api: ConductorCellApiT> Hash for Cell<Api> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -38,20 +41,21 @@ impl Hash for Cell {
     }
 }
 
-impl PartialEq for Cell {
+impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
 #[derive(Clone)]
-pub struct Cell {
+pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
     chain_persistence: SourceChainPersistence,
     dht_persistence: DhtPersistence,
+    conductor_api: Api,
 }
 
-impl Cell {
+impl<Api: ConductorCellApiT> Cell<Api> {
     fn dna_address(&self) -> &DnaAddress {
         &self.id.0
     }
@@ -64,13 +68,23 @@ impl Cell {
         SourceChain::new(&self.chain_persistence)
     }
 
-    pub async fn invoke_zome(&self, invocation: ZomeInvocation) -> CellResult<ZomeInvocationResult> {
+    pub async fn invoke_zome(
+        &self,
+        conductor_api: Api,
+        invocation: ZomeInvocation,
+    ) -> CellResult<ZomeInvocationResult> {
         let source_chain = SourceChain::new(&self.chain_persistence);
         let cursor_rw = self
             .chain_persistence
             .create_cursor_rw()
             .map_err(SkunkError::from)?;
-        Ok(workflow::invoke_zome(invocation, source_chain, cursor_rw).await?)
+        let previous_head = source_chain.head()?;
+        let dna = source_chain.dna()?;
+        let ribosome = Ribosome::new(dna);
+        let (invoke_result, snapshot) =
+            workflow::invoke_zome(invocation, source_chain, ribosome, conductor_api).await?;
+        workflow::publish(snapshot, previous_head.address()).await?;
+        Ok(invoke_result)
     }
 
     pub async fn handle_network_message(
@@ -82,43 +96,44 @@ impl Cell {
 
     pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
         match process {
-            AutonomicProcess::FastPush(entries) => workflow::publish(entries).await,
             AutonomicProcess::SlowHeal => unimplemented!(),
             AutonomicProcess::HealthCheck => unimplemented!(),
         }
     }
 }
 
-impl Cell {
-    /// Checks if Cell has been initialized already
-    pub fn from_id(id: CellId) -> CellResult<Self> {
-        let chain_persistence = SourceChainPersistence::new(id.clone());
-        let dht_persistence = DhtPersistence::new(id.clone());
-        SourceChain::new(&chain_persistence).validate()?;
-        Ok(Cell {
-            id,
-            chain_persistence,
-            dht_persistence,
-        })
-    }
+// impl<Api: ConductorCellApiT> Cell<Api> {
+//     /// Checks if Cell has been initialized already
+//     pub fn from_id(id: CellId) -> CellResult<Self> {
+//         let chain_persistence = SourceChainPersistence::new(id.clone());
+//         let dht_persistence = DhtPersistence::new(id.clone());
+//         SourceChain::new(&chain_persistence).validate()?;
+//         Ok(Cell {
+//             id,
+//             chain_persistence,
+//             dht_persistence,
+//         })
+//     }
 
-    pub fn from_dna(agent_id: AgentId, dna: Dna) -> SkunkResult<Self> {
-        unimplemented!()
-    }
-}
+//     pub fn from_dna(agent_id: AgentId, dna: Dna) -> SkunkResult<Self> {
+//         unimplemented!()
+//     }
+// }
 
-pub struct CellBuilder {
+pub struct CellBuilder<Api: ConductorCellApiT> {
     id: CellId,
     chain_persistence: Option<SourceChainPersistence>,
     dht_persistence: Option<DhtPersistence>,
+    conductor_api: Api,
 }
 
-impl CellBuilder {
-    pub fn new(id: CellId) -> Self {
+impl<Api: ConductorCellApiT> CellBuilder<Api> {
+    pub fn new(id: CellId, conductor_api: Api) -> Self {
         Self {
             id,
             chain_persistence: None,
             dht_persistence: None,
+            conductor_api,
         }
     }
 
@@ -133,7 +148,7 @@ impl CellBuilder {
         self
     }
 
-    pub fn build(self) -> Cell {
+    pub fn build(self) -> Cell<Api> {
         let id = self.id.clone();
         Cell {
             id: self.id,
@@ -143,6 +158,7 @@ impl CellBuilder {
             dht_persistence: self
                 .dht_persistence
                 .unwrap_or_else(|| DhtPersistence::new(id.clone())),
+            conductor_api: self.conductor_api,
         }
     }
 }
@@ -164,13 +180,14 @@ pub type NetSender = futures::channel::mpsc::Sender<Lib3hClientProtocol>;
 pub mod tests {
 
     use super::*;
-    use crate::test_utils::fake_cell_id;
+    use crate::{conductor_api::MockConductorCellApi, test_utils::fake_cell_id};
 
     #[test]
     fn can_create_cell() {
         let tmpdir = tempdir::TempDir::new("skunkworx").unwrap();
-        let cell: Cell = CellBuilder::new(fake_cell_id("a"))
-            .with_test_persistence(tmpdir.path())
-            .build();
+        let cell: Cell<MockConductorCellApi> =
+            CellBuilder::new(fake_cell_id("a"), MockConductorCellApi::new())
+                .with_test_persistence(tmpdir.path())
+                .build();
     }
 }

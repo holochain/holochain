@@ -61,6 +61,10 @@ impl SourceChainSnapshot {
         }
     }
 
+    pub fn head(&self) -> &ChainTop {
+        &self.head
+    }
+
     pub fn agent_id(&self) -> SourceChainResult<AgentId> {
         let entry = self.latest_entry_of_type(EntryType::AgentId)?.ok_or(
             SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing),
@@ -135,6 +139,7 @@ pub struct SourceChainCommitBundle {
     writer: source_chain::CursorRw,
     original_head: ChainTop,
     new_head: ChainTop,
+    new_addresses: Vec<Address>,
 }
 
 impl SourceChainCommitBundle {
@@ -145,6 +150,7 @@ impl SourceChainCommitBundle {
             writer,
             original_head: head.clone(),
             new_head: head,
+            new_addresses: Vec::new(),
         })
     }
 
@@ -154,6 +160,8 @@ impl SourceChainCommitBundle {
         self.writer.add(&header)?;
         self.new_head = ChainTop::new(header.address());
         self.writer.add(&self.new_head)?; // update the chain top
+        self.new_addresses.push(entry.address());
+        self.new_addresses.push(header.address());
         Ok(header)
     }
 
@@ -162,12 +170,10 @@ impl SourceChainCommitBundle {
     }
 
 
-    pub fn commit(self) -> SourceChainResult<()> {
-        Ok(self.writer.commit()?)
-    }
-
-    pub fn readonly_cursor(&self) -> source_chain::Cursor {
-        self.writer.clone()
+    pub fn commit(self) -> SourceChainResult<SourceChainSnapshot> {
+        let snapshot = SourceChainSnapshot::new(self.writer.clone(), self.new_head);
+        self.writer.commit()?;
+        snapshot
     }
 
     fn header_for_entry(&self, entry: &Entry) -> SourceChainResult<ChainHeader> {
@@ -189,7 +195,7 @@ impl SourceChainCommitBundle {
     }
 
     pub fn snapshot(&self) -> SourceChainResult<SourceChainSnapshot> {
-        SourceChainSnapshot::new(self.readonly_cursor(), self.new_head.clone())
+        SourceChainSnapshot::new(self.writer.clone(), self.new_head.clone())
     }
 }
 

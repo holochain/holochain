@@ -144,7 +144,7 @@ impl<'a> SourceChain<'a> {
     }
 
     /// Use the SCHH to attempt to write a bundle of changes
-    pub fn try_commit(&self, bundle: SourceChainCommitBundle) -> SourceChainResult<()> {
+    pub fn try_commit(&self, bundle: SourceChainCommitBundle) -> SourceChainResult<SourceChainSnapshot> {
         let bundle_head = bundle.original_head();
         let self_head = self.head()?;
         if *bundle_head == self_head {
@@ -204,13 +204,12 @@ pub mod tests {
     use tempdir::TempDir;
     use Entry;
 
-    fn test_initialized_chain(
-        dna: Dna,
-        agent: AgentId,
-        persistence: &SourceChainPersistence,
-    ) -> SourceChain {
-        let dna: Dna = test_dna();
-        let agent = AgentId::generate_fake("a");
+    pub fn test_initialized_chain<'a>(
+        agent_name: &str,
+        persistence: &'a SourceChainPersistence,
+    ) -> SourceChain<'a> {
+        let dna: Dna = test_dna(agent_name);
+        let agent = AgentId::generate_fake(agent_name);
         let id: CellId = (dna.address(), agent.clone());
         let chain = SourceChain::new(&persistence);
         let writer = persistence.create_cursor_rw().unwrap();
@@ -239,7 +238,7 @@ pub mod tests {
 
     #[test]
     fn detect_chain_initialized() {
-        let dna: Dna = test_dna();
+        let dna: Dna = test_dna("a");
         let agent = AgentId::generate_fake("a");
         let id: CellId = (dna.address(), agent.clone());
         let tmpdir = TempDir::new("skunkworx").unwrap();
@@ -258,7 +257,7 @@ pub mod tests {
     fn chains_can_have_new_entries_committed_in_bundles() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
         let persistence = SourceChainPersistence::test(tmpdir.path());
-        let chain = test_initialized_chain(test_dna(), AgentId::generate_fake("a"), &persistence);
+        let chain = test_initialized_chain("a", &persistence);
         let post_init_head = chain.head().unwrap();
 
         let mut bundle = chain.bundle().unwrap();
@@ -291,7 +290,7 @@ pub mod tests {
     fn chains_are_protected_from_concurrent_transactional_writes_aka_as_at() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
         let persistence = SourceChainPersistence::test(tmpdir.path());
-        let chain = test_initialized_chain(test_dna(), AgentId::generate_fake("a"), &persistence);
+        let chain = test_initialized_chain("a", &persistence);
         let post_init_head = chain.head().unwrap();
 
         let mut bundle1 = chain.bundle().unwrap();
@@ -307,18 +306,18 @@ pub mod tests {
         let commit_attempt_1 = chain.try_commit(bundle1);
         let new_chain_head = chain.head().unwrap();
 
-        assert_eq!(commit_attempt_1, Ok(()));
+        assert!(commit_attempt_1.is_ok());
         assert_eq!(*new_chain_head.address(), header1.address());
 
         let commit_attempt_2 = chain.try_commit(bundle2);
 
         // TODO: replace this assertion with the actual error issuing from multiple writes, once we know what it is
         assert_eq!(
-            commit_attempt_2,
-            Err(SourceChainError::HeadMismatch(
+            commit_attempt_2.unwrap_err(),
+            SourceChainError::HeadMismatch(
                 post_init_head,
                 new_chain_head
-            ))
+            )
         );
         assert_eq!(*chain.head().unwrap().address(), header1.address());
     }

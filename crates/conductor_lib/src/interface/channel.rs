@@ -2,27 +2,27 @@ use crate::{
     api::{self},
     interface::interface::Interface,
 };
-use api::ConductorApiExternal;
+use api::{ConductorCellApi, ConductorExternalApi};
 use async_trait::async_trait;
 use futures::{channel::mpsc, stream::StreamExt};
 use log::*;
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
-/// interact with a ConductorApiExternal
-pub struct PuppetInterface {
+/// interact with a ConductorExternalApi
+pub struct ChannelInterface {
     rx: mpsc::UnboundedReceiver<bool>,
 }
 
-impl PuppetInterface {
+impl ChannelInterface {
     pub fn new(rx: mpsc::UnboundedReceiver<bool>) -> Self {
         Self { rx }
     }
 }
 
 #[async_trait]
-impl Interface for PuppetInterface {
-    async fn spawn(mut self, mut api: ConductorApiExternal)
+impl Interface for ChannelInterface {
+    async fn spawn(mut self, mut api: ConductorExternalApi<ConductorCellApi>)
     {
         dbg!("spawn start");
         while let Some(true) = self.rx.next().await {

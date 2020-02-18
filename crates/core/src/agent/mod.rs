@@ -1,5 +1,5 @@
 mod snapshot;
-mod source_chain;
+pub mod source_chain;
 
 pub use snapshot::*;
 pub use source_chain::*;

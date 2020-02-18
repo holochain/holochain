@@ -14,6 +14,7 @@ mod workflow;
 
 pub mod agent;
 pub mod cell;
+pub mod conductor_api;
 pub mod dht;
 pub mod net;
 pub mod nucleus;

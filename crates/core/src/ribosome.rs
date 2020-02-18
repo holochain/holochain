@@ -6,6 +6,21 @@ use crate::{
     wasm_engine::WasmEngine,
 };
 use sx_types::{dna::Dna, error::SkunkResult, shims::*};
+use mockall::automock;
+
+#[automock]
+pub trait RibosomeT {
+    fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult;
+
+    /// Runs the specified zome fn. Returns the cursor used by HDK,
+    /// so that it can be passed on to source chain manager for transactional writes
+    fn call_zome_function(
+        self,
+        bundle: SourceChainCommitBundle,
+        invocation: ZomeInvocation,
+        // source_chain: SourceChain,
+    ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)>;
+}
 
 /// TODO determine what cursor looks like for ribosomes
 /// Total hack just to have something to look at
@@ -18,14 +33,16 @@ impl Ribosome {
     pub fn new(dna: Dna) -> Self {
         Self { engine: WasmEngine }
     }
+}
 
-    pub fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult {
+impl RibosomeT for Ribosome {
+    fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult {
         unimplemented!()
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    pub fn call_zome_function(
+    fn call_zome_function(
         self,
         bundle: SourceChainCommitBundle,
         invocation: ZomeInvocation,
