@@ -18,8 +18,10 @@ pub trait ConductorCellApiT {
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResult>;
 
+    /// TODO: maybe move out into its own trait
     async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
 
+    /// TODO: maybe move out into its own trait
     async fn network_request(
         &self,
         _message: Lib3hClientProtocol,

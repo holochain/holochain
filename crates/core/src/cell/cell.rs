@@ -2,9 +2,10 @@ use super::autonomic::AutonomicProcess;
 use crate::{
     agent::SourceChain,
     cell::error::{CellError, CellResult},
+    conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     txn::{dht::DhtPersistence, source_chain, source_chain::SourceChainPersistence},
-    workflow, conductor_api::ConductorCellApiT,
+    workflow, ribosome::Ribosome,
 };
 use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
@@ -27,7 +28,8 @@ pub type DnaAddress = Address;
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 pub type CellId = (DnaAddress, AgentId);
-
+pub type ZomeId = (CellId, ZomeName);
+pub type ZomeName = String;
 
 impl<Api: ConductorCellApiT> Hash for Cell<Api> {
     fn hash<H>(&self, state: &mut H)
@@ -65,13 +67,22 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         SourceChain::new(&self.chain_persistence)
     }
 
-    pub async fn invoke_zome(&self, invocation: ZomeInvocation) -> CellResult<ZomeInvocationResult> {
+    pub async fn invoke_zome(
+        &self,
+        invocation: ZomeInvocation,
+    ) -> CellResult<ZomeInvocationResult> {
         let source_chain = SourceChain::new(&self.chain_persistence);
         let cursor_rw = self
             .chain_persistence
             .create_cursor_rw()
             .map_err(SkunkError::from)?;
-        Ok(workflow::invoke_zome(invocation, source_chain).await?)
+        let previous_head = source_chain.head()?;
+        let dna = source_chain.dna()?;
+        let ribosome = Ribosome::new(dna);
+        let (invoke_result, snapshot) =
+            workflow::invoke_zome(invocation, source_chain, ribosome).await?;
+        workflow::publish(snapshot, previous_head.address()).await?;
+        Ok(invoke_result)
     }
 
     pub async fn handle_network_message(
@@ -120,7 +131,7 @@ impl<Api: ConductorCellApiT> CellBuilder<Api> {
             id,
             chain_persistence: None,
             dht_persistence: None,
-            conductor_api
+            conductor_api,
         }
     }
 
@@ -167,14 +178,14 @@ pub type NetSender = futures::channel::mpsc::Sender<Lib3hClientProtocol>;
 pub mod tests {
 
     use super::*;
-    use crate::test_utils::fake_cell_id;
-    use crate::conductor_api::MockConductorCellApi;
+    use crate::{conductor_api::MockConductorCellApi, test_utils::fake_cell_id};
 
     #[test]
     fn can_create_cell() {
         let tmpdir = tempdir::TempDir::new("skunkworx").unwrap();
-        let cell: Cell<MockConductorCellApi> = CellBuilder::new(fake_cell_id("a"), MockConductorCellApi::new())
-            .with_test_persistence(tmpdir.path())
-            .build();
+        let cell: Cell<MockConductorCellApi> =
+            CellBuilder::new(fake_cell_id("a"), MockConductorCellApi::new())
+                .with_test_persistence(tmpdir.path())
+                .build();
     }
 }

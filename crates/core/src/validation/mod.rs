@@ -1,4 +1,4 @@
-use crate::ribosome::Ribosome;
+use crate::ribosome::{Ribosome, RibosomeT};
 use sx_types::{dna::Dna, entry::Entry, shims::*};
 
 /// TODO Determine cursor type

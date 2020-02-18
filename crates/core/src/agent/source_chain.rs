@@ -144,7 +144,7 @@ impl<'a> SourceChain<'a> {
     }
 
     /// Use the SCHH to attempt to write a bundle of changes
-    pub fn try_commit(&self, bundle: SourceChainCommitBundle) -> SourceChainResult<()> {
+    pub fn try_commit(&self, bundle: SourceChainCommitBundle) -> SourceChainResult<SourceChainSnapshot> {
         let bundle_head = bundle.original_head();
         let self_head = self.head()?;
         if *bundle_head == self_head {
@@ -307,18 +307,18 @@ pub mod tests {
         let commit_attempt_1 = chain.try_commit(bundle1);
         let new_chain_head = chain.head().unwrap();
 
-        assert_eq!(commit_attempt_1, Ok(()));
+        assert!(commit_attempt_1.is_ok());
         assert_eq!(*new_chain_head.address(), header1.address());
 
         let commit_attempt_2 = chain.try_commit(bundle2);
 
         // TODO: replace this assertion with the actual error issuing from multiple writes, once we know what it is
         assert_eq!(
-            commit_attempt_2,
-            Err(SourceChainError::HeadMismatch(
+            commit_attempt_2.unwrap_err(),
+            SourceChainError::HeadMismatch(
                 post_init_head,
                 new_chain_head
-            ))
+            )
         );
         assert_eq!(*chain.head().unwrap().address(), header1.address());
     }
