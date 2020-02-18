@@ -37,7 +37,7 @@ impl ConductorCellApiT for ConductorCellApi {
         let cell = conductor
             .cell_by_id(&cell_id)
             .map_err(|e| ConductorApiError::ConductorInceptionError(e.to_string()))?;
-        Ok(cell.invoke_zome(invocation).await?)
+        Ok(cell.invoke_zome(self.clone(), invocation).await?)
     }
 
     async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()> {

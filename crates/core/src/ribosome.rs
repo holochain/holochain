@@ -6,7 +6,9 @@ use crate::{
     wasm_engine::WasmEngine,
 };
 use sx_types::{dna::Dna, error::SkunkResult, shims::*};
+use mockall::automock;
 
+#[automock]
 pub trait RibosomeT {
     fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult;
 

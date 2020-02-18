@@ -4,8 +4,9 @@ use crate::{
     cell::error::{CellError, CellResult},
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
+    ribosome::Ribosome,
     txn::{dht::DhtPersistence, source_chain, source_chain::SourceChainPersistence},
-    workflow, ribosome::Ribosome,
+    workflow,
 };
 use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
@@ -69,6 +70,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
 
     pub async fn invoke_zome(
         &self,
+        conductor_api: Api,
         invocation: ZomeInvocation,
     ) -> CellResult<ZomeInvocationResult> {
         let source_chain = SourceChain::new(&self.chain_persistence);
@@ -80,7 +82,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         let dna = source_chain.dna()?;
         let ribosome = Ribosome::new(dna);
         let (invoke_result, snapshot) =
-            workflow::invoke_zome(invocation, source_chain, ribosome).await?;
+            workflow::invoke_zome(invocation, source_chain, ribosome, conductor_api).await?;
         workflow::publish(snapshot, previous_head.address()).await?;
         Ok(invoke_result)
     }
