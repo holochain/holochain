@@ -1,8 +1,8 @@
 [workspace]
 
 members = [
+  "crates/cell",
   "crates/conductor_lib",
-  "crates/core",
   # "crates/lib3h_protocol",
   "crates/keystore",
   # "crates/legacy",

@@ -11,7 +11,7 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1.22"
 futures = { version = "0.3.1", features = ["thread-pool"]}
-sx_core = { path = "../core"}
+sx_cell = { path = "../cell"}
 sx_conductor_lib = { path = "../conductor_lib"}
 parking_lot = "0.10.0"
 # tokio = { version =  "0.2.9", features = ["stream"]}

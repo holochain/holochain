@@ -7,7 +7,7 @@ use futures::sink::SinkExt;
 use mockall::mock;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{pin::Pin, sync::Arc};
-use sx_core::{
+use sx_cell::{
     cell::{autonomic::AutonomicCue, Cell, CellId},
     conductor_api::{ConductorApiError, ConductorApiResult, ConductorCellApiT},
     nucleus::{ZomeInvocation, ZomeInvocationResult},

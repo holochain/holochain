@@ -2,7 +2,7 @@ use crate::conductor::CellHandle;
 use std::fmt;
 use sx_types::error::SkunkError;
 use thiserror::Error;
-use sx_core::{conductor_api::ConductorApiError, cell::{CellId, error::CellError}};
+use sx_cell::{conductor_api::ConductorApiError, cell::{CellId, error::CellError}};
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 

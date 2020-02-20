@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use sx_core::{conductor_api::ConductorCellApiT, cell::{Cell, CellId, NetSender}};
+use sx_cell::{conductor_api::ConductorCellApiT, cell::{Cell, CellId, NetSender}};
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
