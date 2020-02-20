@@ -10,6 +10,10 @@ members = [
   "crates/types",
 ]
 
+exclude = [
+  "psuedocode"
+]
+
 
 [patch.crates-io]
 holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
