@@ -29,10 +29,10 @@ mod new_idea {
         unimplemented!()
     }
 
-    pub async fn hold_dht_ops(
-        workspace: HoldDhtOpsWorkspace,
+    pub async fn app_validation(
+        workspace: AppValidationWorkspace,
         ops: Vec<DhtOp>,
-    ) -> WorkflowResult<WorkflowEffects<HoldDhtOpsWorkspace>> {
+    ) -> WorkflowResult<WorkflowEffects<AppValidationWorkspace>> {
         unimplemented!()
     }
 
@@ -66,7 +66,7 @@ mod new_idea {
 
     pub enum WorkflowRun {
         InvokeZome(ZomeInvocation),
-        HoldDhtOps(Vec<DhtOp>),
+        AppValidation(Vec<DhtOp>),
         // {
         //     invocation: ZomeInvocation,
         //     source_chain: SourceChain<'_>,
@@ -77,19 +77,24 @@ mod new_idea {
 
     pub struct DhtOp;
 
+    // invoke_zome(myworkspace, invocation)
+    // vs
+    // WorkflowRun::InvokeZome(invocation).run()
+
     impl WorkflowRun {
         async fn run(self) -> WorkflowResult<()> {
             match self {
                 WorkflowRun::InvokeZome(invocation) => {
-                    Self::handle(invoke_zome(InvokeZomeWorkspace, invocation).await?)
+                    Self::finish(invoke_zome(InvokeZomeWorkspace::new(cell_id), invocation).await?)
                 }
-                WorkflowRun::HoldDhtOps(ops) => {
-                    Self::handle(hold_dht_ops(HoldDhtOpsWorkspace, ops).await?)
+                WorkflowRun::AppValidation(ops) => {
+                    Self::finish(app_validation(AppValidationWorkspace::new(cell_id), ops).await?)
                 }
             }
         }
 
-        fn handle<W: Workspace>(effects: WorkflowEffects<W>) -> WorkflowResult<()> {
+        /// Take the
+        fn finish<W: Workspace>(effects: WorkflowEffects<W>) -> WorkflowResult<()> {
             Self::commit_workspace(effects.workspace)?;
             for trigger in effects.triggers {
                 if let Some(delay) = trigger.interval {
@@ -108,8 +113,15 @@ mod new_idea {
 
     pub trait Workspace {}
     pub struct InvokeZomeWorkspace;
-    pub struct HoldDhtOpsWorkspace;
+    pub struct AppValidationWorkspace;
+
+    impl InvokeZomeWorkspace {
+        pub fn new(cell_id: CellId) -> Self { Self }
+    }
+    impl AppValidationWorkspace {
+        pub fn new(cell_id: CellId) -> Self { Self }
+    }
 
     impl Workspace for InvokeZomeWorkspace {}
-    impl Workspace for HoldDhtOpsWorkspace {}
+    impl Workspace for AppValidationWorkspace {}
 }
