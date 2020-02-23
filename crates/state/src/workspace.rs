@@ -1,8 +1,9 @@
 
 
-use crate::error::WorkspaceResult;
+use crate::{api::{RwTransaction, RwCursor, Database, RoCursor}, error::WorkspaceResult};
+use std::collections::HashMap;
 
-pub trait Workspace: Sized {
+pub trait Workspace<'txn>: Sized {
     fn finalize(self) -> WorkspaceResult<()>;
 }
 
@@ -10,13 +11,46 @@ pub trait Store: Sized {
     fn finalize(self) -> WorkspaceResult<()>;
 }
 
-/// A light wrapper around an arbitrary key-value store
-struct KvDb;
+enum KvCrud<V> {
+    Add(V),
+    Mod(V),
+    Del,
+}
 
-///
-struct KvStore;
-impl Store for KvStore {
-    fn finalize(self) -> WorkspaceResult<()> {
+
+// TODO: make real
+pub type StateResult<T> = Result<T, ()>;
+
+/// A persisted key-value store with a transient HashMap to store
+/// CRUD-like changes without opening a blocking read-write cursor
+struct KvStore<'txn, K, V> {
+    db: Database,
+    cursor: RoCursor<'txn>,
+    scratch: HashMap<K, KvCrud<V>>,
+}
+
+
+impl<'txn, K, V> KvStore<'txn, K, V> {
+    pub fn get(&self, k: &K) -> StateResult<Option<V>> {
+        use KvCrud::*;
+        match self.scratch.get(k) {
+            Some(Add(val)) => self.get_persisted(k).unwrap_or(val),
+            Some(Mod(val)) => Some(val),
+            Some(Del) => None,
+            None => self.get_persisted(k)?
+        }
+    }
+
+    /// Fetch data from DB, deserialize into V type
+    fn get_persisted(&self, k: &K) -> StateResult<Option<V>> {
+        unimplemented!()
+    }
+}
+
+impl<'txn, K, V> Store for KvStore<'txn, K, V> {
+    fn finalize(self, txn: &'txn mut RwTransaction) -> WorkspaceResult<()> {
+        let cursor = txn.open_rw_cursor(self.db).expect("TODO");
+        // TODO: iterate over scratch values and apply them to the cursor
         unimplemented!()
     }
 }
@@ -28,6 +62,12 @@ impl Store for TabularStore {
     }
 }
 
+struct Cascade<'txn> {
+    cas: RwCursor<'txn>,
+    cas_meta: RwCursor<'txn>,
+    cache: RwCursor<'txn>,
+    cache_meta: RwCursor<'txn>,
+}
 
 pub struct InvokeZomeWorkspace {
     cas: KvStore,
