@@ -10,7 +10,7 @@ pub(crate) use publish::publish;
 
 mod new_idea {
 
-    use crate::nucleus::ZomeInvocation;
+    use crate::{cell::CellId, nucleus::ZomeInvocation};
     use std::time::Duration;
     use thiserror::Error;
 
@@ -85,10 +85,10 @@ mod new_idea {
         async fn run(self) -> WorkflowResult<()> {
             match self {
                 WorkflowRun::InvokeZome(invocation) => {
-                    Self::finish(invoke_zome(InvokeZomeWorkspace::new(cell_id), invocation).await?)
+                    Self::finish(invoke_zome(InvokeZomeWorkspace::new(unimplemented!()), invocation).await?)
                 }
                 WorkflowRun::AppValidation(ops) => {
-                    Self::finish(app_validation(AppValidationWorkspace::new(cell_id), ops).await?)
+                    Self::finish(app_validation(AppValidationWorkspace::new(unimplemented!()), ops).await?)
                 }
             }
         }
