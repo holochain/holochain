@@ -1,53 +1,78 @@
+use crate::{
+    error::WorkspaceResult,
+    store::{KvStore, TabularStore, TransactionalStore},
+};
+use rkv::{EnvironmentFlags, Manager, Rkv, Writer};
+use std::{
+    path::Path,
+    sync::{Arc, RwLock},
+};
 
-
-use crate::error::WorkspaceResult;
-
-pub trait Workspace: Sized {
-    fn finalize(self) -> WorkspaceResult<()>;
+pub trait Workspace<'txn>: Sized {
+    fn finalize(self, writer: Writer) -> WorkspaceResult<()>;
 }
 
-pub trait Store: Sized {
-    fn finalize(self) -> WorkspaceResult<()>;
-}
-
-/// A light wrapper around an arbitrary key-value store
-struct KvDb;
-
-///
-struct KvStore;
-impl Store for KvStore {
-    fn finalize(self) -> WorkspaceResult<()> {
-        unimplemented!()
-    }
-}
-
-struct TabularStore;
-impl Store for TabularStore {
-    fn finalize(self) -> WorkspaceResult<()> {
-        unimplemented!()
-    }
-}
-
-
-pub struct InvokeZomeWorkspace {
-    cas: KvStore,
+pub struct InvokeZomeWorkspace<'env> {
+    cas: KvStore<'env, String, String>,
     meta: TabularStore,
 }
 
-/// There can be a different set of db cursors (all writes) that only get accessed in the finalize stage,
-/// but other read-only cursors during the actual workflow
-pub struct AppValidationWorkspace;
-
-impl Workspace for InvokeZomeWorkspace {
-    fn finalize(self) -> WorkspaceResult<()> {
-        self.cas.finalize()?;
-        self.meta.finalize()?;
+impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
+    fn finalize(self, mut writer: Writer) -> WorkspaceResult<()> {
+        self.cas.finalize(&mut writer)?;
+        // self.meta.finalize(&mut writer)?;
+        writer.commit()?;
         Ok(())
     }
 }
 
-impl Workspace for AppValidationWorkspace {
-    fn finalize(self) -> WorkspaceResult<()> {
-        Ok(())
+impl<'env> InvokeZomeWorkspace<'env> {
+    pub fn new(env: &'env Rkv) -> WorkspaceResult<Self> {
+        Ok(Self {
+            // TODO: careful with this create()
+            cas: KvStore::create(env, "cas")?,
+            meta: TabularStore,
+        })
+    }
+
+    pub fn cas(&mut self) -> &mut KvStore<'env, String, String> {
+        &mut self.cas
+    }
+}
+
+pub struct AppValidationWorkspace;
+
+impl<'env> Workspace<'env> for AppValidationWorkspace {
+    fn finalize(self, _writer: Writer) -> WorkspaceResult<()> {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::{InvokeZomeWorkspace, Workspace};
+    use crate::env::create_lmdb_env;
+    use tempdir::TempDir;
+
+    #[test]
+    fn workspace_sanity_check() {
+        let tmpdir = TempDir::new("skunkworx").unwrap();
+        let created_arc = create_lmdb_env(tmpdir.path());
+        let env = created_arc.read().unwrap();
+
+        let mut workspace = InvokeZomeWorkspace::new(&env).unwrap();
+        let cas = workspace.cas();
+        assert_eq!(cas.get(&"hi".to_owned()).unwrap(), None);
+        cas.add("hi".to_owned(), "there".to_owned());
+        assert_eq!(cas.get(&"hi".to_owned()).unwrap(), Some("there".to_owned()));
+        workspace.finalize(env.write().unwrap()).unwrap();
+
+        // Ensure that the data was persisted
+        let mut workspace = InvokeZomeWorkspace::new(&env).unwrap();
+        assert_eq!(
+            workspace.cas().get(&"hi".to_owned()).unwrap(),
+            Some("there".to_owned())
+        );
     }
 }

@@ -14,11 +14,18 @@ futures = "0.3.1"
 thiserror = "1.0.10"
 log = "0.4.8"
 mockall = "0.6.0"
+rkv = "0.10.2"
+# To get access to lmdb error types which aren't exported by rkv
+lmdb-rkv = "0.12.3"
+rmp-serde = "0.14.3"
+serde = "1.0.104"
+serde_derive = "1.0.104"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "0.0.42-alpha5" }
 
 [dev-dependencies]
+tempdir = "0.3.7"
 
 # TODO: this brings in too many assumptions from the previous version,
 # but there is a lot of useful stuff here, so will have to refactor all of this later
