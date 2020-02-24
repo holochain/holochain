@@ -2,11 +2,8 @@ use crate::{
     error::WorkspaceResult,
     store::{KvStore, TabularStore, TransactionalStore},
 };
-use rkv::{EnvironmentFlags, Manager, Rkv, Writer};
-use std::{
-    path::Path,
-    sync::{Arc, RwLock},
-};
+use rkv::{Rkv, Writer};
+
 
 pub trait Workspace<'txn>: Sized {
     fn finalize(self, writer: Writer) -> WorkspaceResult<()>;

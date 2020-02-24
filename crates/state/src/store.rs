@@ -1,22 +1,15 @@
+use sx_types::prelude::{AddressableContent, Address};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use rkv::{Rkv, SingleStore, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, hash::Hash};
-
-/// General trait for transactional stores, exposing only the method which
-/// finalizes the transaction. Not currently used, but could be used in Workspaces
-/// i.e. iterating over a Vec<dyn TransactionalStore> is all that needs to happen
-/// to commit the workspace changes
-pub trait TransactionalStore<'env>: Sized {
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()>;
-}
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist
 /// Mod: set the key to this value regardless of whether or not it already exists
 /// Del: remove the KV
 enum KvOp<V> {
-    Put(V),
+    Put(Box<V>),
     Del,
 }
 
@@ -65,7 +58,7 @@ where
     pub fn get(&self, k: &K) -> WorkspaceResult<Option<V>> {
         use KvOp::*;
         let val = match self.scratch.get(k) {
-            Some(Put(scratch_val)) => Some(scratch_val.clone()),
+            Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Del) => None,
             None => self.get_persisted(k)?,
         };
@@ -74,7 +67,7 @@ where
 
     pub fn put(&mut self, k: K, v: V) {
         // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, KvOp::Put(v));
+        let _ = self.scratch.insert(k, KvOp::Put(Box::new(v)));
     }
 
     pub fn delete(&mut self, k: K) {
@@ -90,6 +83,46 @@ where
             Some(_) => Err(WorkspaceError::InvalidValue),
         }
     }
+}
+
+/// A wrapper around a KvStore where keys are always Addresses,
+/// and values are always AddressableContent.
+pub struct Cas<'env, V>(KvStore<'env, Address, V>)
+where V: AddressableContent + Clone + Serialize + DeserializeOwned;
+
+impl<'env, V> Cas<'env, V>
+where V: AddressableContent + Clone + Serialize + DeserializeOwned
+{
+    /// Create or open DB if it exists.
+    /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
+    pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
+        Ok(Self(KvStore::create(env, name)?))
+    }
+
+    /// Open an existing DB. Will cause an error if the DB was not created already.
+    pub fn open(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
+        Ok(Self(KvStore::open(env, name)?))
+    }
+
+    pub fn get(&self, k: &Address) -> WorkspaceResult<Option<V>> {
+        self.0.get(k)
+    }
+
+    pub fn put(&mut self, v: V) -> () {
+        self.0.put(v.address(), v)
+    }
+
+    pub fn delete(&mut self, k: Address) -> () {
+        self.0.delete(k)
+    }
+}
+
+/// General trait for transactional stores, exposing only the method which
+/// finalizes the transaction. Not currently used, but could be used in Workspaces
+/// i.e. iterating over a Vec<dyn TransactionalStore> is all that needs to happen
+/// to commit the workspace changes
+pub trait TransactionalStore<'env>: Sized {
+    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()>;
 }
 
 impl<'env, K, V> TransactionalStore<'env> for KvStore<'env, K, V>
