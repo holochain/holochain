@@ -1,9 +1,15 @@
 use crate::{
     api::{Database, RoCursor, RwCursor, RwTransaction},
-    error::WorkspaceResult,
+    error::{WorkspaceError, WorkspaceResult},
 };
-use rkv::{Reader, SingleStore, StoreOptions, Writer, Rkv};
-use std::{collections::HashMap, hash::Hash};
+use rkv::{EnvironmentFlags, Manager, Reader, Rkv, SingleStore, StoreOptions, Writer};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    path::Path,
+    sync::{Arc, RwLock},
+};
 
 pub trait Store<'env>: Sized {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()>;
@@ -15,30 +21,34 @@ enum KvCrud<V> {
     Del,
 }
 
-// TODO: make real
-pub type StateResult<T> = Result<T, ()>;
-
 /// A persisted key-value store with a transient HashMap to store
 /// CRUD-like changes without opening a blocking read-write cursor
-pub struct KvStore<'env, K: Hash + Eq, V> {
+pub struct KvStore<'env, K, V>
+where
+    K: Hash + Eq + AsRef<[u8]>,
+    V: Clone + Serialize + DeserializeOwned,
+{
     db: SingleStore,
-    reader: Reader<'env>,
+    env: &'env Rkv,
+    // reader: Reader<'env>,
     scratch: HashMap<K, KvCrud<V>>,
 }
 
-impl<'env, K: Hash + Eq, V: Clone> KvStore<'env, K, V> {
-
-    pub fn new(env: &'env Rkv, name: &str) -> Self {
-        let reader = env.read().expect("TODO");
-        let db = env.open_single(name, StoreOptions::create()).expect("TODO");
-        Self {
+impl<'env, K, V> KvStore<'env, K, V>
+where
+    K: Hash + Eq + AsRef<[u8]>,
+    V: Clone + Serialize + DeserializeOwned,
+{
+    pub fn new(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
+        let db = env.open_single(name, StoreOptions::create())?;
+        Ok(Self {
             db,
-            reader,
-            scratch: HashMap::new()
-        }
+            env,
+            scratch: HashMap::new(),
+        })
     }
 
-    pub fn get(&self, k: &K) -> StateResult<Option<V>> {
+    pub fn get(&self, k: &K) -> WorkspaceResult<Option<V>> {
         use KvCrud::*;
         let val = match self.scratch.get(k) {
             Some(Add(scratch_val)) => Some(
@@ -52,14 +62,63 @@ impl<'env, K: Hash + Eq, V: Clone> KvStore<'env, K, V> {
         Ok(val)
     }
 
+    pub fn add(&mut self, k: K, v: V) {
+        // TODO, maybe give indication of whether the value existed or not
+        let _ = self.scratch.insert(k, KvCrud::Add(v));
+    }
+
+    pub fn modify(&mut self, k: K, v: V) {
+        // TODO, maybe give indication of whether the value existed or not
+        let _ = self.scratch.insert(k, KvCrud::Mod(v));
+    }
+
+    pub fn delete(&mut self, k: &K) {
+        // TODO, maybe give indication of whether the value existed or not
+        let _ = self.scratch.remove(k);
+    }
+
     /// Fetch data from DB, deserialize into V type
-    fn get_persisted(&self, k: &K) -> StateResult<Option<V>> {
-        Ok(self.db.get(&self.reader, k).expect("TODO"))
+    fn get_persisted(&self, k: &K) -> WorkspaceResult<Option<V>> {
+        match self.db.get(&self.env.read()?, k)? {
+            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
+            None => Ok(None),
+            Some(_) => Err(WorkspaceError::InvalidValue),
+        }
     }
 }
 
-impl<'env, K: Hash + Eq, V> Store<'env> for KvStore<'env, K, V> {
+// fn rkv_encode<'a, V>(v: &'a V) -> WorkspaceResult<rkv::Value<'a>>
+// where V: Serialize
+// {
+//     let buf = rmp_serde::to_vec_named(v)?;
+//     Ok(rkv::Value::from_tagged_slice(&buf)?)
+// }
+
+impl<'env, K, V> Store<'env> for KvStore<'env, K, V>
+where
+    K: Hash + Eq + AsRef<[u8]>,
+    V: Clone + Serialize + DeserializeOwned,
+{
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+        use KvCrud::*;
+        for (k, op) in self.scratch.iter() {
+            match op {
+                Add(v) | Mod(v) => {
+                    let buf = rmp_serde::to_vec_named(v)?;
+                    let encoded = rkv::Value::from_tagged_slice(&buf)?;
+                    match op {
+                        Add(_) => {
+                            if self.get_persisted(&k)?.is_none() {
+                                self.db.put(writer, k, &encoded)?;
+                            }
+                        }
+                        Mod(_) => self.db.put(writer, k, &encoded)?,
+                        Del => unreachable!(),
+                    }
+                }
+                Del => self.db.delete(writer, k)?,
+            }
+        }
         // TODO: iterate over scratch values and apply them to the cursor
         // via db.put / db.delete
         unimplemented!()
@@ -102,15 +161,15 @@ impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(env: &'env Rkv) -> Self {
-        Self {
-            cas: KvStore::new(env, "cas"),
+    pub fn new(env: &'env Rkv) -> WorkspaceResult<Self> {
+        Ok(Self {
+            cas: KvStore::new(env, "cas")?,
             meta: TabularStore,
-        }
+        })
     }
 
-    pub fn cas(&self) -> &KvStore<String, String> {
-        &self.cas
+    pub fn cas(&mut self) -> &mut KvStore<'env, String, String> {
+        &mut self.cas
     }
 }
 
@@ -120,18 +179,51 @@ impl<'env> Workspace<'env> for AppValidationWorkspace {
     }
 }
 
+const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
+const MAX_DBS: u32 = 32;
+
+fn create_rkv_env(path: &Path) -> Arc<RwLock<Rkv>> {
+    let initial_map_size = None;
+    let flags = None;
+    Manager::singleton()
+        .write()
+        .unwrap()
+        .get_or_create(path, |path: &Path| {
+            let mut env_builder = Rkv::environment_builder();
+            env_builder
+                // max size of memory map, can be changed later
+                .set_map_size(initial_map_size.unwrap_or(DEFAULT_INITIAL_MAP_SIZE))
+                // max number of DBs in this environment
+                .set_max_dbs(MAX_DBS)
+                // These flags make writes waaaaay faster by async writing to disk rather than blocking
+                // There is some loss of data integrity guarantees that comes with this
+                .set_flags(
+                    flags.unwrap_or_else(|| {
+                        EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC
+                    }),
+                );
+            Rkv::from_env(path, env_builder)
+        })
+        .unwrap()
+}
+
 #[cfg(test)]
 pub mod tests {
 
+    use super::{create_rkv_env, InvokeZomeWorkspace};
+    use rkv::Rkv;
     use tempdir::TempDir;
-    use rkv::{Rkv, Manager};
-    use super::InvokeZomeWorkspace;
 
     #[test]
     fn create_invoke_zome_workspace() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
-        let created_arc = Manager::singleton().write().unwrap().get_or_create(tmpdir.path(), Rkv::new).unwrap();
+        println!("temp dir: {:?}", tmpdir);
+        let created_arc = create_rkv_env(tmpdir.path());
         let env = created_arc.read().unwrap();
-        let workspace = InvokeZomeWorkspace::new(&env);
+        let mut workspace = InvokeZomeWorkspace::new(&env).unwrap();
+        let cas = workspace.cas();
+        assert_eq!(cas.get(&"hi".to_owned()).unwrap(), None);
+        cas.add("hi".to_owned(), "there".to_owned());
+        assert_eq!(cas.get(&"hi".to_owned()).unwrap(), Some("there".to_owned()));
     }
 }
