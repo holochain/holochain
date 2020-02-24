@@ -64,7 +64,7 @@ pub mod tests {
         let mut workspace = InvokeZomeWorkspace::new(&env).unwrap();
         let cas = workspace.cas();
         assert_eq!(cas.get(&"hi".to_owned()).unwrap(), None);
-        cas.add("hi".to_owned(), "there".to_owned());
+        cas.put("hi".to_owned(), "there".to_owned());
         assert_eq!(cas.get(&"hi".to_owned()).unwrap(), Some("there".to_owned()));
         workspace.finalize(env.write().unwrap()).unwrap();
 

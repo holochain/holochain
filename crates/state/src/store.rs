@@ -16,8 +16,7 @@ pub trait TransactionalStore<'env>: Sized {
 /// Mod: set the key to this value regardless of whether or not it already exists
 /// Del: remove the KV
 enum KvOp<V> {
-    Add(V),
-    Mod(V),
+    Put(V),
     Del,
 }
 
@@ -66,30 +65,21 @@ where
     pub fn get(&self, k: &K) -> WorkspaceResult<Option<V>> {
         use KvOp::*;
         let val = match self.scratch.get(k) {
-            Some(Add(scratch_val)) => Some(
-                self.get_persisted(k)?
-                    .unwrap_or_else(|| scratch_val.clone()),
-            ),
-            Some(Mod(scratch_val)) => Some(scratch_val.clone()),
+            Some(Put(scratch_val)) => Some(scratch_val.clone()),
             Some(Del) => None,
             None => self.get_persisted(k)?,
         };
         Ok(val)
     }
 
-    pub fn add(&mut self, k: K, v: V) {
+    pub fn put(&mut self, k: K, v: V) {
         // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, KvOp::Add(v));
+        let _ = self.scratch.insert(k, KvOp::Put(v));
     }
 
-    pub fn modify(&mut self, k: K, v: V) {
+    pub fn delete(&mut self, k: K) {
         // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, KvOp::Mod(v));
-    }
-
-    pub fn delete(&mut self, k: &K) {
-        // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.remove(k);
+        let _ = self.scratch.insert(k, KvOp::Del);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -111,18 +101,10 @@ where
         use KvOp::*;
         for (k, op) in self.scratch.iter() {
             match op {
-                Add(v) | Mod(v) => {
+                Put(v) => {
                     let buf = rmp_serde::to_vec_named(v)?;
                     let encoded = rkv::Value::Blob(&buf);
-                    match op {
-                        Add(_) => {
-                            if self.get_persisted(&k)?.is_none() {
-                                self.db.put(writer, k, &encoded)?;
-                            }
-                        }
-                        Mod(_) => self.db.put(writer, k, &encoded)?,
-                        Del => unreachable!(),
-                    }
+                    self.db.put(writer, k, &encoded)?;
                 }
                 Del => self.db.delete(writer, k)?,
             }
@@ -167,11 +149,11 @@ pub mod tests {
             name: "Joe".to_owned(),
         };
 
-        kv1.add(
+        kv1.put(
             "hi".to_owned(),
             testval.clone(),
         );
-        kv2.add("salutations".to_owned(), "folks".to_owned());
+        kv2.put("salutations".to_owned(), "folks".to_owned());
 
         // Check that the underlying store contains no changes yet
         assert_eq!(kv1.get_persisted(&"hi".to_owned()).unwrap(), None);
