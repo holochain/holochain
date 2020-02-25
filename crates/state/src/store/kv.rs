@@ -14,13 +14,16 @@ enum KvOp<V> {
     Del,
 }
 
+
 /// A persisted key-value store with a transient HashMap to store
 /// CRUD-like changes without opening a blocking read-write cursor
 ///
 /// TODO: split the various methods for accessing data into traits,
 /// and write a macro to help produce traits for every possible combination
 /// of access permission, so that access can be hidden behind a limited interface
-pub struct KvStore<'env, K, V>
+///
+/// TODO: hold onto SingleStore references for as long as the env
+pub struct KvBuffer<'env, K, V>
 where
     K: Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned,
@@ -30,7 +33,7 @@ where
     scratch: HashMap<K, KvOp<V>>,
 }
 
-impl<'env, K, V> KvStore<'env, K, V>
+impl<'env, K, V> KvBuffer<'env, K, V>
 where
     K: Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned,
@@ -86,7 +89,7 @@ where
     }
 }
 
-impl<'env, K, V> TransactionalStore<'env> for KvStore<'env, K, V>
+impl<'env, K, V> TransactionalStore<'env> for KvBuffer<'env, K, V>
 where
     K: Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned,
@@ -110,7 +113,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvStore, TransactionalStore};
+    use super::{KvBuffer, TransactionalStore};
     use crate::env::create_lmdb_env;
     use serde_derive::{Deserialize, Serialize};
     use tempdir::TempDir;
@@ -126,8 +129,8 @@ pub mod tests {
         let created_arc = create_lmdb_env(tmpdir.path());
         let env = created_arc.read().unwrap();
 
-        let mut kv1: KvStore<String, TestVal> = KvStore::create(&env, "kv1").unwrap();
-        let mut kv2: KvStore<String, String> = KvStore::create(&env, "kv2").unwrap();
+        let mut kv1: KvBuffer<String, TestVal> = KvBuffer::create(&env, "kv1").unwrap();
+        let mut kv2: KvBuffer<String, String> = KvBuffer::create(&env, "kv2").unwrap();
 
         let testval = TestVal {
             name: "Joe".to_owned(),
@@ -148,7 +151,7 @@ pub mod tests {
 
         // Ensure that mid-transaction, there has still been no persistence,
         // just for kicks
-        let kv1a: KvStore<String, TestVal> = KvStore::open(&env, "kv1").unwrap();
+        let kv1a: KvBuffer<String, TestVal> = KvBuffer::open(&env, "kv1").unwrap();
         assert_eq!(kv1a.get_persisted(&"hi".to_owned()).unwrap(), None);
 
         // Finish finalizing the transaction
@@ -156,8 +159,8 @@ pub mod tests {
         writer.commit().unwrap();
 
         // Now open some fresh Readers to see that our data was persisted
-        let kv1b: KvStore<String, TestVal> = KvStore::open(&env, "kv1").unwrap();
-        let kv2b: KvStore<String, String> = KvStore::open(&env, "kv2").unwrap();
+        let kv1b: KvBuffer<String, TestVal> = KvBuffer::open(&env, "kv1").unwrap();
+        let kv2b: KvBuffer<String, String> = KvBuffer::open(&env, "kv2").unwrap();
         // Check that the underlying store contains no changes yet
         assert_eq!(kv1b.get_persisted(&"hi".to_owned()).unwrap(), Some(testval));
         assert_eq!(kv2b.get_persisted(&"salutations".to_owned()).unwrap(), Some("folks".to_owned()));

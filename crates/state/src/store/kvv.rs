@@ -26,7 +26,7 @@ type Scratch<K, V> = HashMap<K, HashSet<Op<V>>>;
 /// TODO: split the various methods for accessing data into traits,
 /// and write a macro to help produce traits for every possible combination
 /// of access permission, so that access can be hidden behind a limited interface
-pub struct KvvStore<'env, K, V>
+pub struct KvvBuffer<'env, K, V>
 where
     K: Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned + Hash + Eq,
@@ -36,7 +36,7 @@ where
     scratch: Scratch<K, V>,
 }
 
-impl<'env, K, V> KvvStore<'env, K, V>
+impl<'env, K, V> KvvBuffer<'env, K, V>
 where
     K: Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned + Hash + Eq,
@@ -129,7 +129,7 @@ where
     }
 }
 
-impl<'env, K, V> TransactionalStore<'env> for KvvStore<'env, K, V>
+impl<'env, K, V> TransactionalStore<'env> for KvvBuffer<'env, K, V>
 where
     K: Clone + Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned + Hash + Eq,
@@ -173,7 +173,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvvStore, Op, TransactionalStore};
+    use super::{KvvBuffer, Op, TransactionalStore};
     use crate::env::{
         create_lmdb_env,
         test::{test_env, with_writer},
@@ -187,7 +187,7 @@ pub mod tests {
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
     struct V(pub u32);
 
-    type Store<'a> = KvvStore<'a, &'a str, V>;
+    type Store<'a> = KvvBuffer<'a, &'a str, V>;
 
     fn opInsert<T>(v: T) -> Op<T> {
         Op::Insert(Box::new(v))
@@ -202,7 +202,7 @@ pub mod tests {
         let arc = test_env();
         let env = arc.read().unwrap();
 
-        let mut store: Store = KvvStore::create(&env, "kvv").unwrap();
+        let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
 
         store.insert("key", V(1));
         assert_eq!(
@@ -227,7 +227,7 @@ pub mod tests {
 
         with_writer(&env, |mut writer| store.finalize(&mut writer));
 
-        let mut store: Store = KvvStore::open(&env, "kvv").unwrap();
+        let mut store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
     }
 
@@ -236,7 +236,7 @@ pub mod tests {
         let arc = test_env();
         let env = arc.read().unwrap();
 
-        let mut store: Store = KvvStore::create(&env, "kvv").unwrap();
+        let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
 
         store.insert("key", V(1));
         assert_eq!(
@@ -256,7 +256,7 @@ pub mod tests {
 
         with_writer(&env, |mut writer| store.finalize(&mut writer));
 
-        let store: Store = KvvStore::open(&env, "kvv").unwrap();
+        let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2)});
     }
 
@@ -266,7 +266,7 @@ pub mod tests {
         let env = arc.read().unwrap();
 
         fn add_twice(env: &Rkv) {
-            let mut store: Store = KvvStore::create(&env, "kvv").unwrap();
+            let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
 
             store.insert("key", V(1));
             assert_eq!(
@@ -284,12 +284,12 @@ pub mod tests {
 
         add_twice(&env);
 
-        let store: Store = KvvStore::open(&env, "kvv").unwrap();
+        let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(1)});
 
         add_twice(&env);
 
-        let store: Store = KvvStore::open(&env, "kvv").unwrap();
+        let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(1)});
     }
 
@@ -298,16 +298,16 @@ pub mod tests {
         let arc = test_env();
         let env = arc.read().unwrap();
 
-        let mut store: Store = KvvStore::create(&env, "kvv").unwrap();
+        let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.insert("key", V(1));
         with_writer(&env, |mut writer| store.finalize(&mut writer));
 
-        let mut store: Store = KvvStore::create(&env, "kvv").unwrap();
+        let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.delete("key", V(1));
         store.delete("key", V(1));
         with_writer(&env, |mut writer| store.finalize(&mut writer));
 
-        let store: Store = KvvStore::open(&env, "kvv").unwrap();
+        let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {});
     }
 
@@ -315,7 +315,7 @@ pub mod tests {
     fn kvv_store_get_missing_key() {
         let arc = test_env();
         let env = arc.read().unwrap();
-        let store: Store = KvvStore::create(&env, "kvv").unwrap();
+        let store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         assert_eq!(store.get(&"wompwomp").unwrap(), hashset! {});
     }
 }

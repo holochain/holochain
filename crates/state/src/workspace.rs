@@ -1,6 +1,6 @@
 use crate::{
     error::WorkspaceResult,
-    store::{kv::KvStore, kvv::KvvStore, TransactionalStore},
+    store::{kv::KvBuffer, kvv::KvvBuffer, TransactionalStore},
 };
 use rkv::{Rkv, Writer};
 
@@ -9,8 +9,8 @@ pub trait Workspace<'txn>: Sized {
 }
 
 pub struct InvokeZomeWorkspace<'env> {
-    cas: KvStore<'env, String, String>,
-    meta: KvvStore<'env, String, String>,
+    cas: KvBuffer<'env, String, String>,
+    meta: KvvBuffer<'env, String, String>,
 }
 
 impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
@@ -26,12 +26,12 @@ impl<'env> InvokeZomeWorkspace<'env> {
     pub fn new(env: &'env Rkv) -> WorkspaceResult<Self> {
         Ok(Self {
             // TODO: careful with this create()
-            cas: KvStore::create(env, "cas")?,
-            meta: KvvStore::create(env, "meta")?,
+            cas: KvBuffer::create(env, "cas")?,
+            meta: KvvBuffer::create(env, "meta")?,
         })
     }
 
-    pub fn cas(&mut self) -> &mut KvStore<'env, String, String> {
+    pub fn cas(&mut self) -> &mut KvBuffer<'env, String, String> {
         &mut self.cas
     }
 }
