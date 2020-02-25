@@ -1,3 +1,5 @@
+#![feature(backtrace)]
+
 pub mod cascade;
 pub mod env;
 pub mod error;

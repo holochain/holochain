@@ -10,7 +10,7 @@ pub trait Workspace<'txn>: Sized {
 
 pub struct InvokeZomeWorkspace<'env> {
     cas: KvStore<'env, String, String>,
-    meta: KvvStore,
+    meta: KvvStore<'env, String, String>,
 }
 
 impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
@@ -27,7 +27,7 @@ impl<'env> InvokeZomeWorkspace<'env> {
         Ok(Self {
             // TODO: careful with this create()
             cas: KvStore::create(env, "cas")?,
-            meta: KvvStore,
+            meta: KvvStore::create(env, "meta")?,
         })
     }
 
