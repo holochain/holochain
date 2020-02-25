@@ -3,6 +3,7 @@ use rkv::Writer;
 use crate::error::WorkspaceResult;
 
 pub mod cas;
+pub mod chain_cas;
 pub mod kv;
 pub mod kvv;
 
