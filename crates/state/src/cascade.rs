@@ -1,4 +1,4 @@
-use crate::store::{cas::CasBuffer, kvv::KvvBuffer};
+use crate::buffer::{cas::CasBuffer, kvv::KvvBuffer};
 use sx_types::{chain_header::ChainHeader, entry::Entry};
 
 struct Cascade<'e> {

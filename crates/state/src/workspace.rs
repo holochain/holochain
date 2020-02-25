@@ -1,6 +1,6 @@
 use crate::{
+    buffer::{kv::KvBuffer, kvv::KvvBuffer, TransactionalStore},
     error::WorkspaceResult,
-    store::{kv::KvBuffer, kvv::KvvBuffer, TransactionalStore},
 };
 use rkv::{Rkv, Writer};
 
