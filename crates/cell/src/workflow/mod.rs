@@ -77,10 +77,6 @@ mod new_idea {
 
     pub struct DhtOp;
 
-    // invoke_zome(myworkspace, invocation)
-    // vs
-    // WorkflowRun::InvokeZome(invocation).run()
-
     impl WorkflowRun {
         async fn run(self) -> WorkflowResult<()> {
             match self {
