@@ -1,20 +1,16 @@
 use crate::{
+    buffer::{kv::KvBuffer, kvv::KvvBuffer, TransactionalStore},
     error::WorkspaceResult,
-    store::{KvStore, TabularStore, TransactionalStore},
 };
-use rkv::{EnvironmentFlags, Manager, Rkv, Writer};
-use std::{
-    path::Path,
-    sync::{Arc, RwLock},
-};
+use rkv::{Rkv, Writer};
 
 pub trait Workspace<'txn>: Sized {
     fn finalize(self, writer: Writer) -> WorkspaceResult<()>;
 }
 
 pub struct InvokeZomeWorkspace<'env> {
-    cas: KvStore<'env, String, String>,
-    meta: TabularStore,
+    cas: KvBuffer<'env, String, String>,
+    meta: KvvBuffer<'env, String, String>,
 }
 
 impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
@@ -30,12 +26,12 @@ impl<'env> InvokeZomeWorkspace<'env> {
     pub fn new(env: &'env Rkv) -> WorkspaceResult<Self> {
         Ok(Self {
             // TODO: careful with this create()
-            cas: KvStore::create(env, "cas")?,
-            meta: TabularStore,
+            cas: KvBuffer::create(env, "cas")?,
+            meta: KvvBuffer::create(env, "meta")?,
         })
     }
 
-    pub fn cas(&mut self) -> &mut KvStore<'env, String, String> {
+    pub fn cas(&mut self) -> &mut KvBuffer<'env, String, String> {
         &mut self.cas
     }
 }
@@ -64,7 +60,7 @@ pub mod tests {
         let mut workspace = InvokeZomeWorkspace::new(&env).unwrap();
         let cas = workspace.cas();
         assert_eq!(cas.get(&"hi".to_owned()).unwrap(), None);
-        cas.add("hi".to_owned(), "there".to_owned());
+        cas.put("hi".to_owned(), "there".to_owned());
         assert_eq!(cas.get(&"hi".to_owned()).unwrap(), Some("there".to_owned()));
         workspace.finalize(env.write().unwrap()).unwrap();
 

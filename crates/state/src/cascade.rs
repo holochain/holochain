@@ -1,9 +1,14 @@
+use crate::buffer::{chain_cas::ChainCasBuffer, kvv::KvvBuffer};
 
-use rkv::SingleStore;
+struct Cascade<'e> {
+    cas: &'e ChainCasBuffer<'e>,
+    cache: &'e ChainCasBuffer<'e>,
+    cas_meta: &'e KvvBuffer<'e, String, String>,
+    cache_meta: &'e KvvBuffer<'e, String, String>,
+}
 
-struct Cascade<'env> {
-    cas: &'env SingleStore,
-    cas_meta: &'env SingleStore,
-    cache: &'env SingleStore,
-    cache_meta: &'env SingleStore,
+impl<'env> Cascade<'env> {
+    pub fn dht_get() {
+        unimplemented!()
+    }
 }

@@ -17,7 +17,7 @@ hcid = "0.0.6"
 holochain_persistence_api = "0.0.17"
 holochain_json_api = "0.0.23"
 holochain_json_derive = "0.0.23"
-holochain_locksmith = { version = "0.0.43-alpha3" }
+holochain_locksmith = "0.0.43-alpha3"
 lib3h_crypto_api = "0.0.38"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = ["derive"] }

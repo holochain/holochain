@@ -1,6 +1,8 @@
-
-use rkv::{Rkv, Manager, EnvironmentFlags};
-use std::{sync::{RwLock, Arc}, path::Path};
+use rkv::{EnvironmentFlags, Manager, Rkv};
+use std::{
+    path::Path,
+    sync::{Arc, RwLock},
+};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
@@ -29,4 +31,24 @@ pub fn create_lmdb_env(path: &Path) -> Arc<RwLock<Rkv>> {
             Rkv::from_env(path, env_builder)
         })
         .unwrap()
+}
+
+#[cfg(test)]
+pub mod test {
+    use crate::{error::WorkspaceResult, env::create_lmdb_env};
+    use rkv::{Writer, Rkv};
+    use std::sync::{Arc, RwLock};
+    use tempdir::TempDir;
+
+    pub fn test_env() -> Arc<RwLock<Rkv>> {
+        let tmpdir = TempDir::new("skunkworx").unwrap();
+        create_lmdb_env(tmpdir.path())
+    }
+
+    pub fn with_writer<F>(env: &Rkv, f: F)
+    where F: FnOnce(&mut Writer) -> WorkspaceResult<()> {
+        let mut writer = env.write().unwrap();
+        let result = f(&mut writer).unwrap();
+        writer.commit().unwrap();
+    }
 }
