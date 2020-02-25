@@ -1,9 +1,8 @@
 use crate::{
     error::WorkspaceResult,
-    store::{KvStore, TabularStore, TransactionalStore},
+    store::{kv::KvStore, kvv::KvvStore, TransactionalStore},
 };
 use rkv::{Rkv, Writer};
-
 
 pub trait Workspace<'txn>: Sized {
     fn finalize(self, writer: Writer) -> WorkspaceResult<()>;
@@ -11,7 +10,7 @@ pub trait Workspace<'txn>: Sized {
 
 pub struct InvokeZomeWorkspace<'env> {
     cas: KvStore<'env, String, String>,
-    meta: TabularStore,
+    meta: KvvStore,
 }
 
 impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
@@ -28,7 +27,7 @@ impl<'env> InvokeZomeWorkspace<'env> {
         Ok(Self {
             // TODO: careful with this create()
             cas: KvStore::create(env, "cas")?,
-            meta: TabularStore,
+            meta: KvvStore,
         })
     }
 
