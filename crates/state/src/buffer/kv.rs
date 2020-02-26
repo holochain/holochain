@@ -1,4 +1,4 @@
-use super::TransactionalStore;
+use super::StoreBuffer;
 use crate::error::{WorkspaceError, WorkspaceResult};
 use rkv::{Reader, Rkv, SingleStore, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
@@ -83,9 +83,17 @@ where
             Some(_) => Err(WorkspaceError::InvalidValue),
         }
     }
+
+    fn iter(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
+        Ok((SingleStoreIterTyped::new(self.db.iter_start(&self.reader)?)))
+    }
+
+    fn iter_reverse(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
+        Ok((SingleStoreIterTyped::new(self.db.iter_end(&self.reader)?)))
+    }
 }
 
-impl<'env, K, V> TransactionalStore<'env> for KvBuffer<'env, K, V>
+impl<'env, K, V> StoreBuffer<'env, K, V> for KvBuffer<'env, K, V>
 where
     K: Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned,
@@ -104,13 +112,43 @@ where
         }
         Ok(())
     }
+
+
+}
+
+struct SingleStoreIterTyped<'env, V>(rkv::store::single::Iter<'env>, std::marker::PhantomData<V>);
+
+impl<'env, V> SingleStoreIterTyped<'env, V> {
+    pub fn new(iter: rkv::store::single::Iter<'env>) -> Self {
+        Self(iter, std::marker::PhantomData)
+    }
+}
+
+
+impl<'env, V> Iterator for SingleStoreIterTyped<'env, V>
+where V: Clone + Serialize + DeserializeOwned, {
+    type Item = V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.0.next() {
+            Some(Ok((_k, Some(rkv::Value::Blob(buf))))) => (
+                // k.into(),
+                rmp_serde::from_read_ref(buf).unwrap()
+            ),
+            None => None,
+            x => {
+                dbg!(x);
+                panic!("TODO");
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvBuffer, TransactionalStore};
-    use crate::env::create_lmdb_env;
+    use super::{KvBuffer, StoreBuffer};
+    use crate::env::{create_lmdb_env, test::{with_writer, test_env}};
     use serde_derive::{Deserialize, Serialize};
     use tempdir::TempDir;
 
@@ -119,11 +157,54 @@ pub mod tests {
         name: String,
     }
 
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct V(u32);
+
+    #[test]
+    fn kv_iterators() {
+        let arc = test_env();
+        let env = arc.read().unwrap();
+        type Store<'a> = KvBuffer<'a, &'a str, V>;
+
+        let mut store: Store = KvBuffer::create(&env, "kv").unwrap();
+
+        store.put("a", V(1));
+        store.put("b", V(2));
+        store.put("c", V(3));
+        store.put("d", V(4));
+        store.put("e", V(5));
+
+        with_writer(&env, |mut writer| store.finalize(&mut writer));
+
+        let store: Store = KvBuffer::open(&env, "kv").unwrap();
+
+        let forward: Vec<_> = store.iter().unwrap().collect();
+        let reverse: Vec<_> = store.iter_reverse().unwrap().collect();
+
+        assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
+        assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
+    }
+
+    #[test]
+    fn kv_empty_iterators() {
+        let arc = test_env();
+        let env = arc.read().unwrap();
+        type Store<'a> = KvBuffer<'a, &'a str, V>;
+
+        let store: Store = KvBuffer::create(&env, "kv").unwrap();
+
+        let forward: Vec<_> = store.iter().unwrap().collect();
+        let reverse: Vec<_> = store.iter_reverse().unwrap().collect();
+
+        assert_eq!(forward, vec![]);
+        assert_eq!(reverse, vec![]);
+    }
+
+    /// TODO break up into smaller tests
     #[test]
     fn kv_store_sanity_check() {
-        let tmpdir = TempDir::new("skunkworx").unwrap();
-        let created_arc = create_lmdb_env(tmpdir.path());
-        let env = created_arc.read().unwrap();
+        let arc = test_env();
+        let env = arc.read().unwrap();
 
         let mut kv1: KvBuffer<String, TestVal> = KvBuffer::create(&env, "kv1").unwrap();
         let mut kv2: KvBuffer<String, String> = KvBuffer::create(&env, "kv2").unwrap();

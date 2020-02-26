@@ -1,4 +1,4 @@
-use super::TransactionalStore;
+use super::StoreBuffer;
 use crate::error::{WorkspaceError, WorkspaceResult};
 use maplit::hashset;
 use rkv::{MultiStore, Reader, Rkv, StoreError, StoreOptions, Writer};
@@ -126,7 +126,7 @@ where
     }
 }
 
-impl<'env, K, V> TransactionalStore<'env> for KvvBuffer<'env, K, V>
+impl<'env, K, V> StoreBuffer<'env, K, V> for KvvBuffer<'env, K, V>
 where
     K: Clone + Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned + Hash + Eq,
@@ -170,7 +170,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvvBuffer, Op, TransactionalStore};
+    use super::{KvvBuffer, Op, StoreBuffer};
     use crate::env::{
         create_lmdb_env,
         test::{test_env, with_writer},
