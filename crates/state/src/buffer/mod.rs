@@ -5,11 +5,13 @@ use crate::error::WorkspaceResult;
 mod cas;
 mod chain_cas;
 mod kv;
+mod kv_int;
 mod kvv;
 
 pub use cas::CasBuffer;
 pub use chain_cas::ChainCasBuffer;
 pub use kv::KvBuffer;
+pub use kv_int::KvIntBuffer;
 pub use kvv::KvvBuffer;
 
 /// General trait for transactional stores, exposing only the method which
