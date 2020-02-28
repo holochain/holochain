@@ -5,7 +5,7 @@ use holochain_json_api::error::JsonError;
 use super::ChainTop;
 use sx_state::error::WorkspaceError;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum SourceChainError {
     #[error("The source chain is empty: it needs to be initialized before using")]
     ChainEmpty,

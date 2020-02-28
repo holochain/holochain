@@ -42,12 +42,12 @@ impl<'env> SourceChain<'env> {
     pub fn now(&self) -> SourceChainResult<SourceChainSnapshot> {
         let db = SourceChainBuffer::create(self.env)?;
         let head = db.chain_head()?.ok_or(SourceChainError::ChainEmpty)?;
-        SourceChainSnapshot::new(&db, head)
+        SourceChainSnapshot::new(db, head)
     }
 
     pub fn as_at(&self, head: Address) -> SourceChainResult<SourceChainSnapshot> {
         let db = SourceChainBuffer::create(self.env)?;
-        SourceChainSnapshot::new(&db, head)
+        SourceChainSnapshot::new(db, head)
     }
 
     pub fn bundle(&self) -> SourceChainResult<SourceChainCommitBundle> {
@@ -94,7 +94,8 @@ impl<'env> SourceChain<'env> {
         Ok(SourceChainBuffer::create(self.env)?.chain_head()?)
     }
 
-    // pub fn initialize(&self, writer: CursorRw, dna: Dna, agent: AgentId) -> SourceChainResult<()> {
+    pub fn initialize(&self, dna: Dna, agent: AgentId) -> SourceChainResult<()> {
+        unimplemented!()
     //     let dna_entry = Entry::Dna(Box::new(dna));
     //     let dna_header = self.header_for_entry(
     //         None,
@@ -122,7 +123,7 @@ impl<'env> SourceChain<'env> {
     //     writer.commit()?;
 
     //     Ok(())
-    // }
+    }
 
     pub fn dna(&self) -> SourceChainResult<Dna> {
         self.now()?.dna()
@@ -169,6 +170,7 @@ pub mod tests {
     use sx_types::test_utils::test_dna;
     use tempdir::TempDir;
     use Entry;
+    use sx_state::env::test::test_env;
 
     pub fn test_initialized_chain<'env>(
         agent_name: &str,
@@ -177,9 +179,9 @@ pub mod tests {
         let dna: Dna = test_dna(agent_name);
         let agent = AgentId::generate_fake(agent_name);
         let id: CellId = (dna.address(), agent.clone());
+        let env = test_env();
         let chain = SourceChain::new(&env);
-        let writer = env.create_cursor_rw().unwrap();
-        chain.initialize(writer, dna, agent).unwrap();
+        chain.initialize(dna, agent).unwrap();
         assert!(chain.validate().is_ok());
         chain
     }
@@ -195,7 +197,7 @@ pub mod tests {
             entry.entry_type(),
             entry.address(),
             provenances,
-            Some(head.address().clone()),
+            Some(head.clone()),
             None,
             None,
             timestamp,
@@ -207,14 +209,12 @@ pub mod tests {
         let dna: Dna = test_dna("a");
         let agent = AgentId::generate_fake("a");
         let id: CellId = (dna.address(), agent.clone());
-        let tmpdir = TempDir::new("skunkworx").unwrap();
-        let env = SourceChainPersistence::test(tmpdir.path());
+        let env = test_env();
         let chain = SourceChain::new(&env);
-        let writer = env.create_cursor_rw().unwrap();
 
         assert_eq!(chain.validate(), Err(SourceChainError::ChainEmpty));
 
-        chain.initialize(writer, dna, agent).unwrap();
+        chain.initialize(dna, agent).unwrap();
 
         assert!(chain.validate().is_ok());
     }
@@ -233,7 +233,7 @@ pub mod tests {
             Entry::App("type".into(), "content 3".into()),
         ]
         .iter()
-        .map(|entry| bundle.add_entry(&entry).unwrap())
+        .map(|entry| bundle.add_entry(entry.clone()).unwrap())
         .collect();
 
         // See that the uncommitted new entries are accessible through the iterator
@@ -247,7 +247,7 @@ pub mod tests {
 
         // But also see that the new entries aren't actually committed yet!
         assert_eq!(chain.now().unwrap().iter_back().count().unwrap(), 2);
-        bundle.commit().unwrap();
+        chain.try_commit(bundle).unwrap();
         // Only now should they be
         assert_eq!(chain.now().unwrap().iter_back().count().unwrap(), 5);
     }
@@ -262,18 +262,18 @@ pub mod tests {
         let mut bundle1 = chain.bundle().unwrap();
         let entry1 = Entry::App("type".into(), "content 1".into());
         let entry1 = Entry::App("type".into(), "content 2".into());
-        let header1 = bundle1.add_entry(&entry1).unwrap();
+        let header1 = bundle1.add_entry(entry1.clone()).unwrap();
 
         let mut bundle2 = chain.bundle().unwrap();
         let entry2 = Entry::App("type".into(), "content 3".into());
         let entry2 = Entry::App("type".into(), "content 4".into());
-        let header2 = bundle2.add_entry(&entry1).unwrap();
+        let header2 = bundle2.add_entry(entry1.clone()).unwrap();
 
         let commit_attempt_1 = chain.try_commit(bundle1);
         let new_chain_head = chain.head().unwrap();
 
         assert!(commit_attempt_1.is_ok());
-        assert_eq!(*new_chain_head.address(), header1.address());
+        assert_eq!(new_chain_head, header1.address());
 
         let commit_attempt_2 = chain.try_commit(bundle2);
 
@@ -285,6 +285,6 @@ pub mod tests {
                 new_chain_head
             )
         );
-        assert_eq!(*chain.head().unwrap().address(), header1.address());
+        assert_eq!(chain.head().unwrap(), header1.address());
     }
 }

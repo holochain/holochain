@@ -32,6 +32,12 @@ pub enum WorkspaceError {
     MsgPackDecodeError(#[from] rmp_serde::decode::Error),
 }
 
+impl PartialEq for WorkspaceError {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string() == other.to_string()
+    }
+}
+
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
 // Note: these are necessary since rkv Errors do not have std::Error impls,

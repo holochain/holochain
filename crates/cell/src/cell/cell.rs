@@ -66,7 +66,7 @@ impl<'env, Api: ConductorCellApiT> Cell<'env, Api> {
     }
 
     fn source_chain(&self) -> SourceChain {
-        SourceChain::new(&self.chain_persistence)
+        SourceChain::new(self.state_env)
     }
 
     pub async fn invoke_zome(

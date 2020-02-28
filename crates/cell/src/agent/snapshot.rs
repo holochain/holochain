@@ -10,11 +10,12 @@ use crate::{
         source_chain::{Cursor, CursorRw},
     },
 };
+use core::ops::Deref;
 use fallible_iterator::FallibleIterator;
 use holochain_json_api::error::JsonError;
 use lazy_static::*;
-use std::fmt;
-use sx_state::{RkvEnv, Reader, Writer};
+use std::{borrow::Borrow, fmt, rc::Rc};
+use sx_state::{Reader, RkvEnv, Writer};
 use sx_types::{
     agent::AgentId,
     chain_header::ChainHeader,
@@ -26,21 +27,34 @@ use sx_types::{
     signature::{Provenance, Signature},
     time::Iso8601,
 };
+use owning_ref::BoxRef;
+
+pub type SourceChainSnapshot<'env> = SourceChainSnapshotAbstract<'env, SourceChainBuffer<'env>>;
+pub type SourceChainSnapshotRef<'env> =
+    SourceChainSnapshotAbstract<'env, &'env SourceChainBuffer<'env>>;
+pub type SourceChainSnapshotRcRef<'env> =
+    SourceChainSnapshotAbstract<'env, Rc<SourceChainBuffer<'env>>>;
+
 
 /// Representation of a Cell's source chain.
 /// TODO: work out the details of what's needed for as-at
 /// to make sure the right balance is struck between
 /// creating as-at snapshots and having access to the actual current source chain
-pub struct SourceChainSnapshot<'env> {
-    db: &'env SourceChainBuffer<'env>,
+pub struct SourceChainSnapshotAbstract<'env, Db: Borrow<SourceChainBuffer<'env>>> {
+    db: Db,
     head: Address,
+    _lifetime: std::marker::PhantomData<&'env ()>,
 }
 
-impl<'env> SourceChainSnapshot<'env> {
+impl<'env, Db: Borrow<SourceChainBuffer<'env>>> SourceChainSnapshotAbstract<'env, Db> {
     /// Fails if a source chain has not yet been created for this CellId.
-    pub(super) fn new(db: &'env SourceChainBuffer<'env>, head: Address) -> SourceChainResult<Self> {
-        if db.get_header(&head)?.is_some() {
-            Ok(Self { db, head })
+    pub(super) fn new(db: Db, head: Address) -> SourceChainResult<Self> {
+        if db.borrow().get_header(&head)?.is_some() {
+            Ok(Self {
+                db,
+                head,
+                _lifetime: std::marker::PhantomData,
+            })
         } else {
             Err(SourceChainError::MissingHead)
         }
@@ -55,7 +69,7 @@ impl<'env> SourceChainSnapshot<'env> {
             SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing),
         )?;
         if let Entry::Dna(dna) = entry {
-            Ok(**dna)
+            Ok(*dna)
         } else {
             Err(SourceChainError::InvalidStructure(
                 ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
@@ -68,7 +82,7 @@ impl<'env> SourceChainSnapshot<'env> {
             SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing),
         )?;
         if let Entry::AgentId(agent) = entry {
-            Ok(*agent)
+            Ok(agent)
         } else {
             Err(SourceChainError::InvalidStructure(
                 ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
@@ -103,7 +117,7 @@ impl<'env> SourceChainSnapshot<'env> {
 
     pub fn iter_back(&self) -> SourceChainBackwardIterator {
         SourceChainBackwardIterator {
-            headers: self.db.headers(),
+            headers: self.db.borrow().headers(),
             current: Some(self.head.clone()),
         }
     }
@@ -113,16 +127,17 @@ impl<'env> SourceChainSnapshot<'env> {
     //     unimplemented!()
     // }
 
-    fn latest_entry_of_type(&self, entry_type: EntryType) -> SourceChainResult<Option<&Entry>> {
+    fn latest_entry_of_type(&self, entry_type: EntryType) -> SourceChainResult<Option<Entry>> {
         if let Some(header) = self
             .iter_back()
             .find(|h| Ok(*h.entry_type() == entry_type))?
         {
             Ok(self
                 .db
+                .borrow()
                 .cas()
                 .header_with_entry(header)?
-                .map(|hwe| hwe.entry()))
+                .map(|hwe| hwe.entry().clone()))
         } else {
             Ok(None)
         }
@@ -130,7 +145,7 @@ impl<'env> SourceChainSnapshot<'env> {
 }
 
 pub struct SourceChainCommitBundle<'env> {
-    db: SourceChainBuffer<'env>,
+    db: Rc<SourceChainBuffer<'env>>,
     original_head: ChainTop,
     new_head: ChainTop,
 }
@@ -139,9 +154,9 @@ impl<'env> SourceChainCommitBundle<'env> {
     pub(super) fn new(db: SourceChainBuffer<'env>) -> SourceChainResult<Self> {
         let head = db.chain_head()?.ok_or(SourceChainError::ChainEmpty)?;
         // Just ensure that a snapshot can be created, mainly to perform the chain head integrity check
-        let _ = SourceChainSnapshot::new(&db, head.clone())?;
+        let _ = SourceChainSnapshotRef::new(&db, head.clone())?;
         Ok(Self {
-            db,
+            db: Rc::new(db),
             original_head: head.clone(),
             new_head: head,
         })
@@ -160,11 +175,11 @@ impl<'env> SourceChainCommitBundle<'env> {
     /// Extract the underlying buffer which has been filled with staged changes,
     /// consuming the outer struct. This gets passed to SourceChain::try_commit.
     pub fn buffer(self) -> SourceChainBuffer<'env> {
-        self.db
+        *self.db
     }
 
-    pub fn snapshot(&self) -> SourceChainResult<SourceChainSnapshot> {
-        SourceChainSnapshot::new(&self.db, self.original_head.clone())
+    pub fn snapshot(&self) -> SourceChainResult<SourceChainSnapshotRcRef<'env>> {
+        SourceChainSnapshotRcRef::new(self.db.clone(), self.original_head.clone())
     }
 
     fn header_for_entry(&self, entry: &Entry) -> SourceChainResult<ChainHeader> {

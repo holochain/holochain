@@ -1,3 +1,4 @@
+use core::ops::Deref;
 use super::{chain_cas::{HeaderCas, ChainCasBuffer}, chain_sequence::ChainSequenceBuffer};
 use sx_state::{error::WorkspaceResult, RkvEnv, buffer::StoreBuffer, Writer};
 use sx_types::{chain_header::ChainHeader, entry::Entry, prelude::Address};
