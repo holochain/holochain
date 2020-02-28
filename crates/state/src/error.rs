@@ -1,9 +1,13 @@
+use crate::db::DbName;
 use failure::Fail;
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WorkspaceError {
+    #[error("A store which was expected not to be empty turned out to be empty: {0}")]
+    EmptyStore(DbName),
+
     #[error("There is an unexpected value in an LMDB database (TODO: more info)")]
     InvalidValue,
 

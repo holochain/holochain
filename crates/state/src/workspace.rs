@@ -1,5 +1,5 @@
 use crate::{
-    buffer::{kv::KvBuffer, kvv::KvvBuffer, TransactionalStore},
+    buffer::{KvBuffer, KvvBuffer, StoreBuffer},
     error::WorkspaceResult,
 };
 use rkv::{Rkv, Writer};

@@ -1,7 +1,7 @@
-use super::TransactionalStore;
+use super::StoreBuffer;
 use crate::error::{WorkspaceError, WorkspaceResult};
 use maplit::hashset;
-use rkv::{MultiStore, Rkv, StoreError, StoreOptions, Writer};
+use rkv::{MultiStore, Reader, Rkv, StoreError, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -32,7 +32,7 @@ where
     V: Clone + Serialize + DeserializeOwned + Hash + Eq,
 {
     db: MultiStore,
-    env: &'env Rkv,
+    reader: Reader<'env>,
     scratch: Scratch<K, V>,
 }
 
@@ -44,20 +44,18 @@ where
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
     pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        let db = env.open_multi(name, StoreOptions::create())?;
         Ok(Self {
-            db,
-            env,
+            db: env.open_multi(name, StoreOptions::create())?,
+            reader: env.read()?,
             scratch: HashMap::new(),
         })
     }
 
     /// Open an existing DB. Will cause an error if the DB was not created already.
     pub fn open(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        let db = env.open_multi(name, StoreOptions::default())?;
         Ok(Self {
-            db,
-            env,
+            db: env.open_multi(name, StoreOptions::default())?,
+            reader: env.read()?,
             scratch: HashMap::new(),
         })
     }
@@ -109,8 +107,7 @@ where
 
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> WorkspaceResult<HashSet<V>> {
-        let reader = self.env.read()?;
-        let iter = self.db.get(&reader, k)?;
+        let iter = self.db.get(&self.reader, k)?;
         Ok(iter
             .map(|v| match v {
                 Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
@@ -129,7 +126,7 @@ where
     }
 }
 
-impl<'env, K, V> TransactionalStore<'env> for KvvBuffer<'env, K, V>
+impl<'env, K, V> StoreBuffer<'env, K, V> for KvvBuffer<'env, K, V>
 where
     K: Clone + Hash + Eq + AsRef<[u8]>,
     V: Clone + Serialize + DeserializeOwned + Hash + Eq,
@@ -173,7 +170,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvvBuffer, Op, TransactionalStore};
+    use super::{KvvBuffer, Op, StoreBuffer};
     use crate::env::{
         create_lmdb_env,
         test::{test_env, with_writer},
