@@ -1,4 +1,4 @@
-use super::StoreBuffer;
+use super::{BufferKey, StoreBuffer, BufferVal};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use rkv::{Reader, Rkv, SingleStore, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
@@ -23,8 +23,8 @@ enum KvOp<V> {
 /// TODO: hold onto SingleStore references for as long as the env
 pub struct KvBuffer<'env, K, V>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferKey,
+    V: BufferVal,
 {
     db: SingleStore,
     reader: Reader<'env>,
@@ -33,8 +33,8 @@ where
 
 impl<'env, K, V> KvBuffer<'env, K, V>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferKey,
+    V: BufferVal,
 {
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
@@ -93,10 +93,10 @@ where
     }
 }
 
-impl<'env, K, V> StoreBuffer<'env, K, V> for KvBuffer<'env, K, V>
+impl<'env, K, V> StoreBuffer<'env> for KvBuffer<'env, K, V>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferKey,
+    V: BufferVal,
 {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
@@ -112,8 +112,6 @@ where
         }
         Ok(())
     }
-
-
 }
 
 pub struct SingleStoreIterTyped<'env, V>(rkv::store::single::Iter<'env>, std::marker::PhantomData<V>);
@@ -126,7 +124,7 @@ impl<'env, V> SingleStoreIterTyped<'env, V> {
 
 
 impl<'env, V> Iterator for SingleStoreIterTyped<'env, V>
-where V: Clone + Serialize + DeserializeOwned, {
+where V: BufferVal, {
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {

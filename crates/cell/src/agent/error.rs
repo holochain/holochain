@@ -3,8 +3,9 @@ use sx_types::prelude::*;
 use thiserror::Error;
 use holochain_json_api::error::JsonError;
 use super::ChainTop;
+use sx_state::error::WorkspaceError;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum SourceChainError {
     #[error("The source chain is empty: it needs to be initialized before using")]
     ChainEmpty,
@@ -26,6 +27,9 @@ pub enum SourceChainError {
 
     #[error("Serialization error: {0}")]
     SerializationError(#[from] JsonError),
+
+    #[error("Workspace error: {0}")]
+    WorkspaceError(#[from] WorkspaceError),
 
     #[error(transparent)]
     Generic(#[from] SkunkError),

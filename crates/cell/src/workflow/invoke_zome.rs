@@ -8,16 +8,16 @@ use crate::{
 };
 use sx_types::shims::*;
 
-pub async fn invoke_zome<Ribo: RibosomeT, Api: ConductorCellApiT>(
+pub async fn invoke_zome<'env, Ribo: RibosomeT, Api: ConductorCellApiT>(
     invocation: ZomeInvocation,
     source_chain: SourceChain<'_>,
     ribosome: Ribo,
     conductor_api: Api,
-) -> CellResult<(ZomeInvocationResult, SourceChainSnapshot)> {
-    let bundle = source_chain.bundle()?;
-    let (result, bundle) = ribosome.call_zome_function(bundle, invocation)?;
+) -> CellResult<ZomeInvocationResult> {
+    let mut bundle = source_chain.bundle()?;
+    let result = ribosome.call_zome_function(&mut bundle, invocation)?;
     let snapshot = source_chain.try_commit(bundle)?;
-    Ok((result, snapshot))
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -52,7 +52,7 @@ pub mod tests {
         let mut ribosome = MockRibosomeT::new();
         ribosome.expect_call_zome_function()
             .times(1)
-            .returning(|bundle, _| Ok((ZomeInvocationResult, bundle)));
+            .returning(|bundle, _| Ok(ZomeInvocationResult));
 
         // TODO: make actual assertions on the conductor_api, once more of the
         // actual logic is fleshed out

@@ -5,13 +5,12 @@ use crate::{
     txn::{
         source_chain,
         source_chain::{Cursor, CursorRw},
-    },
+    }, state::source_chain::SourceChainBuffer,
 };
 use fallible_iterator::FallibleIterator;
 use holochain_json_api::error::JsonError;
 use holochain_persistence_api::{
     cas::content::Address,
-    txn::{CursorProvider, Writer},
 };
 use lazy_static::*;
 use sx_types::{
@@ -25,34 +24,35 @@ use sx_types::{
     signature::{Provenance, Signature},
     time::Iso8601,
 };
+use sx_state::{RkvEnv, buffer::StoreBuffer};
 
 /// Interface to the source chain as accessed through persistent storage.
 /// From a SourceChain, you can construct a SourceChainSnapshot to make queries,
 /// or a SourceChainCommitBundle, to start a write transaction and potentially commit
 /// the changes later with `try_commit`.
-pub struct SourceChain<'a> {
-    persistence: &'a source_chain::SourceChainPersistence,
+pub struct SourceChain<'env> {
+    env: &'env RkvEnv,
 }
 
-impl<'a> SourceChain<'a> {
-    pub(crate) fn new(persistence: &'a source_chain::SourceChainPersistence) -> Self {
-        Self { persistence }
+impl<'env> SourceChain<'env> {
+    pub(crate) fn new(env: &'env RkvEnv) -> Self {
+        Self { env }
     }
 
     pub fn now(&self) -> SourceChainResult<SourceChainSnapshot> {
-        let reader = self.persistence.create_cursor()?;
-        let head = Self::head_inner(&reader)?.ok_or(SourceChainError::ChainEmpty)?;
-        SourceChainSnapshot::new(reader, head)
+        let db = SourceChainBuffer::create(self.env)?;
+        let head = db.chain_head()?.ok_or(SourceChainError::ChainEmpty)?;
+        SourceChainSnapshot::new(&db, head)
     }
 
-    pub fn as_at(&self, head: ChainTop) -> SourceChainResult<SourceChainSnapshot> {
-        SourceChainSnapshot::new(self.persistence.create_cursor()?, head)
+    pub fn as_at(&self, head: Address) -> SourceChainResult<SourceChainSnapshot> {
+        let db = SourceChainBuffer::create(self.env)?;
+        SourceChainSnapshot::new(&db, head)
     }
 
     pub fn bundle(&self) -> SourceChainResult<SourceChainCommitBundle> {
-        let cursor = self.persistence.create_cursor_rw()?;
-        let head = Self::head_inner(&cursor)?.ok_or(SourceChainError::ChainEmpty)?;
-        SourceChainCommitBundle::new(cursor, head)
+        let db = SourceChainBuffer::create(self.env)?;
+        SourceChainCommitBundle::new(db)
     }
 
     pub fn validate(&self) -> SourceChainResult<()> {
@@ -62,13 +62,12 @@ impl<'a> SourceChain<'a> {
 
     fn header_for_entry(
         &self,
-        chain_head: Option<&ChainTop>,
+        prev: Option<&Address>,
         entry: &Entry,
         provenances: &[Provenance],
         timestamp: Iso8601,
     ) -> SourceChainResult<ChainHeader> {
-        let link = chain_head.map(|head| head.address().clone());
-        if link.is_none() && entry.entry_type() != EntryType::Dna {
+        if prev.is_none() && entry.entry_type() != EntryType::Dna {
             error!("Attempting to create header for non-Dna entry, but the chain is empty");
             return Err(SourceChainError::ChainEmpty);
         }
@@ -76,7 +75,7 @@ impl<'a> SourceChain<'a> {
             entry.entry_type(),
             entry.address(),
             provenances,
-            link,
+            prev.cloned(),
             None, // TODO
             None, // TODO!!
             timestamp,
@@ -86,54 +85,44 @@ impl<'a> SourceChain<'a> {
 
     /// Return the current chain top address. If no top is persisted, this is treated an error.
     pub fn head(&self) -> SourceChainResult<ChainTop> {
-        let reader = self.reader()?;
-        Self::head_inner(&reader)?.ok_or(SourceChainError::ChainEmpty)
-    }
-
-    fn reader(&self) -> SourceChainResult<Cursor> {
-        Ok(self.persistence.create_cursor()?)
+        self.head_inner()?.ok_or(SourceChainError::ChainEmpty)
     }
 
     /// TODO: rewrite once we have the multi-LMDB cursors sorted out, so that we can
     /// read the chain head from a different DB
-    fn head_inner(reader: &Cursor) -> SourceChainResult<Option<ChainTop>> {
-        let maybe_content = reader.fetch(&CHAIN_HEAD_ADDRESS)?;
-        let maybe_address = match maybe_content {
-            Some(content) => Some(HashString::try_from(content)?),
-            None => None,
-        };
-        Ok(maybe_address.map(ChainTop))
+    fn head_inner(&self) -> SourceChainResult<Option<Address>> {
+        Ok(SourceChainBuffer::create(self.env)?.chain_head()?)
     }
 
-    pub fn initialize(&self, writer: CursorRw, dna: Dna, agent: AgentId) -> SourceChainResult<()> {
-        let dna_entry = Entry::Dna(Box::new(dna));
-        let dna_header = self.header_for_entry(
-            None,
-            &dna_entry,
-            &[Provenance::new(agent.address(), Signature::fake())],
-            chrono::Utc::now().timestamp().into(),
-        )?;
-        let head = ChainTop(dna_header.address());
-        writer.add(&dna_entry)?;
-        writer.add(&dna_header)?;
-        writer.add(&head)?;
+    // pub fn initialize(&self, writer: CursorRw, dna: Dna, agent: AgentId) -> SourceChainResult<()> {
+    //     let dna_entry = Entry::Dna(Box::new(dna));
+    //     let dna_header = self.header_for_entry(
+    //         None,
+    //         &dna_entry,
+    //         &[Provenance::new(agent.address(), Signature::fake())],
+    //         chrono::Utc::now().timestamp().into(),
+    //     )?;
+    //     let head = dna_header.address();
+    //     writer.add(&dna_entry)?;
+    //     writer.add(&dna_header)?;
+    //     writer.add(&head)?;
 
-        let agent_entry = Entry::AgentId(agent.clone());
-        let agent_header = self.header_for_entry(
-            Some(&head),
-            &agent_entry,
-            &[Provenance::new(agent.address(), Signature::fake())],
-            chrono::Utc::now().timestamp().into(),
-        )?;
-        let head = ChainTop(agent_header.address());
+    //     let agent_entry = Entry::AgentId(agent.clone());
+    //     let agent_header = self.header_for_entry(
+    //         Some(&head),
+    //         &agent_entry,
+    //         &[Provenance::new(agent.address(), Signature::fake())],
+    //         chrono::Utc::now().timestamp().into(),
+    //     )?;
+    //     let head = agent_header.address();
 
-        writer.add(&agent_entry)?;
-        writer.add(&agent_header)?;
-        writer.add(&head)?;
-        writer.commit()?;
+    //     writer.add(&agent_entry)?;
+    //     writer.add(&agent_header)?;
+    //     writer.add(&head)?;
+    //     writer.commit()?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     pub fn dna(&self) -> SourceChainResult<Dna> {
         self.now()?.dna()
@@ -144,17 +133,22 @@ impl<'a> SourceChain<'a> {
     }
 
     /// Use the SCHH to attempt to write a bundle of changes
-    pub fn try_commit(&self, bundle: SourceChainCommitBundle) -> SourceChainResult<SourceChainSnapshot> {
-        let bundle_head = bundle.original_head();
-        let self_head = self.head()?;
-        if *bundle_head == self_head {
-            Ok(bundle.commit()?)
-        } else {
-            Err(SourceChainError::HeadMismatch(
-                bundle_head.clone(),
-                self_head,
-            ))
-        }
+    pub fn try_commit(&self, bundle: SourceChainCommitBundle) -> SourceChainResult<()> {
+        unimplemented!();
+        // let bundle_head = bundle.original_head();
+        // let self_head = self.head()?;
+        // let db = bundle.buffer();
+        // if *bundle_head == self_head {
+        //     let writer = self.env.write()?;
+        //     db.finalize(&mut writer)?;
+        //     writer.commit()?;
+        //     Ok(())
+        // } else {
+        //     Err(SourceChainError::HeadMismatch(
+        //         bundle_head.clone(),
+        //         self_head,
+        //     ))
+        // }
     }
 }
 
@@ -162,35 +156,7 @@ lazy_static! {
     static ref CHAIN_HEAD_ADDRESS: HashString = HashString::from("chain-head");
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ChainTop(Address);
-
-impl ChainTop {
-    pub fn new(address: Address) -> Self {
-        Self(address)
-    }
-
-    pub fn address(&self) -> &Address {
-        &self.0
-    }
-}
-
-/// Temporary bastardization until we have LMDB transactions across even more DBs,
-/// so that we can store the chain head in a different DB
-/// TODO: remove once we've got that
-impl AddressableContent for ChainTop {
-    fn address(&self) -> Address {
-        CHAIN_HEAD_ADDRESS.clone()
-    }
-
-    fn content(&self) -> Content {
-        self.0.clone().into()
-    }
-
-    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
-        Ok(Self(HashString::try_from(content.clone())?))
-    }
-}
+pub type ChainTop = Address;
 
 #[cfg(test)]
 pub mod tests {
@@ -204,15 +170,15 @@ pub mod tests {
     use tempdir::TempDir;
     use Entry;
 
-    pub fn test_initialized_chain<'a>(
+    pub fn test_initialized_chain<'env>(
         agent_name: &str,
-        persistence: &'a SourceChainPersistence,
-    ) -> SourceChain<'a> {
+        env: &'env SourceChainPersistence,
+    ) -> SourceChain<'env> {
         let dna: Dna = test_dna(agent_name);
         let agent = AgentId::generate_fake(agent_name);
         let id: CellId = (dna.address(), agent.clone());
-        let chain = SourceChain::new(&persistence);
-        let writer = persistence.create_cursor_rw().unwrap();
+        let chain = SourceChain::new(&env);
+        let writer = env.create_cursor_rw().unwrap();
         chain.initialize(writer, dna, agent).unwrap();
         assert!(chain.validate().is_ok());
         chain
@@ -242,9 +208,9 @@ pub mod tests {
         let agent = AgentId::generate_fake("a");
         let id: CellId = (dna.address(), agent.clone());
         let tmpdir = TempDir::new("skunkworx").unwrap();
-        let persistence = SourceChainPersistence::test(tmpdir.path());
-        let chain = SourceChain::new(&persistence);
-        let writer = persistence.create_cursor_rw().unwrap();
+        let env = SourceChainPersistence::test(tmpdir.path());
+        let chain = SourceChain::new(&env);
+        let writer = env.create_cursor_rw().unwrap();
 
         assert_eq!(chain.validate(), Err(SourceChainError::ChainEmpty));
 
@@ -256,8 +222,8 @@ pub mod tests {
     #[test]
     fn chains_can_have_new_entries_committed_in_bundles() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
-        let persistence = SourceChainPersistence::test(tmpdir.path());
-        let chain = test_initialized_chain("a", &persistence);
+        let env = SourceChainPersistence::test(tmpdir.path());
+        let chain = test_initialized_chain("a", &env);
         let post_init_head = chain.head().unwrap();
 
         let mut bundle = chain.bundle().unwrap();
@@ -289,8 +255,8 @@ pub mod tests {
     #[test]
     fn chains_are_protected_from_concurrent_transactional_writes_aka_as_at() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
-        let persistence = SourceChainPersistence::test(tmpdir.path());
-        let chain = test_initialized_chain("a", &persistence);
+        let env = SourceChainPersistence::test(tmpdir.path());
+        let chain = test_initialized_chain("a", &env);
         let post_init_head = chain.head().unwrap();
 
         let mut bundle1 = chain.bundle().unwrap();

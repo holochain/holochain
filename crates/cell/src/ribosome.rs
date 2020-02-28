@@ -14,12 +14,15 @@ pub trait RibosomeT {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    ///
+    /// Note: it would be nice to pass the bundle by value and then return it at the end,
+    /// but automock doesn't support lifetimes that appear in return values
+    fn call_zome_function<'env>(
         self,
-        bundle: SourceChainCommitBundle,
+        bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)>;
+    ) -> SkunkResult<(ZomeInvocationResult)>;
 }
 
 /// TODO determine what cursor looks like for ribosomes
@@ -42,12 +45,12 @@ impl RibosomeT for Ribosome {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    fn call_zome_function<'env>(
         self,
-        bundle: SourceChainCommitBundle,
+        bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)> {
+    ) -> SkunkResult<(ZomeInvocationResult)> {
         unimplemented!()
     }
 }

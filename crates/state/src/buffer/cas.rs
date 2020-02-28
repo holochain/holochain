@@ -1,16 +1,18 @@
-use sx_types::prelude::{AddressableContent, Address};
 use super::kv::KvBuffer;
-use serde::{de::DeserializeOwned, Serialize};
-use rkv::Rkv;
 use crate::error::WorkspaceResult;
+use rkv::Rkv;
+use serde::{de::DeserializeOwned, Serialize};
+use sx_types::prelude::{Address, AddressableContent};
 
 /// A wrapper around a KvBuffer where keys are always Addresses,
 /// and values are always AddressableContent.
 pub struct CasBuffer<'env, V>(KvBuffer<'env, Address, V>)
-where V: AddressableContent + Clone + Serialize + DeserializeOwned;
+where
+    V: AddressableContent + Clone + Serialize + DeserializeOwned;
 
 impl<'env, V> CasBuffer<'env, V>
-where V: AddressableContent + Clone + Serialize + DeserializeOwned
+where
+    V: AddressableContent + Clone + Serialize + DeserializeOwned,
 {
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock

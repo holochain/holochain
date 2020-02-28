@@ -39,14 +39,14 @@ pub trait ZomeApi {
     // fn version_hash();
 }
 
-pub struct ZomeEnvironment<N: NetRequester> {
-    bundle: SourceChainCommitBundle,
+pub struct ZomeEnvironment<'env, N: NetRequester> {
+    bundle: SourceChainCommitBundle<'env>,
     net_requester: N,
     zome_id: ZomeId,
 }
 
-impl<N: NetRequester> ZomeEnvironment<N> {
-    pub fn new(bundle: SourceChainCommitBundle, net_requester: N, zome_id: ZomeId) -> Self {
+impl<'env, N: NetRequester> ZomeEnvironment<'env, N> {
+    pub fn new(bundle: SourceChainCommitBundle<'env>, net_requester: N, zome_id: ZomeId) -> Self {
         Self {
             bundle,
             net_requester,
@@ -55,7 +55,7 @@ impl<N: NetRequester> ZomeEnvironment<N> {
     }
 }
 
-impl<N: NetRequester> ZomeApi for ZomeEnvironment<N> {
+impl<'env, N: NetRequester> ZomeApi for ZomeEnvironment<'env, N> {
     fn call(&self, invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResult> {
         unimplemented!()
     }

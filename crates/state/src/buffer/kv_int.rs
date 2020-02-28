@@ -2,7 +2,7 @@
 //! This is unfortunately pure copypasta from KvBuffer, since Rust doesn't support specialization yet
 //! TODO, find *some* way to DRY up the two
 
-use super::{kv::SingleStoreIterTyped, StoreBuffer};
+use super::{kv::SingleStoreIterTyped, BufferIntKey, BufferVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use rkv::{IntegerStore, Reader, Rkv, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
@@ -27,8 +27,8 @@ enum KvOp<V> {
 /// TODO: hold onto SingleStore references for as long as the env
 pub struct KvIntBuffer<'env, K, V>
 where
-    K: Hash + Eq + rkv::store::integer::PrimitiveInt,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferIntKey,
+    V: BufferVal,
 {
     db: IntegerStore<K>,
     reader: Reader<'env>,
@@ -37,8 +37,8 @@ where
 
 impl<'env, K, V> KvIntBuffer<'env, K, V>
 where
-    K: Hash + Eq + rkv::store::integer::PrimitiveInt,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferIntKey,
+    V: BufferVal,
 {
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
@@ -97,10 +97,10 @@ where
     }
 }
 
-impl<'env, K, V> StoreBuffer<'env, K, V> for KvIntBuffer<'env, K, V>
+impl<'env, K, V> StoreBuffer<'env> for KvIntBuffer<'env, K, V>
 where
-    K: Hash + Eq + rkv::store::integer::PrimitiveInt,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferIntKey,
+    V: BufferVal,
 {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;

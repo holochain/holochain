@@ -4,6 +4,7 @@ use crate::{
         ChainTop,
     },
     cell::Cell,
+    state::{chain_cas::HeaderCas, source_chain::SourceChainBuffer},
     txn::{
         source_chain,
         source_chain::{Cursor, CursorRw},
@@ -11,12 +12,9 @@ use crate::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_json_api::error::JsonError;
-use holochain_persistence_api::{
-    cas::content::Address,
-    txn::{CursorProvider, Writer},
-};
 use lazy_static::*;
 use std::fmt;
+use sx_state::{RkvEnv, Reader, Writer};
 use sx_types::{
     agent::AgentId,
     chain_header::ChainHeader,
@@ -33,19 +31,23 @@ use sx_types::{
 /// TODO: work out the details of what's needed for as-at
 /// to make sure the right balance is struck between
 /// creating as-at snapshots and having access to the actual current source chain
-pub struct SourceChainSnapshot {
-    reader: source_chain::Cursor,
-    head: ChainTop,
+pub struct SourceChainSnapshot<'env> {
+    db: &'env SourceChainBuffer<'env>,
+    head: Address,
 }
 
-impl SourceChainSnapshot {
+impl<'env> SourceChainSnapshot<'env> {
     /// Fails if a source chain has not yet been created for this CellId.
-    pub(super) fn new(reader: source_chain::Cursor, head: ChainTop) -> SourceChainResult<Self> {
-        match reader.contains(head.address()) {
-            Ok(true) => Ok(Self { reader, head }),
-            Ok(false) => Err(SourceChainError::MissingHead),
-            Err(e) => Err(SkunkError::from(e).into()),
+    pub(super) fn new(db: &'env SourceChainBuffer<'env>, head: Address) -> SourceChainResult<Self> {
+        if db.get_header(&head)?.is_some() {
+            Ok(Self { db, head })
+        } else {
+            Err(SourceChainError::MissingHead)
         }
+    }
+
+    pub fn head(&self) -> &Address {
+        &self.head
     }
 
     pub fn dna(&self) -> SourceChainResult<Dna> {
@@ -53,7 +55,7 @@ impl SourceChainSnapshot {
             SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing),
         )?;
         if let Entry::Dna(dna) = entry {
-            Ok(*dna)
+            Ok(**dna)
         } else {
             Err(SourceChainError::InvalidStructure(
                 ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
@@ -61,16 +63,12 @@ impl SourceChainSnapshot {
         }
     }
 
-    pub fn head(&self) -> &ChainTop {
-        &self.head
-    }
-
     pub fn agent_id(&self) -> SourceChainResult<AgentId> {
         let entry = self.latest_entry_of_type(EntryType::AgentId)?.ok_or(
             SourceChainError::InvalidStructure(ChainInvalidReason::GenesisMissing),
         )?;
         if let Entry::AgentId(agent) = entry {
-            Ok(agent)
+            Ok(*agent)
         } else {
             Err(SourceChainError::InvalidStructure(
                 ChainInvalidReason::HeaderAndEntryMismatch(entry.address()),
@@ -105,7 +103,7 @@ impl SourceChainSnapshot {
 
     pub fn iter_back(&self) -> SourceChainBackwardIterator {
         SourceChainBackwardIterator {
-            reader: self.reader.clone(),
+            headers: self.db.headers(),
             current: Some(self.head.clone()),
         }
     }
@@ -115,53 +113,43 @@ impl SourceChainSnapshot {
     //     unimplemented!()
     // }
 
-    fn latest_entry_of_type(&self, entry_type: EntryType) -> SourceChainResult<Option<Entry>> {
+    fn latest_entry_of_type(&self, entry_type: EntryType) -> SourceChainResult<Option<&Entry>> {
         if let Some(header) = self
             .iter_back()
             .find(|h| Ok(*h.entry_type() == entry_type))?
         {
-            let entry_address = header.entry_address();
-            if let Some(content) = self.reader.fetch(entry_address)? {
-                let entry = Entry::try_from(content)?;
-                Ok(Some(entry))
-            } else {
-                Err(SourceChainError::InvalidStructure(
-                    ChainInvalidReason::MissingData(entry_address.clone()),
-                ))
-            }
+            Ok(self
+                .db
+                .cas()
+                .header_with_entry(header)?
+                .map(|hwe| hwe.entry()))
         } else {
             Ok(None)
         }
     }
 }
 
-pub struct SourceChainCommitBundle {
-    writer: source_chain::CursorRw,
+pub struct SourceChainCommitBundle<'env> {
+    db: SourceChainBuffer<'env>,
     original_head: ChainTop,
     new_head: ChainTop,
-    new_addresses: Vec<Address>,
 }
 
-impl SourceChainCommitBundle {
-    pub(super) fn new(writer: source_chain::CursorRw, head: ChainTop) -> SourceChainResult<Self> {
+impl<'env> SourceChainCommitBundle<'env> {
+    pub(super) fn new(db: SourceChainBuffer<'env>) -> SourceChainResult<Self> {
+        let head = db.chain_head()?.ok_or(SourceChainError::ChainEmpty)?;
         // Just ensure that a snapshot can be created, mainly to perform the chain head integrity check
-        let _ = SourceChainSnapshot::new(writer.clone(), head.clone())?;
+        let _ = SourceChainSnapshot::new(&db, head.clone())?;
         Ok(Self {
-            writer,
+            db,
             original_head: head.clone(),
             new_head: head,
-            new_addresses: Vec::new(),
         })
     }
 
-    pub fn add_entry(&mut self, entry: &Entry) -> SourceChainResult<ChainHeader> {
-        self.writer.add(entry)?;
-        let header = self.header_for_entry(entry)?;
-        self.writer.add(&header)?;
-        self.new_head = ChainTop::new(header.address());
-        self.writer.add(&self.new_head)?; // update the chain top
-        self.new_addresses.push(entry.address());
-        self.new_addresses.push(header.address());
+    pub fn add_entry(&mut self, entry: Entry) -> SourceChainResult<ChainHeader> {
+        let header = self.header_for_entry(&entry)?;
+        self.db.put((header, entry));
         Ok(header)
     }
 
@@ -169,11 +157,14 @@ impl SourceChainCommitBundle {
         &self.original_head
     }
 
+    /// Extract the underlying buffer which has been filled with staged changes,
+    /// consuming the outer struct. This gets passed to SourceChain::try_commit.
+    pub fn buffer(self) -> SourceChainBuffer<'env> {
+        self.db
+    }
 
-    pub fn commit(self) -> SourceChainResult<SourceChainSnapshot> {
-        let snapshot = SourceChainSnapshot::new(self.writer.clone(), self.new_head);
-        self.writer.commit()?;
-        snapshot
+    pub fn snapshot(&self) -> SourceChainResult<SourceChainSnapshot> {
+        SourceChainSnapshot::new(&self.db, self.original_head.clone())
     }
 
     fn header_for_entry(&self, entry: &Entry) -> SourceChainResult<ChainHeader> {
@@ -186,27 +177,23 @@ impl SourceChainCommitBundle {
             entry.entry_type(),
             entry.address(),
             provenances,
-            Some(self.new_head.address().clone()),
+            Some(self.new_head.clone()),
             None,
             None,
             timestamp,
         );
         Ok(header)
     }
-
-    pub fn snapshot(&self) -> SourceChainResult<SourceChainSnapshot> {
-        SourceChainSnapshot::new(self.writer.clone(), self.new_head.clone())
-    }
 }
 
-pub struct SourceChainBackwardIterator {
-    reader: source_chain::Cursor,
-    current: Option<ChainTop>,
+pub struct SourceChainBackwardIterator<'env> {
+    headers: &'env HeaderCas<'env>,
+    current: Option<Address>,
 }
 
 /// Follows ChainHeader.link through every previous Entry (of any EntryType) in the chain
 // #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
-impl FallibleIterator for SourceChainBackwardIterator {
+impl<'env> FallibleIterator for SourceChainBackwardIterator<'env> {
     type Item = ChainHeader;
     type Error = SourceChainError;
 
@@ -214,9 +201,8 @@ impl FallibleIterator for SourceChainBackwardIterator {
         match &self.current {
             None => Ok(None),
             Some(head) => {
-                if let Some(content) = self.reader.fetch(head.address())? {
-                    let header: ChainHeader = ChainHeader::try_from_content(&content)?;
-                    self.current = header.link().map(ChainTop::new);
+                if let Some(header) = self.headers.get(head)? {
+                    self.current = header.link();
                     Ok(Some(header))
                 } else {
                     Ok(None)
@@ -226,7 +212,7 @@ impl FallibleIterator for SourceChainBackwardIterator {
     }
 }
 
-impl fmt::Debug for SourceChainSnapshot {
+impl<'env> fmt::Debug for SourceChainSnapshot<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut iter = self.iter_back();
         while let Some(header) = iter.next().map_err(|_| fmt::Error)? {

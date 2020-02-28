@@ -1,4 +1,5 @@
-use crate::buffer::{ChainCasBuffer, KvvBuffer};
+use sx_state::buffer::{KvvBuffer};
+use super::chain_cas::ChainCasBuffer;
 
 struct Cascade<'e> {
     cas: &'e ChainCasBuffer<'e>,

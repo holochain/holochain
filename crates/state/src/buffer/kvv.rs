@@ -1,4 +1,4 @@
-use super::StoreBuffer;
+use super::{BufferMultiVal, StoreBuffer, BufferKey};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use maplit::hashset;
 use rkv::{MultiStore, Reader, Rkv, StoreError, StoreOptions, Writer};
@@ -28,8 +28,8 @@ type Scratch<K, V> = HashMap<K, HashSet<Op<V>>>;
 /// of access permission, so that access can be hidden behind a limited interface
 pub struct KvvBuffer<'env, K, V>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned + Hash + Eq,
+    K: BufferKey,
+    V: BufferMultiVal,
 {
     db: MultiStore,
     reader: Reader<'env>,
@@ -38,8 +38,8 @@ where
 
 impl<'env, K, V> KvvBuffer<'env, K, V>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned + Hash + Eq,
+    K: BufferKey,
+    V: BufferMultiVal,
 {
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
@@ -126,10 +126,10 @@ where
     }
 }
 
-impl<'env, K, V> StoreBuffer<'env, K, V> for KvvBuffer<'env, K, V>
+impl<'env, K, V> StoreBuffer<'env> for KvvBuffer<'env, K, V>
 where
-    K: Clone + Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned + Hash + Eq,
+    K: Clone + BufferKey,
+    V: BufferMultiVal,
 {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use Op::*;
