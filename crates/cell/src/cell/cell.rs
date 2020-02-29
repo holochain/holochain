@@ -21,14 +21,15 @@ use sx_types::{
     prelude::*,
     shims::*,
 };
+use sx_state::db::DbManager;
 
 /// TODO: consider a newtype for this
-pub type DnaAddress = Address;
+pub type DnaAddress = sx_types::dna::DnaAddress;
 
 /// The unique identifier for a running Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
-pub type CellId = (DnaAddress, AgentId);
+pub type CellId = sx_types::agent::CellId;
 pub type ZomeId = (CellId, ZomeName);
 pub type ZomeName = String;
 
@@ -50,6 +51,7 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
 #[derive(Clone)]
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
+    // db_manager: DbManager,
     chain_persistence: SourceChainPersistence,
     dht_persistence: DhtPersistence,
     conductor_api: Api,

@@ -1,4 +1,4 @@
-use crate::{entry::Entry, error::SkunkResult};
+use crate::{entry::Entry, error::SkunkResult, dna::DnaAddress};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
@@ -6,6 +6,8 @@ use holochain_json_api::{
 };
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use std::{convert::TryFrom, str};
+
+pub type CellId = (DnaAddress, AgentId);
 
 pub type Base32 = String;
 
