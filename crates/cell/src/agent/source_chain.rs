@@ -178,7 +178,7 @@ pub mod tests {
     ) -> SourceChain<'env> {
         let dna: Dna = test_dna(agent_name);
         let agent = AgentId::generate_fake(agent_name);
-        let id: CellId = (dna.address(), agent.clone());
+        let id: CellId = (dna.address(), agent.clone()).into();
         let env = test_env();
         let chain = SourceChain::new(&env);
         chain.initialize(dna, agent).unwrap();
@@ -208,7 +208,7 @@ pub mod tests {
     fn detect_chain_initialized() {
         let dna: Dna = test_dna("a");
         let agent = AgentId::generate_fake("a");
-        let id: CellId = (dna.address(), agent.clone());
+        let id: CellId = (dna.address(), agent.clone()).into();
         let env = test_env();
         let chain = SourceChain::new(&env);
 

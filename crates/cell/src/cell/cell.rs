@@ -14,8 +14,10 @@ use std::{
     hash::{Hash, Hasher},
     path::Path, sync::{Arc, RwLock},
 };
+use sx_state::{db::DbManager, env::create_lmdb_env};
 use sx_types::{
     agent::AgentId,
+    db::DatabasePath,
     dna::Dna,
     error::{SkunkError, SkunkResult},
     prelude::*,
@@ -24,16 +26,16 @@ use sx_types::{
 use sx_state::RkvEnv;
 
 /// TODO: consider a newtype for this
-pub type DnaAddress = Address;
+pub type DnaAddress = sx_types::dna::DnaAddress;
 
 /// The unique identifier for a running Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
-pub type CellId = (DnaAddress, AgentId);
+pub type CellId = sx_types::agent::CellId;
 pub type ZomeId = (CellId, ZomeName);
 pub type ZomeName = String;
 
-impl<'env, Api: ConductorCellApiT> Hash for Cell<'env, Api> {
+impl<Api: ConductorCellApiT> Hash for Cell<Api> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -42,27 +44,26 @@ impl<'env, Api: ConductorCellApiT> Hash for Cell<'env, Api> {
     }
 }
 
-impl<'env, Api: ConductorCellApiT> PartialEq for Cell<'env, Api> {
+impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-#[derive(Clone)]
-pub struct Cell<'env, Api: ConductorCellApiT> {
+// #[derive(Clone)]
+pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
-    state_env: &'env RkvEnv,
-    dht_persistence: DhtPersistence,
+    db_manager: DbManager,
     conductor_api: Api,
 }
 
-impl<'env, Api: ConductorCellApiT> Cell<'env, Api> {
+impl<Api: ConductorCellApiT> Cell<Api> {
     fn dna_address(&self) -> &DnaAddress {
-        &self.id.0
+        &self.id.dna_address()
     }
 
     fn agent_id(&self) -> &AgentId {
-        &self.id.1
+        &self.id.agent_id()
     }
 
     fn source_chain(&self) -> SourceChain {
@@ -100,7 +101,7 @@ impl<'env, Api: ConductorCellApiT> Cell<'env, Api> {
     }
 }
 
-// im'env, pl<Api: ConductorCellApiT> Cell<'env, Api> {
+// impl<Api: ConductorCellApiT> Cell<Api> {
 //     /// Checks if Cell has been initialized already
 //     pub fn from_id(id: CellId) -> CellResult<Self> {
 //         let chain_persistence = SourceChainPersistence::new(id.clone());
@@ -146,7 +147,7 @@ impl<'env, Api: ConductorCellApiT> Cell<'env, Api> {
 //         self
 //     }
 
-//   'env,   pub fn build(self) -> Cell<'env, Api> {
+//     pub fn build(self) -> Cell<Api> {
 //         let id = self.id.clone();
 //         Cell {
 //             id: self.id,
@@ -157,6 +158,7 @@ impl<'env, Api: ConductorCellApiT> Cell<'env, Api> {
 //                 .dht_persistence
 //                 .unwrap_or_else(|| DhtPersistence::new(id.clone())),
 //             conductor_api: self.conductor_api,
+//             db_manager: DbManager::new(create_lmdb_env(DatabasePath::from(id).as_ref())),
 //         }
 //     }
 // }
