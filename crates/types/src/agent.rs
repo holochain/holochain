@@ -5,9 +5,32 @@ use holochain_json_api::{
     json::JsonString,
 };
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
-use std::{convert::TryFrom, str};
+use std::{convert::TryFrom, fmt, str};
 
-pub type CellId = (DnaAddress, AgentId);
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct CellId(DnaAddress, AgentId);
+
+impl fmt::Display for CellId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "cell-{}-{}", self.0, self.1.address())
+    }
+}
+
+impl CellId {
+    pub fn dna_address(&self) -> &DnaAddress {
+        &self.0
+    }
+
+    pub fn agent_id(&self) -> &AgentId {
+        &self.1
+    }
+}
+
+impl From<(DnaAddress, AgentId)> for CellId {
+    fn from(pair: (DnaAddress, AgentId)) -> Self {
+        Self(pair.0, pair.1)
+    }
+}
 
 pub type Base32 = String;
 

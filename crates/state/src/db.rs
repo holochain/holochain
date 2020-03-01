@@ -47,36 +47,31 @@ pub enum DbKind {
 pub type DbKey<V> = UmKey<DbName, V>;
 
 pub struct DbManager {
-    cell_id: CellId,
-    um: UniversalMap<DbName>,
+    // NOTE: this can't just be an Rkv because we get Rkv environments from the Manager
+    // already wrapped in the Arc<RwLock<_>>, so this is the canonical representation of an LMDB environment
     env: Arc<RwLock<Rkv>>,
+    um: UniversalMap<DbName>,
 }
 
 impl DbManager {
-
-    pub fn new(env: Arc<RwLock<Rkv>>, cell_id: CellId) -> Self {
+    pub fn new(env: Arc<RwLock<Rkv>>) -> Self {
         Self {
-            env, cell_id, um: UniversalMap::new()
+            env,
+            um: UniversalMap::new(),
         }
     }
 
-    pub fn get<V: 'static>(&self, key: &DbKey<V>) -> WorkspaceResult<&V> {
+    pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> WorkspaceResult<&V> {
         Ok(self.um.get(&key).unwrap())
     }
 
-    pub fn get_or_insert<V: 'static>(&mut self, key: DbKey<V>) -> WorkspaceResult<&V> {
+    pub fn get_or_insert<V: 'static + Send + Sync>(&mut self, key: DbKey<V>) -> WorkspaceResult<&V> {
         if self.um.get(&key).is_some() {
             return Ok(self.um.get(&key).unwrap());
         } else {
             let env = self.env.read().unwrap();
-            let key: DbKey<V> = key.with_value_type();
             let db_name = key.key();
-            let db_str = format!(
-                "{}-{}-{}",
-                self.cell_id.0,
-                self.cell_id.1.address(),
-                db_name
-            );
+            let db_str = format!("{}", db_name);
             let _ = match db_name.kind() {
                 DbKind::Single => self.um.insert(
                     key.with_value_type(),

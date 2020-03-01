@@ -14,14 +14,15 @@ use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
+use sx_state::{db::DbManager, env::create_lmdb_env};
 use sx_types::{
     agent::AgentId,
+    db::DatabasePath,
     dna::Dna,
     error::{SkunkError, SkunkResult},
     prelude::*,
     shims::*,
 };
-use sx_state::db::DbManager;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
@@ -48,10 +49,10 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
     }
 }
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
-    // db_manager: DbManager,
+    db_manager: DbManager,
     chain_persistence: SourceChainPersistence,
     dht_persistence: DhtPersistence,
     conductor_api: Api,
@@ -59,11 +60,11 @@ pub struct Cell<Api: ConductorCellApiT> {
 
 impl<Api: ConductorCellApiT> Cell<Api> {
     fn dna_address(&self) -> &DnaAddress {
-        &self.id.0
+        &self.id.dna_address()
     }
 
     fn agent_id(&self) -> &AgentId {
-        &self.id.1
+        &self.id.agent_id()
     }
 
     fn source_chain(&self) -> SourceChain {
@@ -161,6 +162,7 @@ impl<Api: ConductorCellApiT> CellBuilder<Api> {
                 .dht_persistence
                 .unwrap_or_else(|| DhtPersistence::new(id.clone())),
             conductor_api: self.conductor_api,
+            db_manager: DbManager::new(create_lmdb_env(DatabasePath::from(id).as_ref())),
         }
     }
 }

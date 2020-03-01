@@ -210,7 +210,7 @@ pub mod tests {
     ) -> SourceChain<'a> {
         let dna: Dna = test_dna(agent_name);
         let agent = AgentId::generate_fake(agent_name);
-        let id: CellId = (dna.address(), agent.clone());
+        let id: CellId = (dna.address(), agent.clone()).into();
         let chain = SourceChain::new(&persistence);
         let writer = persistence.create_cursor_rw().unwrap();
         chain.initialize(writer, dna, agent).unwrap();
@@ -240,7 +240,7 @@ pub mod tests {
     fn detect_chain_initialized() {
         let dna: Dna = test_dna("a");
         let agent = AgentId::generate_fake("a");
-        let id: CellId = (dna.address(), agent.clone());
+        let id: CellId = (dna.address(), agent.clone()).into();
         let tmpdir = TempDir::new("skunkworx").unwrap();
         let persistence = SourceChainPersistence::test(tmpdir.path());
         let chain = SourceChain::new(&persistence);

@@ -45,7 +45,7 @@ pub mod tests {
             fn_name: "fn".into(),
             as_at: "KwyXHisn".into(),
             args: "args".into(),
-            provenance: cell_id.1,
+            provenance: cell_id.agent_id().to_owned(),
             cap: CapabilityRequest,
         };
 
