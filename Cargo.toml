@@ -38,8 +38,8 @@ lib3h_sodium = { version = "0.0.38", git = "https://github.com/holochain/lib3h.g
 holochain_tracing = { version = "0.0.20", git = "https://github.com/holochain/holochain-tracing.git", branch = "unpinned" }
 holochain_tracing_macros = { version = "0.0.20", git = "https://github.com/holochain/holochain-tracing.git", branch = "unpinned" }
 
-lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git", branch = "reverse-iterator" }
-rkv = { git = "https://github.com/holochain/rkv.git", branch = "reverse-iterator" }
+# lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git", branch = "reverse-iterator" }
+# rkv = { git = "https://github.com/holochain/rkv.git", branch = "reverse-iterator" }
 
-# lmdb-rkv = { path = "../lmdb-rs" }
-# rkv = { path = "../rkv" }
+lmdb-rkv = { path = "../lmdb-rs" }
+rkv = { path = "../rkv" }

@@ -73,12 +73,12 @@ where
         }
     }
 
-    fn iter_raw(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_start(self.reader)?)))
+    fn iter_raw(&self) -> WorkspaceResult<SingleIter<K, V>> {
+        Ok((SingleIter::new(self.db.iter_start(self.reader)?)))
     }
 
-    fn iter_raw_reverse(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_end(self.reader)?)))
+    fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<K, V>> {
+        Ok((SingleIter::new(self.db.iter_end(self.reader)?)))
     }
 }
 
@@ -103,30 +103,31 @@ where
     }
 }
 
-pub struct SingleStoreIterTyped<'env, V>(
+pub struct SingleIter<'env, K, V>(
     rkv::store::single::Iter<'env>,
-    std::marker::PhantomData<V>,
+    std::marker::PhantomData<(K, V)>,
 );
 
-impl<'env, V> SingleStoreIterTyped<'env, V> {
+impl<'env, K, V> SingleIter<'env, K, V> {
     pub fn new(iter: rkv::store::single::Iter<'env>) -> Self {
         Self(iter, std::marker::PhantomData)
     }
 }
 
-impl<'env, V> Iterator for SingleStoreIterTyped<'env, V>
+impl<'env, K, V> Iterator for SingleIter<'env, K, V>
 where
+    K: BufferKey,
     V: BufferVal,
 {
-    type Item = V;
+    type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.0.next() {
-            Some(Ok((_k, Some(rkv::Value::Blob(buf))))) => {
-                (
-                    // k.into(),
+            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => {
+                Some((
+                    K::from(k.to_owned()),
                     rmp_serde::from_read_ref(buf).unwrap()
-                )
+                ))
             }
             None => None,
             x => {

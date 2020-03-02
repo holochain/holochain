@@ -4,6 +4,7 @@ use rkv::{Rkv, Writer};
 use serde::{de::DeserializeOwned, Serialize};
 use sx_types::prelude::{Address, AddressableContent};
 
+
 /// A wrapper around a KvBuffer where keys are always Addresses,
 /// and values are always AddressableContent.
 pub struct CasBuffer<'env, V>(KvBuffer<'env, Address, V>)

@@ -60,8 +60,8 @@ pub mod tests {
     use tempdir::TempDir;
 
     struct TestWorkspace<'env> {
-        one: KvBuffer<'env, &'static str, u32>,
-        two: KvBuffer<'env, &'static str, bool>,
+        one: KvBuffer<'env, Address, u32>,
+        two: KvBuffer<'env, Address, bool>,
     }
 
     impl<'env> TestWorkspace<'env> {
@@ -91,16 +91,17 @@ pub mod tests {
         let created_arc = create_lmdb_env(tmpdir.path());
         let env = created_arc.read().unwrap();
         let dbm = DbManager::new(&env).unwrap();
-        let address = Address::from("hi".to_owned());
+        let addr1 = Address::from("hi".to_owned());
+        let addr2 = Address::from("hi".to_owned());
         {
             let reader = env.read().unwrap();
             let mut workspace = TestWorkspace::new(&reader, &dbm).unwrap();
-            assert_eq!(workspace.one.get(&"hi").unwrap(), None);
+            assert_eq!(workspace.one.get(&addr1).unwrap(), None);
 
-            workspace.one.put(&"hi", 1);
-            workspace.two.put(&"ciao", true);
-            assert_eq!(workspace.one.get(&"hi").unwrap(), Some(1));
-            assert_eq!(workspace.two.get(&"ciao").unwrap(), Some(true));
+            workspace.one.put(addr1, 1);
+            workspace.two.put(addr2, true);
+            assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
+            assert_eq!(workspace.two.get(&addr2).unwrap(), Some(true));
             workspace.finalize(env.write().unwrap()).unwrap();
         }
 
@@ -108,7 +109,7 @@ pub mod tests {
         {
             let reader = env.read().unwrap();
             let workspace = TestWorkspace::new(&reader, &dbm).unwrap();
-            assert_eq!(workspace.one.get(&"hi").unwrap(), Some(1));
+            assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
         }
     }
 }

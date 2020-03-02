@@ -2,7 +2,7 @@
 //! This is unfortunately pure copypasta from KvBuffer, since Rust doesn't support specialization yet
 //! TODO, find *some* way to DRY up the two
 
-use super::{kv::SingleStoreIterTyped, BufferIntKey, BufferVal, StoreBuffer};
+use super::{BufferIntKey, BufferVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use rkv::{IntegerStore, Reader, Rkv, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
@@ -77,12 +77,12 @@ where
         }
     }
 
-    pub fn iter_raw(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_start(self.reader)?)))
+    pub fn iter_raw(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
+        Ok((SingleIntIter::new(self.db.iter_start(self.reader)?)))
     }
 
-    pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_end(self.reader)?)))
+    pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
+        Ok((SingleIntIter::new(self.db.iter_end(self.reader)?)))
     }
 }
 
@@ -106,6 +106,43 @@ where
         Ok(())
     }
 }
+
+
+pub struct SingleIntIter<'env, K, V>(
+    rkv::store::single::Iter<'env>,
+    std::marker::PhantomData<(K, V)>,
+);
+
+impl<'env, K, V> SingleIntIter<'env, K, V> {
+    pub fn new(iter: rkv::store::single::Iter<'env>) -> Self {
+        Self(iter, std::marker::PhantomData)
+    }
+}
+
+impl<'env, K, V> Iterator for SingleIntIter<'env, K, V>
+where
+    K: BufferIntKey,
+    V: BufferVal,
+{
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.0.next() {
+            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => {
+                Some((
+                    K::from_bytes(k).unwrap(),
+                    rmp_serde::from_read_ref(buf).unwrap()
+                ))
+            }
+            None => None,
+            x => {
+                dbg!(x);
+                panic!("TODO");
+            }
+        }
+    }
+}
+
 
 #[cfg(test)]
 pub mod tests {
@@ -155,8 +192,8 @@ pub mod tests {
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
             let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
 
-            assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
-            assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
+            assert_eq!(forward, vec![(0, V(1)), (0, V(2)), (0, V(3)), (0, V(4)), (0, V(5))]);
+            assert_eq!(reverse, vec![(0, V(5)), (0, V(4)), (0, V(3)), (0, V(2)), (0, V(1))]);
             Ok(())
         })
         .unwrap();

@@ -32,7 +32,7 @@ impl<'e> ChainSequenceBuffer<'e> {
             KvIntBuffer::new(reader, dbm.get(&*CHAIN_SEQUENCE)?.clone())?;
         let latest = db.iter_raw_reverse()?.next();
         let (next_index, tx_seq) = latest
-            .map(|item| (item.index + 1, item.tx_seq + 1))
+            .map(|(_, item)| (item.index + 1, item.tx_seq + 1))
             .unwrap_or((0, 0));
         Ok(Self {
             db,
@@ -124,7 +124,7 @@ pub mod tests {
         rm.with_reader(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             assert_eq!(buf.chain_head()?, Some(Address::from("2")));
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|i| i.index).collect();
+            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
         })?;
@@ -141,7 +141,7 @@ pub mod tests {
         rm.with_reader(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             assert_eq!(buf.chain_head()?, Some(Address::from("5")));
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|i| i.tx_seq).collect();
+            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
             Ok(())
         })?;

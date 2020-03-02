@@ -10,8 +10,8 @@ pub use cas::CasBuffer;
 pub use kv::KvBuffer;
 pub use kv_int::KvIntBuffer;
 pub use kvv::KvvBuffer;
-use std::hash::Hash;
 use serde::{de::DeserializeOwned, Serialize};
+use std::hash::Hash;
 
 /// General trait for transactional stores, exposing only the method which
 /// finalizes the transaction. Not currently used, but could be used in Workspaces
@@ -23,8 +23,8 @@ pub trait StoreBuffer<'env> {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()>;
 }
 
-pub trait BufferKey: Hash + Eq + AsRef<[u8]> {}
-impl<T> BufferKey for T where T: Hash + Eq + AsRef<[u8]> {}
+pub trait BufferKey: Hash + Eq + AsRef<[u8]> + From<Vec<u8>> {}
+impl<T> BufferKey for T where T: Hash + Eq + AsRef<[u8]> + From<Vec<u8>> {}
 
 pub trait BufferIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 impl<T> BufferIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
