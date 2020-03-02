@@ -73,11 +73,11 @@ where
         }
     }
 
-    fn iter_raw(&self) -> WorkspaceResult<SingleIter<K, V>> {
+    fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
         Ok((SingleIter::new(self.db.iter_start(self.reader)?)))
     }
 
-    fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<K, V>> {
+    fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<V>> {
         Ok((SingleIter::new(self.db.iter_end(self.reader)?)))
     }
 }
@@ -103,30 +103,34 @@ where
     }
 }
 
-pub struct SingleIter<'env, K, V>(
+pub struct SingleIter<'env, V>(
     rkv::store::single::Iter<'env>,
-    std::marker::PhantomData<(K, V)>,
+    std::marker::PhantomData<V>,
 );
 
-impl<'env, K, V> SingleIter<'env, K, V> {
+impl<'env, V> SingleIter<'env, V> {
     pub fn new(iter: rkv::store::single::Iter<'env>) -> Self {
         Self(iter, std::marker::PhantomData)
     }
 }
 
-impl<'env, K, V> Iterator for SingleIter<'env, K, V>
+/// Iterate over key, value pairs in this store using low-level LMDB iterators
+/// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
+/// This is to enable a wider range of keys, such as String, because there is no uniform trait which
+/// enables conversion from a byte slice to a given type.
+/// TODO: Use FallibleIterator to prevent panics within iteration
+impl<'env, V> Iterator for SingleIter<'env, V>
 where
-    K: BufferKey,
     V: BufferVal,
 {
-    type Item = (K, V);
+    type Item = (&'env [u8], V);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.0.next() {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => {
                 Some((
-                    K::from(k.to_owned()),
-                    rmp_serde::from_read_ref(buf).unwrap()
+                    k,
+                    rmp_serde::from_read_ref(buf).expect("Failed to deserialize value")
                 ))
             }
             None => None,
@@ -145,7 +149,7 @@ pub mod tests {
     use crate::{
         db::{ReadManager, WriteManager},
         env::{create_lmdb_env},
-        test_utils::test_env,
+        test_utils::test_env, error::WorkspaceResult,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -162,15 +166,15 @@ pub mod tests {
     type TestBuf<'a> = KvBuffer<'a, &'a str, V>;
 
     #[test]
-    fn kv_iterators() {
+    fn kv_iterators() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.read().unwrap();
-        let db = env.open_single("kv", StoreOptions::create()).unwrap();
+        let db = env.open_single("kv", StoreOptions::create())?;
         let rm = ReadManager::new(&env);
         let wm = WriteManager::new(&env);
 
         rm.with_reader(|reader| {
-            let mut buf: TestBuf = KvBuffer::new(&reader, db).unwrap();
+            let mut buf: TestBuf = KvBuffer::new(&reader, db)?;
 
             buf.put("a", V(1));
             buf.put("b", V(2));
@@ -179,22 +183,23 @@ pub mod tests {
             buf.put("e", V(5));
 
             wm.with_writer(|mut writer| buf.finalize(&mut writer))
-                .unwrap();
+                ?;
             Ok(())
         })
-        .unwrap();
+        ?;
 
         rm.with_reader(|reader| {
-            let buf: TestBuf = KvBuffer::new(&reader, db).unwrap();
+            let buf: TestBuf = KvBuffer::new(&reader, db)?;
 
-            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
-            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| v).collect();
+            let reverse: Vec<_> = buf.iter_raw_reverse()?.map(|(_, v)| v).collect();
 
             assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
             assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
             Ok(())
         })
-        .unwrap();
+        ?;
+        Ok(())
     }
 
     #[test]

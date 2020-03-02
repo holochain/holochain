@@ -78,11 +78,11 @@ where
     }
 
     pub fn iter_raw(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
-        Ok((SingleIntIter::new(self.db.iter_start(self.reader)?)))
+        Ok(SingleIntIter::new(self.db.iter_start(self.reader)?))
     }
 
     pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
-        Ok((SingleIntIter::new(self.db.iter_end(self.reader)?)))
+        Ok(SingleIntIter::new(self.db.iter_end(self.reader)?))
     }
 }
 
@@ -119,6 +119,9 @@ impl<'env, K, V> SingleIntIter<'env, K, V> {
     }
 }
 
+/// Iterator over key, value pairs. Both keys and values are deserialized
+/// to their proper types.
+/// TODO: Use FallibleIterator to prevent panics within iteration
 impl<'env, K, V> Iterator for SingleIntIter<'env, K, V>
 where
     K: BufferIntKey,
@@ -130,8 +133,8 @@ where
         match self.0.next() {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => {
                 Some((
-                    K::from_bytes(k).unwrap(),
-                    rmp_serde::from_read_ref(buf).unwrap()
+                    K::from_bytes(k).expect("Failed to deserialize key"),
+                    rmp_serde::from_read_ref(buf).expect("Failed to deserialize value")
                 ))
             }
             None => None,

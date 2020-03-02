@@ -46,7 +46,7 @@ impl<'e> ChainSequenceBuffer<'e> {
             .db
             .iter_raw_reverse()?
             .next()
-            .map(|item| item.header_address))
+            .map(|(_, item)| item.header_address))
     }
 
     pub fn add_header(&mut self, header_address: Address) {

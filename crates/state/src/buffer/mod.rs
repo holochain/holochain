@@ -23,8 +23,8 @@ pub trait StoreBuffer<'env> {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()>;
 }
 
-pub trait BufferKey: Hash + Eq + AsRef<[u8]> + From<Vec<u8>> {}
-impl<T> BufferKey for T where T: Hash + Eq + AsRef<[u8]> + From<Vec<u8>> {}
+pub trait BufferKey: Hash + Eq + AsRef<[u8]> {}
+impl<T> BufferKey for T where T: Hash + Eq + AsRef<[u8]> {}
 
 pub trait BufferIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 impl<T> BufferIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
