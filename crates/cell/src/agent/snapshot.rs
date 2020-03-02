@@ -1,7 +1,6 @@
 use crate::{
     agent::{
         error::{ChainInvalidReason, SourceChainError, SourceChainResult},
-        ChainTop,
     },
     cell::Cell,
     state::{chain_cas::HeaderCas, source_chain::SourceChainBuffer},
@@ -14,7 +13,7 @@ use core::ops::Deref;
 use fallible_iterator::FallibleIterator;
 use holochain_json_api::error::JsonError;
 use lazy_static::*;
-use std::{borrow::Borrow, fmt, rc::Rc};
+use std::{borrow::Borrow, fmt, rc::Rc, cell::{Ref, RefCell}};
 use sx_state::{Reader, RkvEnv, Writer};
 use sx_types::{
     agent::AgentId,
@@ -32,8 +31,8 @@ use owning_ref::BoxRef;
 pub type SourceChainSnapshot<'env> = SourceChainSnapshotAbstract<'env, SourceChainBuffer<'env>>;
 pub type SourceChainSnapshotRef<'env> =
     SourceChainSnapshotAbstract<'env, &'env SourceChainBuffer<'env>>;
-pub type SourceChainSnapshotRcRef<'env> =
-    SourceChainSnapshotAbstract<'env, Rc<SourceChainBuffer<'env>>>;
+pub type SourceChainSnapshotRefRef<'env> =
+    SourceChainSnapshotAbstract<'env, Ref<'env, SourceChainBuffer<'env>>>;
 
 
 /// Representation of a Cell's source chain.
@@ -145,18 +144,20 @@ impl<'env, Db: Borrow<SourceChainBuffer<'env>>> SourceChainSnapshotAbstract<'env
 }
 
 pub struct SourceChainCommitBundle<'env> {
-    db: Rc<SourceChainBuffer<'env>>,
-    original_head: ChainTop,
-    new_head: ChainTop,
+    db: RefCell<SourceChainBuffer<'env>>,
+    // snapshot: SourceChainSnapshotRefRef<'env>,
+    original_head: Address,
+    new_head: Address,
 }
 
 impl<'env> SourceChainCommitBundle<'env> {
     pub(super) fn new(db: SourceChainBuffer<'env>) -> SourceChainResult<Self> {
         let head = db.chain_head()?.ok_or(SourceChainError::ChainEmpty)?;
-        // Just ensure that a snapshot can be created, mainly to perform the chain head integrity check
         let _ = SourceChainSnapshotRef::new(&db, head.clone())?;
+        let db = RefCell::new(db);
         Ok(Self {
-            db: Rc::new(db),
+            db: db,
+            // snapshot,
             original_head: head.clone(),
             new_head: head,
         })
@@ -164,27 +165,28 @@ impl<'env> SourceChainCommitBundle<'env> {
 
     pub fn add_entry(&mut self, entry: Entry) -> SourceChainResult<ChainHeader> {
         let header = self.header_for_entry(&entry)?;
-        self.db.put((header, entry));
+        self.db.borrow_mut().put((header.clone(), entry));
         Ok(header)
     }
 
-    pub fn original_head(&self) -> &ChainTop {
+    pub fn original_head(&self) -> &Address {
         &self.original_head
     }
 
     /// Extract the underlying buffer which has been filled with staged changes,
     /// consuming the outer struct. This gets passed to SourceChain::try_commit.
     pub fn buffer(self) -> SourceChainBuffer<'env> {
-        *self.db
+        self.db.into_inner()
     }
 
-    pub fn snapshot(&self) -> SourceChainResult<SourceChainSnapshotRcRef<'env>> {
-        SourceChainSnapshotRcRef::new(self.db.clone(), self.original_head.clone())
+    pub fn snapshot(&self) -> SourceChainSnapshotRef<'env> {
+        // &self.snapshot
+        SourceChainSnapshotRef::new(&*self.db.borrow(), self.head.clone())
     }
 
     fn header_for_entry(&self, entry: &Entry) -> SourceChainResult<ChainHeader> {
         let provenances = &[Provenance::new(
-            self.snapshot()?.agent_id().unwrap().address(),
+            self.snapshot.agent_id().unwrap().address(),
             Signature::fake(),
         )];
         let timestamp = chrono::Utc::now().timestamp().into();

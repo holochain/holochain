@@ -1,6 +1,6 @@
 use core::ops::Deref;
 use super::{chain_cas::{HeaderCas, ChainCasBuffer}, chain_sequence::ChainSequenceBuffer};
-use sx_state::{error::WorkspaceResult, RkvEnv, buffer::StoreBuffer, Writer};
+use sx_state::{error::WorkspaceResult, RkvEnv, buffer::StoreBuffer, Writer, db::{self, DbManager}, Reader};
 use sx_types::{chain_header::ChainHeader, entry::Entry, prelude::Address};
 
 pub struct SourceChainBuffer<'env> {
@@ -9,10 +9,12 @@ pub struct SourceChainBuffer<'env> {
 }
 
 impl<'env> SourceChainBuffer<'env> {
-    pub fn create(env: &'env RkvEnv) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env Reader<'env>, dbm: &'env DbManager) -> WorkspaceResult<Self> {
+        // let entries = dbm.get(&*db::CHAIN_ENTRIES)?;
+        // let headers = dbm.get(&*db::CHAIN_HEADERS)?;
         Ok(Self {
-            cas: ChainCasBuffer::create(env, "sourcechain")?,
-            sequence: ChainSequenceBuffer::create(env)?,
+            cas: ChainCasBuffer::primary(reader, dbm)?,
+            sequence: ChainSequenceBuffer::new(reader, dbm)?,
         })
     }
 
@@ -33,7 +35,6 @@ impl<'env> SourceChainBuffer<'env> {
     }
 
     pub fn put(&mut self, pair: (ChainHeader, Entry)) -> () {
-        let (header, entry) = pair;
         self.cas.put(pair);
     }
 

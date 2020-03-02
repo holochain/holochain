@@ -1,4 +1,4 @@
-use super::{BufferMultiVal, StoreBuffer, BufferKey};
+use super::{BufferKey, BufferMultiVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use maplit::hashset;
 use rkv::{MultiStore, Reader, Rkv, StoreError, StoreOptions, Writer};
@@ -41,6 +41,7 @@ where
     K: BufferKey,
     V: BufferMultiVal,
 {
+    // TODO: restructure to match the others
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
     pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
@@ -171,10 +172,7 @@ where
 pub mod tests {
 
     use super::{KvvBuffer, Op, StoreBuffer};
-    use crate::env::{
-        create_lmdb_env,
-        test::{test_env, with_writer},
-    };
+    use crate::{db::WriteManager, env::{create_lmdb_env, test::test_env}};
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
@@ -198,6 +196,7 @@ pub mod tests {
     fn kvv_store_scratch_insert_delete() {
         let arc = test_env();
         let env = arc.read().unwrap();
+        let wm = WriteManager::new(&env);
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
 
@@ -222,7 +221,7 @@ pub mod tests {
             hashset! {opDelete(V(1)), opInsert(V(2)), opInsert(V(3))}
         );
 
-        with_writer(&env, |mut writer| store.finalize(&mut writer));
+        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
 
         let mut store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
@@ -232,6 +231,7 @@ pub mod tests {
     fn kvv_store_get_list() {
         let arc = test_env();
         let env = arc.read().unwrap();
+        let wm = WriteManager::new(&env);
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
 
@@ -251,7 +251,7 @@ pub mod tests {
             hashset! {opDelete(V(1)), opInsert(V(2))}
         );
 
-        with_writer(&env, |mut writer| store.finalize(&mut writer));
+        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2)});
@@ -264,6 +264,7 @@ pub mod tests {
 
         fn add_twice(env: &Rkv) {
             let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
+            let wm = WriteManager::new(&env);
 
             store.insert("key", V(1));
             assert_eq!(
@@ -276,7 +277,7 @@ pub mod tests {
                 hashset! {opInsert(V(1))}
             );
 
-            with_writer(env, |mut writer| store.finalize(&mut writer));
+            wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
         }
 
         add_twice(&env);
@@ -294,15 +295,16 @@ pub mod tests {
     fn kvv_store_duplicate_delete() {
         let arc = test_env();
         let env = arc.read().unwrap();
+        let wm = WriteManager::new(&env);
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.insert("key", V(1));
-        with_writer(&env, |mut writer| store.finalize(&mut writer));
+        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.delete("key", V(1));
         store.delete("key", V(1));
-        with_writer(&env, |mut writer| store.finalize(&mut writer));
+        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {});

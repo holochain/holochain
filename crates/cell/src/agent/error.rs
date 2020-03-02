@@ -2,7 +2,6 @@ use sx_types::error::SkunkError;
 use sx_types::prelude::*;
 use thiserror::Error;
 use holochain_json_api::error::JsonError;
-use super::ChainTop;
 use sx_state::error::WorkspaceError;
 
 #[derive(Error, Debug, PartialEq)]
@@ -11,7 +10,7 @@ pub enum SourceChainError {
     ChainEmpty,
 
     #[error("Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}")]
-    HeadMismatch(ChainTop, ChainTop),
+    HeadMismatch(Address, Address),
 
     #[error("The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}")]
     InvalidStructure(ChainInvalidReason),

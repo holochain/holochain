@@ -31,7 +31,7 @@ where
     V: BufferVal,
 {
     db: IntegerStore<K>,
-    reader: Reader<'env>,
+    reader: &'env Reader<'env>,
     scratch: HashMap<K, KvOp<V>>,
 }
 
@@ -40,21 +40,10 @@ where
     K: BufferIntKey,
     V: BufferVal,
 {
-    /// Create or open DB if it exists.
-    /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
-    pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env Reader<'env>, db: IntegerStore<K>) -> WorkspaceResult<Self> {
         Ok(Self {
-            db: env.open_integer(name, StoreOptions::create())?,
-            reader: env.read()?,
-            scratch: HashMap::new(),
-        })
-    }
-
-    /// Open an existing DB. Will cause an error if the DB was not created already.
-    pub fn open(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        Ok(Self {
-            db: env.open_integer(name, StoreOptions::default())?,
-            reader: env.read()?,
+            db,
+            reader,
             scratch: HashMap::new(),
         })
     }
@@ -81,7 +70,7 @@ where
 
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: K) -> WorkspaceResult<Option<V>> {
-        match self.db.get(&self.reader, k)? {
+        match self.db.get(self.reader, k)? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
             None => Ok(None),
             Some(_) => Err(WorkspaceError::InvalidValue),
@@ -89,11 +78,11 @@ where
     }
 
     pub fn iter(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_start(&self.reader)?)))
+        Ok((SingleStoreIterTyped::new(self.db.iter_start(self.reader)?)))
     }
 
     pub fn iter_reverse(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_end(&self.reader)?)))
+        Ok((SingleStoreIterTyped::new(self.db.iter_end(self.reader)?)))
     }
 }
 
@@ -122,7 +111,11 @@ where
 pub mod tests {
 
     use super::{KvIntBuffer, StoreBuffer};
-    use crate::env::test::{test_env, with_writer};
+    use crate::{
+        db::{ReadManager, WriteManager},
+        env::test::test_env,
+    };
+    use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,43 +126,59 @@ pub mod tests {
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct V(u32);
 
+    type Store<'a> = KvIntBuffer<'a, u32, V>;
+
     #[test]
     fn kv_iterators() {
         let arc = test_env();
         let env = arc.read().unwrap();
-        type Store<'a> = KvIntBuffer<'a, u32, V>;
+        let db = env.open_integer("kv", StoreOptions::create()).unwrap();
+        let rm = ReadManager::new(&env);
+        let wm = WriteManager::new(&env);
 
-        let mut store: Store = KvIntBuffer::create(&env, "kv").unwrap();
+        rm.with_reader(|reader| {
+            let mut buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
-        store.put(1, V(1));
-        store.put(2, V(2));
-        store.put(3, V(3));
-        store.put(4, V(4));
-        store.put(5, V(5));
+            buf.put(1, V(1));
+            buf.put(2, V(2));
+            buf.put(3, V(3));
+            buf.put(4, V(4));
+            buf.put(5, V(5));
 
-        with_writer(&env, |mut writer| store.finalize(&mut writer));
+            wm.with_writer(|mut writer| buf.finalize(&mut writer))
+        })
+        .unwrap();
 
-        let store: Store = KvIntBuffer::open(&env, "kv").unwrap();
+        rm.with_reader(|reader| {
+            let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
-        let forward: Vec<_> = store.iter().unwrap().collect();
-        let reverse: Vec<_> = store.iter_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter().unwrap().collect();
+            let reverse: Vec<_> = buf.iter_reverse().unwrap().collect();
 
-        assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
-        assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
+            assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
+            assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
+            Ok(())
+        })
+        .unwrap();
     }
 
     #[test]
     fn kv_empty_iterators() {
         let arc = test_env();
         let env = arc.read().unwrap();
-        type Store<'a> = KvIntBuffer<'a, u32, V>;
+        let db = env.open_integer("kv", StoreOptions::create()).unwrap();
+        let rm = ReadManager::new(&env);
 
-        let store: Store = KvIntBuffer::create(&env, "kv").unwrap();
+        rm.with_reader(|reader| {
+            let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
-        let forward: Vec<_> = store.iter().unwrap().collect();
-        let reverse: Vec<_> = store.iter_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter().unwrap().collect();
+            let reverse: Vec<_> = buf.iter_reverse().unwrap().collect();
 
-        assert_eq!(forward, vec![]);
-        assert_eq!(reverse, vec![]);
+            assert_eq!(forward, vec![]);
+            assert_eq!(reverse, vec![]);
+            Ok(())
+        })
+        .unwrap();
     }
 }

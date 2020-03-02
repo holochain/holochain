@@ -14,15 +14,8 @@ impl<'env, V> CasBuffer<'env, V>
 where
     V: BufferVal + AddressableContent,
 {
-    /// Create or open DB if it exists.
-    /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
-    pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        Ok(Self(KvBuffer::create(env, name)?))
-    }
-
-    /// Open an existing DB. Will cause an error if the DB was not created already.
-    pub fn open(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        Ok(Self(KvBuffer::open(env, name)?))
+    pub fn new(reader: &'env rkv::Reader<'env>, db: rkv::SingleStore) -> WorkspaceResult<Self> {
+        Ok(Self(KvBuffer::new(reader, db)?))
     }
 
     pub fn get(&self, k: &Address) -> WorkspaceResult<Option<V>> {

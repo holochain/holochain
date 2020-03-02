@@ -1,6 +1,6 @@
 use super::{ZomeInvocationResult, ZomeInvocation, error::ZomeApiResult};
-use crate::{agent::SourceChainCommitBundle, net::NetRequester, cell::ZomeId};
-use sx_types::prelude::*;
+use crate::{net::NetRequester, cell::ZomeId};
+use sx_types::{shims::SourceChainCommitBundle, prelude::*};
 
 pub trait ZomeApi {
     fn call(&self, invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResult>;

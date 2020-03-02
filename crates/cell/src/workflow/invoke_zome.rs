@@ -1,5 +1,4 @@
 use crate::{
-    agent::{ChainTop, SourceChain, SourceChainSnapshot},
     cell::{autonomic::AutonomicCue, error::CellResult},
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
@@ -10,17 +9,18 @@ use sx_types::shims::*;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT, Api: ConductorCellApiT>(
     invocation: ZomeInvocation,
-    source_chain: SourceChain<'_>,
     ribosome: Ribo,
     conductor_api: Api,
 ) -> CellResult<ZomeInvocationResult> {
-    let mut bundle = source_chain.bundle()?;
+    unimplemented!();
+    // let mut bundle = source_chain.bundle()?;
+    let mut bundle = SourceChainCommitBundle::new();
     let result = ribosome.call_zome_function(&mut bundle, invocation)?;
-    let snapshot = source_chain.try_commit(bundle)?;
+    // let snapshot = source_chain.try_commit(bundle)?;
     Ok(result)
 }
 
-#[cfg(test)]
+#[cfg(test_TODO_FIX)]
 pub mod tests {
     use super::*;
     use crate::{

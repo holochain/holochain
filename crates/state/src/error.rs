@@ -8,6 +8,9 @@ pub enum WorkspaceError {
     #[error("A store which was expected not to be empty turned out to be empty: {0}")]
     EmptyStore(DbName),
 
+    #[error("An LMDB store was not created/initialized: {0}")]
+    StoreNotInitialized(DbName),
+
     #[error("There is an unexpected value in an LMDB database (TODO: more info)")]
     InvalidValue,
 

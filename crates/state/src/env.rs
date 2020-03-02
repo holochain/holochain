@@ -45,10 +45,4 @@ pub mod test {
         create_lmdb_env(tmpdir.path())
     }
 
-    pub fn with_writer<F>(env: &Rkv, f: F)
-    where F: FnOnce(&mut Writer) -> WorkspaceResult<()> {
-        let mut writer = env.write().unwrap();
-        let result = f(&mut writer).unwrap();
-        writer.commit().unwrap();
-    }
 }

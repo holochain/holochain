@@ -1,3 +1,5 @@
+use sx_state::db::CHAIN_HEADERS;
+use sx_state::db::CHAIN_ENTRIES;
 use super::{error::ChainInvalidReason, SourceChainCommitBundle, SourceChainSnapshot};
 use crate::{
     agent::error::{SourceChainError, SourceChainResult},
@@ -24,34 +26,36 @@ use sx_types::{
     signature::{Provenance, Signature},
     time::Iso8601,
 };
-use sx_state::{RkvEnv, buffer::StoreBuffer};
+use sx_state::{RkvEnv, buffer::StoreBuffer, db::{ReadManager, DbManager}};
 
 /// Interface to the source chain as accessed through persistent storage.
 /// From a SourceChain, you can construct a SourceChainSnapshot to make queries,
 /// or a SourceChainCommitBundle, to start a write transaction and potentially commit
 /// the changes later with `try_commit`.
 pub struct SourceChain<'env> {
-    env: &'env RkvEnv,
+    dbm: &'env DbManager<'env>,
+    rm: &'env ReadManager<'env>,
 }
 
 impl<'env> SourceChain<'env> {
-    pub(crate) fn new(env: &'env RkvEnv) -> Self {
-        Self { env }
+    pub(crate) fn new(dbm: &'env DbManager, rm: &'env ReadManager) -> Self {
+        Self { dbm, rm }
     }
 
     pub fn now(&self) -> SourceChainResult<SourceChainSnapshot> {
-        let db = SourceChainBuffer::create(self.env)?;
+        let db = SourceChainBuffer::new(self.dbm)?;
         let head = db.chain_head()?.ok_or(SourceChainError::ChainEmpty)?;
         SourceChainSnapshot::new(db, head)
     }
 
     pub fn as_at(&self, head: Address) -> SourceChainResult<SourceChainSnapshot> {
-        let db = SourceChainBuffer::create(self.env)?;
+        let db = SourceChainBuffer::new(self.dbm)?;
         SourceChainSnapshot::new(db, head)
     }
 
     pub fn bundle(&self) -> SourceChainResult<SourceChainCommitBundle> {
-        let db = SourceChainBuffer::create(self.env)?;
+        let reader = self.rm.reader()?;
+        let db = SourceChainBuffer::new(entries, self.dbm)?;
         SourceChainCommitBundle::new(db)
     }
 
@@ -91,7 +95,7 @@ impl<'env> SourceChain<'env> {
     /// TODO: rewrite once we have the multi-LMDB cursors sorted out, so that we can
     /// read the chain head from a different DB
     fn head_inner(&self) -> SourceChainResult<Option<Address>> {
-        Ok(SourceChainBuffer::create(self.env)?.chain_head()?)
+        Ok(SourceChainBuffer::new(self.dbm)?.chain_head()?)
     }
 
     pub fn initialize(&self, dna: Dna, agent: AgentId) -> SourceChainResult<()> {

@@ -1,6 +1,5 @@
 use super::autonomic::AutonomicProcess;
 use crate::{
-    agent::SourceChain,
     cell::error::{CellError, CellResult},
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
@@ -14,7 +13,7 @@ use std::{
     hash::{Hash, Hasher},
     path::Path, sync::{Arc, RwLock},
 };
-use sx_state::{db::DbManager, env::create_lmdb_env};
+use sx_state::{db::{ReadManager, DbManager}, env::create_lmdb_env};
 use sx_types::{
     agent::AgentId,
     db::DatabasePath,
@@ -53,7 +52,9 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
 // #[derive(Clone)]
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
-    db_manager: DbManager,
+    state_env: Arc<RwLock<RkvEnv>>,
+    db_manager: DbManager<'static>,
+    read_manager: ReadManager<'static>,
     conductor_api: Api,
 }
 
@@ -66,24 +67,12 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         &self.id.agent_id()
     }
 
-    fn source_chain(&self) -> SourceChain {
-        SourceChain::new(self.state_env)
-    }
-
     pub async fn invoke_zome(
         &self,
         conductor_api: Api,
         invocation: ZomeInvocation,
     ) -> CellResult<ZomeInvocationResult> {
-        let source_chain = SourceChain::new(self.state_env);
-        let writer = self.state_env.write()?;
-        let previous_head = source_chain.head()?;
-        let dna = source_chain.dna()?;
-        let ribosome = Ribosome::new(dna);
-        let invoke_result =
-            workflow::invoke_zome(invocation, source_chain, ribosome, conductor_api).await?;
-        workflow::publish(source_chain.now().unwrap(), &previous_head).await?;
-        Ok(invoke_result)
+       unimplemented!()
     }
 
     pub async fn handle_network_message(

@@ -1,6 +1,11 @@
-use crate::{Writer, error::WorkspaceResult};
+use crate::{
+    error::{WorkspaceError, WorkspaceResult},
+    Reader, Writer,
+};
 use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
-use rkv::{Rkv, StoreOptions};
+use lazy_static::lazy_static;
+use owning_ref::{ArcRef, OwningRef};
+use rkv::{IntegerStore, MultiStore, Rkv, SingleStore, StoreOptions};
 use std::sync::{Arc, RwLock};
 use sx_types::{agent::CellId, prelude::AddressableContent};
 
@@ -45,47 +50,114 @@ pub enum DbKind {
 
 pub type DbKey<V> = UmKey<DbName, V>;
 
-pub struct DbManager {
+lazy_static! {
+    pub static ref CHAIN_ENTRIES: DbKey<SingleStore> =
+        DbKey::<SingleStore>::new(DbName::ChainEntries);
+    pub static ref CHAIN_HEADERS: DbKey<SingleStore> =
+        DbKey::<SingleStore>::new(DbName::ChainHeaders);
+    pub static ref CHAIN_META: DbKey<MultiStore> = DbKey::new(DbName::ChainMeta);
+    pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
+}
+
+pub struct DbManager<'env> {
     // NOTE: this can't just be an Rkv because we get Rkv environments from the Manager
     // already wrapped in the Arc<RwLock<_>>, so this is the canonical representation of an LMDB environment
-    env: Arc<RwLock<Rkv>>,
+    env: &'env Rkv,
     um: UniversalMap<DbName>,
 }
 
-impl DbManager {
-    pub fn new(env: Arc<RwLock<Rkv>>) -> Self {
-        Self {
+impl<'env> DbManager<'env> {
+    pub fn new(env: &'env Rkv) -> WorkspaceResult<Self> {
+        let mut this = Self {
             env,
             um: UniversalMap::new(),
-        }
+        };
+        // TODO: rethink this. If multiple DbManagers exist for this environment, we might create DBs twice,
+        // which could cause a panic.
+        // This can be simplified (and made safer) if DbManager, ReadManager and WriteManager
+        // are just traits of the Rkv environment.
+        this.initialize()?;
+        Ok(this)
     }
 
     pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> WorkspaceResult<&V> {
-        Ok(self.um.get(&key).unwrap())
+        self.um
+            .get(key)
+            .ok_or(WorkspaceError::StoreNotInitialized(key.key().to_owned()))
     }
 
-    pub fn get_or_insert<V: 'static + Send + Sync>(&mut self, key: DbKey<V>) -> WorkspaceResult<&V> {
-        if self.um.get(&key).is_some() {
-            return Ok(self.um.get(&key).unwrap());
+    fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> WorkspaceResult<()> {
+        let env = self.env; //.read().unwrap();
+        let db_name = key.key();
+        let db_str = format!("{}", db_name);
+        let _ = match db_name.kind() {
+            DbKind::Single => self.um.insert(
+                key.with_value_type(),
+                env.open_single(db_str.as_str(), StoreOptions::create())?,
+            ),
+            DbKind::SingleInt => self.um.insert(
+                key.with_value_type(),
+                env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
+            ),
+            DbKind::Multi => self.um.insert(
+                key.with_value_type(),
+                env.open_multi(db_str.as_str(), StoreOptions::create())?,
+            ),
+        };
+        Ok(())
+    }
+
+    fn initialize(&mut self) -> WorkspaceResult<()> {
+        self.create(&*CHAIN_ENTRIES)?;
+        self.create(&*CHAIN_HEADERS)?;
+        self.create(&*CHAIN_META)?;
+        self.create(&*CHAIN_SEQUENCE)?;
+        Ok(())
+    }
+
+    pub fn get_or_create<V: 'static + Send + Sync>(
+        &mut self,
+        key: &DbKey<V>,
+    ) -> WorkspaceResult<&V> {
+        if self.um.get(key).is_some() {
+            return Ok(self.um.get(key).unwrap());
         } else {
-            let env = self.env.read().unwrap();
-            let db_name = key.key();
-            let db_str = format!("{}", db_name);
-            let _ = match db_name.kind() {
-                DbKind::Single => self.um.insert(
-                    key.with_value_type(),
-                    env.open_single(db_str.as_str(), StoreOptions::create())?,
-                ),
-                DbKind::SingleInt => self.um.insert(
-                    key.with_value_type(),
-                    env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
-                ),
-                DbKind::Multi => self.um.insert(
-                    key.with_value_type(),
-                    env.open_multi(db_str.as_str(), StoreOptions::create())?,
-                ),
-            };
-            Ok(self.um.get(&key).unwrap().clone())
+            self.create(key)?;
+            Ok(self.um.get(key).unwrap().clone())
         }
+    }
+}
+
+pub struct ReadManager<'env>(&'env Rkv);
+
+impl<'e> ReadManager<'e> {
+    pub fn new(env: &'e Rkv) -> Self {
+        Self(env)
+    }
+
+    pub fn reader(&self) -> WorkspaceResult<Reader<'e>> {
+        Ok(self.0.read()?)
+    }
+
+    pub fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(
+        &self,
+        f: F,
+    ) -> WorkspaceResult<R> {
+        f(self.0.read()?)
+    }
+}
+
+pub struct WriteManager<'env>(&'env Rkv);
+
+impl<'e> WriteManager<'e> {
+    pub fn new(env: &'e Rkv) -> Self {
+        Self(env)
+    }
+
+    pub fn with_writer<R, F: FnOnce(Writer) -> WorkspaceResult<R>>(
+        &self,
+        f: F,
+    ) -> WorkspaceResult<R> {
+        f(self.0.write()?)
     }
 }

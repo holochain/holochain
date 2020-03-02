@@ -1,9 +1,11 @@
+use sx_state::db::CHAIN_HEADERS;
+use sx_state::db::CHAIN_ENTRIES;
 use crate::agent::error::{SourceChainError, SourceChainResult, ChainInvalidReason};
 use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
     error::WorkspaceResult,
-    RkvEnv, Writer,
+    RkvEnv, Writer, db::DbManager, Reader, SingleStore,
 };
 use sx_types::{
     chain_header::{HeaderWithEntry, ChainHeader},
@@ -21,21 +23,18 @@ pub struct ChainCasBuffer<'env> {
 }
 
 impl<'env> ChainCasBuffer<'env> {
-    /// Create or open DB if it exists.
-    /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
-    pub fn create(env: &'env RkvEnv, prefix: &str) -> WorkspaceResult<Self> {
+
+    fn new(reader: &'env Reader<'env>, entries_store: SingleStore, headers_store: SingleStore) -> WorkspaceResult<Self> {
         Ok(Self {
-            entries: CasBuffer::create(env, &format!("{}-entries", prefix))?,
-            headers: CasBuffer::create(env, &format!("{}-headers", prefix))?,
+            entries: CasBuffer::new(reader, entries_store)?,
+            headers: CasBuffer::new(reader, headers_store)?,
         })
     }
 
-    /// Open an existing DB. Will cause an error if the DB was not created already.
-    pub fn open(env: &'env RkvEnv, prefix: &str) -> WorkspaceResult<Self> {
-        Ok(Self {
-            entries: CasBuffer::open(env, &format!("{}-entries", prefix))?,
-            headers: CasBuffer::open(env, &format!("{}-headers", prefix))?,
-        })
+    pub fn primary(reader: &'env Reader<'env>, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
+        let entries = dbm.get(&*CHAIN_ENTRIES)?.clone();
+        let headers = dbm.get(&*CHAIN_HEADERS)?.clone();
+        Self::new(reader, entries, headers)
     }
 
     pub fn get_entry(&self, entry_address: &Address) -> WorkspaceResult<Option<Entry>> {

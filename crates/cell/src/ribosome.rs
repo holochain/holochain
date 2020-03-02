@@ -1,6 +1,5 @@
 use sx_types::entry::Entry;
 use crate::{
-    agent::{SourceChainCommitBundle, SourceChain},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     txn::source_chain,
     wasm_engine::WasmEngine,
@@ -22,7 +21,7 @@ pub trait RibosomeT {
         bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<(ZomeInvocationResult)>;
+    ) -> SkunkResult<ZomeInvocationResult>;
 }
 
 /// TODO determine what cursor looks like for ribosomes
