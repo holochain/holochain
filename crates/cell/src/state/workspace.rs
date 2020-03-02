@@ -1,9 +1,10 @@
+use super::chain_cas::ChainCasBuffer;
 use sx_state::{
     buffer::{KvBuffer, KvvBuffer, StoreBuffer},
-    error::WorkspaceResult, db::DbManager,
-    Writer, Reader,
+    db::DbManager,
+    error::WorkspaceResult,
+    Reader, Writer,
 };
-use super::chain_cas::ChainCasBuffer;
 
 pub trait Workspace<'txn>: Sized {
     fn finalize(self, writer: Writer) -> WorkspaceResult<()>;
@@ -48,9 +49,41 @@ impl<'env> Workspace<'env> for AppValidationWorkspace {
 pub mod tests {
 
     use super::{InvokeZomeWorkspace, Workspace};
-    use sx_state::{db::DbManager, env::create_lmdb_env};
+    use sx_state::{
+        buffer::{KvBuffer, StoreBuffer},
+        db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
+        env::create_lmdb_env,
+        error::WorkspaceResult,
+        Reader, SingleStore, Writer,
+    };
     use sx_types::prelude::*;
     use tempdir::TempDir;
+
+    struct TestWorkspace<'env> {
+        one: KvBuffer<'env, &'static str, u32>,
+        two: KvBuffer<'env, &'static str, bool>,
+    }
+
+    impl<'env> TestWorkspace<'env> {
+        pub fn new(
+            reader: &'env Reader<'env>,
+            dbm: &'env DbManager<'env>,
+        ) -> WorkspaceResult<Self> {
+            Ok(Self {
+                one: KvBuffer::new(reader, *dbm.get(&*CHAIN_ENTRIES)?)?,
+                two: KvBuffer::new(reader, *dbm.get(&*CHAIN_HEADERS)?)?,
+            })
+        }
+    }
+
+    impl<'env> Workspace<'env> for TestWorkspace<'env> {
+        fn finalize(self, mut writer: Writer) -> WorkspaceResult<()> {
+            self.one.finalize(&mut writer)?;
+            self.two.finalize(&mut writer)?;
+            writer.commit()?;
+            Ok(())
+        }
+    }
 
     #[test]
     fn workspace_sanity_check() {
@@ -59,25 +92,23 @@ pub mod tests {
         let env = created_arc.read().unwrap();
         let dbm = DbManager::new(&env).unwrap();
         let address = Address::from("hi".to_owned());
-        let reader = env.read().unwrap();
+        {
+            let reader = env.read().unwrap();
+            let mut workspace = TestWorkspace::new(&reader, &dbm).unwrap();
+            assert_eq!(workspace.one.get(&"hi").unwrap(), None);
 
-        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbm).unwrap();
-        let cas = workspace.cas();
-        assert_eq!(cas.get_entry(&address).unwrap(), None);
+            workspace.one.put(&"hi", 1);
+            workspace.two.put(&"ciao", true);
+            assert_eq!(workspace.one.get(&"hi").unwrap(), Some(1));
+            assert_eq!(workspace.two.get(&"ciao").unwrap(), Some(true));
+            workspace.finalize(env.write().unwrap()).unwrap();
+        }
 
-        panic!("Rewrite this test using a fake TestWorkspace")
-
-        // TODO: rewrite with real entries and headers
-
-        // cas.put("hi".to_owned(), "there".to_owned());
-        // assert_eq!(cas.get(&"hi".to_owned()).unwrap(), Some("there".to_owned()));
-        // workspace.finalize(env.write().unwrap()).unwrap();
-
-        // // Ensure that the data was persisted
-        // let mut workspace = InvokeZomeWorkspace::new(&env).unwrap();
-        // assert_eq!(
-        //     workspace.cas().get(&"hi".to_owned()).unwrap(),
-        //     Some("there".to_owned())
-        // );
+        // Ensure that the data was persisted
+        {
+            let reader = env.read().unwrap();
+            let workspace = TestWorkspace::new(&reader, &dbm).unwrap();
+            assert_eq!(workspace.one.get(&"hi").unwrap(), Some(1));
+        }
     }
 }

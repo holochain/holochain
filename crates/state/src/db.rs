@@ -154,10 +154,13 @@ impl<'e> WriteManager<'e> {
         Self(env)
     }
 
-    pub fn with_writer<R, F: FnOnce(Writer) -> WorkspaceResult<R>>(
+    pub fn with_writer<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
         &self,
         f: F,
     ) -> WorkspaceResult<R> {
-        f(self.0.write()?)
+        let mut writer = self.0.write()?;
+        let result = f(&mut writer);
+        writer.commit()?;
+        result
     }
 }
