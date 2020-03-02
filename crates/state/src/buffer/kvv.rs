@@ -172,7 +172,7 @@ where
 pub mod tests {
 
     use super::{KvvBuffer, Op, StoreBuffer};
-    use crate::{db::WriteManager, env::{create_lmdb_env, test::test_env}};
+    use crate::{db::WriteManager, env::create_lmdb_env, test_utils::test_env};
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
@@ -221,7 +221,8 @@ pub mod tests {
             hashset! {opDelete(V(1)), opInsert(V(2)), opInsert(V(3))}
         );
 
-        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
+        wm.with_writer(|mut writer| store.finalize(&mut writer))
+            .unwrap();
 
         let mut store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
@@ -251,7 +252,8 @@ pub mod tests {
             hashset! {opDelete(V(1)), opInsert(V(2))}
         );
 
-        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
+        wm.with_writer(|mut writer| store.finalize(&mut writer))
+            .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2)});
@@ -277,7 +279,8 @@ pub mod tests {
                 hashset! {opInsert(V(1))}
             );
 
-            wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
+            wm.with_writer(|mut writer| store.finalize(&mut writer))
+                .unwrap();
         }
 
         add_twice(&env);
@@ -299,12 +302,14 @@ pub mod tests {
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.insert("key", V(1));
-        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
+        wm.with_writer(|mut writer| store.finalize(&mut writer))
+            .unwrap();
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.delete("key", V(1));
         store.delete("key", V(1));
-        wm.with_writer(|mut writer| store.finalize(&mut writer)).unwrap();
+        wm.with_writer(|mut writer| store.finalize(&mut writer))
+            .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {});

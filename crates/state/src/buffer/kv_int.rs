@@ -77,11 +77,11 @@ where
         }
     }
 
-    pub fn iter(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
+    pub fn iter_raw(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
         Ok((SingleStoreIterTyped::new(self.db.iter_start(self.reader)?)))
     }
 
-    pub fn iter_reverse(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
+    pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
         Ok((SingleStoreIterTyped::new(self.db.iter_end(self.reader)?)))
     }
 }
@@ -113,7 +113,7 @@ pub mod tests {
     use super::{KvIntBuffer, StoreBuffer};
     use crate::{
         db::{ReadManager, WriteManager},
-        env::test::test_env,
+        test_utils::test_env,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -152,8 +152,8 @@ pub mod tests {
         rm.with_reader(|reader| {
             let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
-            let forward: Vec<_> = buf.iter().unwrap().collect();
-            let reverse: Vec<_> = buf.iter_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
 
             assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
             assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
@@ -172,8 +172,8 @@ pub mod tests {
         rm.with_reader(|reader| {
             let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
-            let forward: Vec<_> = buf.iter().unwrap().collect();
-            let reverse: Vec<_> = buf.iter_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
 
             assert_eq!(forward, vec![]);
             assert_eq!(reverse, vec![]);
