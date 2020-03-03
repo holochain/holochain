@@ -1,26 +1,25 @@
-use sx_types::prelude::{AddressableContent, Address};
-use super::kv::KvBuffer;
-use serde::{de::DeserializeOwned, Serialize};
-use rkv::Rkv;
+use crate::Readable;
+use super::{kv::KvBuffer, StoreBuffer, BufferVal};
 use crate::error::WorkspaceResult;
+use rkv::{Writer};
+
+use sx_types::prelude::{Address, AddressableContent};
+
 
 /// A wrapper around a KvBuffer where keys are always Addresses,
 /// and values are always AddressableContent.
-pub struct CasBuffer<'env, V>(KvBuffer<'env, Address, V>)
-where V: AddressableContent + Clone + Serialize + DeserializeOwned;
+pub struct CasBuffer<'env, V, R>(KvBuffer<'env, Address, V, R>)
+where
+    V: BufferVal + AddressableContent,
+    R: Readable;
 
-impl<'env, V> CasBuffer<'env, V>
-where V: AddressableContent + Clone + Serialize + DeserializeOwned
+impl<'env, V, R> CasBuffer<'env, V, R>
+where
+    V: BufferVal + AddressableContent,
+    R: Readable,
 {
-    /// Create or open DB if it exists.
-    /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
-    pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        Ok(Self(KvBuffer::create(env, name)?))
-    }
-
-    /// Open an existing DB. Will cause an error if the DB was not created already.
-    pub fn open(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        Ok(Self(KvBuffer::open(env, name)?))
+    pub fn new(reader: &'env R, db: rkv::SingleStore) -> WorkspaceResult<Self> {
+        Ok(Self(KvBuffer::new(reader, db)?))
     }
 
     pub fn get(&self, k: &Address) -> WorkspaceResult<Option<V>> {
@@ -33,5 +32,16 @@ where V: AddressableContent + Clone + Serialize + DeserializeOwned
 
     pub fn delete(&mut self, k: Address) -> () {
         self.0.delete(k)
+    }
+}
+
+impl<'env, V, R> StoreBuffer<'env> for CasBuffer<'env, V, R>
+where
+    V: BufferVal + AddressableContent,
+    R: Readable,
+{
+    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+        self.0.finalize(writer)?;
+        Ok(())
     }
 }

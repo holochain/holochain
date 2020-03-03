@@ -1,8 +1,9 @@
-use super::StoreBuffer;
+use super::{BufferKey, BufferVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
-use rkv::{Reader, Rkv, SingleStore, StoreOptions, Writer};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, hash::Hash};
+use crate::Readable;
+use rkv::{Reader, SingleStore, Writer};
+
+use std::{collections::HashMap};
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist
@@ -21,36 +22,26 @@ enum KvOp<V> {
 /// of access permission, so that access can be hidden behind a limited interface
 ///
 /// TODO: hold onto SingleStore references for as long as the env
-pub struct KvBuffer<'env, K, V>
+pub struct KvBuffer<'env, K, V, R=Reader<'env>>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferKey,
+    V: BufferVal,
 {
     db: SingleStore,
-    reader: Reader<'env>,
+    reader: &'env R,
     scratch: HashMap<K, KvOp<V>>,
 }
 
-impl<'env, K, V> KvBuffer<'env, K, V>
+impl<'env, K, V, R> KvBuffer<'env, K, V, R>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferKey,
+    V: BufferVal,
+    R: Readable,
 {
-    /// Create or open DB if it exists.
-    /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
-    pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, db: SingleStore) -> WorkspaceResult<Self> {
         Ok(Self {
-            db: env.open_single(name, StoreOptions::create())?,
-            reader: env.read()?,
-            scratch: HashMap::new(),
-        })
-    }
-
-    /// Open an existing DB. Will cause an error if the DB was not created already.
-    pub fn open(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
-        Ok(Self {
-            db: env.open_single(name, StoreOptions::default())?,
-            reader: env.read()?,
+            db,
+            reader,
             scratch: HashMap::new(),
         })
     }
@@ -77,26 +68,29 @@ where
 
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> WorkspaceResult<Option<V>> {
-        match self.db.get(&self.reader, k)? {
+        match self.db.get(self.reader, k)? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
             None => Ok(None),
             Some(_) => Err(WorkspaceError::InvalidValue),
         }
     }
 
-    fn iter(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_start(&self.reader)?)))
+    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
+    pub fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
+        Ok(SingleIter::new(self.db.iter_start(self.reader)?))
     }
 
-    fn iter_reverse(&self) -> WorkspaceResult<SingleStoreIterTyped<V>> {
-        Ok((SingleStoreIterTyped::new(self.db.iter_end(&self.reader)?)))
+    /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
+    pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<V>> {
+        Ok(SingleIter::new(self.db.iter_end(self.reader)?))
     }
 }
 
-impl<'env, K, V> StoreBuffer<'env, K, V> for KvBuffer<'env, K, V>
+impl<'env, K, V, R> StoreBuffer<'env> for KvBuffer<'env, K, V, R>
 where
-    K: Hash + Eq + AsRef<[u8]>,
-    V: Clone + Serialize + DeserializeOwned,
+    K: BufferKey,
+    V: BufferVal,
+    R: Readable,
 {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
@@ -112,29 +106,38 @@ where
         }
         Ok(())
     }
-
-
 }
 
-pub struct SingleStoreIterTyped<'env, V>(rkv::store::single::Iter<'env>, std::marker::PhantomData<V>);
+pub struct SingleIter<'env, V>(
+    rkv::store::single::Iter<'env>,
+    std::marker::PhantomData<V>,
+);
 
-impl<'env, V> SingleStoreIterTyped<'env, V> {
+impl<'env, V> SingleIter<'env, V> {
     pub fn new(iter: rkv::store::single::Iter<'env>) -> Self {
         Self(iter, std::marker::PhantomData)
     }
 }
 
-
-impl<'env, V> Iterator for SingleStoreIterTyped<'env, V>
-where V: Clone + Serialize + DeserializeOwned, {
-    type Item = V;
+/// Iterate over key, value pairs in this store using low-level LMDB iterators
+/// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
+/// This is to enable a wider range of keys, such as String, because there is no uniform trait which
+/// enables conversion from a byte slice to a given type.
+/// TODO: Use FallibleIterator to prevent panics within iteration
+impl<'env, V> Iterator for SingleIter<'env, V>
+where
+    V: BufferVal,
+{
+    type Item = (&'env [u8], V);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.0.next() {
-            Some(Ok((_k, Some(rkv::Value::Blob(buf))))) => (
-                // k.into(),
-                rmp_serde::from_read_ref(buf).unwrap()
-            ),
+            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => {
+                Some((
+                    k,
+                    rmp_serde::from_read_ref(buf).expect("Failed to deserialize value")
+                ))
+            }
             None => None,
             x => {
                 dbg!(x);
@@ -148,9 +151,13 @@ where V: Clone + Serialize + DeserializeOwned, {
 pub mod tests {
 
     use super::{KvBuffer, StoreBuffer};
-    use crate::env::{create_lmdb_env, test::{with_writer, test_env}};
+    use crate::{
+        db::{ReadManager, WriteManager},
+        test_utils::test_env, error::WorkspaceResult,
+    };
+    use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    use tempdir::TempDir;
+
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
@@ -160,44 +167,63 @@ pub mod tests {
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct V(u32);
 
+    type TestBuf<'a> = KvBuffer<'a, &'a str, V>;
+
     #[test]
-    fn kv_iterators() {
+    fn kv_iterators() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.read().unwrap();
-        type Store<'a> = KvBuffer<'a, &'a str, V>;
+        let db = env.open_single("kv", StoreOptions::create())?;
+        let rm = ReadManager::new(&env);
+        let wm = WriteManager::new(&env);
 
-        let mut store: Store = KvBuffer::create(&env, "kv").unwrap();
+        rm.with_reader(|reader| {
+            let mut buf: TestBuf = KvBuffer::new(&reader, db)?;
 
-        store.put("a", V(1));
-        store.put("b", V(2));
-        store.put("c", V(3));
-        store.put("d", V(4));
-        store.put("e", V(5));
+            buf.put("a", V(1));
+            buf.put("b", V(2));
+            buf.put("c", V(3));
+            buf.put("d", V(4));
+            buf.put("e", V(5));
 
-        with_writer(&env, |mut writer| store.finalize(&mut writer));
+            wm.with_writer(|mut writer| buf.finalize(&mut writer))
+                ?;
+            Ok(())
+        })
+        ?;
 
-        let store: Store = KvBuffer::open(&env, "kv").unwrap();
+        rm.with_reader(|reader| {
+            let buf: TestBuf = KvBuffer::new(&reader, db)?;
 
-        let forward: Vec<_> = store.iter().unwrap().collect();
-        let reverse: Vec<_> = store.iter_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| v).collect();
+            let reverse: Vec<_> = buf.iter_raw_reverse()?.map(|(_, v)| v).collect();
 
-        assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
-        assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
+            assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
+            assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
+            Ok(())
+        })
+        ?;
+        Ok(())
     }
 
     #[test]
     fn kv_empty_iterators() {
         let arc = test_env();
         let env = arc.read().unwrap();
-        type Store<'a> = KvBuffer<'a, &'a str, V>;
+        let db = env.open_single("kv", StoreOptions::create()).unwrap();
+        let rm = ReadManager::new(&env);
 
-        let store: Store = KvBuffer::create(&env, "kv").unwrap();
+        rm.with_reader(|reader| {
+            let buf: TestBuf = KvBuffer::new(&reader, db).unwrap();
 
-        let forward: Vec<_> = store.iter().unwrap().collect();
-        let reverse: Vec<_> = store.iter_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
 
-        assert_eq!(forward, vec![]);
-        assert_eq!(reverse, vec![]);
+            assert_eq!(forward, vec![]);
+            assert_eq!(reverse, vec![]);
+            Ok(())
+        })
+        .unwrap();
     }
 
     /// TODO break up into smaller tests
@@ -205,41 +231,51 @@ pub mod tests {
     fn kv_store_sanity_check() {
         let arc = test_env();
         let env = arc.read().unwrap();
-
-        let mut kv1: KvBuffer<String, TestVal> = KvBuffer::create(&env, "kv1").unwrap();
-        let mut kv2: KvBuffer<String, String> = KvBuffer::create(&env, "kv2").unwrap();
+        let db1 = env.open_single("kv1", StoreOptions::create()).unwrap();
+        let db2 = env.open_single("kv1", StoreOptions::create()).unwrap();
+        let rm = ReadManager::new(&env);
+        let mut writer = env.write().unwrap();
 
         let testval = TestVal {
             name: "Joe".to_owned(),
         };
 
-        kv1.put("hi".to_owned(), testval.clone());
-        kv2.put("salutations".to_owned(), "folks".to_owned());
+        rm.with_reader(|reader| {
+            let mut kv1: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1).unwrap();
+            let mut kv2: KvBuffer<String, String> = KvBuffer::new(&reader, db2).unwrap();
 
-        // Check that the underlying store contains no changes yet
-        assert_eq!(kv1.get_persisted(&"hi".to_owned()).unwrap(), None);
-        assert_eq!(kv2.get_persisted(&"salutations".to_owned()).unwrap(), None);
+            kv1.put("hi".to_owned(), testval.clone());
+            kv2.put("salutations".to_owned(), "folks".to_owned());
 
-        let mut writer = env.write().unwrap();
-        kv1.finalize(&mut writer).unwrap();
+            // Check that the underlying store contains no changes yet
+            assert_eq!(kv1.get_persisted(&"hi".to_owned()).unwrap(), None);
+            assert_eq!(kv2.get_persisted(&"salutations".to_owned()).unwrap(), None);
+            kv1.finalize(&mut writer).unwrap();
 
-        // Ensure that mid-transaction, there has still been no persistence,
-        // just for kicks
-        let kv1a: KvBuffer<String, TestVal> = KvBuffer::open(&env, "kv1").unwrap();
-        assert_eq!(kv1a.get_persisted(&"hi".to_owned()).unwrap(), None);
+            // Ensure that mid-transaction, there has still been no persistence,
+            // just for kicks
+            let kv1a: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1).unwrap();
+            assert_eq!(kv1a.get_persisted(&"hi".to_owned()).unwrap(), None);
+            kv2.finalize(&mut writer).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
         // Finish finalizing the transaction
-        kv2.finalize(&mut writer).unwrap();
         writer.commit().unwrap();
 
-        // Now open some fresh Readers to see that our data was persisted
-        let kv1b: KvBuffer<String, TestVal> = KvBuffer::open(&env, "kv1").unwrap();
-        let kv2b: KvBuffer<String, String> = KvBuffer::open(&env, "kv2").unwrap();
-        // Check that the underlying store contains no changes yet
-        assert_eq!(kv1b.get_persisted(&"hi".to_owned()).unwrap(), Some(testval));
-        assert_eq!(
-            kv2b.get_persisted(&"salutations".to_owned()).unwrap(),
-            Some("folks".to_owned())
-        );
+        rm.with_reader(|reader| {
+            // Now open some fresh Readers to see that our data was persisted
+            let kv1b: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1).unwrap();
+            let kv2b: KvBuffer<String, String> = KvBuffer::new(&reader, db2).unwrap();
+            // Check that the underlying store contains no changes yet
+            assert_eq!(kv1b.get_persisted(&"hi".to_owned()).unwrap(), Some(testval));
+            assert_eq!(
+                kv2b.get_persisted(&"salutations".to_owned()).unwrap(),
+                Some("folks".to_owned())
+            );
+            Ok(())
+        })
+        .unwrap();
     }
 }

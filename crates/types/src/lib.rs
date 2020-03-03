@@ -17,6 +17,7 @@ extern crate maplit;
 
 pub mod agent;
 pub mod chain_header;
+pub mod db;
 pub mod dna;
 pub mod entry;
 pub mod error;

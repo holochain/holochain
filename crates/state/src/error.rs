@@ -8,6 +8,13 @@ pub enum WorkspaceError {
     #[error("A store which was expected not to be empty turned out to be empty: {0}")]
     EmptyStore(DbName),
 
+    #[error("An LMDB store was not created/initialized: {0}")]
+    StoreNotInitialized(DbName),
+
+    /// This is an error we can catch and treat specially
+    #[error("The source chain head has moved since this store was created")]
+    SourceChainHeadMoved,
+
     #[error("There is an unexpected value in an LMDB database (TODO: more info)")]
     InvalidValue,
 
@@ -30,6 +37,16 @@ pub enum WorkspaceError {
 
     #[error("Error decoding to MsgPack: {0}")]
     MsgPackDecodeError(#[from] rmp_serde::decode::Error),
+
+    #[cfg(test)]
+    #[error(transparent)]
+    Other(#[from] anyhow::Error)
+}
+
+impl PartialEq for WorkspaceError {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string() == other.to_string()
+    }
 }
 
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;

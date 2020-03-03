@@ -48,7 +48,7 @@ impl<Api: ConductorCellApiT> Conductor<Api> {
         &self.tx_network
     }
 
-    pub fn load_config(config: Config) -> ConductorResult<()> {
+    pub fn load_config(_config: Config) -> ConductorResult<()> {
         Ok(())
     }
 }

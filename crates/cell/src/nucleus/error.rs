@@ -1,5 +1,4 @@
 use sx_types::error::SkunkError;
-use crate::agent::error::SourceChainError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

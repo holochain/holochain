@@ -1,8 +1,6 @@
 use sx_types::entry::Entry;
 use crate::{
-    agent::{SourceChainCommitBundle, SourceChain},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
-    txn::source_chain,
     wasm_engine::WasmEngine,
 };
 use sx_types::{dna::Dna, error::SkunkResult, shims::*};
@@ -10,16 +8,19 @@ use mockall::automock;
 
 #[automock]
 pub trait RibosomeT {
-    fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult;
+    fn run_validation(self, entry: Entry) -> ValidationResult;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    ///
+    /// Note: it would be nice to pass the bundle by value and then return it at the end,
+    /// but automock doesn't support lifetimes that appear in return values
+    fn call_zome_function<'env>(
         self,
-        bundle: SourceChainCommitBundle,
+        bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)>;
+    ) -> SkunkResult<ZomeInvocationResult>;
 }
 
 /// TODO determine what cursor looks like for ribosomes
@@ -36,18 +37,18 @@ impl Ribosome {
 }
 
 impl RibosomeT for Ribosome {
-    fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult {
+    fn run_validation(self, entry: Entry) -> ValidationResult {
         unimplemented!()
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    fn call_zome_function<'env>(
         self,
-        bundle: SourceChainCommitBundle,
+        bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)> {
+    ) -> SkunkResult<ZomeInvocationResult> {
         unimplemented!()
     }
 }

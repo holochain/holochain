@@ -39,6 +39,7 @@ use crate::{
     },
     entry::entry_type::{AppEntryType, EntryType},
     error::{SkunkError, SkunkResult},
+    prelude::Address,
 };
 use holochain_json_api::{
     error::{JsonError, JsonResult},
@@ -62,6 +63,8 @@ fn empty_object() -> Value {
 fn zero_uuid() -> String {
     String::from("00000000-0000-0000-0000-000000000000")
 }
+
+pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.
 #[derive(Serialize, Deserialize, Clone, Debug, DefaultJson)]

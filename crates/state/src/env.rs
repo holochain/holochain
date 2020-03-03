@@ -21,34 +21,16 @@ pub fn create_lmdb_env(path: &Path) -> Arc<RwLock<Rkv>> {
                 .set_map_size(initial_map_size.unwrap_or(DEFAULT_INITIAL_MAP_SIZE))
                 // max number of DBs in this environment
                 .set_max_dbs(MAX_DBS)
-                // These flags make writes waaaaay faster by async writing to disk rather than blocking
-                // There is some loss of data integrity guarantees that comes with this
+                // The flags WRITE_MAP and MAP_ASYNC make writes waaaaay faster by async writing to disk rather than blocking
+                // There is some loss of data integrity guarantees that comes with this.
+                // NO_TLS associates read slots with the transaction object instead of the thread, which is crucial for us
+                // so we can have multiple read transactions per thread (since futures can run on any thread)
                 .set_flags(
                     flags.unwrap_or_else(|| {
-                        EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC
+                        EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC | EnvironmentFlags::NO_TLS
                     }),
                 );
             Rkv::from_env(path, env_builder)
         })
         .unwrap()
-}
-
-#[cfg(test)]
-pub mod test {
-    use crate::{error::WorkspaceResult, env::create_lmdb_env};
-    use rkv::{Writer, Rkv};
-    use std::sync::{Arc, RwLock};
-    use tempdir::TempDir;
-
-    pub fn test_env() -> Arc<RwLock<Rkv>> {
-        let tmpdir = TempDir::new("skunkworx").unwrap();
-        create_lmdb_env(tmpdir.path())
-    }
-
-    pub fn with_writer<F>(env: &Rkv, f: F)
-    where F: FnOnce(&mut Writer) -> WorkspaceResult<()> {
-        let mut writer = env.write().unwrap();
-        let result = f(&mut writer).unwrap();
-        writer.commit().unwrap();
-    }
 }

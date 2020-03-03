@@ -20,7 +20,6 @@ pub mod net;
 pub mod nucleus;
 pub mod ribosome;
 pub mod state;
-pub mod txn;
 pub mod validation;
 pub mod wasm_engine;
 

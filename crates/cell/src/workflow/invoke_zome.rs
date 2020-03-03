@@ -1,26 +1,25 @@
 use crate::{
-    agent::{ChainTop, SourceChain, SourceChainSnapshot},
     cell::{autonomic::AutonomicCue, error::CellResult},
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::{Ribosome, RibosomeT},
-    txn::source_chain,
 };
 use sx_types::shims::*;
 
-pub async fn invoke_zome<Ribo: RibosomeT, Api: ConductorCellApiT>(
+pub async fn invoke_zome<'env, Ribo: RibosomeT, Api: ConductorCellApiT>(
     invocation: ZomeInvocation,
-    source_chain: SourceChain<'_>,
     ribosome: Ribo,
     conductor_api: Api,
-) -> CellResult<(ZomeInvocationResult, SourceChainSnapshot)> {
-    let bundle = source_chain.bundle()?;
-    let (result, bundle) = ribosome.call_zome_function(bundle, invocation)?;
-    let snapshot = source_chain.try_commit(bundle)?;
-    Ok((result, snapshot))
+) -> CellResult<ZomeInvocationResult> {
+    unimplemented!();
+    // let mut bundle = source_chain.bundle()?;
+    let mut bundle = SourceChainCommitBundle::new();
+    let result = ribosome.call_zome_function(&mut bundle, invocation)?;
+    // let snapshot = source_chain.try_commit(bundle)?;
+    Ok(result)
 }
 
-#[cfg(test)]
+#[cfg(test_TODO_FIX)]
 pub mod tests {
     use super::*;
     use crate::{
@@ -29,7 +28,6 @@ pub mod tests {
         ribosome::MockRibosomeT,
         test_utils::fake_cell_id,
     };
-    use source_chain::SourceChainPersistence;
     use sx_types::{entry::Entry, error::SkunkResult};
     use tempdir::TempDir;
 
@@ -45,14 +43,14 @@ pub mod tests {
             fn_name: "fn".into(),
             as_at: "KwyXHisn".into(),
             args: "args".into(),
-            provenance: cell_id.1,
+            provenance: cell_id.agent_id().to_owned(),
             cap: CapabilityRequest,
         };
 
         let mut ribosome = MockRibosomeT::new();
         ribosome.expect_call_zome_function()
             .times(1)
-            .returning(|bundle, _| Ok((ZomeInvocationResult, bundle)));
+            .returning(|bundle, _| Ok(ZomeInvocationResult));
 
         // TODO: make actual assertions on the conductor_api, once more of the
         // actual logic is fleshed out

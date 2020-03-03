@@ -3,7 +3,7 @@
 //! are then used to check the integrity of data using cryptographic hash functions.
 
 use crate::{
-    entry::entry_type::EntryType,
+    entry::{Entry, entry_type::EntryType},
     signature::{Provenance, Signature},
     time::Iso8601,
 };
@@ -16,6 +16,22 @@ use holochain_json_api::{
 };
 
 use std::convert::TryInto;
+
+pub struct HeaderWithEntry(ChainHeader, Entry);
+
+impl HeaderWithEntry {
+    pub fn new(header: ChainHeader, entry: Entry) -> Self {
+        Self(header, entry)
+    }
+
+    pub fn header(&self) -> &ChainHeader {
+        &self.0
+    }
+
+    pub fn entry(&self) -> &Entry {
+        &self.1
+    }
+}
 
 /// ChainHeader of a source chain "Item"
 /// The address of the ChainHeader is used as the Item's key in the source chain hash table
