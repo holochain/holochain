@@ -1,7 +1,6 @@
 use sx_types::entry::Entry;
 use crate::{
     nucleus::{ZomeInvocation, ZomeInvocationResult},
-    txn::source_chain,
     wasm_engine::WasmEngine,
 };
 use sx_types::{dna::Dna, error::SkunkResult, shims::*};
@@ -9,7 +8,7 @@ use mockall::automock;
 
 #[automock]
 pub trait RibosomeT {
-    fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult;
+    fn run_validation(self, entry: Entry) -> ValidationResult;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -38,7 +37,7 @@ impl Ribosome {
 }
 
 impl RibosomeT for Ribosome {
-    fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult {
+    fn run_validation(self, entry: Entry) -> ValidationResult {
         unimplemented!()
     }
 

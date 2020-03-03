@@ -3,7 +3,6 @@ use crate::{
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::{Ribosome, RibosomeT},
-    txn::source_chain,
 };
 use sx_types::shims::*;
 
@@ -29,7 +28,6 @@ pub mod tests {
         ribosome::MockRibosomeT,
         test_utils::fake_cell_id,
     };
-    use source_chain::SourceChainPersistence;
     use sx_types::{entry::Entry, error::SkunkResult};
     use tempdir::TempDir;
 
