@@ -3,7 +3,10 @@
 //! TODO, find *some* way to DRY up the two
 
 use super::{BufferIntKey, BufferVal, StoreBuffer};
-use crate::error::{WorkspaceError, WorkspaceResult};
+use crate::{
+    error::{WorkspaceError, WorkspaceResult},
+    Readable,
+};
 use rkv::{IntegerStore, Reader, Rkv, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, hash::Hash};
@@ -25,27 +28,37 @@ enum KvOp<V> {
 /// of access permission, so that access can be hidden behind a limited interface
 ///
 /// TODO: hold onto SingleStore references for as long as the env
-pub struct KvIntBuffer<'env, K, V>
+pub struct KvIntBuffer<'env, K, V, R = Reader<'env>>
 where
     K: BufferIntKey,
     V: BufferVal,
+    R: Readable,
 {
     db: IntegerStore<K>,
-    reader: &'env Reader<'env>,
+    reader: &'env R,
     scratch: HashMap<K, KvOp<V>>,
 }
 
-impl<'env, K, V> KvIntBuffer<'env, K, V>
+impl<'env, K, V, R> KvIntBuffer<'env, K, V, R>
 where
     K: BufferIntKey,
     V: BufferVal,
+    R: Readable,
 {
-    pub fn new(reader: &'env Reader<'env>, db: IntegerStore<K>) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, db: IntegerStore<K>) -> WorkspaceResult<Self> {
         Ok(Self {
             db,
             reader,
             scratch: HashMap::new(),
         })
+    }
+
+    pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> KvIntBuffer<'env, K, V, RR> {
+        KvIntBuffer {
+            db: self.db.clone(),
+            reader,
+            scratch: HashMap::new(),
+        }
     }
 
     pub fn get(&self, k: K) -> WorkspaceResult<Option<V>> {
@@ -88,10 +101,11 @@ where
     }
 }
 
-impl<'env, K, V> StoreBuffer<'env> for KvIntBuffer<'env, K, V>
+impl<'env, K, V, R> StoreBuffer<'env> for KvIntBuffer<'env, K, V, R>
 where
     K: BufferIntKey,
     V: BufferVal,
+    R: Readable,
 {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
@@ -108,7 +122,6 @@ where
         Ok(())
     }
 }
-
 
 pub struct SingleIntIter<'env, K, V>(
     rkv::store::single::Iter<'env>,
@@ -133,12 +146,10 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.0.next() {
-            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => {
-                Some((
-                    K::from_bytes(k).expect("Failed to deserialize key"),
-                    rmp_serde::from_read_ref(buf).expect("Failed to deserialize value")
-                ))
-            }
+            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
+                K::from_bytes(k).expect("Failed to deserialize key"),
+                rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
+            )),
             None => None,
             x => {
                 dbg!(x);
@@ -147,7 +158,6 @@ where
         }
     }
 }
-
 
 #[cfg(test)]
 pub mod tests {
@@ -197,8 +207,14 @@ pub mod tests {
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
             let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
 
-            assert_eq!(forward, vec![(0, V(1)), (0, V(2)), (0, V(3)), (0, V(4)), (0, V(5))]);
-            assert_eq!(reverse, vec![(0, V(5)), (0, V(4)), (0, V(3)), (0, V(2)), (0, V(1))]);
+            assert_eq!(
+                forward,
+                vec![(0, V(1)), (0, V(2)), (0, V(3)), (0, V(4)), (0, V(5))]
+            );
+            assert_eq!(
+                reverse,
+                vec![(0, V(5)), (0, V(4)), (0, V(3)), (0, V(2)), (0, V(1))]
+            );
             Ok(())
         })
         .unwrap();

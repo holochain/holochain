@@ -1,17 +1,34 @@
+use super::{
+    chain_cas::{ChainCasBuffer, HeaderCas},
+    chain_sequence::ChainSequenceBuffer,
+};
 use core::ops::Deref;
-use super::{chain_cas::{HeaderCas, ChainCasBuffer}, chain_sequence::ChainSequenceBuffer};
-use sx_state::{error::WorkspaceResult, RkvEnv, buffer::StoreBuffer, Writer, db::{self, DbManager}, Reader};
-use sx_types::{chain_header::ChainHeader, entry::Entry, prelude::Address, signature::{Signature, Provenance}};
 use db::ReadManager;
+use sx_state::{
+    buffer::StoreBuffer,
+    db::{self, DbManager},
+    error::WorkspaceResult,
+    Readable, Reader, RkvEnv, Writer,
+};
+use sx_types::{
+    chain_header::ChainHeader,
+    entry::Entry,
+    prelude::Address,
+    signature::{Provenance, Signature},
+};
 
-pub struct SourceChainBuffer<'env> {
-    cas: ChainCasBuffer<'env>,
-    sequence: ChainSequenceBuffer<'env>,
+pub struct SourceChainBuffer<'env, R: Readable> {
+    cas: ChainCasBuffer<'env, R>,
+    sequence: ChainSequenceBuffer<'env, R>,
     rm: &'env ReadManager<'env>,
 }
 
-impl<'env> SourceChainBuffer<'env> {
-    pub fn new(reader: &'env Reader, dbm: &'env DbManager, rm: &'env ReadManager) -> WorkspaceResult<Self> {
+impl<'env, R: Readable> SourceChainBuffer<'env, R> {
+    pub fn new(
+        reader: &'env R,
+        dbm: &'env DbManager,
+        rm: &'env ReadManager,
+    ) -> WorkspaceResult<Self> {
         Ok(Self {
             cas: ChainCasBuffer::primary(reader, dbm)?,
             sequence: ChainSequenceBuffer::new(reader, dbm)?,
@@ -31,7 +48,7 @@ impl<'env> SourceChainBuffer<'env> {
         self.cas.get_header(k)
     }
 
-    pub fn cas(&self) -> &ChainCasBuffer {
+    pub fn cas(&self) -> &ChainCasBuffer<R> {
         &self.cas
     }
 
@@ -40,7 +57,7 @@ impl<'env> SourceChainBuffer<'env> {
         self.cas.put((header, entry));
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env> {
+    pub fn headers(&self) -> &HeaderCas<'env, R> {
         &self.cas.headers()
     }
 
@@ -68,9 +85,7 @@ impl<'env> SourceChainBuffer<'env> {
     }
 }
 
-
-impl<'env> StoreBuffer<'env> for SourceChainBuffer<'env>
-{
+impl<'env, R: Readable> StoreBuffer<'env> for SourceChainBuffer<'env, R> {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         self.cas.finalize(writer)?;
         self.sequence.finalize(writer)?;
@@ -78,15 +93,15 @@ impl<'env> StoreBuffer<'env> for SourceChainBuffer<'env>
     }
 }
 
-
 #[cfg(test)]
 pub mod tests {
 
     use super::{SourceChainBuffer, StoreBuffer};
     use sx_state::{
-        db::{ReadManager, WriteManager, DbManager},
-        env::{create_lmdb_env}, error::WorkspaceResult,
-        test_utils::test_env
+        db::{DbManager, ReadManager, WriteManager},
+        env::create_lmdb_env,
+        error::WorkspaceResult,
+        test_utils::test_env,
     };
     use tempdir::TempDir;
 
@@ -102,5 +117,4 @@ pub mod tests {
         })?;
         Ok(())
     }
-
 }

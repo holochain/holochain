@@ -11,6 +11,10 @@ pub mod error;
 // since cfg(test) only applies to the crate in which you run tests
 pub mod test_utils;
 
+// trait alias
+pub trait Readable: rkv::Readable {}
+impl<T: rkv::Readable> Readable for T {}
+
 pub type Reader<'env> = rkv::Reader<'env>;
 pub type Writer<'env> = rkv::Writer<'env>;
 pub type SingleStore = rkv::SingleStore;

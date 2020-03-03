@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
     error::WorkspaceResult,
-    RkvEnv, Writer, db::DbManager, Reader, SingleStore,
+    RkvEnv, Writer, db::DbManager, Reader, SingleStore, Readable,
 };
 use sx_types::{
     chain_header::{HeaderWithEntry, ChainHeader},
@@ -13,25 +13,25 @@ use sx_types::{
     prelude::{Address, AddressableContent},
 };
 
-pub type EntryCas<'env> = CasBuffer<'env, Entry>;
-pub type HeaderCas<'env> = CasBuffer<'env, ChainHeader>;
+pub type EntryCas<'env, R> = CasBuffer<'env, Entry, R>;
+pub type HeaderCas<'env, R> = CasBuffer<'env, ChainHeader, R>;
 
 /// A convenient pairing of two CasBuffers, one for entries and one for headers
-pub struct ChainCasBuffer<'env> {
-    entries: EntryCas<'env>,
-    headers: HeaderCas<'env>,
+pub struct ChainCasBuffer<'env, R: Readable = Reader<'env>> {
+    entries: EntryCas<'env, R>,
+    headers: HeaderCas<'env, R>,
 }
 
-impl<'env> ChainCasBuffer<'env> {
+impl<'env, R: Readable> ChainCasBuffer<'env, R> {
 
-    fn new(reader: &'env Reader<'env>, entries_store: SingleStore, headers_store: SingleStore) -> WorkspaceResult<Self> {
+    fn new(reader: &'env R, entries_store: SingleStore, headers_store: SingleStore) -> WorkspaceResult<Self> {
         Ok(Self {
             entries: CasBuffer::new(reader, entries_store)?,
             headers: CasBuffer::new(reader, headers_store)?,
         })
     }
 
-    pub fn primary(reader: &'env Reader<'env>, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
+    pub fn primary(reader: &'env R, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
         let entries = dbm.get(&*CHAIN_ENTRIES)?.clone();
         let headers = dbm.get(&*CHAIN_HEADERS)?.clone();
         Self::new(reader, entries, headers)
@@ -79,12 +79,12 @@ impl<'env> ChainCasBuffer<'env> {
         self.headers.delete(k)
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env> {
+    pub fn headers(&self) -> &HeaderCas<'env, R> {
         &self.headers
     }
 }
 
-impl<'env> StoreBuffer<'env> for ChainCasBuffer<'env> {
+impl<'env, R: Readable> StoreBuffer<'env> for ChainCasBuffer<'env, R> {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         self.entries.finalize(writer)?;
         self.headers.finalize(writer)?;

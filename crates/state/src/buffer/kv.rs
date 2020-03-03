@@ -1,5 +1,6 @@
 use super::{BufferKey, BufferVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
+use crate::Readable;
 use rkv::{Reader, Rkv, SingleStore, StoreOptions, Writer};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, hash::Hash};
@@ -21,22 +22,23 @@ enum KvOp<V> {
 /// of access permission, so that access can be hidden behind a limited interface
 ///
 /// TODO: hold onto SingleStore references for as long as the env
-pub struct KvBuffer<'env, K, V>
+pub struct KvBuffer<'env, K, V, R=Reader<'env>>
 where
     K: BufferKey,
     V: BufferVal,
 {
     db: SingleStore,
-    reader: &'env Reader<'env>,
+    reader: &'env R,
     scratch: HashMap<K, KvOp<V>>,
 }
 
-impl<'env, K, V> KvBuffer<'env, K, V>
+impl<'env, K, V, R> KvBuffer<'env, K, V, R>
 where
     K: BufferKey,
     V: BufferVal,
+    R: Readable,
 {
-    pub fn new(reader: &'env Reader<'env>, db: SingleStore) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, db: SingleStore) -> WorkspaceResult<Self> {
         Ok(Self {
             db,
             reader,
@@ -84,10 +86,11 @@ where
     }
 }
 
-impl<'env, K, V> StoreBuffer<'env> for KvBuffer<'env, K, V>
+impl<'env, K, V, R> StoreBuffer<'env> for KvBuffer<'env, K, V, R>
 where
     K: BufferKey,
     V: BufferVal,
+    R: Readable,
 {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;

@@ -31,5 +31,5 @@ lazy_static = "1.4.0"
 chrono = "0.4.6"
 tempdir = "0.3.7"
 mockall = "0.6.0"
-tokio = { version = "0.2.11", features = ["macros", "rt-threaded"] }
+tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 owning_ref = "0.4.1"

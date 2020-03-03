@@ -1,3 +1,4 @@
+use crate::Readable;
 use super::{kv::KvBuffer, StoreBuffer, BufferVal};
 use crate::error::WorkspaceResult;
 use rkv::{Rkv, Writer};
@@ -7,15 +8,17 @@ use sx_types::prelude::{Address, AddressableContent};
 
 /// A wrapper around a KvBuffer where keys are always Addresses,
 /// and values are always AddressableContent.
-pub struct CasBuffer<'env, V>(KvBuffer<'env, Address, V>)
-where
-    V: BufferVal + AddressableContent;
-
-impl<'env, V> CasBuffer<'env, V>
+pub struct CasBuffer<'env, V, R>(KvBuffer<'env, Address, V, R>)
 where
     V: BufferVal + AddressableContent,
+    R: Readable;
+
+impl<'env, V, R> CasBuffer<'env, V, R>
+where
+    V: BufferVal + AddressableContent,
+    R: Readable,
 {
-    pub fn new(reader: &'env rkv::Reader<'env>, db: rkv::SingleStore) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, db: rkv::SingleStore) -> WorkspaceResult<Self> {
         Ok(Self(KvBuffer::new(reader, db)?))
     }
 
@@ -32,9 +35,10 @@ where
     }
 }
 
-impl<'env, V> StoreBuffer<'env> for CasBuffer<'env, V>
+impl<'env, V, R> StoreBuffer<'env> for CasBuffer<'env, V, R>
 where
     V: BufferVal + AddressableContent,
+    R: Readable,
 {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         self.0.finalize(writer)?;
