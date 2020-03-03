@@ -136,14 +136,14 @@ impl<'e> ReadManager<'e> {
     }
 
     pub fn reader(&self) -> WorkspaceResult<Reader<'e>> {
-        Ok(self.0.read()?)
+        Ok(Reader(self.0.read()?))
     }
 
     pub fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(
         &self,
         f: F,
     ) -> WorkspaceResult<R> {
-        f(self.0.read()?)
+        f(Reader(self.0.read()?))
     }
 }
 

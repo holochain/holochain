@@ -5,11 +5,11 @@
 use super::{BufferIntKey, BufferVal, StoreBuffer};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
-    Readable,
+    Readable, Reader, Writer,
 };
-use rkv::{IntegerStore, Reader, Writer};
-
-use std::{collections::HashMap};
+use rkv::{IntegerStore, StoreOptions};
+use serde::{de::DeserializeOwned, Serialize};
+use std::{collections::HashMap, hash::Hash};
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist

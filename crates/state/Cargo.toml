@@ -39,4 +39,5 @@ anyhow = "1.0.26"
 # test_utils = { version = "0.0.42-alpha5", path = "../../test_utils" }
 
 [features]
-test = []
+default = ["lmdb_no_tls"]
+lmdb_no_tls = []

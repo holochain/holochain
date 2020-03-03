@@ -184,48 +184,48 @@ pub mod tests {
         let local = tokio::task::LocalSet::new();
 
         // run in same thread, because these futures are not Send...or are they?
-        let (result1, result2) = local.run_until(async move {
 
-            let task1 = tokio::task::spawn_local(async move {
-                let env = arc1.read().unwrap();
+        let task1 = tokio::spawn(async move {
+            let env = arc1.read().unwrap();
+            let mut buf = {
                 let dbm = DbManager::new(&env)?;
                 let rm = ReadManager::new(&env);
                 let reader = rm.reader()?;
-                let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
-                buf.add_header(Address::from("0"));
-                buf.add_header(Address::from("1"));
-                buf.add_header(Address::from("2"));
+                ChainSequenceBuffer::new(&reader, &dbm)?
+            };
+            buf.add_header(Address::from("0"));
+            buf.add_header(Address::from("1"));
+            buf.add_header(Address::from("2"));
 
-                // let the other task run and make a commit to the chain head,
-                // which will cause this one to error out when it re-enters and tries to commit
-                tx1.send(()).unwrap();
-                rx2.await.unwrap();
+            // let the other task run and make a commit to the chain head,
+            // which will cause this one to error out when it re-enters and tries to commit
+            tx1.send(()).unwrap();
+            rx2.await.unwrap();
 
-                let env = arc1.read().unwrap();
-                let wm = WriteManager::new(&env);
-                wm.with_writer(|mut writer| buf.finalize(&mut writer))
-            });
+            let env = arc1.read().unwrap();
+            let wm = WriteManager::new(&env);
+            wm.with_writer(|mut writer| buf.finalize(&mut writer))
+        });
 
-            let task2 = tokio::task::spawn_local(async move {
-                rx1.await.unwrap();
-                let env = arc2.read().unwrap();
-                let dbm = DbManager::new(&env)?;
-                let rm = ReadManager::new(&env);
-                let wm = WriteManager::new(&env);
+        let task2 = tokio::spawn(async move {
+            rx1.await.unwrap();
+            let env = arc2.read().unwrap();
+            let dbm = DbManager::new(&env)?;
+            let rm = ReadManager::new(&env);
+            let wm = WriteManager::new(&env);
 
-                let reader = rm.reader()?;
-                let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
-                buf.add_header(Address::from("3"));
-                buf.add_header(Address::from("4"));
-                buf.add_header(Address::from("5"));
+            let reader = rm.reader()?;
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+            buf.add_header(Address::from("3"));
+            buf.add_header(Address::from("4"));
+            buf.add_header(Address::from("5"));
 
-                wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
-                tx2.send(()).unwrap();
-                Result::<_, WorkspaceError>::Ok(())
-            });
+            wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
+            tx2.send(()).unwrap();
+            Result::<_, WorkspaceError>::Ok(())
+        });
 
-            tokio::join!(task1, task2)
-        }).await;
+        let (result1, result2) = tokio::join!(task1, task2);
 
         assert_eq!(result1.unwrap(), Err(WorkspaceError::SourceChainHeadMoved));
         assert!(result2.unwrap().is_ok());

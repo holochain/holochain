@@ -94,7 +94,7 @@ pub mod tests {
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {
-            let reader = env.read().unwrap();
+            let reader = env.read().unwrap().into();
             let mut workspace = TestWorkspace::new(&reader, &dbm).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), None);
 
@@ -107,7 +107,7 @@ pub mod tests {
 
         // Ensure that the data was persisted
         {
-            let reader = env.read().unwrap();
+            let reader = env.read().unwrap().into();
             let workspace = TestWorkspace::new(&reader, &dbm).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
         }
