@@ -1,8 +1,8 @@
 use super::{BufferKey, BufferMultiVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use maplit::hashset;
-use rkv::{MultiStore, Reader, Rkv, StoreError, StoreOptions, Writer};
-use serde::{de::DeserializeOwned, Serialize};
+use rkv::{MultiStore, Reader, Rkv, StoreOptions, Writer};
+
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     hash::Hash,
@@ -102,7 +102,7 @@ where
 
     pub fn delete_all(&mut self, k: K) {
         if let Entry::Occupied(mut entry) = self.scratch.entry(k) {
-            let ops = entry.get_mut();
+            let _ops = entry.get_mut();
         }
     }
 
@@ -172,12 +172,12 @@ where
 pub mod tests {
 
     use super::{KvvBuffer, Op, StoreBuffer};
-    use crate::{db::WriteManager, env::create_lmdb_env, test_utils::test_env};
+    use crate::{db::WriteManager, test_utils::test_env};
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
-    use std::collections::HashSet;
-    use tempdir::TempDir;
+    
+    
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
     struct V(pub u32);
@@ -224,7 +224,7 @@ pub mod tests {
         wm.with_writer(|mut writer| store.finalize(&mut writer))
             .unwrap();
 
-        let mut store: Store = KvvBuffer::open(&env, "kvv").unwrap();
+        let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
     }
 

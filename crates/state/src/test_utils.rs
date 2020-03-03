@@ -1,7 +1,7 @@
 
 
-use crate::{error::WorkspaceResult, env::create_lmdb_env};
-use rkv::{Writer, Rkv};
+use crate::{env::create_lmdb_env};
+use rkv::{Rkv};
 use std::sync::{Arc, RwLock};
 use tempdir::TempDir;
 

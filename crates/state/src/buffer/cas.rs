@@ -1,8 +1,8 @@
 use crate::Readable;
 use super::{kv::KvBuffer, StoreBuffer, BufferVal};
 use crate::error::WorkspaceResult;
-use rkv::{Rkv, Writer};
-use serde::{de::DeserializeOwned, Serialize};
+use rkv::{Writer};
+
 use sx_types::prelude::{Address, AddressableContent};
 
 

@@ -2,8 +2,8 @@ use super::{BufferKey, BufferVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use crate::Readable;
 use rkv::{Reader, Rkv, SingleStore, StoreOptions, Writer};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, hash::Hash};
+
+use std::{collections::HashMap};
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist
@@ -77,12 +77,12 @@ where
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
     fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
-        Ok((SingleIter::new(self.db.iter_start(self.reader)?)))
+        Ok(SingleIter::new(self.db.iter_start(self.reader)?))
     }
 
     /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
     fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<V>> {
-        Ok((SingleIter::new(self.db.iter_end(self.reader)?)))
+        Ok(SingleIter::new(self.db.iter_end(self.reader)?))
     }
 }
 
@@ -153,12 +153,11 @@ pub mod tests {
     use super::{KvBuffer, StoreBuffer};
     use crate::{
         db::{ReadManager, WriteManager},
-        env::{create_lmdb_env},
         test_utils::test_env, error::WorkspaceResult,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    use tempdir::TempDir;
+    
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {

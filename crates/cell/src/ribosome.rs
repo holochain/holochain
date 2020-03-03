@@ -48,7 +48,7 @@ impl RibosomeT for Ribosome {
         bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<(ZomeInvocationResult)> {
+    ) -> SkunkResult<ZomeInvocationResult> {
         unimplemented!()
     }
 }

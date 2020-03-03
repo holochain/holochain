@@ -1,4 +1,4 @@
-use crate::NEW_RELIC_LICENSE_KEY;
+
 pub use aead::{ABYTES, NONCEBYTES};
 use sx_types::error::SkunkResult;
 use lib3h_sodium::{aead, kx, pwhash, secbuf::SecBuf};
