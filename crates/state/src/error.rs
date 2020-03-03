@@ -37,6 +37,10 @@ pub enum WorkspaceError {
 
     #[error("Error decoding to MsgPack: {0}")]
     MsgPackDecodeError(#[from] rmp_serde::decode::Error),
+
+    #[cfg(test)]
+    #[error(transparent)]
+    Other(#[from] anyhow::Error)
 }
 
 impl PartialEq for WorkspaceError {
