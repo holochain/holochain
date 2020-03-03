@@ -1,16 +1,7 @@
 //! Provide a slightly higher-level abstraction over the raw sodium crypto functions for
 //! how we are going to be managing keys in Holochain.
-//!
-#![warn(unused_extern_crates)]
 
-#[macro_use]
-extern crate lazy_static;
-
-#[macro_use]
-extern crate holochain_tracing_macros;
-
-#[macro_use]
-extern crate holochain_common;
+use lazy_static::lazy_static;
 
 pub const CONTEXT_SIZE: usize = 8;
 pub const SEED_SIZE: usize = 32;

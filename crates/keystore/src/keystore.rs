@@ -13,7 +13,6 @@ use holochain_locksmith::Mutex;
 use sx_types::{
     agent::Base32,
     error::{SkunkError, SkunkResult},
-    prelude::*,
     signature::Signature,
 };
 use lib3h_sodium::{

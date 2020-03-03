@@ -1,7 +1,7 @@
 use super::{BufferKey, BufferVal, StoreBuffer};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use crate::Readable;
-use rkv::{Reader, Rkv, SingleStore, StoreOptions, Writer};
+use rkv::{Reader, SingleStore, Writer};
 
 use std::{collections::HashMap};
 
@@ -76,12 +76,12 @@ where
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
+    pub fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
         Ok(SingleIter::new(self.db.iter_start(self.reader)?))
     }
 
     /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
-    fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<V>> {
+    pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<V>> {
         Ok(SingleIter::new(self.db.iter_end(self.reader)?))
     }
 }
@@ -157,7 +157,7 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    
+
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {

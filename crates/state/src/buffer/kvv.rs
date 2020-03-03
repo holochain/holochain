@@ -176,19 +176,17 @@ pub mod tests {
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
-    
-    
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
     struct V(pub u32);
 
     type Store<'a> = KvvBuffer<'a, &'a str, V>;
 
-    fn opInsert<T>(v: T) -> Op<T> {
+    fn op_insert<T>(v: T) -> Op<T> {
         Op::Insert(Box::new(v))
     }
 
-    fn opDelete<T>(v: T) -> Op<T> {
+    fn op_delete<T>(v: T) -> Op<T> {
         Op::Delete(Box::new(v))
     }
 
@@ -203,22 +201,22 @@ pub mod tests {
         store.insert("key", V(1));
         assert_eq!(
             *store.scratch.get("key").unwrap(),
-            hashset! {opInsert(V(1))}
+            hashset! {op_insert(V(1))}
         );
         store.insert("key", V(2));
         assert_eq!(
             *store.scratch.get("key").unwrap(),
-            hashset! {opInsert(V(1)), opInsert(V(2))}
+            hashset! {op_insert(V(1)), op_insert(V(2))}
         );
         store.delete("key", V(1));
         assert_eq!(
             *store.scratch.get("key").unwrap(),
-            hashset! {opDelete(V(1)), opInsert(V(2))}
+            hashset! {op_delete(V(1)), op_insert(V(2))}
         );
         store.insert("key", V(3));
         assert_eq!(
             *store.scratch.get("key").unwrap(),
-            hashset! {opDelete(V(1)), opInsert(V(2)), opInsert(V(3))}
+            hashset! {op_delete(V(1)), op_insert(V(2)), op_insert(V(3))}
         );
 
         wm.with_writer(|mut writer| store.finalize(&mut writer))
@@ -239,17 +237,17 @@ pub mod tests {
         store.insert("key", V(1));
         assert_eq!(
             *store.scratch.get("key").unwrap(),
-            hashset! {opInsert(V(1))}
+            hashset! {op_insert(V(1))}
         );
         store.insert("key", V(2));
         assert_eq!(
             *store.scratch.get("key").unwrap(),
-            hashset! {opInsert(V(1)), opInsert(V(2))}
+            hashset! {op_insert(V(1)), op_insert(V(2))}
         );
         store.delete("key", V(1));
         assert_eq!(
             *store.scratch.get("key").unwrap(),
-            hashset! {opDelete(V(1)), opInsert(V(2))}
+            hashset! {op_delete(V(1)), op_insert(V(2))}
         );
 
         wm.with_writer(|mut writer| store.finalize(&mut writer))
@@ -271,12 +269,12 @@ pub mod tests {
             store.insert("key", V(1));
             assert_eq!(
                 *store.scratch.get("key").unwrap(),
-                hashset! {opInsert(V(1))}
+                hashset! {op_insert(V(1))}
             );
             store.insert("key", V(1));
             assert_eq!(
                 *store.scratch.get("key").unwrap(),
-                hashset! {opInsert(V(1))}
+                hashset! {op_insert(V(1))}
             );
 
             wm.with_writer(|mut writer| store.finalize(&mut writer))
