@@ -20,46 +20,47 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
+type Store<'e> = KvIntBuffer<'e, u32, ChainSequenceItem>;
+
 pub struct ChainSequenceBuffer<'e> {
-    db: KvIntBuffer<'e, u32, ChainSequenceItem>,
+    db: Store<'e>,
     next_index: u32,
     tx_seq: u32,
+    current_head: Option<Address>,
 }
 
 impl<'e> ChainSequenceBuffer<'e> {
     pub fn new(reader: &'e Reader<'e>, dbm: &'e DbManager<'e>) -> WorkspaceResult<Self> {
-        let db: KvIntBuffer<'e, u32, ChainSequenceItem> =
-            KvIntBuffer::new(reader, dbm.get(&*CHAIN_SEQUENCE)?.clone())?;
+        let db: Store<'e> = KvIntBuffer::new(reader, dbm.get(&*CHAIN_SEQUENCE)?.clone())?;
         let latest = db.iter_raw_reverse()?.next();
-        let (next_index, tx_seq) = latest
-            .map(|(_, item)| (item.index + 1, item.tx_seq + 1))
-            .unwrap_or((0, 0));
+        let (next_index, tx_seq, current_head) = latest
+            .map(|(_, item)| (item.index + 1, item.tx_seq + 1, Some(item.header_address)))
+            .unwrap_or((0, 0, None));
+
         Ok(Self {
             db,
             next_index,
             tx_seq,
+            current_head,
         })
     }
 
-    pub fn chain_head(&self) -> WorkspaceResult<Option<Address>> {
-        Ok(self
-            .db
-            .iter_raw_reverse()?
-            .next()
-            .map(|(_, item)| item.header_address))
+    pub fn chain_head(&self) -> Option<&Address> {
+        self.current_head.as_ref()
     }
 
     pub fn add_header(&mut self, header_address: Address) {
         self.db.put(
             self.next_index,
             ChainSequenceItem {
-                header_address,
+                header_address: header_address.clone(),
                 index: self.next_index,
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
         );
         self.next_index += 1;
+        self.current_head = Some(header_address);
     }
 }
 
@@ -91,13 +92,13 @@ pub mod tests {
         let wm = WriteManager::new(&env);
         rm.with_reader(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
-            assert_eq!(buf.chain_head()?, None);
+            assert_eq!(buf.chain_head(), None);
             buf.add_header(Address::from("0"));
-            assert_eq!(buf.chain_head()?, Some(Address::from("0")));
+            assert_eq!(buf.chain_head(), Some(&Address::from("0")));
             buf.add_header(Address::from("1"));
-            assert_eq!(buf.chain_head()?, Some(Address::from("1")));
+            assert_eq!(buf.chain_head(), Some(&Address::from("1")));
             buf.add_header(Address::from("2"));
-            assert_eq!(buf.chain_head()?, Some(Address::from("2")));
+            assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             Ok(())
         })?;
 
@@ -115,7 +116,7 @@ pub mod tests {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
-            assert_eq!(buf.chain_head()?, Some(Address::from("1")));
+            assert_eq!(buf.chain_head(), Some(&Address::from("1")));
             buf.add_header(Address::from("2"));
             wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
             Ok(())
@@ -123,7 +124,7 @@ pub mod tests {
 
         rm.with_reader(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
-            assert_eq!(buf.chain_head()?, Some(Address::from("2")));
+            assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
@@ -140,7 +141,7 @@ pub mod tests {
 
         rm.with_reader(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
-            assert_eq!(buf.chain_head()?, Some(Address::from("5")));
+            assert_eq!(buf.chain_head(), Some(&Address::from("5")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
             Ok(())

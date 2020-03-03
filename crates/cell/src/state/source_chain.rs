@@ -19,7 +19,7 @@ impl<'env> SourceChainBuffer<'env> {
         })
     }
 
-    pub fn chain_head(&self) -> WorkspaceResult<Option<Address>> {
+    pub fn chain_head(&self) -> Option<&Address> {
         self.sequence.chain_head()
     }
 

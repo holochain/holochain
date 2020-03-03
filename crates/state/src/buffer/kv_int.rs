@@ -77,10 +77,12 @@ where
         }
     }
 
+    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
     pub fn iter_raw(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
         Ok(SingleIntIter::new(self.db.iter_start(self.reader)?))
     }
 
+    /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
     pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
         Ok(SingleIntIter::new(self.db.iter_end(self.reader)?))
     }
