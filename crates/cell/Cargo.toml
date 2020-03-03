@@ -24,7 +24,7 @@ holochain_json_api = "0.0.23"
 holochain_json_derive = "0.0.23"
 holochain_persistence_api = "0.0.17"
 holochain_persistence_lmdb = "0.0.17"
-lmdb-rkv = "0.12"
+lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git", branch = "reverse-iterator" }
 fallible-iterator = "0.2.0"
 thiserror = "1.0.10"
 lazy_static = "1.4.0"

@@ -14,9 +14,9 @@ futures = "0.3.1"
 thiserror = "1.0.10"
 log = "0.4.8"
 mockall = "0.6.0"
-rkv = "0.10.2"
+rkv = { git = "https://github.com/holochain/rkv.git", branch = "reverse-iterator" }
 # To get access to lmdb error types which aren't exported by rkv
-lmdb-rkv = "0.12.3"
+lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git", branch = "reverse-iterator" }
 rmp-serde = "0.14.3"
 serde = "1.0.104"
 serde_derive = "1.0.104"

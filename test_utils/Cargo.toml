@@ -13,7 +13,7 @@ hdk = { version = "0.0.42-alpha5" }
 holochain_net = { version = "0.0.42-alpha5" }
 holochain_core = { version = "0.0.42-alpha5" }
 holochain_conductor_lib = { version = "0.0.42-alpha5" }
-sx_dpki = { path = "../crates/dpki" }
+# sx_dpki = { path = "../crates/dpki" }
 sx_types = { path = "../crates/types" }
 holochain_wasm_utils = { version = "0.0.42-alpha5" }
 holochain_locksmith = { version = "0.0.43-alpha3" }

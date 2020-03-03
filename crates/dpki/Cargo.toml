@@ -12,7 +12,6 @@ edition = "2018"
 lazy_static = "1.4.0"
 base64 = "0.10.1"
 sx_types = { path = "../types" }
-holochain_tracing_macros = "0.0.20"
 newrelic = "0.2"
 lib3h_sodium = "0.0.38"
 holochain_persistence_api = "0.0.17"

@@ -158,7 +158,6 @@ pub mod tests {
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
-
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
         name: String,
