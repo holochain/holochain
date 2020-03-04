@@ -1,7 +1,7 @@
 [package]
-name = "rich_channel"
+name = "rpc_channel"
 version = "0.0.1"
-description = "tokio mpsc channel with support for nicer type handling"
+description = "tokio mpsc channel supporting responding to requests"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain-rust"
 documentation = "https://github.com/holochain/holochain-rust"

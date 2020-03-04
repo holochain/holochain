@@ -7,7 +7,7 @@ members = [
   #"crates/keystore",
   # "crates/legacy",
   #"crates/holochain",
-  "crates/rich_channel",
+  "crates/rpc_channel",
   #"crates/state",
   #"crates/types",
 ]
