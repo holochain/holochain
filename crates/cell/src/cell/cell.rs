@@ -12,7 +12,7 @@ use std::{
     hash::{Hash, Hasher},
     path::Path, sync::{Arc, RwLock},
 };
-use sx_state::{db::{ReadManager, DbManager}, env::create_lmdb_env};
+use sx_state::{env::{ReadManager, DbManager, EnvArc}, env::create_lmdb_env};
 use sx_types::{
     agent::AgentId,
     db::DatabasePath,
@@ -21,7 +21,6 @@ use sx_types::{
     prelude::*,
     shims::*,
 };
-use sx_state::RkvEnv;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
@@ -51,9 +50,7 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
 // #[derive(Clone)]
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
-    state_env: Arc<RwLock<RkvEnv>>,
-    db_manager: DbManager<'static>,
-    read_manager: ReadManager<'static>,
+    state_env: EnvArc,
     conductor_api: Api,
 }
 

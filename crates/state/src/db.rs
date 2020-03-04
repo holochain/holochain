@@ -1,6 +1,6 @@
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
-    Reader, Writer,
+    Reader, Writer, env::Env,
 };
 use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
@@ -62,12 +62,12 @@ lazy_static! {
 pub struct DbManager<'env> {
     // NOTE: this can't just be an Rkv because we get Rkv environments from the Manager
     // already wrapped in the Arc<RwLock<_>>, so this is the canonical representation of an LMDB environment
-    env: &'env Rkv,
+    env: Env<'env>,
     um: UniversalMap<DbName>,
 }
 
 impl<'env> DbManager<'env> {
-    pub fn new(env: &'env Rkv) -> WorkspaceResult<Self> {
+    pub fn new(env: Env<'env>) -> WorkspaceResult<Self> {
         let mut this = Self {
             env,
             um: UniversalMap::new(),
@@ -87,21 +87,20 @@ impl<'env> DbManager<'env> {
     }
 
     fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> WorkspaceResult<()> {
-        let env = self.env; //.read().unwrap();
         let db_name = key.key();
         let db_str = format!("{}", db_name);
         let _ = match db_name.kind() {
             DbKind::Single => self.um.insert(
                 key.with_value_type(),
-                env.open_single(db_str.as_str(), StoreOptions::create())?,
+                self.env.inner().open_single(db_str.as_str(), StoreOptions::create())?,
             ),
             DbKind::SingleInt => self.um.insert(
                 key.with_value_type(),
-                env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
+                self.env.inner().open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
             ),
             DbKind::Multi => self.um.insert(
                 key.with_value_type(),
-                env.open_multi(db_str.as_str(), StoreOptions::create())?,
+                self.env.inner().open_multi(db_str.as_str(), StoreOptions::create())?,
             ),
         };
         Ok(())
@@ -128,39 +127,39 @@ impl<'env> DbManager<'env> {
     }
 }
 
-pub struct ReadManager<'env>(&'env Rkv);
+// pub struct ReadManager<'env>(&'env Rkv);
 
-impl<'e> ReadManager<'e> {
-    pub fn new(env: &'e Rkv) -> Self {
-        Self(env)
-    }
+// impl<'e> ReadManager<'e> {
+//     pub fn new(env: &'e Rkv) -> Self {
+//         Self(env)
+//     }
 
-    pub fn reader(&self) -> WorkspaceResult<Reader<'e>> {
-        Ok(Reader(self.0.read()?))
-    }
+//     pub fn reader(&self) -> WorkspaceResult<Reader<'e>> {
+//         Ok(Reader(self.0.read()?))
+//     }
 
-    pub fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(
-        &self,
-        f: F,
-    ) -> WorkspaceResult<R> {
-        f(Reader(self.0.read()?))
-    }
-}
+//     pub fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(
+//         &self,
+//         f: F,
+//     ) -> WorkspaceResult<R> {
+//         f(Reader(self.0.read()?))
+//     }
+// }
 
-pub struct WriteManager<'env>(&'env Rkv);
+// pub struct WriteManager<'env>(&'env Rkv);
 
-impl<'e> WriteManager<'e> {
-    pub fn new(env: &'e Rkv) -> Self {
-        Self(env)
-    }
+// impl<'e> WriteManager<'e> {
+//     pub fn new(env: &'e Rkv) -> Self {
+//         Self(env)
+//     }
 
-    pub fn with_writer<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
-        &self,
-        f: F,
-    ) -> WorkspaceResult<R> {
-        let mut writer = self.0.write()?;
-        let result = f(&mut writer);
-        writer.commit()?;
-        result
-    }
-}
+//     pub fn with_commit<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
+//         &self,
+//         f: F,
+//     ) -> WorkspaceResult<R> {
+//         let mut writer = self.0.write()?;
+//         let result = f(&mut writer);
+//         writer.commit()?;
+//         result
+//     }
+// }

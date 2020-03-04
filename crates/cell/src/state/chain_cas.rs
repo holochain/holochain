@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
     error::WorkspaceResult,
-    RkvEnv, Writer, db::DbManager, Reader, SingleStore, Readable,
+    Writer, env::DbManager, Reader, SingleStore, Readable,
 };
 use sx_types::{
     chain_header::{HeaderWithEntry, ChainHeader},

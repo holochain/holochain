@@ -10,7 +10,7 @@ use sx_state::{
     buffer::{KvIntBuffer, StoreBuffer},
     db::{DbManager, DbName, CHAIN_SEQUENCE},
     error::{WorkspaceError, WorkspaceResult},
-    Readable, Reader, RkvEnv, Writer,
+    Readable, Reader, Writer,
 };
 use sx_types::prelude::Address;
 
@@ -98,8 +98,7 @@ pub mod tests {
     use super::{ChainSequenceBuffer, StoreBuffer};
     use std::sync::Arc;
     use sx_state::{
-        db::{DbManager, ReadManager, WriteManager},
-        env::create_lmdb_env,
+        env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
         error::{WorkspaceError, WorkspaceResult},
         test_utils::test_env,
     };
@@ -109,11 +108,9 @@ pub mod tests {
     #[test]
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let dbm = DbManager::new(&env)?;
-        let rm = ReadManager::new(&env);
-        let wm = WriteManager::new(&env);
-        rm.with_reader(|reader| {
+        let env = arc.env();
+        let dbm = DbManager::new(arc.env())?;
+        env.with_reader(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             assert_eq!(buf.chain_head(), None);
             buf.add_header(Address::from("0"));
@@ -131,21 +128,19 @@ pub mod tests {
     #[test]
     fn chain_sequence_functionality() -> WorkspaceResult<()> {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let dbm = DbManager::new(&env)?;
-        let rm = ReadManager::new(&env);
-        let wm = WriteManager::new(&env);
-        rm.with_reader(|reader| {
+        let env = arc.env();
+        let dbm = DbManager::new(arc.env())?;
+        env.with_reader(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
             assert_eq!(buf.chain_head(), Some(&Address::from("1")));
             buf.add_header(Address::from("2"));
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
             Ok(())
         })?;
 
-        rm.with_reader(|reader| {
+        env.with_reader(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
@@ -153,16 +148,16 @@ pub mod tests {
             Ok(())
         })?;
 
-        rm.with_reader(|reader| {
+        env.with_reader(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
             Ok(())
         })?;
 
-        rm.with_reader(|reader| {
+        env.with_reader(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("5")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
@@ -186,11 +181,10 @@ pub mod tests {
         // run in same thread, because these futures are not Send...or are they?
 
         let task1 = tokio::spawn(async move {
-            let env = arc1.read().unwrap();
             let mut buf = {
-                let dbm = DbManager::new(&env)?;
-                let rm = ReadManager::new(&env);
-                let reader = rm.reader()?;
+                let dbm = DbManager::new(arc1.env())?;
+                let env = arc1.env();
+                let reader = env.reader()?;
                 ChainSequenceBuffer::new(&reader, &dbm)?
             };
             buf.add_header(Address::from("0"));
@@ -202,25 +196,22 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            let env = arc1.read().unwrap();
-            let wm = WriteManager::new(&env);
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))
+            let env = arc1.env();
+            env.with_commit(|mut writer| buf.finalize(&mut writer))
         });
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = arc2.read().unwrap();
-            let dbm = DbManager::new(&env)?;
-            let rm = ReadManager::new(&env);
-            let wm = WriteManager::new(&env);
+            let env = arc2.env();
+            let dbm = DbManager::new(env)?;
 
-            let reader = rm.reader()?;
+            let reader = env.reader()?;
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
 
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, WorkspaceError>::Ok(())
         });

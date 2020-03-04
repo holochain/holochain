@@ -1,17 +1,21 @@
+use crate::Writer;
+use crate::Reader;
 use rkv::{EnvironmentFlags, Manager, Rkv};
 use std::{
     path::Path,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockReadGuard},
 };
+use crate::error::WorkspaceResult;
+use owning_ref::RwLockReadGuardRef;
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
 /// Standard way to create an Rkv object representing an LMDB environment
-pub fn create_lmdb_env(path: &Path) -> Arc<RwLock<Rkv>> {
+pub fn create_lmdb_env(path: &Path) -> EnvArc {
     let initial_map_size = None;
     let flags = None;
-    Manager::singleton()
+    let rkv = Manager::singleton()
         .write()
         .unwrap()
         .get_or_create(path, |path: &Path| {
@@ -32,5 +36,77 @@ pub fn create_lmdb_env(path: &Path) -> Arc<RwLock<Rkv>> {
                 );
             Rkv::from_env(path, env_builder)
         })
-        .unwrap()
+        .unwrap();
+    EnvArc(rkv)
+}
+
+// TODO: make this a trait of Env
+pub type DbManager<'e> = crate::db::DbManager<'e>;
+
+#[derive(Clone)]
+pub struct EnvArc(Arc<RwLock<Rkv>>);
+
+impl EnvArc {
+    pub fn env(&self) -> Env {
+        Env(self.0.read().unwrap())
+    }
+}
+
+pub struct Env<'e>(RwLockReadGuard<'e, Rkv>);
+
+pub trait ReadManager {
+
+    fn reader(&self) -> WorkspaceResult<Reader>;
+
+    fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(
+        &self,
+        f: F,
+    ) -> WorkspaceResult<R>;
+}
+
+pub trait WriteManager {
+
+    fn writer(&self) -> WorkspaceResult<Writer>;
+
+    fn with_commit<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
+        &self,
+        f: F,
+    ) -> WorkspaceResult<R>;
+}
+
+impl<'e> ReadManager for Env<'e> {
+
+    fn reader(&self) -> WorkspaceResult<Reader> {
+        Ok(Reader(self.0.read()?))
+    }
+
+    fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(
+        &self,
+        f: F,
+    ) -> WorkspaceResult<R> {
+        f(Reader(self.0.read()?))
+    }
+}
+
+impl<'e> WriteManager for Env<'e> {
+
+    fn writer(&self) -> WorkspaceResult<Writer> {
+        Ok(self.0.write()?)
+    }
+
+    fn with_commit<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
+        &self,
+        f: F,
+    ) -> WorkspaceResult<R> {
+        let mut writer = self.0.write()?;
+        let result = f(&mut writer);
+        writer.commit()?;
+        result
+    }
+}
+
+impl<'e> Env<'e> {
+    pub fn inner(&self) -> &RwLockReadGuard<Rkv> {
+        &self.0
+    }
 }

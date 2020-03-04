@@ -52,7 +52,7 @@ pub mod tests {
     use sx_state::{
         buffer::{KvBuffer, StoreBuffer},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
-        env::create_lmdb_env,
+        env::{create_lmdb_env, ReadManager, WriteManager},
         error::WorkspaceResult,
         Reader, SingleStore, Writer,
     };
@@ -89,12 +89,12 @@ pub mod tests {
     fn workspace_sanity_check() {
         let tmpdir = TempDir::new("skunkworx").unwrap();
         let created_arc = create_lmdb_env(tmpdir.path());
-        let env = created_arc.read().unwrap();
-        let dbm = DbManager::new(&env).unwrap();
+        let env = created_arc.env();
+        let dbm = DbManager::new(env).unwrap();
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {
-            let reader = env.read().unwrap().into();
+            let reader = env.reader().unwrap();
             let mut workspace = TestWorkspace::new(&reader, &dbm).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), None);
 
@@ -102,12 +102,12 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true);
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
             assert_eq!(workspace.two.get(&addr2).unwrap(), Some(true));
-            workspace.finalize(env.write().unwrap()).unwrap();
+            workspace.finalize(env.writer().unwrap());
         }
 
         // Ensure that the data was persisted
         {
-            let reader = env.read().unwrap().into();
+            let reader = env.reader().unwrap();
             let workspace = TestWorkspace::new(&reader, &dbm).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
         }

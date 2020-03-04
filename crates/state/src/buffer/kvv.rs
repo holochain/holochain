@@ -172,7 +172,7 @@ where
 pub mod tests {
 
     use super::{KvvBuffer, Op, StoreBuffer};
-    use crate::{db::WriteManager, test_utils::test_env};
+    use crate::{test_utils::test_env};
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
@@ -219,7 +219,7 @@ pub mod tests {
             hashset! {op_delete(V(1)), op_insert(V(2)), op_insert(V(3))}
         );
 
-        wm.with_writer(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.finalize(&mut writer))
             .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
@@ -250,7 +250,7 @@ pub mod tests {
             hashset! {op_delete(V(1)), op_insert(V(2))}
         );
 
-        wm.with_writer(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.finalize(&mut writer))
             .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
@@ -277,7 +277,7 @@ pub mod tests {
                 hashset! {op_insert(V(1))}
             );
 
-            wm.with_writer(|mut writer| store.finalize(&mut writer))
+            wm.with_commit(|mut writer| store.finalize(&mut writer))
                 .unwrap();
         }
 
@@ -300,13 +300,13 @@ pub mod tests {
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.insert("key", V(1));
-        wm.with_writer(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.finalize(&mut writer))
             .unwrap();
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.delete("key", V(1));
         store.delete("key", V(1));
-        wm.with_writer(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.finalize(&mut writer))
             .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();

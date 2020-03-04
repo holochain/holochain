@@ -2,7 +2,8 @@
 use error::WorkspaceResult;
 use shrinkwraprs::Shrinkwrap;
 use lmdb::{RoCursor, Database};
-use rkv::{Value, StoreError};
+use rkv::{Value, StoreError, Rkv};
+use std::sync::{RwLock, Arc, RwLockReadGuard};
 
 pub mod buffer;
 pub mod db;
@@ -46,29 +47,3 @@ unsafe impl<'env> Send for Reader<'env> {}
 
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Sync for Reader<'env> {}
-
-// TODO: remove ASAP, once we know how to actually create an env and get databases
-#[derive(Shrinkwrap)]
-pub struct RkvEnv(rkv::Rkv);
-
-impl RkvEnv {
-    pub fn read(&self) -> WorkspaceResult<Reader> {
-        Ok(Reader(self.0.read()?))
-    }
-
-    pub fn write(&self) -> WorkspaceResult<Writer> {
-        Ok(self.0.write()?)
-    }
-}
-
-pub struct Env(rkv::Rkv);
-
-impl Env {
-    pub fn read(&self) -> WorkspaceResult<Reader> {
-        Ok(Reader(self.0.read()?))
-    }
-
-    pub fn write(&self) -> WorkspaceResult<Writer> {
-        Ok(self.0.write()?)
-    }
-}
