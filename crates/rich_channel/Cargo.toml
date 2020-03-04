@@ -1,0 +1,14 @@
+[package]
+name = "rich_channel"
+version = "0.0.1"
+description = "tokio mpsc channel with support for nicer type handling"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain-rust"
+documentation = "https://github.com/holochain/holochain-rust"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.3"
+thiserror = "1"
+tokio = { version = "0.2", features = ["full"] }
