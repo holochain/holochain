@@ -22,7 +22,7 @@
 //!     }
 //! }
 //! let test_constructor: SpawnConnection<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
-//! let mut r = spawn_connection(10, test_constructor).await.unwrap();
+//! let (mut r, _) = spawn_connection(10, test_constructor).await.unwrap();
 //! assert_eq!("test", r.get_remote_url().await.unwrap());
 //! assert_eq!(b"123".to_vec(), r.outgoing_request(b"123".to_vec()).await.unwrap());
 //! #

@@ -59,7 +59,10 @@ impl ConnectionSender {
 
     /// Make a request of the remote endpoint, allowing awaiting the response.
     pub async fn outgoing_request(&mut self, data: Vec<u8>) -> Result<Vec<u8>> {
-        let res = self.sender.request(ConCommand::OutgoingRequest(data)).await?;
+        let res = self
+            .sender
+            .request(ConCommand::OutgoingRequest(data))
+            .await?;
         if let ConResponse::OutgoingRequest(res) = res {
             Ok(res.await?)
         } else {
@@ -95,12 +98,19 @@ pub trait ConnectionHandler: 'static + Send {
 /// Handler callback for responding to incoming requests.
 pub type IncomingRequestResponder = Box<dyn FnOnce(Result<Vec<u8>>) -> Result<()> + 'static + Send>;
 
+/// Connections can accept incoming requests. Your SpawnConnection callback
+/// will be supplied with the sender portion of this channel.
+pub type IncomingRequestSender = tokio::sync::mpsc::Sender<(Vec<u8>, IncomingRequestResponder)>;
+
+/// Connections can accept incoming requests. spawn_connection will return
+/// the receive portion of this channel.
 pub type IncomingRequestReceiver = tokio::sync::mpsc::Receiver<(Vec<u8>, IncomingRequestResponder)>;
 
 /// The handler constructor to be invoked from `spawn_connection`.
 /// Will be supplied with a RpcChannelSender for this same task,
 /// incase you need to set up custom messages, such as a timer tick, etc.
-pub type SpawnConnection<H> = Box<dyn FnOnce(ConnectionSender, IncomingRequestReceiver) -> FutureResult<H> + 'static + Send>;
+pub type SpawnConnection<H> =
+    Box<dyn FnOnce(ConnectionSender, IncomingRequestSender) -> FutureResult<H> + 'static + Send>;
 
 /// Create an actual connection task, returning the Sender reference that allows
 /// controlling this task.
@@ -109,13 +119,13 @@ pub type SpawnConnection<H> = Box<dyn FnOnce(ConnectionSender, IncomingRequestRe
 pub async fn spawn_connection<H: ConnectionHandler>(
     channel_size: usize,
     constructor: SpawnConnection<H>,
-) -> Result<ConnectionSender> {
-    let (_incoming_sender, incoming_receiver) = tokio::sync::mpsc::channel(channel_size);
+) -> Result<(ConnectionSender, IncomingRequestReceiver)> {
+    let (incoming_sender, incoming_receiver) = tokio::sync::mpsc::channel(channel_size);
     let (sender, mut receiver) = rpc_channel::rpc_channel::<ConCommand, ConResponse>(channel_size);
 
     let sender = ConnectionSender { sender };
 
-    let mut handler = constructor(sender.clone(), incoming_receiver).await?;
+    let mut handler = constructor(sender.clone(), incoming_sender).await?;
 
     tokio::task::spawn(async move {
         while let Ok((data, respond, span)) = receiver.recv().await {
@@ -144,7 +154,7 @@ pub async fn spawn_connection<H: ConnectionHandler>(
         }
     });
 
-    Ok(sender)
+    Ok((sender, incoming_receiver))
 }
 
 #[cfg(test)]
@@ -167,10 +177,14 @@ mod tests {
                 async move { Ok(data) }.boxed()
             }
         }
-        let test_constructor: SpawnConnection<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
-        let mut r = spawn_connection(10, test_constructor).await.unwrap();
+        let test_constructor: SpawnConnection<Bob> =
+            Box::new(|_, _| async move { Ok(Bob) }.boxed());
+        let (mut r, _) = spawn_connection(10, test_constructor).await.unwrap();
         assert_eq!("test", r.get_remote_url().await.unwrap());
-        assert_eq!(b"123".to_vec(), r.outgoing_request(b"123".to_vec()).await.unwrap());
+        assert_eq!(
+            b"123".to_vec(),
+            r.outgoing_request(b"123".to_vec()).await.unwrap()
+        );
         r.custom(Box::new(()))
             .await
             .unwrap()
