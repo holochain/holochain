@@ -1,7 +1,7 @@
 [package]
-name = "rpc_channel"
+name = "transport_api"
 version = "0.0.1"
-description = "tokio mpsc channel supporting responding to requests"
+description = "Tokio API for managing low-level transport bindings and connections"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain-rust"
 documentation = "https://github.com/holochain/holochain-rust"
@@ -13,3 +13,4 @@ futures = "0.3"
 thiserror = "1"
 tokio = { version = "0.2", features = ["full"] }
 tracing = "0.1"
+rpc_channel = { version = "0.0.1", path = "../rpc_channel" }

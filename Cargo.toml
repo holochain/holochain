@@ -8,6 +8,7 @@ members = [
   # "crates/legacy",
   #"crates/holochain",
   "crates/rpc_channel",
+  "crates/transport_api",
   #"crates/state",
   #"crates/types",
 ]

@@ -10,7 +10,8 @@
 //! let (mut send, mut recv) = rpc_channel::<String, String>(10);
 //!
 //! tokio::task::spawn(async move {
-//!     let (data, respond) = recv.recv().await.unwrap();
+//!     let (data, respond, span) = recv.recv().await.unwrap();
+//!     let _g = span.enter();
 //!     let _ = respond(Ok(format!("{} world", data)));
 //! });
 //!
@@ -55,7 +56,11 @@ pub type Result<T> = ::std::result::Result<T, RpcChannelError>;
 
 /// The "sender" side of an rpc_channel.
 pub struct RpcChannelSender<I: 'static + Send, O: 'static + Send> {
-    sender: tokio::sync::mpsc::Sender<(I, tokio::sync::oneshot::Sender<Result<O>>)>,
+    sender: tokio::sync::mpsc::Sender<(
+        I,
+        tokio::sync::oneshot::Sender<(Result<O>, tracing::Span)>,
+        tracing::Span,
+    )>,
 }
 
 // not sure why derive(Clone) doesn't work here
@@ -70,14 +75,17 @@ impl<I: 'static + Send, O: 'static + Send> Clone for RpcChannelSender<I, O> {
 impl<I: 'static + Send, O: 'static + Send> RpcChannelSender<I, O> {
     /// The request function on an RpcChannelSender.
     pub async fn request(&mut self, data: I) -> Result<O> {
+        let req_span = tracing::trace_span!("request");
         let (one_send, one_recv) = tokio::sync::oneshot::channel();
         self.sender
-            .send((data, one_send))
+            .send((data, one_send, req_span))
             .await
             .map_err(|_| RpcChannelError::ChannelClosed)?;
-        let resp = one_recv
+        let (resp, recv_span) = one_recv
             .await
             .map_err(|_| RpcChannelError::ResponseChannelClosed)?;
+        let _g = recv_span.enter();
+        tracing::trace!("respond complete");
         resp
     }
 }
@@ -87,24 +95,29 @@ pub type RpcChannelResponder<O> = Box<dyn FnOnce(Result<O>) -> Result<()> + 'sta
 
 /// The "receiver" side of an rpc_channel.
 pub struct RpcChannelReceiver<I: 'static + Send, O: 'static + Send> {
-    receiver: tokio::sync::mpsc::Receiver<(I, tokio::sync::oneshot::Sender<Result<O>>)>,
+    receiver: tokio::sync::mpsc::Receiver<(
+        I,
+        tokio::sync::oneshot::Sender<(Result<O>, tracing::Span)>,
+        tracing::Span,
+    )>,
 }
 
 impl<I: 'static + Send, O: 'static + Send> RpcChannelReceiver<I, O> {
     /// Handle any incoming messages by invoking the "RpcChannelResponder" callback.
     /// Will return an error if the channel is broken.
-    pub async fn recv(&mut self) -> Result<(I, RpcChannelResponder<O>)> {
-        let (data, respond) = match self.receiver.recv().await {
+    pub async fn recv(&mut self) -> Result<(I, RpcChannelResponder<O>, tracing::Span)> {
+        let (data, respond, recv_span) = match self.receiver.recv().await {
             None => Err(RpcChannelError::ChannelClosed),
             Some(r) => Ok(r),
         }?;
         let out: RpcChannelResponder<O> = Box::new(|o| {
+            let span = tracing::trace_span!("respond");
             respond
-                .send(o)
+                .send((o, span))
                 .map_err(|_| RpcChannelError::ResponseChannelClosed)?;
             Ok(())
         });
-        Ok((data, out))
+        Ok((data, out, recv_span))
     }
 }
 
@@ -159,7 +172,8 @@ mod tests {
             mut handler: H,
         ) {
             tokio::task::spawn(async move {
-                while let Ok((data, respond)) = receiver.recv().await {
+                while let Ok((data, respond, span)) = receiver.recv().await {
+                    let _g = span.enter();
                     match data {
                         Msg::Request(data) => {
                             let res = handler.handle_msg_request(&data);
