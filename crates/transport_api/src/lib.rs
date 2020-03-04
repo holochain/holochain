@@ -17,14 +17,14 @@
 //!         async move { Ok("test".to_string()) }.boxed()
 //!     }
 //!
-//!     fn handle_request(&mut self, data: Vec<u8>) -> FutureResult<Vec<u8>> {
+//!     fn handle_outgoing_request(&mut self, data: Vec<u8>) -> FutureResult<Vec<u8>> {
 //!         async move { Ok(data) }.boxed()
 //!     }
 //! }
-//! let test_constructor: SpawnConnection<Bob> = Box::new(|_| async move { Ok(Bob) }.boxed());
+//! let test_constructor: SpawnConnection<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
 //! let mut r = spawn_connection(10, test_constructor).await.unwrap();
 //! assert_eq!("test", r.get_remote_url().await.unwrap());
-//! assert_eq!(b"123".to_vec(), r.request(b"123".to_vec()).await.unwrap());
+//! assert_eq!(b"123".to_vec(), r.outgoing_request(b"123".to_vec()).await.unwrap());
 //! #
 //! # }
 //! #
@@ -67,6 +67,9 @@ pub type FutureResult<T> = ::futures::future::BoxFuture<'static, Result<T>>;
 
 mod connection;
 pub use connection::*;
+
+mod listener;
+pub use listener::*;
 
 #[cfg(test)]
 mod tests {
