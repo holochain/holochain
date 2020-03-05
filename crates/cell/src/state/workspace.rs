@@ -54,7 +54,8 @@ pub mod tests {
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         error::WorkspaceResult,
-        Reader, SingleStore, Writer, test_utils::test_env,
+        test_utils::test_env,
+        Reader, SingleStore, Writer,
     };
     use sx_types::prelude::*;
     use tempdir::TempDir;

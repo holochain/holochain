@@ -26,7 +26,6 @@ pub enum ValidationResult {
     Pending,
 }
 
-
 pub struct SourceChainCommitBundle<'env>(std::marker::PhantomData<&'env ()>);
 impl<'env> SourceChainCommitBundle<'env> {
     pub fn new() -> Self {

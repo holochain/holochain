@@ -1,6 +1,9 @@
-use sx_types::shims::Keystore;
 use std::collections::HashMap;
-use sx_cell::{conductor_api::ConductorCellApiT, cell::{Cell, CellId, NetSender}};
+use sx_cell::{
+    cell::{Cell, CellId, NetSender},
+    conductor_api::ConductorCellApiT,
+};
+use sx_types::shims::Keystore;
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)

@@ -96,7 +96,8 @@ pub mod tests {
     use sx_state::{
         env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
         error::WorkspaceResult,
-        test_utils::test_env, Reader,
+        test_utils::test_env,
+        Reader,
     };
     use tempdir::TempDir;
 

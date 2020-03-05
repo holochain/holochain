@@ -172,7 +172,7 @@ where
 pub mod tests {
 
     use super::{KvvBuffer, Op, StoreBuffer};
-    use crate::{test_utils::test_env};
+    use crate::test_utils::test_env;
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};

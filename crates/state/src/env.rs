@@ -1,19 +1,20 @@
 use crate::{error::WorkspaceResult, Reader, Writer};
 
 use rkv::{EnvironmentFlags, Rkv};
-use std::{
-    path::Path,
-    sync::{Arc},
-};
+use std::{path::Path, sync::Arc};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
 #[cfg(feature = "lmdb_no_tls")]
-fn default_flags() -> EnvironmentFlags { EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC | EnvironmentFlags::NO_TLS }
+fn default_flags() -> EnvironmentFlags {
+    EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC | EnvironmentFlags::NO_TLS
+}
 
 #[cfg(not(feature = "lmdb_no_tls"))]
-fn default_flags() -> EnvironmentFlags { EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC }
+fn default_flags() -> EnvironmentFlags {
+    EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC
+}
 
 /// A standard way to create a representation of an LMDB environment suitable for Holochain
 /// TODO: put this behind a singleton HashMap, just like rkv::Manager,

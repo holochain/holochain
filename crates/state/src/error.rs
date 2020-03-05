@@ -40,7 +40,7 @@ pub enum WorkspaceError {
 
     #[cfg(test)]
     #[error(transparent)]
-    Other(#[from] anyhow::Error)
+    Other(#[from] anyhow::Error),
 }
 
 impl PartialEq for WorkspaceError {

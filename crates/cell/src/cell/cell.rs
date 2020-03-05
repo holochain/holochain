@@ -10,9 +10,10 @@ use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
 use std::{
     hash::{Hash, Hasher},
-    path::Path, sync::{Arc, RwLock},
+    path::Path,
+    sync::{Arc, RwLock},
 };
-use sx_state::{env::{ReadManager, DbManager, EnvArc}, env::create_lmdb_env};
+use sx_state::env::{create_lmdb_env, DbManager, EnvArc, ReadManager};
 use sx_types::{
     agent::AgentId,
     db::DatabasePath,
@@ -68,7 +69,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         conductor_api: Api,
         invocation: ZomeInvocation,
     ) -> CellResult<ZomeInvocationResult> {
-       unimplemented!()
+        unimplemented!()
     }
 
     pub async fn handle_network_message(

@@ -7,9 +7,9 @@ use crate::{
     error::{WorkspaceError, WorkspaceResult},
     Readable, Reader, Writer,
 };
-use rkv::{IntegerStore};
+use rkv::IntegerStore;
 
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist
@@ -184,7 +184,10 @@ pub mod tests {
     fn kv_iterators() {
         let arc = test_env();
         let env = arc.env();
-        let db = env.inner().open_integer("kv", StoreOptions::create()).unwrap();
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())
+            .unwrap();
 
         env.with_reader(|reader| {
             let mut buf: Store = KvIntBuffer::new(&reader, db).unwrap();
@@ -222,7 +225,10 @@ pub mod tests {
     fn kv_empty_iterators() {
         let arc = test_env();
         let env = arc.env();
-        let db = env.inner().open_integer("kv", StoreOptions::create()).unwrap();
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())
+            .unwrap();
 
         env.with_reader(|reader| {
             let buf: Store = KvIntBuffer::new(&reader, db).unwrap();

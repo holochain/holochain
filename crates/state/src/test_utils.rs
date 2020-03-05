@@ -1,7 +1,4 @@
-
-
-use crate::{env::{create_lmdb_env, EnvArc}};
-
+use crate::env::{create_lmdb_env, EnvArc};
 
 use tempdir::TempDir;
 

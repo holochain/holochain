@@ -1,4 +1,7 @@
-use crate::{conductor::{CellHandle, Conductor}, error::ConductorResult};
+use crate::{
+    conductor::{CellHandle, Conductor},
+    error::ConductorResult,
+};
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 use mockall::mock;
@@ -6,7 +9,7 @@ use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{pin::Pin, sync::Arc};
 use sx_cell::{
     cell::{autonomic::AutonomicCue, Cell, CellId},
-    conductor_api::{ConductorApiError, ConductorCellApiT, ConductorApiResult},
+    conductor_api::{ConductorApiError, ConductorApiResult, ConductorCellApiT},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
 };
 use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
@@ -35,7 +38,6 @@ impl<Api: ConductorCellApiT> ConductorExternalApi<Api> {
         unimplemented!()
     }
 }
-
 
 /// It's unsure whether we'll actually use the following
 

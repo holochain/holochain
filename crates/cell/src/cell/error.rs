@@ -1,7 +1,7 @@
 use sx_types::error::SkunkError;
 // use crate::agent::error::SourceChainError;
-use thiserror::Error;
 use sx_state::error::WorkspaceError;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CellError {
@@ -11,9 +11,8 @@ pub enum CellError {
     // TODO
     // #[error("could not read from source chain")]
     // SourceChainError(#[from] SourceChainError),
-
     #[error("generic error")]
-    Generic(#[from] SkunkError)
+    Generic(#[from] SkunkError),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

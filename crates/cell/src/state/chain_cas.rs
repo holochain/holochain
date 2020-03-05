@@ -1,14 +1,14 @@
-use sx_state::db::CHAIN_HEADERS;
-use sx_state::db::CHAIN_ENTRIES;
-use crate::agent::error::{SourceChainError, SourceChainResult, ChainInvalidReason};
+use crate::agent::error::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
+    db::{CHAIN_ENTRIES, CHAIN_HEADERS},
+    env::DbManager,
     error::WorkspaceResult,
-    Writer, env::DbManager, Reader, SingleStore, Readable,
+    Readable, Reader, SingleStore, Writer,
 };
 use sx_types::{
-    chain_header::{HeaderWithEntry, ChainHeader},
+    chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,
     prelude::{Address, AddressableContent},
 };
@@ -23,8 +23,11 @@ pub struct ChainCasBuffer<'env, R: Readable = Reader<'env>> {
 }
 
 impl<'env, R: Readable> ChainCasBuffer<'env, R> {
-
-    fn new(reader: &'env R, entries_store: SingleStore, headers_store: SingleStore) -> WorkspaceResult<Self> {
+    fn new(
+        reader: &'env R,
+        entries_store: SingleStore,
+        headers_store: SingleStore,
+    ) -> WorkspaceResult<Self> {
         Ok(Self {
             entries: CasBuffer::new(reader, entries_store)?,
             headers: CasBuffer::new(reader, headers_store)?,
@@ -46,7 +49,10 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
     }
 
     /// Given a ChainHeader, return the corresponding HeaderWithEntry
-    pub fn header_with_entry(&self, header: ChainHeader) -> SourceChainResult<Option<HeaderWithEntry>> {
+    pub fn header_with_entry(
+        &self,
+        header: ChainHeader,
+    ) -> SourceChainResult<Option<HeaderWithEntry>> {
         if let Some(entry) = self.get_entry(header.entry_address())? {
             Ok(Some(HeaderWithEntry::new(header, entry)))
         } else {
@@ -56,7 +62,10 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
         }
     }
 
-    pub fn get_header_with_entry(&self, header_address: &Address) -> SourceChainResult<Option<HeaderWithEntry>> {
+    pub fn get_header_with_entry(
+        &self,
+        header_address: &Address,
+    ) -> SourceChainResult<Option<HeaderWithEntry>> {
         if let Some(header) = self.get_header(header_address)? {
             self.header_with_entry(header)
         } else {

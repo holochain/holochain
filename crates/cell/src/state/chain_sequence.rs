@@ -182,9 +182,7 @@ pub mod tests {
             let dbs = arc1.dbs()?;
             let env = arc1.env();
             let reader = env.reader()?;
-            let mut buf = {
-                ChainSequenceBuffer::new(&reader, &dbs)?
-            };
+            let mut buf = { ChainSequenceBuffer::new(&reader, &dbs)? };
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
             buf.add_header(Address::from("2"));

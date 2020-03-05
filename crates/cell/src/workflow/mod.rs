@@ -80,12 +80,12 @@ mod new_idea {
     impl WorkflowRun {
         async fn run(self) -> WorkflowResult<()> {
             match self {
-                WorkflowRun::InvokeZome(invocation) => {
-                    Self::finish(invoke_zome(InvokeZomeWorkspace::new(unimplemented!()), invocation).await?)
-                }
-                WorkflowRun::AppValidation(ops) => {
-                    Self::finish(app_validation(AppValidationWorkspace::new(unimplemented!()), ops).await?)
-                }
+                WorkflowRun::InvokeZome(invocation) => Self::finish(
+                    invoke_zome(InvokeZomeWorkspace::new(unimplemented!()), invocation).await?,
+                ),
+                WorkflowRun::AppValidation(ops) => Self::finish(
+                    app_validation(AppValidationWorkspace::new(unimplemented!()), ops).await?,
+                ),
             }
         }
 
@@ -112,10 +112,14 @@ mod new_idea {
     pub struct AppValidationWorkspace;
 
     impl InvokeZomeWorkspace {
-        pub fn new(cell_id: CellId) -> Self { Self }
+        pub fn new(cell_id: CellId) -> Self {
+            Self
+        }
     }
     impl AppValidationWorkspace {
-        pub fn new(cell_id: CellId) -> Self { Self }
+        pub fn new(cell_id: CellId) -> Self {
+            Self
+        }
     }
 
     impl Workspace for InvokeZomeWorkspace {}

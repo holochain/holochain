@@ -1,6 +1,6 @@
 use super::chain_cas::ChainCasBuffer;
 use holochain_persistence_api::cas::content::Address;
-use sx_state::{Reader, buffer::KvvBuffer};
+use sx_state::{buffer::KvvBuffer, Reader};
 
 struct Cascade<'e> {
     cas: &'e ChainCasBuffer<'e, Reader<'e>>,

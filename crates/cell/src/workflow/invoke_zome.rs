@@ -48,7 +48,8 @@ pub mod tests {
         };
 
         let mut ribosome = MockRibosomeT::new();
-        ribosome.expect_call_zome_function()
+        ribosome
+            .expect_call_zome_function()
             .times(1)
             .returning(|bundle, _| Ok(ZomeInvocationResult));
 

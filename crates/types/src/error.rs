@@ -45,7 +45,7 @@ impl PartialEq for SkunkError {
             (CryptoError(a), CryptoError(b)) => a == b,
             (PersistenceError(a), PersistenceError(b)) => a == b,
             (Base64DecodeError(a), Base64DecodeError(b)) => a == b,
-            _ => false
+            _ => false,
         }
     }
 }

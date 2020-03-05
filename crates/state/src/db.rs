@@ -1,12 +1,11 @@
 use crate::{
-    error::{WorkspaceError, WorkspaceResult}, env::Env,
+    env::Env,
+    error::{WorkspaceError, WorkspaceResult},
 };
 use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
 
 use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
-
-
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum DbName {
@@ -91,15 +90,21 @@ impl<'env> DbManager<'env> {
         let _ = match db_name.kind() {
             DbKind::Single => self.um.insert(
                 key.with_value_type(),
-                self.env.inner().open_single(db_str.as_str(), StoreOptions::create())?,
+                self.env
+                    .inner()
+                    .open_single(db_str.as_str(), StoreOptions::create())?,
             ),
             DbKind::SingleInt => self.um.insert(
                 key.with_value_type(),
-                self.env.inner().open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
+                self.env
+                    .inner()
+                    .open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
             ),
             DbKind::Multi => self.um.insert(
                 key.with_value_type(),
-                self.env.inner().open_multi(db_str.as_str(), StoreOptions::create())?,
+                self.env
+                    .inner()
+                    .open_multi(db_str.as_str(), StoreOptions::create())?,
             ),
         };
         Ok(())

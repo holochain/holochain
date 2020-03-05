@@ -1,10 +1,9 @@
-use sx_types::entry::Entry;
 use crate::{
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     wasm_engine::WasmEngine,
 };
-use sx_types::{dna::Dna, error::SkunkResult, shims::*};
 use mockall::automock;
+use sx_types::{dna::Dna, entry::Entry, error::SkunkResult, shims::*};
 
 #[automock]
 pub trait RibosomeT {

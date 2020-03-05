@@ -1,10 +1,8 @@
-use crate::Readable;
-use super::{kv::KvBuffer, StoreBuffer, BufferVal};
-use crate::error::WorkspaceResult;
-use rkv::{Writer};
+use super::{kv::KvBuffer, BufferVal, StoreBuffer};
+use crate::{error::WorkspaceResult, Readable};
+use rkv::Writer;
 
 use sx_types::prelude::{Address, AddressableContent};
-
 
 /// A wrapper around a KvBuffer where keys are always Addresses,
 /// and values are always AddressableContent.

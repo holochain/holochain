@@ -3,9 +3,9 @@ use crate::{
     error::{WorkspaceError, WorkspaceResult},
     Readable, Reader, Writer,
 };
-use rkv::{SingleStore};
+use rkv::SingleStore;
 
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist
@@ -202,7 +202,10 @@ pub mod tests {
     fn kv_empty_iterators() {
         let arc = test_env();
         let env = arc.env();
-        let db = env.inner().open_single("kv", StoreOptions::create()).unwrap();
+        let db = env
+            .inner()
+            .open_single("kv", StoreOptions::create())
+            .unwrap();
 
         env.with_reader(|reader| {
             let buf: TestBuf = KvBuffer::new(&reader, db).unwrap();
@@ -222,8 +225,14 @@ pub mod tests {
     fn kv_store_sanity_check() {
         let arc = test_env();
         let env = arc.env();
-        let db1 = env.inner().open_single("kv1", StoreOptions::create()).unwrap();
-        let db2 = env.inner().open_single("kv1", StoreOptions::create()).unwrap();
+        let db1 = env
+            .inner()
+            .open_single("kv1", StoreOptions::create())
+            .unwrap();
+        let db2 = env
+            .inner()
+            .open_single("kv1", StoreOptions::create())
+            .unwrap();
         let mut writer = env.writer().unwrap();
 
         let testval = TestVal {

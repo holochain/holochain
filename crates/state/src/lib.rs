@@ -1,9 +1,8 @@
 #![feature(backtrace)]
 
+use lmdb::{Database, RoCursor};
+use rkv::{StoreError, Value};
 use shrinkwraprs::Shrinkwrap;
-use lmdb::{RoCursor, Database};
-use rkv::{Value, StoreError};
-
 
 pub mod buffer;
 pub mod db;
