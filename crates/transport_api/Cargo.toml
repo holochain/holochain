@@ -14,3 +14,4 @@ thiserror = "1"
 tokio = { version = "0.2", features = ["full"] }
 tracing = "0.1"
 rpc_channel = { version = "0.0.1", path = "../rpc_channel" }
+url2 = "0.0.5"

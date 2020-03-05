@@ -54,13 +54,16 @@ impl<R: AsRef<str>> From<R> for RpcChannelError {
 /// RpcChannel result type.
 pub type Result<T> = ::std::result::Result<T, RpcChannelError>;
 
+/// Internal rpc channel type
+type RpcChannelType<I, O> = (
+    I,
+    tokio::sync::oneshot::Sender<(Result<O>, tracing::Span)>,
+    tracing::Span,
+);
+
 /// The "sender" side of an rpc_channel.
 pub struct RpcChannelSender<I: 'static + Send, O: 'static + Send> {
-    sender: tokio::sync::mpsc::Sender<(
-        I,
-        tokio::sync::oneshot::Sender<(Result<O>, tracing::Span)>,
-        tracing::Span,
-    )>,
+    sender: tokio::sync::mpsc::Sender<RpcChannelType<I, O>>,
 }
 
 // not sure why derive(Clone) doesn't work here
@@ -95,11 +98,7 @@ pub type RpcChannelResponder<O> = Box<dyn FnOnce(Result<O>) -> Result<()> + 'sta
 
 /// The "receiver" side of an rpc_channel.
 pub struct RpcChannelReceiver<I: 'static + Send, O: 'static + Send> {
-    receiver: tokio::sync::mpsc::Receiver<(
-        I,
-        tokio::sync::oneshot::Sender<(Result<O>, tracing::Span)>,
-        tracing::Span,
-    )>,
+    receiver: tokio::sync::mpsc::Receiver<RpcChannelType<I, O>>,
 }
 
 impl<I: 'static + Send, O: 'static + Send> RpcChannelReceiver<I, O> {

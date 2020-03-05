@@ -6,14 +6,14 @@ enum ListenCommand {
     Custom(BoxAny),
     Shutdown,
     GetBoundUrl,
-    Connect(String),
+    Connect(Url2),
 }
 
 /// internal receive responses from listener task
 enum ListenResponse {
     Custom(FutureResult<BoxAny>),
     Shutdown(FutureResult<()>),
-    GetBoundUrl(FutureResult<String>),
+    GetBoundUrl(FutureResult<Url2>),
     Connect(FutureResult<(ConnectionSender, IncomingRequestReceiver)>),
 }
 
@@ -49,7 +49,7 @@ impl ListenerSender {
     }
 
     /// Get the post-binding url this listener endpoint is attached to.
-    pub async fn get_bound_url(&mut self) -> Result<String> {
+    pub async fn get_bound_url(&mut self) -> Result<Url2> {
         let res = self.sender.request(ListenCommand::GetBoundUrl).await?;
         if let ListenResponse::GetBoundUrl(res) = res {
             Ok(res.await?)
@@ -61,7 +61,7 @@ impl ListenerSender {
     /// Attempt to establish an outgoing connection to a remote peer.
     pub async fn connect(
         &mut self,
-        url: String,
+        url: Url2,
     ) -> Result<(ConnectionSender, IncomingRequestReceiver)> {
         let res = self.sender.request(ListenCommand::Connect(url)).await?;
         if let ListenResponse::Connect(res) = res {
@@ -89,13 +89,13 @@ pub trait ListenerHandler: 'static + Send {
 
     /// Return the url that this listener endpoint is bound to.
     #[must_use]
-    fn handle_get_bound_url(&mut self) -> FutureResult<String>;
+    fn handle_get_bound_url(&mut self) -> FutureResult<Url2>;
 
     /// Establish a new outgoing connection.
     #[must_use]
     fn handle_connect(
         &mut self,
-        url: String,
+        url: Url2,
     ) -> FutureResult<(ConnectionSender, IncomingRequestReceiver)>;
 }
 
@@ -173,21 +173,21 @@ mod tests {
                 async move { Ok(()) }.boxed()
             }
 
-            fn handle_get_bound_url(&mut self) -> FutureResult<String> {
-                async move { Ok("test".to_string()) }.boxed()
+            fn handle_get_bound_url(&mut self) -> FutureResult<Url2> {
+                async move { Ok(url2!("test://test/")) }.boxed()
             }
 
             fn handle_connect(
                 &mut self,
-                _url: String,
+                _url: Url2,
             ) -> FutureResult<(ConnectionSender, IncomingRequestReceiver)> {
                 async move { Err(TransportError::Other("unimplemented".into())) }.boxed()
             }
         }
         let test_constructor: SpawnListener<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
         let (mut r, _) = spawn_listener(10, test_constructor).await.unwrap();
-        assert_eq!("test", r.get_bound_url().await.unwrap());
-        assert!(r.connect("test".to_string()).await.is_err());
+        assert_eq!("test://test/", r.get_bound_url().await.unwrap().as_str());
+        assert!(r.connect(url2!("test://test/")).await.is_err());
         r.custom(Box::new(()))
             .await
             .unwrap()
