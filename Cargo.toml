@@ -12,7 +12,7 @@ members = [
 ]
 
 exclude = [
-  "psuedocode"
+  "pseudocode"
 ]
 
 
@@ -22,10 +22,10 @@ holochain_locksmith = { version = "0.0.43-alpha3", git = "https://github.com/hol
 holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 
-holochain_persistence_api = { path = "../holochain-persistence/crates/holochain_persistence_api" }
-holochain_persistence_lmdb = { path = "../holochain-persistence/crates/holochain_persistence_lmdb" }
-# holochain_persistence_api = { version = "0.0.17", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+unpinned" }
-# holochain_persistence_lmdb = { version = "0.0.17", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+unpinned" }
+# holochain_persistence_api = { path = "../holochain-persistence/crates/holochain_persistence_api" }
+# holochain_persistence_lmdb = { path = "../holochain-persistence/crates/holochain_persistence_lmdb" }
+holochain_persistence_api = { version = "0.0.17", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+unpinned" }
+holochain_persistence_lmdb = { version = "0.0.17", git = "https://github.com/holochain/holochain-persistence.git", branch = "transactional+unpinned" }
 
 # holochain_json_api = { version = "0.0.23", path = "../holochain-serialization/crates/holochain_json_api" }
 # holochain_json_derive = { version = "0.0.23", path = "../holochain-serialization/crates/holochain_json_derive" }
