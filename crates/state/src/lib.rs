@@ -1,9 +1,9 @@
 #![feature(backtrace)]
-use error::WorkspaceResult;
+
 use shrinkwraprs::Shrinkwrap;
 use lmdb::{RoCursor, Database};
-use rkv::{Value, StoreError, Rkv};
-use std::sync::{RwLock, Arc, RwLockReadGuard};
+use rkv::{Value, StoreError};
+
 
 pub mod buffer;
 pub mod db;

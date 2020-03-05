@@ -7,9 +7,9 @@ use crate::{
     error::{WorkspaceError, WorkspaceResult},
     Readable, Reader, Writer,
 };
-use rkv::{IntegerStore, StoreOptions};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, hash::Hash};
+use rkv::{IntegerStore};
+
+use std::{collections::HashMap};
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist

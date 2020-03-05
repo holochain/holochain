@@ -1,9 +1,9 @@
 use crate::{error::WorkspaceResult, Reader, Writer};
-use owning_ref::RwLockReadGuardRef;
-use rkv::{EnvironmentFlags, Manager, Rkv};
+
+use rkv::{EnvironmentFlags, Rkv};
 use std::{
     path::Path,
-    sync::{Arc, RwLock, RwLockReadGuard},
+    sync::{Arc},
 };
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;

@@ -1,11 +1,10 @@
 use crate::{
-    error::{WorkspaceError, WorkspaceResult},
-    Reader, Writer, env::Env,
+    error::{WorkspaceError, WorkspaceResult}, env::Env,
 };
 use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
 
-use rkv::{IntegerStore, MultiStore, Rkv, SingleStore, StoreOptions};
+use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
 
 
 

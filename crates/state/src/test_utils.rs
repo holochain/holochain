@@ -1,8 +1,8 @@
 
 
-use crate::{env::{Env, create_lmdb_env, EnvArc}};
-use rkv::{Rkv};
-use std::sync::{Arc, RwLock};
+use crate::{env::{create_lmdb_env, EnvArc}};
+
+
 use tempdir::TempDir;
 
 pub fn test_env() -> EnvArc {

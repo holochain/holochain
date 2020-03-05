@@ -3,9 +3,9 @@ use crate::{
     error::{WorkspaceError, WorkspaceResult},
     Readable, Reader, Writer,
 };
-use rkv::{Rkv, SingleStore, StoreOptions};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, hash::Hash};
+use rkv::{SingleStore};
+
+use std::{collections::HashMap};
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist
@@ -150,7 +150,6 @@ pub mod tests {
     use super::{KvBuffer, StoreBuffer};
     use crate::{
         env::{ReadManager, WriteManager},
-        env::create_lmdb_env,
         error::WorkspaceResult,
         test_utils::test_env,
     };

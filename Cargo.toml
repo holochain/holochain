@@ -33,7 +33,7 @@ holochain_persistence_lmdb = { path = "../holochain-persistence/crates/holochain
 # holochain_persistence_lmdb = { version = "0.0.17", path = "../holochain-persistence/crates/holochain_persistence_lmdb" }
 
 lib3h_crypto_api = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }
-lib3h_sodium = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }
+# lib3h_sodium = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }
 
 # lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git", branch = "reverse-iterator" }
 # rkv = { git = "https://github.com/holochain/rkv.git", branch = "reverse-iterator" }
