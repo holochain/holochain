@@ -57,21 +57,11 @@
 use thiserror::Error;
 use url2::prelude::*;
 
-/// RpcChannel error type.
+/// TransportApi error type.
 #[derive(Error, Debug)]
 pub enum TransportError {
     #[error("rpc channel error: {0}")]
     RpcChannel(#[from] rpc_channel::RpcChannelError),
-
-    /// The other end of this channel has been dropped.
-    /// No more communication will be possible.
-    #[error("channel closed")]
-    ChannelClosed,
-
-    /// The handler end dropped the response channel,
-    /// you will not receive a response to this request.
-    #[error("response channel closed")]
-    ResponseChannelClosed,
 
     /// An unspecified internal error occurred.
     #[error("{0}")]
