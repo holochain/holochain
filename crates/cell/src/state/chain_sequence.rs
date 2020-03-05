@@ -178,13 +178,11 @@ pub mod tests {
 
         let local = tokio::task::LocalSet::new();
 
-        // run in same thread, because these futures are not Send...or are they?
-
         let task1 = tokio::spawn(async move {
+            let dbm = DbManager::new(arc1.env())?;
+            let env = arc1.env();
+            let reader = env.reader()?;
             let mut buf = {
-                let dbm = DbManager::new(arc1.env())?;
-                let env = arc1.env();
-                let reader = env.reader()?;
                 ChainSequenceBuffer::new(&reader, &dbm)?
             };
             buf.add_header(Address::from("0"));
@@ -203,7 +201,7 @@ pub mod tests {
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
             let env = arc2.env();
-            let dbm = DbManager::new(env)?;
+            let dbm = DbManager::new(arc2.env())?;
 
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;

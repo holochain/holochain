@@ -168,7 +168,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(test_TODO_FIX)]
 pub mod tests {
 
     use super::{KvvBuffer, Op, StoreBuffer};
@@ -193,7 +193,7 @@ pub mod tests {
     #[test]
     fn kvv_store_scratch_insert_delete() {
         let arc = test_env();
-        let env = arc.read().unwrap();
+        let env = arc.env();
         let wm = WriteManager::new(&env);
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
@@ -229,8 +229,7 @@ pub mod tests {
     #[test]
     fn kvv_store_get_list() {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let wm = WriteManager::new(&env);
+        let env = arc.env();
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
 
@@ -260,7 +259,7 @@ pub mod tests {
     #[test]
     fn kvv_store_duplicate_insert() {
         let arc = test_env();
-        let env = arc.read().unwrap();
+        let env = arc.env();
 
         fn add_twice(env: &Rkv) {
             let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
@@ -295,7 +294,7 @@ pub mod tests {
     #[test]
     fn kvv_store_duplicate_delete() {
         let arc = test_env();
-        let env = arc.read().unwrap();
+        let env = arc.env();
         let wm = WriteManager::new(&env);
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
@@ -316,7 +315,7 @@ pub mod tests {
     #[test]
     fn kvv_store_get_missing_key() {
         let arc = test_env();
-        let env = arc.read().unwrap();
+        let env = arc.env();
         let store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         assert_eq!(store.get(&"wompwomp").unwrap(), hashset! {});
     }

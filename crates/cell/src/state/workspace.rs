@@ -52,9 +52,9 @@ pub mod tests {
     use sx_state::{
         buffer::{KvBuffer, StoreBuffer},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
-        env::{create_lmdb_env, ReadManager, WriteManager},
+        env::{ReadManager, WriteManager},
         error::WorkspaceResult,
-        Reader, SingleStore, Writer,
+        Reader, SingleStore, Writer, test_utils::test_env,
     };
     use sx_types::prelude::*;
     use tempdir::TempDir;
@@ -87,10 +87,9 @@ pub mod tests {
 
     #[test]
     fn workspace_sanity_check() {
-        let tmpdir = TempDir::new("skunkworx").unwrap();
-        let created_arc = create_lmdb_env(tmpdir.path());
-        let env = created_arc.env();
-        let dbm = DbManager::new(env).unwrap();
+        let arc = test_env();
+        let env = arc.env();
+        let dbm = DbManager::new(arc.env()).unwrap();
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {

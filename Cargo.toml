@@ -4,7 +4,7 @@ members = [
   "crates/cell",
   "crates/conductor_lib",
   # "crates/lib3h_protocol",
-  "crates/keystore",
+  # "crates/keystore",
   # "crates/legacy",
   "crates/holochain",
   "crates/state",

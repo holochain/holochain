@@ -96,7 +96,7 @@ pub mod tests {
     use sx_state::{
         env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
         error::WorkspaceResult,
-        test_utils::test_env,
+        test_utils::test_env, Reader,
     };
     use tempdir::TempDir;
 
@@ -104,8 +104,8 @@ pub mod tests {
     fn asdf() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let dbm = DbManager::new(env)?;
-        env.with_reader(|reader| {
+        let dbm = DbManager::new(arc.env())?;
+        arc.env().with_reader(|reader| {
             let source_chain = SourceChainBuffer::new(&reader, &dbm, env)?;
             Ok(())
         })?;

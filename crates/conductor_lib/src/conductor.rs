@@ -1,3 +1,4 @@
+use sx_types::shims::Keystore;
 use std::collections::HashMap;
 use sx_cell::{conductor_api::ConductorCellApiT, cell::{Cell, CellId, NetSender}};
 
@@ -90,5 +91,5 @@ use crate::{
     error::{ConductorError, ConductorResult},
 };
 pub use builder::*;
-use sx_keystore::keystore::Keystore;
+// use sx_keystore::keystore::Keystore;
 use sx_types::agent::AgentId;

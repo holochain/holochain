@@ -170,7 +170,8 @@ pub mod tests {
     #[test]
     fn kv_iterators() -> WorkspaceResult<()> {
         let arc = test_env();
-        let db = arc.env().inner().open_single("kv", StoreOptions::create())?;
+        let env = arc.env();
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
             let mut buf: TestBuf = KvBuffer::new(&reader, db)?;
@@ -201,7 +202,8 @@ pub mod tests {
     #[test]
     fn kv_empty_iterators() {
         let arc = test_env();
-        let db = arc.env().inner().open_single("kv", StoreOptions::create()).unwrap();
+        let env = arc.env();
+        let db = env.inner().open_single("kv", StoreOptions::create()).unwrap();
 
         env.with_reader(|reader| {
             let buf: TestBuf = KvBuffer::new(&reader, db).unwrap();
