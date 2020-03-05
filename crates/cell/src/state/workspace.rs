@@ -25,10 +25,10 @@ pub struct InvokeZomeWorkspace<'env> {
 // }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(reader: &'env Reader<'env>, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager<'env>) -> WorkspaceResult<Self> {
         Ok(Self {
-            cas: ChainCasBuffer::primary(reader, dbm)?,
-            // meta: KvvBuffer::new(reader, dbm)?,
+            cas: ChainCasBuffer::primary(reader, dbs)?,
+            // meta: KvvBuffer::new(reader, dbs)?,
         })
     }
 
@@ -67,11 +67,11 @@ pub mod tests {
     impl<'env> TestWorkspace<'env> {
         pub fn new(
             reader: &'env Reader<'env>,
-            dbm: &'env DbManager<'env>,
+            dbs: &'env DbManager<'env>,
         ) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuffer::new(reader, *dbm.get(&*CHAIN_ENTRIES)?)?,
-                two: KvBuffer::new(reader, *dbm.get(&*CHAIN_HEADERS)?)?,
+                one: KvBuffer::new(reader, *dbs.get(&*CHAIN_ENTRIES)?)?,
+                two: KvBuffer::new(reader, *dbs.get(&*CHAIN_HEADERS)?)?,
             })
         }
     }
@@ -89,12 +89,12 @@ pub mod tests {
     fn workspace_sanity_check() {
         let arc = test_env();
         let env = arc.env();
-        let dbm = arc.dbs().unwrap();
+        let dbs = arc.dbs().unwrap();
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {
             let reader = env.reader().unwrap();
-            let mut workspace = TestWorkspace::new(&reader, &dbm).unwrap();
+            let mut workspace = TestWorkspace::new(&reader, &dbs).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), None);
 
             workspace.one.put(addr1.clone(), 1);
@@ -107,7 +107,7 @@ pub mod tests {
         // Ensure that the data was persisted
         {
             let reader = env.reader().unwrap();
-            let workspace = TestWorkspace::new(&reader, &dbm).unwrap();
+            let workspace = TestWorkspace::new(&reader, &dbs).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
         }
     }

@@ -24,10 +24,10 @@ pub struct SourceChainBuffer<'env, R: Readable, RM: ReadManager> {
 }
 
 impl<'env, R: Readable, RM: ReadManager> SourceChainBuffer<'env, R, RM> {
-    pub fn new(reader: &'env R, dbm: &'env DbManager, rm: RM) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, dbs: &'env DbManager, rm: RM) -> WorkspaceResult<Self> {
         Ok(Self {
-            cas: ChainCasBuffer::primary(reader, dbm)?,
-            sequence: ChainSequenceBuffer::new(reader, dbm)?,
+            cas: ChainCasBuffer::primary(reader, dbs)?,
+            sequence: ChainSequenceBuffer::new(reader, dbs)?,
             rm,
         })
     }
@@ -104,9 +104,9 @@ pub mod tests {
     fn asdf() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let dbm = arc.dbs()?;
+        let dbs = arc.dbs()?;
         arc.env().with_reader(|reader| {
-            let source_chain = SourceChainBuffer::new(&reader, &dbm, env)?;
+            let source_chain = SourceChainBuffer::new(&reader, &dbs, env)?;
             Ok(())
         })?;
         Ok(())

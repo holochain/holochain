@@ -31,9 +31,9 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
         })
     }
 
-    pub fn primary(reader: &'env R, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
-        let entries = dbm.get(&*CHAIN_ENTRIES)?.clone();
-        let headers = dbm.get(&*CHAIN_HEADERS)?.clone();
+    pub fn primary(reader: &'env R, dbs: &'env DbManager<'env>) -> WorkspaceResult<Self> {
+        let entries = dbs.get(&*CHAIN_ENTRIES)?.clone();
+        let headers = dbs.get(&*CHAIN_HEADERS)?.clone();
         Self::new(reader, entries, headers)
     }
 

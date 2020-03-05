@@ -34,8 +34,8 @@ pub struct ChainSequenceBuffer<'e, R: Readable> {
 }
 
 impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
-    pub fn new(reader: &'e R, dbm: &'e DbManager<'e>) -> WorkspaceResult<Self> {
-        let db: Store<'e, R> = KvIntBuffer::new(reader, dbm.get(&*CHAIN_SEQUENCE)?.clone())?;
+    pub fn new(reader: &'e R, dbs: &'e DbManager<'e>) -> WorkspaceResult<Self> {
+        let db: Store<'e, R> = KvIntBuffer::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
         Self::from_db(db)
     }
 
@@ -109,9 +109,9 @@ pub mod tests {
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let dbm = arc.dbs()?;
+        let dbs = arc.dbs()?;
         env.with_reader(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
             buf.add_header(Address::from("0"));
             assert_eq!(buf.chain_head(), Some(&Address::from("0")));
@@ -129,9 +129,9 @@ pub mod tests {
     fn chain_sequence_functionality() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let dbm = arc.dbs()?;
+        let dbs = arc.dbs()?;
         env.with_reader(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
             assert_eq!(buf.chain_head(), Some(&Address::from("1")));
@@ -141,7 +141,7 @@ pub mod tests {
         })?;
 
         env.with_reader(|reader| {
-            let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+            let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
             assert_eq!(items, vec![0, 1, 2]);
@@ -149,7 +149,7 @@ pub mod tests {
         })?;
 
         env.with_reader(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
@@ -158,7 +158,7 @@ pub mod tests {
         })?;
 
         env.with_reader(|reader| {
-            let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+            let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("5")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
@@ -179,11 +179,11 @@ pub mod tests {
         let local = tokio::task::LocalSet::new();
 
         let task1 = tokio::spawn(async move {
-            let dbm = arc1.dbs()?;
+            let dbs = arc1.dbs()?;
             let env = arc1.env();
             let reader = env.reader()?;
             let mut buf = {
-                ChainSequenceBuffer::new(&reader, &dbm)?
+                ChainSequenceBuffer::new(&reader, &dbs)?
             };
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
@@ -201,10 +201,10 @@ pub mod tests {
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
             let env = arc2.env();
-            let dbm = arc2.dbs()?;
+            let dbs = arc2.dbs()?;
 
             let reader = env.reader()?;
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
