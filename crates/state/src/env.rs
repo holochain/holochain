@@ -9,6 +9,12 @@ use std::{
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
+#[cfg(feature = "lmdb_no_tls")]
+fn default_flags() -> EnvironmentFlags { EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC | EnvironmentFlags::NO_TLS }
+
+#[cfg(not(feature = "lmdb_no_tls"))]
+fn default_flags() -> EnvironmentFlags { EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC }
+
 /// A standard way to create a representation of an LMDB environment suitable for Holochain
 /// TODO: put this behind a singleton HashMap, just like rkv::Manager,
 ///     but wrap it in Arc<_> instead of Arc<RwLock<_>>
@@ -39,9 +45,7 @@ fn rkv_builder(
             // There is some loss of data integrity guarantees that comes with this.
             // NO_TLS associates read slots with the transaction object instead of the thread, which is crucial for us
             // so we can have multiple read transactions per thread (since futures can run on any thread)
-            .set_flags(flags.unwrap_or_else(|| {
-                EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC | EnvironmentFlags::NO_TLS
-            }));
+            .set_flags(flags.unwrap_or_else(default_flags));
         Rkv::from_env(path, env_builder)
     }
 }
