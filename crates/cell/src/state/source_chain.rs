@@ -104,7 +104,7 @@ pub mod tests {
     fn asdf() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let dbm = DbManager::new(arc.env())?;
+        let dbm = arc.dbs()?;
         arc.env().with_reader(|reader| {
             let source_chain = SourceChainBuffer::new(&reader, &dbm, env)?;
             Ok(())

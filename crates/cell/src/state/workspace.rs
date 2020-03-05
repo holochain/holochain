@@ -89,7 +89,7 @@ pub mod tests {
     fn workspace_sanity_check() {
         let arc = test_env();
         let env = arc.env();
-        let dbm = DbManager::new(arc.env()).unwrap();
+        let dbm = arc.dbs().unwrap();
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {
@@ -101,7 +101,7 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true);
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
             assert_eq!(workspace.two.get(&addr2).unwrap(), Some(true));
-            workspace.finalize(env.writer().unwrap());
+            workspace.finalize(env.writer().unwrap()).unwrap();
         }
 
         // Ensure that the data was persisted

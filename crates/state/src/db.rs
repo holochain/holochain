@@ -67,7 +67,7 @@ pub struct DbManager<'env> {
 }
 
 impl<'env> DbManager<'env> {
-    pub fn new(env: Env<'env>) -> WorkspaceResult<Self> {
+    pub(crate) fn new(env: Env<'env>) -> WorkspaceResult<Self> {
         let mut this = Self {
             env,
             um: UniversalMap::new(),
@@ -126,40 +126,3 @@ impl<'env> DbManager<'env> {
         }
     }
 }
-
-// pub struct ReadManager<'env>(&'env Rkv);
-
-// impl<'e> ReadManager<'e> {
-//     pub fn new(env: &'e Rkv) -> Self {
-//         Self(env)
-//     }
-
-//     pub fn reader(&self) -> WorkspaceResult<Reader<'e>> {
-//         Ok(Reader(self.0.read()?))
-//     }
-
-//     pub fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(
-//         &self,
-//         f: F,
-//     ) -> WorkspaceResult<R> {
-//         f(Reader(self.0.read()?))
-//     }
-// }
-
-// pub struct WriteManager<'env>(&'env Rkv);
-
-// impl<'e> WriteManager<'e> {
-//     pub fn new(env: &'e Rkv) -> Self {
-//         Self(env)
-//     }
-
-//     pub fn with_commit<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
-//         &self,
-//         f: F,
-//     ) -> WorkspaceResult<R> {
-//         let mut writer = self.0.write()?;
-//         let result = f(&mut writer);
-//         writer.commit()?;
-//         result
-//     }
-// }

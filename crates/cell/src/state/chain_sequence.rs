@@ -109,7 +109,7 @@ pub mod tests {
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let dbm = DbManager::new(arc.env())?;
+        let dbm = arc.dbs()?;
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             assert_eq!(buf.chain_head(), None);
@@ -129,7 +129,7 @@ pub mod tests {
     fn chain_sequence_functionality() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let dbm = DbManager::new(arc.env())?;
+        let dbm = arc.dbs()?;
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
             buf.add_header(Address::from("0"));
@@ -179,7 +179,7 @@ pub mod tests {
         let local = tokio::task::LocalSet::new();
 
         let task1 = tokio::spawn(async move {
-            let dbm = DbManager::new(arc1.env())?;
+            let dbm = arc1.dbs()?;
             let env = arc1.env();
             let reader = env.reader()?;
             let mut buf = {
@@ -201,7 +201,7 @@ pub mod tests {
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
             let env = arc2.env();
-            let dbm = DbManager::new(arc2.env())?;
+            let dbm = arc2.dbs()?;
 
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;

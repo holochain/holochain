@@ -21,7 +21,7 @@ pub fn create_lmdb_env(path: &Path) -> WorkspaceResult<EnvArc> {
     //     .get_or_create(path, rkv_builder(initial_map_size, flags))
     //     .unwrap();
     let rkv = rkv_builder(initial_map_size, flags)(path)?;
-    Ok(EnvArc(Arc::new(rkv)))
+    Ok(EnvArc::new(rkv))
 }
 
 fn rkv_builder(
@@ -52,11 +52,22 @@ pub type DbManager<'e> = crate::db::DbManager<'e>;
 /// There can only be one owned value of `Rkv`. EnvArc is a simple wrapper around an `Arc<Rkv>`,
 /// which can produce as many `Env` values as needed.
 #[derive(Clone)]
-pub struct EnvArc(Arc<Rkv>);
+pub struct EnvArc {
+    rkv: Arc<Rkv>,
+}
 
 impl EnvArc {
+    fn new(rkv: Rkv) -> Self {
+        Self { rkv: Arc::new(rkv) }
+    }
+
     pub fn env(&self) -> Env {
-        Env(&self.0)
+        Env(&self.rkv)
+    }
+
+    // TODO: make sure this is never called more than once per environment!
+    pub fn dbs(&self) -> WorkspaceResult<DbManager> {
+        DbManager::new(self.env())
     }
 }
 
