@@ -21,9 +21,16 @@ enum ConResponse {
 #[derive(Clone)]
 pub struct ConnectionSender {
     sender: rpc_channel::RpcChannelSender<ConCommand, ConResponse>,
+
+    listener: ListenerSender,
 }
 
 impl ConnectionSender {
+    /// Get a reference to the listener that controls this connection.
+    pub fn get_listener(&self) -> ListenerSender {
+        self.listener.clone()
+    }
+
     /// Send a custom command to the connection task.
     /// See the documentation for the specific connection type you are messaging.
     pub async fn custom(&mut self, any: BoxAny) -> Result<BoxAny> {
@@ -118,12 +125,13 @@ pub type SpawnConnection<H> =
 /// You probably want a spawn function for a specific type of connection.
 pub async fn spawn_connection<H: ConnectionHandler>(
     channel_size: usize,
+    listener: ListenerSender,
     constructor: SpawnConnection<H>,
 ) -> Result<(ConnectionSender, IncomingRequestReceiver)> {
     let (incoming_sender, incoming_receiver) = tokio::sync::mpsc::channel(channel_size);
     let (sender, mut receiver) = rpc_channel::rpc_channel::<ConCommand, ConResponse>(channel_size);
 
-    let sender = ConnectionSender { sender };
+    let sender = ConnectionSender { sender, listener };
 
     let mut handler = constructor(sender.clone(), incoming_sender).await?;
 
@@ -163,6 +171,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_connection_api() {
+        struct Foo;
+        impl ListenerHandler for Foo {
+            fn handle_shutdown(&mut self) -> FutureResult<()> {
+                async move { Ok(()) }.boxed()
+            }
+
+            fn handle_get_bound_url(&mut self) -> FutureResult<Url2> {
+                async move { Ok(url2!("test://test/")) }.boxed()
+            }
+
+            fn handle_connect(
+                &mut self,
+                _url: Url2,
+            ) -> FutureResult<(ConnectionSender, IncomingRequestReceiver)> {
+                async move { Err(TransportError::Other("unimplemented".into())) }.boxed()
+            }
+        }
+        let (l, _) = spawn_listener(10, "test", Box::new(|_, _| async move { Ok(Foo) }.boxed()))
+            .await
+            .unwrap();
         struct Bob;
         impl ConnectionHandler for Bob {
             fn handle_shutdown(&mut self) -> FutureResult<()> {
@@ -179,7 +207,7 @@ mod tests {
         }
         let test_constructor: SpawnConnection<Bob> =
             Box::new(|_, _| async move { Ok(Bob) }.boxed());
-        let (mut r, _) = spawn_connection(10, test_constructor).await.unwrap();
+        let (mut r, _) = spawn_connection(10, l, test_constructor).await.unwrap();
         assert_eq!("test://test/", r.get_remote_url().await.unwrap().as_str());
         assert_eq!(
             b"123".to_vec(),

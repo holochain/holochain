@@ -8,6 +8,26 @@
 //! #
 //! # pub async fn async_main() {
 //! #
+//! struct Foo;
+//! impl ListenerHandler for Foo {
+//!     fn handle_shutdown(&mut self) -> FutureResult<()> {
+//!         async move { Ok(()) }.boxed()
+//!     }
+//!
+//!     fn handle_get_bound_url(&mut self) -> FutureResult<Url2> {
+//!         async move { Ok(url2!("test://test/")) }.boxed()
+//!     }
+//!
+//!     fn handle_connect(
+//!         &mut self,
+//!         _url: Url2,
+//!     ) -> FutureResult<(ConnectionSender, IncomingRequestReceiver)> {
+//!         async move { Err(TransportError::Other("unimplemented".into())) }.boxed()
+//!     }
+//! }
+//! let (l, _) = spawn_listener(10, "test", Box::new(|_, _| {
+//!     async move { Ok(Foo) }.boxed()
+//! })).await.unwrap();
 //! struct Bob;
 //! impl ConnectionHandler for Bob {
 //!     fn handle_shutdown(&mut self) -> FutureResult<()> {
@@ -23,7 +43,7 @@
 //!     }
 //! }
 //! let test_constructor: SpawnConnection<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
-//! let (mut r, _) = spawn_connection(10, test_constructor).await.unwrap();
+//! let (mut r, _) = spawn_connection(10, l, test_constructor).await.unwrap();
 //! assert_eq!("test://test/", r.get_remote_url().await.unwrap().as_str());
 //! assert_eq!(b"123".to_vec(), r.outgoing_request(b"123".to_vec()).await.unwrap());
 //! #

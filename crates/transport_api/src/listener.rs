@@ -22,9 +22,18 @@ enum ListenResponse {
 #[derive(Clone)]
 pub struct ListenerSender {
     sender: rpc_channel::RpcChannelSender<ListenCommand, ListenResponse>,
+
+    // safe to clone as these should generally be small
+    protocol: String,
 }
 
 impl ListenerSender {
+    /// What protocol is this connection functioning over.
+    /// i.e. "tcp", "wss", "holo-quic", ...
+    pub fn get_protocol(&self) -> &str {
+        &self.protocol
+    }
+
     /// Send a custom command to the listener task.
     /// See the documentation for the specific listener type you are messaging.
     pub async fn custom(&mut self, any: BoxAny) -> Result<BoxAny> {
@@ -121,13 +130,17 @@ pub type SpawnListener<H> =
 /// You probably want a spawn function for a specific type of connection.
 pub async fn spawn_listener<H: ListenerHandler>(
     channel_size: usize,
+    protocol: &str,
     constructor: SpawnListener<H>,
 ) -> Result<(ListenerSender, IncomingConnectionReceiver)> {
     let (incoming_sender, incoming_receiver) = tokio::sync::mpsc::channel(channel_size);
     let (sender, mut receiver) =
         rpc_channel::rpc_channel::<ListenCommand, ListenResponse>(channel_size);
 
-    let sender = ListenerSender { sender };
+    let sender = ListenerSender {
+        sender,
+        protocol: protocol.to_string(),
+    };
 
     let mut handler = constructor(sender.clone(), incoming_sender).await?;
 
@@ -185,7 +198,8 @@ mod tests {
             }
         }
         let test_constructor: SpawnListener<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
-        let (mut r, _) = spawn_listener(10, test_constructor).await.unwrap();
+        let (mut r, _) = spawn_listener(10, "test", test_constructor).await.unwrap();
+        assert_eq!("test", r.get_protocol());
         assert_eq!("test://test/", r.get_bound_url().await.unwrap().as_str());
         assert!(r.connect(url2!("test://test/")).await.is_err());
         r.custom(Box::new(()))
