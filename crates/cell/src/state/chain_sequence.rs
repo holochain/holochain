@@ -10,7 +10,7 @@ use sx_state::{
     buffer::{KvIntBuffer, StoreBuffer},
     db::{DbManager, DbName, CHAIN_SEQUENCE},
     error::{WorkspaceError, WorkspaceResult},
-    Readable, Reader, RkvEnv, Writer,
+    Readable, Reader, Writer,
 };
 use sx_types::prelude::Address;
 
@@ -34,8 +34,8 @@ pub struct ChainSequenceBuffer<'e, R: Readable> {
 }
 
 impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
-    pub fn new(reader: &'e R, dbm: &'e DbManager<'e>) -> WorkspaceResult<Self> {
-        let db: Store<'e, R> = KvIntBuffer::new(reader, dbm.get(&*CHAIN_SEQUENCE)?.clone())?;
+    pub fn new(reader: &'e R, dbs: &'e DbManager<'e>) -> WorkspaceResult<Self> {
+        let db: Store<'e, R> = KvIntBuffer::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
         Self::from_db(db)
     }
 
@@ -98,8 +98,7 @@ pub mod tests {
     use super::{ChainSequenceBuffer, StoreBuffer};
     use std::sync::Arc;
     use sx_state::{
-        db::{DbManager, ReadManager, WriteManager},
-        env::create_lmdb_env,
+        env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
         error::{WorkspaceError, WorkspaceResult},
         test_utils::test_env,
     };
@@ -109,12 +108,10 @@ pub mod tests {
     #[test]
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let dbm = DbManager::new(&env)?;
-        let rm = ReadManager::new(&env);
-        let wm = WriteManager::new(&env);
-        rm.with_reader(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+        let env = arc.env();
+        let dbs = arc.dbs()?;
+        env.with_reader(|reader| {
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
             buf.add_header(Address::from("0"));
             assert_eq!(buf.chain_head(), Some(&Address::from("0")));
@@ -131,39 +128,37 @@ pub mod tests {
     #[test]
     fn chain_sequence_functionality() -> WorkspaceResult<()> {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let dbm = DbManager::new(&env)?;
-        let rm = ReadManager::new(&env);
-        let wm = WriteManager::new(&env);
-        rm.with_reader(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+        let env = arc.env();
+        let dbs = arc.dbs()?;
+        env.with_reader(|reader| {
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
             assert_eq!(buf.chain_head(), Some(&Address::from("1")));
             buf.add_header(Address::from("2"));
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
             Ok(())
         })?;
 
-        rm.with_reader(|reader| {
-            let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+        env.with_reader(|reader| {
+            let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
         })?;
 
-        rm.with_reader(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+        env.with_reader(|reader| {
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
             Ok(())
         })?;
 
-        rm.with_reader(|reader| {
-            let buf = ChainSequenceBuffer::new(&reader, &dbm)?;
+        env.with_reader(|reader| {
+            let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("5")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
@@ -183,49 +178,43 @@ pub mod tests {
 
         let local = tokio::task::LocalSet::new();
 
-        // run in same thread, because these futures are not Send...or are they?
-        let (result1, result2) = local.run_until(async move {
+        let task1 = tokio::spawn(async move {
+            let dbs = arc1.dbs()?;
+            let env = arc1.env();
+            let reader = env.reader()?;
+            let mut buf = {
+                ChainSequenceBuffer::new(&reader, &dbs)?
+            };
+            buf.add_header(Address::from("0"));
+            buf.add_header(Address::from("1"));
+            buf.add_header(Address::from("2"));
 
-            let task1 = tokio::task::spawn_local(async move {
-                let env = arc1.read().unwrap();
-                let dbm = DbManager::new(&env)?;
-                let rm = ReadManager::new(&env);
-                let reader = rm.reader()?;
-                let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
-                buf.add_header(Address::from("0"));
-                buf.add_header(Address::from("1"));
-                buf.add_header(Address::from("2"));
+            // let the other task run and make a commit to the chain head,
+            // which will cause this one to error out when it re-enters and tries to commit
+            tx1.send(()).unwrap();
+            rx2.await.unwrap();
 
-                // let the other task run and make a commit to the chain head,
-                // which will cause this one to error out when it re-enters and tries to commit
-                tx1.send(()).unwrap();
-                rx2.await.unwrap();
+            let env = arc1.env();
+            env.with_commit(|mut writer| buf.finalize(&mut writer))
+        });
 
-                let env = arc1.read().unwrap();
-                let wm = WriteManager::new(&env);
-                wm.with_writer(|mut writer| buf.finalize(&mut writer))
-            });
+        let task2 = tokio::spawn(async move {
+            rx1.await.unwrap();
+            let env = arc2.env();
+            let dbs = arc2.dbs()?;
 
-            let task2 = tokio::task::spawn_local(async move {
-                rx1.await.unwrap();
-                let env = arc2.read().unwrap();
-                let dbm = DbManager::new(&env)?;
-                let rm = ReadManager::new(&env);
-                let wm = WriteManager::new(&env);
+            let reader = env.reader()?;
+            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
+            buf.add_header(Address::from("3"));
+            buf.add_header(Address::from("4"));
+            buf.add_header(Address::from("5"));
 
-                let reader = rm.reader()?;
-                let mut buf = ChainSequenceBuffer::new(&reader, &dbm)?;
-                buf.add_header(Address::from("3"));
-                buf.add_header(Address::from("4"));
-                buf.add_header(Address::from("5"));
+            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
+            tx2.send(()).unwrap();
+            Result::<_, WorkspaceError>::Ok(())
+        });
 
-                wm.with_writer(|mut writer| buf.finalize(&mut writer))?;
-                tx2.send(()).unwrap();
-                Result::<_, WorkspaceError>::Ok(())
-            });
-
-            tokio::join!(task1, task2)
-        }).await;
+        let (result1, result2) = tokio::join!(task1, task2);
 
         assert_eq!(result1.unwrap(), Err(WorkspaceError::SourceChainHeadMoved));
         assert!(result2.unwrap().is_ok());

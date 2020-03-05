@@ -25,10 +25,10 @@ pub struct InvokeZomeWorkspace<'env> {
 // }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(reader: &'env Reader<'env>, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager<'env>) -> WorkspaceResult<Self> {
         Ok(Self {
-            cas: ChainCasBuffer::primary(reader, dbm)?,
-            // meta: KvvBuffer::new(reader, dbm)?,
+            cas: ChainCasBuffer::primary(reader, dbs)?,
+            // meta: KvvBuffer::new(reader, dbs)?,
         })
     }
 
@@ -52,9 +52,9 @@ pub mod tests {
     use sx_state::{
         buffer::{KvBuffer, StoreBuffer},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
-        env::create_lmdb_env,
+        env::{ReadManager, WriteManager},
         error::WorkspaceResult,
-        Reader, SingleStore, Writer,
+        Reader, SingleStore, Writer, test_utils::test_env,
     };
     use sx_types::prelude::*;
     use tempdir::TempDir;
@@ -67,11 +67,11 @@ pub mod tests {
     impl<'env> TestWorkspace<'env> {
         pub fn new(
             reader: &'env Reader<'env>,
-            dbm: &'env DbManager<'env>,
+            dbs: &'env DbManager<'env>,
         ) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuffer::new(reader, *dbm.get(&*CHAIN_ENTRIES)?)?,
-                two: KvBuffer::new(reader, *dbm.get(&*CHAIN_HEADERS)?)?,
+                one: KvBuffer::new(reader, *dbs.get(&*CHAIN_ENTRIES)?)?,
+                two: KvBuffer::new(reader, *dbs.get(&*CHAIN_HEADERS)?)?,
             })
         }
     }
@@ -87,28 +87,27 @@ pub mod tests {
 
     #[test]
     fn workspace_sanity_check() {
-        let tmpdir = TempDir::new("skunkworx").unwrap();
-        let created_arc = create_lmdb_env(tmpdir.path());
-        let env = created_arc.read().unwrap();
-        let dbm = DbManager::new(&env).unwrap();
+        let arc = test_env();
+        let env = arc.env();
+        let dbs = arc.dbs().unwrap();
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {
-            let reader = env.read().unwrap();
-            let mut workspace = TestWorkspace::new(&reader, &dbm).unwrap();
+            let reader = env.reader().unwrap();
+            let mut workspace = TestWorkspace::new(&reader, &dbs).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), None);
 
             workspace.one.put(addr1.clone(), 1);
             workspace.two.put(addr2.clone(), true);
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
             assert_eq!(workspace.two.get(&addr2).unwrap(), Some(true));
-            workspace.finalize(env.write().unwrap()).unwrap();
+            workspace.finalize(env.writer().unwrap()).unwrap();
         }
 
         // Ensure that the data was persisted
         {
-            let reader = env.read().unwrap();
-            let workspace = TestWorkspace::new(&reader, &dbm).unwrap();
+            let reader = env.reader().unwrap();
+            let workspace = TestWorkspace::new(&reader, &dbs).unwrap();
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
         }
     }

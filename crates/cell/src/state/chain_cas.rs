@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
     error::WorkspaceResult,
-    RkvEnv, Writer, db::DbManager, Reader, SingleStore, Readable,
+    Writer, env::DbManager, Reader, SingleStore, Readable,
 };
 use sx_types::{
     chain_header::{HeaderWithEntry, ChainHeader},
@@ -31,9 +31,9 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
         })
     }
 
-    pub fn primary(reader: &'env R, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
-        let entries = dbm.get(&*CHAIN_ENTRIES)?.clone();
-        let headers = dbm.get(&*CHAIN_HEADERS)?.clone();
+    pub fn primary(reader: &'env R, dbs: &'env DbManager<'env>) -> WorkspaceResult<Self> {
+        let entries = dbs.get(&*CHAIN_ENTRIES)?.clone();
+        let headers = dbs.get(&*CHAIN_HEADERS)?.clone();
         Self::new(reader, entries, headers)
     }
 

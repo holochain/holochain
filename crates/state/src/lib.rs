@@ -1,6 +1,9 @@
 #![feature(backtrace)]
-use error::WorkspaceResult;
+
 use shrinkwraprs::Shrinkwrap;
+use lmdb::{RoCursor, Database};
+use rkv::{Value, StoreError};
+
 
 pub mod buffer;
 pub mod db;
@@ -15,34 +18,32 @@ pub mod test_utils;
 pub trait Readable: rkv::Readable {}
 impl<T: rkv::Readable> Readable for T {}
 
-pub type Reader<'env> = rkv::Reader<'env>;
+#[derive(Shrinkwrap)]
+pub struct Reader<'env>(rkv::Reader<'env>);
+
+impl<'env> rkv::Readable for Reader<'env> {
+    fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
+        self.0.get(db, k)
+    }
+
+    fn open_ro_cursor(&self, db: Database) -> Result<RoCursor, StoreError> {
+        self.0.open_ro_cursor(db)
+    }
+}
+
+impl<'env> From<rkv::Reader<'env>> for Reader<'env> {
+    fn from(r: rkv::Reader<'env>) -> Reader {
+        Reader(r)
+    }
+}
+
 pub type Writer<'env> = rkv::Writer<'env>;
 pub type SingleStore = rkv::SingleStore;
 pub type IntegerStore = rkv::IntegerStore<u32>;
 pub type MultiStore = rkv::MultiStore;
 
-// TODO: remove ASAP, once we know how to actually create an env and get databases
-#[derive(Shrinkwrap)]
-pub struct RkvEnv(rkv::Rkv);
+#[cfg(feature = "lmdb_no_tls")]
+unsafe impl<'env> Send for Reader<'env> {}
 
-impl RkvEnv {
-    pub fn read(&self) -> WorkspaceResult<Reader> {
-        Ok(self.0.read()?)
-    }
-
-    pub fn write(&self) -> WorkspaceResult<Writer> {
-        Ok(self.0.write()?)
-    }
-}
-
-pub struct Env(rkv::Rkv);
-
-impl Env {
-    pub fn read(&self) -> WorkspaceResult<Reader> {
-        Ok(self.0.read()?)
-    }
-
-    pub fn write(&self) -> WorkspaceResult<Writer> {
-        Ok(self.0.write()?)
-    }
-}
+#[cfg(feature = "lmdb_no_tls")]
+unsafe impl<'env> Sync for Reader<'env> {}

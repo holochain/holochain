@@ -5,9 +5,9 @@
 use super::{BufferIntKey, BufferVal, StoreBuffer};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
-    Readable,
+    Readable, Reader, Writer,
 };
-use rkv::{IntegerStore, Reader, Writer};
+use rkv::{IntegerStore};
 
 use std::{collections::HashMap};
 
@@ -164,7 +164,7 @@ pub mod tests {
 
     use super::{KvIntBuffer, StoreBuffer};
     use crate::{
-        db::{ReadManager, WriteManager},
+        env::{ReadManager, WriteManager},
         test_utils::test_env,
     };
     use rkv::StoreOptions;
@@ -183,12 +183,10 @@ pub mod tests {
     #[test]
     fn kv_iterators() {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let db = env.open_integer("kv", StoreOptions::create()).unwrap();
-        let rm = ReadManager::new(&env);
-        let wm = WriteManager::new(&env);
+        let env = arc.env();
+        let db = env.inner().open_integer("kv", StoreOptions::create()).unwrap();
 
-        rm.with_reader(|reader| {
+        env.with_reader(|reader| {
             let mut buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
             buf.put(1, V(1));
@@ -197,11 +195,11 @@ pub mod tests {
             buf.put(4, V(4));
             buf.put(5, V(5));
 
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))
+            env.with_commit(|mut writer| buf.finalize(&mut writer))
         })
         .unwrap();
 
-        rm.with_reader(|reader| {
+        env.with_reader(|reader| {
             let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
@@ -223,11 +221,10 @@ pub mod tests {
     #[test]
     fn kv_empty_iterators() {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let db = env.open_integer("kv", StoreOptions::create()).unwrap();
-        let rm = ReadManager::new(&env);
+        let env = arc.env();
+        let db = env.inner().open_integer("kv", StoreOptions::create()).unwrap();
 
-        rm.with_reader(|reader| {
+        env.with_reader(|reader| {
             let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();

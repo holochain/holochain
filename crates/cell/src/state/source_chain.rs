@@ -3,12 +3,12 @@ use super::{
     chain_sequence::ChainSequenceBuffer,
 };
 use core::ops::Deref;
-use db::ReadManager;
 use sx_state::{
     buffer::StoreBuffer,
     db::{self, DbManager},
+    env::ReadManager,
     error::WorkspaceResult,
-    Readable, Reader, RkvEnv, Writer,
+    Readable, Reader, Writer,
 };
 use sx_types::{
     chain_header::ChainHeader,
@@ -17,21 +17,17 @@ use sx_types::{
     signature::{Provenance, Signature},
 };
 
-pub struct SourceChainBuffer<'env, R: Readable> {
+pub struct SourceChainBuffer<'env, R: Readable, RM: ReadManager> {
     cas: ChainCasBuffer<'env, R>,
     sequence: ChainSequenceBuffer<'env, R>,
-    rm: &'env ReadManager<'env>,
+    rm: RM,
 }
 
-impl<'env, R: Readable> SourceChainBuffer<'env, R> {
-    pub fn new(
-        reader: &'env R,
-        dbm: &'env DbManager,
-        rm: &'env ReadManager,
-    ) -> WorkspaceResult<Self> {
+impl<'env, R: Readable, RM: ReadManager> SourceChainBuffer<'env, R, RM> {
+    pub fn new(reader: &'env R, dbs: &'env DbManager, rm: RM) -> WorkspaceResult<Self> {
         Ok(Self {
-            cas: ChainCasBuffer::primary(reader, dbm)?,
-            sequence: ChainSequenceBuffer::new(reader, dbm)?,
+            cas: ChainCasBuffer::primary(reader, dbs)?,
+            sequence: ChainSequenceBuffer::new(reader, dbs)?,
             rm,
         })
     }
@@ -85,7 +81,7 @@ impl<'env, R: Readable> SourceChainBuffer<'env, R> {
     }
 }
 
-impl<'env, R: Readable> StoreBuffer<'env> for SourceChainBuffer<'env, R> {
+impl<'env, R: Readable, RM: ReadManager> StoreBuffer<'env> for SourceChainBuffer<'env, R, RM> {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         self.cas.finalize(writer)?;
         self.sequence.finalize(writer)?;
@@ -98,21 +94,19 @@ pub mod tests {
 
     use super::{SourceChainBuffer, StoreBuffer};
     use sx_state::{
-        db::{DbManager, ReadManager, WriteManager},
-        env::create_lmdb_env,
+        env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
         error::WorkspaceResult,
-        test_utils::test_env,
+        test_utils::test_env, Reader,
     };
     use tempdir::TempDir;
 
     #[test]
     fn asdf() -> WorkspaceResult<()> {
         let arc = test_env();
-        let env = arc.read().unwrap();
-        let dbm = DbManager::new(&env)?;
-        let rm = ReadManager::new(&env);
-        rm.with_reader(|reader| {
-            let source_chain = SourceChainBuffer::new(&reader, &dbm, &rm)?;
+        let env = arc.env();
+        let dbs = arc.dbs()?;
+        arc.env().with_reader(|reader| {
+            let source_chain = SourceChainBuffer::new(&reader, &dbs, env)?;
             Ok(())
         })?;
         Ok(())
