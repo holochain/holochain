@@ -13,6 +13,7 @@ use sx_state::{
     Readable, Reader, Writer,
 };
 use sx_types::prelude::Address;
+use crate::agent::error::{SourceChainResult, SourceChainError};
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Serialize, Deserialize)]
@@ -82,12 +83,17 @@ impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
 }
 
 impl<'env, R: Readable> StoreBuffer<'env> for ChainSequenceBuffer<'env, R> {
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    type Error = SourceChainError;
+
+    /// Commit to the source chain, performing an as-at check and returning a
+    /// SourceChainError::HeadMoved error if the as-at check fails
+    fn finalize(self, writer: &'env mut Writer) -> SourceChainResult<()> {
         let fresh = self.with_reader(writer)?;
-        if fresh.persisted_head != self.persisted_head {
-            Err(WorkspaceError::SourceChainHeadMoved)
+        let (old, new) = (self.persisted_head, fresh.persisted_head);
+        if old != new {
+            Err(SourceChainError::HeadMoved(old, new))
         } else {
-            self.db.finalize(writer)
+            Ok(self.db.finalize(writer)?)
         }
     }
 }
@@ -95,7 +101,7 @@ impl<'env, R: Readable> StoreBuffer<'env> for ChainSequenceBuffer<'env, R> {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{ChainSequenceBuffer, StoreBuffer};
+    use super::{ChainSequenceBuffer, StoreBuffer, SourceChainError};
     use std::sync::Arc;
     use sx_state::{
         env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
@@ -104,6 +110,7 @@ pub mod tests {
     };
     use sx_types::prelude::Address;
     use tempdir::TempDir;
+    use crate::agent::error::SourceChainResult;
 
     #[test]
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
@@ -120,17 +127,15 @@ pub mod tests {
             buf.add_header(Address::from("2"));
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             Ok(())
-        })?;
-
-        Ok(())
+        })
     }
 
     #[test]
-    fn chain_sequence_functionality() -> WorkspaceResult<()> {
+    fn chain_sequence_functionality() -> SourceChainResult<()> {
         let arc = test_env();
         let env = arc.env();
         let dbs = arc.dbs()?;
-        env.with_reader(|reader| {
+        env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
@@ -140,7 +145,7 @@ pub mod tests {
             Ok(())
         })?;
 
-        env.with_reader(|reader| {
+        env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
@@ -148,7 +153,7 @@ pub mod tests {
             Ok(())
         })?;
 
-        env.with_reader(|reader| {
+        env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
@@ -157,7 +162,7 @@ pub mod tests {
             Ok(())
         })?;
 
-        env.with_reader(|reader| {
+        env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("5")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
@@ -209,12 +214,12 @@ pub mod tests {
 
             env.with_commit(|mut writer| buf.finalize(&mut writer))?;
             tx2.send(()).unwrap();
-            Result::<_, WorkspaceError>::Ok(())
+            Result::<_, SourceChainError>::Ok(())
         });
 
         let (result1, result2) = tokio::join!(task1, task2);
 
-        assert_eq!(result1.unwrap(), Err(WorkspaceError::SourceChainHeadMoved));
+        assert_eq!(result1.unwrap(), Err(SourceChainError::HeadMoved(None, Some(Address::from("5")))));
         assert!(result2.unwrap().is_ok());
 
         Ok(())

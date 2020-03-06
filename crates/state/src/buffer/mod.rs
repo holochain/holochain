@@ -1,4 +1,3 @@
-use crate::error::WorkspaceResult;
 use rkv::Writer;
 
 mod cas;
@@ -18,9 +17,10 @@ use std::hash::Hash;
 /// i.e. iterating over a Vec<dyn StoreBuffer> is all that needs to happen
 /// to commit the workspace changes
 pub trait StoreBuffer<'env> {
+    type Error: std::error::Error;
     // fn iter(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;
     // fn iter_reverse(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()>;
+    fn finalize(self, writer: &'env mut Writer) -> Result<(), Self::Error>;
 }
 
 pub trait BufferKey: Hash + Eq + AsRef<[u8]> {}

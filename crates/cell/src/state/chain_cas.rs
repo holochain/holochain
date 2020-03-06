@@ -4,7 +4,7 @@ use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
     db::{CHAIN_ENTRIES, CHAIN_HEADERS},
     env::DbManager,
-    error::WorkspaceResult,
+    error::{WorkspaceError, WorkspaceResult},
     Readable, Reader, SingleStore, Writer,
 };
 use sx_types::{
@@ -98,6 +98,8 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
 }
 
 impl<'env, R: Readable> StoreBuffer<'env> for ChainCasBuffer<'env, R> {
+    type Error = WorkspaceError;
+
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         self.entries.finalize(writer)?;
         self.headers.finalize(writer)?;

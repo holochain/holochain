@@ -132,6 +132,8 @@ where
     K: Clone + BufferKey,
     V: BufferMultiVal,
 {
+    type Error = WorkspaceError;
+
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use Op::*;
         for (k, mut ops) in self.scratch.into_iter() {

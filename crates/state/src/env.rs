@@ -1,4 +1,7 @@
-use crate::{error::WorkspaceResult, Reader, Writer};
+use crate::{
+    error::{WorkspaceError, WorkspaceResult},
+    Reader, Writer,
+};
 
 use rkv::{EnvironmentFlags, Rkv};
 use std::{path::Path, sync::Arc};
@@ -85,16 +88,19 @@ pub struct Env<'e>(&'e Rkv);
 pub trait ReadManager {
     fn reader(&self) -> WorkspaceResult<Reader>;
 
-    fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(&self, f: F) -> WorkspaceResult<R>;
+    fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<WorkspaceError>,
+        F: FnOnce(Reader) -> Result<R, E>;
 }
 
 pub trait WriteManager {
     fn writer(&self) -> WorkspaceResult<Writer>;
 
-    fn with_commit<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
-        &self,
-        f: F,
-    ) -> WorkspaceResult<R>;
+    fn with_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<WorkspaceError>,
+        F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
 impl<'e> ReadManager for Env<'e> {
@@ -102,8 +108,12 @@ impl<'e> ReadManager for Env<'e> {
         Ok(Reader(self.0.read()?))
     }
 
-    fn with_reader<R, F: FnOnce(Reader) -> WorkspaceResult<R>>(&self, f: F) -> WorkspaceResult<R> {
-        f(Reader(self.0.read()?))
+    fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<WorkspaceError>,
+        F: FnOnce(Reader) -> Result<R, E>,
+    {
+        f(Reader(self.0.read().map_err(Into::into)?))
     }
 }
 
@@ -112,13 +122,14 @@ impl<'e> WriteManager for Env<'e> {
         Ok(self.0.write()?)
     }
 
-    fn with_commit<R, F: FnOnce(&mut Writer) -> WorkspaceResult<R>>(
-        &self,
-        f: F,
-    ) -> WorkspaceResult<R> {
-        let mut writer = self.0.write()?;
+    fn with_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<WorkspaceError>,
+        F: FnOnce(&mut Writer) -> Result<R, E>,
+    {
+        let mut writer = self.0.write().map_err(Into::into)?;
         let result = f(&mut writer);
-        writer.commit()?;
+        writer.commit().map_err(Into::into)?;
         result
     }
 }

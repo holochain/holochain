@@ -107,6 +107,8 @@ where
     V: BufferVal,
     R: Readable,
 {
+    type Error = WorkspaceError;
+
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
         for (k, op) in self.scratch.iter() {
@@ -165,7 +167,7 @@ pub mod tests {
     use super::{KvIntBuffer, StoreBuffer};
     use crate::{
         env::{ReadManager, WriteManager},
-        test_utils::test_env,
+        test_utils::test_env, error::WorkspaceResult,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -181,16 +183,13 @@ pub mod tests {
     type Store<'a> = KvIntBuffer<'a, u32, V>;
 
     #[test]
-    fn kv_iterators() {
+    fn kv_iterators() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
-        let db = env
-            .inner()
-            .open_integer("kv", StoreOptions::create())
-            .unwrap();
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
-            let mut buf: Store = KvIntBuffer::new(&reader, db).unwrap();
+            let mut buf: Store = KvIntBuffer::new(&reader, db)?;
 
             buf.put(1, V(1));
             buf.put(2, V(2));
@@ -199,14 +198,13 @@ pub mod tests {
             buf.put(5, V(5));
 
             env.with_commit(|mut writer| buf.finalize(&mut writer))
-        })
-        .unwrap();
+        })?;
 
         env.with_reader(|reader| {
-            let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
+            let buf: Store = KvIntBuffer::new(&reader, db)?;
 
-            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
-            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw()?.collect();
+            let reverse: Vec<_> = buf.iter_raw_reverse()?.collect();
 
             assert_eq!(
                 forward,
@@ -218,11 +216,10 @@ pub mod tests {
             );
             Ok(())
         })
-        .unwrap();
     }
 
     #[test]
-    fn kv_empty_iterators() {
+    fn kv_empty_iterators() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
         let db = env
@@ -240,6 +237,5 @@ pub mod tests {
             assert_eq!(reverse, vec![]);
             Ok(())
         })
-        .unwrap();
     }
 }

@@ -94,6 +94,8 @@ where
     V: BufferVal,
     R: Readable,
 {
+    type Error = WorkspaceError;
+
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
         for (k, op) in self.scratch.iter() {
@@ -150,7 +152,7 @@ pub mod tests {
     use super::{KvBuffer, StoreBuffer};
     use crate::{
         env::{ReadManager, WriteManager},
-        error::WorkspaceResult,
+        error::{WorkspaceError, WorkspaceResult},
         test_utils::test_env,
     };
     use rkv::StoreOptions;
@@ -172,7 +174,7 @@ pub mod tests {
         let env = arc.env();
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
-        env.with_reader(|reader| {
+        env.with_reader::<WorkspaceError, _, _>(|reader| {
             let mut buf: TestBuf = KvBuffer::new(&reader, db)?;
 
             buf.put("a", V(1));
@@ -194,12 +196,11 @@ pub mod tests {
             assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
             assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
             Ok(())
-        })?;
-        Ok(())
+        })
     }
 
     #[test]
-    fn kv_empty_iterators() {
+    fn kv_empty_iterators() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
         let db = env
@@ -217,64 +218,61 @@ pub mod tests {
             assert_eq!(reverse, vec![]);
             Ok(())
         })
-        .unwrap();
     }
 
     /// TODO break up into smaller tests
     #[test]
-    fn kv_store_sanity_check() {
+    fn kv_store_sanity_check() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.env();
         let db1 = env
             .inner()
             .open_single("kv1", StoreOptions::create())
-            .unwrap();
+            ?;
         let db2 = env
             .inner()
             .open_single("kv1", StoreOptions::create())
-            .unwrap();
-        let mut writer = env.writer().unwrap();
+            ?;
+        let mut writer = env.writer()?;
 
         let testval = TestVal {
             name: "Joe".to_owned(),
         };
 
-        env.with_reader(|reader| {
-            let mut kv1: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1).unwrap();
-            let mut kv2: KvBuffer<String, String> = KvBuffer::new(&reader, db2).unwrap();
+        env.with_reader::<WorkspaceError, _, _>(|reader| {
+            let mut kv1: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1)?;
+            let mut kv2: KvBuffer<String, String> = KvBuffer::new(&reader, db2)?;
 
             kv1.put("hi".to_owned(), testval.clone());
             kv2.put("salutations".to_owned(), "folks".to_owned());
 
             // Check that the underlying store contains no changes yet
-            assert_eq!(kv1.get_persisted(&"hi".to_owned()).unwrap(), None);
-            assert_eq!(kv2.get_persisted(&"salutations".to_owned()).unwrap(), None);
-            kv1.finalize(&mut writer).unwrap();
+            assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
+            assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);
+            kv1.finalize(&mut writer)?;
 
             // Ensure that mid-transaction, there has still been no persistence,
             // just for kicks
-            let kv1a: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1).unwrap();
-            assert_eq!(kv1a.get_persisted(&"hi".to_owned()).unwrap(), None);
-            kv2.finalize(&mut writer).unwrap();
+            let kv1a: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1)?;
+            assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
+            kv2.finalize(&mut writer)?;
             Ok(())
-        })
-        .unwrap();
+        })?;
 
         // Finish finalizing the transaction
-        writer.commit().unwrap();
+        writer.commit()?;
 
         env.with_reader(|reader| {
             // Now open some fresh Readers to see that our data was persisted
-            let kv1b: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1).unwrap();
-            let kv2b: KvBuffer<String, String> = KvBuffer::new(&reader, db2).unwrap();
+            let kv1b: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1)?;
+            let kv2b: KvBuffer<String, String> = KvBuffer::new(&reader, db2)?;
             // Check that the underlying store contains no changes yet
-            assert_eq!(kv1b.get_persisted(&"hi".to_owned()).unwrap(), Some(testval));
+            assert_eq!(kv1b.get_persisted(&"hi".to_owned())?, Some(testval));
             assert_eq!(
-                kv2b.get_persisted(&"salutations".to_owned()).unwrap(),
+                kv2b.get_persisted(&"salutations".to_owned())?,
                 Some("folks".to_owned())
             );
             Ok(())
         })
-        .unwrap();
     }
 }

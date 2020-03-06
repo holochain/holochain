@@ -1,5 +1,5 @@
 use super::{kv::{SingleIter, KvBuffer}, BufferVal, StoreBuffer};
-use crate::{error::WorkspaceResult, Readable};
+use crate::{error::{WorkspaceError, WorkspaceResult}, Readable};
 use rkv::Writer;
 
 use sx_types::prelude::{Address, AddressableContent};
@@ -43,6 +43,8 @@ where
     V: BufferVal + AddressableContent,
     R: Readable,
 {
+    type Error = WorkspaceError;
+
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         self.0.finalize(writer)?;
         Ok(())

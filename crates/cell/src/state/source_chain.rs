@@ -16,6 +16,7 @@ use sx_types::{
     prelude::{Address, AddressableContent},
     signature::{Provenance, Signature}, agent::AgentId,
 };
+use crate::agent::error::SourceChainError;
 
 pub struct SourceChainBuffer<'env, R: Readable> {
     cas: ChainCasBuffer<'env, R>,
@@ -74,7 +75,9 @@ impl<'env, R: Readable> SourceChainBuffer<'env, R> {
 }
 
 impl<'env, R: Readable> StoreBuffer<'env> for SourceChainBuffer<'env, R> {
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    type Error = SourceChainError;
+
+    fn finalize(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
         self.cas.finalize(writer)?;
         self.sequence.finalize(writer)?;
         Ok(())
@@ -111,16 +114,16 @@ pub mod tests {
         Reader,
     };
     use tempdir::TempDir;
+    use crate::agent::error::SourceChainResult;
 
     #[test]
-    fn asdf() -> WorkspaceResult<()> {
+    fn asdf() -> SourceChainResult<()> {
         let arc = test_env();
         let env = arc.env();
         let dbs = arc.dbs()?;
         arc.env().with_reader(|reader| {
-            let source_chain = SourceChainBuffer::new(&reader, &dbs, env)?;
+            let source_chain = SourceChainBuffer::new(&reader, &dbs)?;
             Ok(())
-        })?;
-        Ok(())
+        })
     }
 }
