@@ -1,4 +1,4 @@
-use super::{BufferKey, BufferMultiVal, StoreBuffer};
+use super::{BufferKey, BufferMultiVal, BufferedStore};
 use crate::error::{WorkspaceError, WorkspaceResult};
 use maplit::hashset;
 use rkv::{MultiStore, Reader, Rkv, StoreOptions, Writer};
@@ -127,7 +127,7 @@ where
     }
 }
 
-impl<'env, K, V> StoreBuffer<'env> for KvvBuffer<'env, K, V>
+impl<'env, K, V> BufferedStore<'env> for KvvBuffer<'env, K, V>
 where
     K: Clone + BufferKey,
     V: BufferMultiVal,
@@ -173,7 +173,7 @@ where
 #[cfg(test_TODO_FIX)]
 pub mod tests {
 
-    use super::{KvvBuffer, Op, StoreBuffer};
+    use super::{KvvBuffer, Op, BufferedStore};
     use crate::test_utils::test_env;
     use maplit::hashset;
     use rkv::Rkv;

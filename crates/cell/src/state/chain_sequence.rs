@@ -8,7 +8,7 @@ use crate::state::source_chain::{SourceChainError, SourceChainResult};
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
 use sx_state::{
-    buffer::{IntKvBuffer, StoreBuffer},
+    buffer::{IntKvBuffer, BufferedStore},
     db::{DbManager, DbName, CHAIN_SEQUENCE},
     error::{WorkspaceError, WorkspaceResult},
     prelude::{Readable, Reader, Writer},
@@ -82,7 +82,7 @@ impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
     }
 }
 
-impl<'env, R: Readable> StoreBuffer<'env> for ChainSequenceBuffer<'env, R> {
+impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuffer<'env, R> {
     type Error = SourceChainError;
 
     /// Commit to the source chain, performing an as-at check and returning a
@@ -101,7 +101,7 @@ impl<'env, R: Readable> StoreBuffer<'env> for ChainSequenceBuffer<'env, R> {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{ChainSequenceBuffer, SourceChainError, StoreBuffer};
+    use super::{ChainSequenceBuffer, SourceChainError, BufferedStore};
     use crate::state::source_chain::SourceChainResult;
     use std::sync::Arc;
     use sx_state::{

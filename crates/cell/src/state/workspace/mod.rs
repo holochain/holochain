@@ -1,6 +1,6 @@
 use super::chain_cas::ChainCasBuffer;
 use sx_state::{
-    buffer::{KvBuffer, KvvBuffer, StoreBuffer},
+    buffer::{KvBuffer, KvvBuffer, BufferedStore},
     db::DbManager,
     error::WorkspaceResult,
     prelude::{Reader, Writer},
@@ -22,7 +22,7 @@ pub mod tests {
 
     use super::{InvokeZomeWorkspace, Workspace};
     use sx_state::{
-        buffer::{KvBuffer, StoreBuffer},
+        buffer::{KvBuffer, BufferedStore},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         error::WorkspaceResult,

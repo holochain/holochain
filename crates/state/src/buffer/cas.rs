@@ -1,6 +1,6 @@
 use super::{
     kv::{KvBuffer, SingleIter},
-    BufferVal, StoreBuffer,
+    BufferVal, BufferedStore,
 };
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
@@ -44,7 +44,7 @@ where
     }
 }
 
-impl<'env, V, R> StoreBuffer<'env> for CasBuffer<'env, V, R>
+impl<'env, V, R> BufferedStore<'env> for CasBuffer<'env, V, R>
 where
     V: BufferVal + AddressableContent,
     R: Readable,

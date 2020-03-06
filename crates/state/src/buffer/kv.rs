@@ -1,4 +1,4 @@
-use super::{BufferKey, BufferVal, StoreBuffer};
+use super::{BufferKey, BufferVal, BufferedStore};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
     prelude::{Readable, Reader, Writer},
@@ -87,7 +87,7 @@ where
     }
 }
 
-impl<'env, K, V, R> StoreBuffer<'env> for KvBuffer<'env, K, V, R>
+impl<'env, K, V, R> BufferedStore<'env> for KvBuffer<'env, K, V, R>
 where
     K: BufferKey,
     V: BufferVal,
@@ -148,7 +148,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvBuffer, StoreBuffer};
+    use super::{KvBuffer, BufferedStore};
     use crate::{
         env::{ReadManager, WriteManager},
         error::{WorkspaceError, WorkspaceResult},

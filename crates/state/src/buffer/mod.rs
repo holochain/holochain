@@ -14,9 +14,9 @@ use std::hash::Hash;
 
 /// General trait for transactional stores, exposing only the method which
 /// adds changes to the write transaction. This generalization is not really used,
-/// but could be used in Workspaces i.e. iterating over a Vec<dyn StoreBuffer>
+/// but could be used in Workspaces i.e. iterating over a Vec<dyn BufferedStore>
 /// is all that needs to happen to commit the workspace changes
-pub trait StoreBuffer<'env> {
+pub trait BufferedStore<'env> {
     type Error: std::error::Error;
     // fn iter(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;
     // fn iter_reverse(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;

@@ -2,7 +2,7 @@
 //! This is unfortunately pure copypasta from KvBuffer, since Rust doesn't support specialization yet
 //! TODO, find *some* way to DRY up the two
 
-use super::{BufferIntKey, BufferVal, StoreBuffer};
+use super::{BufferIntKey, BufferVal, BufferedStore};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
     prelude::{Readable, Reader, Writer},
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<'env, K, V, R> StoreBuffer<'env> for IntKvBuffer<'env, K, V, R>
+impl<'env, K, V, R> BufferedStore<'env> for IntKvBuffer<'env, K, V, R>
 where
     K: BufferIntKey,
     V: BufferVal,
@@ -164,7 +164,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{IntKvBuffer, StoreBuffer};
+    use super::{IntKvBuffer, BufferedStore};
     use crate::{
         env::{ReadManager, WriteManager},
         test_utils::test_env, error::WorkspaceResult,

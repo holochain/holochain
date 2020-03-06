@@ -5,7 +5,7 @@ use crate::state::{
 };
 use core::ops::Deref;
 use sx_state::{
-    buffer::StoreBuffer,
+    buffer::BufferedStore,
     db::{self, DbManager},
     env::ReadManager,
     error::WorkspaceResult,

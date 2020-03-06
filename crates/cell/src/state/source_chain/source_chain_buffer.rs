@@ -5,7 +5,7 @@ use crate::state::{
 };
 use core::ops::Deref;
 use sx_state::{
-    buffer::StoreBuffer,
+    buffer::BufferedStore,
     db::{self, DbManager},
     env::ReadManager,
     error::WorkspaceResult,
@@ -80,7 +80,7 @@ impl<'env, R: Readable> SourceChainBuffer<'env, R> {
     }
 }
 
-impl<'env, R: Readable> StoreBuffer<'env> for SourceChainBuffer<'env, R> {
+impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuffer<'env, R> {
     type Error = SourceChainError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
@@ -108,7 +108,7 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> Ch
 #[cfg(test)]
 pub mod tests {
 
-    use super::{SourceChainBuffer, StoreBuffer};
+    use super::{SourceChainBuffer, BufferedStore};
     use crate::state::source_chain::SourceChainResult;
     use sx_state::{
         db::DbManager,

@@ -1,7 +1,7 @@
 use crate::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
-    buffer::{CasBuffer, StoreBuffer},
+    buffer::{CasBuffer, BufferedStore},
     db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
     error::{WorkspaceError, WorkspaceResult},
     exports::SingleStore,
@@ -97,7 +97,7 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
     }
 }
 
-impl<'env, R: Readable> StoreBuffer<'env> for ChainCasBuffer<'env, R> {
+impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuffer<'env, R> {
     type Error = WorkspaceError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
