@@ -4,7 +4,6 @@ use crate::{
     prelude::{Readable, Reader, Writer},
 };
 use rkv::SingleStore;
-
 use std::collections::HashMap;
 
 /// Transactional operations on a KV store
@@ -71,7 +70,7 @@ where
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> WorkspaceResult<Option<V>> {
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(bincode::deserialize(buf)?)),
             None => Ok(None),
             Some(_) => Err(WorkspaceError::InvalidValue),
         }
@@ -101,7 +100,7 @@ where
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
-                    let buf = rmp_serde::to_vec_named(v)?;
+                    let buf = bincode::serialize(v)?;
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
@@ -135,7 +134,7 @@ where
         match self.0.next() {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
                 k,
-                rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
+                bincode::deserialize(buf).expect("Failed to deserialize value"),
             )),
             None => None,
             x => {
@@ -222,14 +221,8 @@ pub mod tests {
     #[test]
     fn kv_store_sanity_check() -> WorkspaceResult<()> {
         let env = test_env();
-        let db1 = env
-            .inner()
-            .open_single("kv1", StoreOptions::create())
-            ?;
-        let db2 = env
-            .inner()
-            .open_single("kv1", StoreOptions::create())
-            ?;
+        let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
+        let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
         let mut writer = env.writer()?;
 
         let testval = TestVal {

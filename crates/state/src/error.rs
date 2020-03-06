@@ -28,11 +28,8 @@ pub enum WorkspaceError {
         backtrace: Backtrace,
     },
 
-    #[error("Error encoding to MsgPack: {0}")]
-    MsgPackEncodeError(#[from] rmp_serde::encode::Error),
-
-    #[error("Error decoding to MsgPack: {0}")]
-    MsgPackDecodeError(#[from] rmp_serde::decode::Error),
+    #[error("Error with bincode encoding/decoding: {0}")]
+    BincodeError(#[from] bincode::Error),
 
     #[cfg(test)]
     #[error(transparent)]
