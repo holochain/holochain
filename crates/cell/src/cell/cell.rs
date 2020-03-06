@@ -13,7 +13,10 @@ use std::{
     path::Path,
     sync::{Arc, RwLock},
 };
-use sx_state::env::{create_lmdb_env, DbManager, EnvArc, ReadManager};
+use sx_state::{
+    db::DbManager,
+    env::{create_lmdb_env, EnvArc, ReadManager},
+};
 use sx_types::{
     agent::AgentId,
     db::DatabasePath,

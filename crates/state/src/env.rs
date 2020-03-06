@@ -1,6 +1,7 @@
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
-    Reader, Writer,
+    exports::Writer,
+    reader::Reader, db::DbManager,
 };
 
 use rkv::{EnvironmentFlags, Rkv};
@@ -53,9 +54,6 @@ fn rkv_builder(
         Rkv::from_env(path, env_builder)
     }
 }
-
-// TODO: make this a trait of Env
-pub type DbManager<'e> = crate::db::DbManager<'e>;
 
 /// There can only be one owned value of `Rkv`. EnvArc is a simple wrapper around an `Arc<Rkv>`,
 /// which can produce as many `Env` values as needed.

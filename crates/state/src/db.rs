@@ -57,6 +57,10 @@ lazy_static! {
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
 }
 
+
+/// DbManager is intended to be used as a singleton store for LMDB Database references.
+/// It uses a UniversalMap to retrieve heterogeneously typed data via special keys
+/// whose type includes the type of the corresponding value.
 pub struct DbManager<'env> {
     // NOTE: this can't just be an Rkv because we get Rkv environments from the Manager
     // already wrapped in the Arc<RwLock<_>>, so this is the canonical representation of an LMDB environment

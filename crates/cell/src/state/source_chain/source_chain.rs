@@ -9,7 +9,7 @@ use sx_state::{
     db::{self, DbManager},
     env::ReadManager,
     error::WorkspaceResult,
-    Readable, Reader, Writer,
+    prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
     agent::AgentId,

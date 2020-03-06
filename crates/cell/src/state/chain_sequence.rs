@@ -1,3 +1,4 @@
+use crate::state::source_chain::{SourceChainError, SourceChainResult};
 /// The ChainSequence database serves several purposes:
 /// - enables fast forward iteration over the entire source chain
 /// - knows what the chain head is, by accessing the last item's header address
@@ -10,10 +11,9 @@ use sx_state::{
     buffer::{KvIntBuffer, StoreBuffer},
     db::{DbManager, DbName, CHAIN_SEQUENCE},
     error::{WorkspaceError, WorkspaceResult},
-    Readable, Reader, Writer,
+    prelude::{Readable, Reader, Writer},
 };
 use sx_types::prelude::Address;
-use crate::state::source_chain::{SourceChainResult, SourceChainError};
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Serialize, Deserialize)]
@@ -101,16 +101,17 @@ impl<'env, R: Readable> StoreBuffer<'env> for ChainSequenceBuffer<'env, R> {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{ChainSequenceBuffer, StoreBuffer, SourceChainError};
+    use super::{ChainSequenceBuffer, SourceChainError, StoreBuffer};
+    use crate::state::source_chain::SourceChainResult;
     use std::sync::Arc;
     use sx_state::{
-        env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
+        db::DbManager,
+        env::{create_lmdb_env, ReadManager, WriteManager},
         error::{WorkspaceError, WorkspaceResult},
         test_utils::test_env,
     };
     use sx_types::prelude::Address;
     use tempdir::TempDir;
-    use crate::state::source_chain::SourceChainResult;
 
     #[test]
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
@@ -219,7 +220,10 @@ pub mod tests {
 
         let (result1, result2) = tokio::join!(task1, task2);
 
-        assert_eq!(result1.unwrap(), Err(SourceChainError::HeadMoved(None, Some(Address::from("5")))));
+        assert_eq!(
+            result1.unwrap(),
+            Err(SourceChainError::HeadMoved(None, Some(Address::from("5"))))
+        );
         assert!(result2.unwrap().is_ok());
 
         Ok(())

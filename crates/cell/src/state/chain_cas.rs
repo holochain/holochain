@@ -2,10 +2,10 @@ use crate::state::source_chain::{ChainInvalidReason, SourceChainError, SourceCha
 use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
-    db::{CHAIN_ENTRIES, CHAIN_HEADERS},
-    env::DbManager,
+    db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
     error::{WorkspaceError, WorkspaceResult},
-    Readable, Reader, SingleStore, Writer,
+    exports::SingleStore,
+    prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
     chain_header::{ChainHeader, HeaderWithEntry},

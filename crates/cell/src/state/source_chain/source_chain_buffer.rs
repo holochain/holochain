@@ -1,6 +1,7 @@
 use crate::state::{
     chain_cas::{ChainCasBuffer, HeaderCas},
     chain_sequence::ChainSequenceBuffer,
+    source_chain::SourceChainError,
 };
 use core::ops::Deref;
 use sx_state::{
@@ -8,15 +9,15 @@ use sx_state::{
     db::{self, DbManager},
     env::ReadManager,
     error::WorkspaceResult,
-    Readable, Reader, Writer,
+    prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
+    agent::AgentId,
     chain_header::ChainHeader,
     entry::{entry_type::EntryType, Entry},
     prelude::{Address, AddressableContent},
-    signature::{Provenance, Signature}, agent::AgentId,
+    signature::{Provenance, Signature},
 };
-use crate::state::source_chain::SourceChainError;
 
 pub struct SourceChainBuffer<'env, R: Readable> {
     cas: ChainCasBuffer<'env, R>,
@@ -63,10 +64,15 @@ impl<'env, R: Readable> SourceChainBuffer<'env, R> {
     /// Get the AgentId from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
     pub fn agent_id(&self) -> WorkspaceResult<Option<AgentId>> {
-        Ok(self.cas.entries().iter_raw()?.filter_map(|(_, e)| match e {
-            Entry::AgentId(agent_id) => Some(agent_id),
-            _ => None
-        }).next())
+        Ok(self
+            .cas
+            .entries()
+            .iter_raw()?
+            .filter_map(|(_, e)| match e {
+                Entry::AgentId(agent_id) => Some(agent_id),
+                _ => None,
+            })
+            .next())
     }
 
     pub fn try_commit(&self, writer: &'env mut Writer) -> WorkspaceResult<()> {
@@ -84,12 +90,8 @@ impl<'env, R: Readable> StoreBuffer<'env> for SourceChainBuffer<'env, R> {
     }
 }
 
-
 fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> ChainHeader {
-    let provenances = &[Provenance::new(
-        agent_id.address(),
-        Signature::fake(),
-    )];
+    let provenances = &[Provenance::new(agent_id.address(), Signature::fake())];
     let timestamp = chrono::Utc::now().timestamp().into();
     let header = ChainHeader::new(
         entry.entry_type(),
@@ -107,14 +109,15 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> Ch
 pub mod tests {
 
     use super::{SourceChainBuffer, StoreBuffer};
+    use crate::state::source_chain::SourceChainResult;
     use sx_state::{
-        env::{create_lmdb_env, DbManager, ReadManager, WriteManager},
+        db::DbManager,
+        env::{create_lmdb_env, ReadManager, WriteManager},
         error::WorkspaceResult,
+        prelude::Reader,
         test_utils::test_env,
-        Reader,
     };
     use tempdir::TempDir;
-    use crate::state::source_chain::SourceChainResult;
 
     #[test]
     fn asdf() -> SourceChainResult<()> {

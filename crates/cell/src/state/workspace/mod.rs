@@ -3,7 +3,7 @@ use sx_state::{
     buffer::{KvBuffer, KvvBuffer, StoreBuffer},
     db::DbManager,
     error::WorkspaceResult,
-    Reader, Writer,
+    prelude::{Reader, Writer},
 };
 
 mod genesis;
@@ -58,7 +58,7 @@ pub mod tests {
         env::{ReadManager, WriteManager},
         error::WorkspaceResult,
         test_utils::test_env,
-        Reader, SingleStore, Writer,
+        prelude::{Reader, SingleStore, Writer},
     };
     use sx_types::prelude::*;
     use tempdir::TempDir;

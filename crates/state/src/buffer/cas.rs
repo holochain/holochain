@@ -1,5 +1,11 @@
-use super::{kv::{SingleIter, KvBuffer}, BufferVal, StoreBuffer};
-use crate::{error::{WorkspaceError, WorkspaceResult}, Readable};
+use super::{
+    kv::{KvBuffer, SingleIter},
+    BufferVal, StoreBuffer,
+};
+use crate::{
+    error::{WorkspaceError, WorkspaceResult},
+    reader::Readable,
+};
 use rkv::Writer;
 
 use sx_types::prelude::{Address, AddressableContent};

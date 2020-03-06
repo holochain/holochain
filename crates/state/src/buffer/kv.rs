@@ -1,7 +1,7 @@
 use super::{BufferKey, BufferVal, StoreBuffer};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
-    Readable, Reader, Writer,
+    prelude::{Readable, Reader, Writer},
 };
 use rkv::SingleStore;
 
