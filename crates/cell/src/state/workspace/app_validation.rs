@@ -1,12 +1,19 @@
+use super::Workspace;
 use crate::state::source_chain::SourceChainBuffer;
-use sx_state::{db::DbManager, error::WorkspaceResult, prelude::Reader};
+use sx_state::{db::DbManager, error::WorkspaceResult, prelude::*};
 
-pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuffer<'env, Reader<'env>>,
+pub struct AppValidationWorkspace {
+
 }
 
-impl<'env> GenesisWorkspace<'env> {
+impl<'env> AppValidationWorkspace {
     pub fn new(reader: Reader<'env>, dbs: DbManager<'env>) -> WorkspaceResult<Self> {
+        unimplemented!()
+    }
+}
+
+impl<'env> Workspace for AppValidationWorkspace {
+    fn commit_txn(self, _writer: Writer) -> WorkspaceResult<()> {
         unimplemented!()
     }
 }
@@ -14,7 +21,7 @@ impl<'env> GenesisWorkspace<'env> {
 #[cfg(test)]
 pub mod tests {
 
-    use super::GenesisWorkspace;
+    use super::AppValidationWorkspace;
     use crate::state::source_chain::{SourceChainBuffer, SourceChainResult};
     use sx_state::{
         env::ReadManager, error::WorkspaceError, prelude::Readable, test_utils::test_env,
@@ -28,7 +35,7 @@ pub mod tests {
         let env = arc.env();
         let dbs = arc.dbs()?;
         env.with_reader::<Err, _, _>(|reader| {
-            let workspace = GenesisWorkspace::new(reader, dbs);
+            let workspace = AppValidationWorkspace::new(reader, dbs);
             Ok(())
         })?;
         Ok(())

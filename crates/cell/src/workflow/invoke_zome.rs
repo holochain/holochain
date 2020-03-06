@@ -1,22 +1,23 @@
+
 use crate::{
     cell::{autonomic::AutonomicCue, error::CellResult},
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::{Ribosome, RibosomeT},
+    state::workspace::{InvokeZomeWorkspace, Workspace}, workflow_runner::{WorkflowResult, WorkflowEffects},
 };
 use sx_types::shims::*;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT, Api: ConductorCellApiT>(
+    workspace: InvokeZomeWorkspace<'env>,
     invocation: ZomeInvocation,
-    ribosome: Ribo,
-    conductor_api: Api,
-) -> CellResult<ZomeInvocationResult> {
-    unimplemented!();
-    // let mut bundle = source_chain.bundle()?;
-    let mut bundle = SourceChainCommitBundle::new();
-    let result = ribosome.call_zome_function(&mut bundle, invocation)?;
-    // let snapshot = source_chain.try_commit(bundle)?;
-    Ok(result)
+) -> WorkflowResult<InvokeZomeWorkspace<'env>> {
+    Ok(WorkflowEffects {
+        workspace,
+        triggers: Default::default(),
+        signals: Default::default(),
+        callbacks: Default::default(),
+    })
 }
 
 #[cfg(test_TODO_FIX)]

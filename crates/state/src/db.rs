@@ -61,9 +61,9 @@ lazy_static! {
 /// DbManager is intended to be used as a singleton store for LMDB Database references.
 /// It uses a UniversalMap to retrieve heterogeneously typed data via special keys
 /// whose type includes the type of the corresponding value.
+///
+/// TODO: we must ensure that this is a singleton per Env! Probably needs to be created at the same time as the EnvArc itself.
 pub struct DbManager<'env> {
-    // NOTE: this can't just be an Rkv because we get Rkv environments from the Manager
-    // already wrapped in the Arc<RwLock<_>>, so this is the canonical representation of an LMDB environment
     env: Env<'env>,
     um: UniversalMap<DbName>,
 }

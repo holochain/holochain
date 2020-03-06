@@ -7,45 +7,14 @@ use sx_state::{
 };
 
 mod genesis;
+mod invoke_zome;
+mod app_validation;
 pub use genesis::GenesisWorkspace;
+pub use invoke_zome::InvokeZomeWorkspace;
+pub use app_validation::AppValidationWorkspace;
 
-pub trait Workspace<'txn>: Sized {
+pub trait Workspace: Sized {
     fn commit_txn(self, writer: Writer) -> WorkspaceResult<()>;
-}
-
-pub struct InvokeZomeWorkspace<'env> {
-    cas: ChainCasBuffer<'env>,
-    // meta: KvvBuffer<'env, String, String>,
-}
-
-// impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
-//     fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-//         self.cas.flush_to_txn(&mut writer)?;
-//         // self.meta.flush_to_txn(&mut writer)?;
-//         writer.commit()?;
-//         Ok(())
-//     }
-// }
-
-impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager<'env>) -> WorkspaceResult<Self> {
-        Ok(Self {
-            cas: ChainCasBuffer::primary(reader, dbs)?,
-            // meta: KvvBuffer::new(reader, dbs)?,
-        })
-    }
-
-    pub fn cas(&mut self) -> &mut ChainCasBuffer<'env> {
-        &mut self.cas
-    }
-}
-
-pub struct AppValidationWorkspace;
-
-impl<'env> Workspace<'env> for AppValidationWorkspace {
-    fn commit_txn(self, _writer: Writer) -> WorkspaceResult<()> {
-        unimplemented!()
-    }
 }
 
 #[cfg(test)]
@@ -80,7 +49,7 @@ pub mod tests {
         }
     }
 
-    impl<'env> Workspace<'env> for TestWorkspace<'env> {
+    impl<'env> Workspace for TestWorkspace<'env> {
         fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(&mut writer)?;
             self.two.flush_to_txn(&mut writer)?;

@@ -1,14 +1,21 @@
+use std::path::PathBuf;
 use crate::{
+    db::DbManager,
     error::{WorkspaceError, WorkspaceResult},
     exports::Writer,
-    reader::Reader, db::DbManager,
+    reader::Reader,
 };
-
+use lazy_static::lazy_static;
 use rkv::{EnvironmentFlags, Rkv};
-use std::{path::Path, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
+
+// lazy_static! {
+//     static ref ENVIRONMENTS: HashMap<PathBuf, EnvArc> = HashMap::new();
+//     static ref DB_MANAGERS: HashMap<PathBuf, DbManager> = HashMap::new();
+// }
 
 #[cfg(feature = "lmdb_no_tls")]
 fn default_flags() -> EnvironmentFlags {
