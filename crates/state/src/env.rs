@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use crate::{
     db::DbManager,
     error::{WorkspaceError, WorkspaceResult},
@@ -6,16 +5,22 @@ use crate::{
     reader::Reader,
 };
 use lazy_static::lazy_static;
+use parking_lot::RwLock;
 use rkv::{EnvironmentFlags, Rkv};
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{
+    collections::{hash_map, HashMap},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
-// lazy_static! {
-//     static ref ENVIRONMENTS: HashMap<PathBuf, EnvArc> = HashMap::new();
-//     static ref DB_MANAGERS: HashMap<PathBuf, DbManager> = HashMap::new();
-// }
+lazy_static! {
+    static ref ENVIRONMENTS: RwLock<HashMap<PathBuf, Environment>> = RwLock::new(HashMap::new());
+    static ref DB_MANAGERS: RwLock<HashMap<PathBuf, Arc<DbManager>>> =
+        RwLock::new(HashMap::new());
+}
 
 #[cfg(feature = "lmdb_no_tls")]
 fn default_flags() -> EnvironmentFlags {
@@ -28,18 +33,18 @@ fn default_flags() -> EnvironmentFlags {
 }
 
 /// A standard way to create a representation of an LMDB environment suitable for Holochain
-/// TODO: put this behind a singleton HashMap, just like rkv::Manager,
-///     but wrap it in Arc<_> instead of Arc<RwLock<_>>
-pub fn create_lmdb_env(path: &Path) -> WorkspaceResult<EnvArc> {
-    let initial_map_size = None;
-    let flags = None;
-    // let rkv = Manager::singleton()
-    //     .write()
-    //     .unwrap()
-    //     .get_or_create(path, rkv_builder(initial_map_size, flags))
-    //     .unwrap();
-    let rkv = rkv_builder(initial_map_size, flags)(path)?;
-    Ok(EnvArc::new(rkv))
+pub fn create_lmdb_env(path: &Path) -> WorkspaceResult<Environment> {
+    let mut map = ENVIRONMENTS.write();
+    let env: Environment = match map.entry(path.into()) {
+        hash_map::Entry::Occupied(e) => e.get().clone(),
+        hash_map::Entry::Vacant(e) => e
+            .insert({
+                let rkv = rkv_builder(None, None)(path)?;
+                Environment(Arc::new(rkv))
+            })
+            .clone(),
+    };
+    Ok(env)
 }
 
 fn rkv_builder(
@@ -62,33 +67,12 @@ fn rkv_builder(
     }
 }
 
-/// There can only be one owned value of `Rkv`. EnvArc is a simple wrapper around an `Arc<Rkv>`,
-/// which can produce as many `Env` values as needed.
-#[derive(Clone)]
-pub struct EnvArc {
-    rkv: Arc<Rkv>,
-}
-
-impl EnvArc {
-    fn new(rkv: Rkv) -> Self {
-        Self { rkv: Arc::new(rkv) }
-    }
-
-    pub fn env(&self) -> Env {
-        Env(&self.rkv)
-    }
-
-    // TODO: make sure this is never called more than once per environment!
-    pub fn dbs(&self) -> WorkspaceResult<DbManager> {
-        DbManager::new(self.env())
-    }
-}
 
 /// The canonical representation of a reference to a (singleton) LMDB environment.
-/// These are produced by an `EnvArc`.
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
-pub struct Env<'e>(&'e Rkv);
+#[derive(Clone)]
+pub struct Environment(Arc<Rkv>);
 
 pub trait ReadManager {
     fn reader(&self) -> WorkspaceResult<Reader>;
@@ -108,7 +92,7 @@ pub trait WriteManager {
         F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
-impl<'e> ReadManager for Env<'e> {
+impl ReadManager for Environment {
     fn reader(&self) -> WorkspaceResult<Reader> {
         Ok(Reader::new(self.0.read()?))
     }
@@ -122,7 +106,7 @@ impl<'e> ReadManager for Env<'e> {
     }
 }
 
-impl<'e> WriteManager for Env<'e> {
+impl WriteManager for Environment {
     fn writer(&self) -> WorkspaceResult<Writer> {
         Ok(self.0.write()?)
     }
@@ -139,8 +123,17 @@ impl<'e> WriteManager for Env<'e> {
     }
 }
 
-impl<'e> Env<'e> {
+impl Environment {
     pub fn inner(&self) -> &Rkv {
         &self.0
+    }
+
+    pub fn dbs(&self) -> WorkspaceResult<Arc<DbManager>> {
+        let mut map = DB_MANAGERS.write();
+        let dbs = map.entry(self.0.as_ref().path().into()).or_insert_with(|| {
+            Arc::new(DbManager::new(self.clone()).expect("TODO"))
+        });
+        Ok(dbs.clone())
+        // DbManager::new(self.env())
     }
 }

@@ -7,7 +7,7 @@ pub struct AppValidationWorkspace {
 }
 
 impl<'env> AppValidationWorkspace {
-    pub fn new(reader: Reader<'env>, dbs: DbManager<'env>) -> WorkspaceResult<Self> {
+    pub fn new(reader: Reader<'env>, dbs: &DbManager) -> WorkspaceResult<Self> {
         unimplemented!()
     }
 }
@@ -31,11 +31,10 @@ pub mod tests {
 
     #[test]
     fn can_commit_workspace() -> SourceChainResult<()> {
-        let arc = test_env();
-        let env = arc.env();
-        let dbs = arc.dbs()?;
+        let env = test_env();
+        let dbs = env.dbs()?;
         env.with_reader::<Err, _, _>(|reader| {
-            let workspace = AppValidationWorkspace::new(reader, dbs);
+            let workspace = AppValidationWorkspace::new(reader, &dbs);
             Ok(())
         })?;
         Ok(())

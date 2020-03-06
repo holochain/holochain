@@ -15,7 +15,7 @@ use std::{
 };
 use sx_state::{
     db::DbManager,
-    env::{create_lmdb_env, EnvArc, ReadManager},
+    env::{create_lmdb_env, Environment, ReadManager},
 };
 use sx_types::{
     agent::AgentId,
@@ -54,7 +54,7 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
 // #[derive(Clone)]
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
-    state_env: EnvArc,
+    state_env: Environment,
     conductor_api: Api,
 }
 

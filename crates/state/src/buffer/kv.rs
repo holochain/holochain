@@ -170,8 +170,7 @@ pub mod tests {
 
     #[test]
     fn kv_iterators() -> WorkspaceResult<()> {
-        let arc = test_env();
-        let env = arc.env();
+        let env = test_env();
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
         env.with_reader::<WorkspaceError, _, _>(|reader| {
@@ -201,8 +200,7 @@ pub mod tests {
 
     #[test]
     fn kv_empty_iterators() -> WorkspaceResult<()> {
-        let arc = test_env();
-        let env = arc.env();
+        let env = test_env();
         let db = env
             .inner()
             .open_single("kv", StoreOptions::create())
@@ -223,8 +221,7 @@ pub mod tests {
     /// TODO break up into smaller tests
     #[test]
     fn kv_store_sanity_check() -> WorkspaceResult<()> {
-        let arc = test_env();
-        let env = arc.env();
+        let env = test_env();
         let db1 = env
             .inner()
             .open_single("kv1", StoreOptions::create())

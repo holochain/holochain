@@ -35,7 +35,7 @@ pub struct ChainSequenceBuffer<'e, R: Readable> {
 }
 
 impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
-    pub fn new(reader: &'e R, dbs: &'e DbManager<'e>) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'e R, dbs: &'e DbManager) -> WorkspaceResult<Self> {
         let db: Store<'e, R> = KvIntBuffer::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
         Self::from_db(db)
     }
@@ -115,9 +115,8 @@ pub mod tests {
 
     #[test]
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
-        let arc = test_env();
-        let env = arc.env();
-        let dbs = arc.dbs()?;
+        let env = test_env();
+        let dbs = env.dbs()?;
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
@@ -133,9 +132,8 @@ pub mod tests {
 
     #[test]
     fn chain_sequence_functionality() -> SourceChainResult<()> {
-        let arc = test_env();
-        let env = arc.env();
-        let dbs = arc.dbs()?;
+        let env = test_env();
+        let dbs = env.dbs()?;
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
             buf.add_header(Address::from("0"));
@@ -176,17 +174,17 @@ pub mod tests {
 
     #[tokio::test]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
-        let arc = test_env();
-        let arc1 = arc.clone();
-        let arc2 = arc.clone();
+        let env = test_env();
+        let env1 = env.clone();
+        let env2 = env.clone();
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let local = tokio::task::LocalSet::new();
 
         let task1 = tokio::spawn(async move {
-            let dbs = arc1.dbs()?;
-            let env = arc1.env();
+            let env = env1.clone();
+            let dbs = env.dbs()?;
             let reader = env.reader()?;
             let mut buf = { ChainSequenceBuffer::new(&reader, &dbs)? };
             buf.add_header(Address::from("0"));
@@ -198,14 +196,13 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            let env = arc1.env();
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+            env1.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = arc2.env();
-            let dbs = arc2.dbs()?;
+            let env = env2.clone();
+            let dbs = env.dbs()?;
 
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;

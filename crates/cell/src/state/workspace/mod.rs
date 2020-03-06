@@ -40,7 +40,7 @@ pub mod tests {
     impl<'env> TestWorkspace<'env> {
         pub fn new(
             reader: &'env Reader<'env>,
-            dbs: &'env DbManager<'env>,
+            dbs: &'env DbManager,
         ) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBuffer::new(reader, *dbs.get(&*CHAIN_ENTRIES)?)?,
@@ -59,29 +59,29 @@ pub mod tests {
     }
 
     #[test]
-    fn workspace_sanity_check() {
-        let arc = test_env();
-        let env = arc.env();
-        let dbs = arc.dbs().unwrap();
+    fn workspace_sanity_check() -> WorkspaceResult<()> {
+        let env = test_env();
+        let dbs = env.dbs()?;
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {
-            let reader = env.reader().unwrap();
-            let mut workspace = TestWorkspace::new(&reader, &dbs).unwrap();
-            assert_eq!(workspace.one.get(&addr1).unwrap(), None);
+            let reader = env.reader()?;
+            let mut workspace = TestWorkspace::new(&reader, &dbs)?;
+            assert_eq!(workspace.one.get(&addr1)?, None);
 
             workspace.one.put(addr1.clone(), 1);
             workspace.two.put(addr2.clone(), true);
-            assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
-            assert_eq!(workspace.two.get(&addr2).unwrap(), Some(true));
-            workspace.commit_txn(env.writer().unwrap()).unwrap();
+            assert_eq!(workspace.one.get(&addr1)?, Some(1));
+            assert_eq!(workspace.two.get(&addr2)?, Some(true));
+            workspace.commit_txn(env.writer()?)?;
         }
 
         // Ensure that the data was persisted
         {
-            let reader = env.reader().unwrap();
-            let workspace = TestWorkspace::new(&reader, &dbs).unwrap();
-            assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
+            let reader = env.reader()?;
+            let workspace = TestWorkspace::new(&reader, &dbs)?;
+            assert_eq!(workspace.one.get(&addr1)?, Some(1));
         }
+        Ok(())
     }
 }

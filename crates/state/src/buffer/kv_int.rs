@@ -184,8 +184,7 @@ pub mod tests {
 
     #[test]
     fn kv_iterators() -> WorkspaceResult<()> {
-        let arc = test_env();
-        let env = arc.env();
+        let env = test_env();
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
@@ -220,8 +219,7 @@ pub mod tests {
 
     #[test]
     fn kv_empty_iterators() -> WorkspaceResult<()> {
-        let arc = test_env();
-        let env = arc.env();
+        let env = test_env();
         let db = env
             .inner()
             .open_integer("kv", StoreOptions::create())

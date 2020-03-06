@@ -121,10 +121,9 @@ pub mod tests {
 
     #[test]
     fn asdf() -> SourceChainResult<()> {
-        let arc = test_env();
-        let env = arc.env();
-        let dbs = arc.dbs()?;
-        arc.env().with_reader(|reader| {
+        let env = test_env();
+        let dbs = env.dbs()?;
+        env.with_reader(|reader| {
             let source_chain = SourceChainBuffer::new(&reader, &dbs)?;
             Ok(())
         })

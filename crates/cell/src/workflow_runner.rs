@@ -6,7 +6,7 @@
         workflow,
     };
     use std::time::Duration;
-    use sx_state::{db::DbManager, env::{Env, WriteManager, EnvArc}, prelude::*, error::WorkspaceError};
+    use sx_state::{db::DbManager, env::{Environment, WriteManager}, prelude::*, error::WorkspaceError};
     use thiserror::Error;
 
 /// TODO: flesh out for real
@@ -24,7 +24,7 @@ pub enum WorkflowRunError {
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
-pub type WorkflowResult<W: Workspace> = Result<WorkflowEffects<W>, WorkflowError>;
+pub type WorkflowResult<W> = Result<WorkflowEffects<W>, WorkflowError>;
 
 /// Internal type to handle running workflows
 type WorkflowRunResult<T> = Result<T, WorkflowRunError>;
@@ -76,13 +76,13 @@ pub struct DhtOp;
 mod todo {
 
     pub struct WorkflowRunner {
-        env: Env<'env>,
+        env: Environment<'env>,
         dbs: DbManager<'env>,
     }
 
     impl WorkflowRunner {
 
-        pub fn new(env: Env<'env>, dbs: DbManager) -> Self {
+        pub fn new(env: Environment<'env>, dbs: DbManager) -> Self {
 
         }
 

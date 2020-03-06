@@ -1,5 +1,5 @@
 use crate::{
-    env::Env,
+    env::Environment,
     error::{WorkspaceError, WorkspaceResult},
 };
 use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
@@ -62,14 +62,14 @@ lazy_static! {
 /// It uses a UniversalMap to retrieve heterogeneously typed data via special keys
 /// whose type includes the type of the corresponding value.
 ///
-/// TODO: we must ensure that this is a singleton per Env! Probably needs to be created at the same time as the EnvArc itself.
-pub struct DbManager<'env> {
-    env: Env<'env>,
+/// TODO: we must ensure that this is a singleton per Environment! Probably needs to be created at the same time as the EnvArc itself.
+pub struct DbManager {
+    env: Environment,
     um: UniversalMap<DbName>,
 }
 
-impl<'env> DbManager<'env> {
-    pub(crate) fn new(env: Env<'env>) -> WorkspaceResult<Self> {
+impl DbManager {
+    pub(crate) fn new(env: Environment) -> WorkspaceResult<Self> {
         let mut this = Self {
             env,
             um: UniversalMap::new(),
