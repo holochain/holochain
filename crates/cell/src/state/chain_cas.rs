@@ -91,6 +91,10 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
     pub fn headers(&self) -> &HeaderCas<'env, R> {
         &self.headers
     }
+
+    pub fn entries(&self) -> &EntryCas<'env, R> {
+        &self.entries
+    }
 }
 
 impl<'env, R: Readable> StoreBuffer<'env> for ChainCasBuffer<'env, R> {

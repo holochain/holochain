@@ -1,4 +1,4 @@
-use super::{kv::KvBuffer, BufferVal, StoreBuffer};
+use super::{kv::{SingleIter, KvBuffer}, BufferVal, StoreBuffer};
 use crate::{error::WorkspaceResult, Readable};
 use rkv::Writer;
 
@@ -30,6 +30,11 @@ where
 
     pub fn delete(&mut self, k: Address) -> () {
         self.0.delete(k)
+    }
+
+    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
+    pub fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
+        self.0.iter_raw()
     }
 }
 

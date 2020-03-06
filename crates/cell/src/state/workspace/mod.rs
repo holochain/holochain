@@ -6,6 +6,9 @@ use sx_state::{
     Reader, Writer,
 };
 
+mod genesis;
+pub use genesis::GenesisWorkspace;
+
 pub trait Workspace<'txn>: Sized {
     fn finalize(self, writer: Writer) -> WorkspaceResult<()>;
 }

@@ -12,24 +12,26 @@ use sx_state::{
 };
 use sx_types::{
     chain_header::ChainHeader,
-    entry::Entry,
-    prelude::Address,
-    signature::{Provenance, Signature},
+    entry::{entry_type::EntryType, Entry},
+    prelude::{Address, AddressableContent},
+    signature::{Provenance, Signature}, agent::AgentId,
 };
 
-pub struct SourceChainBuffer<'env, R: Readable, RM: ReadManager> {
+pub struct SourceChainBuffer<'env, R: Readable> {
     cas: ChainCasBuffer<'env, R>,
     sequence: ChainSequenceBuffer<'env, R>,
-    rm: RM,
 }
 
-impl<'env, R: Readable, RM: ReadManager> SourceChainBuffer<'env, R, RM> {
-    pub fn new(reader: &'env R, dbs: &'env DbManager, rm: RM) -> WorkspaceResult<Self> {
+impl<'env, R: Readable> SourceChainBuffer<'env, R> {
+    pub fn new(reader: &'env R, dbs: &'env DbManager) -> WorkspaceResult<Self> {
         Ok(Self {
             cas: ChainCasBuffer::primary(reader, dbs)?,
             sequence: ChainSequenceBuffer::new(reader, dbs)?,
-            rm,
         })
+    }
+
+    fn initialize() -> WorkspaceResult<()> {
+        unimplemented!()
     }
 
     pub fn chain_head(&self) -> Option<&Address> {
@@ -49,7 +51,7 @@ impl<'env, R: Readable, RM: ReadManager> SourceChainBuffer<'env, R, RM> {
     }
 
     pub fn put_entry(&mut self, entry: Entry) -> () {
-        let header = self.header_for_entry(&entry);
+        let header = header_for_entry(&entry, unimplemented!(), unimplemented!());
         self.cas.put((header, entry));
     }
 
@@ -57,36 +59,45 @@ impl<'env, R: Readable, RM: ReadManager> SourceChainBuffer<'env, R, RM> {
         &self.cas.headers()
     }
 
+    /// Get the AgentId from the entry committed to the chain.
+    /// If this returns None, the chain was not initialized.
+    pub fn agent_id(&self) -> WorkspaceResult<Option<AgentId>> {
+        Ok(self.cas.entries().iter_raw()?.filter_map(|(_, e)| match e {
+            Entry::AgentId(agent_id) => Some(agent_id),
+            _ => None
+        }).next())
+    }
+
     pub fn try_commit(&self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         unimplemented!()
     }
-
-    fn header_for_entry(&self, entry: &Entry) -> ChainHeader {
-        unimplemented!()
-        // let provenances = &[Provenance::new(
-        //     self.snapshot.agent_id().unwrap().address(),
-        //     Signature::fake(),
-        // )];
-        // let timestamp = chrono::Utc::now().timestamp().into();
-        // let header = ChainHeader::new(
-        //     entry.entry_type(),
-        //     entry.address(),
-        //     provenances,
-        //     Some(self.new_head.clone()),
-        //     None,
-        //     None,
-        //     timestamp,
-        // );
-        // Ok(header)
-    }
 }
 
-impl<'env, R: Readable, RM: ReadManager> StoreBuffer<'env> for SourceChainBuffer<'env, R, RM> {
+impl<'env, R: Readable> StoreBuffer<'env> for SourceChainBuffer<'env, R> {
     fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         self.cas.finalize(writer)?;
         self.sequence.finalize(writer)?;
         Ok(())
     }
+}
+
+
+fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> ChainHeader {
+    let provenances = &[Provenance::new(
+        agent_id.address(),
+        Signature::fake(),
+    )];
+    let timestamp = chrono::Utc::now().timestamp().into();
+    let header = ChainHeader::new(
+        entry.entry_type(),
+        entry.address(),
+        provenances,
+        Some(prev_head),
+        None,
+        None,
+        timestamp,
+    );
+    header
 }
 
 #[cfg(test)]
