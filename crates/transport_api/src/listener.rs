@@ -118,21 +118,19 @@ pub type IncomingConnectionSender =
 pub type IncomingConnectionReceiver =
     tokio::sync::mpsc::Receiver<(ConnectionSender, IncomingRequestReceiver)>;
 
-/// The handler constructor to be invoked from `spawn_listener`.
-/// Will be supplied with a RpcChannelSender for this same task,
-/// incase you need to set up custom messages, such as a timer tick, etc.
-pub type SpawnListener<H> =
-    Box<dyn FnOnce(ListenerSender, IncomingConnectionSender) -> FutureResult<H> + 'static + Send>;
-
 /// Create an actual listener task, returning the Sender reference that allows
 /// controlling this task.
 /// Note, as a user you probably don't want this function.
 /// You probably want a spawn function for a specific type of connection.
-pub async fn spawn_listener<H: ListenerHandler>(
+pub async fn spawn_listener<H, F>(
     channel_size: usize,
     protocol: &str,
-    constructor: SpawnListener<H>,
-) -> Result<(ListenerSender, IncomingConnectionReceiver)> {
+    constructor: F,
+) -> Result<(ListenerSender, IncomingConnectionReceiver)>
+where
+    H: ListenerHandler,
+    F: FnOnce(ListenerSender, IncomingConnectionSender) -> FutureResult<H> + 'static + Send,
+{
     let (incoming_sender, incoming_receiver) = tokio::sync::mpsc::channel(channel_size);
     let (sender, mut receiver) =
         rpc_channel::rpc_channel::<ListenCommand, ListenResponse>(channel_size);
@@ -179,7 +177,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_connection_api() {
+    async fn test_listener_api() {
         struct Bob;
         impl ListenerHandler for Bob {
             fn handle_shutdown(&mut self) -> FutureResult<()> {
@@ -197,8 +195,9 @@ mod tests {
                 async move { Err(TransportError::Other("unimplemented".into())) }.boxed()
             }
         }
-        let test_constructor: SpawnListener<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
-        let (mut r, _) = spawn_listener(10, "test", test_constructor).await.unwrap();
+        let (mut r, _) = spawn_listener(10, "test", |_, _| async move { Ok(Bob) }.boxed())
+            .await
+            .unwrap();
         assert_eq!("test", r.get_protocol());
         assert_eq!("test://test/", r.get_bound_url().await.unwrap().as_str());
         assert!(r.connect(url2!("test://test/")).await.is_err());

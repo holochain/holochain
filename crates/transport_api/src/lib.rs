@@ -8,31 +8,31 @@
 //! #
 //! # pub async fn async_main() {
 //! #
-//! struct Foo;
-//! impl ListenerHandler for Foo {
-//!     fn handle_shutdown(&mut self) -> FutureResult<()> {
-//!         async move { Ok(()) }.boxed()
-//!     }
-//!
-//!     fn handle_get_bound_url(&mut self) -> FutureResult<Url2> {
-//!         async move { Ok(url2!("test://test/")) }.boxed()
-//!     }
-//!
-//!     fn handle_connect(
-//!         &mut self,
-//!         _url: Url2,
-//!     ) -> FutureResult<(ConnectionSender, IncomingRequestReceiver)> {
-//!         async move { Err(TransportError::Other("unimplemented".into())) }.boxed()
-//!     }
+//! struct MyListener;
+//! impl ListenerHandler for MyListener {
+//!     // ...
+//! #     fn handle_shutdown(&mut self) -> FutureResult<()> {
+//! #         async move { Ok(()) }.boxed()
+//! #     }
+//! #
+//! #     fn handle_get_bound_url(&mut self) -> FutureResult<Url2> {
+//! #         async move { Ok(url2!("test://test/")) }.boxed()
+//! #     }
+//! #
+//! #     fn handle_connect(
+//! #         &mut self,
+//! #         _url: Url2,
+//! #     ) -> FutureResult<(ConnectionSender, IncomingRequestReceiver)> {
+//! #         async move { Err(TransportError::Other("unimplemented".into())) }.boxed()
+//! #     }
 //! }
-//! let (l, _) = spawn_listener(10, "test", Box::new(|_, _| {
-//!     async move { Ok(Foo) }.boxed()
-//! })).await.unwrap();
-//! struct Bob;
-//! impl ConnectionHandler for Bob {
-//!     fn handle_shutdown(&mut self) -> FutureResult<()> {
-//!         async move { Ok(()) }.boxed()
-//!     }
+//!
+//! struct MyConnection;
+//! impl ConnectionHandler for MyConnection {
+//!     // ...
+//! #     fn handle_shutdown(&mut self) -> FutureResult<()> {
+//! #         async move { Ok(()) }.boxed()
+//! #     }
 //!
 //!     fn handle_get_remote_url(&mut self) -> FutureResult<Url2> {
 //!         async move { Ok(url2!("test://test/")) }.boxed()
@@ -42,10 +42,17 @@
 //!         async move { Ok(data) }.boxed()
 //!     }
 //! }
-//! let test_constructor: SpawnConnection<Bob> = Box::new(|_, _| async move { Ok(Bob) }.boxed());
-//! let (mut r, _) = spawn_connection(10, l, test_constructor).await.unwrap();
-//! assert_eq!("test://test/", r.get_remote_url().await.unwrap().as_str());
-//! assert_eq!(b"123".to_vec(), r.outgoing_request(b"123".to_vec()).await.unwrap());
+//!
+//! let (listener, _) = spawn_listener(10, "test", |_, _| {
+//!     async move { Ok(MyListener) }.boxed()
+//! }).await.unwrap();
+//!
+//! let (mut con, _) = spawn_connection(10, listener, |_, _| {
+//!     async move { Ok(MyConnection) }.boxed()
+//! }).await.unwrap();
+//!
+//! assert_eq!("test://test/", con.get_remote_url().await.unwrap().as_str());
+//! assert_eq!(b"123".to_vec(), con.outgoing_request(b"123".to_vec()).await.unwrap());
 //! #
 //! # }
 //! #
@@ -83,10 +90,5 @@ pub use connection::*;
 mod listener;
 pub use listener::*;
 
-#[cfg(test)]
-mod tests {
-    //use super::*;
-
-    #[tokio::test]
-    async fn transport_api_test() {}
-}
+mod transport_pool;
+pub use transport_pool::*;

@@ -113,21 +113,19 @@ pub type IncomingRequestSender = tokio::sync::mpsc::Sender<(Vec<u8>, IncomingReq
 /// the receive portion of this channel.
 pub type IncomingRequestReceiver = tokio::sync::mpsc::Receiver<(Vec<u8>, IncomingRequestResponder)>;
 
-/// The handler constructor to be invoked from `spawn_connection`.
-/// Will be supplied with a RpcChannelSender for this same task,
-/// incase you need to set up custom messages, such as a timer tick, etc.
-pub type SpawnConnection<H> =
-    Box<dyn FnOnce(ConnectionSender, IncomingRequestSender) -> FutureResult<H> + 'static + Send>;
-
 /// Create an actual connection task, returning the Sender reference that allows
 /// controlling this task.
 /// Note, as a user you probably don't want this function.
 /// You probably want a spawn function for a specific type of connection.
-pub async fn spawn_connection<H: ConnectionHandler>(
+pub async fn spawn_connection<H, F>(
     channel_size: usize,
     listener: ListenerSender,
-    constructor: SpawnConnection<H>,
-) -> Result<(ConnectionSender, IncomingRequestReceiver)> {
+    constructor: F,
+) -> Result<(ConnectionSender, IncomingRequestReceiver)>
+where
+    H: ConnectionHandler,
+    F: FnOnce(ConnectionSender, IncomingRequestSender) -> FutureResult<H> + 'static + Send,
+{
     let (incoming_sender, incoming_receiver) = tokio::sync::mpsc::channel(channel_size);
     let (sender, mut receiver) = rpc_channel::rpc_channel::<ConCommand, ConResponse>(channel_size);
 
@@ -205,9 +203,9 @@ mod tests {
                 async move { Ok(data) }.boxed()
             }
         }
-        let test_constructor: SpawnConnection<Bob> =
-            Box::new(|_, _| async move { Ok(Bob) }.boxed());
-        let (mut r, _) = spawn_connection(10, l, test_constructor).await.unwrap();
+        let (mut r, _) = spawn_connection(10, l, |_, _| async move { Ok(Bob) }.boxed())
+            .await
+            .unwrap();
         assert_eq!("test://test/", r.get_remote_url().await.unwrap().as_str());
         assert_eq!(
             b"123".to_vec(),
