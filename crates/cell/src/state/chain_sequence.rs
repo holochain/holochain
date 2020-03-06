@@ -8,7 +8,7 @@ use crate::state::source_chain::{SourceChainError, SourceChainResult};
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
 use sx_state::{
-    buffer::{KvIntBuffer, StoreBuffer},
+    buffer::{IntKvBuffer, StoreBuffer},
     db::{DbManager, DbName, CHAIN_SEQUENCE},
     error::{WorkspaceError, WorkspaceResult},
     prelude::{Readable, Reader, Writer},
@@ -24,7 +24,7 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'e, R> = KvIntBuffer<'e, u32, ChainSequenceItem, R>;
+type Store<'e, R> = IntKvBuffer<'e, u32, ChainSequenceItem, R>;
 
 pub struct ChainSequenceBuffer<'e, R: Readable> {
     db: Store<'e, R>,
@@ -36,7 +36,7 @@ pub struct ChainSequenceBuffer<'e, R: Readable> {
 
 impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
     pub fn new(reader: &'e R, dbs: &'e DbManager) -> WorkspaceResult<Self> {
-        let db: Store<'e, R> = KvIntBuffer::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
+        let db: Store<'e, R> = IntKvBuffer::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
         Self::from_db(db)
     }
 

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// Add: add this KV if the key does not yet exist
 /// Mod: set the key to this value regardless of whether or not it already exists
 /// Del: remove the KV
-enum KvOp<V> {
+enum Op<V> {
     Put(Box<V>),
     Del,
 }
@@ -30,7 +30,7 @@ where
 {
     db: SingleStore,
     reader: &'env R,
-    scratch: HashMap<K, KvOp<V>>,
+    scratch: HashMap<K, Op<V>>,
 }
 
 impl<'env, K, V, R> KvBuffer<'env, K, V, R>
@@ -48,7 +48,7 @@ where
     }
 
     pub fn get(&self, k: &K) -> WorkspaceResult<Option<V>> {
-        use KvOp::*;
+        use Op::*;
         let val = match self.scratch.get(k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Del) => None,
@@ -59,12 +59,12 @@ where
 
     pub fn put(&mut self, k: K, v: V) {
         // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, KvOp::Put(Box::new(v)));
+        let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
     pub fn delete(&mut self, k: K) {
         // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, KvOp::Del);
+        let _ = self.scratch.insert(k, Op::Del);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -96,7 +96,7 @@ where
     type Error = WorkspaceError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
-        use KvOp::*;
+        use Op::*;
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {

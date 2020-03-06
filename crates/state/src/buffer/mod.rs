@@ -7,7 +7,7 @@ mod kvv;
 
 pub use cas::CasBuffer;
 pub use kv::KvBuffer;
-pub use kv_int::KvIntBuffer;
+pub use kv_int::IntKvBuffer;
 pub use kvv::KvvBuffer;
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;

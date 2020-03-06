@@ -15,7 +15,7 @@ use std::collections::HashMap;
 /// Add: add this KV if the key does not yet exist
 /// Mod: set the key to this value regardless of whether or not it already exists
 /// Del: remove the KV
-enum KvOp<V> {
+enum Op<V> {
     Put(Box<V>),
     Del,
 }
@@ -28,7 +28,7 @@ enum KvOp<V> {
 /// of access permission, so that access can be hidden behind a limited interface
 ///
 /// TODO: hold onto SingleStore references for as long as the env
-pub struct KvIntBuffer<'env, K, V, R = Reader<'env>>
+pub struct IntKvBuffer<'env, K, V, R = Reader<'env>>
 where
     K: BufferIntKey,
     V: BufferVal,
@@ -36,10 +36,10 @@ where
 {
     db: IntegerStore<K>,
     reader: &'env R,
-    scratch: HashMap<K, KvOp<V>>,
+    scratch: HashMap<K, Op<V>>,
 }
 
-impl<'env, K, V, R> KvIntBuffer<'env, K, V, R>
+impl<'env, K, V, R> IntKvBuffer<'env, K, V, R>
 where
     K: BufferIntKey,
     V: BufferVal,
@@ -53,8 +53,8 @@ where
         })
     }
 
-    pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> KvIntBuffer<'env, K, V, RR> {
-        KvIntBuffer {
+    pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuffer<'env, K, V, RR> {
+        IntKvBuffer {
             db: self.db.clone(),
             reader,
             scratch: HashMap::new(),
@@ -62,7 +62,7 @@ where
     }
 
     pub fn get(&self, k: K) -> WorkspaceResult<Option<V>> {
-        use KvOp::*;
+        use Op::*;
         let val = match self.scratch.get(&k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Del) => None,
@@ -73,12 +73,12 @@ where
 
     pub fn put(&mut self, k: K, v: V) {
         // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, KvOp::Put(Box::new(v)));
+        let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
     pub fn delete(&mut self, k: K) {
         // TODO, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, KvOp::Del);
+        let _ = self.scratch.insert(k, Op::Del);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<'env, K, V, R> StoreBuffer<'env> for KvIntBuffer<'env, K, V, R>
+impl<'env, K, V, R> StoreBuffer<'env> for IntKvBuffer<'env, K, V, R>
 where
     K: BufferIntKey,
     V: BufferVal,
@@ -110,7 +110,7 @@ where
     type Error = WorkspaceError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
-        use KvOp::*;
+        use Op::*;
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
@@ -164,7 +164,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvIntBuffer, StoreBuffer};
+    use super::{IntKvBuffer, StoreBuffer};
     use crate::{
         env::{ReadManager, WriteManager},
         test_utils::test_env, error::WorkspaceResult,
@@ -180,7 +180,7 @@ pub mod tests {
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct V(u32);
 
-    type Store<'a> = KvIntBuffer<'a, u32, V>;
+    type Store<'a> = IntKvBuffer<'a, u32, V>;
 
     #[test]
     fn kv_iterators() -> WorkspaceResult<()> {
@@ -188,7 +188,7 @@ pub mod tests {
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
-            let mut buf: Store = KvIntBuffer::new(&reader, db)?;
+            let mut buf: Store = IntKvBuffer::new(&reader, db)?;
 
             buf.put(1, V(1));
             buf.put(2, V(2));
@@ -200,7 +200,7 @@ pub mod tests {
         })?;
 
         env.with_reader(|reader| {
-            let buf: Store = KvIntBuffer::new(&reader, db)?;
+            let buf: Store = IntKvBuffer::new(&reader, db)?;
 
             let forward: Vec<_> = buf.iter_raw()?.collect();
             let reverse: Vec<_> = buf.iter_raw_reverse()?.collect();
@@ -226,7 +226,7 @@ pub mod tests {
             .unwrap();
 
         env.with_reader(|reader| {
-            let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
+            let buf: Store = IntKvBuffer::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
             let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
