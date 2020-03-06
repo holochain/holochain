@@ -110,14 +110,6 @@ impl<'env> DbManager<'env> {
         Ok(())
     }
 
-    fn initialize(&mut self) -> WorkspaceResult<()> {
-        self.create(&*CHAIN_ENTRIES)?;
-        self.create(&*CHAIN_HEADERS)?;
-        self.create(&*CHAIN_META)?;
-        self.create(&*CHAIN_SEQUENCE)?;
-        Ok(())
-    }
-
     pub fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,
@@ -128,5 +120,13 @@ impl<'env> DbManager<'env> {
             self.create(key)?;
             Ok(self.um.get(key).unwrap().clone())
         }
+    }
+
+    fn initialize(&mut self) -> WorkspaceResult<()> {
+        self.create(&*CHAIN_ENTRIES)?;
+        self.create(&*CHAIN_HEADERS)?;
+        self.create(&*CHAIN_META)?;
+        self.create(&*CHAIN_SEQUENCE)?;
+        Ok(())
     }
 }

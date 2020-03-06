@@ -105,7 +105,7 @@ pub trait WriteManager {
 
 impl<'e> ReadManager for Env<'e> {
     fn reader(&self) -> WorkspaceResult<Reader> {
-        Ok(Reader(self.0.read()?))
+        Ok(Reader::new(self.0.read()?))
     }
 
     fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
@@ -113,7 +113,7 @@ impl<'e> ReadManager for Env<'e> {
         E: From<WorkspaceError>,
         F: FnOnce(Reader) -> Result<R, E>,
     {
-        f(Reader(self.0.read().map_err(Into::into)?))
+        f(Reader::new(self.0.read().map_err(Into::into)?))
     }
 }
 
