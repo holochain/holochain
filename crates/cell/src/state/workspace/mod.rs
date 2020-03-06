@@ -10,7 +10,7 @@ mod genesis;
 pub use genesis::GenesisWorkspace;
 
 pub trait Workspace<'txn>: Sized {
-    fn finalize(self, writer: Writer) -> WorkspaceResult<()>;
+    fn commit_txn(self, writer: Writer) -> WorkspaceResult<()>;
 }
 
 pub struct InvokeZomeWorkspace<'env> {
@@ -19,9 +19,9 @@ pub struct InvokeZomeWorkspace<'env> {
 }
 
 // impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
-//     fn finalize(self, mut writer: Writer) -> WorkspaceResult<()> {
-//         self.cas.finalize(&mut writer)?;
-//         // self.meta.finalize(&mut writer)?;
+//     fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
+//         self.cas.flush_to_txn(&mut writer)?;
+//         // self.meta.flush_to_txn(&mut writer)?;
 //         writer.commit()?;
 //         Ok(())
 //     }
@@ -43,7 +43,7 @@ impl<'env> InvokeZomeWorkspace<'env> {
 pub struct AppValidationWorkspace;
 
 impl<'env> Workspace<'env> for AppValidationWorkspace {
-    fn finalize(self, _writer: Writer) -> WorkspaceResult<()> {
+    fn commit_txn(self, _writer: Writer) -> WorkspaceResult<()> {
         unimplemented!()
     }
 }
@@ -81,9 +81,9 @@ pub mod tests {
     }
 
     impl<'env> Workspace<'env> for TestWorkspace<'env> {
-        fn finalize(self, mut writer: Writer) -> WorkspaceResult<()> {
-            self.one.finalize(&mut writer)?;
-            self.two.finalize(&mut writer)?;
+        fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
+            self.one.flush_to_txn(&mut writer)?;
+            self.two.flush_to_txn(&mut writer)?;
             writer.commit()?;
             Ok(())
         }
@@ -105,7 +105,7 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true);
             assert_eq!(workspace.one.get(&addr1).unwrap(), Some(1));
             assert_eq!(workspace.two.get(&addr2).unwrap(), Some(true));
-            workspace.finalize(env.writer().unwrap()).unwrap();
+            workspace.commit_txn(env.writer().unwrap()).unwrap();
         }
 
         // Ensure that the data was persisted

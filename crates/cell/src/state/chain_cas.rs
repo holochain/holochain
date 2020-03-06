@@ -100,9 +100,9 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
 impl<'env, R: Readable> StoreBuffer<'env> for ChainCasBuffer<'env, R> {
     type Error = WorkspaceError;
 
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
-        self.entries.finalize(writer)?;
-        self.headers.finalize(writer)?;
+    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+        self.entries.flush_to_txn(writer)?;
+        self.headers.flush_to_txn(writer)?;
         Ok(())
     }
 }

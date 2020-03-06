@@ -87,13 +87,13 @@ impl<'env, R: Readable> StoreBuffer<'env> for ChainSequenceBuffer<'env, R> {
 
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
-    fn finalize(self, writer: &'env mut Writer) -> SourceChainResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> SourceChainResult<()> {
         let fresh = self.with_reader(writer)?;
         let (old, new) = (self.persisted_head, fresh.persisted_head);
         if old != new {
             Err(SourceChainError::HeadMoved(old, new))
         } else {
-            Ok(self.db.finalize(writer)?)
+            Ok(self.db.flush_to_txn(writer)?)
         }
     }
 }
@@ -141,7 +141,7 @@ pub mod tests {
             buf.add_header(Address::from("1"));
             assert_eq!(buf.chain_head(), Some(&Address::from("1")));
             buf.add_header(Address::from("2"));
-            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             Ok(())
         })?;
 
@@ -158,7 +158,7 @@ pub mod tests {
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
-            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             Ok(())
         })?;
 
@@ -198,7 +198,7 @@ pub mod tests {
             rx2.await.unwrap();
 
             let env = arc1.env();
-            env.with_commit(|mut writer| buf.finalize(&mut writer))
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         let task2 = tokio::spawn(async move {
@@ -212,7 +212,7 @@ pub mod tests {
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
 
-            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
         });

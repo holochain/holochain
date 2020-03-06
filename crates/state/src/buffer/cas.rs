@@ -45,8 +45,8 @@ where
 {
     type Error = WorkspaceError;
 
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
-        self.0.finalize(writer)?;
+    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+        self.0.flush_to_txn(writer)?;
         Ok(())
     }
 }

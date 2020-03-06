@@ -77,9 +77,9 @@ impl<'env, R: Readable> SourceChainBuffer<'env, R> {
 impl<'env, R: Readable> StoreBuffer<'env> for SourceChainBuffer<'env, R> {
     type Error = SourceChainError;
 
-    fn finalize(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
-        self.cas.finalize(writer)?;
-        self.sequence.finalize(writer)?;
+    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+        self.cas.flush_to_txn(writer)?;
+        self.sequence.flush_to_txn(writer)?;
         Ok(())
     }
 }

@@ -109,7 +109,7 @@ where
 {
     type Error = WorkspaceError;
 
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
         for (k, op) in self.scratch.iter() {
             match op {
@@ -197,7 +197,7 @@ pub mod tests {
             buf.put(4, V(4));
             buf.put(5, V(5));
 
-            env.with_commit(|mut writer| buf.finalize(&mut writer))
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
 
         env.with_reader(|reader| {

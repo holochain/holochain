@@ -134,7 +134,7 @@ where
 {
     type Error = WorkspaceError;
 
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use Op::*;
         for (k, mut ops) in self.scratch.into_iter() {
             // If there is a DeleteAll in the set, that signifies that we should
@@ -221,7 +221,7 @@ pub mod tests {
             hashset! {op_delete(V(1)), op_insert(V(2)), op_insert(V(3))}
         );
 
-        wm.with_commit(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
             .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
@@ -251,7 +251,7 @@ pub mod tests {
             hashset! {op_delete(V(1)), op_insert(V(2))}
         );
 
-        wm.with_commit(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
             .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();
@@ -278,7 +278,7 @@ pub mod tests {
                 hashset! {op_insert(V(1))}
             );
 
-            wm.with_commit(|mut writer| store.finalize(&mut writer))
+            wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
         }
 
@@ -301,13 +301,13 @@ pub mod tests {
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.insert("key", V(1));
-        wm.with_commit(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
             .unwrap();
 
         let mut store: Store = KvvBuffer::create(&env, "kvv").unwrap();
         store.delete("key", V(1));
         store.delete("key", V(1));
-        wm.with_commit(|mut writer| store.finalize(&mut writer))
+        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
             .unwrap();
 
         let store: Store = KvvBuffer::open(&env, "kvv").unwrap();

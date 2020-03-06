@@ -96,7 +96,7 @@ where
 {
     type Error = WorkspaceError;
 
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
         for (k, op) in self.scratch.iter() {
             match op {
@@ -183,7 +183,7 @@ pub mod tests {
             buf.put("d", V(4));
             buf.put("e", V(5));
 
-            env.with_commit(|mut writer| buf.finalize(&mut writer))?;
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             Ok(())
         })?;
 
@@ -249,13 +249,13 @@ pub mod tests {
             // Check that the underlying store contains no changes yet
             assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
             assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);
-            kv1.finalize(&mut writer)?;
+            kv1.flush_to_txn(&mut writer)?;
 
             // Ensure that mid-transaction, there has still been no persistence,
             // just for kicks
             let kv1a: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1)?;
             assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
-            kv2.finalize(&mut writer)?;
+            kv2.flush_to_txn(&mut writer)?;
             Ok(())
         })?;
 
