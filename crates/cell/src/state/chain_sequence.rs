@@ -13,7 +13,7 @@ use sx_state::{
     Readable, Reader, Writer,
 };
 use sx_types::prelude::Address;
-use crate::agent::error::{SourceChainResult, SourceChainError};
+use crate::state::source_chain::{SourceChainResult, SourceChainError};
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Serialize, Deserialize)]
@@ -110,7 +110,7 @@ pub mod tests {
     };
     use sx_types::prelude::Address;
     use tempdir::TempDir;
-    use crate::agent::error::SourceChainResult;
+    use crate::state::source_chain::SourceChainResult;
 
     #[test]
     fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {

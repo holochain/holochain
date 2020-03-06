@@ -1,4 +1,4 @@
-use super::{
+use crate::state::{
     chain_cas::{ChainCasBuffer, HeaderCas},
     chain_sequence::ChainSequenceBuffer,
 };
@@ -16,7 +16,7 @@ use sx_types::{
     prelude::{Address, AddressableContent},
     signature::{Provenance, Signature}, agent::AgentId,
 };
-use crate::agent::error::SourceChainError;
+use crate::state::source_chain::SourceChainError;
 
 pub struct SourceChainBuffer<'env, R: Readable> {
     cas: ChainCasBuffer<'env, R>,
@@ -114,7 +114,7 @@ pub mod tests {
         Reader,
     };
     use tempdir::TempDir;
-    use crate::agent::error::SourceChainResult;
+    use crate::state::source_chain::SourceChainResult;
 
     #[test]
     fn asdf() -> SourceChainResult<()> {

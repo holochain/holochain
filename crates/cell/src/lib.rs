@@ -12,7 +12,6 @@ extern crate shrinkwraprs;
 
 mod workflow;
 
-pub mod agent;
 pub mod cell;
 pub mod conductor_api;
 pub mod dht;

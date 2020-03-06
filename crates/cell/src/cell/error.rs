@@ -1,5 +1,5 @@
 use sx_types::error::SkunkError;
-// use crate::agent::error::SourceChainError;
+// use crate::state::source_chain::SourceChainError;
 use sx_state::error::WorkspaceError;
 use thiserror::Error;
 

@@ -5,7 +5,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum SourceChainError {
-    #[error("The source chain is empty: it needs to be initialized before using")]
+    #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
 
     #[error("Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}")]
@@ -38,7 +38,7 @@ pub enum SourceChainError {
 #[derive(Error, Debug, PartialEq)]
 pub enum ChainInvalidReason {
     #[error("A valid chain always begins with a Dna entry, followed by an Agent entry.")]
-    GenesisMissing,
+    GenesisDataMissing,
 
     #[error("A chain header and its corresponding entry have a discrepancy. Entry address: {0}")]
     HeaderAndEntryMismatch(Address),

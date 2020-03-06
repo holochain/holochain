@@ -1,4 +1,4 @@
-use crate::agent::error::{ChainInvalidReason, SourceChainError, SourceChainResult};
+use crate::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
