@@ -1,5 +1,5 @@
 use crate::{
-    cell::{autonomic::AutonomicCue, Cell, error::CellError, CellId},
+    cell::{autonomic::AutonomicCue, error::CellError, Cell, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
 };
 use async_trait::async_trait;
@@ -38,7 +38,6 @@ pub trait ConductorCellApiT {
 
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
-
     #[error("CellError: {0}")]
     CellError(#[from] CellError),
 
@@ -57,7 +56,6 @@ pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 
 use mockall::mock;
 // mock
-
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
 // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented

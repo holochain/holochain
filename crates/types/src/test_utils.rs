@@ -48,7 +48,7 @@ pub fn test_dna(uuid: &str) -> Dna {
                     }}
                 }}
             }}"#,
-            uuid
+        uuid
     );
     Dna::try_from(JsonString::from_json(&fixture)).unwrap()
 }

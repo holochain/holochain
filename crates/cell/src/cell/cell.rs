@@ -10,9 +10,13 @@ use async_trait::async_trait;
 use holochain_persistence_api::txn::CursorProvider;
 use std::{
     hash::{Hash, Hasher},
-    path::Path, sync::{Arc, RwLock},
+    path::Path,
+    sync::{Arc, RwLock},
 };
-use sx_state::{db::{ReadManager, DbManager}, env::create_lmdb_env};
+use sx_state::{
+    db::DbManager,
+    env::{create_lmdb_env, Environment, ReadManager},
+};
 use sx_types::{
     agent::AgentId,
     db::DatabasePath,
@@ -21,7 +25,6 @@ use sx_types::{
     prelude::*,
     shims::*,
 };
-use sx_state::RkvEnv;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
@@ -51,9 +54,7 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
 // #[derive(Clone)]
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
-    state_env: Arc<RwLock<RkvEnv>>,
-    db_manager: DbManager<'static>,
-    read_manager: ReadManager<'static>,
+    state_env: Environment,
     conductor_api: Api,
 }
 
@@ -71,7 +72,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         conductor_api: Api,
         invocation: ZomeInvocation,
     ) -> CellResult<ZomeInvocationResult> {
-       unimplemented!()
+        unimplemented!()
     }
 
     pub async fn handle_network_message(

@@ -1,14 +1,14 @@
-use sx_state::db::CHAIN_HEADERS;
-use sx_state::db::CHAIN_ENTRIES;
-use crate::agent::error::{SourceChainError, SourceChainResult, ChainInvalidReason};
+use crate::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuffer, StoreBuffer},
-    error::WorkspaceResult,
-    RkvEnv, Writer, db::DbManager, Reader, SingleStore, Readable,
+    db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
+    error::{WorkspaceError, WorkspaceResult},
+    exports::SingleStore,
+    prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
-    chain_header::{HeaderWithEntry, ChainHeader},
+    chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,
     prelude::{Address, AddressableContent},
 };
@@ -23,17 +23,20 @@ pub struct ChainCasBuffer<'env, R: Readable = Reader<'env>> {
 }
 
 impl<'env, R: Readable> ChainCasBuffer<'env, R> {
-
-    fn new(reader: &'env R, entries_store: SingleStore, headers_store: SingleStore) -> WorkspaceResult<Self> {
+    fn new(
+        reader: &'env R,
+        entries_store: SingleStore,
+        headers_store: SingleStore,
+    ) -> WorkspaceResult<Self> {
         Ok(Self {
             entries: CasBuffer::new(reader, entries_store)?,
             headers: CasBuffer::new(reader, headers_store)?,
         })
     }
 
-    pub fn primary(reader: &'env R, dbm: &'env DbManager<'env>) -> WorkspaceResult<Self> {
-        let entries = dbm.get(&*CHAIN_ENTRIES)?.clone();
-        let headers = dbm.get(&*CHAIN_HEADERS)?.clone();
+    pub fn primary(reader: &'env R, dbs: &'env DbManager) -> WorkspaceResult<Self> {
+        let entries = dbs.get(&*CHAIN_ENTRIES)?.clone();
+        let headers = dbs.get(&*CHAIN_HEADERS)?.clone();
         Self::new(reader, entries, headers)
     }
 
@@ -46,7 +49,10 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
     }
 
     /// Given a ChainHeader, return the corresponding HeaderWithEntry
-    pub fn header_with_entry(&self, header: ChainHeader) -> SourceChainResult<Option<HeaderWithEntry>> {
+    pub fn header_with_entry(
+        &self,
+        header: ChainHeader,
+    ) -> SourceChainResult<Option<HeaderWithEntry>> {
         if let Some(entry) = self.get_entry(header.entry_address())? {
             Ok(Some(HeaderWithEntry::new(header, entry)))
         } else {
@@ -56,7 +62,10 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
         }
     }
 
-    pub fn get_header_with_entry(&self, header_address: &Address) -> SourceChainResult<Option<HeaderWithEntry>> {
+    pub fn get_header_with_entry(
+        &self,
+        header_address: &Address,
+    ) -> SourceChainResult<Option<HeaderWithEntry>> {
         if let Some(header) = self.get_header(header_address)? {
             self.header_with_entry(header)
         } else {
@@ -82,12 +91,18 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
     pub fn headers(&self) -> &HeaderCas<'env, R> {
         &self.headers
     }
+
+    pub fn entries(&self) -> &EntryCas<'env, R> {
+        &self.entries
+    }
 }
 
 impl<'env, R: Readable> StoreBuffer<'env> for ChainCasBuffer<'env, R> {
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
-        self.entries.finalize(writer)?;
-        self.headers.finalize(writer)?;
+    type Error = WorkspaceError;
+
+    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+        self.entries.flush_to_txn(writer)?;
+        self.headers.flush_to_txn(writer)?;
         Ok(())
     }
 }

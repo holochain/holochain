@@ -1,4 +1,3 @@
-use crate::error::WorkspaceResult;
 use rkv::Writer;
 
 mod cas;
@@ -14,13 +13,14 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 /// General trait for transactional stores, exposing only the method which
-/// finalizes the transaction. Not currently used, but could be used in Workspaces
-/// i.e. iterating over a Vec<dyn StoreBuffer> is all that needs to happen
-/// to commit the workspace changes
+/// adds changes to the write transaction. This generalization is not really used,
+/// but could be used in Workspaces i.e. iterating over a Vec<dyn StoreBuffer>
+/// is all that needs to happen to commit the workspace changes
 pub trait StoreBuffer<'env> {
+    type Error: std::error::Error;
     // fn iter(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;
     // fn iter_reverse(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()>;
+    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error>;
 }
 
 pub trait BufferKey: Hash + Eq + AsRef<[u8]> {}

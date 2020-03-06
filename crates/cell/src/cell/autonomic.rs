@@ -1,9 +1,8 @@
-use sx_types::{prelude::Address, entry::EntryAddress};
+use sx_types::{entry::EntryAddress, prelude::Address};
 
 /// The various processes which run "autonomically", aka subconsciously.
 /// These are triggered by
 pub enum AutonomicProcess {
-
     SlowHeal,
 
     /// See how many validators we can find on the network for all of our entries
@@ -15,13 +14,12 @@ pub enum AutonomicProcess {
 /// rather than at the next scheduled time
 pub enum AutonomicCue {
     // /// Cue sent when it is known that entries are ready for initial publishing,
-    // /// i.e. after committing new entries to your source chain
-    // Publish(Address),
+// /// i.e. after committing new entries to your source chain
+// Publish(Address),
 }
 
 impl From<AutonomicCue> for AutonomicProcess {
     fn from(cue: AutonomicCue) -> AutonomicProcess {
-        match cue {
-        }
+        match cue {}
     }
 }

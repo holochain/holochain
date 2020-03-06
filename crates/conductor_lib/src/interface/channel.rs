@@ -22,12 +22,14 @@ impl ChannelInterface {
 
 #[async_trait]
 impl Interface for ChannelInterface {
-    async fn spawn(mut self, mut api: ConductorExternalApi<ConductorCellApi>)
-    {
+    async fn spawn(mut self, mut api: ConductorExternalApi<ConductorCellApi>) {
         dbg!("spawn start");
         while let Some(true) = self.rx.next().await {
             dbg!("x");
-            if let Err(err) = api.admin(api::AdminMethod::Start("cell-handle".into())).await {
+            if let Err(err) = api
+                .admin(api::AdminMethod::Start("cell-handle".into()))
+                .await
+            {
                 error!("Error calling admin interface function: {}", err);
             };
         }

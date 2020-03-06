@@ -1,4 +1,4 @@
-use crate::{entry::Entry, error::SkunkResult, dna::DnaAddress};
+use crate::{dna::DnaAddress, entry::Entry, error::SkunkResult};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},

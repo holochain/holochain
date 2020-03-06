@@ -5,11 +5,11 @@
 use super::{BufferIntKey, BufferVal, StoreBuffer};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
-    Readable,
+    prelude::{Readable, Reader, Writer},
 };
-use rkv::{IntegerStore, Reader, Writer};
+use rkv::IntegerStore;
 
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 /// Transactional operations on a KV store
 /// Add: add this KV if the key does not yet exist
@@ -107,7 +107,9 @@ where
     V: BufferVal,
     R: Readable,
 {
-    fn finalize(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    type Error = WorkspaceError;
+
+    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
         use KvOp::*;
         for (k, op) in self.scratch.iter() {
             match op {
@@ -164,8 +166,8 @@ pub mod tests {
 
     use super::{KvIntBuffer, StoreBuffer};
     use crate::{
-        db::{ReadManager, WriteManager},
-        test_utils::test_env,
+        env::{ReadManager, WriteManager},
+        test_utils::test_env, error::WorkspaceResult,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -181,15 +183,12 @@ pub mod tests {
     type Store<'a> = KvIntBuffer<'a, u32, V>;
 
     #[test]
-    fn kv_iterators() {
-        let arc = test_env();
-        let env = arc.read().unwrap();
-        let db = env.open_integer("kv", StoreOptions::create()).unwrap();
-        let rm = ReadManager::new(&env);
-        let wm = WriteManager::new(&env);
+    fn kv_iterators() -> WorkspaceResult<()> {
+        let env = test_env();
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
-        rm.with_reader(|reader| {
-            let mut buf: Store = KvIntBuffer::new(&reader, db).unwrap();
+        env.with_reader(|reader| {
+            let mut buf: Store = KvIntBuffer::new(&reader, db)?;
 
             buf.put(1, V(1));
             buf.put(2, V(2));
@@ -197,37 +196,36 @@ pub mod tests {
             buf.put(4, V(4));
             buf.put(5, V(5));
 
-            wm.with_writer(|mut writer| buf.finalize(&mut writer))
-        })
-        .unwrap();
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
 
-        rm.with_reader(|reader| {
-            let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
+        env.with_reader(|reader| {
+            let buf: Store = KvIntBuffer::new(&reader, db)?;
 
-            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
-            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw()?.collect();
+            let reverse: Vec<_> = buf.iter_raw_reverse()?.collect();
 
             assert_eq!(
                 forward,
-                vec![(0, V(1)), (0, V(2)), (0, V(3)), (0, V(4)), (0, V(5))]
+                vec![(1, V(1)), (2, V(2)), (3, V(3)), (4, V(4)), (5, V(5))]
             );
             assert_eq!(
                 reverse,
-                vec![(0, V(5)), (0, V(4)), (0, V(3)), (0, V(2)), (0, V(1))]
+                vec![(5, V(5)), (4, V(4)), (3, V(3)), (2, V(2)), (1, V(1))]
             );
             Ok(())
         })
-        .unwrap();
     }
 
     #[test]
-    fn kv_empty_iterators() {
-        let arc = test_env();
-        let env = arc.read().unwrap();
-        let db = env.open_integer("kv", StoreOptions::create()).unwrap();
-        let rm = ReadManager::new(&env);
+    fn kv_empty_iterators() -> WorkspaceResult<()> {
+        let env = test_env();
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())
+            .unwrap();
 
-        rm.with_reader(|reader| {
+        env.with_reader(|reader| {
             let buf: Store = KvIntBuffer::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
@@ -237,6 +235,5 @@ pub mod tests {
             assert_eq!(reverse, vec![]);
             Ok(())
         })
-        .unwrap();
     }
 }

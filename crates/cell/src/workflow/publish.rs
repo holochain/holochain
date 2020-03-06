@@ -1,4 +1,4 @@
-use crate::{cell::error::CellResult};
+use crate::cell::error::CellResult;
 use sx_types::prelude::*;
 
 /// Publish DHT ops based on a segment of a source chain

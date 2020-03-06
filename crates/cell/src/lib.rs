@@ -12,7 +12,6 @@ extern crate shrinkwraprs;
 
 mod workflow;
 
-pub mod agent;
 pub mod cell;
 pub mod conductor_api;
 pub mod dht;
@@ -22,6 +21,7 @@ pub mod ribosome;
 pub mod state;
 pub mod validation;
 pub mod wasm_engine;
+pub mod workflow_runner;
 
 #[cfg(test)]
 pub mod test_utils;

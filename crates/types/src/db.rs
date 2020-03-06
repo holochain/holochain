@@ -1,6 +1,5 @@
-
-use std::path::{Path, PathBuf};
 use crate::agent::CellId;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
 pub struct DatabasePath(PathBuf);

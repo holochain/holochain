@@ -1,18 +1,19 @@
-use sx_types::error::SkunkError;
-use sx_types::prelude::*;
-use thiserror::Error;
 use holochain_json_api::error::JsonError;
 use sx_state::error::WorkspaceError;
+use sx_types::{error::SkunkError, prelude::*};
+use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum SourceChainError {
-    #[error("The source chain is empty: it needs to be initialized before using")]
+    #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
 
     #[error("Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}")]
-    HeadMismatch(Address, Address),
+    HeadMoved(Option<Address>, Option<Address>),
 
-    #[error("The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}")]
+    #[error(
+        "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
+    )]
     InvalidStructure(ChainInvalidReason),
 
     #[error("The source chain's head is pointing to an address which has no content.")]
@@ -37,7 +38,7 @@ pub enum SourceChainError {
 #[derive(Error, Debug, PartialEq)]
 pub enum ChainInvalidReason {
     #[error("A valid chain always begins with a Dna entry, followed by an Agent entry.")]
-    GenesisMissing,
+    GenesisDataMissing,
 
     #[error("A chain header and its corresponding entry have a discrepancy. Entry address: {0}")]
     HeaderAndEntryMismatch(Address),

@@ -11,10 +11,6 @@ pub enum WorkspaceError {
     #[error("An LMDB store was not created/initialized: {0}")]
     StoreNotInitialized(DbName),
 
-    /// This is an error we can catch and treat specially
-    #[error("The source chain head has moved since this store was created")]
-    SourceChainHeadMoved,
-
     #[error("There is an unexpected value in an LMDB database (TODO: more info)")]
     InvalidValue,
 
@@ -40,7 +36,7 @@ pub enum WorkspaceError {
 
     #[cfg(test)]
     #[error(transparent)]
-    Other(#[from] anyhow::Error)
+    Other(#[from] anyhow::Error),
 }
 
 impl PartialEq for WorkspaceError {

@@ -1,8 +1,11 @@
 use crate::conductor::CellHandle;
 use std::fmt;
+use sx_cell::{
+    cell::{error::CellError, CellId},
+    conductor_api::ConductorApiError,
+};
 use sx_types::error::SkunkError;
 use thiserror::Error;
-use sx_cell::{conductor_api::ConductorApiError, cell::{CellId, error::CellError}};
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -48,7 +51,6 @@ impl From<String> for ConductorError {
     }
 }
 
-
 impl PartialEq for ConductorError {
     fn eq(&self, other: &Self) -> bool {
         use ConductorError::*;
@@ -56,7 +58,7 @@ impl PartialEq for ConductorError {
             (InternalCellError(a), InternalCellError(b)) => a.to_string() == b.to_string(),
             (InternalCellError(_), _) => false,
             (_, InternalCellError(_)) => false,
-            (a, b) => a == b
+            (a, b) => a == b,
         }
     }
 }
