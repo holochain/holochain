@@ -1,8 +1,8 @@
 //! An interface to an LMDB key-value store, with integer keys
-//! This is unfortunately pure copypasta from KvBuffer, since Rust doesn't support specialization yet
+//! This is unfortunately pure copypasta from KvBuf, since Rust doesn't support specialization yet
 //! TODO, find *some* way to DRY up the two
 
-use super::{BufferIntKey, BufferVal, BufferedStore};
+use super::{BufIntKey, BufVal, BufferedStore};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
     prelude::{Readable, Reader, Writer},
@@ -28,10 +28,10 @@ enum Op<V> {
 /// of access permission, so that access can be hidden behind a limited interface
 ///
 /// TODO: hold onto SingleStore references for as long as the env
-pub struct IntKvBuffer<'env, K, V, R = Reader<'env>>
+pub struct IntKvBuf<'env, K, V, R = Reader<'env>>
 where
-    K: BufferIntKey,
-    V: BufferVal,
+    K: BufIntKey,
+    V: BufVal,
     R: Readable,
 {
     db: IntegerStore<K>,
@@ -39,10 +39,10 @@ where
     scratch: HashMap<K, Op<V>>,
 }
 
-impl<'env, K, V, R> IntKvBuffer<'env, K, V, R>
+impl<'env, K, V, R> IntKvBuf<'env, K, V, R>
 where
-    K: BufferIntKey,
-    V: BufferVal,
+    K: BufIntKey,
+    V: BufVal,
     R: Readable,
 {
     pub fn new(reader: &'env R, db: IntegerStore<K>) -> WorkspaceResult<Self> {
@@ -53,8 +53,8 @@ where
         })
     }
 
-    pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuffer<'env, K, V, RR> {
-        IntKvBuffer {
+    pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuf<'env, K, V, RR> {
+        IntKvBuf {
             db: self.db.clone(),
             reader,
             scratch: HashMap::new(),
@@ -101,10 +101,10 @@ where
     }
 }
 
-impl<'env, K, V, R> BufferedStore<'env> for IntKvBuffer<'env, K, V, R>
+impl<'env, K, V, R> BufferedStore<'env> for IntKvBuf<'env, K, V, R>
 where
-    K: BufferIntKey,
-    V: BufferVal,
+    K: BufIntKey,
+    V: BufVal,
     R: Readable,
 {
     type Error = WorkspaceError;
@@ -141,8 +141,8 @@ impl<'env, K, V> SingleIntIter<'env, K, V> {
 /// TODO: Use FallibleIterator to prevent panics within iteration
 impl<'env, K, V> Iterator for SingleIntIter<'env, K, V>
 where
-    K: BufferIntKey,
-    V: BufferVal,
+    K: BufIntKey,
+    V: BufVal,
 {
     type Item = (K, V);
 
@@ -164,7 +164,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{IntKvBuffer, BufferedStore};
+    use super::{IntKvBuf, BufferedStore};
     use crate::{
         env::{ReadManager, WriteManager},
         test_utils::test_env, error::WorkspaceResult,
@@ -180,7 +180,7 @@ pub mod tests {
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct V(u32);
 
-    type Store<'a> = IntKvBuffer<'a, u32, V>;
+    type Store<'a> = IntKvBuf<'a, u32, V>;
 
     #[test]
     fn kv_iterators() -> WorkspaceResult<()> {
@@ -188,7 +188,7 @@ pub mod tests {
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
-            let mut buf: Store = IntKvBuffer::new(&reader, db)?;
+            let mut buf: Store = IntKvBuf::new(&reader, db)?;
 
             buf.put(1, V(1));
             buf.put(2, V(2));
@@ -200,7 +200,7 @@ pub mod tests {
         })?;
 
         env.with_reader(|reader| {
-            let buf: Store = IntKvBuffer::new(&reader, db)?;
+            let buf: Store = IntKvBuf::new(&reader, db)?;
 
             let forward: Vec<_> = buf.iter_raw()?.collect();
             let reverse: Vec<_> = buf.iter_raw_reverse()?.collect();
@@ -226,7 +226,7 @@ pub mod tests {
             .unwrap();
 
         env.with_reader(|reader| {
-            let buf: Store = IntKvBuffer::new(&reader, db).unwrap();
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
             let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();

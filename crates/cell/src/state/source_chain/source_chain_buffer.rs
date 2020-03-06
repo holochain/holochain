@@ -1,6 +1,6 @@
 use crate::state::{
-    chain_cas::{ChainCasBuffer, HeaderCas},
-    chain_sequence::ChainSequenceBuffer,
+    chain_cas::{ChainCasBuf, HeaderCas},
+    chain_sequence::ChainSequenceBuf,
     source_chain::SourceChainError,
 };
 use core::ops::Deref;
@@ -19,16 +19,16 @@ use sx_types::{
     signature::{Provenance, Signature},
 };
 
-pub struct SourceChainBuffer<'env, R: Readable> {
-    cas: ChainCasBuffer<'env, R>,
-    sequence: ChainSequenceBuffer<'env, R>,
+pub struct SourceChainBuf<'env, R: Readable> {
+    cas: ChainCasBuf<'env, R>,
+    sequence: ChainSequenceBuf<'env, R>,
 }
 
-impl<'env, R: Readable> SourceChainBuffer<'env, R> {
+impl<'env, R: Readable> SourceChainBuf<'env, R> {
     pub fn new(reader: &'env R, dbs: &'env DbManager) -> WorkspaceResult<Self> {
         Ok(Self {
-            cas: ChainCasBuffer::primary(reader, dbs)?,
-            sequence: ChainSequenceBuffer::new(reader, dbs)?,
+            cas: ChainCasBuf::primary(reader, dbs)?,
+            sequence: ChainSequenceBuf::new(reader, dbs)?,
         })
     }
 
@@ -48,7 +48,7 @@ impl<'env, R: Readable> SourceChainBuffer<'env, R> {
         self.cas.get_header(k)
     }
 
-    pub fn cas(&self) -> &ChainCasBuffer<R> {
+    pub fn cas(&self) -> &ChainCasBuf<R> {
         &self.cas
     }
 
@@ -80,7 +80,7 @@ impl<'env, R: Readable> SourceChainBuffer<'env, R> {
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuffer<'env, R> {
+impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
     type Error = SourceChainError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
@@ -108,7 +108,7 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> Ch
 #[cfg(test)]
 pub mod tests {
 
-    use super::{SourceChainBuffer, BufferedStore};
+    use super::{SourceChainBuf, BufferedStore};
     use crate::state::source_chain::SourceChainResult;
     use sx_state::{
         db::DbManager,
@@ -124,7 +124,7 @@ pub mod tests {
         let env = test_env();
         let dbs = env.dbs()?;
         env.with_reader(|reader| {
-            let source_chain = SourceChainBuffer::new(&reader, &dbs)?;
+            let source_chain = SourceChainBuf::new(&reader, &dbs)?;
             Ok(())
         })
     }

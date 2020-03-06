@@ -1,8 +1,8 @@
-use crate::state::source_chain::SourceChainBuffer;
+use crate::state::source_chain::SourceChainBuf;
 use sx_state::{db::DbManager, error::WorkspaceResult, prelude::Reader};
 
 pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuffer<'env, Reader<'env>>,
+    source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
 impl<'env> GenesisWorkspace<'env> {
@@ -15,7 +15,7 @@ impl<'env> GenesisWorkspace<'env> {
 pub mod tests {
 
     use super::GenesisWorkspace;
-    use crate::state::source_chain::{SourceChainBuffer, SourceChainResult};
+    use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
     use sx_state::{
         env::ReadManager, error::WorkspaceError, prelude::Readable, test_utils::test_env,
     };

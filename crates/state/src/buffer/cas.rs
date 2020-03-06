@@ -1,6 +1,6 @@
 use super::{
-    kv::{KvBuffer, SingleIter},
-    BufferVal, BufferedStore,
+    kv::{KvBuf, SingleIter},
+    BufVal, BufferedStore,
 };
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
@@ -10,20 +10,20 @@ use rkv::Writer;
 
 use sx_types::prelude::{Address, AddressableContent};
 
-/// A wrapper around a KvBuffer where keys are always Addresses,
+/// A wrapper around a KvBuf where keys are always Addresses,
 /// and values are always AddressableContent.
-pub struct CasBuffer<'env, V, R>(KvBuffer<'env, Address, V, R>)
+pub struct CasBuf<'env, V, R>(KvBuf<'env, Address, V, R>)
 where
-    V: BufferVal + AddressableContent,
+    V: BufVal + AddressableContent,
     R: Readable;
 
-impl<'env, V, R> CasBuffer<'env, V, R>
+impl<'env, V, R> CasBuf<'env, V, R>
 where
-    V: BufferVal + AddressableContent,
+    V: BufVal + AddressableContent,
     R: Readable,
 {
     pub fn new(reader: &'env R, db: rkv::SingleStore) -> WorkspaceResult<Self> {
-        Ok(Self(KvBuffer::new(reader, db)?))
+        Ok(Self(KvBuf::new(reader, db)?))
     }
 
     pub fn get(&self, k: &Address) -> WorkspaceResult<Option<V>> {
@@ -44,9 +44,9 @@ where
     }
 }
 
-impl<'env, V, R> BufferedStore<'env> for CasBuffer<'env, V, R>
+impl<'env, V, R> BufferedStore<'env> for CasBuf<'env, V, R>
 where
-    V: BufferVal + AddressableContent,
+    V: BufVal + AddressableContent,
     R: Readable,
 {
     type Error = WorkspaceError;

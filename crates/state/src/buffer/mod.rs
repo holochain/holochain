@@ -5,10 +5,10 @@ mod kv;
 mod kv_int;
 mod kvv;
 
-pub use cas::CasBuffer;
-pub use kv::KvBuffer;
-pub use kv_int::IntKvBuffer;
-pub use kvv::KvvBuffer;
+pub use cas::CasBuf;
+pub use kv::KvBuf;
+pub use kv_int::IntKvBuf;
+pub use kvv::KvvBuf;
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
@@ -23,14 +23,14 @@ pub trait BufferedStore<'env> {
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error>;
 }
 
-pub trait BufferKey: Hash + Eq + AsRef<[u8]> {}
-impl<T> BufferKey for T where T: Hash + Eq + AsRef<[u8]> {}
+pub trait BufKey: Hash + Eq + AsRef<[u8]> {}
+impl<T> BufKey for T where T: Hash + Eq + AsRef<[u8]> {}
 
-pub trait BufferIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
-impl<T> BufferIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
+pub trait BufIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
+impl<T> BufIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 
-pub trait BufferVal: Clone + Serialize + DeserializeOwned {}
-impl<T> BufferVal for T where T: Clone + Serialize + DeserializeOwned {}
+pub trait BufVal: Clone + Serialize + DeserializeOwned {}
+impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned {}
 
-pub trait BufferMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned {}
-impl<T> BufferMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned {}
+pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned {}
+impl<T> BufMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned {}

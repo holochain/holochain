@@ -1,7 +1,7 @@
-use super::{ChainInvalidReason, SourceChainBuffer, SourceChainError, SourceChainResult};
+use super::{ChainInvalidReason, SourceChainBuf, SourceChainError, SourceChainResult};
 use crate::state::{
-    chain_cas::{ChainCasBuffer, HeaderCas},
-    chain_sequence::ChainSequenceBuffer,
+    chain_cas::{ChainCasBuf, HeaderCas},
+    chain_sequence::ChainSequenceBuf,
 };
 use core::ops::Deref;
 use sx_state::{
@@ -19,11 +19,11 @@ use sx_types::{
     signature::{Provenance, Signature},
 };
 
-type InnerBuffer<'env> = SourceChainBuffer<'env, Reader<'env>>;
+type InnerBuffer<'env> = SourceChainBuf<'env, Reader<'env>>;
 
 /// A SourceChain is guaranteed to be initialized, i.e. it has gone through the CellGenesis workflow.
-/// It has the same interface as its underlying SourceChainBuffer, except that certain operations,
-/// which would return Option in the SourceChainBuffer, like getting the source chain head, or the AgentId,
+/// It has the same interface as its underlying SourceChainBuf, except that certain operations,
+/// which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentId,
 /// cannot fail, so the function return types reflect that.
 #[derive(Shrinkwrap)]
 pub struct SourceChain<'env>(InnerBuffer<'env>);

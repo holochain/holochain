@@ -1,7 +1,7 @@
 use crate::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
-    buffer::{CasBuffer, BufferedStore},
+    buffer::{CasBuf, BufferedStore},
     db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
     error::{WorkspaceError, WorkspaceResult},
     exports::SingleStore,
@@ -13,24 +13,24 @@ use sx_types::{
     prelude::{Address, AddressableContent},
 };
 
-pub type EntryCas<'env, R> = CasBuffer<'env, Entry, R>;
-pub type HeaderCas<'env, R> = CasBuffer<'env, ChainHeader, R>;
+pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
+pub type HeaderCas<'env, R> = CasBuf<'env, ChainHeader, R>;
 
-/// A convenient pairing of two CasBuffers, one for entries and one for headers
-pub struct ChainCasBuffer<'env, R: Readable = Reader<'env>> {
+/// A convenient pairing of two CasBufs, one for entries and one for headers
+pub struct ChainCasBuf<'env, R: Readable = Reader<'env>> {
     entries: EntryCas<'env, R>,
     headers: HeaderCas<'env, R>,
 }
 
-impl<'env, R: Readable> ChainCasBuffer<'env, R> {
+impl<'env, R: Readable> ChainCasBuf<'env, R> {
     fn new(
         reader: &'env R,
         entries_store: SingleStore,
         headers_store: SingleStore,
     ) -> WorkspaceResult<Self> {
         Ok(Self {
-            entries: CasBuffer::new(reader, entries_store)?,
-            headers: CasBuffer::new(reader, headers_store)?,
+            entries: CasBuf::new(reader, entries_store)?,
+            headers: CasBuf::new(reader, headers_store)?,
         })
     }
 
@@ -97,7 +97,7 @@ impl<'env, R: Readable> ChainCasBuffer<'env, R> {
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuffer<'env, R> {
+impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuf<'env, R> {
     type Error = WorkspaceError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {

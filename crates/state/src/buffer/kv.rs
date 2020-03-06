@@ -1,4 +1,4 @@
-use super::{BufferKey, BufferVal, BufferedStore};
+use super::{BufKey, BufVal, BufferedStore};
 use crate::{
     error::{WorkspaceError, WorkspaceResult},
     prelude::{Readable, Reader, Writer},
@@ -23,20 +23,20 @@ enum Op<V> {
 /// of access permission, so that access can be hidden behind a limited interface
 ///
 /// TODO: hold onto SingleStore references for as long as the env
-pub struct KvBuffer<'env, K, V, R = Reader<'env>>
+pub struct KvBuf<'env, K, V, R = Reader<'env>>
 where
-    K: BufferKey,
-    V: BufferVal,
+    K: BufKey,
+    V: BufVal,
 {
     db: SingleStore,
     reader: &'env R,
     scratch: HashMap<K, Op<V>>,
 }
 
-impl<'env, K, V, R> KvBuffer<'env, K, V, R>
+impl<'env, K, V, R> KvBuf<'env, K, V, R>
 where
-    K: BufferKey,
-    V: BufferVal,
+    K: BufKey,
+    V: BufVal,
     R: Readable,
 {
     pub fn new(reader: &'env R, db: SingleStore) -> WorkspaceResult<Self> {
@@ -87,10 +87,10 @@ where
     }
 }
 
-impl<'env, K, V, R> BufferedStore<'env> for KvBuffer<'env, K, V, R>
+impl<'env, K, V, R> BufferedStore<'env> for KvBuf<'env, K, V, R>
 where
-    K: BufferKey,
-    V: BufferVal,
+    K: BufKey,
+    V: BufVal,
     R: Readable,
 {
     type Error = WorkspaceError;
@@ -126,7 +126,7 @@ impl<'env, V> SingleIter<'env, V> {
 /// TODO: Use FallibleIterator to prevent panics within iteration
 impl<'env, V> Iterator for SingleIter<'env, V>
 where
-    V: BufferVal,
+    V: BufVal,
 {
     type Item = (&'env [u8], V);
 
@@ -148,7 +148,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvBuffer, BufferedStore};
+    use super::{KvBuf, BufferedStore};
     use crate::{
         env::{ReadManager, WriteManager},
         error::{WorkspaceError, WorkspaceResult},
@@ -165,7 +165,7 @@ pub mod tests {
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct V(u32);
 
-    type TestBuf<'a> = KvBuffer<'a, &'a str, V>;
+    type TestBuf<'a> = KvBuf<'a, &'a str, V>;
 
     #[test]
     fn kv_iterators() -> WorkspaceResult<()> {
@@ -173,7 +173,7 @@ pub mod tests {
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
         env.with_reader::<WorkspaceError, _, _>(|reader| {
-            let mut buf: TestBuf = KvBuffer::new(&reader, db)?;
+            let mut buf: TestBuf = KvBuf::new(&reader, db)?;
 
             buf.put("a", V(1));
             buf.put("b", V(2));
@@ -186,7 +186,7 @@ pub mod tests {
         })?;
 
         env.with_reader(|reader| {
-            let buf: TestBuf = KvBuffer::new(&reader, db)?;
+            let buf: TestBuf = KvBuf::new(&reader, db)?;
 
             let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| v).collect();
             let reverse: Vec<_> = buf.iter_raw_reverse()?.map(|(_, v)| v).collect();
@@ -206,7 +206,7 @@ pub mod tests {
             .unwrap();
 
         env.with_reader(|reader| {
-            let buf: TestBuf = KvBuffer::new(&reader, db).unwrap();
+            let buf: TestBuf = KvBuf::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
             let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
@@ -230,8 +230,8 @@ pub mod tests {
         };
 
         env.with_reader::<WorkspaceError, _, _>(|reader| {
-            let mut kv1: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1)?;
-            let mut kv2: KvBuffer<String, String> = KvBuffer::new(&reader, db2)?;
+            let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
+            let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
 
             kv1.put("hi".to_owned(), testval.clone());
             kv2.put("salutations".to_owned(), "folks".to_owned());
@@ -243,7 +243,7 @@ pub mod tests {
 
             // Ensure that mid-transaction, there has still been no persistence,
             // just for kicks
-            let kv1a: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1)?;
+            let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
             kv2.flush_to_txn(&mut writer)?;
             Ok(())
@@ -254,8 +254,8 @@ pub mod tests {
 
         env.with_reader(|reader| {
             // Now open some fresh Readers to see that our data was persisted
-            let kv1b: KvBuffer<String, TestVal> = KvBuffer::new(&reader, db1)?;
-            let kv2b: KvBuffer<String, String> = KvBuffer::new(&reader, db2)?;
+            let kv1b: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
+            let kv2b: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
             // Check that the underlying store contains no changes yet
             assert_eq!(kv1b.get_persisted(&"hi".to_owned())?, Some(testval));
             assert_eq!(

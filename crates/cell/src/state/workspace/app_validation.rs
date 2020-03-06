@@ -1,5 +1,5 @@
 use super::Workspace;
-use crate::state::source_chain::SourceChainBuffer;
+use crate::state::source_chain::SourceChainBuf;
 use sx_state::{db::DbManager, error::WorkspaceResult, prelude::*};
 
 pub struct AppValidationWorkspace {
@@ -22,7 +22,7 @@ impl<'env> Workspace for AppValidationWorkspace {
 pub mod tests {
 
     use super::AppValidationWorkspace;
-    use crate::state::source_chain::{SourceChainBuffer, SourceChainResult};
+    use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
     use sx_state::{
         env::ReadManager, error::WorkspaceError, prelude::Readable, test_utils::test_env,
     };

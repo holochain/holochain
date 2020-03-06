@@ -1,6 +1,6 @@
-use super::chain_cas::ChainCasBuffer;
+use super::chain_cas::ChainCasBuf;
 use sx_state::{
-    buffer::{KvBuffer, KvvBuffer, BufferedStore},
+    buffer::{KvBuf, KvvBuf, BufferedStore},
     db::DbManager,
     error::WorkspaceResult,
     prelude::{Reader, Writer},
@@ -22,7 +22,7 @@ pub mod tests {
 
     use super::{InvokeZomeWorkspace, Workspace};
     use sx_state::{
-        buffer::{KvBuffer, BufferedStore},
+        buffer::{KvBuf, BufferedStore},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         error::WorkspaceResult,
@@ -33,8 +33,8 @@ pub mod tests {
     use tempdir::TempDir;
 
     struct TestWorkspace<'env> {
-        one: KvBuffer<'env, Address, u32>,
-        two: KvBuffer<'env, Address, bool>,
+        one: KvBuf<'env, Address, u32>,
+        two: KvBuf<'env, Address, bool>,
     }
 
     impl<'env> TestWorkspace<'env> {
@@ -43,8 +43,8 @@ pub mod tests {
             dbs: &'env DbManager,
         ) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuffer::new(reader, *dbs.get(&*CHAIN_ENTRIES)?)?,
-                two: KvBuffer::new(reader, *dbs.get(&*CHAIN_HEADERS)?)?,
+                one: KvBuf::new(reader, *dbs.get(&*CHAIN_ENTRIES)?)?,
+                two: KvBuf::new(reader, *dbs.get(&*CHAIN_HEADERS)?)?,
             })
         }
     }

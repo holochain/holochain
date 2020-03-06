@@ -8,7 +8,7 @@ use crate::state::source_chain::{SourceChainError, SourceChainResult};
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
 use sx_state::{
-    buffer::{IntKvBuffer, BufferedStore},
+    buffer::{IntKvBuf, BufferedStore},
     db::{DbManager, DbName, CHAIN_SEQUENCE},
     error::{WorkspaceError, WorkspaceResult},
     prelude::{Readable, Reader, Writer},
@@ -24,9 +24,9 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'e, R> = IntKvBuffer<'e, u32, ChainSequenceItem, R>;
+type Store<'e, R> = IntKvBuf<'e, u32, ChainSequenceItem, R>;
 
-pub struct ChainSequenceBuffer<'e, R: Readable> {
+pub struct ChainSequenceBuf<'e, R: Readable> {
     db: Store<'e, R>,
     next_index: u32,
     tx_seq: u32,
@@ -34,27 +34,27 @@ pub struct ChainSequenceBuffer<'e, R: Readable> {
     persisted_head: Option<Address>,
 }
 
-impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
+impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     pub fn new(reader: &'e R, dbs: &'e DbManager) -> WorkspaceResult<Self> {
-        let db: Store<'e, R> = IntKvBuffer::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
+        let db: Store<'e, R> = IntKvBuf::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
         Self::from_db(db)
     }
 
     pub fn with_reader<RR: Readable>(
         &self,
         reader: &'e RR,
-    ) -> WorkspaceResult<ChainSequenceBuffer<'e, RR>> {
+    ) -> WorkspaceResult<ChainSequenceBuf<'e, RR>> {
         Self::from_db(self.db.with_reader(reader))
     }
 
-    fn from_db<RR: Readable>(db: Store<'e, RR>) -> WorkspaceResult<ChainSequenceBuffer<'e, RR>> {
+    fn from_db<RR: Readable>(db: Store<'e, RR>) -> WorkspaceResult<ChainSequenceBuf<'e, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         let (next_index, tx_seq, current_head) = latest
             .map(|(_, item)| (item.index + 1, item.tx_seq + 1, Some(item.header_address)))
             .unwrap_or((0, 0, None));
         let persisted_head = current_head.clone();
 
-        Ok(ChainSequenceBuffer {
+        Ok(ChainSequenceBuf {
             db,
             next_index,
             tx_seq,
@@ -82,7 +82,7 @@ impl<'e, R: Readable> ChainSequenceBuffer<'e, R> {
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuffer<'env, R> {
+impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
     type Error = SourceChainError;
 
     /// Commit to the source chain, performing an as-at check and returning a
@@ -101,7 +101,7 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuffer<'env, R> {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{ChainSequenceBuffer, SourceChainError, BufferedStore};
+    use super::{ChainSequenceBuf, SourceChainError, BufferedStore};
     use crate::state::source_chain::SourceChainResult;
     use std::sync::Arc;
     use sx_state::{
@@ -118,7 +118,7 @@ pub mod tests {
         let env = test_env();
         let dbs = env.dbs()?;
         env.with_reader(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
             buf.add_header(Address::from("0"));
             assert_eq!(buf.chain_head(), Some(&Address::from("0")));
@@ -135,7 +135,7 @@ pub mod tests {
         let env = test_env();
         let dbs = env.dbs()?;
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
             assert_eq!(buf.chain_head(), Some(&Address::from("1")));
@@ -145,7 +145,7 @@ pub mod tests {
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
+            let buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
             assert_eq!(items, vec![0, 1, 2]);
@@ -153,7 +153,7 @@ pub mod tests {
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
@@ -162,7 +162,7 @@ pub mod tests {
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let buf = ChainSequenceBuffer::new(&reader, &dbs)?;
+            let buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("5")));
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
@@ -186,7 +186,7 @@ pub mod tests {
             let env = env1.clone();
             let dbs = env.dbs()?;
             let reader = env.reader()?;
-            let mut buf = { ChainSequenceBuffer::new(&reader, &dbs)? };
+            let mut buf = { ChainSequenceBuf::new(&reader, &dbs)? };
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
             buf.add_header(Address::from("2"));
@@ -205,7 +205,7 @@ pub mod tests {
             let dbs = env.dbs()?;
 
             let reader = env.reader()?;
-            let mut buf = ChainSequenceBuffer::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));

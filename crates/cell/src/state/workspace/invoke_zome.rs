@@ -1,9 +1,9 @@
 use super::Workspace;
-use crate::state::source_chain::SourceChainBuffer;
+use crate::state::source_chain::SourceChainBuf;
 use sx_state::{db::DbManager, error::WorkspaceResult, prelude::*};
 
 pub struct InvokeZomeWorkspace<'env> {
-    source_chain: SourceChainBuffer<'env, Reader<'env>>,
+    source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
@@ -22,7 +22,7 @@ impl<'env> Workspace for InvokeZomeWorkspace<'env> {
 pub mod tests {
 
     use super::InvokeZomeWorkspace;
-    use crate::state::source_chain::{SourceChainBuffer, SourceChainResult};
+    use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
     use sx_state::{
         env::ReadManager, error::WorkspaceError, prelude::Readable, test_utils::test_env,
     };
