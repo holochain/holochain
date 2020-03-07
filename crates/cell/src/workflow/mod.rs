@@ -24,7 +24,7 @@ use sx_types::{agent::AgentId, dna::Dna, shims::DhtOp};
 use thiserror::Error;
 
 #[derive(Clone, Debug)]
-pub enum WorkflowParams {
+pub enum WorkflowCall {
     InvokeZome(ZomeInvocation),
     Genesis(Dna, AgentId),
     // AppValidation(Vec<DhtOp>),
@@ -47,21 +47,21 @@ pub struct WorkflowEffects<W: Workspace> {
 
 #[derive(Clone, Debug)]
 pub struct WorkflowTrigger {
-    params: WorkflowParams,
+    call: WorkflowCall,
     interval: Option<Duration>,
 }
 
 impl WorkflowTrigger {
-    pub fn immediate(params: WorkflowParams) -> Self {
+    pub fn immediate(call: WorkflowCall) -> Self {
         Self {
-            params,
+            call,
             interval: None,
         }
     }
 
-    pub fn delayed(params: WorkflowParams, interval: Duration) -> Self {
+    pub fn delayed(call: WorkflowCall, interval: Duration) -> Self {
         Self {
-            params,
+            call,
             interval: Some(interval),
         }
     }

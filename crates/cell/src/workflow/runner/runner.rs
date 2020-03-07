@@ -14,27 +14,27 @@ use sx_state::{
     error::DatabaseError,
     prelude::*,
 };
-use workflow::{WorkflowEffects, WorkflowParams, WorkflowTrigger};
+use workflow::{WorkflowEffects, WorkflowCall, WorkflowTrigger};
 use workspace::WorkspaceError;
 
 impl<Api: ConductorCellApiT> Cell<Api> {
-    pub async fn run_workflow(&self, params: WorkflowParams) -> WorkflowRunResult<()> {
+    pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
         let env = self.state_env();
         let dbs = env.dbs()?;
-        match params {
-            WorkflowParams::InvokeZome(invocation) => {
+        match call {
+            WorkflowCall::InvokeZome(invocation) => {
                 let workspace = workspace::InvokeZomeWorkspace::new(env.reader()?, &dbs)?;
                 let result =
                     workflow::invoke_zome(workspace, self.get_ribosome(), invocation).await?;
                 self.finish_workflow(result).await?;
             },
-            WorkflowParams::Genesis(dna, agent_id) => {
+            WorkflowCall::Genesis(dna, agent_id) => {
                 let workspace = workspace::GenesisWorkspace::new(env.reader()?, &dbs)?;
                 let result =
                     workflow::genesis(workspace, dna, agent_id).await?;
                 self.finish_workflow(result).await?;
             }
-            // WorkflowParams::AppValidation(ops) => self
+            // WorkflowCall::AppValidation(ops) => self
             //     .finish(app_validation(AppValidationWorkspace::new(unimplemented!()), ops).await?),
         }
         Ok(())
@@ -50,11 +50,11 @@ impl<Api: ConductorCellApiT> Cell<Api> {
             effects.workspace.commit_txn(writer).map_err(Into::into)
         });
         async move {
-            for WorkflowTrigger { params, interval } in triggers {
+            for WorkflowTrigger { call, interval } in triggers {
                 if let Some(delay) = interval {
                     unimplemented!()
                 } else {
-                    self.run_workflow(params).await?
+                    self.run_workflow(call).await?
                 }
             }
             Ok(())
