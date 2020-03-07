@@ -3,7 +3,7 @@
 //! as having been the author of a given data entry.
 
 use holochain_persistence_api::cas::content::Address;
-
+use serde::{Deserialize, Serialize};
 use holochain_json_api::{error::JsonError, json::JsonString};
 
 /// Provenance is a tuple of initiating agent public key and signature of some item being signed

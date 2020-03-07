@@ -1,5 +1,7 @@
 //! File holding all the structs for handling function declarations defined in DNA.
 
+use serde::{Deserialize, Serialize};
+
 /// Represents the type declaration for zome function parameter
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub struct FnParameter {

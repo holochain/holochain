@@ -1,4 +1,4 @@
-use crate::{dna::DnaAddress, entry::Entry, error::SkunkResult};
+use crate::{dna::DnaAddress, entry::Entry, error::SkunkResult, prelude::DefaultJson};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
@@ -6,6 +6,7 @@ use holochain_json_api::{
 };
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use std::{convert::TryFrom, fmt, str};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct CellId(DnaAddress, AgentId);

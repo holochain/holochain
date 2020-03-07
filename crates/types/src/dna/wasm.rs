@@ -5,10 +5,12 @@ use crate::error::SkunkError;
 use backtrace::Backtrace;
 
 use base64;
+use log::*;
 use serde::{
     self,
     de::{Deserializer, Visitor},
     ser::Serializer,
+    Deserialize, Serialize,
 };
 use std::{
     fmt,

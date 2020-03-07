@@ -47,7 +47,8 @@ use holochain_json_api::{
 };
 use holochain_persistence_api::cas::content::{AddressableContent, Content};
 use multihash;
-use serde_json::{self, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{self, Value, json};
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
@@ -888,7 +889,7 @@ pub mod tests {
                     presence: BridgePresence::Required,
                     handle: String::from("HCHC"),
                     reference: BridgeReference::Trait {
-                        traits: btreemap! {
+                        traits: maplit::btreemap! {
                             String::from("happ_directory") => Trait {
                                 functions: vec![
                                     FnDeclaration {

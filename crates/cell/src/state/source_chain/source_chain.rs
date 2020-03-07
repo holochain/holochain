@@ -17,6 +17,7 @@ use sx_types::{
     prelude::{Address, AddressableContent},
     signature::{Provenance, Signature},
 };
+use shrinkwraprs::Shrinkwrap;
 
 type InnerBuffer<'env> = SourceChainBuf<'env, Reader<'env>>;
 

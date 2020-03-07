@@ -7,7 +7,7 @@ use crate::{
     signature::{Provenance, Signature},
     time::Iso8601,
 };
-
+use serde::{Deserialize, Serialize};
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 
 use holochain_json_api::{

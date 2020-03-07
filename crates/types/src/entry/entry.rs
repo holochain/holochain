@@ -12,6 +12,7 @@ use crate::{
         entry_type::{AppEntryType, EntryType},
     },
     link::Link,
+    prelude::*,
 };
 use holochain_json_api::{
     error::{JsonError, JsonResult},
@@ -20,7 +21,6 @@ use holochain_json_api::{
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
-
 use std::convert::TryFrom;
 
 pub type AppEntryValue = JsonString;

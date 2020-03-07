@@ -1,19 +1,12 @@
 // FIXME: re-enable all warnings after skunkworx
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code)]
 
+/// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)
 #[macro_use]
 extern crate serde;
 #[macro_use]
-extern crate serde_json;
-#[macro_use]
 extern crate holochain_json_derive;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-#[macro_use]
-#[cfg(test)]
-extern crate maplit;
+
 
 pub mod agent;
 pub mod chain_header;

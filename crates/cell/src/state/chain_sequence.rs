@@ -1,5 +1,5 @@
-use crate::state::source_chain::{SourceChainError, SourceChainResult};
-/// The ChainSequence database serves several purposes:
+/// The BufferedStore for the Chain Sequence database
+/// This database serves several purposes:
 /// - enables fast forward iteration over the entire source chain
 /// - knows what the chain head is, by accessing the last item's header address
 /// - stores information about which headers were committed in the same transactional bundle
@@ -7,10 +7,12 @@ use crate::state::source_chain::{SourceChainError, SourceChainResult};
 ///
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
+use crate::state::source_chain::{SourceChainError, SourceChainResult};
+use serde::{Deserialize, Serialize};
 use sx_state::{
-    buffer::{IntKvBuf, BufferedStore},
-    db::{DbManager, DbName, CHAIN_SEQUENCE},
-    error::{DatabaseError, DatabaseResult},
+    buffer::{BufferedStore, IntKvBuf},
+    db::{DbManager, CHAIN_SEQUENCE},
+    error::DatabaseResult,
     prelude::{Readable, Reader, Writer},
 };
 use sx_types::prelude::Address;
@@ -101,7 +103,7 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{ChainSequenceBuf, SourceChainError, BufferedStore};
+    use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
     use crate::state::source_chain::SourceChainResult;
     use std::sync::Arc;
     use sx_state::{
