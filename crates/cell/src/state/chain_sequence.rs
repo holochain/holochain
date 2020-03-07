@@ -180,8 +180,6 @@ pub mod tests {
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
-        let local = tokio::task::LocalSet::new();
-
         let task1 = tokio::spawn(async move {
             let env = env1.clone();
             let dbs = env.dbs()?;

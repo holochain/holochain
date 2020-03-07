@@ -9,9 +9,9 @@ type WS<'env> = GenesisWorkspace<'env>;
 /// - AgentId
 /// - CapTokenGrant
 pub async fn genesis<'env>(
-    workspace: WS<'env>,
-    dna: Dna,
-    agent_id: AgentId,
+    _workspace: WS<'env>,
+    _dna: Dna,
+    _agent_id: AgentId,
 ) -> WorkflowResult<WS<'env>> {
     unimplemented!()
 }

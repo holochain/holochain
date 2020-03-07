@@ -44,7 +44,7 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
     state_env: Environment,
-    conductor_api: Api,
+    _conductor_api: Api,
 }
 
 impl<Api: ConductorCellApiT> Cell<Api> {
@@ -66,15 +66,15 @@ impl<Api: ConductorCellApiT> Cell<Api> {
 
     pub async fn invoke_zome(
         &self,
-        conductor_api: Api,
-        invocation: ZomeInvocation,
+        _conductor_api: Api,
+        _invocation: ZomeInvocation,
     ) -> CellResult<ZomeInvocationResult> {
         unimplemented!()
     }
 
     pub async fn handle_network_message(
         &self,
-        msg: Lib3hToClient,
+        _msg: Lib3hToClient,
     ) -> CellResult<Option<Lib3hToClientResponse>> {
         unimplemented!()
     }

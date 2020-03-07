@@ -40,23 +40,23 @@ pub trait ZomeApi {
 }
 
 pub struct ZomeEnvironment<'env, N: NetRequester> {
-    bundle: SourceChainCommitBundle<'env>,
-    net_requester: N,
-    zome_id: ZomeId,
+    _bundle: SourceChainCommitBundle<'env>,
+    _net_requester: N,
+    _zome_id: ZomeId,
 }
 
 impl<'env, N: NetRequester> ZomeEnvironment<'env, N> {
-    pub fn new(bundle: SourceChainCommitBundle<'env>, net_requester: N, zome_id: ZomeId) -> Self {
+    pub fn new(_bundle: SourceChainCommitBundle<'env>, _net_requester: N, _zome_id: ZomeId) -> Self {
         Self {
-            bundle,
-            net_requester,
-            zome_id,
+            _bundle,
+            _net_requester,
+            _zome_id,
         }
     }
 }
 
 impl<'env, N: NetRequester> ZomeApi for ZomeEnvironment<'env, N> {
-    fn call(&self, invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResult> {
+    fn call(&self, _invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResult> {
         unimplemented!()
     }
 }

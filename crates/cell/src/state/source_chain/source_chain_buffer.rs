@@ -31,10 +31,6 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         })
     }
 
-    fn initialize() -> DatabaseResult<()> {
-        unimplemented!()
-    }
-
     pub fn chain_head(&self) -> Option<&Address> {
         self.sequence.chain_head()
     }
@@ -51,9 +47,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &self.cas
     }
 
+    // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
+    #[allow(dead_code, unreachable_code)]
     pub fn put_entry(&mut self, entry: Entry) -> () {
-        let header = header_for_entry(&entry, unimplemented!(), unimplemented!());
-        self.cas.put((header, entry));
+        let _header = header_for_entry(&entry, unimplemented!(), unimplemented!());
+        self.cas.put((_header, entry));
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
@@ -74,9 +72,6 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             .next())
     }
 
-    pub fn try_commit(&self, writer: &'env mut Writer) -> DatabaseResult<()> {
-        unimplemented!()
-    }
 }
 
 impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
@@ -115,11 +110,12 @@ pub mod tests {
     };
 
     #[test]
-    fn asdf() -> SourceChainResult<()> {
+    fn header_for_entry() -> SourceChainResult<()> {
+        // TODO: write test
         let env = test_env();
         let dbs = env.dbs()?;
         env.with_reader(|reader| {
-            let source_chain = SourceChainBuf::new(&reader, &dbs)?;
+            let _source_chain = SourceChainBuf::new(&reader, &dbs)?;
             Ok(())
         })
     }

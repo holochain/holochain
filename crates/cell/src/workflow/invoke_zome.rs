@@ -4,7 +4,7 @@ use crate::{nucleus::ZomeInvocation, ribosome::RibosomeT, state::workspace::Invo
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(
     workspace: InvokeZomeWorkspace<'env>,
     _ribosome: Ribo,
-    invocation: ZomeInvocation,
+    _invocation: ZomeInvocation,
 ) -> WorkflowResult<InvokeZomeWorkspace<'env>> {
     Ok(WorkflowEffects {
         workspace,

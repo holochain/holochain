@@ -43,6 +43,7 @@ pub struct WorkflowTrigger {
     interval: Option<Duration>,
 }
 
+#[allow(dead_code)]
 impl WorkflowTrigger {
     pub fn immediate(call: WorkflowCall) -> Self {
         Self {

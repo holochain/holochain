@@ -25,17 +25,17 @@ pub trait RibosomeT {
 /// Total hack just to have something to look at
 /// The only Ribosome is a Wasm ribosome.
 pub struct Ribosome {
-    engine: WasmEngine,
+    _engine: WasmEngine,
 }
 
 impl Ribosome {
-    pub fn new(dna: Dna) -> Self {
-        Self { engine: WasmEngine }
+    pub fn new(_dna: Dna) -> Self {
+        Self { _engine: WasmEngine }
     }
 }
 
 impl RibosomeT for Ribosome {
-    fn run_validation(self, entry: Entry) -> ValidationResult {
+    fn run_validation(self, _entry: Entry) -> ValidationResult {
         unimplemented!()
     }
 
@@ -43,8 +43,8 @@ impl RibosomeT for Ribosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        bundle: &mut SourceChainCommitBundle<'env>,
-        invocation: ZomeInvocation,
+        _bundle: &mut SourceChainCommitBundle<'env>,
+        _invocation: ZomeInvocation,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResult> {
         unimplemented!()

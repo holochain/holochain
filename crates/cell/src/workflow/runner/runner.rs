@@ -33,24 +33,36 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         Ok(())
     }
 
-    fn finish_workflow<W: Workspace>(
-        &self,
+    fn finish_workflow<'a, W: 'a + Workspace>(
+        &'a self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
         let env = self.state_env();
-        let triggers = effects.triggers.clone();
-        let result: Result<(), WorkspaceError> = env
-            .writer()
-            .map_err(Into::<WorkspaceError>::into)
-            .and_then(|writer| effects.workspace.commit_txn(writer).map_err(Into::into));
         async move {
+            let WorkflowEffects {
+                workspace,
+                triggers,
+                callbacks,
+                signals,
+            } = effects;
+            env.writer()
+                .map_err(Into::<WorkspaceError>::into)
+                .and_then(|writer| workspace.commit_txn(writer).map_err(Into::into))?;
             for WorkflowTrigger { call, interval } in triggers {
-                if let Some(delay) = interval {
+                if let Some(_delay) = interval {
+                    // FIXME: implement or discard
                     unimplemented!()
                 } else {
                     self.run_workflow(call).await?
                 }
             }
+            for _callback in callbacks {
+                // TODO
+            }
+            for _signal in signals {
+                // TODO
+            }
+
             Ok(())
         }
         .boxed()
