@@ -3,7 +3,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sx_state::{
     buffer::{CasBuf, BufferedStore},
     db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
-    error::{WorkspaceError, WorkspaceResult},
+    error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
     prelude::{Readable, Reader, Writer},
 };
@@ -27,24 +27,24 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         reader: &'env R,
         entries_store: SingleStore,
         headers_store: SingleStore,
-    ) -> WorkspaceResult<Self> {
+    ) -> DatabaseResult<Self> {
         Ok(Self {
             entries: CasBuf::new(reader, entries_store)?,
             headers: CasBuf::new(reader, headers_store)?,
         })
     }
 
-    pub fn primary(reader: &'env R, dbs: &'env DbManager) -> WorkspaceResult<Self> {
+    pub fn primary(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
         let entries = dbs.get(&*CHAIN_ENTRIES)?.clone();
         let headers = dbs.get(&*CHAIN_HEADERS)?.clone();
         Self::new(reader, entries, headers)
     }
 
-    pub fn get_entry(&self, entry_address: &Address) -> WorkspaceResult<Option<Entry>> {
+    pub fn get_entry(&self, entry_address: &Address) -> DatabaseResult<Option<Entry>> {
         self.entries.get(entry_address)
     }
 
-    pub fn get_header(&self, header_address: &Address) -> WorkspaceResult<Option<ChainHeader>> {
+    pub fn get_header(&self, header_address: &Address) -> DatabaseResult<Option<ChainHeader>> {
         self.headers.get(header_address)
     }
 
@@ -98,9 +98,9 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 }
 
 impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuf<'env, R> {
-    type Error = WorkspaceError;
+    type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         self.entries.flush_to_txn(writer)?;
         self.headers.flush_to_txn(writer)?;
         Ok(())

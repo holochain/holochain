@@ -11,7 +11,7 @@ use thiserror::Error;
 
 /// The interface for a Cell to talk to its calling Conductor
 #[async_trait(?Send)]
-pub trait ConductorCellApiT {
+pub trait ConductorCellApiT: Send + Sync {
     async fn invoke_zome(
         &self,
         cell: CellId,

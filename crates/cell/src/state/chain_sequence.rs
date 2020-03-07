@@ -10,7 +10,7 @@ use crate::state::source_chain::{SourceChainError, SourceChainResult};
 use sx_state::{
     buffer::{IntKvBuf, BufferedStore},
     db::{DbManager, DbName, CHAIN_SEQUENCE},
-    error::{WorkspaceError, WorkspaceResult},
+    error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Reader, Writer},
 };
 use sx_types::prelude::Address;
@@ -35,7 +35,7 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
 }
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
-    pub fn new(reader: &'e R, dbs: &'e DbManager) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
         let db: Store<'e, R> = IntKvBuf::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
         Self::from_db(db)
     }
@@ -43,11 +43,11 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     pub fn with_reader<RR: Readable>(
         &self,
         reader: &'e RR,
-    ) -> WorkspaceResult<ChainSequenceBuf<'e, RR>> {
+    ) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
         Self::from_db(self.db.with_reader(reader))
     }
 
-    fn from_db<RR: Readable>(db: Store<'e, RR>) -> WorkspaceResult<ChainSequenceBuf<'e, RR>> {
+    fn from_db<RR: Readable>(db: Store<'e, RR>) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         let (next_index, tx_seq, current_head) = latest
             .map(|(_, item)| (item.index + 1, item.tx_seq + 1, Some(item.header_address)))
@@ -107,14 +107,14 @@ pub mod tests {
     use sx_state::{
         db::DbManager,
         env::{create_lmdb_env, ReadManager, WriteManager},
-        error::{WorkspaceError, WorkspaceResult},
+        error::{DatabaseError, DatabaseResult},
         test_utils::test_env,
     };
     use sx_types::prelude::Address;
     use tempdir::TempDir;
 
     #[test]
-    fn chain_sequence_scratch_awareness() -> WorkspaceResult<()> {
+    fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         let env = test_env();
         let dbs = env.dbs()?;
         env.with_reader(|reader| {

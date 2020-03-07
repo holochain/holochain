@@ -1,6 +1,7 @@
 // TODO: re-enable all warnings after skunkworx
 #![allow(dead_code, unused_imports, unused_variables, unreachable_code)]
 
+
 #[macro_use]
 extern crate holochain_json_derive;
 #[macro_use]
@@ -21,7 +22,6 @@ pub mod ribosome;
 pub mod state;
 pub mod validation;
 pub mod wasm_engine;
-pub mod workflow_runner;
 
 #[cfg(test)]
 pub mod test_utils;

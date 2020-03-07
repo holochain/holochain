@@ -1,47 +1,58 @@
-use super::chain_cas::ChainCasBuf;
+use super::{chain_cas::ChainCasBuf, source_chain::SourceChainError};
 use sx_state::{
-    buffer::{KvBuf, KvvBuf, BufferedStore},
+    buffer::{BufferedStore, KvBuf, KvvBuf},
     db::DbManager,
-    error::WorkspaceResult,
+    error::DatabaseError,
     prelude::{Reader, Writer},
 };
+use thiserror::Error;
 
+mod app_validation;
 mod genesis;
 mod invoke_zome;
-mod app_validation;
+pub use app_validation::AppValidationWorkspace;
 pub use genesis::GenesisWorkspace;
 pub use invoke_zome::InvokeZomeWorkspace;
-pub use app_validation::AppValidationWorkspace;
 
-pub trait Workspace: Sized {
-    fn commit_txn(self, writer: Writer) -> WorkspaceResult<()>;
+#[derive(Debug, Error)]
+pub enum WorkspaceError {
+    #[error(transparent)]
+    DatabaseError(#[from] DatabaseError),
+
+    #[error(transparent)]
+    SourceChainError(#[from] SourceChainError),
+}
+
+pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
+
+
+pub trait Workspace: Send {
+    fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
 }
 
 #[cfg(test)]
 pub mod tests {
 
     use super::{InvokeZomeWorkspace, Workspace};
+    use crate::state::workspace::WorkspaceResult;
     use sx_state::{
-        buffer::{KvBuf, BufferedStore},
+        buffer::{BufferedStore, KvBuf},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
-        error::WorkspaceResult,
-        test_utils::test_env,
+        error::DatabaseError,
         prelude::{Reader, SingleStore, Writer},
+        test_utils::test_env,
     };
     use sx_types::prelude::*;
     use tempdir::TempDir;
 
-    struct TestWorkspace<'env> {
+    pub struct TestWorkspace<'env> {
         one: KvBuf<'env, Address, u32>,
         two: KvBuf<'env, Address, bool>,
     }
 
     impl<'env> TestWorkspace<'env> {
-        pub fn new(
-            reader: &'env Reader<'env>,
-            dbs: &'env DbManager,
-        ) -> WorkspaceResult<Self> {
+        pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBuf::new(reader, *dbs.get(&*CHAIN_ENTRIES)?)?,
                 two: KvBuf::new(reader, *dbs.get(&*CHAIN_HEADERS)?)?,
@@ -53,7 +64,7 @@ pub mod tests {
         fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(&mut writer)?;
             self.two.flush_to_txn(&mut writer)?;
-            writer.commit()?;
+            writer.commit().map_err(DatabaseError::from)?;
             Ok(())
         }
     }

@@ -8,7 +8,7 @@ use sx_state::{
     buffer::BufferedStore,
     db::{self, DbManager},
     env::ReadManager,
-    error::WorkspaceResult,
+    error::DatabaseResult,
     prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
@@ -25,14 +25,14 @@ pub struct SourceChainBuf<'env, R: Readable> {
 }
 
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
-    pub fn new(reader: &'env R, dbs: &'env DbManager) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
         })
     }
 
-    fn initialize() -> WorkspaceResult<()> {
+    fn initialize() -> DatabaseResult<()> {
         unimplemented!()
     }
 
@@ -40,11 +40,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.chain_head()
     }
 
-    pub fn get_entry(&self, k: &Address) -> WorkspaceResult<Option<Entry>> {
+    pub fn get_entry(&self, k: &Address) -> DatabaseResult<Option<Entry>> {
         self.cas.get_entry(k)
     }
 
-    pub fn get_header(&self, k: &Address) -> WorkspaceResult<Option<ChainHeader>> {
+    pub fn get_header(&self, k: &Address) -> DatabaseResult<Option<ChainHeader>> {
         self.cas.get_header(k)
     }
 
@@ -63,7 +63,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     /// Get the AgentId from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
-    pub fn agent_id(&self) -> WorkspaceResult<Option<AgentId>> {
+    pub fn agent_id(&self) -> DatabaseResult<Option<AgentId>> {
         Ok(self
             .cas
             .entries()
@@ -75,7 +75,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             .next())
     }
 
-    pub fn try_commit(&self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    pub fn try_commit(&self, writer: &'env mut Writer) -> DatabaseResult<()> {
         unimplemented!()
     }
 }
@@ -113,7 +113,7 @@ pub mod tests {
     use sx_state::{
         db::DbManager,
         env::{create_lmdb_env, ReadManager, WriteManager},
-        error::WorkspaceResult,
+        error::DatabaseResult,
         prelude::Reader,
         test_utils::test_env,
     };

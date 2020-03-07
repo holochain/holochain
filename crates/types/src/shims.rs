@@ -7,7 +7,7 @@ pub struct CapToken;
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct CapabilityRequest;
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
-pub struct DhtTransform;
+pub struct DhtOp;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
 pub struct LogRules;
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]

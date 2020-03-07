@@ -1,6 +1,6 @@
 use crate::{
     db::DbManager,
-    error::{WorkspaceError, WorkspaceResult},
+    error::{DatabaseError, DatabaseResult},
     exports::Writer,
     reader::Reader,
 };
@@ -40,7 +40,7 @@ fn required_flags() -> EnvironmentFlags {
 }
 
 /// A standard way to create a representation of an LMDB environment suitable for Holochain
-pub fn create_lmdb_env(path: &Path) -> WorkspaceResult<Environment> {
+pub fn create_lmdb_env(path: &Path) -> DatabaseResult<Environment> {
     let mut map = ENVIRONMENTS.write();
     let env: Environment = match map.entry(path.into()) {
         hash_map::Entry::Occupied(e) => e.get().clone(),
@@ -77,31 +77,31 @@ fn rkv_builder(
 pub struct Environment(Arc<Rkv>);
 
 pub trait ReadManager {
-    fn reader(&self) -> WorkspaceResult<Reader>;
+    fn reader(&self) -> DatabaseResult<Reader>;
 
     fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
     where
-        E: From<WorkspaceError>,
+        E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>;
 }
 
 pub trait WriteManager {
-    fn writer(&self) -> WorkspaceResult<Writer>;
+    fn writer(&self) -> DatabaseResult<Writer>;
 
     fn with_commit<E, R, F>(&self, f: F) -> Result<R, E>
     where
-        E: From<WorkspaceError>,
+        E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
 impl ReadManager for Environment {
-    fn reader(&self) -> WorkspaceResult<Reader> {
+    fn reader(&self) -> DatabaseResult<Reader> {
         Ok(Reader::new(self.0.read()?))
     }
 
     fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
     where
-        E: From<WorkspaceError>,
+        E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>,
     {
         f(Reader::new(self.0.read().map_err(Into::into)?))
@@ -109,13 +109,13 @@ impl ReadManager for Environment {
 }
 
 impl WriteManager for Environment {
-    fn writer(&self) -> WorkspaceResult<Writer> {
+    fn writer(&self) -> DatabaseResult<Writer> {
         Ok(self.0.write()?)
     }
 
     fn with_commit<E, R, F>(&self, f: F) -> Result<R, E>
     where
-        E: From<WorkspaceError>,
+        E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
         let mut writer = self.0.write().map_err(Into::into)?;
@@ -130,7 +130,7 @@ impl Environment {
         &self.0
     }
 
-    pub fn dbs(&self) -> WorkspaceResult<Arc<DbManager>> {
+    pub fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
         let mut map = DB_MANAGERS.write();
         let dbs = map
             .entry(self.0.as_ref().path().into())

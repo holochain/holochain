@@ -3,7 +3,7 @@ use super::{
     BufVal, BufferedStore,
 };
 use crate::{
-    error::{WorkspaceError, WorkspaceResult},
+    error::{DatabaseError, DatabaseResult},
     reader::Readable,
 };
 use rkv::Writer;
@@ -22,11 +22,11 @@ where
     V: BufVal + AddressableContent,
     R: Readable,
 {
-    pub fn new(reader: &'env R, db: rkv::SingleStore) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, db: rkv::SingleStore) -> DatabaseResult<Self> {
         Ok(Self(KvBuf::new(reader, db)?))
     }
 
-    pub fn get(&self, k: &Address) -> WorkspaceResult<Option<V>> {
+    pub fn get(&self, k: &Address) -> DatabaseResult<Option<V>> {
         self.0.get(k)
     }
 
@@ -39,7 +39,7 @@ where
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
+    pub fn iter_raw(&self) -> DatabaseResult<SingleIter<V>> {
         self.0.iter_raw()
     }
 }
@@ -49,9 +49,9 @@ where
     V: BufVal + AddressableContent,
     R: Readable,
 {
-    type Error = WorkspaceError;
+    type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         self.0.flush_to_txn(writer)?;
         Ok(())
     }

@@ -8,7 +8,6 @@ use sx_state::{
     buffer::BufferedStore,
     db::{self, DbManager},
     env::ReadManager,
-    error::WorkspaceResult,
     prelude::{Readable, Reader, Writer},
 };
 use sx_types::{

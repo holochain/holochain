@@ -1,5 +1,9 @@
-use crate::state::source_chain::SourceChainBuf;
-use sx_state::{db::DbManager, error::WorkspaceResult, prelude::Reader};
+use super::Workspace;
+use crate::state::{
+    source_chain::{SourceChainBuf, SourceChainError, SourceChainResult},
+    workspace::WorkspaceResult,
+};
+use sx_state::{db::DbManager, exports::Writer, prelude::*};
 
 pub struct GenesisWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
@@ -11,16 +15,22 @@ impl<'env> GenesisWorkspace<'env> {
     }
 }
 
+impl<'env> Workspace for GenesisWorkspace<'env> {
+    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
+        Ok(self.source_chain.flush_to_txn(&mut writer)?)
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
 
     use super::GenesisWorkspace;
     use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
     use sx_state::{
-        env::ReadManager, error::WorkspaceError, prelude::Readable, test_utils::test_env,
+        env::ReadManager, error::DatabaseError, prelude::Readable, test_utils::test_env,
     };
 
-    type Err = WorkspaceError;
+    type Err = DatabaseError;
 
     #[test]
     fn can_commit_workspace() -> SourceChainResult<()> {

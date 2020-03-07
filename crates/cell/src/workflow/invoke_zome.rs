@@ -1,15 +1,16 @@
-
+use super::{WorkflowEffects, WorkflowResult};
 use crate::{
     cell::{autonomic::AutonomicCue, error::CellResult},
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::{Ribosome, RibosomeT},
-    state::workspace::{InvokeZomeWorkspace, Workspace}, workflow_runner::{WorkflowResult, WorkflowEffects},
+    state::workspace::{InvokeZomeWorkspace, Workspace},
 };
 use sx_types::shims::*;
 
-pub async fn invoke_zome<'env, Ribo: RibosomeT, Api: ConductorCellApiT>(
+pub async fn invoke_zome<'env, Ribo: RibosomeT>(
     workspace: InvokeZomeWorkspace<'env>,
+    _ribosome: Ribo,
     invocation: ZomeInvocation,
 ) -> WorkflowResult<InvokeZomeWorkspace<'env>> {
     Ok(WorkflowEffects {

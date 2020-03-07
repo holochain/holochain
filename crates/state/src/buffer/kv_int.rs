@@ -4,7 +4,7 @@
 
 use super::{BufIntKey, BufVal, BufferedStore};
 use crate::{
-    error::{WorkspaceError, WorkspaceResult},
+    error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Reader, Writer},
 };
 use rkv::IntegerStore;
@@ -45,7 +45,7 @@ where
     V: BufVal,
     R: Readable,
 {
-    pub fn new(reader: &'env R, db: IntegerStore<K>) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, db: IntegerStore<K>) -> DatabaseResult<Self> {
         Ok(Self {
             db,
             reader,
@@ -61,7 +61,7 @@ where
         }
     }
 
-    pub fn get(&self, k: K) -> WorkspaceResult<Option<V>> {
+    pub fn get(&self, k: K) -> DatabaseResult<Option<V>> {
         use Op::*;
         let val = match self.scratch.get(&k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
@@ -82,21 +82,21 @@ where
     }
 
     /// Fetch data from DB, deserialize into V type
-    fn get_persisted(&self, k: K) -> WorkspaceResult<Option<V>> {
+    fn get_persisted(&self, k: K) -> DatabaseResult<Option<V>> {
         match self.db.get(self.reader, k)? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(bincode::deserialize(buf)?)),
             None => Ok(None),
-            Some(_) => Err(WorkspaceError::InvalidValue),
+            Some(_) => Err(DatabaseError::InvalidValue),
         }
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
+    pub fn iter_raw(&self) -> DatabaseResult<SingleIntIter<K, V>> {
         Ok(SingleIntIter::new(self.db.iter_start(self.reader)?))
     }
 
     /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
-    pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIntIter<K, V>> {
+    pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIntIter<K, V>> {
         Ok(SingleIntIter::new(self.db.iter_end(self.reader)?))
     }
 }
@@ -107,9 +107,9 @@ where
     V: BufVal,
     R: Readable,
 {
-    type Error = WorkspaceError;
+    type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
         for (k, op) in self.scratch.iter() {
             match op {
@@ -167,7 +167,7 @@ pub mod tests {
     use super::{IntKvBuf, BufferedStore};
     use crate::{
         env::{ReadManager, WriteManager},
-        test_utils::test_env, error::WorkspaceResult,
+        test_utils::test_env, error::DatabaseResult,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -183,7 +183,7 @@ pub mod tests {
     type Store<'a> = IntKvBuf<'a, u32, V>;
 
     #[test]
-    fn kv_iterators() -> WorkspaceResult<()> {
+    fn kv_iterators() -> DatabaseResult<()> {
         let env = test_env();
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -218,7 +218,7 @@ pub mod tests {
     }
 
     #[test]
-    fn kv_empty_iterators() -> WorkspaceResult<()> {
+    fn kv_empty_iterators() -> DatabaseResult<()> {
         let env = test_env();
         let db = env
             .inner()

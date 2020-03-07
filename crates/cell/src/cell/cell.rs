@@ -4,6 +4,7 @@ use crate::{
     conductor_api::ConductorCellApiT,
     nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::Ribosome,
+    state::workspace,
     workflow,
 };
 use async_trait::async_trait;
@@ -16,6 +17,7 @@ use std::{
 use sx_state::{
     db::DbManager,
     env::{create_lmdb_env, Environment, ReadManager},
+    prelude::*,
 };
 use sx_types::{
     agent::AgentId,
@@ -25,6 +27,7 @@ use sx_types::{
     prelude::*,
     shims::*,
 };
+use workspace::Workspace;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
@@ -51,7 +54,6 @@ impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
     }
 }
 
-// #[derive(Clone)]
 pub struct Cell<Api: ConductorCellApiT> {
     id: CellId,
     state_env: Environment,
@@ -67,6 +69,14 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         &self.id.agent_id()
     }
 
+    pub(crate) fn get_ribosome(&self) -> Ribosome {
+        unimplemented!()
+    }
+
+    pub(crate) fn state_env(&self) -> Environment {
+        self.state_env.clone()
+    }
+
     pub async fn invoke_zome(
         &self,
         conductor_api: Api,
@@ -79,7 +89,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         &self,
         msg: Lib3hToClient,
     ) -> CellResult<Option<Lib3hToClientResponse>> {
-        Ok(workflow::handle_network_message(msg).await?)
+        unimplemented!()
     }
 
     pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {

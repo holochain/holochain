@@ -1,6 +1,6 @@
 use crate::{
     env::Environment,
-    error::{WorkspaceError, WorkspaceResult},
+    error::{DatabaseError, DatabaseResult},
 };
 use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
@@ -69,7 +69,7 @@ pub struct DbManager {
 }
 
 impl DbManager {
-    pub(crate) fn new(env: Environment) -> WorkspaceResult<Self> {
+    pub(crate) fn new(env: Environment) -> DatabaseResult<Self> {
         let mut this = Self {
             env,
             um: UniversalMap::new(),
@@ -82,13 +82,13 @@ impl DbManager {
         Ok(this)
     }
 
-    pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> WorkspaceResult<&V> {
+    pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> DatabaseResult<&V> {
         self.um
             .get(key)
-            .ok_or(WorkspaceError::StoreNotInitialized(key.key().to_owned()))
+            .ok_or(DatabaseError::StoreNotInitialized(key.key().to_owned()))
     }
 
-    fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> WorkspaceResult<()> {
+    fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> DatabaseResult<()> {
         let db_name = key.key();
         let db_str = format!("{}", db_name);
         let _ = match db_name.kind() {
@@ -117,7 +117,7 @@ impl DbManager {
     pub fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,
-    ) -> WorkspaceResult<&V> {
+    ) -> DatabaseResult<&V> {
         if self.um.get(key).is_some() {
             return Ok(self.um.get(key).unwrap());
         } else {
@@ -126,7 +126,7 @@ impl DbManager {
         }
     }
 
-    fn initialize(&mut self) -> WorkspaceResult<()> {
+    fn initialize(&mut self) -> DatabaseResult<()> {
         self.create(&*CHAIN_ENTRIES)?;
         self.create(&*CHAIN_HEADERS)?;
         self.create(&*CHAIN_META)?;

@@ -6,6 +6,7 @@ pub mod zome_api;
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
+#[derive(Clone, Debug)]
 pub struct ZomeInvocation {
     pub cell_id: CellId,
     pub zome_name: ZomeName,

@@ -1,5 +1,5 @@
 use super::{BufKey, BufMultiVal, BufferedStore};
-use crate::error::{WorkspaceError, WorkspaceResult};
+use crate::error::{DatabaseError, DatabaseResult};
 use maplit::hashset;
 use rkv::{MultiStore, Reader, Rkv, StoreOptions, Writer};
 
@@ -44,7 +44,7 @@ where
     // TODO: restructure to match the others
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
-    pub fn create(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
+    pub fn create(env: &'env Rkv, name: &str) -> DatabaseResult<Self> {
         Ok(Self {
             db: env.open_multi(name, StoreOptions::create())?,
             reader: env.read()?,
@@ -53,7 +53,7 @@ where
     }
 
     /// Open an existing DB. Will cause an error if the DB was not created already.
-    pub fn open(env: &'env Rkv, name: &str) -> WorkspaceResult<Self> {
+    pub fn open(env: &'env Rkv, name: &str) -> DatabaseResult<Self> {
         Ok(Self {
             db: env.open_multi(name, StoreOptions::default())?,
             reader: env.read()?,
@@ -61,7 +61,7 @@ where
         })
     }
 
-    pub fn get(&self, k: &K) -> WorkspaceResult<HashSet<V>> {
+    pub fn get(&self, k: &K) -> DatabaseResult<HashSet<V>> {
         use Op::*;
         let mut values = self.get_persisted(k)?;
         if let Some(ops) = self.scratch.get(k) {
@@ -107,12 +107,12 @@ where
     }
 
     /// Fetch data from DB, deserialize into V type
-    fn get_persisted(&self, k: &K) -> WorkspaceResult<HashSet<V>> {
+    fn get_persisted(&self, k: &K) -> DatabaseResult<HashSet<V>> {
         let iter = self.db.get(&self.reader, k)?;
         Ok(iter
             .map(|v| match v {
                 Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(bincode::deserialize(buf)?)),
-                Ok((_, Some(_))) => Err(WorkspaceError::InvalidValue),
+                Ok((_, Some(_))) => Err(DatabaseError::InvalidValue),
                 Ok((_, None)) => Ok(None),
                 Err(e) => Ok(Err(e)?),
                 // Err(e) => match e {
@@ -120,7 +120,7 @@ where
                 //     e => Ok(Err(e)?)
                 // },
             })
-            .collect::<Result<Vec<Option<V>>, WorkspaceError>>()?
+            .collect::<Result<Vec<Option<V>>, DatabaseError>>()?
             .into_iter()
             .filter_map(|v| v)
             .collect())
@@ -132,9 +132,9 @@ where
     K: Clone + BufKey,
     V: BufMultiVal,
 {
-    type Error = WorkspaceError;
+    type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
         for (k, mut ops) in self.scratch.into_iter() {
             // If there is a DeleteAll in the set, that signifies that we should

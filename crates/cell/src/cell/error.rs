@@ -1,12 +1,12 @@
 use sx_types::error::SkunkError;
 // use crate::state::source_chain::SourceChainError;
-use sx_state::error::WorkspaceError;
+use sx_state::error::DatabaseError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CellError {
     #[error("error dealing with workspace state: {0}")]
-    WorkspaceError(#[from] WorkspaceError),
+    DatabaseError(#[from] DatabaseError),
 
     // TODO
     // #[error("could not read from source chain")]

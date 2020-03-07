@@ -33,6 +33,7 @@ tempdir = "0.3.7"
 mockall = "0.6.0"
 tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 owning_ref = "0.4.1"
+anyhow = "1.0.26"
 
 [dev-dependencies]
 anyhow = "1.0.26"

@@ -1,6 +1,6 @@
 use super::Workspace;
-use crate::state::source_chain::SourceChainBuf;
-use sx_state::{db::DbManager, error::WorkspaceResult, prelude::*};
+use crate::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
+use sx_state::{db::DbManager, error::DatabaseError, prelude::*};
 
 pub struct InvokeZomeWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
@@ -24,10 +24,10 @@ pub mod tests {
     use super::InvokeZomeWorkspace;
     use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
     use sx_state::{
-        env::ReadManager, error::WorkspaceError, prelude::Readable, test_utils::test_env,
+        env::ReadManager, error::DatabaseError, prelude::Readable, test_utils::test_env,
     };
 
-    type Err = WorkspaceError;
+    type Err = DatabaseError;
 
     #[test]
     fn can_commit_workspace() -> SourceChainResult<()> {

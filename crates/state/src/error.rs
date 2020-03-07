@@ -4,7 +4,7 @@ use std::backtrace::Backtrace;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum WorkspaceError {
+pub enum DatabaseError {
     #[error("A store which was expected not to be empty turned out to be empty: {0}")]
     EmptyStore(DbName),
 
@@ -36,29 +36,29 @@ pub enum WorkspaceError {
     Other(#[from] anyhow::Error),
 }
 
-impl PartialEq for WorkspaceError {
+impl PartialEq for DatabaseError {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
     }
 }
 
-pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
+pub type DatabaseResult<T> = Result<T, DatabaseError>;
 
 // Note: these are necessary since rkv Errors do not have std::Error impls,
 // so we have to do some finagling
 
-impl From<rkv::StoreError> for WorkspaceError {
-    fn from(e: rkv::StoreError) -> WorkspaceError {
-        WorkspaceError::LmdbStoreError {
+impl From<rkv::StoreError> for DatabaseError {
+    fn from(e: rkv::StoreError) -> DatabaseError {
+        DatabaseError::LmdbStoreError {
             source: e.compat(),
             backtrace: Backtrace::capture(),
         }
     }
 }
 
-impl From<rkv::DataError> for WorkspaceError {
-    fn from(e: rkv::DataError) -> WorkspaceError {
-        WorkspaceError::LmdbDataError {
+impl From<rkv::DataError> for DatabaseError {
+    fn from(e: rkv::DataError) -> DatabaseError {
+        DatabaseError::LmdbDataError {
             source: e.compat(),
             backtrace: Backtrace::capture(),
         }

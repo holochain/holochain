@@ -1,6 +1,6 @@
 use super::{BufKey, BufVal, BufferedStore};
 use crate::{
-    error::{WorkspaceError, WorkspaceResult},
+    error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Reader, Writer},
 };
 use rkv::SingleStore;
@@ -39,7 +39,7 @@ where
     V: BufVal,
     R: Readable,
 {
-    pub fn new(reader: &'env R, db: SingleStore) -> WorkspaceResult<Self> {
+    pub fn new(reader: &'env R, db: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
             db,
             reader,
@@ -47,7 +47,7 @@ where
         })
     }
 
-    pub fn get(&self, k: &K) -> WorkspaceResult<Option<V>> {
+    pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         use Op::*;
         let val = match self.scratch.get(k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
@@ -68,21 +68,21 @@ where
     }
 
     /// Fetch data from DB, deserialize into V type
-    fn get_persisted(&self, k: &K) -> WorkspaceResult<Option<V>> {
+    fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
         match self.db.get(self.reader, k)? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(bincode::deserialize(buf)?)),
             None => Ok(None),
-            Some(_) => Err(WorkspaceError::InvalidValue),
+            Some(_) => Err(DatabaseError::InvalidValue),
         }
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&self) -> WorkspaceResult<SingleIter<V>> {
+    pub fn iter_raw(&self) -> DatabaseResult<SingleIter<V>> {
         Ok(SingleIter::new(self.db.iter_start(self.reader)?))
     }
 
     /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
-    pub fn iter_raw_reverse(&self) -> WorkspaceResult<SingleIter<V>> {
+    pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIter<V>> {
         Ok(SingleIter::new(self.db.iter_end(self.reader)?))
     }
 }
@@ -93,9 +93,9 @@ where
     V: BufVal,
     R: Readable,
 {
-    type Error = WorkspaceError;
+    type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
         for (k, op) in self.scratch.iter() {
             match op {
@@ -151,7 +151,7 @@ pub mod tests {
     use super::{KvBuf, BufferedStore};
     use crate::{
         env::{ReadManager, WriteManager},
-        error::{WorkspaceError, WorkspaceResult},
+        error::{DatabaseError, DatabaseResult},
         test_utils::test_env,
     };
     use rkv::StoreOptions;
@@ -168,11 +168,11 @@ pub mod tests {
     type TestBuf<'a> = KvBuf<'a, &'a str, V>;
 
     #[test]
-    fn kv_iterators() -> WorkspaceResult<()> {
+    fn kv_iterators() -> DatabaseResult<()> {
         let env = test_env();
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
-        env.with_reader::<WorkspaceError, _, _>(|reader| {
+        env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut buf: TestBuf = KvBuf::new(&reader, db)?;
 
             buf.put("a", V(1));
@@ -198,7 +198,7 @@ pub mod tests {
     }
 
     #[test]
-    fn kv_empty_iterators() -> WorkspaceResult<()> {
+    fn kv_empty_iterators() -> DatabaseResult<()> {
         let env = test_env();
         let db = env
             .inner()
@@ -219,7 +219,7 @@ pub mod tests {
 
     /// TODO break up into smaller tests
     #[test]
-    fn kv_store_sanity_check() -> WorkspaceResult<()> {
+    fn kv_store_sanity_check() -> DatabaseResult<()> {
         let env = test_env();
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
@@ -229,7 +229,7 @@ pub mod tests {
             name: "Joe".to_owned(),
         };
 
-        env.with_reader::<WorkspaceError, _, _>(|reader| {
+        env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
 
