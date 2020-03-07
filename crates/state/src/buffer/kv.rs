@@ -21,8 +21,6 @@ enum Op<V> {
 /// TODO: split the various methods for accessing data into traits,
 /// and write a macro to help produce traits for every possible combination
 /// of access permission, so that access can be hidden behind a limited interface
-///
-/// TODO: hold onto SingleStore references for as long as the env
 pub struct KvBuf<'env, K, V, R = Reader<'env>>
 where
     K: BufKey,
@@ -58,12 +56,12 @@ where
     }
 
     pub fn put(&mut self, k: K, v: V) {
-        // TODO, maybe give indication of whether the value existed or not
+        // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
     pub fn delete(&mut self, k: K) {
-        // TODO, maybe give indication of whether the value existed or not
+        // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Del);
     }
 
@@ -123,7 +121,7 @@ impl<'env, V> SingleIter<'env, V> {
 /// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
 /// This is to enable a wider range of keys, such as String, because there is no uniform trait which
 /// enables conversion from a byte slice to a given type.
-/// TODO: Use FallibleIterator to prevent panics within iteration
+/// FIXME: Use FallibleIterator to prevent panics within iteration
 impl<'env, V> Iterator for SingleIter<'env, V>
 where
     V: BufVal,

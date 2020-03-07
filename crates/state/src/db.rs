@@ -58,11 +58,10 @@ lazy_static! {
 }
 
 
-/// DbManager is intended to be used as a singleton store for LMDB Database references.
+/// DbManager is intended to be used as a singleton store for LMDB Database references,
+/// so its constructor is intentionally private.
 /// It uses a UniversalMap to retrieve heterogeneously typed data via special keys
 /// whose type includes the type of the corresponding value.
-///
-/// TODO: we must ensure that this is a singleton per Environment! Probably needs to be created at the same time as the EnvArc itself.
 pub struct DbManager {
     env: Environment,
     um: UniversalMap<DbName>,

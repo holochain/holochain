@@ -41,7 +41,8 @@ where
     K: BufKey,
     V: BufMultiVal,
 {
-    // TODO: restructure to match the others
+    // FIXME: restructure constructors to match KvBuf and IntKvBuf
+
     /// Create or open DB if it exists.
     /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
     pub fn create(env: &'env Rkv, name: &str) -> DatabaseResult<Self> {

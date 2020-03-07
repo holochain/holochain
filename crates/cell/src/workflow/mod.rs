@@ -70,8 +70,7 @@ impl WorkflowTrigger {
 // TODO: flesh out for real
 #[derive(Error, Debug)]
 pub enum WorkflowError {
-    #[error("It's too awful to tell!")]
-    ItsAwful,
+
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.

@@ -26,8 +26,6 @@ enum Op<V> {
 /// TODO: split the various methods for accessing data into traits,
 /// and write a macro to help produce traits for every possible combination
 /// of access permission, so that access can be hidden behind a limited interface
-///
-/// TODO: hold onto SingleStore references for as long as the env
 pub struct IntKvBuf<'env, K, V, R = Reader<'env>>
 where
     K: BufIntKey,
@@ -72,12 +70,12 @@ where
     }
 
     pub fn put(&mut self, k: K, v: V) {
-        // TODO, maybe give indication of whether the value existed or not
+        // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
     pub fn delete(&mut self, k: K) {
-        // TODO, maybe give indication of whether the value existed or not
+        // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Del);
     }
 

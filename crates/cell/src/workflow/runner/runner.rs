@@ -17,10 +17,13 @@ use sx_state::{
 use workflow::{WorkflowEffects, WorkflowCall, WorkflowTrigger};
 use workspace::WorkspaceError;
 
+
 impl<Api: ConductorCellApiT> Cell<Api> {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
         let env = self.state_env();
         let dbs = env.dbs()?;
+
+        // TODO: is it possible to DRY this up with a macro?
         match call {
             WorkflowCall::InvokeZome(invocation) => {
                 let workspace = workspace::InvokeZomeWorkspace::new(env.reader()?, &dbs)?;
@@ -34,8 +37,6 @@ impl<Api: ConductorCellApiT> Cell<Api> {
                     workflow::genesis(workspace, dna, agent_id).await?;
                 self.finish_workflow(result).await?;
             }
-            // WorkflowCall::AppValidation(ops) => self
-            //     .finish(app_validation(AppValidationWorkspace::new(unimplemented!()), ops).await?),
         }
         Ok(())
     }
@@ -59,14 +60,5 @@ impl<Api: ConductorCellApiT> Cell<Api> {
             }
             Ok(())
         }.boxed()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn can_run_workflow() {
-
     }
 }

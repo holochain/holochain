@@ -2,7 +2,6 @@ use crate::{state::workspace::WorkspaceError, workflow::WorkflowError};
 use sx_state::error::DatabaseError;
 use thiserror::Error;
 
-/// TODO: flesh out for real
 #[derive(Error, Debug)]
 pub enum WorkflowRunError {
     #[error(transparent)]

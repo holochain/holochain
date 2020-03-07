@@ -22,7 +22,6 @@ pub trait RibosomeT {
     ) -> SkunkResult<ZomeInvocationResult>;
 }
 
-/// TODO determine what cursor looks like for ribosomes
 /// Total hack just to have something to look at
 /// The only Ribosome is a Wasm ribosome.
 pub struct Ribosome {

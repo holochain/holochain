@@ -19,7 +19,7 @@ use sx_types::prelude::Address;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
     header_address: Address,
-    index: u32, // TODO: this is the key, so once iterators can return keys, we can remove this
+    index: u32, // FIXME: this is the key, so once iterators can return keys, we can remove this
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
