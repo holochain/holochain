@@ -1,5 +1,3 @@
-// FIXME: re-enable all warnings after skunkworx
-#![allow(dead_code)]
 
 /// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)
 #[macro_use]

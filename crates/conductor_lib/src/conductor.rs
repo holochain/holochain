@@ -15,28 +15,28 @@ pub type CellHandle = String;
 /// when we need to load new config, etc.
 pub struct CellState {
     /// Whether or not we should call any methods on the cell
-    active: bool,
+    _active: bool,
 }
 
 pub struct CellItem<Api: ConductorCellApiT> {
     cell: Cell<Api>,
-    state: CellState,
+    _state: CellState,
 }
 
 pub struct Conductor<Api: ConductorCellApiT> {
     tx_network: NetSender,
     cells: HashMap<CellId, CellItem<Api>>,
-    handle_map: HashMap<CellHandle, CellId>,
-    agent_keys: HashMap<AgentId, Keystore>,
+    _handle_map: HashMap<CellHandle, CellId>,
+    _agent_keys: HashMap<AgentId, Keystore>,
 }
 
 impl<Api: ConductorCellApiT> Conductor<Api> {
     pub fn new(tx_network: NetSender) -> Self {
         Self {
             cells: HashMap::new(),
-            handle_map: HashMap::new(),
             tx_network,
-            agent_keys: HashMap::new(),
+            _handle_map: HashMap::new(),
+            _agent_keys: HashMap::new(),
         }
     }
 

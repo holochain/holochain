@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // TODO: use jsonrpc-lite or something to represent JSON-RPC requests
 struct JsonRpc;
 

@@ -60,6 +60,7 @@ pub enum Test {
     AddAgent(AddAgentArgs),
 }
 
+#[allow(dead_code)]
 pub struct AddAgentArgs {
     id: String,
     name: String,

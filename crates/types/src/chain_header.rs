@@ -100,7 +100,7 @@ impl ChainHeader {
     }
 
     /// timestamp getter
-    fn timestamp(&self) -> &Iso8601 {
+    pub fn timestamp(&self) -> &Iso8601 {
         &self.timestamp
     }
 
@@ -115,17 +115,17 @@ impl ChainHeader {
     }
 
     /// link_same_type getter
-    fn link_same_type(&self) -> Option<Address> {
+    pub fn link_same_type(&self) -> Option<Address> {
         self.link_same_type.clone()
     }
 
     /// link_crud getter
-    fn link_crud(&self) -> Option<Address> {
+    pub fn link_crud(&self) -> Option<Address> {
         self.link_crud.clone()
     }
 
     /// entry_signature getter
-    fn provenances(&self) -> &Vec<Provenance> {
+    pub fn provenances(&self) -> &Vec<Provenance> {
         &self.provenances
     }
 }
