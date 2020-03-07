@@ -1,5 +1,5 @@
 // FIXME: re-enable all warnings after skunkworx
-#![allow(dead_code, unused_variables, unreachable_code)]
+#![allow(dead_code, unreachable_code)]
 
 mod workflow;
 
