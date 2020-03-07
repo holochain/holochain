@@ -1,19 +1,8 @@
 use super::{ChainInvalidReason, SourceChainBuf, SourceChainError, SourceChainResult};
 
 use shrinkwraprs::Shrinkwrap;
-use sx_state::{
-    buffer::BufferedStore,
-    db::{self, DbManager},
-    env::ReadManager,
-    prelude::{Readable, Reader, Writer},
-};
-use sx_types::{
-    agent::AgentId,
-    chain_header::ChainHeader,
-    entry::{entry_type::EntryType, Entry},
-    prelude::{Address, AddressableContent},
-    signature::{Provenance, Signature},
-};
+use sx_state::prelude::Reader;
+use sx_types::{agent::AgentId, prelude::Address};
 
 type InnerBuffer<'env> = SourceChainBuf<'env, Reader<'env>>;
 

@@ -1,11 +1,5 @@
 use super::{WorkflowEffects, WorkflowResult};
-use crate::{
-    cell::{autonomic::AutonomicCue, error::CellResult},
-    conductor_api::ConductorCellApiT,
-    nucleus::{ZomeInvocation, ZomeInvocationResult},
-    ribosome::{Ribosome, RibosomeT},
-    state::workspace::{InvokeZomeWorkspace, Workspace},
-};
+use crate::{nucleus::ZomeInvocation, ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(
     workspace: InvokeZomeWorkspace<'env>,

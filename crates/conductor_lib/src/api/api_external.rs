@@ -3,11 +3,11 @@ use crate::conductor::{CellHandle, Conductor};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use sx_cell::{
-    cell::{autonomic::AutonomicCue, Cell, CellId},
-    conductor_api::{ConductorApiError, ConductorApiResult, ConductorCellApiT},
-    nucleus::{ZomeInvocation, ZomeInvocationResult},
+    cell::{Cell},
+    conductor_api::{ConductorApiResult, ConductorCellApiT},
+    nucleus::{ZomeInvocation},
 };
-use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
+use sx_types::{prelude::*, shims::*};
 
 #[derive(Clone)]
 pub struct ConductorExternalApi<Api: ConductorCellApiT> {

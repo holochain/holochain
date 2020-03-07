@@ -1,7 +1,4 @@
-use crate::{
-    conductor::{CellHandle, Conductor},
-    error::ConductorResult,
-};
+use crate::conductor::Conductor;
 use async_trait::async_trait;
 use futures::sink::SinkExt;
 

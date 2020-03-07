@@ -107,9 +107,8 @@ pub mod tests {
     use crate::state::source_chain::SourceChainResult;
 
     use sx_state::{
-        db::DbManager,
-        env::{create_lmdb_env, ReadManager, WriteManager},
-        error::{DatabaseError, DatabaseResult},
+        env::{ReadManager, WriteManager},
+        error::{DatabaseResult},
         test_utils::test_env,
     };
     use sx_types::prelude::Address;

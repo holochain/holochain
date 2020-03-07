@@ -6,10 +6,9 @@ use crate::state::{
 
 use sx_state::{
     buffer::BufferedStore,
-    db::{self, DbManager},
-    env::ReadManager,
+    db::{DbManager},
     error::DatabaseResult,
-    prelude::{Readable, Reader, Writer},
+    prelude::{Readable, Writer},
 };
 use sx_types::{
     agent::AgentId,
@@ -111,10 +110,7 @@ pub mod tests {
     use super::SourceChainBuf;
     use crate::state::source_chain::SourceChainResult;
     use sx_state::{
-        db::DbManager,
-        env::{create_lmdb_env, ReadManager, WriteManager},
-        error::DatabaseResult,
-        prelude::Reader,
+        env::{ReadManager},
         test_utils::test_env,
     };
 
