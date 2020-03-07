@@ -1,6 +1,6 @@
 use super::Workspace;
 use crate::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
-use sx_state::{db::DbManager, error::DatabaseError, prelude::*};
+use sx_state::{db::DbManager, prelude::*};
 
 pub struct InvokeZomeWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
@@ -22,10 +22,8 @@ impl<'env> Workspace for InvokeZomeWorkspace<'env> {
 pub mod tests {
 
     use super::InvokeZomeWorkspace;
-    use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
-    use sx_state::{
-        env::ReadManager, error::DatabaseError, prelude::Readable, test_utils::test_env,
-    };
+    use crate::state::source_chain::SourceChainResult;
+    use sx_state::{env::ReadManager, error::DatabaseError, test_utils::test_env};
 
     type Err = DatabaseError;
 

@@ -1,5 +1,5 @@
 use crate::conductor::CellHandle;
-use std::fmt;
+
 use sx_cell::{
     cell::{error::CellError, CellId},
     conductor_api::ConductorApiError,

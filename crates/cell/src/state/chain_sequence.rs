@@ -13,7 +13,7 @@ use sx_state::{
     buffer::{BufferedStore, IntKvBuf},
     db::{DbManager, CHAIN_SEQUENCE},
     error::DatabaseResult,
-    prelude::{Readable, Reader, Writer},
+    prelude::{Readable, Writer},
 };
 use sx_types::prelude::Address;
 
@@ -105,7 +105,7 @@ pub mod tests {
 
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
     use crate::state::source_chain::SourceChainResult;
-    use std::sync::Arc;
+
     use sx_state::{
         db::DbManager,
         env::{create_lmdb_env, ReadManager, WriteManager},
@@ -113,7 +113,6 @@ pub mod tests {
         test_utils::test_env,
     };
     use sx_types::prelude::Address;
-    use tempdir::TempDir;
 
     #[test]
     fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {

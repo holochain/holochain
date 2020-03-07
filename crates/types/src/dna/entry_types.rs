@@ -5,7 +5,6 @@ use holochain_json_api::{error::JsonError, json::JsonString};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 
-
 /// Enum for Zome EntryType "sharing" property.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 #[serde(rename_all = "lowercase")]

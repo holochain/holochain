@@ -162,10 +162,11 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{IntKvBuf, BufferedStore};
+    use super::{BufferedStore, IntKvBuf};
     use crate::{
         env::{ReadManager, WriteManager},
-        test_utils::test_env, error::DatabaseResult,
+        error::DatabaseResult,
+        test_utils::test_env,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};

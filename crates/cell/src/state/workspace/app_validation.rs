@@ -1,11 +1,9 @@
 use super::Workspace;
-use crate::state::source_chain::SourceChainBuf;
+
 use crate::state::workspace::WorkspaceResult;
-use sx_state::{db::DbManager, error::{DatabaseError, DatabaseResult}, prelude::*};
+use sx_state::{db::DbManager, error::DatabaseResult, prelude::*};
 
-pub struct AppValidationWorkspace {
-
-}
+pub struct AppValidationWorkspace {}
 
 impl<'env> AppValidationWorkspace {
     pub fn new(reader: Reader<'env>, dbs: &DbManager) -> DatabaseResult<Self> {
@@ -23,10 +21,8 @@ impl<'env> Workspace for AppValidationWorkspace {
 pub mod tests {
 
     use super::AppValidationWorkspace;
-    use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
-    use sx_state::{
-        env::ReadManager, error::DatabaseError, prelude::Readable, test_utils::test_env,
-    };
+    use crate::state::source_chain::SourceChainResult;
+    use sx_state::{env::ReadManager, error::DatabaseError, test_utils::test_env};
 
     type Err = DatabaseError;
 

@@ -1,8 +1,5 @@
 use super::Workspace;
-use crate::state::{
-    source_chain::{SourceChainBuf, SourceChainError, SourceChainResult},
-    workspace::WorkspaceResult,
-};
+use crate::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use sx_state::{db::DbManager, exports::Writer, prelude::*};
 
 pub struct GenesisWorkspace<'env> {
@@ -25,10 +22,8 @@ impl<'env> Workspace for GenesisWorkspace<'env> {
 pub mod tests {
 
     use super::GenesisWorkspace;
-    use crate::state::source_chain::{SourceChainBuf, SourceChainResult};
-    use sx_state::{
-        env::ReadManager, error::DatabaseError, prelude::Readable, test_utils::test_env,
-    };
+    use crate::state::source_chain::SourceChainResult;
+    use sx_state::{env::ReadManager, error::DatabaseError, test_utils::test_env};
 
     type Err = DatabaseError;
 

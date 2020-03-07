@@ -1,7 +1,6 @@
 //! Just enough to get us rolling for now.
 //! Not the intended final struct for Errors.
 
-use crate::prelude::*;
 use holochain_json_api::error::JsonError;
 use holochain_persistence_api::error::PersistenceError;
 use lib3h_crypto_api::CryptoError;

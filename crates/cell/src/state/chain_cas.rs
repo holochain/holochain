@@ -1,7 +1,7 @@
 use crate::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
-use serde::{de::DeserializeOwned, Serialize};
+
 use sx_state::{
-    buffer::{CasBuf, BufferedStore},
+    buffer::{BufferedStore, CasBuf},
     db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
@@ -10,7 +10,7 @@ use sx_state::{
 use sx_types::{
     chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,
-    prelude::{Address, AddressableContent},
+    prelude::Address,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;

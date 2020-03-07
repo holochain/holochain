@@ -57,7 +57,6 @@ lazy_static! {
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
 }
 
-
 /// DbManager is intended to be used as a singleton store for LMDB Database references,
 /// so its constructor is intentionally private.
 /// It uses a UniversalMap to retrieve heterogeneously typed data via special keys

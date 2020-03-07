@@ -7,13 +7,8 @@ use crate::{
     state::workspace,
     workflow,
 };
-use async_trait::async_trait;
-use holochain_persistence_api::txn::CursorProvider;
-use std::{
-    hash::{Hash, Hasher},
-    path::Path,
-    sync::{Arc, RwLock},
-};
+
+use std::hash::{Hash, Hasher};
 use sx_state::{
     db::DbManager,
     env::{create_lmdb_env, Environment, ReadManager},
@@ -27,7 +22,6 @@ use sx_types::{
     prelude::*,
     shims::*,
 };
-use workspace::Workspace;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
@@ -177,9 +171,6 @@ pub type NetSender = futures::channel::mpsc::Sender<Lib3hClientProtocol>;
 
 #[cfg(test)]
 pub mod tests {
-
-    use super::*;
-    use crate::{conductor_api::MockConductorCellApi, test_utils::fake_cell_id};
 
     // #[test]
     // fn can_create_cell() {

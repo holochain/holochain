@@ -174,7 +174,7 @@ where
 #[cfg(test_TODO_FIX)]
 pub mod tests {
 
-    use super::{KvvBuf, Op, BufferedStore};
+    use super::{BufferedStore, KvvBuf, Op};
     use crate::test_utils::test_env;
     use maplit::hashset;
     use rkv::Rkv;

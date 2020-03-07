@@ -1,6 +1,6 @@
-use crate::{state::workspace::GenesisWorkspace, cell::error::CellResult};
-use sx_types::{dna::Dna, prelude::*, agent::AgentId};
 use super::WorkflowResult;
+use crate::state::workspace::GenesisWorkspace;
+use sx_types::{agent::AgentId, dna::Dna};
 
 type WS<'env> = GenesisWorkspace<'env>;
 
@@ -8,6 +8,10 @@ type WS<'env> = GenesisWorkspace<'env>;
 /// - Dna
 /// - AgentId
 /// - CapTokenGrant
-pub async fn genesis<'env>(workspace: WS<'env>, dna: Dna, agent_id: AgentId) -> WorkflowResult<WS<'env>> {
+pub async fn genesis<'env>(
+    workspace: WS<'env>,
+    dna: Dna,
+    agent_id: AgentId,
+) -> WorkflowResult<WS<'env>> {
     unimplemented!()
 }

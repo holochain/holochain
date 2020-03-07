@@ -48,7 +48,7 @@ use holochain_json_api::{
 use holochain_persistence_api::cas::content::{AddressableContent, Content};
 use multihash;
 use serde::{Deserialize, Serialize};
-use serde_json::{self, Value, json};
+use serde_json::{self, json, Value};
 use std::{
     collections::BTreeMap,
     convert::TryFrom,

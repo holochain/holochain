@@ -4,15 +4,15 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::sink::SinkExt;
-use mockall::mock;
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::{pin::Pin, sync::Arc};
+
+use parking_lot::RwLock;
+use std::sync::Arc;
 use sx_cell::{
-    cell::{autonomic::AutonomicCue, Cell, CellId},
+    cell::{autonomic::AutonomicCue, CellId},
     conductor_api::{ConductorApiError, ConductorApiResult, ConductorCellApiT},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
 };
-use sx_types::{error::SkunkResult, prelude::*, shims::*, signature::Signature};
+use sx_types::{shims::*, signature::Signature};
 
 #[derive(Clone)]
 pub struct ConductorCellApi {

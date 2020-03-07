@@ -14,13 +14,8 @@ use crate::{
     workflow,
 };
 use std::time::Duration;
-use sx_state::{
-    db::DbManager,
-    env::{Environment, WriteManager},
-    error::DatabaseError,
-    prelude::*,
-};
-use sx_types::{agent::AgentId, dna::Dna, shims::DhtOp};
+
+use sx_types::{agent::AgentId, dna::Dna};
 use thiserror::Error;
 
 #[derive(Clone, Debug)]
@@ -69,9 +64,7 @@ impl WorkflowTrigger {
 
 // TODO: flesh out for real
 #[derive(Error, Debug)]
-pub enum WorkflowError {
-
-}
+pub enum WorkflowError {}
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
 pub type WorkflowResult<W> = Result<WorkflowEffects<W>, WorkflowError>;

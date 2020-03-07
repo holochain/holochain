@@ -12,7 +12,6 @@ pub enum WorkflowRunError {
 
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
-
 }
 
 /// Internal type to handle running workflows

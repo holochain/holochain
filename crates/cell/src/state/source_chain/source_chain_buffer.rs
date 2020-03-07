@@ -3,7 +3,7 @@ use crate::state::{
     chain_sequence::ChainSequenceBuf,
     source_chain::SourceChainError,
 };
-use core::ops::Deref;
+
 use sx_state::{
     buffer::BufferedStore,
     db::{self, DbManager},
@@ -14,7 +14,7 @@ use sx_state::{
 use sx_types::{
     agent::AgentId,
     chain_header::ChainHeader,
-    entry::{entry_type::EntryType, Entry},
+    entry::Entry,
     prelude::{Address, AddressableContent},
     signature::{Provenance, Signature},
 };
@@ -108,7 +108,7 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> Ch
 #[cfg(test)]
 pub mod tests {
 
-    use super::{SourceChainBuf, BufferedStore};
+    use super::SourceChainBuf;
     use crate::state::source_chain::SourceChainResult;
     use sx_state::{
         db::DbManager,
@@ -117,7 +117,6 @@ pub mod tests {
         prelude::Reader,
         test_utils::test_env,
     };
-    use tempdir::TempDir;
 
     #[test]
     fn asdf() -> SourceChainResult<()> {

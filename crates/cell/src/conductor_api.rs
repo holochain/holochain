@@ -1,5 +1,5 @@
 use crate::{
-    cell::{autonomic::AutonomicCue, error::CellError, Cell, CellId},
+    cell::{autonomic::AutonomicCue, error::CellError, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResult},
 };
 use async_trait::async_trait;

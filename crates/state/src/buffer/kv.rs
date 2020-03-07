@@ -146,7 +146,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{KvBuf, BufferedStore};
+    use super::{BufferedStore, KvBuf};
     use crate::{
         env::{ReadManager, WriteManager},
         error::{DatabaseError, DatabaseResult},

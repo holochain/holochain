@@ -6,7 +6,6 @@ use crate::{
     ribosome::{Ribosome, RibosomeT},
     state::workspace::{InvokeZomeWorkspace, Workspace},
 };
-use sx_types::shims::*;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(
     workspace: InvokeZomeWorkspace<'env>,

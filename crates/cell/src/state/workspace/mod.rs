@@ -1,4 +1,4 @@
-use super::{chain_cas::ChainCasBuf, source_chain::SourceChainError};
+use super::source_chain::SourceChainError;
 use sx_state::{
     buffer::{BufferedStore, KvBuf, KvvBuf},
     db::DbManager,
@@ -25,7 +25,6 @@ pub enum WorkspaceError {
 
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
-
 pub trait Workspace: Send {
     fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
 }
@@ -33,18 +32,17 @@ pub trait Workspace: Send {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{InvokeZomeWorkspace, Workspace};
+    use super::Workspace;
     use crate::state::workspace::WorkspaceResult;
     use sx_state::{
         buffer::{BufferedStore, KvBuf},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         error::DatabaseError,
-        prelude::{Reader, SingleStore, Writer},
+        prelude::{Reader, Writer},
         test_utils::test_env,
     };
     use sx_types::prelude::*;
-    use tempdir::TempDir;
 
     pub struct TestWorkspace<'env> {
         one: KvBuf<'env, Address, u32>,

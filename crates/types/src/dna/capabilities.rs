@@ -1,9 +1,9 @@
 /// capabilities implements the capability request functionality used to check
 /// that a given capability has been granted for actions like zome calls
 use crate::signature::{Provenance, Signature};
-use serde::{Deserialize, Serialize};
 use holochain_json_api::{error::JsonError, json::JsonString};
 use holochain_persistence_api::cas::content::Address;
+use serde::{Deserialize, Serialize};
 
 //--------------------------------------------------------------------------------------------------
 // CapabilityRequest

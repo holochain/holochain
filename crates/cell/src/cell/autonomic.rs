@@ -1,5 +1,3 @@
-use sx_types::{entry::EntryAddress, prelude::Address};
-
 /// The various processes which run "autonomically", aka subconsciously.
 /// These are triggered by
 pub enum AutonomicProcess {

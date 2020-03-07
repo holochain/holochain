@@ -1,5 +1,5 @@
-use std::{error::Error, fmt};
 use serde::{Deserialize, Serialize};
+use std::{error::Error, fmt};
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum DnaError {

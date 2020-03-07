@@ -7,7 +7,6 @@ extern crate serde;
 #[macro_use]
 extern crate holochain_json_derive;
 
-
 pub mod agent;
 pub mod chain_header;
 pub mod db;

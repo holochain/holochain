@@ -1,9 +1,6 @@
 use super::{ChainInvalidReason, SourceChainBuf, SourceChainError, SourceChainResult};
-use crate::state::{
-    chain_cas::{ChainCasBuf, HeaderCas},
-    chain_sequence::ChainSequenceBuf,
-};
-use core::ops::Deref;
+
+use shrinkwraprs::Shrinkwrap;
 use sx_state::{
     buffer::BufferedStore,
     db::{self, DbManager},
@@ -17,7 +14,6 @@ use sx_types::{
     prelude::{Address, AddressableContent},
     signature::{Provenance, Signature},
 };
-use shrinkwraprs::Shrinkwrap;
 
 type InnerBuffer<'env> = SourceChainBuf<'env, Reader<'env>>;
 

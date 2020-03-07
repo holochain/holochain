@@ -3,8 +3,8 @@
 pub mod buffer;
 pub mod db;
 pub mod env;
-pub mod exports;
 pub mod error;
+pub mod exports;
 pub mod prelude;
 pub mod reader;
 
