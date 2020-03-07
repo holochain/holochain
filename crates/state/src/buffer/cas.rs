@@ -4,10 +4,8 @@ use super::{
 };
 use crate::{
     error::{DatabaseError, DatabaseResult},
-    reader::Readable,
+    transaction::Readable, prelude::Writer,
 };
-use rkv::Writer;
-
 use sx_types::prelude::{Address, AddressableContent};
 
 /// A wrapper around a KvBuf where keys are always Addresses,

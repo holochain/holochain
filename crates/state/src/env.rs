@@ -1,8 +1,7 @@
 use crate::{
     db::DbManager,
     error::{DatabaseError, DatabaseResult},
-    exports::Writer,
-    reader::Reader,
+    transaction::{Reader, Writer},
 };
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
@@ -96,7 +95,7 @@ pub trait WriteManager {
 
 impl ReadManager for Environment {
     fn reader(&self) -> DatabaseResult<Reader> {
-        Ok(Reader::new(self.0.read()?))
+        Ok(Reader::from(self.0.read()?))
     }
 
     fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
@@ -104,13 +103,13 @@ impl ReadManager for Environment {
         E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>,
     {
-        f(Reader::new(self.0.read().map_err(Into::into)?))
+        f(Reader::from(self.0.read().map_err(Into::into)?))
     }
 }
 
 impl WriteManager for Environment {
     fn writer(&self) -> DatabaseResult<Writer> {
-        Ok(self.0.write()?)
+        Ok(self.0.write()?.into())
     }
 
     fn with_commit<E, R, F>(&self, f: F) -> Result<R, E>
@@ -118,7 +117,7 @@ impl WriteManager for Environment {
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let mut writer = self.0.write().map_err(Into::into)?;
+        let mut writer = self.0.write().map_err(Into::into)?.into();
         let result = f(&mut writer);
         writer.commit().map_err(Into::into)?;
         result

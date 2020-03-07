@@ -33,7 +33,6 @@ pub mod tests {
         buffer::{BufferedStore, KvBuf},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
-        error::DatabaseError,
         prelude::{Reader, Writer},
         test_utils::test_env,
     };
@@ -57,7 +56,7 @@ pub mod tests {
         fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(&mut writer)?;
             self.two.flush_to_txn(&mut writer)?;
-            writer.commit().map_err(DatabaseError::from)?;
+            writer.commit()?;
             Ok(())
         }
     }

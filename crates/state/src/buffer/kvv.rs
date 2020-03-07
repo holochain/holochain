@@ -1,8 +1,10 @@
 use super::{BufKey, BufMultiVal, BufferedStore};
-use crate::error::{DatabaseError, DatabaseResult};
+use crate::{
+    error::{DatabaseError, DatabaseResult},
+    prelude::*,
+};
 use maplit::hashset;
-use rkv::{MultiStore, Reader, Rkv, StoreOptions, Writer};
-
+use rkv::MultiStore;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     hash::Hash,
@@ -26,38 +28,27 @@ type Scratch<K, V> = HashMap<K, HashSet<Op<V>>>;
 /// TODO: split the various methods for accessing data into traits,
 /// and write a macro to help produce traits for every possible combination
 /// of access permission, so that access can be hidden behind a limited interface
-pub struct KvvBuf<'env, K, V>
+pub struct KvvBuf<'env, K, V, R = Reader<'env>>
 where
     K: BufKey,
     V: BufMultiVal,
+    R: Readable,
 {
     db: MultiStore,
-    reader: Reader<'env>,
+    reader: &'env R,
     scratch: Scratch<K, V>,
 }
 
-impl<'env, K, V> KvvBuf<'env, K, V>
+impl<'env, K, V, R> KvvBuf<'env, K, V, R>
 where
     K: BufKey,
     V: BufMultiVal,
+    R: Readable,
 {
-    // FIXME: restructure constructors to match KvBuf and IntKvBuf
-
-    /// Create or open DB if it exists.
-    /// CAREFUL with this! Calling create() during a transaction seems to cause a deadlock
-    pub fn create(env: &'env Rkv, name: &str) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, db: MultiStore) -> DatabaseResult<Self> {
         Ok(Self {
-            db: env.open_multi(name, StoreOptions::create())?,
-            reader: env.read()?,
-            scratch: HashMap::new(),
-        })
-    }
-
-    /// Open an existing DB. Will cause an error if the DB was not created already.
-    pub fn open(env: &'env Rkv, name: &str) -> DatabaseResult<Self> {
-        Ok(Self {
-            db: env.open_multi(name, StoreOptions::default())?,
-            reader: env.read()?,
+            db,
+            reader,
             scratch: HashMap::new(),
         })
     }
@@ -109,7 +100,7 @@ where
 
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> DatabaseResult<HashSet<V>> {
-        let iter = self.db.get(&self.reader, k)?;
+        let iter = self.db.get(self.reader, k)?;
         Ok(iter
             .map(|v| match v {
                 Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(bincode::deserialize(buf)?)),
@@ -128,10 +119,11 @@ where
     }
 }
 
-impl<'env, K, V> BufferedStore<'env> for KvvBuf<'env, K, V>
+impl<'env, K, V, R> BufferedStore<'env> for KvvBuf<'env, K, V, R>
 where
     K: Clone + BufKey,
     V: BufMultiVal,
+    R: Readable,
 {
     type Error = DatabaseError;
 
