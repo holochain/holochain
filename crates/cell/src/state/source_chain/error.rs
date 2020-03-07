@@ -1,6 +1,6 @@
 use holochain_json_api::error::JsonError;
 use sx_state::error::DatabaseError;
-use sx_types::{error::SkunkError, prelude::*};
+use sx_types::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -30,9 +30,6 @@ pub enum SourceChainError {
 
     #[error("Workspace error: {0}")]
     DatabaseError(#[from] DatabaseError),
-
-    #[error(transparent)]
-    Generic(#[from] SkunkError),
 }
 
 #[derive(Error, Debug, PartialEq)]

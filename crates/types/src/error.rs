@@ -1,5 +1,9 @@
-//! Just enough to get us rolling for now.
-//! Not the intended final struct for Errors.
+//! SkunkError should go away as soon as possible.
+//! It is a catch-all for the various error types produced by code in the
+//! previous Holochain version, as well as a rough replacement for
+//! HolochainError in that version.
+//! As we decide which previous code to use, we should port those error types
+//! over to the appropriate error type in this crate.
 
 use holochain_json_api::error::JsonError;
 use holochain_persistence_api::error::PersistenceError;

@@ -4,15 +4,12 @@ use sx_cell::{
     cell::{error::CellError, CellId},
     conductor_api::ConductorApiError,
 };
-use sx_types::error::SkunkError;
 use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
 #[derive(Error, Debug)]
 pub enum ConductorError {
-    #[error(transparent)]
-    SkunkError(#[from] SkunkError),
 
     #[error("Internal Cell error: {0}")]
     InternalCellError(#[from] CellError),
