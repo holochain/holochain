@@ -1,15 +1,17 @@
 use crate::conductor::Conductor;
 use async_trait::async_trait;
 use futures::sink::SinkExt;
+use sx_cell::cell::CellId;
 
 use parking_lot::RwLock;
 use std::sync::Arc;
-use sx_cell::{
-    cell::{autonomic::AutonomicCue, CellId},
-    conductor_api::{ConductorApiError, ConductorApiResult, ConductorCellApiT},
-    nucleus::{ZomeInvocation, ZomeInvocationResult},
+use sx_cell::conductor_api::{ConductorApiError, ConductorApiResult, ConductorCellApiT};
+use sx_types::{
+    autonomic::AutonomicCue,
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    shims::*,
+    signature::Signature,
 };
-use sx_types::{shims::*, signature::Signature};
 
 #[derive(Clone)]
 pub struct ConductorCellApi {
@@ -29,7 +31,7 @@ impl ConductorCellApiT for ConductorCellApi {
         &self,
         cell_id: CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+    ) -> ConductorApiResult<ZomeInvocationResponse> {
         let conductor = self.lock.read();
         let cell = conductor
             .cell_by_id(&cell_id)

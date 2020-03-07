@@ -1,5 +1,6 @@
 use super::{WorkflowEffects, WorkflowResult};
-use crate::{nucleus::ZomeInvocation, ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use crate::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use sx_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(
     workspace: InvokeZomeWorkspace<'env>,
@@ -46,7 +47,7 @@ pub mod tests {
         ribosome
             .expect_call_zome_function()
             .times(1)
-            .returning(|bundle, _| Ok(ZomeInvocationResult));
+            .returning(|bundle, _| Ok(ZomeInvocationResponse));
 
         // TODO: make actual assertions on the conductor_api, once more of the
         // actual logic is fleshed out
@@ -72,7 +73,7 @@ pub mod tests {
     //         self,
     //         bundle: SourceChainCommitBundle,
     //         invocation: ZomeInvocation,
-    //     ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)> {
+    //     ) -> SkunkResult<(ZomeInvocationResponse, SourceChainCommitBundle)> {
     //         unimplemented!()
     //     }
     // }

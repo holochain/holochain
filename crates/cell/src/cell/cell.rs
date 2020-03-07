@@ -1,8 +1,6 @@
-use super::autonomic::AutonomicProcess;
 use crate::{
     cell::error::{CellResult},
     conductor_api::ConductorCellApiT,
-    nucleus::{ZomeInvocation, ZomeInvocationResult},
     ribosome::Ribosome,
 };
 
@@ -11,9 +9,11 @@ use sx_state::{
     env::{Environment},
 };
 use sx_types::{
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     agent::AgentId,
     error::{SkunkResult},
     shims::*,
+    autonomic::AutonomicProcess
 };
 
 /// TODO: consider a newtype for this
@@ -23,8 +23,7 @@ pub type DnaAddress = sx_types::dna::DnaAddress;
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 pub type CellId = sx_types::agent::CellId;
-pub type ZomeId = (CellId, ZomeName);
-pub type ZomeName = String;
+
 
 impl<Api: ConductorCellApiT> Hash for Cell<Api> {
     fn hash<H>(&self, state: &mut H)
@@ -68,7 +67,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
         &self,
         _conductor_api: Api,
         _invocation: ZomeInvocation,
-    ) -> CellResult<ZomeInvocationResult> {
+    ) -> CellResult<ZomeInvocationResponse> {
         unimplemented!()
     }
 

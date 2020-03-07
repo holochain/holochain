@@ -1,9 +1,10 @@
 use crate::{
-    cell::{autonomic::AutonomicCue, error::CellError, CellId},
-    nucleus::{ZomeInvocation, ZomeInvocationResult},
+    cell::{error::CellError, CellId},
 };
 use async_trait::async_trait;
 use sx_types::{
+    autonomic::AutonomicCue,
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::{Lib3hClientProtocol, Lib3hServerProtocol},
     signature::Signature,
 };
@@ -16,7 +17,7 @@ pub trait ConductorCellApiT: Send + Sync {
         &self,
         cell: CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult>;
+    ) -> ConductorApiResult<ZomeInvocationResponse>;
 
     /// TODO: maybe move out into its own trait
     async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
@@ -67,7 +68,7 @@ mock! {
             &self,
             cell_id: CellId,
             invocation: ZomeInvocation,
-        ) -> ConductorApiResult<ZomeInvocationResult>;
+        ) -> ConductorApiResult<ZomeInvocationResponse>;
 
         fn sync_network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
 
@@ -92,7 +93,7 @@ impl ConductorCellApiT for MockConductorCellApi {
         &self,
         cell_id: CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+    ) -> ConductorApiResult<ZomeInvocationResponse> {
         self.sync_invoke_zome(cell_id, invocation)
     }
 

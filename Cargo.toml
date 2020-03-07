@@ -2,6 +2,7 @@
 
 members = [
   "crates/cell",
+  "crates/conductor_api",
   "crates/conductor_lib",
   # "crates/lib3h_protocol",
   # "crates/keystore",

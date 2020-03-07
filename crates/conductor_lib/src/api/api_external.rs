@@ -3,11 +3,10 @@ use crate::conductor::{CellHandle, Conductor};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use sx_cell::{
-    cell::{Cell},
+    cell::Cell,
     conductor_api::{ConductorApiResult, ConductorCellApiT},
-    nucleus::{ZomeInvocation},
 };
-use sx_types::{prelude::*, shims::*};
+use sx_types::{nucleus::ZomeInvocation, prelude::*, shims::*};
 
 #[derive(Clone)]
 pub struct ConductorExternalApi<Api: ConductorCellApiT> {
