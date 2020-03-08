@@ -6,7 +6,7 @@ use crate::{
 };
 use api::CellConductorInterface;
 use async_trait::async_trait;
-use futures::{channel::mpsc, stream::StreamExt};
+use tokio::sync::mpsc;
 use log::*;
 use sx_conductor_api::{AdminMethod, ExternalConductorInterfaceT};
 
@@ -27,8 +27,7 @@ impl ChannelInterface {
 impl Interface for ChannelInterface {
     async fn spawn(mut self, mut api: ExternalConductorInterface<CellConductorInterface>) {
         dbg!("spawn start");
-        while let Some(true) = self.rx.next().await {
-            dbg!("x");
+        while let Some(true) = self.rx.recv().await {
             if let Err(err) = api.admin(AdminMethod::Start("cell-handle".into())).await {
                 error!("Error calling admin interface function: {}", err);
             };

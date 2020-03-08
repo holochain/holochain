@@ -2,7 +2,6 @@ use crate::conductor::Conductor;
 use async_trait::async_trait;
 use mockall::mock;
 use std::sync::Arc;
-use sx_cell::cell::Cell;
 use sx_conductor_api::{CellConductorInterfaceT, CellT, ConductorApiResult, ConductorT};
 use sx_types::{
     agent::CellId,
@@ -26,7 +25,7 @@ mock! {
 
     CellConductorInterface {
 
-        fn sync_conductor(&self) -> tokio::sync::RwLockReadGuard<'static, Conductor>;
+        fn sync_conductor_ref(&self) -> tokio::sync::RwLockReadGuard<'static, Conductor<Self>>;
 
         fn sync_invoke_zome(
             &self,
@@ -57,14 +56,12 @@ mock! {
 
 #[async_trait(?Send)]
 impl CellConductorInterfaceT for MockCellConductorInterface {
-    type Cell = Cell;
-    type Conductor = Conductor;
+    type Cell = Cell<Self>;
+    type Conductor = Conductor<Self>;
 
-
-    async fn conductor(&self) -> tokio::sync::RwLockReadGuard<'static, Conductor> {
-        self.sync_conductor()
+    async fn conductor_ref(&self) -> tokio::sync::RwLockReadGuard<'_, Self::Conductor> {
+        self.sync_conductor_ref()
     }
-
 
     async fn invoke_zome(
         &self,

@@ -1,9 +1,10 @@
 use std::collections::HashMap;
-use sx_cell::cell::{Cell, CellId, NetSender};
+use sx_cell::cell::{CellId, NetSender};
 use sx_conductor_api::{
     CellConductorInterfaceT, ConductorApiError, ConductorApiResult, ConductorT,
 };
 use sx_types::{agent::CellHandle, shims::Keystore};
+use crate::api::Cell;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -14,22 +15,23 @@ pub struct CellState {
     _active: bool,
 }
 
-pub struct CellItem {
-    cell: Cell,
+pub struct CellItem<I: CellConductorInterfaceT = CellConductorInterface> {
+    cell: I::Cell,
     _state: CellState,
 }
 
-pub struct Conductor {
+pub struct Conductor<I: CellConductorInterfaceT = CellConductorInterface> {
     tx_network: NetSender,
-    cells: HashMap<CellId, CellItem>,
+    cells: HashMap<CellId, CellItem<I>>,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
+    // _phantom: std::marker::PhantomData<I>,
 }
 
-impl ConductorT for Conductor {
-    type Interface = CellConductorInterface;
+impl<I: CellConductorInterfaceT> ConductorT for Conductor<I> {
+    type Interface = I;
 
-    fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+    fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&I::Cell> {
         let item = self
             .cells
             .get(cell_id)

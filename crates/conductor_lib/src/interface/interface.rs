@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use super::ExternalConductorInterface;
+use crate::api::ExternalConductorInterface;
 
 #[async_trait]
 pub trait Interface {

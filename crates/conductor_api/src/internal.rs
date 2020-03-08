@@ -19,14 +19,18 @@ pub trait CellConductorInterfaceT: Clone + Send + Sync + Sized
     type Cell: CellT<Interface = Self>;
     type Conductor: ConductorT<Interface = Self>;
 
-    async fn conductor(&self) -> RwLockReadGuard<Self::Conductor>;
+    // TODO: I realized late in the game that if all methods in this trait
+    // are implemented only by the concrete type, then there is no need
+    // for this trait to know about the type of the Conductor OR the Cell!
+    // Might look into this to simplify things a lot...
+    async fn conductor_ref(&self) -> RwLockReadGuard<Self::Conductor>;
 
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        let conductor = self.conductor().await;
+        let conductor = self.conductor_ref().await;
         let cell: &Self::Cell = conductor.cell_by_id(cell_id)?;
         cell.invoke_zome(self.clone(), invocation).await.map_err(Into::into)
     }

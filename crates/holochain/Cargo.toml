@@ -14,7 +14,7 @@ futures = { version = "0.3.1", features = ["thread-pool"]}
 sx_cell = { path = "../cell"}
 sx_conductor_lib = { path = "../conductor_lib"}
 parking_lot = "0.10.0"
-# tokio = { version =  "0.2.9", features = ["stream"]}
+tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 
 [[bin]]
 path = "src/main.rs"

@@ -15,12 +15,12 @@ use crate::conductor::ConductorT;
 use async_trait::async_trait;
 
 /// The interface for a Cell to talk to its calling Conductor
-#[async_trait(?Send)]
-pub trait ExternalConductorInterfaceT: Clone + Send + Sync + Sized
+#[async_trait]
+pub trait ExternalConductorInterfaceT: Send + Sync + Sized
 {
     type Conductor: ConductorT;
 
-    async fn conductor_mut(&self) -> RwLockWriteGuard<Self::Conductor>;
+    // async fn conductor_mut(&self) -> RwLockWriteGuard<Self::Conductor>;
 
     async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
         unimplemented!()

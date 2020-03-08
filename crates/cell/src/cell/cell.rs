@@ -1,7 +1,5 @@
 use crate::{cell::error::CellResult, ribosome::Ribosome};
-use async_trait::async_trait;
 use std::hash::{Hash, Hasher};
-use sx_conductor_api::{CellT, ConductorApiResult};
 use sx_state::env::Environment;
 use sx_types::{
     agent::AgentId,
@@ -14,7 +12,7 @@ use sx_types::{
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
 
-/// The unique identifier for a running Cell.
+/// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 pub type CellId = sx_types::agent::CellId;
@@ -34,6 +32,13 @@ impl PartialEq for Cell {
     }
 }
 
+/// A Cell is a grouping of the resources necessary to run workflows
+/// on behalf of an agent. It does not have a lifetime of its own aside
+/// from the lifetimes of the resources which it holds references to.
+/// Any work it does is through running a workflow, passing references to
+/// the resources needed to complete that workflow.
+///
+/// TODO: determine if this can be Clone?
 pub struct Cell {
     id: CellId,
     state_env: Environment,
@@ -144,7 +149,7 @@ trait NetSend {
 /// Could use the trait instead, but we will want an impl of it
 /// for just a basic crossbeam_channel::Sender, so I'm simplifying
 /// to avoid making a change to holochain_net
-pub type NetSender = futures::channel::mpsc::Sender<Lib3hClientProtocol>;
+pub type NetSender = tokio::sync::mpsc::Sender<Lib3hClientProtocol>;
 
 #[cfg(test)]
 pub mod tests {

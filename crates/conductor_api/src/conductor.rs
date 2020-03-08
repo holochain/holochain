@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use sx_types::agent::CellId;
 
 #[async_trait]
-pub trait ConductorT: Sized {
+pub trait ConductorT: Sized + Send + Sync {
     type Interface: CellConductorInterfaceT;
 
     fn cell_by_id(
