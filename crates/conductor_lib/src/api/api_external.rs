@@ -1,13 +1,14 @@
 use crate::conductor::Conductor;
 use std::sync::Arc;
 use sx_conductor_api::{
-    AdminMethod, CellConductorInterfaceT, ConductorApiResult, ExternalConductorInterfaceT,
+    AdminMethod, ConductorApiResult, ExternalConductorInterfaceT,
 };
-use sx_types::{nucleus::{ZomeInvocationResponse, ZomeInvocation}, prelude::*, shims::*, agent::CellId};
-use tokio::sync::{RwLock, RwLockWriteGuard};
-use super::CellConductorInterface;
+use sx_types::{nucleus::{ZomeInvocationResponse, ZomeInvocation}, prelude::*, agent::CellId};
+use tokio::sync::{RwLock};
 
-// #[derive(Clone)]
+/// The interface that a Conductor exposes to the outside world.
+/// The Conductor lives inside an Arc<RwLock<_>> for the benefit of
+/// all other API handles
 pub struct ExternalConductorInterface {
     conductor_mutex: Arc<RwLock<Conductor>>,
 }
@@ -27,9 +28,10 @@ impl ExternalConductorInterfaceT for ExternalConductorInterface
 
     async fn invoke_zome(
         &self,
-        cell_id: &CellId,
-        invocation: ZomeInvocation,
+        _cell_id: &CellId,
+        _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
+        let _conductor = self.conductor_mutex.read().await;
         unimplemented!()
     }
 

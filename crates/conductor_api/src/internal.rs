@@ -1,5 +1,4 @@
-use crate::{cell::CellT, conductor::ConductorT, error::ConductorApiResult};
-use std::sync::Arc;
+use crate::error::ConductorApiResult;
 use sx_types::{
     agent::CellId,
     autonomic::AutonomicCue,
@@ -7,7 +6,6 @@ use sx_types::{
     shims::*,
     signature::Signature,
 };
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use async_trait::async_trait;
 

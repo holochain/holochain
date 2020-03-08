@@ -1,6 +1,5 @@
 use crate::conductor::Conductor;
 use async_trait::async_trait;
-use futures::sink::SinkExt;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
 use sx_cell::cell::CellId;

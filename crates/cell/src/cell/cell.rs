@@ -5,7 +5,6 @@ use sx_types::{
     agent::AgentId,
     autonomic::AutonomicProcess,
     error::SkunkResult,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
 

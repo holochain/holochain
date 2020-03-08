@@ -5,7 +5,6 @@ use crate::{
     workflow,
 };
 use futures::future::{BoxFuture, FutureExt};
-use sx_conductor_api::CellConductorInterfaceT;
 use sx_state::{env::WriteManager, prelude::*};
 use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
 use workspace::WorkspaceError;
