@@ -1,7 +1,7 @@
+use sx_conductor_api::interface::CellConductorInterfaceT;
 use super::error::WorkflowRunResult;
 use crate::{
     cell::Cell,
-    conductor_api::ConductorCellApiT,
     state::workspace::{self, Workspace},
     workflow,
 };
@@ -11,7 +11,7 @@ use sx_state::{env::WriteManager, prelude::*};
 use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
 use workspace::WorkspaceError;
 
-impl<Api: ConductorCellApiT> Cell<Api> {
+impl<Api: CellConductorInterfaceT> Cell<Api> {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
         let env = self.state_env();
         let dbs = env.dbs()?;

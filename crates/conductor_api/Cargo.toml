@@ -14,3 +14,4 @@ sx_types = { path = "../types" }
 thiserror = "1.0.10"
 tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 log = "0.4.8"
+mockall = "0.6.0"

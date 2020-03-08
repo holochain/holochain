@@ -48,3 +48,4 @@ pub trait CellConductorInterfaceT: Clone + Send + Sync + Sized
 
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
 }
+

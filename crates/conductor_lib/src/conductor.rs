@@ -1,7 +1,7 @@
+use sx_conductor_api::interface::CellConductorInterfaceT;
 use std::collections::HashMap;
 use sx_cell::{
     cell::{Cell, CellId, NetSender},
-    conductor_api::ConductorCellApiT,
 };
 use sx_types::shims::Keystore;
 
@@ -18,19 +18,19 @@ pub struct CellState {
     _active: bool,
 }
 
-pub struct CellItem<Api: ConductorCellApiT> {
+pub struct CellItem<Api: CellConductorInterfaceT> {
     cell: Cell<Api>,
     _state: CellState,
 }
 
-pub struct Conductor<Api: ConductorCellApiT> {
+pub struct Conductor<Api: CellConductorInterfaceT> {
     tx_network: NetSender,
     cells: HashMap<CellId, CellItem<Api>>,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
 }
 
-impl<Api: ConductorCellApiT> Conductor<Api> {
+impl<Api: CellConductorInterfaceT> Conductor<Api> {
     pub fn new(tx_network: NetSender) -> Self {
         Self {
             cells: HashMap::new(),

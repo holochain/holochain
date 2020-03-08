@@ -1,9 +1,8 @@
 use crate::{
     cell::error::{CellResult},
-    conductor_api::ConductorCellApiT,
     ribosome::Ribosome,
 };
-
+use async_trait::async_trait;
 use std::hash::{Hash, Hasher};
 use sx_state::{
     env::{Environment},
@@ -15,6 +14,9 @@ use sx_types::{
     shims::*,
     autonomic::AutonomicProcess
 };
+use sx_conductor_api::error::ConductorApiResult;
+use sx_conductor_api::interface::CellConductorInterfaceT;
+use sx_conductor_api::cell::CellT;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
@@ -25,7 +27,7 @@ pub type DnaAddress = sx_types::dna::DnaAddress;
 pub type CellId = sx_types::agent::CellId;
 
 
-impl<Api: ConductorCellApiT> Hash for Cell<Api> {
+impl<I: CellConductorInterfaceT> Hash for Cell<I> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -34,19 +36,34 @@ impl<Api: ConductorCellApiT> Hash for Cell<Api> {
     }
 }
 
-impl<Api: ConductorCellApiT> PartialEq for Cell<Api> {
+impl<I: CellConductorInterfaceT> PartialEq for Cell<I> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-pub struct Cell<Api: ConductorCellApiT> {
-    id: CellId,
-    state_env: Environment,
-    _conductor_api: Api,
+#[async_trait]
+impl<I: CellConductorInterfaceT> CellT for Cell<I> {
+    type Interface = I;
+
+    async fn invoke_zome(
+        &self,
+        _conductor_api: I,
+        _invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResponse> {
+        unimplemented!()
+    }
+
 }
 
-impl<Api: ConductorCellApiT> Cell<Api> {
+
+pub struct Cell<I: CellConductorInterfaceT> {
+    id: CellId,
+    state_env: Environment,
+    _conductor_api: I,
+}
+
+impl<I: CellConductorInterfaceT> Cell<I> {
     fn dna_address(&self) -> &DnaAddress {
         &self.id.dna_address()
     }
@@ -61,14 +78,6 @@ impl<Api: ConductorCellApiT> Cell<Api> {
 
     pub(crate) fn state_env(&self) -> Environment {
         self.state_env.clone()
-    }
-
-    pub async fn invoke_zome(
-        &self,
-        _conductor_api: Api,
-        _invocation: ZomeInvocation,
-    ) -> CellResult<ZomeInvocationResponse> {
-        unimplemented!()
     }
 
     pub async fn handle_network_message(
@@ -86,7 +95,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
     }
 }
 
-// impl<Api: ConductorCellApiT> Cell<Api> {
+// impl<I: CellConductorInterfaceT> Cell<I> {
 //     /// Checks if Cell has been initialized already
 //     pub fn from_id(id: CellId) -> CellResult<Self> {
 //         let chain_persistence = SourceChainPersistence::new(id.clone());
@@ -104,15 +113,15 @@ impl<Api: ConductorCellApiT> Cell<Api> {
 //     }
 // }
 
-// pub struct CellBuilder<Api: ConductorCellApiT> {
+// pub struct CellBuilder<I: CellConductorInterfaceT> {
 //     id: CellId,
 //     chain_persistence: Option<SourceChainPersistence>,
 //     dht_persistence: Option<DhtPersistence>,
-//     conductor_api: Api,
+//     conductor_api: I,
 // }
 
-// impl<Api: ConductorCellApiT> CellBuilder<Api> {
-//     pub fn new(id: CellId, conductor_api: Api) -> Self {
+// impl<I: CellConductorInterfaceT> CellBuilder<I> {
+//     pub fn new(id: CellId, conductor_api: I) -> Self {
 //         Self {
 //             id,
 //             chain_persistence: None,
@@ -132,7 +141,7 @@ impl<Api: ConductorCellApiT> Cell<Api> {
 //         self
 //     }
 
-//     pub fn build(self) -> Cell<Api> {
+//     pub fn build(self) -> Cell<I> {
 //         let id = self.id.clone();
 //         Cell {
 //             id: self.id,

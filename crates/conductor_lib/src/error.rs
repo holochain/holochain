@@ -2,8 +2,8 @@ use crate::conductor::CellHandle;
 
 use sx_cell::{
     cell::{error::CellError, CellId},
-    conductor_api::ConductorApiError,
 };
+use sx_conductor_api::error::ConductorApiError;
 use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;

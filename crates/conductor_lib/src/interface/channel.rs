@@ -1,8 +1,8 @@
+use sx_conductor_api::interface::CellConductorInterfaceT;
 use crate::{
-    api::{self},
+    api::{self, ConductorExternalApi},
     interface::interface::Interface,
 };
-use api::{ConductorCellApi, ConductorExternalApi};
 use async_trait::async_trait;
 use futures::{channel::mpsc, stream::StreamExt};
 use log::*;
@@ -22,7 +22,7 @@ impl ChannelInterface {
 
 #[async_trait]
 impl Interface for ChannelInterface {
-    async fn spawn(mut self, mut api: ConductorExternalApi<ConductorCellApi>) {
+    async fn spawn(mut self, mut api: ConductorExternalApi<dyn CellConductorInterfaceT>) {
         dbg!("spawn start");
         while let Some(true) = self.rx.next().await {
             dbg!("x");
