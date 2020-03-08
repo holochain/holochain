@@ -25,8 +25,6 @@ mock! {
 
     CellConductorInterface {
 
-        fn sync_conductor_ref(&self) -> tokio::sync::RwLockReadGuard<'static, Conductor<Self>>;
-
         fn sync_invoke_zome(
             &self,
             cell_id: &CellId,
@@ -54,14 +52,8 @@ mock! {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl CellConductorInterfaceT for MockCellConductorInterface {
-    type Cell = Cell<Self>;
-    type Conductor = Conductor<Self>;
-
-    async fn conductor_ref(&self) -> tokio::sync::RwLockReadGuard<'_, Self::Conductor> {
-        self.sync_conductor_ref()
-    }
 
     async fn invoke_zome(
         &self,

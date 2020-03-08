@@ -18,14 +18,15 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait ExternalConductorInterfaceT: Send + Sync + Sized
 {
-    type Conductor: ConductorT;
-
-    // async fn conductor_mut(&self) -> RwLockWriteGuard<Self::Conductor>;
-
     async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
         unimplemented!()
     }
 
+    async fn invoke_zome(
+        &self,
+        cell_id: &CellId,
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResponse>;
 }
 
 

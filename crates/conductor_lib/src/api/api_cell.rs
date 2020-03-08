@@ -29,24 +29,18 @@ impl CellConductorInterface {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl CellConductorInterfaceT for CellConductorInterface {
-    type Cell = Cell<Self>;
-    type Conductor = Conductor<Self>;
 
-    async fn conductor_ref(&self) -> RwLockReadGuard<'_, Self::Conductor> {
-        self.lock.read().await
+    async fn invoke_zome(
+        &self,
+        cell_id: &CellId,
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResponse> {
+        let conductor = self.lock.read().await;
+        let cell: &Cell = conductor.cell_by_id(cell_id)?;
+        cell.invoke_zome(self.clone(), invocation).await.map_err(Into::into)
     }
-
-    // async fn invoke_zome(
-    //     &self,
-    //     cell_id: &CellId,
-    //     invocation: ZomeInvocation,
-    // ) -> ConductorApiResult<ZomeInvocationResponse> {
-    //     let conductor = self.lock.read();
-    //     let cell = conductor.cell_by_id(&cell_id)?;
-    //     Ok(cell.invoke_zome(self.clone(), invocation).await?)
-    // }
 
     async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()> {
         let mut tx = self.lock.read().await.tx_network().clone();

@@ -15,23 +15,22 @@ pub struct CellState {
     _active: bool,
 }
 
-pub struct CellItem<I: CellConductorInterfaceT = CellConductorInterface> {
-    cell: I::Cell,
+pub struct CellItem {
+    cell: Cell,
     _state: CellState,
 }
 
-pub struct Conductor<I: CellConductorInterfaceT = CellConductorInterface> {
+pub struct Conductor {
     tx_network: NetSender,
-    cells: HashMap<CellId, CellItem<I>>,
+    cells: HashMap<CellId, CellItem>,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
-    // _phantom: std::marker::PhantomData<I>,
 }
 
-impl<I: CellConductorInterfaceT> ConductorT for Conductor<I> {
-    type Interface = I;
+impl ConductorT for Conductor {
+    type Cell = Cell;
 
-    fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&I::Cell> {
+    fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
         let item = self
             .cells
             .get(cell_id)

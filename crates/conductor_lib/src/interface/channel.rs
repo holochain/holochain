@@ -25,7 +25,7 @@ impl ChannelInterface {
 
 #[async_trait]
 impl Interface for ChannelInterface {
-    async fn spawn(mut self, mut api: ExternalConductorInterface<CellConductorInterface>) {
+    async fn spawn(mut self, mut api: ExternalConductorInterface) {
         dbg!("spawn start");
         while let Some(true) = self.rx.recv().await {
             if let Err(err) = api.admin(AdminMethod::Start("cell-handle".into())).await {
