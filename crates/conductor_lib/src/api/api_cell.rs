@@ -13,7 +13,7 @@ use sx_types::{
     shims::*,
     signature::Signature,
 };
-use tokio::sync::{RwLock, RwLockReadGuard};
+use tokio::sync::RwLock;
 
 /// The concrete implementation of [CellConductorInterfaceT], which is used to give
 /// Cells an API for calling back to their [Conductor].
@@ -31,7 +31,6 @@ impl CellConductorInterface {
 
 #[async_trait]
 impl CellConductorInterfaceT for CellConductorInterface {
-
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
@@ -39,7 +38,9 @@ impl CellConductorInterfaceT for CellConductorInterface {
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         let conductor = self.lock.read().await;
         let cell: &Cell = conductor.cell_by_id(cell_id)?;
-        cell.invoke_zome(self.clone(), invocation).await.map_err(Into::into)
+        cell.invoke_zome(self.clone(), invocation)
+            .await
+            .map_err(Into::into)
     }
 
     async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()> {
@@ -87,6 +88,12 @@ pub struct Cell<I = CellConductorInterface>(
     std::marker::PhantomData<I>,
 );
 
+/// This is weird. Because CellT needs to know the concrete [CellConductorInterfaceT],
+/// we need to implement it here, and not in the sx_cell crate. This is strongly
+/// pointing towards a restructuring, where the Cell becomes a conductor-specific
+/// concept, and the "cell" crate becomes more geared towards the Workflows, which
+/// just get resources passed in and perform some work, without the notion of being
+/// "a Cell"
 #[async_trait]
 impl<I: CellConductorInterfaceT> CellT for Cell<I> {
     type Interface = I;
@@ -98,4 +105,7 @@ impl<I: CellConductorInterfaceT> CellT for Cell<I> {
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         unimplemented!()
     }
+
+    // TODO: if things stay this way, as mentioned in the comment for this impl,
+    // then all other implementations for the important Cell methods would go here
 }

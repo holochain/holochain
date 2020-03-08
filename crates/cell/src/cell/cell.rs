@@ -38,7 +38,9 @@ impl PartialEq for Cell {
 /// Any work it does is through running a workflow, passing references to
 /// the resources needed to complete that workflow.
 ///
-/// TODO: determine if this can be Clone?
+/// XXX: The important methods of the Cell are actually not implemented here!
+/// See `impl CellT for Cell` in conductor_api for the actual implementations,
+/// as well as an explanation for why this is the case right now.
 pub struct Cell {
     id: CellId,
     state_env: Environment,
@@ -76,67 +78,9 @@ impl Cell {
     }
 }
 
-// impl<I: CellConductorInterface> Cell<I> {
-//     /// Checks if Cell has been initialized already
-//     pub fn from_id(id: CellId) -> CellResult<Self> {
-//         let chain_persistence = SourceChainPersistence::new(id.clone());
-//         let dht_persistence = DhtPersistence::new(id.clone());
-//         SourceChain::new(&chain_persistence).validate()?;
-//         Ok(Cell {
-//             id,
-//             chain_persistence,
-//             dht_persistence,
-//         })
-//     }
+////////////////////////////////////////////////////////////////////////////////////
+// The following is a sketch from the skunkworx phase, and can probably be removed
 
-//     pub fn from_dna(agent_id: AgentId, dna: Dna) -> SkunkResult<Self> {
-//         unimplemented!()
-//     }
-// }
-
-// pub struct CellBuilder<I: CellConductorInterface> {
-//     id: CellId,
-//     chain_persistence: Option<SourceChainPersistence>,
-//     dht_persistence: Option<DhtPersistence>,
-//     conductor_api: I,
-// }
-
-// impl<I: CellConductorInterface> CellBuilder<I> {
-//     pub fn new(id: CellId, conductor_api: I) -> Self {
-//         Self {
-//             id,
-//             chain_persistence: None,
-//             dht_persistence: None,
-//             conductor_api,
-//         }
-//     }
-
-//     pub fn with_dna(self, dna: Dna) -> Self {
-//         unimplemented!()
-//     }
-
-//     #[cfg(test)]
-//     pub fn with_test_persistence(mut self, dir: &Path) -> Self {
-//         self.chain_persistence = Some(SourceChainPersistence::test(&dir.join("chain")));
-//         self.dht_persistence = Some(DhtPersistence::test(&dir.join("dht")));
-//         self
-//     }
-
-//     pub fn build(self) -> Cell<I> {
-//         let id = self.id.clone();
-//         Cell {
-//             id: self.id,
-//             chain_persistence: self
-//                 .chain_persistence
-//                 .unwrap_or_else(|| SourceChainPersistence::new(id.clone())),
-//             dht_persistence: self
-//                 .dht_persistence
-//                 .unwrap_or_else(|| DhtPersistence::new(id.clone())),
-//             conductor_api: self.conductor_api,
-//             db_manager: DbManager::new(create_lmdb_env(DatabasePath::from(id).as_ref())),
-//         }
-//     }
-// }
 
 // These are possibly composable traits that describe how to get a resource,
 // so instead of explicitly building resources, we can downcast a Cell to exactly
@@ -149,17 +93,6 @@ trait NetSend {
 /// Could use the trait instead, but we will want an impl of it
 /// for just a basic crossbeam_channel::Sender, so I'm simplifying
 /// to avoid making a change to holochain_net
+///
+/// This is just a "sketch", can be removed.
 pub type NetSender = tokio::sync::mpsc::Sender<Lib3hClientProtocol>;
-
-#[cfg(test)]
-pub mod tests {
-
-    // #[test]
-    // fn can_create_cell() {
-    //     let tmpdir = tempdir::TempDir::new("skunkworx").unwrap();
-    //     let cell: Cell<MockCellConductorInterface> =
-    //         CellBuilder::new(fake_cell_id("a"), MockCellConductorInterface::new())
-    //             .with_test_persistence(tmpdir.path())
-    //             .build();
-    // }
-}

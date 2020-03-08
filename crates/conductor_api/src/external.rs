@@ -30,7 +30,7 @@ pub trait ExternalConductorInterfaceT: Send + Sync + Sized
 }
 
 
-// It's uncertain whether we'll actually use the following
+// It's uncertain whether we'll actually use all of the following
 
 /// The set of messages that a conductor understands how to handle
 pub enum ConductorProtocol {
