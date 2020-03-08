@@ -1,22 +1,19 @@
-use crate::{cell::CellT, conductor::ConductorT, interface::CellConductorInterfaceT};
+use sx_types::agent::CellId;
+use crate::{CellT, ConductorT};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ConductorApiError
-// where
-//     CellError: std::error::Error + 'static,
-{
-    // #[error("CellError: {0}")]
-    // CellError(#[from] CellError),
+pub enum ConductorApiError {
+    #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
+    CellMissing(CellId),
 
     #[error("Miscellaneous error: {0}")]
     Misc(String),
 }
 
-
 pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 
-    // pub type ConductorApiResult<I: CellConductorInterfaceT, T> =
+// pub type ConductorApiResult<I: CellConductorInterfaceT, T> =
 //     Result<T, ConductorApiError< <I::Cell as CellT>::Error>>;
 
 // pub type InterfaceConductorResult<I: CellConductorInterfaceT, T> =

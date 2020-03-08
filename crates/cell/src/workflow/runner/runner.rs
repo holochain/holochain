@@ -1,4 +1,3 @@
-use sx_conductor_api::interface::CellConductorInterfaceT;
 use super::error::WorkflowRunResult;
 use crate::{
     cell::Cell,
@@ -6,12 +5,12 @@ use crate::{
     workflow,
 };
 use futures::future::{BoxFuture, FutureExt};
-
+use sx_conductor_api::CellConductorInterfaceT;
 use sx_state::{env::WriteManager, prelude::*};
 use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
 use workspace::WorkspaceError;
 
-impl<Api: CellConductorInterfaceT> Cell<Api> {
+impl Cell {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
         let env = self.state_env();
         let dbs = env.dbs()?;

@@ -1,22 +1,15 @@
-use crate::{
-    cell::error::{CellResult},
-    ribosome::Ribosome,
-};
+use crate::{cell::error::CellResult, ribosome::Ribosome};
 use async_trait::async_trait;
 use std::hash::{Hash, Hasher};
-use sx_state::{
-    env::{Environment},
-};
+use sx_conductor_api::{CellT, ConductorApiResult};
+use sx_state::env::Environment;
 use sx_types::{
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     agent::AgentId,
-    error::{SkunkResult},
+    autonomic::AutonomicProcess,
+    error::SkunkResult,
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
-    autonomic::AutonomicProcess
 };
-use sx_conductor_api::error::ConductorApiResult;
-use sx_conductor_api::interface::CellConductorInterfaceT;
-use sx_conductor_api::cell::CellT;
 
 /// TODO: consider a newtype for this
 pub type DnaAddress = sx_types::dna::DnaAddress;
@@ -26,8 +19,7 @@ pub type DnaAddress = sx_types::dna::DnaAddress;
 /// and sufficient to refer to a cell in a conductor
 pub type CellId = sx_types::agent::CellId;
 
-
-impl<I: CellConductorInterfaceT> Hash for Cell<I> {
+impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -36,34 +28,18 @@ impl<I: CellConductorInterfaceT> Hash for Cell<I> {
     }
 }
 
-impl<I: CellConductorInterfaceT> PartialEq for Cell<I> {
+impl PartialEq for Cell {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-#[async_trait]
-impl<I: CellConductorInterfaceT> CellT for Cell<I> {
-    type Interface = I;
-
-    async fn invoke_zome(
-        &self,
-        _conductor_api: I,
-        _invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
-    }
-
-}
-
-
-pub struct Cell<I: CellConductorInterfaceT> {
+pub struct Cell {
     id: CellId,
     state_env: Environment,
-    _conductor_api: I,
 }
 
-impl<I: CellConductorInterfaceT> Cell<I> {
+impl Cell {
     fn dna_address(&self) -> &DnaAddress {
         &self.id.dna_address()
     }
@@ -95,7 +71,7 @@ impl<I: CellConductorInterfaceT> Cell<I> {
     }
 }
 
-// impl<I: CellConductorInterfaceT> Cell<I> {
+// impl<I: CellConductorInterface> Cell<I> {
 //     /// Checks if Cell has been initialized already
 //     pub fn from_id(id: CellId) -> CellResult<Self> {
 //         let chain_persistence = SourceChainPersistence::new(id.clone());
@@ -113,14 +89,14 @@ impl<I: CellConductorInterfaceT> Cell<I> {
 //     }
 // }
 
-// pub struct CellBuilder<I: CellConductorInterfaceT> {
+// pub struct CellBuilder<I: CellConductorInterface> {
 //     id: CellId,
 //     chain_persistence: Option<SourceChainPersistence>,
 //     dht_persistence: Option<DhtPersistence>,
 //     conductor_api: I,
 // }
 
-// impl<I: CellConductorInterfaceT> CellBuilder<I> {
+// impl<I: CellConductorInterface> CellBuilder<I> {
 //     pub fn new(id: CellId, conductor_api: I) -> Self {
 //         Self {
 //             id,
@@ -176,8 +152,8 @@ pub mod tests {
     // #[test]
     // fn can_create_cell() {
     //     let tmpdir = tempdir::TempDir::new("skunkworx").unwrap();
-    //     let cell: Cell<MockConductorCellApi> =
-    //         CellBuilder::new(fake_cell_id("a"), MockConductorCellApi::new())
+    //     let cell: Cell<MockCellConductorInterface> =
+    //         CellBuilder::new(fake_cell_id("a"), MockCellConductorInterface::new())
     //             .with_test_persistence(tmpdir.path())
     //             .build();
     // }

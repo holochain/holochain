@@ -1,11 +1,14 @@
+use sx_conductor_api::CellT;
 use crate::conductor::Conductor;
 use async_trait::async_trait;
 use futures::sink::SinkExt;
-use sx_cell::cell::CellId;
+use sx_cell::cell::{Cell, CellId};
 
 use parking_lot::RwLock;
 use std::sync::Arc;
-use sx_cell::conductor_api::{ConductorApiError, ConductorApiResult, ConductorCellApiT};
+use sx_conductor_api::{
+    CellConductorInterfaceT, ConductorApiError, ConductorApiResult, ConductorT,
+};
 use sx_types::{
     autonomic::AutonomicCue,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
@@ -14,28 +17,26 @@ use sx_types::{
 };
 
 #[derive(Clone)]
-pub struct ConductorCellApi {
-    lock: Arc<RwLock<Conductor<ConductorCellApi>>>,
+pub struct CellConductorInterface {
+    lock: Arc<RwLock<Conductor>>,
     cell_id: CellId,
 }
 
-impl ConductorCellApi {
-    pub fn new(lock: Arc<RwLock<Conductor<ConductorCellApi>>>, cell_id: CellId) -> Self {
+impl CellConductorInterface {
+    pub fn new(lock: Arc<RwLock<Conductor>>, cell_id: CellId) -> Self {
         Self { cell_id, lock }
     }
 }
 
 #[async_trait(?Send)]
-impl ConductorCellApiT for ConductorCellApi {
+impl CellConductorInterfaceT for CellConductorInterface {
     async fn invoke_zome(
         &self,
         cell_id: CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         let conductor = self.lock.read();
-        let cell = conductor
-            .cell_by_id(&cell_id)
-            .map_err(|e| ConductorApiError::ConductorInceptionError(e.to_string()))?;
+        let cell = conductor.cell_by_id(&cell_id)?;
         Ok(cell.invoke_zome(self.clone(), invocation).await?)
     }
 
@@ -55,9 +56,7 @@ impl ConductorCellApiT for ConductorCellApi {
 
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
         let conductor = self.lock.write();
-        let cell = conductor
-            .cell_by_id(&self.cell_id)
-            .map_err(|e| ConductorApiError::ConductorInceptionError(e.to_string()))?;
+        let cell = conductor.cell_by_id(&self.cell_id)?;
         let _ = cell.handle_autonomic_process(cue.into()).await;
         Ok(())
     }
@@ -71,6 +70,20 @@ impl ConductorCellApiT for ConductorCellApi {
     }
 
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
+        unimplemented!()
+    }
+}
+
+
+#[async_trait]
+impl CellT for Cell {
+    type Interface = CellConductorInterface;
+
+    async fn invoke_zome(
+        &self,
+        _conductor_api: Self::Interface,
+        _invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResponse> {
         unimplemented!()
     }
 }

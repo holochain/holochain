@@ -20,7 +20,7 @@ pub mod tests {
     use super::*;
     use crate::{
         agent::{source_chain::tests::test_initialized_chain, SourceChainCommitBundle},
-        conductor_api::MockConductorCellApi,
+        conductor_api::MockCellConductorInterface,
         ribosome::MockRibosomeT,
         test_utils::fake_cell_id,
     };
@@ -51,7 +51,7 @@ pub mod tests {
 
         // TODO: make actual assertions on the conductor_api, once more of the
         // actual logic is fleshed out
-        let mut conductor_api = MockConductorCellApi::new();
+        let mut conductor_api = MockCellConductorInterface::new();
 
         let result = invoke_zome(invocation, chain, ribosome, conductor_api).await;
         assert!(result.is_ok());

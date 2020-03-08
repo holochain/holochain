@@ -1,15 +1,18 @@
-use sx_conductor_api::interface::CellConductorInterfaceT;
 use crate::{
-    api::{self, ConductorExternalApi},
+    api::{
+        ExternalConductorInterface, {self},
+    },
     interface::interface::Interface,
 };
+use api::CellConductorInterface;
 use async_trait::async_trait;
 use futures::{channel::mpsc, stream::StreamExt};
 use log::*;
+use sx_conductor_api::{AdminMethod, ExternalConductorInterfaceT};
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
-/// interact with a ConductorExternalApi
+/// interact with a ExternalConductorInterface
 pub struct ChannelInterface {
     rx: mpsc::UnboundedReceiver<bool>,
 }
@@ -22,14 +25,11 @@ impl ChannelInterface {
 
 #[async_trait]
 impl Interface for ChannelInterface {
-    async fn spawn(mut self, mut api: ConductorExternalApi<dyn CellConductorInterfaceT>) {
+    async fn spawn(mut self, mut api: ExternalConductorInterface<CellConductorInterface>) {
         dbg!("spawn start");
         while let Some(true) = self.rx.next().await {
             dbg!("x");
-            if let Err(err) = api
-                .admin(api::AdminMethod::Start("cell-handle".into()))
-                .await
-            {
+            if let Err(err) = api.admin(AdminMethod::Start("cell-handle".into())).await {
                 error!("Error calling admin interface function: {}", err);
             };
         }

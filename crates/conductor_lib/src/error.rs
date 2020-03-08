@@ -1,16 +1,12 @@
-use crate::conductor::CellHandle;
-
-use sx_cell::{
-    cell::{error::CellError, CellId},
-};
-use sx_conductor_api::error::ConductorApiError;
+use sx_cell::cell::{error::CellError, CellId};
+use sx_conductor_api::ConductorApiError;
+use sx_types::agent::CellHandle;
 use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
 #[derive(Error, Debug)]
 pub enum ConductorError {
-
     #[error("Internal Cell error: {0}")]
     InternalCellError(#[from] CellError),
 

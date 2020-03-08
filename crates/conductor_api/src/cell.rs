@@ -1,7 +1,7 @@
-use crate::error::ConductorApiResult;
+use crate::ConductorApiResult;
 use sx_types::nucleus::ZomeInvocationResponse;
 use sx_types::nucleus::ZomeInvocation;
-use crate::interface::CellConductorInterfaceT;
+use crate::CellConductorInterfaceT;
 use async_trait::async_trait;
 
 #[async_trait]

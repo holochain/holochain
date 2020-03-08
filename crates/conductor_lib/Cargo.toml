@@ -19,6 +19,7 @@ sx_conductor_api = { path = "../conductor_api"}
 sx_types = { path = "../types"}
 holochain_common = "0.0.42-alpha5"
 futures = "0.3.1"
+tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 parking_lot = "0.10.0"
 toml = "0.5.0"
 petgraph = "0.5.0"

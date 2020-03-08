@@ -11,6 +11,16 @@ use std::{convert::TryFrom, fmt, str};
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct CellId(DnaAddress, AgentId);
 
+/// A conductor-specific name for a Cell
+/// (Used to be instance_id)
+pub struct CellHandle(String);
+
+impl From<&str> for CellHandle {
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
+}
+
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "cell-{}-{}", self.0, self.1.address())

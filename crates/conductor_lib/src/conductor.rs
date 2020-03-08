@@ -1,13 +1,9 @@
-use sx_conductor_api::interface::CellConductorInterfaceT;
 use std::collections::HashMap;
-use sx_cell::{
-    cell::{Cell, CellId, NetSender},
+use sx_cell::cell::{Cell, CellId, NetSender};
+use sx_conductor_api::{
+    CellConductorInterfaceT, ConductorApiError, ConductorApiResult, ConductorT,
 };
-use sx_types::shims::Keystore;
-
-/// A conductor-specific name for a Cell
-/// (Used to be instance_id)
-pub type CellHandle = String;
+use sx_types::{agent::CellHandle, shims::Keystore};
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -18,19 +14,31 @@ pub struct CellState {
     _active: bool,
 }
 
-pub struct CellItem<Api: CellConductorInterfaceT> {
-    cell: Cell<Api>,
+pub struct CellItem {
+    cell: Cell,
     _state: CellState,
 }
 
-pub struct Conductor<Api: CellConductorInterfaceT> {
+pub struct Conductor {
     tx_network: NetSender,
-    cells: HashMap<CellId, CellItem<Api>>,
+    cells: HashMap<CellId, CellItem>,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
 }
 
-impl<Api: CellConductorInterfaceT> Conductor<Api> {
+impl ConductorT for Conductor {
+    type Interface = CellConductorInterface;
+
+    fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+        let item = self
+            .cells
+            .get(cell_id)
+            .ok_or_else(|| ConductorApiError::CellMissing(cell_id.clone()))?;
+        Ok(&item.cell)
+    }
+}
+
+impl Conductor {
     pub fn new(tx_network: NetSender) -> Self {
         Self {
             cells: HashMap::new(),
@@ -40,13 +48,13 @@ impl<Api: CellConductorInterfaceT> Conductor<Api> {
         }
     }
 
-    pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell<Api>> {
-        let item = self
-            .cells
-            .get(cell_id)
-            .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(&item.cell)
-    }
+    // pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell<Api>> {
+    //     let item = self
+    //         .cells
+    //         .get(cell_id)
+    //         .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
+    //     Ok(&item.cell)
+    // }
 
     pub fn tx_network(&self) -> &NetSender {
         &self.tx_network
@@ -91,7 +99,7 @@ mod builder {
 
 use crate::{
     config::Config,
-    error::{ConductorError, ConductorResult},
+    error::{ConductorError, ConductorResult}, api::CellConductorInterface,
 };
 pub use builder::*;
 // use sx_keystore::keystore::Keystore;

@@ -1,6 +1,9 @@
-use sx_conductor_api::{
-    cell::CellT, error::ConductorApiResult, interface::CellConductorInterfaceT,
-};
+use crate::conductor::Conductor;
+use async_trait::async_trait;
+use mockall::mock;
+use std::sync::Arc;
+use sx_cell::cell::Cell;
+use sx_conductor_api::{CellConductorInterfaceT, CellT, ConductorApiResult, ConductorT};
 use sx_types::{
     agent::CellId,
     autonomic::AutonomicCue,
@@ -8,29 +11,26 @@ use sx_types::{
     shims::*,
     signature::Signature,
 };
-// use tokio::sync::{RwLock, RwLockReadGuard};
-use async_trait::async_trait;
-use mockall::mock;
-use std::sync::Arc;
-use sx_conductor_api::conductor::ConductorT;
-use crate::conductor::Conductor;
-use sx_cell::cell::Cell;
 
+mod api_cell;
 mod api_external;
+pub use api_cell::*;
 pub use api_external::*;
 
-// mock
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
 // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
 // by delegating each async trait method to its sync counterpart
 // See https://github.com/asomers/mockall/issues/75
 mock! {
+
     CellConductorInterface {
+
+        fn sync_conductor(&self) -> tokio::sync::RwLockReadGuard<'static, Conductor>;
 
         fn sync_invoke_zome(
             &self,
-            cell_id: CellId,
+            cell_id: &CellId,
             invocation: ZomeInvocation,
         ) -> ConductorApiResult<ZomeInvocationResponse>;
 
@@ -57,12 +57,18 @@ mock! {
 
 #[async_trait(?Send)]
 impl CellConductorInterfaceT for MockCellConductorInterface {
-    type Cell = Cell<Self>;
-    type Conductor = Conductor<Self>;
+    type Cell = Cell;
+    type Conductor = Conductor;
+
+
+    async fn conductor(&self) -> tokio::sync::RwLockReadGuard<'static, Conductor> {
+        self.sync_conductor()
+    }
+
 
     async fn invoke_zome(
         &self,
-        cell_id: CellId,
+        cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         self.sync_invoke_zome(cell_id, invocation)
