@@ -1,10 +1,14 @@
 use super::error::WorkflowRunResult;
 use crate::{
+    ribosome::Ribosome,
     state::workspace::{self, Workspace},
-    workflow, ribosome::Ribosome,
+    workflow,
 };
 use futures::future::{BoxFuture, FutureExt};
-use sx_state::{env::{Environment, WriteManager}, prelude::*};
+use sx_state::{
+    env::{Environment, WriteManager},
+    prelude::*,
+};
 use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
 use workspace::WorkspaceError;
 

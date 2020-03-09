@@ -3,13 +3,13 @@ mod kv;
 mod kv_int;
 mod kvv;
 
+use crate::prelude::Writer;
 pub use cas::CasBuf;
 pub use kv::KvBuf;
 pub use kv_int::IntKvBuf;
 pub use kvv::KvvBuf;
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
-use crate::prelude::Writer;
 
 /// General trait for transactional stores, exposing only the method which
 /// adds changes to the write transaction. This generalization is not really used,

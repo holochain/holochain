@@ -1,4 +1,4 @@
-use crate::{dna::DnaAddress, entry::Entry, error::SkunkResult, prelude::DefaultJson};
+use crate::{entry::Entry, error::SkunkResult, prelude::DefaultJson};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
@@ -6,9 +6,7 @@ use holochain_json_api::{
 };
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, str};
-use derive_more::{From, Into, Display};
-
+use std::{convert::TryFrom, str};
 
 pub type Base32 = String;
 

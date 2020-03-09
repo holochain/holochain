@@ -1,8 +1,7 @@
 use crate::{api::CellConductorApi, cell::error::CellResult};
-use sx_cell::runner::RunnerCellT;
 use async_trait::async_trait;
 use std::hash::{Hash, Hasher};
-use sx_cell::ribosome::Ribosome;
+use sx_cell::{ribosome::Ribosome, runner::RunnerCellT};
 use sx_conductor_api::{ApiCellT, ConductorApiResult};
 use sx_state::env::Environment;
 use sx_types::{

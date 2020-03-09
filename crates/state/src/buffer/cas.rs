@@ -4,7 +4,8 @@ use super::{
 };
 use crate::{
     error::{DatabaseError, DatabaseResult},
-    transaction::Readable, prelude::Writer,
+    prelude::Writer,
+    transaction::Readable,
 };
 use sx_types::prelude::{Address, AddressableContent};
 

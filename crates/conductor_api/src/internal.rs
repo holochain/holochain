@@ -1,7 +1,7 @@
 use crate::error::ConductorApiResult;
 use sx_types::{
-    cell::CellId,
     autonomic::AutonomicCue,
+    cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
     signature::Signature,

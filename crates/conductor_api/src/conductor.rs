@@ -6,8 +6,5 @@ use sx_types::cell::CellId;
 pub trait ConductorT: Sized + Send + Sync {
     type Cell: ApiCellT;
 
-    fn cell_by_id(
-        &self,
-        cell_id: &CellId,
-    ) -> ConductorApiResult<&Self::Cell>;
+    fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Self::Cell>;
 }
