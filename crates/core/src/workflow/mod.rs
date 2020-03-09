@@ -4,17 +4,10 @@ mod invoke_zome;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 
-pub(crate) mod runner;
-
-use crate::{
-    state::workspace::{Workspace},
-};
+use crate::state::workspace::Workspace;
 use std::time::Duration;
 
-use sx_types::{
-    nucleus::ZomeInvocation,
-
-    agent::AgentId, dna::Dna};
+use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;
 
 #[derive(Clone, Debug)]
@@ -41,8 +34,8 @@ pub struct WorkflowEffects<W: Workspace> {
 
 #[derive(Clone, Debug)]
 pub struct WorkflowTrigger {
-    call: WorkflowCall,
-    interval: Option<Duration>,
+    pub(crate) call: WorkflowCall,
+    pub(crate) interval: Option<Duration>,
 }
 
 #[allow(dead_code)]

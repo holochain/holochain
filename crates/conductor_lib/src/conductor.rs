@@ -1,10 +1,17 @@
-use std::collections::HashMap;
-use sx_cell::cell::{CellId, NetSender};
-use sx_conductor_api::{
-    CellConductorApiT, ConductorApiError, ConductorApiResult, ConductorT,
+use crate::{
+    cell::{Cell, NetSender},
+    config::Config,
+    error::ConductorResult,
 };
-use sx_types::{agent::CellHandle, shims::Keystore};
-use crate::api::Cell;
+pub use builder::*;
+use std::collections::HashMap;
+use sx_conductor_api::{ConductorApiError, ConductorApiResult, ConductorT};
+use sx_types::{
+    cell::{CellHandle, CellId},
+    shims::Keystore,
+};
+// use sx_keystore::keystore::Keystore;
+use sx_types::agent::AgentId;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -97,11 +104,3 @@ mod builder {
     //     Box::new(ThreadPool::new().expect("Couldn't create Threadpool executor"))
     // }
 }
-
-use crate::{
-    config::Config,
-    error::{ConductorError, ConductorResult}, api::CellConductorApi,
-};
-pub use builder::*;
-// use sx_keystore::keystore::Keystore;
-use sx_types::agent::AgentId;

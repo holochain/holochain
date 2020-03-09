@@ -1,10 +1,11 @@
 use futures::{executor::ThreadPool, task::SpawnExt};
-use tokio::{sync::RwLock, sync::mpsc};
 use std::sync::Arc;
 use sx_conductor_lib::{
+    api::ExternalConductorApi,
     conductor::Conductor,
-    interface::{channel::ChannelInterface, Interface}, api::ExternalConductorApi,
+    interface::{channel::ChannelInterface, Interface},
 };
+use tokio::sync::{mpsc, RwLock};
 
 fn main() {
     println!("Running silly ChannelInterface example");

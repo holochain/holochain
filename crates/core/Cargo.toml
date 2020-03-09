@@ -1,5 +1,5 @@
 [package]
-name = "sx_cell"
+name = "sx_core"
 version = "0.0.1"
 description = "holochain core skunkworx"
 license = "GPL-3.0-only"

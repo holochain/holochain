@@ -1,11 +1,9 @@
-use crate::ConductorApiResult;
-use sx_types::nucleus::ZomeInvocationResponse;
-use sx_types::nucleus::ZomeInvocation;
-use crate::CellConductorApiT;
+use crate::{CellConductorApiT, ConductorApiResult};
 use async_trait::async_trait;
+use sx_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
 
 #[async_trait]
-pub trait CellT: Sized + Send + Sync {
+pub trait ApiCellT: Sized + Send + Sync {
     type Api: CellConductorApiT;
 
     async fn invoke_zome(
@@ -14,4 +12,3 @@ pub trait CellT: Sized + Send + Sync {
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 }
-

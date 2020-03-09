@@ -1,14 +1,8 @@
-use crate::{
-    api::{
-        ExternalConductorApi, {self},
-    },
-    interface::interface::Interface,
-};
-use api::CellConductorApi;
+use crate::{api::ExternalConductorApi, interface::interface::Interface};
 use async_trait::async_trait;
-use tokio::sync::mpsc;
 use log::*;
 use sx_conductor_api::{AdminMethod, ExternalConductorApiT};
+use tokio::sync::mpsc;
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to

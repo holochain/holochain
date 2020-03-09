@@ -1,4 +1,3 @@
-
 /// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)
 #[macro_use]
 extern crate serde;
@@ -7,6 +6,7 @@ extern crate holochain_json_derive;
 
 pub mod agent;
 pub mod autonomic;
+pub mod cell;
 pub mod chain_header;
 pub mod db;
 pub mod dna;

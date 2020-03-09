@@ -6,7 +6,7 @@ use crate::state::{
 
 use sx_state::{
     buffer::BufferedStore,
-    db::{DbManager},
+    db::DbManager,
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
@@ -71,7 +71,6 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             })
             .next())
     }
-
 }
 
 impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
@@ -104,10 +103,7 @@ pub mod tests {
 
     use super::SourceChainBuf;
     use crate::state::source_chain::SourceChainResult;
-    use sx_state::{
-        env::{ReadManager},
-        test_utils::test_env,
-    };
+    use sx_state::{env::ReadManager, test_utils::test_env};
 
     #[test]
     fn header_for_entry() -> SourceChainResult<()> {

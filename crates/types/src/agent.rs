@@ -1,4 +1,4 @@
-use crate::{dna::DnaAddress, entry::Entry, error::SkunkResult, prelude::DefaultJson};
+use crate::{entry::Entry, error::SkunkResult, prelude::DefaultJson};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
@@ -6,44 +6,7 @@ use holochain_json_api::{
 };
 use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, str};
-use derive_more::{From, Into, Display};
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct CellId(DnaAddress, AgentId);
-
-/// A conductor-specific name for a Cell
-/// (Used to be instance_id)
-#[derive(Clone, Debug, Display, Hash, PartialEq, Eq, From, Into)]
-pub struct CellHandle(String);
-
-impl From<&str> for CellHandle {
-    fn from(s: &str) -> Self {
-        Self(s.to_owned())
-    }
-}
-
-impl fmt::Display for CellId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "cell-{}-{}", self.0, self.1.address())
-    }
-}
-
-impl CellId {
-    pub fn dna_address(&self) -> &DnaAddress {
-        &self.0
-    }
-
-    pub fn agent_id(&self) -> &AgentId {
-        &self.1
-    }
-}
-
-impl From<(DnaAddress, AgentId)> for CellId {
-    fn from(pair: (DnaAddress, AgentId)) -> Self {
-        Self(pair.0, pair.1)
-    }
-}
+use std::{convert::TryFrom, str};
 
 pub type Base32 = String;
 

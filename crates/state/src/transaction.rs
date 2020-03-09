@@ -5,10 +5,10 @@
 //! - We can upgrade some error types from rkv::StoreError, which does not implement
 //!     std::error::Error, into error types that do
 
+use crate::error::DatabaseError;
 use lmdb::{Database, RoCursor};
 use rkv::{StoreError, Value};
 use shrinkwraprs::Shrinkwrap;
-use crate::error::DatabaseError;
 
 /// Just a trait alias for rkv::Readable
 /// It's important because it lets us use either a Reader or a Writer
@@ -44,8 +44,6 @@ unsafe impl<'env> Send for Reader<'env> {}
 /// and we can mark them as such
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Sync for Reader<'env> {}
-
-
 
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]

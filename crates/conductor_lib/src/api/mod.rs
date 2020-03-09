@@ -1,11 +1,9 @@
-use crate::conductor::Conductor;
 use async_trait::async_trait;
 use mockall::mock;
-use std::sync::Arc;
-use sx_conductor_api::{CellConductorApiT, CellT, ConductorApiResult, ConductorT};
+use sx_conductor_api::{CellConductorApiT, ConductorApiResult};
 use sx_types::{
-    agent::CellId,
     autonomic::AutonomicCue,
+    cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
     signature::Signature,
@@ -15,7 +13,6 @@ mod api_cell;
 mod api_external;
 pub use api_cell::*;
 pub use api_external::*;
-
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
 // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
@@ -54,7 +51,6 @@ mock! {
 
 #[async_trait]
 impl CellConductorApiT for MockCellConductorApi {
-
     async fn invoke_zome(
         &self,
         cell_id: &CellId,

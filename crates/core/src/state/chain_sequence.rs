@@ -108,7 +108,7 @@ pub mod tests {
 
     use sx_state::{
         env::{ReadManager, WriteManager},
-        error::{DatabaseResult},
+        error::DatabaseResult,
         test_utils::test_env,
     };
     use sx_types::prelude::Address;

@@ -1,12 +1,11 @@
-
-mod internal;
-mod external;
 mod cell;
 mod conductor;
 mod error;
+mod external;
+mod internal;
 
-pub use cell::CellT;
+pub use cell::ApiCellT;
 pub use conductor::ConductorT;
-pub use internal::CellConductorApiT;
+pub use error::{ConductorApiError, ConductorApiResult};
 pub use external::*;
-pub use error::{ConductorApiResult, ConductorApiError};
+pub use internal::CellConductorApiT;
