@@ -1,8 +1,6 @@
-use crate::conductor::Conductor;
 use async_trait::async_trait;
 use mockall::mock;
-use std::sync::Arc;
-use sx_conductor_api::{CellConductorApiT, CellT, ConductorApiResult, ConductorT};
+use sx_conductor_api::{CellConductorApiT, ConductorApiResult};
 use sx_types::{
     agent::CellId,
     autonomic::AutonomicCue,

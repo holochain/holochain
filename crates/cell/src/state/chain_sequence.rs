@@ -16,12 +16,12 @@ use sx_state::{
     prelude::{Readable, Writer},
 };
 use sx_types::prelude::Address;
+use tracing::*;
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
     header_address: Address,
-    index: u32, // FIXME: this is the key, so once iterators can return keys, we can remove this
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
@@ -31,17 +31,22 @@ type Store<'e, R> = IntKvBuf<'e, u32, ChainSequenceItem, R>;
 pub struct ChainSequenceBuf<'e, R: Readable> {
     db: Store<'e, R>,
     next_index: u32,
+    // The current transaction sequence
     tx_seq: u32,
     current_head: Option<Address>,
     persisted_head: Option<Address>,
 }
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
+    /// Create a [ChainSequenceBuf] that will continue the chain from the 
+    /// current head and track the transaction sequence
+    #[instrument(skip(reader, dbs))]
     pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
         let db: Store<'e, R> = IntKvBuf::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
         Self::from_db(db)
     }
 
+    #[instrument(skip(self, reader))]
     pub fn with_reader<RR: Readable>(
         &self,
         reader: &'e RR,
@@ -49,12 +54,14 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
         Self::from_db(self.db.with_reader(reader))
     }
 
+    #[instrument(skip(db))]
     fn from_db<RR: Readable>(db: Store<'e, RR>) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         let (next_index, tx_seq, current_head) = latest
-            .map(|(_, item)| (item.index + 1, item.tx_seq + 1, Some(item.header_address)))
+            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
             .unwrap_or((0, 0, None));
         let persisted_head = current_head.clone();
+        trace!(next_index, tx_seq, ?current_head);
 
         Ok(ChainSequenceBuf {
             db,
@@ -65,20 +72,23 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
         })
     }
 
+    #[instrument(skip(self))]
     pub fn chain_head(&self) -> Option<&Address> {
+        trace!(?self.current_head);
         self.current_head.as_ref()
     }
 
+    #[instrument(skip(self))]
     pub fn add_header(&mut self, header_address: Address) {
         self.db.put(
             self.next_index,
             ChainSequenceItem {
                 header_address: header_address.clone(),
-                index: self.next_index,
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
         );
+        trace!(self.next_index);
         self.next_index += 1;
         self.current_head = Some(header_address);
     }
@@ -89,9 +99,11 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
 
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
+    #[instrument(skip(self, writer))]
     fn flush_to_txn(self, writer: &'env mut Writer) -> SourceChainResult<()> {
         let fresh = self.with_reader(writer)?;
         let (old, new) = (self.persisted_head, fresh.persisted_head);
+        trace!(?old, ?new);
         if old != new {
             Err(SourceChainError::HeadMoved(old, new))
         } else {
@@ -109,8 +121,8 @@ pub mod tests {
     use sx_state::{
         env::{ReadManager, WriteManager},
         error::{DatabaseResult},
-        test_utils::test_env,
     };
+    use test_utils::test_env;
     use sx_types::prelude::Address;
 
     #[test]
@@ -147,7 +159,7 @@ pub mod tests {
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
+            let items: Vec<u32> = buf.db.iter_raw()?.map(|(k, _)| k).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
         })?;

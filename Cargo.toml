@@ -10,6 +10,7 @@ members = [
   "crates/holochain",
   "crates/state",
   "crates/types",
+  "crates/test_utils",
 ]
 
 exclude = [

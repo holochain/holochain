@@ -34,8 +34,8 @@ pub mod tests {
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         prelude::{Reader, Writer},
-        test_utils::test_env,
     };
+    use test_utils::test_env;
     use sx_types::prelude::*;
 
     pub struct TestWorkspace<'env> {

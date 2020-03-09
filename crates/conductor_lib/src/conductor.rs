@@ -1,10 +1,8 @@
+use crate::api::Cell;
 use std::collections::HashMap;
 use sx_cell::cell::{CellId, NetSender};
-use sx_conductor_api::{
-    CellConductorApiT, ConductorApiError, ConductorApiResult, ConductorT,
-};
+use sx_conductor_api::{ConductorApiError, ConductorApiResult, ConductorT};
 use sx_types::{agent::CellHandle, shims::Keystore};
-use crate::api::Cell;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -98,10 +96,7 @@ mod builder {
     // }
 }
 
-use crate::{
-    config::Config,
-    error::{ConductorError, ConductorResult}, api::CellConductorApi,
-};
+use crate::{config::Config, error::ConductorResult};
 pub use builder::*;
 // use sx_keystore::keystore::Keystore;
 use sx_types::agent::AgentId;

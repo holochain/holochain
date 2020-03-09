@@ -106,8 +106,8 @@ pub mod tests {
     use crate::state::source_chain::SourceChainResult;
     use sx_state::{
         env::{ReadManager},
-        test_utils::test_env,
     };
+    use test_utils::test_env;
 
     #[test]
     fn header_for_entry() -> SourceChainResult<()> {

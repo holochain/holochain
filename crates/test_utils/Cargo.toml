@@ -1,0 +1,17 @@
+[package]
+name = "test_utils"
+version = "0.0.1"
+description = "test utilities for holochain"
+license = "GPL-3.0-only"
+homepage = "https://github.com/holochain/holochain-rust"
+documentation = "https://github.com/holochain/holochain-rust"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sx_state = { path = "../state" }
+tempdir = "0.3.7"
+tracing-subscriber = "0.2.3"
+tracing = "0.1.13"
