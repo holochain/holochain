@@ -15,9 +15,11 @@ serde_json = "1.0.48"
 sx_cell = { path = "../cell"}
 # sx_dpki = { path = "../dpki" }
 # sx_keystore = { path = "../keystore"}
+sx_conductor_api = { path = "../conductor_api"}
 sx_types = { path = "../types"}
 holochain_common = "0.0.42-alpha5"
 futures = "0.3.1"
+tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 parking_lot = "0.10.0"
 toml = "0.5.0"
 petgraph = "0.5.0"
@@ -26,6 +28,7 @@ thiserror = "1.0.10"
 log = "0.4.8"
 base64 = "0.10.1"
 mockall = "0.6.0"
+shrinkwraprs = "0.3.0"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "0.0.42-alpha5" }

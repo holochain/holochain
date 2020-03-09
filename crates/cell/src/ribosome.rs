@@ -1,9 +1,12 @@
-use crate::{
-    nucleus::{ZomeInvocation, ZomeInvocationResult},
-    wasm_engine::WasmEngine,
-};
+use crate::wasm_engine::WasmEngine;
 use mockall::automock;
-use sx_types::{dna::Dna, entry::Entry, error::SkunkResult, shims::*};
+use sx_types::{
+    dna::Dna,
+    entry::Entry,
+    error::SkunkResult,
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    shims::*,
+};
 
 #[automock]
 pub trait RibosomeT {
@@ -19,7 +22,7 @@ pub trait RibosomeT {
         bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<ZomeInvocationResult>;
+    ) -> SkunkResult<ZomeInvocationResponse>;
 }
 
 /// Total hack just to have something to look at
@@ -30,7 +33,9 @@ pub struct Ribosome {
 
 impl Ribosome {
     pub fn new(_dna: Dna) -> Self {
-        Self { _engine: WasmEngine }
+        Self {
+            _engine: WasmEngine,
+        }
     }
 }
 
@@ -46,7 +51,7 @@ impl RibosomeT for Ribosome {
         _bundle: &mut SourceChainCommitBundle<'env>,
         _invocation: ZomeInvocation,
         // source_chain: SourceChain,
-    ) -> SkunkResult<ZomeInvocationResult> {
+    ) -> SkunkResult<ZomeInvocationResponse> {
         unimplemented!()
     }
 }

@@ -1,7 +1,7 @@
 [package]
-name = "skunkworx_holochain"
+name = "sx_conductor_api"
 version = "0.0.1"
-description = "holochain skunkworx"
+description = "holochain conductor api"
 license = "GPL-3.0-only"
 homepage = "https://github.com/holochain/holochain-rust"
 documentation = "https://github.com/holochain/holochain-rust"
@@ -10,12 +10,8 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.22"
-futures = { version = "0.3.1", features = ["thread-pool"]}
-sx_cell = { path = "../cell"}
-sx_conductor_lib = { path = "../conductor_lib"}
-parking_lot = "0.10.0"
+sx_types = { path = "../types" }
+thiserror = "1.0.10"
 tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
-
-[[bin]]
-path = "src/main.rs"
-name = "holochain-skunkworx"
+log = "0.4.8"
+mockall = "0.6.0"

@@ -1,5 +1,6 @@
 use super::{WorkflowEffects, WorkflowResult};
-use crate::{nucleus::ZomeInvocation, ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use crate::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use sx_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(
     workspace: InvokeZomeWorkspace<'env>,
@@ -19,7 +20,7 @@ pub mod tests {
     use super::*;
     use crate::{
         agent::{source_chain::tests::test_initialized_chain, SourceChainCommitBundle},
-        conductor_api::MockConductorCellApi,
+        conductor_api::MockCellConductorApi,
         ribosome::MockRibosomeT,
         test_utils::fake_cell_id,
     };
@@ -46,11 +47,11 @@ pub mod tests {
         ribosome
             .expect_call_zome_function()
             .times(1)
-            .returning(|bundle, _| Ok(ZomeInvocationResult));
+            .returning(|bundle, _| Ok(ZomeInvocationResponse));
 
         // TODO: make actual assertions on the conductor_api, once more of the
         // actual logic is fleshed out
-        let mut conductor_api = MockConductorCellApi::new();
+        let mut conductor_api = MockCellConductorApi::new();
 
         let result = invoke_zome(invocation, chain, ribosome, conductor_api).await;
         assert!(result.is_ok());
@@ -72,7 +73,7 @@ pub mod tests {
     //         self,
     //         bundle: SourceChainCommitBundle,
     //         invocation: ZomeInvocation,
-    //     ) -> SkunkResult<(ZomeInvocationResult, SourceChainCommitBundle)> {
+    //     ) -> SkunkResult<(ZomeInvocationResponse, SourceChainCommitBundle)> {
     //         unimplemented!()
     //     }
     // }

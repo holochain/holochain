@@ -1,9 +1,12 @@
-use super::{error::ZomeApiResult, ZomeInvocation, ZomeInvocationResult};
-use crate::{cell::ZomeId, net::NetRequester};
-use sx_types::shims::SourceChainCommitBundle;
+use super::error::ZomeApiResult;
+use crate::net::NetRequester;
+use sx_types::{
+    nucleus::{ZomeId, ZomeInvocation, ZomeInvocationResponse},
+    shims::SourceChainCommitBundle,
+};
 
 pub trait ZomeApi {
-    fn call(&self, invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResult>;
+    fn call(&self, invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResponse>;
     // fn commit_capability_claim();
     // fn commit_capability_grant();
     // fn commit_entry();
@@ -46,7 +49,11 @@ pub struct ZomeEnvironment<'env, N: NetRequester> {
 }
 
 impl<'env, N: NetRequester> ZomeEnvironment<'env, N> {
-    pub fn new(_bundle: SourceChainCommitBundle<'env>, _net_requester: N, _zome_id: ZomeId) -> Self {
+    pub fn new(
+        _bundle: SourceChainCommitBundle<'env>,
+        _net_requester: N,
+        _zome_id: ZomeId,
+    ) -> Self {
         Self {
             _bundle,
             _net_requester,
@@ -56,7 +63,7 @@ impl<'env, N: NetRequester> ZomeEnvironment<'env, N> {
 }
 
 impl<'env, N: NetRequester> ZomeApi for ZomeEnvironment<'env, N> {
-    fn call(&self, _invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResult> {
+    fn call(&self, _invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResponse> {
         unimplemented!()
     }
 }
