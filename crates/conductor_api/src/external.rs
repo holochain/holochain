@@ -1,7 +1,7 @@
 use crate::error::ConductorApiResult;
 use async_trait::async_trait;
 use sx_types::{
-    agent::{CellHandle, CellId},
+    cell::{CellHandle, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::JsonString,
     shims::*,

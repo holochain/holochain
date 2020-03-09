@@ -1,10 +1,10 @@
-use crate::{CellT, ConductorApiResult};
+use crate::{ApiCellT, ConductorApiResult};
 use async_trait::async_trait;
-use sx_types::agent::CellId;
+use sx_types::cell::CellId;
 
 #[async_trait]
 pub trait ConductorT: Sized + Send + Sync {
-    type Cell: CellT;
+    type Cell: ApiCellT;
 
     fn cell_by_id(
         &self,

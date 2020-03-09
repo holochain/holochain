@@ -5,7 +5,7 @@ use crate::CellConductorApiT;
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait CellT: Sized + Send + Sync {
+pub trait ApiCellT: Sized + Send + Sync {
     type Api: CellConductorApiT;
 
     async fn invoke_zome(

@@ -16,6 +16,7 @@ sx_cell = { path = "../cell"}
 # sx_dpki = { path = "../dpki" }
 # sx_keystore = { path = "../keystore"}
 sx_conductor_api = { path = "../conductor_api"}
+sx_state = { path = "../state"}
 sx_types = { path = "../types"}
 holochain_common = "0.0.42-alpha5"
 futures = "0.3.1"

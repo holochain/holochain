@@ -1,6 +1,6 @@
 use crate::error::ConductorApiResult;
 use sx_types::{
-    agent::CellId,
+    cell::CellId,
     autonomic::AutonomicCue,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,

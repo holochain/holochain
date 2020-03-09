@@ -5,7 +5,7 @@ mod cell;
 mod conductor;
 mod error;
 
-pub use cell::CellT;
+pub use cell::ApiCellT;
 pub use conductor::ConductorT;
 pub use internal::CellConductorApiT;
 pub use external::*;

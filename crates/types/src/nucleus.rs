@@ -1,5 +1,4 @@
-
-use crate::{agent::{CellId, AgentId}, prelude::*, shims::*};
+use crate::{agent::AgentId, cell::CellId, prelude::*, shims::*};
 
 pub type ZomeId = (CellId, ZomeName);
 pub type ZomeName = String;

@@ -1,6 +1,6 @@
-use sx_cell::cell::{error::CellError, CellId};
+use crate::cell::error::CellError;
 use sx_conductor_api::ConductorApiError;
-use sx_types::agent::CellHandle;
+use sx_types::cell::{CellHandle, CellId};
 use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;

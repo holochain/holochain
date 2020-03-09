@@ -1,4 +1,4 @@
-use crate::agent::CellId;
+use crate::cell::CellId;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]

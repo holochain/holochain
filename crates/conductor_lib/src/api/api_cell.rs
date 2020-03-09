@@ -1,13 +1,13 @@
-use crate::conductor::Conductor;
+use crate::{cell::Cell, conductor::Conductor};
 use async_trait::async_trait;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
-use sx_cell::cell::CellId;
 use sx_conductor_api::{
-    CellConductorApiT, CellT, ConductorApiError, ConductorApiResult, ConductorT,
+    ApiCellT, CellConductorApiT, ConductorApiError, ConductorApiResult, ConductorT,
 };
 use sx_types::{
     autonomic::AutonomicCue,
+    cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
     signature::Signature,
@@ -74,37 +74,4 @@ impl CellConductorApiT for CellConductorApi {
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
         unimplemented!()
     }
-}
-
-/// A wrapper around the actual [Cell] implementation, which is only necessary because
-/// we need to implement [CellT] in this crate, not the sx_cell crate, because [CellT]
-/// needs to know the concrete [CellConductorApiT] implementation, which is also
-/// defined in this crate. The Conductor and everything in this crate should refer
-/// to this wrapper type, to make the [CellConductorApi] types work out.
-#[derive(Shrinkwrap)]
-pub struct Cell<I = CellConductorApi>(
-    #[shrinkwrap(main_field)] sx_cell::cell::Cell,
-    std::marker::PhantomData<I>,
-);
-
-/// This is weird. Because CellT needs to know the concrete [CellConductorApiT],
-/// we need to implement it here, and not in the sx_cell crate. This is strongly
-/// pointing towards a restructuring, where the Cell becomes a conductor-specific
-/// concept, and the "cell" crate becomes more geared towards the Workflows, which
-/// just get resources passed in and perform some work, without the notion of being
-/// "a Cell"
-#[async_trait]
-impl<I: CellConductorApiT> CellT for Cell<I> {
-    type Api = I;
-
-    async fn invoke_zome(
-        &self,
-        _conductor_api: Self::Api,
-        _invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
-    }
-
-    // TODO: if things stay this way, as mentioned in the comment for this impl,
-    // then all other implementations for the important Cell methods would go here
 }

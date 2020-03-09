@@ -65,6 +65,7 @@ fn zero_uuid() -> String {
     String::from("00000000-0000-0000-0000-000000000000")
 }
 
+/// TODO: consider a newtype for this
 pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.

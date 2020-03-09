@@ -4,8 +4,6 @@ mod invoke_zome;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 
-pub(crate) mod runner;
-
 use crate::{
     state::workspace::{Workspace},
 };
@@ -41,8 +39,8 @@ pub struct WorkflowEffects<W: Workspace> {
 
 #[derive(Clone, Debug)]
 pub struct WorkflowTrigger {
-    call: WorkflowCall,
-    interval: Option<Duration>,
+    pub(crate) call: WorkflowCall,
+    pub(crate) interval: Option<Duration>,
 }
 
 #[allow(dead_code)]

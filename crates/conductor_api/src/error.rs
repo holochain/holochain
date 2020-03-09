@@ -1,4 +1,4 @@
-use sx_types::agent::CellId;
+use sx_types::cell::CellId;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
