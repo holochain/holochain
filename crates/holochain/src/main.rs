@@ -2,8 +2,8 @@ use futures::{executor::ThreadPool, task::SpawnExt};
 use std::sync::Arc;
 use sx_conductor_lib::{
     api::ExternalConductorApi,
-    conductor::Conductor,
     interface::{channel::ChannelInterface, Interface},
+    Conductor,
 };
 use tokio::sync::{mpsc, RwLock};
 

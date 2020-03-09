@@ -5,7 +5,7 @@ use crate::{
 };
 pub use builder::*;
 use std::collections::HashMap;
-use sx_conductor_api::{ConductorApiError, ConductorApiResult, ConductorT};
+use sx_conductor_api::{ConductorApiError, ConductorApiResult, ApiConductorT};
 use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
@@ -34,7 +34,7 @@ pub struct Conductor {
     _agent_keys: HashMap<AgentId, Keystore>,
 }
 
-impl ConductorT for Conductor {
+impl ApiConductorT for Conductor {
     type Cell = Cell;
 
     fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {

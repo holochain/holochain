@@ -2,7 +2,7 @@ use crate::{cell::Cell, conductor::Conductor};
 use async_trait::async_trait;
 use std::sync::Arc;
 use sx_conductor_api::{
-    ApiCellT, CellConductorApiT, ConductorApiError, ConductorApiResult, ConductorT,
+    ApiCellT, CellConductorApiT, ConductorApiError, ConductorApiResult, ApiConductorT,
 };
 use sx_types::{
     autonomic::AutonomicCue,

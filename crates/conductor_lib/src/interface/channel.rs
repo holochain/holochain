@@ -1,7 +1,7 @@
 use crate::{api::ExternalConductorApi, interface::interface::Interface};
 use async_trait::async_trait;
 use log::*;
-use sx_conductor_api::{AdminMethod, ExternalConductorApiT};
+use sx_conductor_api::{external::AdminMethod, ExternalConductorApiT};
 use tokio::sync::mpsc;
 
 /// A trivial Interface, used for proof of concept only,

@@ -1,6 +1,6 @@
 use crate::conductor::Conductor;
 use std::sync::Arc;
-use sx_conductor_api::{AdminMethod, ConductorApiResult, ExternalConductorApiT};
+use sx_conductor_api::{external::AdminMethod, ConductorApiResult, ExternalConductorApiT};
 use sx_types::{
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},

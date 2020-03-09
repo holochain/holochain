@@ -9,7 +9,7 @@ use sx_types::{
 
 use async_trait::async_trait;
 
-/// The interface for a Cell to talk to its calling Conductor
+/// The "internal" Conductor API, for a Cell to talk to its calling Conductor
 #[async_trait]
 pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn invoke_zome(

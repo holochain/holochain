@@ -7,7 +7,8 @@ use sx_types::{
     shims::*,
 };
 
-/// The interface for a Cell to talk to its calling Conductor
+/// The "external" Conductor API, which is used by e.g. Interfaces
+/// to control a [Conductor] externally
 #[async_trait]
 pub trait ExternalConductorApiT: Send + Sync + Sized {
     async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
