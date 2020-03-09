@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use crate::api::ExternalConductorInterface;
+use crate::api::ExternalConductorApi;
 
 #[async_trait]
 pub trait Interface {
-    async fn spawn(self, api: ExternalConductorInterface);
+    async fn spawn(self, api: ExternalConductorApi);
 }

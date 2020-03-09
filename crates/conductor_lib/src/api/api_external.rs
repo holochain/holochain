@@ -1,7 +1,7 @@
 use crate::conductor::Conductor;
 use std::sync::Arc;
 use sx_conductor_api::{
-    AdminMethod, ConductorApiResult, ExternalConductorInterfaceT,
+    AdminMethod, ConductorApiResult, ExternalConductorApiT,
 };
 use sx_types::{nucleus::{ZomeInvocationResponse, ZomeInvocation}, prelude::*, agent::CellId};
 use tokio::sync::{RwLock};
@@ -9,18 +9,18 @@ use tokio::sync::{RwLock};
 /// The interface that a Conductor exposes to the outside world.
 /// The Conductor lives inside an Arc<RwLock<_>> for the benefit of
 /// all other API handles
-pub struct ExternalConductorInterface {
+pub struct ExternalConductorApi {
     conductor_mutex: Arc<RwLock<Conductor>>,
 }
 
-impl ExternalConductorInterface {
+impl ExternalConductorApi {
     pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
         Self { conductor_mutex }
     }
 }
 
 #[async_trait::async_trait]
-impl ExternalConductorInterfaceT for ExternalConductorInterface
+impl ExternalConductorApiT for ExternalConductorApi
 {
     async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
         unimplemented!()

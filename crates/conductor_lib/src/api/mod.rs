@@ -2,7 +2,7 @@ use crate::conductor::Conductor;
 use async_trait::async_trait;
 use mockall::mock;
 use std::sync::Arc;
-use sx_conductor_api::{CellConductorInterfaceT, CellT, ConductorApiResult, ConductorT};
+use sx_conductor_api::{CellConductorApiT, CellT, ConductorApiResult, ConductorT};
 use sx_types::{
     agent::CellId,
     autonomic::AutonomicCue,
@@ -23,7 +23,7 @@ pub use api_external::*;
 // See https://github.com/asomers/mockall/issues/75
 mock! {
 
-    CellConductorInterface {
+    CellConductorApi {
 
         fn sync_invoke_zome(
             &self,
@@ -53,7 +53,7 @@ mock! {
 }
 
 #[async_trait]
-impl CellConductorInterfaceT for MockCellConductorInterface {
+impl CellConductorApiT for MockCellConductorApi {
 
     async fn invoke_zome(
         &self,

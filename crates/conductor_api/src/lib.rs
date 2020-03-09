@@ -7,6 +7,6 @@ mod error;
 
 pub use cell::CellT;
 pub use conductor::ConductorT;
-pub use internal::CellConductorInterfaceT;
+pub use internal::CellConductorApiT;
 pub use external::*;
 pub use error::{ConductorApiResult, ConductorApiError};

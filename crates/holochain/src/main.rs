@@ -3,7 +3,7 @@ use tokio::{sync::RwLock, sync::mpsc};
 use std::sync::Arc;
 use sx_conductor_lib::{
     conductor::Conductor,
-    interface::{channel::ChannelInterface, Interface}, api::ExternalConductorInterface,
+    interface::{channel::ChannelInterface, Interface}, api::ExternalConductorApi,
 };
 
 fn main() {
@@ -17,7 +17,7 @@ async fn example(executor: ThreadPool) {
     let (tx_dummy, rx_dummy) = mpsc::unbounded_channel();
     let conductor = Conductor::new(tx_network);
     let lock = Arc::new(RwLock::new(conductor));
-    let handle = ExternalConductorInterface::new(lock);
+    let handle = ExternalConductorApi::new(lock);
     let interface_fut = executor
         .spawn_with_handle(ChannelInterface::new(rx_dummy).spawn(handle))
         .unwrap();

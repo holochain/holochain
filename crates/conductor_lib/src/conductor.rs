@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use sx_cell::cell::{CellId, NetSender};
 use sx_conductor_api::{
-    CellConductorInterfaceT, ConductorApiError, ConductorApiResult, ConductorT,
+    CellConductorApiT, ConductorApiError, ConductorApiResult, ConductorT,
 };
 use sx_types::{agent::CellHandle, shims::Keystore};
 use crate::api::Cell;
@@ -100,7 +100,7 @@ mod builder {
 
 use crate::{
     config::Config,
-    error::{ConductorError, ConductorResult}, api::CellConductorInterface,
+    error::{ConductorError, ConductorResult}, api::CellConductorApi,
 };
 pub use builder::*;
 // use sx_keystore::keystore::Keystore;

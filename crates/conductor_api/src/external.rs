@@ -9,7 +9,7 @@ use sx_types::{
 
 /// The interface for a Cell to talk to its calling Conductor
 #[async_trait]
-pub trait ExternalConductorInterfaceT: Send + Sync + Sized {
+pub trait ExternalConductorApiT: Send + Sync + Sized {
     async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
         unimplemented!()
     }

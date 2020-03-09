@@ -11,7 +11,7 @@ use async_trait::async_trait;
 
 /// The interface for a Cell to talk to its calling Conductor
 #[async_trait]
-pub trait CellConductorInterfaceT: Clone + Send + Sync + Sized {
+pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
