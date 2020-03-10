@@ -49,8 +49,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
-    pub fn put_entry(&mut self, entry: Entry) -> () {
-        let _header = header_for_entry(&entry, unimplemented!(), unimplemented!());
+    pub fn put_entry(&mut self, entry: Entry, agent_id: AgentId) -> () {
+        let _header = header_for_entry(&entry, agent_id, unimplemented!());
         self.cas.put((_header, entry));
     }
 

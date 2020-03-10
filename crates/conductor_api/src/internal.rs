@@ -34,4 +34,6 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
 
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
+
+    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 }

@@ -11,10 +11,12 @@ use sx_state::{
 };
 use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
 use workspace::WorkspaceError;
+use sx_conductor_api::CellConductorApiT;
 
 pub trait RunnerCellT: Send + Sync {
     fn state_env(&self) -> Environment;
     fn get_ribosome(&self) -> Ribosome;
+    fn get_conductor_api<Api: CellConductorApiT>(&self) -> Api;
 }
 
 pub struct WorkflowRunner<'c, Cell: RunnerCellT>(&'c Cell);
@@ -34,7 +36,8 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
             }
             WorkflowCall::Genesis(dna, agent_id) => {
                 let workspace = workspace::GenesisWorkspace::new(env.reader()?, &dbs)?;
-                let result = workflow::genesis(workspace, dna, agent_id).await?;
+                let api = self.0.get_conductor_api();
+                let result = workflow::genesis(workspace, api, dna, agent_id).await?;
                 self.finish_workflow(result).await?;
             }
         }

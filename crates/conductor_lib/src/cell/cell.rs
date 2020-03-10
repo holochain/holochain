@@ -40,6 +40,7 @@ impl PartialEq for Cell {
 /// as well as an explanation for why this is the case right now.
 pub struct Cell {
     id: CellId,
+    conductor_api: CellConductorApi,
     state_env: Environment,
 }
 
@@ -90,6 +91,10 @@ impl RunnerCellT for Cell {
 
     fn state_env(&self) -> Environment {
         self.state_env.clone()
+    }
+
+    fn get_conductor_api<CellConductorApi>(&self) -> CellConductorApi {
+        self.conductor_api.clone()
     }
 }
 

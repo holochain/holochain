@@ -2,8 +2,9 @@ use super::Workspace;
 use crate::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use sx_state::{db::DbManager, prelude::*};
 
+// TODO: visibility
 pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuf<'env, Reader<'env>>,
+    pub source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
 impl<'env> GenesisWorkspace<'env> {

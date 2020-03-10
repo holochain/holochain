@@ -10,10 +10,12 @@ use std::time::Duration;
 use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;
 
+/// Specify the workflow-specific arguments to the functions that make the workflow go
+/// It's intended that resources like Workspaces and Conductor APIs don't go here.
 #[derive(Clone, Debug)]
 pub enum WorkflowCall {
     InvokeZome(ZomeInvocation),
-    Genesis(Dna, AgentId),
+    Genesis(Box<Dna>, AgentId),
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,
@@ -57,7 +59,10 @@ impl WorkflowTrigger {
 
 // TODO: flesh out for real
 #[derive(Error, Debug)]
-pub enum WorkflowError {}
+pub enum WorkflowError {
+    #[error("AgentId is invalid")]
+    AgentIdInvalid(#[from] AgentId)
+}
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
 pub type WorkflowResult<W> = Result<WorkflowEffects<W>, WorkflowError>;

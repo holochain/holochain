@@ -73,4 +73,8 @@ impl CellConductorApiT for CellConductorApi {
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
         unimplemented!()
     }
+
+    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
+        unimplemented!()
+    }
 }
