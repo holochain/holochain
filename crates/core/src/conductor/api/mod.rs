@@ -1,6 +1,6 @@
+use crate::conductor::api::error::ConductorApiResult;
 use async_trait::async_trait;
 use mockall::mock;
-use sx_conductor_api::{CellConductorApiT, ConductorApiResult};
 use sx_types::{
     autonomic::AutonomicCue,
     cell::CellId,
@@ -11,6 +11,7 @@ use sx_types::{
 
 mod api_cell;
 mod api_external;
+pub mod error;
 pub use api_cell::*;
 pub use api_external::*;
 

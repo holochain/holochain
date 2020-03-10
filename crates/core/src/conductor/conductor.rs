@@ -1,11 +1,11 @@
 use crate::conductor::{
+    api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
     config::Config,
     error::ConductorResult,
 };
 pub use builder::*;
 use std::collections::HashMap;
-use sx_conductor_api::{ConductorApiError, ConductorApiResult};
 use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,

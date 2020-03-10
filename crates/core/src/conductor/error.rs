@@ -1,5 +1,4 @@
-use crate::conductor::cell::error::CellError;
-use sx_conductor_api::ConductorApiError;
+use crate::conductor::{api::error::ConductorApiError, cell::error::CellError};
 use sx_types::cell::{CellHandle, CellId};
 use thiserror::Error;
 

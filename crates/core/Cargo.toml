@@ -13,7 +13,6 @@ async-trait = "0.1.24"
 crossbeam-channel = "0.4.0"
 hcid = "0.0.6"
 futures = "0.3.1"
-sx_conductor_api = { path = "../conductor_api" }
 sx_state = { path = "../state" }
 sx_types = { path = "../types" }
 log = "0.4.8"

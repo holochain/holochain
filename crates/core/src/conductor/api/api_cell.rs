@@ -1,7 +1,6 @@
 use crate::conductor::{cell::Cell, conductor::Conductor};
 use async_trait::async_trait;
 use std::sync::Arc;
-use sx_conductor_api::{CellConductorApiT, ConductorApiError, ConductorApiResult};
 use sx_types::{
     autonomic::AutonomicCue,
     cell::CellId,
@@ -10,6 +9,7 @@ use sx_types::{
     signature::Signature,
 };
 use tokio::sync::RwLock;
+use super::error::{ConductorApiError, ConductorApiResult};
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].
@@ -71,4 +71,32 @@ impl CellConductorApiT for CellConductorApi {
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
         unimplemented!()
     }
+}
+
+
+/// The "internal" Conductor API, for a Cell to talk to its calling Conductor
+#[async_trait]
+pub trait CellConductorApiT: Clone + Send + Sync + Sized {
+    async fn invoke_zome(
+        &self,
+        cell_id: &CellId,
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResponse>;
+
+    /// TODO: maybe move out into its own trait
+    async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
+
+    /// TODO: maybe move out into its own trait
+    async fn network_request(
+        &self,
+        _message: Lib3hClientProtocol,
+    ) -> ConductorApiResult<Lib3hServerProtocol>;
+
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
+
+    async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature>;
+
+    async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
+
+    async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
 }

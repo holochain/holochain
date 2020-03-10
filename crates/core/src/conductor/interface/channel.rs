@@ -1,7 +1,9 @@
-use crate::conductor::{api::ExternalConductorApi, interface::interface::Interface};
+use crate::conductor::{
+    api::{AdminMethod, ExternalConductorApi},
+    interface::interface::Interface,
+};
 use async_trait::async_trait;
 use log::*;
-use sx_conductor_api::external::AdminMethod;
 use tokio::sync::mpsc;
 
 /// A trivial Interface, used for proof of concept only,

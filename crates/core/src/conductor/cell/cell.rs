@@ -1,6 +1,6 @@
 use crate::conductor::{api::CellConductorApi, cell::error::CellResult};
 use std::hash::{Hash, Hasher};
-use sx_conductor_api::ConductorApiResult;
+use crate::conductor::api::error::ConductorApiResult;
 use crate::workflows::{ribosome::Ribosome, runner::RunnerCellT};
 use sx_state::env::Environment;
 use sx_types::{

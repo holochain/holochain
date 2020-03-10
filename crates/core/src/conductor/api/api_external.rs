@@ -1,10 +1,11 @@
+use super::error::ConductorApiResult;
 use crate::conductor::conductor::Conductor;
 use std::sync::Arc;
-use sx_conductor_api::{external::AdminMethod, ConductorApiResult};
 use sx_types::{
-    cell::CellId,
+    cell::{CellHandle, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,
+    shims::*,
 };
 use tokio::sync::RwLock;
 
@@ -19,6 +20,7 @@ impl ExternalConductorApi {
     pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
         Self { conductor_mutex }
     }
+
     pub async fn invoke_zome(
         &self,
         _cell_id: &CellId,
@@ -27,7 +29,38 @@ impl ExternalConductorApi {
         let _conductor = self.conductor_mutex.read().await;
         unimplemented!()
     }
+
     pub async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
         unimplemented!()
     }
+}
+
+/// The set of messages that a conductor understands how to handle
+pub enum ConductorProtocol {
+    Admin(AdminMethod),
+    Crypto(Crypto),
+    Network(Lib3hServerProtocol),
+    Test(Test),
+    ZomeInvocation(CellHandle, ZomeInvocation),
+}
+
+pub enum AdminMethod {
+    Start(CellHandle),
+    Stop(CellHandle),
+}
+
+pub enum Crypto {
+    Sign(String),
+    Decrypt(String),
+    Encrypt(String),
+}
+
+pub enum Test {
+    AddAgent(AddAgentArgs),
+}
+
+#[allow(dead_code)]
+pub struct AddAgentArgs {
+    id: String,
+    name: String,
 }
