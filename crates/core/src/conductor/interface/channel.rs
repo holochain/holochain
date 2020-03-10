@@ -1,4 +1,4 @@
-use crate::conductor_lib::{api::ExternalConductorApi, interface::interface::Interface};
+use crate::conductor::{api::ExternalConductorApi, interface::interface::Interface};
 use async_trait::async_trait;
 use log::*;
 use sx_conductor_api::external::AdminMethod;

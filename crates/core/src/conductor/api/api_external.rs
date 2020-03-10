@@ -1,4 +1,4 @@
-use crate::conductor_lib::conductor::Conductor;
+use crate::conductor::conductor::Conductor;
 use std::sync::Arc;
 use sx_conductor_api::{external::AdminMethod, ConductorApiResult};
 use sx_types::{

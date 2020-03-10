@@ -1,4 +1,4 @@
-use crate::conductor_lib::{api::CellConductorApi, cell::error::CellResult};
+use crate::conductor::{api::CellConductorApi, cell::error::CellResult};
 use std::hash::{Hash, Hasher};
 use sx_conductor_api::ConductorApiResult;
 use crate::{ribosome::Ribosome, runner::RunnerCellT};

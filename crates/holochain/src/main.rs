@@ -1,6 +1,6 @@
 use futures::{executor::ThreadPool, task::SpawnExt};
 use std::sync::Arc;
-use sx_core::conductor_lib::{
+use sx_core::conductor::{
     api::ExternalConductorApi,
     interface::{channel::ChannelInterface, Interface},
     Conductor,
