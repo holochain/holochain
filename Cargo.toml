@@ -8,6 +8,7 @@ members = [
   "crates/holochain",
   "crates/state",
   "crates/types",
+  "crates/tracing_spike"
 ]
 
 exclude = [

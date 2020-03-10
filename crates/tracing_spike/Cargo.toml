@@ -1,0 +1,18 @@
+[package]
+name = "tracing_spike"
+version = "0.1.0"
+authors = ["freesig <tomrgowan@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sx_types = { path = "../types" }
+structopt = "=0.3.11"
+tokio = { version = "=0.2.13", features = ["full"] }
+tracing = "=0.1.13"
+
+[dev-dependencies]
+assert_cmd = "=0.12.0"
+predicates = "=1.0.4"
+uuid = { version = "=0.8", features = ["v4"] }
