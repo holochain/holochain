@@ -1,4 +1,4 @@
-use crate::state::{
+use crate::workflows::state::{
     chain_cas::{ChainCasBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
     source_chain::SourceChainError,
@@ -102,7 +102,7 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> Ch
 pub mod tests {
 
     use super::SourceChainBuf;
-    use crate::state::source_chain::SourceChainResult;
+    use crate::workflows::state::source_chain::SourceChainResult;
     use sx_state::{env::ReadManager, test_utils::test_env};
 
     #[test]

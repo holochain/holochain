@@ -7,7 +7,7 @@
 ///
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
-use crate::state::source_chain::{SourceChainError, SourceChainResult};
+use crate::workflows::state::source_chain::{SourceChainError, SourceChainResult};
 use serde::{Deserialize, Serialize};
 use sx_state::{
     buffer::{BufferedStore, IntKvBuf},
@@ -104,7 +104,7 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
 pub mod tests {
 
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
-    use crate::state::source_chain::SourceChainResult;
+    use crate::workflows::state::source_chain::SourceChainResult;
 
     use sx_state::{
         env::{ReadManager, WriteManager},

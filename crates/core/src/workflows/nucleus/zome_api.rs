@@ -1,5 +1,5 @@
 use super::error::ZomeApiResult;
-use crate::net::NetRequester;
+use crate::workflows::net::NetRequester;
 use sx_types::{
     nucleus::{ZomeId, ZomeInvocation, ZomeInvocationResponse},
     shims::SourceChainCommitBundle,

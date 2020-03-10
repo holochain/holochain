@@ -1,4 +1,4 @@
-use crate::{state::workspace::WorkspaceError, workflow::WorkflowError};
+use crate::workflows::{state::workspace::WorkspaceError, workflow::WorkflowError};
 use sx_state::error::DatabaseError;
 use thiserror::Error;
 
