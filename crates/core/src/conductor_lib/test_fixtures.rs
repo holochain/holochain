@@ -225,6 +225,7 @@ fn caller_dna() -> Dna {
     let mut path = PathBuf::new();
 
     path.push(wasm_target_dir(
+        // FIXME This should change to core
         &String::from("conductor_lib").into(),
         &String::from("test-bridge-caller").into(),
     ));

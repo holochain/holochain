@@ -1,4 +1,4 @@
-use crate::api::ExternalConductorApi;
+use crate::conductor_lib::api::ExternalConductorApi;
 use async_trait::async_trait;
 
 #[async_trait]

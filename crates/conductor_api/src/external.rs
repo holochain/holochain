@@ -1,26 +1,4 @@
-use crate::error::ConductorApiResult;
-use async_trait::async_trait;
-use sx_types::{
-    cell::{CellHandle, CellId},
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::JsonString,
-    shims::*,
-};
-
-/// The "external" Conductor API, which is used by e.g. Interfaces
-/// to control a [Conductor] externally
-#[async_trait]
-pub trait ExternalConductorApiT: Send + Sync + Sized {
-    async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
-        unimplemented!()
-    }
-
-    async fn invoke_zome(
-        &self,
-        cell_id: &CellId,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse>;
-}
+use sx_types::{cell::CellHandle, nucleus::ZomeInvocation, shims::*};
 
 // It's uncertain whether we'll actually use all of the following
 

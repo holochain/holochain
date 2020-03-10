@@ -10,6 +10,7 @@ pub mod runner;
 pub mod state;
 pub mod validation;
 pub mod wasm_engine;
+pub mod conductor_lib;
 
 #[cfg(test)]
 pub mod test_utils;

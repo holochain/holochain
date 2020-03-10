@@ -1,8 +1,7 @@
-use crate::{api::CellConductorApi, cell::error::CellResult};
-use async_trait::async_trait;
+use crate::conductor_lib::{api::CellConductorApi, cell::error::CellResult};
 use std::hash::{Hash, Hasher};
-use sx_core::{ribosome::Ribosome, runner::RunnerCellT};
-use sx_conductor_api::{ApiCellT, ConductorApiResult};
+use sx_conductor_api::ConductorApiResult;
+use crate::{ribosome::Ribosome, runner::RunnerCellT};
 use sx_state::env::Environment;
 use sx_types::{
     agent::AgentId,
@@ -65,22 +64,14 @@ impl Cell {
             AutonomicProcess::HealthCheck => unimplemented!(),
         }
     }
-}
 
-#[async_trait]
-impl ApiCellT for Cell {
-    type Api = CellConductorApi;
-
-    async fn invoke_zome(
+    pub async fn invoke_zome(
         &self,
         _conductor_api: CellConductorApi,
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         unimplemented!()
     }
-
-    // TODO: if things stay this way, as mentioned in the comment for this impl,
-    // then all other implementations for the important Cell methods would go here
 }
 
 impl RunnerCellT for Cell {

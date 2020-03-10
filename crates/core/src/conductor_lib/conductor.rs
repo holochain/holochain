@@ -1,11 +1,11 @@
-use crate::{
+use crate::conductor_lib::{
     cell::{Cell, NetSender},
     config::Config,
     error::ConductorResult,
 };
 pub use builder::*;
 use std::collections::HashMap;
-use sx_conductor_api::{ConductorApiError, ConductorApiResult, ApiConductorT};
+use sx_conductor_api::{ConductorApiError, ConductorApiResult};
 use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
@@ -34,18 +34,6 @@ pub struct Conductor {
     _agent_keys: HashMap<AgentId, Keystore>,
 }
 
-impl ApiConductorT for Conductor {
-    type Cell = Cell;
-
-    fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
-        let item = self
-            .cells
-            .get(cell_id)
-            .ok_or_else(|| ConductorApiError::CellMissing(cell_id.clone()))?;
-        Ok(&item.cell)
-    }
-}
-
 impl Conductor {
     pub fn new(tx_network: NetSender) -> Self {
         Self {
@@ -56,13 +44,13 @@ impl Conductor {
         }
     }
 
-    // pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell<Api>> {
-    //     let item = self
-    //         .cells
-    //         .get(cell_id)
-    //         .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-    //     Ok(&item.cell)
-    // }
+    pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+        let item = self
+            .cells
+            .get(cell_id)
+            .ok_or_else(|| ConductorApiError::CellMissing(cell_id.clone()))?;
+        Ok(&item.cell)
+    }
 
     pub fn tx_network(&self) -> &NetSender {
         &self.tx_network

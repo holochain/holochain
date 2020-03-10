@@ -1,4 +1,4 @@
-use crate::error::ConductorError;
+use crate::conductor_lib::error::ConductorError;
 use boolinator::Boolinator;
 use petgraph::{algo::toposort, graph::DiGraph, prelude::NodeIndex};
 use serde::{Deserialize, Serialize};
