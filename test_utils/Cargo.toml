@@ -16,7 +16,7 @@ holochain_core = { version = "0.0.42-alpha5" }
 sx_types = { path = "../crates/types" }
 holochain_wasm_utils = { version = "0.0.42-alpha5" }
 holochain_locksmith = { version = "0.0.43-alpha3" }
-holochain_persistence_api = "0.0.17"
+holochain_persistence_api = "0.0.18"
 holochain_json_api = "0.0.23"
 holochain_json_derive = "0.0.23"
 lib3h_sodium = "0.0.38"
