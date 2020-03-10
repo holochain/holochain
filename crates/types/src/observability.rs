@@ -75,7 +75,7 @@ use tracing_subscriber::{
 use serde_json::json;
 use std::{str::FromStr, sync::Once};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Sets the kind of structed logging output you want
 pub enum Output {
     /// Outputs everything as json
