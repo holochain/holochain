@@ -108,7 +108,7 @@ where
                 Ok((_, None)) => Ok(None),
                 Err(e) => Ok(Err(e)?),
                 // Err(e) => match e {
-                //     rkv::StoreError::LmdbError(lmdb::Error::NotFound) => Ok(None),
+                //     rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(None),
                 //     e => Ok(Err(e)?)
                 // },
             })
@@ -148,7 +148,7 @@ where
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.delete(writer, k.clone(), &encoded).or_else(|err| {
                             // Ignore the case where the key is not found
-                            if let rkv::StoreError::LmdbError(lmdb::Error::NotFound) = err {
+                            if let rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) = err {
                                 Ok(())
                             } else {
                                 Err(err)

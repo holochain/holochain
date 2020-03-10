@@ -6,8 +6,7 @@
 //!     std::error::Error, into error types that do
 
 use crate::error::DatabaseError;
-use lmdb::{Database, RoCursor};
-use rkv::{StoreError, Value};
+use rkv::{Database, RoCursor, StoreError, Value};
 use shrinkwraprs::Shrinkwrap;
 
 /// Just a trait alias for rkv::Readable
