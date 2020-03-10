@@ -1,3 +1,4 @@
+use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::{cell::Cell, conductor::Conductor};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -9,7 +10,6 @@ use sx_types::{
     signature::Signature,
 };
 use tokio::sync::RwLock;
-use super::error::{ConductorApiError, ConductorApiResult};
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].
@@ -72,7 +72,6 @@ impl CellConductorApiT for CellConductorApi {
         unimplemented!()
     }
 }
-
 
 /// The "internal" Conductor API, for a Cell to talk to its calling Conductor
 #[async_trait]

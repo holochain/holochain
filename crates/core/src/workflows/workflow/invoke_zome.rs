@@ -3,10 +3,10 @@ use crate::workflows::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspac
 use sx_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(
-    workspace: InvokeZomeWorkspace<'env>,
+    workspace: InvokeZomeWorkspace<'_>,
     _ribosome: Ribo,
     _invocation: ZomeInvocation,
-) -> WorkflowResult<InvokeZomeWorkspace<'env>> {
+) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
     Ok(WorkflowEffects {
         workspace,
         triggers: Default::default(),

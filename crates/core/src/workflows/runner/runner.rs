@@ -45,7 +45,7 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
         &'a self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
-        let env = self.0.state_env().clone();
+        let env = self.0.state_env();
         async move {
             let WorkflowEffects {
                 workspace,

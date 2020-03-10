@@ -37,11 +37,11 @@ impl ExternalConductorApi {
 
 /// The set of messages that a conductor understands how to handle
 pub enum ConductorProtocol {
-    Admin(AdminMethod),
-    Crypto(Crypto),
-    Network(Lib3hServerProtocol),
-    Test(Test),
-    ZomeInvocation(CellHandle, ZomeInvocation),
+    Admin(Box<AdminMethod>),
+    Crypto(Box<Crypto>),
+    Network(Box<Lib3hServerProtocol>),
+    Test(Box<Test>),
+    ZomeInvocation(Box<CellHandle>, Box<ZomeInvocation>),
 }
 
 pub enum AdminMethod {

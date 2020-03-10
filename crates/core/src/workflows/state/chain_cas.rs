@@ -36,8 +36,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     }
 
     pub fn primary(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
-        let entries = dbs.get(&*CHAIN_ENTRIES)?.clone();
-        let headers = dbs.get(&*CHAIN_HEADERS)?.clone();
+        let entries = *dbs.get(&*CHAIN_ENTRIES)?;
+        let headers = *dbs.get(&*CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 
