@@ -12,6 +12,7 @@ use tracing_subscriber::{
 use serde_json::json;
 use std::{str::FromStr, sync::Once};
 
+#[derive(Debug)]
 /// Sets the kind of structed logging output you want
 pub enum Output {
     /// Outputs everything as json
@@ -102,6 +103,19 @@ where
     writeln!(writer, "{}", json)
 }
 
+/// Run logging in a unit test
+/// RUST_LOG or CUSTOM_FILTER must be set or
+/// this is a no-op
+pub fn test_run() -> Result<(), errors::TracingError> {
+    if let (None, None) = (
+        std::env::var_os("RUST_LOG"),
+        std::env::var_os("CUSTOM_FILTER"),
+    ) {
+        return Ok(());
+    }
+    init_fmt(Output::Log)
+}
+
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
 /// It then checks for CUSTOM_FILTER which if set will output an error if it doesn't parse.
 pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
@@ -120,7 +134,7 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
         &Event<'_>,
     ) -> std::fmt::Result = format_event;
 
-    let subscriber = FmtSubscriber::builder();
+    let subscriber = FmtSubscriber::builder().with_target(true);
 
     match output {
         Output::Json => {
@@ -146,8 +160,7 @@ where
 {
     let mut result = Ok(());
     INIT.call_once(|| {
-        result =
-            tracing::subscriber::set_global_default(subscriber).map_err(Into::into);
+        result = tracing::subscriber::set_global_default(subscriber).map_err(Into::into);
     });
     result
 }
@@ -155,7 +168,7 @@ where
 pub mod errors {
     use thiserror::Error;
     #[derive(Error, Debug)]
-    pub enum TracingError{
+    pub enum TracingError {
         #[error(transparent)]
         SetGlobal(#[from] tracing::subscriber::SetGlobalDefaultError),
     }

@@ -16,6 +16,7 @@ use sx_state::{
     prelude::{Readable, Writer},
 };
 use sx_types::prelude::Address;
+use tracing::*;
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Serialize, Deserialize)]
@@ -69,6 +70,7 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
         self.current_head.as_ref()
     }
 
+    #[instrument(skip(self))]
     pub fn add_header(&mut self, header_address: Address) {
         self.db.put(
             self.next_index,
@@ -79,6 +81,7 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
                 dht_transforms_complete: false,
             },
         );
+        trace!(self.next_index);
         self.next_index += 1;
         self.current_head = Some(header_address);
     }
@@ -111,10 +114,10 @@ pub mod tests {
         error::DatabaseResult,
         test_utils::test_env,
     };
-    use sx_types::prelude::Address;
-
+    use sx_types::{observability, prelude::Address};
     #[test]
     fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
+        observability::test_run().ok();
         let env = test_env();
         let dbs = env.dbs()?;
         env.with_reader(|reader| {

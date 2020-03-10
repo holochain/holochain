@@ -1,7 +1,11 @@
-use crate::conductor::{api::CellConductorApi, cell::error::CellResult};
+use crate::{
+    conductor::{
+        api::{error::ConductorApiResult, CellConductorApi},
+        cell::error::CellResult,
+    },
+    workflows::{ribosome::Ribosome, runner::RunnerCellT},
+};
 use std::hash::{Hash, Hasher};
-use crate::conductor::api::error::ConductorApiResult;
-use crate::workflows::{ribosome::Ribosome, runner::RunnerCellT};
 use sx_state::env::Environment;
 use sx_types::{
     agent::AgentId,

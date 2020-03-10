@@ -12,8 +12,11 @@ edition = "2018"
 async-trait = "0.1.22"
 futures = { version = "0.3.1", features = ["thread-pool"]}
 sx_core = { path = "../core"}
+sx_types = { path = "../types"}
 parking_lot = "0.10.0"
 tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
+structopt = "=0.3.11"
+tracing = "=0.1.13"
 
 [[bin]]
 path = "src/main.rs"
