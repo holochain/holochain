@@ -1,3 +1,5 @@
+//! [DOC_STUB] types crate
+
 /// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)
 #[macro_use]
 extern crate serde;

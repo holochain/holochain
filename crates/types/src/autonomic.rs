@@ -1,6 +1,9 @@
+//! [DOC_STUB] autonomic
+
 /// The various processes which run "autonomically", aka subconsciously.
 /// These are triggered by
 pub enum AutonomicProcess {
+    /// [DOC_STUB]
     SlowHeal,
 
     /// See how many validators we can find on the network for all of our entries

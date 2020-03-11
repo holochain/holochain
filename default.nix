@@ -24,6 +24,14 @@ with holonix.pkgs;
  dev-shell = stdenv.mkDerivation (holonix.shell // {
   name = "dev-shell";
 
+  shellHook = holonix.pkgs.lib.concatStrings [
+   holonix.shell.shellHook
+   ''
+   # add to RUSTFLAGS requiring all public items be documented
+   export RUSTFLAGS="-D missing_docs $RUSTFLAGS"
+   ''
+  ];
+
   buildInputs = [ ]
    ++ holonix.shell.buildInputs
 
