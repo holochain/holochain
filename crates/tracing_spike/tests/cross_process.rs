@@ -4,8 +4,7 @@ use uuid::Uuid;
 
 #[test]
 fn cross_process() {
-    let dir = tempdir::TempDir::new("tmp_sock")
-        .expect("Failed to create tmp dir");
+    let dir = tempdir::TempDir::new("tmp_sock").expect("Failed to create tmp dir");
     let trace_id = Uuid::new_v4();
     let dir2 = dir.path().to_owned();
     let j = std::thread::spawn(move || {

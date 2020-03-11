@@ -60,7 +60,7 @@
 //! tad log.csv
 //! ```
 
-use tracing::{Event, Subscriber};
+use tracing::{Event, Span, Subscriber};
 use tracing_core::field::Field;
 use tracing_serde::AsSerde;
 use tracing_subscriber::{
@@ -167,6 +167,10 @@ where
     event.record(&mut values);
     let json = json!({"time": now, "name": name, "level": level.as_serde(), "target": target, "module_path": module_path, "file": file, "line": line, "fields": values.json, "spans": parents});
     writeln!(writer, "{}", json)
+}
+
+pub fn get_trace_id(span: Span) -> Option<String> {
+    cross::get_trace_id(span)
 }
 
 /// Run logging in a unit test
