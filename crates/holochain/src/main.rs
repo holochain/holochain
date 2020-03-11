@@ -24,11 +24,13 @@ struct Opt {
         default_value = "Log"
     )]
     structured: Output,
+    #[structopt(long, help = "enable cross process tracing (slight performance hit)")]
+    cross_process: bool,
 }
 fn main() {
     println!("Running silly ChannelInterface example");
     let opt = Opt::from_args();
-    observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
+    observability::init_fmt(opt.structured, opt.cross_process ).expect("Failed to start contextual logging");
     let executor = ThreadPool::new().unwrap();
     futures::executor::block_on(example(executor));
 }

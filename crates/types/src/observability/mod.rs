@@ -1,7 +1,7 @@
 //! # Structured Contextual Logging (or tracing)
 //! ## Why
 //! [Watch](https://www.youtube.com/watch?v=JjItsfqFIdo) or [Read](https://tokio.rs/blog/2019-08-tracing/)
-//! 
+//!
 //! ## Usage
 //! There are a couple of ways to use structured logging.
 //! ### Console and filter
@@ -23,16 +23,16 @@
 //! - Inside a span called `a`
 //! - The span `a` has to have a field called `something` that is equal to `foo`
 //! - They are atleast debug level.
-//! 
+//!
 //! Most of these options are optional.
 //! They can be combined like:
 //! ```bash
 //! CUSTOM_FILTER='[{}]=error, [{something}]=debug'
 //! ```
 //! > The above means show me errors from anywhere but also any event or span with the field something that's atleast debug.
-//! 
+//!
 //! [See here](https://docs.rs/tracing-subscriber/0.2.2/tracing_subscriber/filter/struct.EnvFilter.html) for more info.
-//! 
+//!
 //! #### Json
 //! Sometimes there's too much data and it's better to capture it to interact with using another tool later.
 //! For this we can output everything as Json using the flag `--structured Json`.
@@ -44,36 +44,39 @@
 //! im2h_im_state.rs","line":690}]}
 //! ```
 //! Every log will include the above information expect for the spans which will only show up if there are parent spans in the context of the event.
-//! 
+//!
 //! You can combine filter with Json as well.
-//! 
+//!
 //! ##### Tools
 //! Some useful tools for formatting and using the json data.
 //! - [json2csv](https://www.npmjs.com/package/json2csv)
 //! - [jq](https://stedolan.github.io/jq/)
 //! - [tad](https://www.tadviewer.com/)
-//! 
+//!
 //! A sample workflow:
 //! ```bash
 //! CUSTOM_FILTER='core[{}]=debug' holochain --structured Json > log.json
-//! cat out.json | jq '. | {time: .time, name: .name, message: .fields.message, file: .file, line: .line, fields: .fields, spans: .spans}' | json2csv -o log.csv 
+//! cat out.json | jq '. | {time: .time, name: .name, message: .fields.message, file: .file, line: .line, fields: .fields, spans: .spans}' | json2csv -o log.csv
 //! tad log.csv
 //! ```
-
 
 use tracing::{Event, Subscriber};
 use tracing_core::field::Field;
 use tracing_serde::AsSerde;
 use tracing_subscriber::{
     field::Visit,
-    filter::EnvFilter,
+    filter::{EnvFilter, LevelFilter},
     fmt::{time::ChronoUtc, FmtContext, FormatFields},
     registry::LookupSpan,
-    FmtSubscriber,
+    FmtSubscriber, Layer,
 };
 
 use serde_json::json;
 use std::{str::FromStr, sync::Once};
+
+use cross::CrossLayer;
+
+mod cross;
 
 #[derive(Debug, Clone)]
 /// Sets the kind of structed logging output you want
@@ -176,12 +179,12 @@ pub fn test_run() -> Result<(), errors::TracingError> {
     ) {
         return Ok(());
     }
-    init_fmt(Output::Log)
+    init_fmt(Output::Log, false)
 }
 
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
 /// It then checks for CUSTOM_FILTER which if set will output an error if it doesn't parse.
-pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
+pub fn init_fmt(output: Output, cross: bool) -> Result<(), errors::TracingError> {
     let mut filter = EnvFilter::from_default_env();
     if std::env::var("CUSTOM_FILTER").is_ok() {
         EnvFilter::try_from_env("CUSTOM_FILTER")
@@ -197,33 +200,42 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
         &Event<'_>,
     ) -> std::fmt::Result = format_event;
 
-    let subscriber = FmtSubscriber::builder().with_target(true);
+    let subscriber = FmtSubscriber::builder()
+        .with_target(true)
+        .with_max_level(LevelFilter::TRACE);
 
     match output {
         Output::Json => {
             let subscriber = subscriber
-                .with_env_filter(filter)
                 .with_timer(ChronoUtc::rfc3339())
                 .json()
                 .event_format(fm);
-            finish(subscriber.finish())
+            finish(subscriber.finish(), filter, cross)
         }
-        Output::Log => finish(subscriber.with_env_filter(filter).finish()),
+        Output::Log => finish(subscriber.finish(), filter, cross),
         Output::Compact => {
             let subscriber = subscriber.compact();
-            finish(subscriber.with_env_filter(filter).finish())
+            finish(subscriber.finish(), filter, cross)
         }
         Output::None => Ok(()),
     }
 }
 
-fn finish<S>(subscriber: S) -> Result<(), errors::TracingError>
+fn finish<S>(subscriber: S, filter: EnvFilter, cross: bool) -> Result<(), errors::TracingError>
 where
     S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
 {
     let mut result = Ok(());
     INIT.call_once(|| {
-        result = tracing::subscriber::set_global_default(subscriber).map_err(Into::into);
+        result = if cross {
+            let subscriber = filter
+                .and_then(CrossLayer::new())
+                .with_subscriber(subscriber);
+            tracing::subscriber::set_global_default(subscriber).map_err(Into::into)
+        } else {
+            let subscriber = filter.with_subscriber(subscriber);
+            tracing::subscriber::set_global_default(subscriber).map_err(Into::into)
+        };
     });
     result
 }
