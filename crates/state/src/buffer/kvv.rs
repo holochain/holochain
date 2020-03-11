@@ -82,7 +82,6 @@ where
     }
 
     pub fn delete(&mut self, k: K, v: V) {
-        // let deletion = Op::Delete(Box::new(v));
         self.scratch
             .entry(k)
             .and_modify(|ops| {
@@ -107,10 +106,6 @@ where
                 Ok((_, Some(_))) => Err(DatabaseError::InvalidValue),
                 Ok((_, None)) => Ok(None),
                 Err(e) => Ok(Err(e)?),
-                // Err(e) => match e {
-                //     rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(None),
-                //     e => Ok(Err(e)?)
-                // },
             })
             .collect::<Result<Vec<Option<V>>, DatabaseError>>()?
             .into_iter()

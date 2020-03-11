@@ -1,6 +1,6 @@
 use super::error::WorkflowRunResult;
 use crate::workflows::{
-    ribosome::Ribosome,
+    ribosome::WasmRibosome,
     state::workspace::{self, Workspace},
     workflow,
 };
@@ -14,7 +14,7 @@ use workspace::WorkspaceError;
 
 pub trait RunnerCellT: Send + Sync {
     fn state_env(&self) -> Environment;
-    fn get_ribosome(&self) -> Ribosome;
+    fn get_ribosome(&self) -> WasmRibosome;
 }
 
 pub struct WorkflowRunner<'c, Cell: RunnerCellT>(&'c Cell);

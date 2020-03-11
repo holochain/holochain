@@ -10,7 +10,12 @@ use sx_types::{
 
 #[automock]
 pub trait RibosomeT {
-    fn run_validation(self, entry: Entry) -> ValidationResult;
+    fn run_validation(self, entry: Entry) -> ValidationResult {
+        // TODO: turn entry into "data"
+        self.run_callback(())
+    }
+
+    fn run_callback(self, data: ()) -> ValidationResult;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -26,12 +31,12 @@ pub trait RibosomeT {
 }
 
 /// Total hack just to have something to look at
-/// The only Ribosome is a Wasm ribosome.
-pub struct Ribosome {
+/// The only WasmRibosome is a Wasm ribosome.
+pub struct WasmRibosome {
     _engine: WasmEngine,
 }
 
-impl Ribosome {
+impl WasmRibosome {
     pub fn new(_dna: Dna) -> Self {
         Self {
             _engine: WasmEngine,
@@ -39,7 +44,7 @@ impl Ribosome {
     }
 }
 
-impl RibosomeT for Ribosome {
+impl RibosomeT for WasmRibosome {
     fn run_validation(self, _entry: Entry) -> ValidationResult {
         unimplemented!()
     }
