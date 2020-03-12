@@ -167,7 +167,8 @@ pub mod tests {
 
     #[test]
     async fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+        let arc = test_env();
+let env = arc.guard().await;
         let db = env.inner().await.open_single("kv", StoreOptions::create())?;
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
@@ -197,7 +198,8 @@ pub mod tests {
 
     #[test]
     async fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+        let arc = test_env();
+let env = arc.guard().await;
         let db = env
             .inner()
             .open_single("kv", StoreOptions::create())
@@ -218,7 +220,8 @@ pub mod tests {
     /// TODO break up into smaller tests
     #[test]
     async fn kv_store_sanity_check() -> DatabaseResult<()> {
-        let env = test_env();
+        let arc = test_env();
+let env = arc.guard().await;
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
         let mut writer = env.writer()?;

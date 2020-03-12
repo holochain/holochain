@@ -112,11 +112,13 @@ pub mod tests {
         test_utils::test_env,
     };
     use sx_types::prelude::Address;
+    use tokio::test;
 
     #[test]
-    fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
-        let env = test_env();
-        let dbs = env.dbs()?;
+    async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
@@ -127,13 +129,14 @@ pub mod tests {
             buf.add_header(Address::from("2"));
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
             Ok(())
-        })
+        });
     }
 
     #[test]
-    fn chain_sequence_functionality() -> SourceChainResult<()> {
-        let env = test_env();
-        let dbs = env.dbs()?;
+    async fn chain_sequence_functionality() -> SourceChainResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.add_header(Address::from("0"));
@@ -172,18 +175,19 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
-        let env = test_env();
-        let env1 = env.clone().guard().await;
-        let env2 = env.clone().guard().await;
+        let environ = test_env();
+        let dbs1 = environ.dbs().await?;
+        let dbs2 = dbs1.clone();
+        let env1 = environ.clone().guard().await;
+        let env2 = environ.clone().guard().await;
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
-            let dbs = env1.dbs()?;
             let reader = env1.reader()?;
-            let mut buf = { ChainSequenceBuf::new(&reader, &dbs)? };
+            let mut buf = { ChainSequenceBuf::new(&reader, &dbs1)? };
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
             buf.add_header(Address::from("2"));
@@ -198,10 +202,9 @@ pub mod tests {
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let dbs = env2.dbs()?;
 
             let reader = env2.reader()?;
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(&reader, &dbs2)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));

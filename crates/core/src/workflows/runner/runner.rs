@@ -21,9 +21,9 @@ pub struct WorkflowRunner<'c, Cell: RunnerCellT>(&'c Cell);
 
 impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
-        let env = self.0.state_env();
-        let env = env.guard().await;
-        let dbs = env.dbs()?;
+        let environ = self.0.state_env();
+        let dbs = environ.dbs().await?;
+        let env = environ.guard().await;
 
         // TODO: is it possible to DRY this up with a macro?
         match call {
@@ -46,34 +46,35 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
         &'a self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
-        async move {
-            let env = self.0.state_env().guard().await;
-            let WorkflowEffects {
-                workspace,
-                triggers,
-                callbacks,
-                signals,
-            } = effects;
-            env.writer()
-                .map_err(Into::<WorkspaceError>::into)
-                .and_then(|writer| workspace.commit_txn(writer).map_err(Into::into))?;
-            for WorkflowTrigger { call, interval } in triggers {
-                if let Some(_delay) = interval {
-                    // FIXME: implement or discard
-                    unimplemented!()
-                } else {
-                    self.run_workflow(call).await?
-                }
-            }
-            for _callback in callbacks {
-                // TODO
-            }
-            for _signal in signals {
-                // TODO
-            }
+        unimplemented!()
+        // async move {
+        //     let env = self.0.state_env().guard().await;
+        //     let WorkflowEffects {
+        //         workspace,
+        //         triggers,
+        //         callbacks,
+        //         signals,
+        //     } = effects;
+        //     env.writer()
+        //         .map_err(Into::<WorkspaceError>::into)
+        //         .and_then(|writer| workspace.commit_txn(writer).map_err(Into::into))?;
+        //     for WorkflowTrigger { call, interval } in triggers {
+        //         if let Some(_delay) = interval {
+        //             // FIXME: implement or discard
+        //             unimplemented!()
+        //         } else {
+        //             self.run_workflow(call).await?
+        //         }
+        //     }
+        //     for _callback in callbacks {
+        //         // TODO
+        //     }
+        //     for _signal in signals {
+        //         // TODO
+        //     }
 
-            Ok(())
-        }
-        .boxed()
+        //     Ok(())
+        // }
+        // .boxed()
     }
 }

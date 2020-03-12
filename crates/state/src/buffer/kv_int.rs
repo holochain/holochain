@@ -183,7 +183,8 @@ pub mod tests {
 
     #[test]
     async fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+        let arc = test_env();
+let env = arc.guard().await;
         let db = env.inner().await.open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
@@ -218,7 +219,8 @@ pub mod tests {
 
     #[test]
     async fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+        let arc = test_env();
+let env = arc.guard().await;
         let db = env
             .inner()
             .open_integer("kv", StoreOptions::create())

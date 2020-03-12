@@ -21,7 +21,7 @@ const MAX_DBS: u32 = 32;
 lazy_static! {
     static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, Environment>> =
         RwLockSync::new(HashMap::new());
-    static ref DB_MANAGERS: RwLockSync<HashMap<PathBuf, Arc<DbManager<'static>>>> =
+    static ref DB_MANAGERS: RwLockSync<HashMap<PathBuf, Arc<DbManager>>> =
         RwLockSync::new(HashMap::new());
 }
 
@@ -129,8 +129,22 @@ impl Environment {
     pub async fn guard(&self) -> EnvironmentRef<'_> {
         EnvironmentRef(self.0.read().await)
     }
-}
 
+    pub async fn inner(&self) -> RwLockReadGuard<'_, Rkv> {
+        self.0.read().await
+    }
+
+    pub async fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
+        let mut map = DB_MANAGERS.write();
+        let dbs: Arc<DbManager> = match map.entry(self.inner().await.path().into()) {
+            hash_map::Entry::Occupied(e) => e.get().clone(),
+            hash_map::Entry::Vacant(e) => e
+                .insert(Arc::new(DbManager::new(self.clone()).await?))
+                .clone(),
+        };
+        Ok(dbs)
+    }
+}
 
 pub struct EnvironmentRef<'e>(RwLockReadGuard<'e, Rkv>);
 
@@ -188,16 +202,5 @@ impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
 impl<'e> EnvironmentRef<'e> {
     pub fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
         &self.0
-    }
-
-    pub fn dbs(&'e self) -> DatabaseResult<Arc<DbManager<'e>>> {
-        let mut map = DB_MANAGERS.write();
-        let dbs = match map.entry(self.0.path().into()) {
-            hash_map::Entry::Occupied(e) => e.get().clone(),
-            hash_map::Entry::Vacant(e) => {
-                e.insert(Arc::new(DbManager::new(self).expect("TODO"))).clone()
-            }
-        };
-        Ok(dbs)
     }
 }
