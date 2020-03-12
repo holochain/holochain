@@ -21,8 +21,8 @@ const MAX_DBS: u32 = 32;
 lazy_static! {
     static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, Environment>> =
         RwLockSync::new(HashMap::new());
-    static ref DB_MANAGERS: RwLockSync<HashMap<PathBuf, Arc<DbManager>>> =
-        RwLockSync::new(HashMap::new());
+    static ref DB_MANAGERS: RwLock<HashMap<PathBuf, Arc<DbManager>>> =
+        RwLock::new(HashMap::new());
 }
 
 fn default_flags() -> EnvironmentFlags {
@@ -135,7 +135,7 @@ impl Environment {
     }
 
     pub async fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
-        let mut map = DB_MANAGERS.write();
+        let mut map = DB_MANAGERS.write().await;
         let dbs: Arc<DbManager> = match map.entry(self.inner().await.path().into()) {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => e
