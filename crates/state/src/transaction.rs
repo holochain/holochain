@@ -59,7 +59,7 @@ impl<'env> rkv::Readable for Writer<'env> {
 
 impl<'env> Writer<'env> {
     /// This override exists solely to raise the Error from the rkv::StoreError,
-    /// which does not implement std::error::Error, into DatabaseError, which does.
+    /// which does not implement std::error::Error, into a DatabaseError, which does.
     pub fn commit(self) -> Result<(), DatabaseError> {
         self.0.commit().map_err(DatabaseError::from)
     }

@@ -169,7 +169,6 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    use tokio::test;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
@@ -181,11 +180,13 @@ pub mod tests {
 
     type Store<'a> = IntKvBuf<'a, u32, V>;
 
-    #[test]
+    #[tokio::test]
     async fn kv_iterators() -> DatabaseResult<()> {
         let arc = test_env();
-let env = arc.guard().await;
-        let db = env.inner().await.open_integer("kv", StoreOptions::create())?;
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
             let mut buf: Store = IntKvBuf::new(&reader, db)?;
@@ -217,10 +218,10 @@ let env = arc.guard().await;
         })
     }
 
-    #[test]
+    #[tokio::test]
     async fn kv_empty_iterators() -> DatabaseResult<()> {
         let arc = test_env();
-let env = arc.guard().await;
+        let env = arc.guard().await;
         let db = env
             .inner()
             .open_integer("kv", StoreOptions::create())

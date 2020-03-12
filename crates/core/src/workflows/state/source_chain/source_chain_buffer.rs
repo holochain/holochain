@@ -104,9 +104,9 @@ pub mod tests {
     use super::SourceChainBuf;
     use crate::workflows::state::source_chain::SourceChainResult;
     use sx_state::{env::ReadManager, test_utils::test_env};
-    use tokio::test;
 
-    #[test]
+
+    #[tokio::test]
     async fn header_for_entry() -> SourceChainResult<()> {
         // TODO: write test
         let arc = test_env();

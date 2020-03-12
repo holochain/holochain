@@ -37,7 +37,7 @@ pub mod tests {
         test_utils::test_env,
     };
     use sx_types::prelude::*;
-    use tokio::test;
+
 
     pub struct TestWorkspace<'env> {
         one: KvBuf<'env, Address, u32>,
@@ -62,7 +62,7 @@ pub mod tests {
         }
     }
 
-    #[test]
+    #[tokio::test]
     async fn workspace_sanity_check() -> WorkspaceResult<()> {
         let arc = test_env();
         let env = arc.guard().await;

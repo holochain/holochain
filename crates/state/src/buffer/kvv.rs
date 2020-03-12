@@ -166,7 +166,7 @@ pub mod tests {
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
-    use tokio::test;
+
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
     struct V(pub u32);
@@ -181,7 +181,7 @@ pub mod tests {
         Op::Delete(Box::new(v))
     }
 
-    #[test]
+    #[tokio::test]
     async fn kvv_store_scratch_insert_delete() {
         let arc = test_env();
 let env = arc.guard().await;
@@ -218,7 +218,7 @@ let env = arc.guard().await;
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
     }
 
-    #[test]
+    #[tokio::test]
     async fn kvv_store_get_list() {
         let arc = test_env();
 let env = arc.guard().await;
@@ -249,7 +249,7 @@ let env = arc.guard().await;
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2)});
     }
 
-    #[test]
+    #[tokio::test]
     async fn kvv_store_duplicate_insert() {
         let arc = test_env();
 let env = arc.guard().await;
@@ -285,7 +285,7 @@ let env = arc.guard().await;
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(1)});
     }
 
-    #[test]
+    #[tokio::test]
     async fn kvv_store_duplicate_delete() {
         let arc = test_env();
 let env = arc.guard().await;
