@@ -46,35 +46,35 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
         &'a self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
-        unimplemented!()
-        // async move {
-        //     let env = self.0.state_env().guard().await;
-        //     let WorkflowEffects {
-        //         workspace,
-        //         triggers,
-        //         callbacks,
-        //         signals,
-        //     } = effects;
-        //     env.writer()
-        //         .map_err(Into::<WorkspaceError>::into)
-        //         .and_then(|writer| workspace.commit_txn(writer).map_err(Into::into))?;
-        //     for WorkflowTrigger { call, interval } in triggers {
-        //         if let Some(_delay) = interval {
-        //             // FIXME: implement or discard
-        //             unimplemented!()
-        //         } else {
-        //             self.run_workflow(call).await?
-        //         }
-        //     }
-        //     for _callback in callbacks {
-        //         // TODO
-        //     }
-        //     for _signal in signals {
-        //         // TODO
-        //     }
+        async move {
+            let arc = self.0.state_env();
+            let env = arc.guard().await;
+            let WorkflowEffects {
+                workspace,
+                triggers,
+                callbacks,
+                signals,
+            } = effects;
+            env.writer()
+                .map_err(Into::<WorkspaceError>::into)
+                .and_then(|writer| workspace.commit_txn(writer).map_err(Into::into))?;
+            for WorkflowTrigger { call, interval } in triggers {
+                if let Some(_delay) = interval {
+                    // FIXME: implement or discard
+                    unimplemented!()
+                } else {
+                    self.run_workflow(call).await?
+                }
+            }
+            for _callback in callbacks {
+                // TODO
+            }
+            for _signal in signals {
+                // TODO
+            }
 
-        //     Ok(())
-        // }
-        // .boxed()
+            Ok(())
+        }
+        .boxed()
     }
 }

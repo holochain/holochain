@@ -3,17 +3,15 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
-use async_trait::async_trait;
 use lazy_static::lazy_static;
 use parking_lot::RwLock as RwLockSync;
 use rkv::{EnvironmentFlags, Rkv};
-use shrinkwraprs::Shrinkwrap;
 use std::{
     collections::{hash_map, HashMap},
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;

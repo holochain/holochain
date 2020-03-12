@@ -10,7 +10,7 @@ use sx_types::{
 
 #[automock]
 pub trait RibosomeT: Sized {
-    fn run_validation(self, entry: Entry) -> ValidationResult {
+    fn run_validation(self, _entry: Entry) -> ValidationResult {
         // TODO: turn entry into "data"
         self.run_callback(())
     }
@@ -46,7 +46,7 @@ impl WasmRibosome {
 
 impl RibosomeT for WasmRibosome {
 
-    fn run_callback(self, data: ()) -> ValidationResult {
+    fn run_callback(self, _data: ()) -> ValidationResult {
         unimplemented!()
     }
 
