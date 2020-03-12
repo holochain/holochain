@@ -17,7 +17,7 @@ pub trait Readable: rkv::Readable {}
 impl<T: rkv::Readable> Readable for T {}
 
 #[derive(From, Shrinkwrap)]
-pub(crate) struct ThreadsafeRkvReader<'env>(rkv::Reader<'env>);
+pub struct ThreadsafeRkvReader<'env>(rkv::Reader<'env>);
 
 /// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
 /// and we can mark them as such
@@ -31,7 +31,7 @@ unsafe impl<'env> Sync for ThreadsafeRkvReader<'env> {}
 
 
 #[derive(From, Shrinkwrap)]
-pub struct Reader<'env>(EnvReadRef<'env, ThreadsafeRkvReader<'env>>);
+pub struct Reader<'env>(ThreadsafeRkvReader<'env>);
 
 impl<'env> rkv::Readable for Reader<'env> {
     fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
@@ -45,7 +45,7 @@ impl<'env> rkv::Readable for Reader<'env> {
 
 #[derive(From, Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct Writer<'env>(EnvReadRef<'env, rkv::Writer<'env>>);
+pub struct Writer<'env>(rkv::Writer<'env>);
 
 impl<'env> rkv::Readable for Writer<'env> {
     fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {

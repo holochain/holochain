@@ -119,15 +119,23 @@ impl<'a, T: 'a> EnvWriteRef<'a, T> {
     // }
 }
 
-/// The canonical representation of a reference to a (singleton) LMDB environment.
+/// The canonical representation of a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
 #[derive(Clone)]
 pub struct Environment(Arc<RwLock<Rkv>>);
 
+impl Environment {
+    pub async fn guard(&self) -> EnvironmentRef<'_> {
+        EnvironmentRef(self.0.read().await)
+    }
+}
+
+pub struct EnvironmentRef<'e>(RwLockReadGuard<'e, Rkv>);
+
 #[async_trait]
-pub trait ReadManager {
-    async fn reader(&self) -> DatabaseResult<Reader>;
+pub trait ReadManager<'e> {
+    async fn reader(&'e self) -> DatabaseResult<Reader<'e>>;
 
     async fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
@@ -136,8 +144,8 @@ pub trait ReadManager {
 }
 
 #[async_trait]
-pub trait WriteManager {
-    async fn writer(&self) -> DatabaseResult<Writer>;
+pub trait WriteManager<'e> {
+    async fn writer(&'e self) -> DatabaseResult<Writer<'e>>;
 
     async fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
@@ -146,12 +154,9 @@ pub trait WriteManager {
 }
 
 #[async_trait]
-impl ReadManager for Environment {
-    async fn reader<'e>(&'e self) -> DatabaseResult<Reader<'e>> {
-        let guard = self.0.read().await;
-        let data = ThreadsafeRkvReader::from(guard.read()?);
-        let reader: Reader =
-            EnvReadRef::from_parts(data, guard).into();
+impl<'e> ReadManager<'e> for EnvironmentRef<'e> {
+    async fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
+        let reader = Reader::from(ThreadsafeRkvReader::from(self.0.read()?));
         Ok(reader)
     }
 
@@ -165,10 +170,9 @@ impl ReadManager for Environment {
 }
 
 #[async_trait]
-impl WriteManager for Environment {
-    async fn writer<'e>(&'e self) -> DatabaseResult<Writer<'e>> {
-        let guard = self.0.read().await;
-        let writer: Writer = EnvReadRef::from_parts(guard.write()?, guard).into();
+impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
+    async fn writer(&'e self) -> DatabaseResult<Writer<'e>> {
+        let writer = Writer::from(self.0.write()?);
         Ok(writer)
     }
 
@@ -192,11 +196,11 @@ impl Environment {
     pub async fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
         let mut map = DB_MANAGERS.write();
         let dbs = match map.entry(self.inner().await.path().into()) {
-            hash_map::Entry::Occupied(e) => e.get(),
+            hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => {
-                e.insert(Arc::new(DbManager::new(self.clone()).await.expect("TODO")))
+                e.insert(Arc::new(DbManager::new(self.clone()).await.expect("TODO"))).clone()
             }
         };
-        Ok(dbs.clone())
+        Ok(dbs)
     }
 }
