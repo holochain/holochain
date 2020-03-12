@@ -5,9 +5,10 @@
 //! - We can upgrade some error types from rkv::StoreError, which does not implement
 //!     std::error::Error, into error types that do
 
-use crate::error::DatabaseError;
+use crate::{env::EnvReadRef, error::DatabaseError};
 use rkv::{Database, RoCursor, StoreError, Value};
 use shrinkwraprs::Shrinkwrap;
+use derive_more::{From};
 
 /// Just a trait alias for rkv::Readable
 /// It's important because it lets us use either a Reader or a Writer
@@ -15,8 +16,22 @@ use shrinkwraprs::Shrinkwrap;
 pub trait Readable: rkv::Readable {}
 impl<T: rkv::Readable> Readable for T {}
 
-#[derive(Shrinkwrap)]
-pub struct Reader<'env>(rkv::Reader<'env>);
+#[derive(From, Shrinkwrap)]
+pub(crate) struct ThreadsafeRkvReader<'env>(rkv::Reader<'env>);
+
+/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
+/// and we can mark them as such
+#[cfg(feature = "lmdb_no_tls")]
+unsafe impl<'env> Send for ThreadsafeRkvReader<'env> {}
+
+/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
+/// and we can mark them as such
+#[cfg(feature = "lmdb_no_tls")]
+unsafe impl<'env> Sync for ThreadsafeRkvReader<'env> {}
+
+
+#[derive(From, Shrinkwrap)]
+pub struct Reader<'env>(EnvReadRef<'env, ThreadsafeRkvReader<'env>>);
 
 impl<'env> rkv::Readable for Reader<'env> {
     fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
@@ -28,25 +43,9 @@ impl<'env> rkv::Readable for Reader<'env> {
     }
 }
 
-impl<'env> From<rkv::Reader<'env>> for Reader<'env> {
-    fn from(r: rkv::Reader<'env>) -> Reader {
-        Reader(r)
-    }
-}
-
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
-/// and we can mark them as such
-#[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Send for Reader<'env> {}
-
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
-/// and we can mark them as such
-#[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Sync for Reader<'env> {}
-
-#[derive(Shrinkwrap)]
+#[derive(From, Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct Writer<'env>(rkv::Writer<'env>);
+pub struct Writer<'env>(EnvReadRef<'env, rkv::Writer<'env>>);
 
 impl<'env> rkv::Readable for Writer<'env> {
     fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
@@ -55,12 +54,6 @@ impl<'env> rkv::Readable for Writer<'env> {
 
     fn open_ro_cursor(&self, db: Database) -> Result<RoCursor, StoreError> {
         self.0.open_ro_cursor(db)
-    }
-}
-
-impl<'env> From<rkv::Writer<'env>> for Writer<'env> {
-    fn from(w: rkv::Writer<'env>) -> Writer {
-        Writer(w)
     }
 }
 

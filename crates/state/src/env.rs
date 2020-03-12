@@ -1,23 +1,28 @@
 use crate::{
     db::DbManager,
     error::{DatabaseError, DatabaseResult},
-    transaction::{Reader, Writer},
+    transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
+use async_trait::async_trait;
 use lazy_static::lazy_static;
-use parking_lot::RwLock;
+use parking_lot::RwLock as RwLockSync;
 use rkv::{EnvironmentFlags, Rkv};
+use shrinkwraprs::Shrinkwrap;
 use std::{
     collections::{hash_map, HashMap},
     path::{Path, PathBuf},
     sync::Arc,
 };
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
 lazy_static! {
-    static ref ENVIRONMENTS: RwLock<HashMap<PathBuf, Environment>> = RwLock::new(HashMap::new());
-    static ref DB_MANAGERS: RwLock<HashMap<PathBuf, Arc<DbManager>>> = RwLock::new(HashMap::new());
+    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, Environment>> =
+        RwLockSync::new(HashMap::new());
+    static ref DB_MANAGERS: RwLockSync<HashMap<PathBuf, Arc<DbManager>>> =
+        RwLockSync::new(HashMap::new());
 }
 
 fn default_flags() -> EnvironmentFlags {
@@ -46,7 +51,7 @@ pub fn create_lmdb_env(path: &Path) -> DatabaseResult<Environment> {
         hash_map::Entry::Vacant(e) => e
             .insert({
                 let rkv = rkv_builder(None, None)(path)?;
-                Environment(Arc::new(rkv))
+                Environment(Arc::new(RwLock::new(rkv)))
             })
             .clone(),
     };
@@ -69,55 +74,110 @@ fn rkv_builder(
     }
 }
 
+#[derive(Shrinkwrap)]
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
+pub(crate) struct EnvReadRef<'a, T: 'a> {
+    #[shrinkwrap(main_field)]
+    data: T,
+    guard: RwLockReadGuard<'a, Rkv>,
+}
+
+impl<'a, T: 'a> EnvReadRef<'a, T> {
+    fn from_parts(data: T, guard: RwLockReadGuard<'a, Rkv>) -> Self {
+        Self { data, guard }
+    }
+
+    // pub async fn new<F>(mutex: &'a RwLock<Rkv>, f: F) -> Result<EnvReadRef<'a, T>, DatabaseError>
+    // where
+    //     F: FnOnce(&RwLockReadGuard<'a, Rkv>) -> Result<T, DatabaseError>,
+    // {
+    //     let guard = mutex.read().await;
+    //     let data = f(&guard)?;
+    //     Ok(Self { data, guard })
+    // }
+}
+
+#[derive(Shrinkwrap)]
+pub(crate) struct EnvWriteRef<'a, T: 'a> {
+    #[shrinkwrap(main_field)]
+    data: T,
+    guard: RwLockWriteGuard<'a, Rkv>,
+}
+
+impl<'a, T: 'a> EnvWriteRef<'a, T> {
+    fn from_parts(data: T, guard: RwLockWriteGuard<'a, Rkv>) -> Self {
+        Self { data, guard }
+    }
+
+    // pub async fn new<F>(mutex: &'a RwLock<Rkv>, f: F) -> Result<EnvWriteRef<'a, T>, DatabaseError>
+    // where
+    //     F: FnOnce(&RwLockWriteGuard<'a, Rkv>) -> Result<&'a T, DatabaseError>,
+    // {
+    //     let guard = mutex.write().await;
+    //     let data = f(&guard)?;
+    //     Ok(Self { data, guard })
+    // }
+}
+
 /// The canonical representation of a reference to a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
 #[derive(Clone)]
-pub struct Environment(Arc<Rkv>);
+pub struct Environment(Arc<RwLock<Rkv>>);
 
+#[async_trait]
 pub trait ReadManager {
-    fn reader(&self) -> DatabaseResult<Reader>;
+    async fn reader(&self) -> DatabaseResult<Reader>;
 
-    fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    async fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>;
 }
 
+#[async_trait]
 pub trait WriteManager {
-    fn writer(&self) -> DatabaseResult<Writer>;
+    async fn writer(&self) -> DatabaseResult<Writer>;
 
-    fn with_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    async fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
+#[async_trait]
 impl ReadManager for Environment {
-    fn reader(&self) -> DatabaseResult<Reader> {
-        Ok(Reader::from(self.0.read()?))
+    async fn reader<'e>(&'e self) -> DatabaseResult<Reader<'e>> {
+        let guard = self.0.read().await;
+        let data = ThreadsafeRkvReader::from(guard.read()?);
+        let reader: Reader =
+            EnvReadRef::from_parts(data, guard).into();
+        Ok(reader)
     }
 
-    fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    async fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>,
     {
-        f(Reader::from(self.0.read().map_err(Into::into)?))
+        f(self.reader().await?)
     }
 }
 
+#[async_trait]
 impl WriteManager for Environment {
-    fn writer(&self) -> DatabaseResult<Writer> {
-        Ok(self.0.write()?.into())
+    async fn writer<'e>(&'e self) -> DatabaseResult<Writer<'e>> {
+        let guard = self.0.read().await;
+        let writer: Writer = EnvReadRef::from_parts(guard.write()?, guard).into();
+        Ok(writer)
     }
 
-    fn with_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    async fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let mut writer = self.0.write().map_err(Into::into)?.into();
+        let mut writer = self.writer().await?;
         let result = f(&mut writer);
         writer.commit().map_err(Into::into)?;
         result
@@ -125,16 +185,18 @@ impl WriteManager for Environment {
 }
 
 impl Environment {
-    pub fn inner(&self) -> &Rkv {
-        &self.0
+    pub async fn inner<'e>(&'e self) -> RwLockReadGuard<'e, Rkv> {
+        self.0.read().await
     }
 
-    pub fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
+    pub async fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
         let mut map = DB_MANAGERS.write();
-        let dbs = map
-            .entry(self.0.as_ref().path().into())
-            .or_insert_with(|| Arc::new(DbManager::new(self.clone()).expect("TODO")));
+        let dbs = match map.entry(self.inner().await.path().into()) {
+            hash_map::Entry::Occupied(e) => e.get(),
+            hash_map::Entry::Vacant(e) => {
+                e.insert(Arc::new(DbManager::new(self.clone()).await.expect("TODO")))
+            }
+        };
         Ok(dbs.clone())
-        // DbManager::new(self.env())
     }
 }
