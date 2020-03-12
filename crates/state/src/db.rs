@@ -1,5 +1,5 @@
 use crate::{
-    env::Environment,
+    env::{EnvironmentRef, Environment},
     error::{DatabaseError, DatabaseResult},
 };
 use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
@@ -61,13 +61,13 @@ lazy_static! {
 /// so its constructor is intentionally private.
 /// It uses a UniversalMap to retrieve heterogeneously typed data via special keys
 /// whose type includes the type of the corresponding value.
-pub struct DbManager {
-    env: Environment,
+pub struct DbManager<'e> {
+    env: &'e EnvironmentRef<'e>,
     um: UniversalMap<DbName>,
 }
 
-impl DbManager {
-    pub(crate) async fn new(env: Environment) -> DatabaseResult<Self> {
+impl<'e> DbManager<'e> {
+    pub(crate) fn new(env: &'e EnvironmentRef<'e>) -> DatabaseResult<DbManager<'e>> {
         let mut this = Self {
             env,
             um: UniversalMap::new(),
@@ -76,7 +76,7 @@ impl DbManager {
         // which could cause a panic.
         // This can be simplified (and made safer) if DbManager, ReadManager and WriteManager
         // are just traits of the Rkv environment.
-        this.initialize().await?;
+        this.initialize()?;
         Ok(this)
     }
 
@@ -86,49 +86,49 @@ impl DbManager {
             .ok_or(DatabaseError::StoreNotInitialized(key.key().to_owned()))
     }
 
-    async fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> DatabaseResult<()> {
+    fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> DatabaseResult<()> {
         let db_name = key.key();
         let db_str = format!("{}", db_name);
         let _ = match db_name.kind() {
             DbKind::Single => self.um.insert(
                 key.with_value_type(),
                 self.env
-                    .inner().await
+                    .inner()
                     .open_single(db_str.as_str(), StoreOptions::create())?,
             ),
             DbKind::SingleInt => self.um.insert(
                 key.with_value_type(),
                 self.env
-                    .inner().await
+                    .inner()
                     .open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
             ),
             DbKind::Multi => self.um.insert(
                 key.with_value_type(),
                 self.env
-                    .inner().await
+                    .inner()
                     .open_multi(db_str.as_str(), StoreOptions::create())?,
             ),
         };
         Ok(())
     }
 
-    pub async fn get_or_create<V: 'static + Send + Sync>(
+    pub fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,
     ) -> DatabaseResult<&V> {
         if self.um.get(key).is_some() {
             return Ok(self.um.get(key).unwrap());
         } else {
-            self.create(key).await?;
+            self.create(key)?;
             Ok(self.um.get(key).unwrap().clone())
         }
     }
 
-    async fn initialize(&mut self) -> DatabaseResult<()> {
-        self.create(&*CHAIN_ENTRIES).await?;
-        self.create(&*CHAIN_HEADERS).await?;
-        self.create(&*CHAIN_META).await?;
-        self.create(&*CHAIN_SEQUENCE).await?;
+    fn initialize(&mut self) -> DatabaseResult<()> {
+        self.create(&*CHAIN_ENTRIES)?;
+        self.create(&*CHAIN_HEADERS)?;
+        self.create(&*CHAIN_META)?;
+        self.create(&*CHAIN_SEQUENCE)?;
         Ok(())
     }
 }

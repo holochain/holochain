@@ -21,7 +21,7 @@ const MAX_DBS: u32 = 32;
 lazy_static! {
     static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, Environment>> =
         RwLockSync::new(HashMap::new());
-    static ref DB_MANAGERS: RwLockSync<HashMap<PathBuf, Arc<DbManager>>> =
+    static ref DB_MANAGERS: RwLockSync<HashMap<PathBuf, Arc<DbManager<'static>>>> =
         RwLockSync::new(HashMap::new());
 }
 
@@ -131,74 +131,71 @@ impl Environment {
     }
 }
 
+
 pub struct EnvironmentRef<'e>(RwLockReadGuard<'e, Rkv>);
 
-#[async_trait]
 pub trait ReadManager<'e> {
-    async fn reader(&'e self) -> DatabaseResult<Reader<'e>>;
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>>;
 
-    async fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>;
 }
 
-#[async_trait]
 pub trait WriteManager<'e> {
-    async fn writer(&'e self) -> DatabaseResult<Writer<'e>>;
+    fn writer(&'e self) -> DatabaseResult<Writer<'e>>;
 
-    async fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
-#[async_trait]
 impl<'e> ReadManager<'e> for EnvironmentRef<'e> {
-    async fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
         let reader = Reader::from(ThreadsafeRkvReader::from(self.0.read()?));
         Ok(reader)
     }
 
-    async fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>,
     {
-        f(self.reader().await?)
+        f(self.reader()?)
     }
 }
 
-#[async_trait]
 impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
-    async fn writer(&'e self) -> DatabaseResult<Writer<'e>> {
+    fn writer(&'e self) -> DatabaseResult<Writer<'e>> {
         let writer = Writer::from(self.0.write()?);
         Ok(writer)
     }
 
-    async fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let mut writer = self.writer().await?;
+        let mut writer = self.writer()?;
         let result = f(&mut writer);
         writer.commit().map_err(Into::into)?;
         result
     }
 }
 
-impl Environment {
-    pub async fn inner<'e>(&'e self) -> RwLockReadGuard<'e, Rkv> {
-        self.0.read().await
+impl<'e> EnvironmentRef<'e> {
+    pub fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
+        &self.0
     }
 
-    pub async fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
+    pub fn dbs(&'e self) -> DatabaseResult<Arc<DbManager<'e>>> {
         let mut map = DB_MANAGERS.write();
-        let dbs = match map.entry(self.inner().await.path().into()) {
+        let dbs = match map.entry(self.0.path().into()) {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => {
-                e.insert(Arc::new(DbManager::new(self.clone()).await.expect("TODO"))).clone()
+                e.insert(Arc::new(DbManager::new(self).expect("TODO"))).clone()
             }
         };
         Ok(dbs)

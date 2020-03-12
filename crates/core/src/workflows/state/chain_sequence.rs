@@ -175,15 +175,14 @@ pub mod tests {
     #[tokio::test]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
         let env = test_env();
-        let env1 = env.clone();
-        let env2 = env.clone();
+        let env1 = env.clone().guard().await;
+        let env2 = env.clone().guard().await;
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
-            let env = env1.clone();
-            let dbs = env.dbs()?;
-            let reader = env.reader()?;
+            let dbs = env1.dbs()?;
+            let reader = env1.reader()?;
             let mut buf = { ChainSequenceBuf::new(&reader, &dbs)? };
             buf.add_header(Address::from("0"));
             buf.add_header(Address::from("1"));
@@ -199,16 +198,15 @@ pub mod tests {
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = env2.clone();
-            let dbs = env.dbs()?;
+            let dbs = env2.dbs()?;
 
-            let reader = env.reader()?;
+            let reader = env2.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));
             buf.add_header(Address::from("4"));
             buf.add_header(Address::from("5"));
 
-            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            env2.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())
         });

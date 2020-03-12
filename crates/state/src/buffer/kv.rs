@@ -196,7 +196,7 @@ pub mod tests {
     }
 
     #[test]
-    fn kv_empty_iterators() -> DatabaseResult<()> {
+    async fn kv_empty_iterators() -> DatabaseResult<()> {
         let env = test_env();
         let db = env
             .inner()
@@ -217,7 +217,7 @@ pub mod tests {
 
     /// TODO break up into smaller tests
     #[test]
-    fn kv_store_sanity_check() -> DatabaseResult<()> {
+    async fn kv_store_sanity_check() -> DatabaseResult<()> {
         let env = test_env();
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;

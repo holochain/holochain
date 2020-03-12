@@ -21,7 +21,8 @@ pub struct WorkflowRunner<'c, Cell: RunnerCellT>(&'c Cell);
 
 impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
-        let env = self.0.state_env().clone();
+        let env = self.0.state_env();
+        let env = env.guard().await;
         let dbs = env.dbs()?;
 
         // TODO: is it possible to DRY this up with a macro?
@@ -45,8 +46,8 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
         &'a self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
-        let env = self.0.state_env().clone();
         async move {
+            let env = self.0.state_env().guard().await;
             let WorkflowEffects {
                 workspace,
                 triggers,

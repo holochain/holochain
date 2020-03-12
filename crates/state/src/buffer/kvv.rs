@@ -166,6 +166,7 @@ pub mod tests {
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
+    use tokio::test;
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
     struct V(pub u32);
@@ -181,7 +182,7 @@ pub mod tests {
     }
 
     #[test]
-    fn kvv_store_scratch_insert_delete() {
+    async fn kvv_store_scratch_insert_delete() {
         let arc = test_env();
         let env = arc.env();
         let wm = WriteManager::new(&env);
@@ -217,7 +218,7 @@ pub mod tests {
     }
 
     #[test]
-    fn kvv_store_get_list() {
+    async fn kvv_store_get_list() {
         let arc = test_env();
         let env = arc.env();
 
@@ -247,7 +248,7 @@ pub mod tests {
     }
 
     #[test]
-    fn kvv_store_duplicate_insert() {
+    async fn kvv_store_duplicate_insert() {
         let arc = test_env();
         let env = arc.env();
 
@@ -282,7 +283,7 @@ pub mod tests {
     }
 
     #[test]
-    fn kvv_store_duplicate_delete() {
+    async fn kvv_store_duplicate_delete() {
         let arc = test_env();
         let env = arc.env();
         let wm = WriteManager::new(&env);
