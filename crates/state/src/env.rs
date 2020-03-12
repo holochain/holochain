@@ -74,51 +74,6 @@ fn rkv_builder(
     }
 }
 
-#[derive(Shrinkwrap)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub(crate) struct EnvReadRef<'a, T: 'a> {
-    #[shrinkwrap(main_field)]
-    data: T,
-    guard: RwLockReadGuard<'a, Rkv>,
-}
-
-impl<'a, T: 'a> EnvReadRef<'a, T> {
-    fn from_parts(data: T, guard: RwLockReadGuard<'a, Rkv>) -> Self {
-        Self { data, guard }
-    }
-
-    // pub async fn new<F>(mutex: &'a RwLock<Rkv>, f: F) -> Result<EnvReadRef<'a, T>, DatabaseError>
-    // where
-    //     F: FnOnce(&RwLockReadGuard<'a, Rkv>) -> Result<T, DatabaseError>,
-    // {
-    //     let guard = mutex.read().await;
-    //     let data = f(&guard)?;
-    //     Ok(Self { data, guard })
-    // }
-}
-
-#[derive(Shrinkwrap)]
-pub(crate) struct EnvWriteRef<'a, T: 'a> {
-    #[shrinkwrap(main_field)]
-    data: T,
-    guard: RwLockWriteGuard<'a, Rkv>,
-}
-
-impl<'a, T: 'a> EnvWriteRef<'a, T> {
-    fn from_parts(data: T, guard: RwLockWriteGuard<'a, Rkv>) -> Self {
-        Self { data, guard }
-    }
-
-    // pub async fn new<F>(mutex: &'a RwLock<Rkv>, f: F) -> Result<EnvWriteRef<'a, T>, DatabaseError>
-    // where
-    //     F: FnOnce(&RwLockWriteGuard<'a, Rkv>) -> Result<&'a T, DatabaseError>,
-    // {
-    //     let guard = mutex.write().await;
-    //     let data = f(&guard)?;
-    //     Ok(Self { data, guard })
-    // }
-}
-
 /// The canonical representation of a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
