@@ -38,7 +38,7 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
-        let db: Store<'e, R> = IntKvBuf::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
+        let db: Store<'e, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 

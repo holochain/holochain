@@ -52,7 +52,7 @@ where
 
     pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuf<'env, K, V, RR> {
         IntKvBuf {
-            db: self.db.clone(),
+            db: self.db,
             reader,
             scratch: HashMap::new(),
         }
