@@ -2,10 +2,10 @@
 name = "test_utils"
 version = "0.0.42-alpha5"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
-description = "holochain test utils"
+description = "Holochain test utils"
 license = "GPL-3.0-only"
-homepage = "https://github.com/holochain/holochain-rust"
-documentation = "https://github.com/holochain/holochain-rust"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
 edition = "2018"
 
 [dependencies]
