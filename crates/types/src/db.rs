@@ -1,6 +1,9 @@
+//! Utility items related to data persistence.
+
 use crate::cell::CellId;
 use std::path::{Path, PathBuf};
 
+/// Path to persistence storage.
 #[derive(Clone, Debug)]
 pub struct DatabasePath(PathBuf);
 

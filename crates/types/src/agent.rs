@@ -94,19 +94,21 @@ impl AddressableContent for AgentId {
     }
 }
 
-/// should these not be in the tests module?
+// should these not be in the tests module?!?
+
+/// Valid test agent id
 pub static GOOD_ID: &str = "HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa";
-/// [DOC_STUB]
+/// Invalid test agent id
 pub static BAD_ID: &str = "HcScIkRaAaaaaaaaaaAaaaBBBBaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa";
-/// [DOC_STUB]
+/// Invalid test agent id #2
 pub static TOO_BAD_ID: &str = "HcScIkRaAaaaaaaaaaBBBBBBBBaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa";
 
-/// [DOC_STUB]
+/// get a valid test agent id
 pub fn test_agent_id() -> AgentId {
     AgentId::new("bob", GOOD_ID.to_string())
 }
 
-/// [DOC_STUB]
+/// get a named test agent id
 pub fn test_agent_id_with_name(name: &str) -> AgentId {
     AgentId::new(name, name.to_string())
 }
