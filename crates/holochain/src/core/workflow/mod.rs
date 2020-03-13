@@ -4,7 +4,7 @@ mod invoke_zome;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 
-use crate::workflows::state::workspace::Workspace;
+use crate::core::state::workspace::Workspace;
 use std::time::Duration;
 
 use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};

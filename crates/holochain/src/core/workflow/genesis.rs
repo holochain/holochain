@@ -1,5 +1,5 @@
 use super::WorkflowResult;
-use crate::workflows::state::workspace::GenesisWorkspace;
+use crate::core::state::workspace::GenesisWorkspace;
 use sx_types::{agent::AgentId, dna::Dna};
 
 type WS<'env> = GenesisWorkspace<'env>;

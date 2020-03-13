@@ -3,7 +3,7 @@ use crate::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    workflows::{ribosome::WasmRibosome, runner::RunnerCellT},
+    core::{ribosome::WasmRibosome, runner::RunnerCellT},
 };
 use std::hash::{Hash, Hasher};
 use sx_state::env::Environment;

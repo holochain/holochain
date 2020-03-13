@@ -1,5 +1,5 @@
 use super::error::WorkflowRunResult;
-use crate::workflows::{
+use crate::core::{
     ribosome::WasmRibosome,
     state::workspace::{self, Workspace},
     workflow,

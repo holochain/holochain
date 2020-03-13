@@ -1,5 +1,5 @@
 use super::{WorkflowEffects, WorkflowResult};
-use crate::workflows::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
 use sx_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(

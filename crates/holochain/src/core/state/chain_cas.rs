@@ -1,4 +1,4 @@
-use crate::workflows::state::source_chain::{
+use crate::core::state::source_chain::{
     ChainInvalidReason, SourceChainError, SourceChainResult,
 };
 use sx_state::{

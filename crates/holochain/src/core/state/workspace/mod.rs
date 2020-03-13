@@ -28,7 +28,7 @@ pub trait Workspace: Send {
 pub mod tests {
 
     use super::Workspace;
-    use crate::workflows::state::workspace::WorkspaceResult;
+    use crate::core::state::workspace::WorkspaceResult;
     use sx_state::{
         buffer::{BufferedStore, KvBuf},
         db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},

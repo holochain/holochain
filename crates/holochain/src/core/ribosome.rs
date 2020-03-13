@@ -1,4 +1,4 @@
-use crate::workflows::wasm_engine::WasmEngine;
+use crate::core::wasm_engine::WasmEngine;
 use mockall::automock;
 use sx_types::{
     dna::Dna,
