@@ -1,8 +1,8 @@
+use crate::persistence::cas::content::Address;
 /// capabilities implements the capability request functionality used to check
 /// that a given capability has been granted for actions like zome calls
 use crate::signature::{Provenance, Signature};
 use holochain_json_api::{error::JsonError, json::JsonString};
-use crate::persistence::cas::content::Address;
 use serde::{Deserialize, Serialize};
 
 //--------------------------------------------------------------------------------------------------

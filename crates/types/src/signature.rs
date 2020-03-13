@@ -2,8 +2,8 @@
 //! a way of providing cryptographically verifiable proof of a given agent
 //! as having been the author of a given data entry.
 
-use holochain_json_api::{error::JsonError, json::JsonString};
 use crate::persistence::cas::content::Address;
+use holochain_json_api::{error::JsonError, json::JsonString};
 use serde::{Deserialize, Serialize};
 
 /// Provenance is a tuple of initiating agent public key and signature of some item being signed
