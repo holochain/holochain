@@ -11,6 +11,9 @@ use serde_json::Error as SerdeError;
 use std::fmt;
 use thiserror::Error;
 
+/// Holochain high-level error type
+/// TODO - Stop calling this "Skunk"
+#[allow(missing_docs)] // these are self explanitory
 #[derive(Error, Debug)]
 pub enum SkunkError {
     Todo(String),
@@ -57,9 +60,12 @@ impl From<String> for SkunkError {
 }
 
 impl SkunkError {
+    /// Construct an new Error type from something that can be converted to a String
     pub fn new<S: Into<String>>(s: S) -> Self {
         SkunkError::Todo(s.into())
     }
 }
 
+/// High-level Holochain Result type
+/// TODO - Stop calling this "Skunk"
 pub type SkunkResult<T> = Result<T, SkunkError>;

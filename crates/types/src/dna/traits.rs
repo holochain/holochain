@@ -24,6 +24,7 @@ impl FromStr for ReservedTraitNames {
 }
 
 impl ReservedTraitNames {
+    /// Get the reserved trait name literal
     pub fn as_str(&self) -> &'static str {
         match *self {
             ReservedTraitNames::Public => "hc_public",
