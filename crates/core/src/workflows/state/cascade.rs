@@ -1,5 +1,5 @@
 use super::chain_cas::ChainCasBuf;
-use holochain_persistence_api::cas::content::Address;
+use sx_types::persistence::cas::content::Address;
 use sx_state::{buffer::KvvBuf, prelude::Reader};
 
 #[allow(dead_code)]

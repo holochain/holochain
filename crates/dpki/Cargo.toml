@@ -14,7 +14,6 @@ base64 = "0.10.1"
 sx_types = { path = "../types" }
 newrelic = "0.2"
 lib3h_sodium = "0.0.38"
-holochain_persistence_api = "0.0.18"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = { version = "1.0.48", features = ["preserve_order"] }
 hcid = "0.0.6"

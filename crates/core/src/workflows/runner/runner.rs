@@ -1,6 +1,6 @@
 use super::error::WorkflowRunResult;
 use crate::workflows::{
-    ribosome::Ribosome,
+    ribosome::WasmRibosome,
     state::workspace::{self, Workspace},
     workflow,
 };
@@ -14,15 +14,16 @@ use workspace::WorkspaceError;
 
 pub trait RunnerCellT: Send + Sync {
     fn state_env(&self) -> Environment;
-    fn get_ribosome(&self) -> Ribosome;
+    fn get_ribosome(&self) -> WasmRibosome;
 }
 
 pub struct WorkflowRunner<'c, Cell: RunnerCellT>(&'c Cell);
 
 impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
-        let env = self.0.state_env().clone();
-        let dbs = env.dbs()?;
+        let environ = self.0.state_env();
+        let dbs = environ.dbs().await?;
+        let env = environ.guard().await;
 
         // TODO: is it possible to DRY this up with a macro?
         match call {
@@ -45,17 +46,19 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
         &'a self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
-        let env = self.0.state_env().clone();
         async move {
+            let arc = self.0.state_env();
+            let env = arc.guard().await;
             let WorkflowEffects {
                 workspace,
                 triggers,
                 callbacks,
                 signals,
             } = effects;
-            env.writer()
-                .map_err(Into::<WorkspaceError>::into)
-                .and_then(|writer| workspace.commit_txn(writer).map_err(Into::into))?;
+            {
+                let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
+                workspace.commit_txn(writer).map_err(Into::<WorkspaceError>::into)?;
+            }
             for WorkflowTrigger { call, interval } in triggers {
                 if let Some(_delay) = interval {
                     // FIXME: implement or discard
