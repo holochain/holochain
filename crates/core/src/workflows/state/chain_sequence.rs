@@ -21,7 +21,6 @@ use sx_types::prelude::Address;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
     header_address: Address,
-    index: u32, // FIXME: this is the key, so once iterators can return keys, we can remove this
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
@@ -52,7 +51,7 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     fn from_db<RR: Readable>(db: Store<'e, RR>) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         let (next_index, tx_seq, current_head) = latest
-            .map(|(_, item)| (item.index + 1, item.tx_seq + 1, Some(item.header_address)))
+            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
             .unwrap_or((0, 0, None));
         let persisted_head = current_head.clone();
 
@@ -74,7 +73,6 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
             self.next_index,
             ChainSequenceItem {
                 header_address: header_address.clone(),
-                index: self.next_index,
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
@@ -150,7 +148,7 @@ pub mod tests {
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
+            let items: Vec<u32> = buf.db.iter_raw()?.map(|(key, _)| key).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
         })?;
