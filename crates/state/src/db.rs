@@ -2,7 +2,7 @@ use crate::{
     env::Environment,
     error::{DatabaseError, DatabaseResult},
 };
-use holochain_persistence_api::univ_map::{Key as UmKey, UniversalMap};
+use sx_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
 
 use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};

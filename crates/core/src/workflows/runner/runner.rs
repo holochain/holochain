@@ -55,9 +55,10 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
                 callbacks,
                 signals,
             } = effects;
-            env.writer()
-                .map_err(Into::<WorkspaceError>::into)
-                .and_then(|writer| workspace.commit_txn(writer).map_err(Into::into))?;
+            {
+                let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
+                workspace.commit_txn(writer).map_err(Into::<WorkspaceError>::into)?;
+            }
             for WorkflowTrigger { call, interval } in triggers {
                 if let Some(_delay) = interval {
                     // FIXME: implement or discard

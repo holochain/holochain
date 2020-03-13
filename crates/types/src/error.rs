@@ -6,7 +6,6 @@
 //! over to the appropriate error type in this crate.
 
 use holochain_json_api::error::JsonError;
-use holochain_persistence_api::error::PersistenceError;
 use lib3h_crypto_api::CryptoError;
 use serde_json::Error as SerdeError;
 use std::fmt;
@@ -21,7 +20,6 @@ pub enum SkunkError {
     SerdeError(#[from] SerdeError),
     JsonError(#[from] JsonError),
     CryptoError(#[from] CryptoError),
-    PersistenceError(#[from] PersistenceError),
     Base64DecodeError(#[from] base64::DecodeError),
     Utf8Error(#[from] std::str::Utf8Error),
     LocksmithError(#[from] holochain_locksmith::LocksmithError),
@@ -46,7 +44,6 @@ impl PartialEq for SkunkError {
             (SerdeError(a), SerdeError(b)) => a.to_string() == b.to_string(),
             (JsonError(a), JsonError(b)) => a == b,
             (CryptoError(a), CryptoError(b)) => a == b,
-            (PersistenceError(a), PersistenceError(b)) => a == b,
             (Base64DecodeError(a), Base64DecodeError(b)) => a == b,
             _ => false,
         }

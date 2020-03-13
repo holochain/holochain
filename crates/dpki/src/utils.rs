@@ -8,7 +8,7 @@ use sx_types::{
     error::{SkunkResult, SkunkError},
     signature::{Provenance, Signature},
 };
-use holochain_persistence_api::cas::content::Address;
+use sx_types::persistence::cas::content::Address;
 use lib3h_sodium::{kdf, secbuf::SecBuf, sign};
 use std::str;
 
