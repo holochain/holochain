@@ -1,5 +1,5 @@
 [package]
-name = "test_utils"
+name = "sx_test_utils"
 version = "0.0.42-alpha5"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 description = "Holochain test utils"

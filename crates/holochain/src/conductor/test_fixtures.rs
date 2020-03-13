@@ -1,4 +1,4 @@
-use test_utils::create_test_dna_with_wat;
+use sx_test_utils::create_test_dna_with_wat;
 use sx_types::dna::fn_declarations::FnDeclaration;
 use crate::config::DnaLoader;
 use std::convert::TryFrom;
