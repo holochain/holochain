@@ -167,6 +167,7 @@ pub mod tests {
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
 
+
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
     struct V(pub u32);
 
@@ -180,9 +181,10 @@ pub mod tests {
         Op::Delete(Box::new(v))
     }
 
-    #[test]
-    fn kvv_store_scratch_insert_delete() {
+    #[tokio::test]
+    async fn kvv_store_scratch_insert_delete() {
         let arc = test_env();
+let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
 
@@ -216,9 +218,10 @@ pub mod tests {
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
     }
 
-    #[test]
-    fn kvv_store_get_list() {
+    #[tokio::test]
+    async fn kvv_store_get_list() {
         let arc = test_env();
+let env = arc.guard().await;
         let env = arc.env();
 
         let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
@@ -246,9 +249,10 @@ pub mod tests {
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2)});
     }
 
-    #[test]
-    fn kvv_store_duplicate_insert() {
+    #[tokio::test]
+    async fn kvv_store_duplicate_insert() {
         let arc = test_env();
+let env = arc.guard().await;
         let env = arc.env();
 
         fn add_twice(env: &Rkv) {
@@ -281,9 +285,10 @@ pub mod tests {
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(1)});
     }
 
-    #[test]
-    fn kvv_store_duplicate_delete() {
+    #[tokio::test]
+    async fn kvv_store_duplicate_delete() {
         let arc = test_env();
+let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
 
@@ -305,6 +310,7 @@ pub mod tests {
     #[test]
     fn kvv_store_get_missing_key() {
         let arc = test_env();
+let env = arc.guard().await;
         let env = arc.env();
         let store: Store = KvvBuf::create(&env, "kvv").unwrap();
         assert_eq!(store.get(&"wompwomp").unwrap(), hashset! {});

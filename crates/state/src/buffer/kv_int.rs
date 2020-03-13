@@ -180,10 +180,13 @@ pub mod tests {
 
     type Store<'a> = IntKvBuf<'a, u32, V>;
 
-    #[test]
-    fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
-        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+    #[tokio::test]
+    async fn kv_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
             let mut buf: Store = IntKvBuf::new(&reader, db)?;
@@ -215,9 +218,10 @@ pub mod tests {
         })
     }
 
-    #[test]
-    fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_empty_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env
             .inner()
             .open_integer("kv", StoreOptions::create())

@@ -154,6 +154,7 @@ pub mod tests {
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
+
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
         name: String,
@@ -164,10 +165,13 @@ pub mod tests {
 
     type TestBuf<'a> = KvBuf<'a, &'a str, V>;
 
-    #[test]
-    fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
-        let db = env.inner().open_single("kv", StoreOptions::create())?;
+    #[tokio::test]
+    async fn kv_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_single("kv", StoreOptions::create())?;
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut buf: TestBuf = KvBuf::new(&reader, db)?;
@@ -194,9 +198,10 @@ pub mod tests {
         })
     }
 
-    #[test]
-    fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_empty_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env
             .inner()
             .open_single("kv", StoreOptions::create())
@@ -215,18 +220,19 @@ pub mod tests {
     }
 
     /// TODO break up into smaller tests
-    #[test]
-    fn kv_store_sanity_check() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_store_sanity_check() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
-        let mut writer = env.writer()?;
 
         let testval = TestVal {
             name: "Joe".to_owned(),
         };
 
-        env.with_reader::<DatabaseError, _, _>(|reader| {
+        let writer = env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut writer = env.writer()?;
             let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
 
@@ -243,7 +249,7 @@ pub mod tests {
             let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
             kv2.flush_to_txn(&mut writer)?;
-            Ok(())
+            Ok(writer)
         })?;
 
         // Finish finalizing the transaction

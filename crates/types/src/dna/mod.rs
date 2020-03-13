@@ -45,7 +45,7 @@ use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use holochain_persistence_api::cas::content::{AddressableContent, Content};
+use crate::persistence::cas::content::{AddressableContent, Content};
 use multihash;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, json, Value};
@@ -306,7 +306,7 @@ pub mod tests {
         test_utils::test_dna,
     };
     use holochain_json_api::json::JsonString;
-    use holochain_persistence_api::cas::content::Address;
+    use crate::persistence::cas::content::Address;
     use std::convert::TryFrom;
 
     #[test]

@@ -105,11 +105,13 @@ pub mod tests {
     use crate::workflows::state::source_chain::SourceChainResult;
     use sx_state::{env::ReadManager, test_utils::test_env};
 
-    #[test]
-    fn header_for_entry() -> SourceChainResult<()> {
+
+    #[tokio::test]
+    async fn header_for_entry() -> SourceChainResult<()> {
         // TODO: write test
-        let env = test_env();
-        let dbs = env.dbs()?;
+        let arc = test_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
         env.with_reader(|reader| {
             let _source_chain = SourceChainBuf::new(&reader, &dbs)?;
             Ok(())
