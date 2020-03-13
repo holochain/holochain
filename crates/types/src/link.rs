@@ -1,5 +1,5 @@
-use holochain_json_api::{error::JsonError, json::JsonString};
 use crate::persistence::cas::content::Address;
+use holochain_json_api::{error::JsonError, json::JsonString};
 use regex::Regex;
 
 type LinkType = String;

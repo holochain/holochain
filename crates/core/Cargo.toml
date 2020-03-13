@@ -15,7 +15,6 @@ hcid = "0.0.6"
 futures = "0.3.1"
 sx_state = { path = "../state" }
 sx_types = { path = "../types" }
-log = "0.4.8"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.48"
 shrinkwraprs = "0.3.0"
@@ -36,6 +35,7 @@ toml = "0.5.0"
 petgraph = "0.5.0"
 boolinator = "2.4.0"
 base64 = "0.10.1"
+tracing = "=0.1.13"
 
 [dev-dependencies]
 anyhow = "1.0.26"

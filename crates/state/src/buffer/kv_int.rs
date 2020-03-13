@@ -10,6 +10,7 @@ use crate::{
 use rkv::IntegerStore;
 
 use std::collections::HashMap;
+use tracing::*;
 
 /// Transactional operations on a KV store with integer keys
 /// Put: add or replace this KV
@@ -52,7 +53,7 @@ where
 
     pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuf<'env, K, V, RR> {
         IntKvBuf {
-            db: self.db.clone(),
+            db: self.db,
             reader,
             scratch: HashMap::new(),
         }
@@ -151,7 +152,7 @@ where
             )),
             None => None,
             x => {
-                dbg!(x);
+                error!(?x);
                 panic!("TODO");
             }
         }

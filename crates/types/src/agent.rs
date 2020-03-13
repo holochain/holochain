@@ -1,12 +1,16 @@
 //! agent module
 
-use crate::{entry::Entry, error::SkunkResult, prelude::DefaultJson};
+use crate::{
+    entry::Entry,
+    error::SkunkResult,
+    persistence::cas::content::{Address, AddressableContent, Content},
+    prelude::DefaultJson,
+};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use crate::persistence::cas::content::{Address, AddressableContent, Content};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, str};
 

@@ -5,6 +5,7 @@ use crate::{
 };
 use rkv::SingleStore;
 use std::collections::HashMap;
+use tracing::*;
 
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
@@ -135,7 +136,7 @@ where
             )),
             None => None,
             x => {
-                dbg!(x);
+                error!(?x);
                 panic!("TODO");
             }
         }

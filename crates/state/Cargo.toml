@@ -12,7 +12,6 @@ edition = "2018"
 sx_types = { path = "../types"}
 futures = "0.3.1"
 thiserror = "1.0.10"
-log = "0.4.8"
 mockall = "0.6.0"
 rkv = { git = "https://github.com/holochain/rkv.git" }
 serde = "1.0.104"
@@ -25,6 +24,7 @@ owning_ref = "0.4.1"
 tempdir = "0.3.7"  # technically a dev-dependency, but is used by code that needs to be accessed by other crates
 parking_lot = "0.10.0"
 bincode = "1.2.1"
+tracing = "0.1.13"
 anyhow = "1.0.26"
 tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 derive_more = "0.99.3"

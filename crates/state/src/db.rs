@@ -83,7 +83,7 @@ impl DbManager {
     pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> DatabaseResult<&V> {
         self.um
             .get(key)
-            .ok_or(DatabaseError::StoreNotInitialized(key.key().to_owned()))
+            .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().to_owned()))
     }
 
     async fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> DatabaseResult<()> {

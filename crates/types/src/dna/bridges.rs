@@ -1,8 +1,7 @@
 //! A bridge is the definition of a connection to another DNA that runs under the same agency,
 //! i.e. in the same conductor.
 
-use crate::dna::fn_declarations::Trait;
-use crate::persistence::cas::content::Address;
+use crate::{dna::fn_declarations::Trait, persistence::cas::content::Address};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

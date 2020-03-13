@@ -16,12 +16,12 @@ use sx_state::{
     prelude::{Readable, Writer},
 };
 use sx_types::prelude::Address;
+use tracing::*;
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
     header_address: Address,
-    index: u32, // FIXME: this is the key, so once iterators can return keys, we can remove this
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
@@ -38,7 +38,7 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
-        let db: Store<'e, R> = IntKvBuf::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
+        let db: Store<'e, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 
@@ -52,7 +52,7 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     fn from_db<RR: Readable>(db: Store<'e, RR>) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         let (next_index, tx_seq, current_head) = latest
-            .map(|(_, item)| (item.index + 1, item.tx_seq + 1, Some(item.header_address)))
+            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
             .unwrap_or((0, 0, None));
         let persisted_head = current_head.clone();
 
@@ -69,16 +69,17 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
         self.current_head.as_ref()
     }
 
+    #[instrument(skip(self))]
     pub fn add_header(&mut self, header_address: Address) {
         self.db.put(
             self.next_index,
             ChainSequenceItem {
                 header_address: header_address.clone(),
-                index: self.next_index,
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
         );
+        trace!(self.next_index);
         self.next_index += 1;
         self.current_head = Some(header_address);
     }
@@ -105,17 +106,16 @@ pub mod tests {
 
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
     use crate::workflows::state::source_chain::SourceChainResult;
-
     use sx_state::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,
         test_utils::test_env,
     };
-    use sx_types::prelude::Address;
-
+    use sx_types::{observability, prelude::Address};
 
     #[tokio::test]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
+        observability::test_run().ok();
         let arc = test_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
@@ -150,7 +150,7 @@ pub mod tests {
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
+            let items: Vec<u32> = buf.db.iter_raw()?.map(|(key, _)| key).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
         })?;

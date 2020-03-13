@@ -16,6 +16,7 @@ pub mod entry;
 pub mod error;
 pub mod link;
 pub mod nucleus;
+pub mod observability;
 pub mod persistence;
 pub mod prelude;
 pub mod shims;

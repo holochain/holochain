@@ -7,8 +7,8 @@
 //!
 //! Thanks to Carmelo Piccione (@struktured) for the implementation which we ported here.
 
-use std::{any::Any, collections::HashMap, hash::Hash, marker::PhantomData};
 use shrinkwraprs::Shrinkwrap;
+use std::{any::Any, collections::HashMap, hash::Hash, marker::PhantomData};
 
 #[derive(Clone, Debug)]
 pub struct Key<K: Send + Sync, V>(K, PhantomData<V>);
@@ -50,7 +50,11 @@ impl<K: Eq + Hash + Send + Sync> UniversalMap<K> {
         Self(HashMap::new())
     }
 
-    pub fn insert<V: 'static + Send + Sync>(&mut self, key: Key<K, V>, value: V) -> Option<Box<dyn Any + Send + Sync>> {
+    pub fn insert<V: 'static + Send + Sync>(
+        &mut self,
+        key: Key<K, V>,
+        value: V,
+    ) -> Option<Box<dyn Any + Send + Sync>> {
         let result = self.0.insert(key.0, Box::new(value));
         result
     }

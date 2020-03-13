@@ -12,13 +12,13 @@ use crate::{
         entry_type::{AppEntryType, EntryType},
     },
     link::Link,
+    persistence::cas::content::{Address, AddressableContent, Content},
     prelude::*,
 };
 use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use crate::persistence::cas::content::{Address, AddressableContent, Content};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
 use std::convert::TryFrom;
@@ -128,9 +128,7 @@ pub mod tests {
         entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
     };
 
-    use crate::persistence::cas::{
-        content::{AddressableContent, AddressableContentTestSuite},
-    };
+    use crate::persistence::cas::content::{AddressableContent, AddressableContentTestSuite};
 
     /// dummy entry value
     #[cfg_attr(tarpaulin, skip)]

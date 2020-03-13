@@ -5,7 +5,6 @@ use crate::error::SkunkError;
 use backtrace::Backtrace;
 
 use base64;
-use log::*;
 use serde::{
     self,
     de::{Deserializer, Visitor},
@@ -18,6 +17,7 @@ use std::{
     ops::Deref,
     sync::{Arc, RwLock},
 };
+use tracing::*;
 // use wasmi::Module;
 // TODO: dummy shim for wasm, will be replaced by wasmer soon
 pub struct Module;
