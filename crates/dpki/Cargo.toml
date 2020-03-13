@@ -3,8 +3,8 @@ name = "sx_dpki"
 version = "0.0.42-alpha5"
 description = "holochain dpki"
 license = "GPL-3.0-only"
-homepage = "https://github.com/holochain/holochain-rust"
-documentation = "https://github.com/holochain/holochain-rust"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
