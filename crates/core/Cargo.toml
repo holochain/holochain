@@ -18,6 +18,7 @@ sx_types = { path = "../types" }
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.48"
 shrinkwraprs = "0.3.0"
+structopt = "=0.3.11"
 holochain_common = "0.0.43-alpha3"
 holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
@@ -39,3 +40,11 @@ tracing = "=0.1.13"
 
 [dev-dependencies]
 anyhow = "1.0.26"
+
+[lib]
+name = "holochain"
+path = "src/lib.rs"
+
+[[bin]]
+name = "holochain-2020"
+path = "src/bin/holochain.rs"

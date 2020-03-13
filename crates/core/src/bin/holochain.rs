@@ -1,7 +1,6 @@
-use futures::{executor::ThreadPool, task::SpawnExt};
 use std::sync::Arc;
 use structopt::StructOpt;
-use sx_core::conductor::{
+use holochain::conductor::{
     api::ExternalConductorApi,
     interface::{channel::ChannelInterface, Interface},
     Conductor,
@@ -25,31 +24,28 @@ struct Opt {
     )]
     structured: Output,
 }
-fn main() {
+
+#[tokio::main]
+async fn main() {
     println!("Running silly ChannelInterface example");
     let opt = Opt::from_args();
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
-    let executor = ThreadPool::new().unwrap();
-    futures::executor::block_on(example(executor));
+    example().await;
 }
 
-async fn example(executor: ThreadPool) {
+async fn example() {
     let (tx_network, _rx_network) = mpsc::channel(1);
     let (tx_dummy, rx_dummy) = mpsc::unbounded_channel();
     let conductor = Conductor::new(tx_network);
     let lock = Arc::new(RwLock::new(conductor));
     let handle = ExternalConductorApi::new(lock);
-    let interface_fut = executor
-        .spawn_with_handle(ChannelInterface::new(rx_dummy).spawn(handle))
-        .unwrap();
-    let driver_fut = executor
-        .spawn_with_handle(async move {
-            for _ in 0..50 as u32 {
-                debug!("sending dummy msg");
-                tx_dummy.send(true).unwrap();
-            }
-            tx_dummy.send(false).unwrap();
-        })
-        .unwrap();
-    futures::join!(interface_fut, driver_fut);
+    let interface_fut = ChannelInterface::new(rx_dummy).spawn(handle);
+    let driver_fut = async move {
+        for _ in 0..50 as u32 {
+            debug!("sending dummy msg");
+            tx_dummy.send(true).unwrap();
+        }
+        tx_dummy.send(false).unwrap();
+    };
+    tokio::join!(interface_fut, driver_fut);
 }
