@@ -13,8 +13,8 @@ serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.48"
 parking_lot = "0.10.0"
 toml = "0.5.0"
-holochain_json_derive = "0.0.23"
-holochain_json_api = "0.0.23"
+holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 holochain_metrics = { version = "0.0.42-alpha5" }
 holochain_common = { version = "0.0.42-alpha5" }
 lib3h = "0.0.31"

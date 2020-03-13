@@ -3,7 +3,7 @@ use crate::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    workflows::{ribosome::Ribosome, runner::RunnerCellT},
+    workflows::{ribosome::WasmRibosome, runner::RunnerCellT},
 };
 use std::hash::{Hash, Hasher};
 use sx_state::env::Environment;
@@ -37,10 +37,6 @@ impl PartialEq for Cell {
 /// from the lifetimes of the resources which it holds references to.
 /// Any work it does is through running a workflow, passing references to
 /// the resources needed to complete that workflow.
-///
-/// XXX: The important methods of the Cell are actually not implemented here!
-/// See `impl ApiCellT for Cell` in conductor_lib for the actual implementations,
-/// as well as an explanation for why this is the case right now.
 pub struct Cell {
     id: CellId,
     state_env: Environment,
@@ -79,7 +75,7 @@ impl Cell {
 }
 
 impl RunnerCellT for Cell {
-    fn get_ribosome(&self) -> Ribosome {
+    fn get_ribosome(&self) -> WasmRibosome {
         unimplemented!()
     }
 

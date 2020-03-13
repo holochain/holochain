@@ -22,9 +22,6 @@ pub enum SourceChainError {
     #[error("The content at address {0} is malformed and can't be deserialized.")]
     MalformedEntry(Address),
 
-    #[error("Persistence error: {0}")]
-    PersistenceError(#[from] PersistenceError),
-
     #[error("Serialization error: {0}")]
     SerializationError(#[from] JsonError),
 

@@ -6,8 +6,8 @@
 //!     std::error::Error, into error types that do
 
 use crate::error::DatabaseError;
-use lmdb::{Database, RoCursor};
-use rkv::{StoreError, Value};
+use derive_more::From;
+use rkv::{Database, RoCursor, StoreError, Value};
 use shrinkwraprs::Shrinkwrap;
 
 /// Just a trait alias for rkv::Readable
@@ -16,8 +16,21 @@ use shrinkwraprs::Shrinkwrap;
 pub trait Readable: rkv::Readable {}
 impl<T: rkv::Readable> Readable for T {}
 
-#[derive(Shrinkwrap)]
-pub struct Reader<'env>(rkv::Reader<'env>);
+#[derive(From, Shrinkwrap)]
+pub struct ThreadsafeRkvReader<'env>(rkv::Reader<'env>);
+
+/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
+/// and we can mark them as such
+#[cfg(feature = "lmdb_no_tls")]
+unsafe impl<'env> Send for ThreadsafeRkvReader<'env> {}
+
+/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
+/// and we can mark them as such
+#[cfg(feature = "lmdb_no_tls")]
+unsafe impl<'env> Sync for ThreadsafeRkvReader<'env> {}
+
+#[derive(From, Shrinkwrap)]
+pub struct Reader<'env>(ThreadsafeRkvReader<'env>);
 
 impl<'env> rkv::Readable for Reader<'env> {
     fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
@@ -29,23 +42,7 @@ impl<'env> rkv::Readable for Reader<'env> {
     }
 }
 
-impl<'env> From<rkv::Reader<'env>> for Reader<'env> {
-    fn from(r: rkv::Reader<'env>) -> Reader {
-        Reader(r)
-    }
-}
-
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
-/// and we can mark them as such
-#[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Send for Reader<'env> {}
-
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
-/// and we can mark them as such
-#[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Sync for Reader<'env> {}
-
-#[derive(Shrinkwrap)]
+#[derive(From, Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct Writer<'env>(rkv::Writer<'env>);
 
@@ -59,15 +56,9 @@ impl<'env> rkv::Readable for Writer<'env> {
     }
 }
 
-impl<'env> From<rkv::Writer<'env>> for Writer<'env> {
-    fn from(w: rkv::Writer<'env>) -> Writer {
-        Writer(w)
-    }
-}
-
 impl<'env> Writer<'env> {
     /// This override exists solely to raise the Error from the rkv::StoreError,
-    /// which does not implement std::error::Error, into DatabaseError, which does.
+    /// which does not implement std::error::Error, into a DatabaseError, which does.
     pub fn commit(self) -> Result<(), DatabaseError> {
         self.0.commit().map_err(DatabaseError::from)
     }
