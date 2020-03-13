@@ -1,5 +1,5 @@
 [package]
-name = "holochain"
+name = "holochain_2020"
 version = "0.0.1"
 description = "Holochain, a framework for distributed applications"
 license = "GPL-3.0-only"
@@ -42,7 +42,7 @@ tracing = "=0.1.13"
 anyhow = "1.0.26"
 
 [lib]
-name = "holochain"
+name = "holochain_2020"
 path = "src/lib.rs"
 
 [[bin]]

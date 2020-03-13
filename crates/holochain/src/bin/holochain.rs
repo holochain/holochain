@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use structopt::StructOpt;
-use holochain::conductor::{
+use holochain_2020::conductor::{
     api::ExternalConductorApi,
     interface::{channel::ChannelInterface, Interface},
     Conductor,
