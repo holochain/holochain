@@ -6,7 +6,7 @@ use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
+use crate::persistence::cas::content::{Address, AddressableContent, Content};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, str};
 

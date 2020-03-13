@@ -2,7 +2,7 @@
 /// that a given capability has been granted for actions like zome calls
 use crate::signature::{Provenance, Signature};
 use holochain_json_api::{error::JsonError, json::JsonString};
-use holochain_persistence_api::cas::content::Address;
+use crate::persistence::cas::content::Address;
 use serde::{Deserialize, Serialize};
 
 //--------------------------------------------------------------------------------------------------
@@ -30,7 +30,7 @@ impl CapabilityRequest {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use holochain_persistence_api::cas::content::Address;
+    use crate::persistence::cas::content::Address;
 
     #[test]
     fn test_capability_request_new() {

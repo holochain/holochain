@@ -7,7 +7,7 @@ use crate::{
     signature::Provenance,
     time::Iso8601,
 };
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
+use crate::persistence::cas::content::{Address, AddressableContent, Content};
 use serde::{Deserialize, Serialize};
 
 use holochain_json_api::{
@@ -153,7 +153,7 @@ pub mod tests {
         signature::Signature,
         time::test_iso_8601,
     };
-    use holochain_persistence_api::cas::content::{Address, AddressableContent};
+    use crate::persistence::cas::content::{Address, AddressableContent};
 
     /// returns a dummy header for use in tests
     pub fn test_chain_header() -> ChainHeader {
