@@ -22,7 +22,6 @@ use tracing::*;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
     header_address: Address,
-    index: u32, // FIXME: this is the key, so once iterators can return keys, we can remove this
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
@@ -39,7 +38,7 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
-        let db: Store<'e, R> = IntKvBuf::new(reader, dbs.get(&*CHAIN_SEQUENCE)?.clone())?;
+        let db: Store<'e, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 
@@ -53,7 +52,7 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     fn from_db<RR: Readable>(db: Store<'e, RR>) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         let (next_index, tx_seq, current_head) = latest
-            .map(|(_, item)| (item.index + 1, item.tx_seq + 1, Some(item.header_address)))
+            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
             .unwrap_or((0, 0, None));
         let persisted_head = current_head.clone();
 
@@ -76,7 +75,6 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
             self.next_index,
             ChainSequenceItem {
                 header_address: header_address.clone(),
-                index: self.next_index,
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
@@ -108,18 +106,19 @@ pub mod tests {
 
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
     use crate::workflows::state::source_chain::SourceChainResult;
-
     use sx_state::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,
         test_utils::test_env,
     };
     use sx_types::{observability, prelude::Address};
-    #[test]
-    fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
+
+    #[tokio::test]
+    async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
-        let env = test_env();
-        let dbs = env.dbs()?;
+        let arc = test_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
@@ -133,10 +132,11 @@ pub mod tests {
         })
     }
 
-    #[test]
-    fn chain_sequence_functionality() -> SourceChainResult<()> {
-        let env = test_env();
-        let dbs = env.dbs()?;
+    #[tokio::test]
+    async fn chain_sequence_functionality() -> SourceChainResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.add_header(Address::from("0"));
@@ -150,7 +150,7 @@ pub mod tests {
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), Some(&Address::from("2")));
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.index).collect();
+            let items: Vec<u32> = buf.db.iter_raw()?.map(|(key, _)| key).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
         })?;
@@ -177,15 +177,14 @@ pub mod tests {
 
     #[tokio::test]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
-        let env = test_env();
-        let env1 = env.clone();
-        let env2 = env.clone();
+        let arc1 = test_env();
+        let arc2 = arc1.clone();
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
-            let env = env1.clone();
-            let dbs = env.dbs()?;
+            let env = arc1.guard().await;
+            let dbs = arc1.clone().dbs().await?;
             let reader = env.reader()?;
             let mut buf = { ChainSequenceBuf::new(&reader, &dbs)? };
             buf.add_header(Address::from("0"));
@@ -197,14 +196,13 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
-            env1.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = env2.clone();
-            let dbs = env.dbs()?;
-
+            let env = arc2.guard().await;
+            let dbs = arc2.clone().dbs().await?;
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.add_header(Address::from("3"));

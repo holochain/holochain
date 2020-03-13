@@ -12,13 +12,12 @@ use rkv::IntegerStore;
 use std::collections::HashMap;
 use tracing::*;
 
-/// Transactional operations on a KV store
-/// Add: add this KV if the key does not yet exist
-/// Mod: set the key to this value regardless of whether or not it already exists
-/// Del: remove the KV
+/// Transactional operations on a KV store with integer keys
+/// Put: add or replace this KV
+/// Delete: remove the KV
 enum Op<V> {
     Put(Box<V>),
-    Del,
+    Delete,
 }
 
 /// A persisted key-value store with a transient HashMap to store
@@ -54,7 +53,7 @@ where
 
     pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuf<'env, K, V, RR> {
         IntKvBuf {
-            db: self.db.clone(),
+            db: self.db,
             reader,
             scratch: HashMap::new(),
         }
@@ -64,7 +63,7 @@ where
         use Op::*;
         let val = match self.scratch.get(&k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
-            Some(Del) => None,
+            Some(Delete) => None,
             None => self.get_persisted(k)?,
         };
         Ok(val)
@@ -77,7 +76,7 @@ where
 
     pub fn delete(&mut self, k: K) {
         // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Del);
+        let _ = self.scratch.insert(k, Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -117,7 +116,7 @@ where
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, *k, &encoded)?;
                 }
-                Del => self.db.delete(writer, *k)?,
+                Delete => self.db.delete(writer, *k)?,
             }
         }
         Ok(())
@@ -182,10 +181,13 @@ pub mod tests {
 
     type Store<'a> = IntKvBuf<'a, u32, V>;
 
-    #[test]
-    fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
-        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+    #[tokio::test]
+    async fn kv_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
             let mut buf: Store = IntKvBuf::new(&reader, db)?;
@@ -217,9 +219,10 @@ pub mod tests {
         })
     }
 
-    #[test]
-    fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_empty_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env
             .inner()
             .open_integer("kv", StoreOptions::create())

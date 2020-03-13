@@ -31,7 +31,6 @@ pub enum DatabaseError {
     #[error("Error with bincode encoding/decoding: {0}")]
     BincodeError(#[from] bincode::Error),
 
-    #[cfg(test)]
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

@@ -3,10 +3,10 @@ use crate::workflows::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspac
 use sx_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env, Ribo: RibosomeT>(
-    workspace: InvokeZomeWorkspace<'env>,
+    workspace: InvokeZomeWorkspace<'_>,
     _ribosome: Ribo,
     _invocation: ZomeInvocation,
-) -> WorkflowResult<InvokeZomeWorkspace<'env>> {
+) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
     Ok(WorkflowEffects {
         workspace,
         triggers: Default::default(),
@@ -59,7 +59,7 @@ pub mod tests {
 
     // TODO: can try making a fake (not mock) ribosome that has some hard-coded logic
     // for calling into a ZomeApi, rather than needing to write a test DNA. This will
-    // have to wait until the whole Ribosome thing is more fleshed out.
+    // have to wait until the whole WasmRibosome thing is more fleshed out.
     // struct FakeRibosome;
 
     // impl RibosomeT for FakeRibosome {

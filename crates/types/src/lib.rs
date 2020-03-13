@@ -15,10 +15,12 @@ pub mod error;
 pub mod link;
 pub mod nucleus;
 pub mod observability;
+pub mod persistence;
 pub mod prelude;
 pub mod shims;
 pub mod signature;
 pub mod time;
+pub mod universal_map;
 
 // #[cfg(test)]
 pub mod test_utils;

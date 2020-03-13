@@ -38,6 +38,7 @@ pub mod tests {
     };
     use sx_types::prelude::*;
 
+
     pub struct TestWorkspace<'env> {
         one: KvBuf<'env, Address, u32>,
         two: KvBuf<'env, Address, bool>,
@@ -61,10 +62,11 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn workspace_sanity_check() -> WorkspaceResult<()> {
-        let env = test_env();
-        let dbs = env.dbs()?;
+    #[tokio::test]
+    async fn workspace_sanity_check() -> WorkspaceResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
         let addr1 = Address::from("hi".to_owned());
         let addr2 = Address::from("hi".to_owned());
         {

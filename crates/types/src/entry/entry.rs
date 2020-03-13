@@ -12,13 +12,13 @@ use crate::{
         entry_type::{AppEntryType, EntryType},
     },
     link::Link,
+    persistence::cas::content::{Address, AddressableContent, Content},
     prelude::*,
 };
 use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
 use std::convert::TryFrom;
@@ -128,10 +128,7 @@ pub mod tests {
         entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
     };
 
-    use holochain_persistence_api::cas::{
-        content::{AddressableContent, AddressableContentTestSuite},
-        storage::{test_content_addressable_storage, ExampleContentAddressableStorage},
-    };
+    use crate::persistence::cas::content::{AddressableContent, AddressableContentTestSuite};
 
     /// dummy entry value
     #[cfg_attr(tarpaulin, skip)]
@@ -302,15 +299,5 @@ pub mod tests {
             test_entry(),
             expected_entry_address(),
         );
-    }
-
-    #[test]
-    /// show CAS round trip
-    fn cas_round_trip_test() {
-        let entries = vec![test_entry()];
-        AddressableContentTestSuite::addressable_content_round_trip::<
-            Entry,
-            ExampleContentAddressableStorage,
-        >(entries, test_content_addressable_storage());
     }
 }
