@@ -61,7 +61,7 @@ impl WorkflowTrigger {
 // TODO: flesh out for real
 #[derive(Error, Debug)]
 pub enum WorkflowError {
-    #[error("AgentId is invalid: {0}")]
+    #[error("AgentId is invalid: {0:?}")]
     AgentIdInvalid(AgentId),
 
     #[error("Conductor API error: {0}")]

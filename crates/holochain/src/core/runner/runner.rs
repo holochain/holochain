@@ -1,4 +1,4 @@
-use crate::conductor::api::CellConductorApiT;
+use crate::conductor::api::{CellConductorApi, CellConductorApiT};
 use super::error::WorkflowRunResult;
 use crate::core::{
     ribosome::WasmRibosome,
@@ -13,10 +13,10 @@ use sx_state::{
 use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
 use workspace::WorkspaceError;
 
-pub trait RunnerCellT: Send + Sync {
+pub trait RunnerCellT<Api: CellConductorApiT = CellConductorApi>: Send + Sync {
     fn state_env(&self) -> Environment;
     fn get_ribosome(&self) -> WasmRibosome;
-    fn get_conductor_api<Api: CellConductorApiT>(&self) -> Api;
+    fn get_conductor_api(&self) -> Api;
 }
 
 pub struct WorkflowRunner<'c, Cell: RunnerCellT>(&'c Cell);

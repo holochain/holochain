@@ -72,7 +72,7 @@ impl CellConductorApiT for CellConductorApi {
         unimplemented!()
     }
 
-    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
+    async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
         unimplemented!()
     }
 }

@@ -3,7 +3,6 @@ use super::{WorkflowError, WorkflowResult, WorkflowEffects};
 use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
 use crate::core::state::workspace::GenesisWorkspace;
 
-type WS<'env> = GenesisWorkspace<'env>;
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -13,7 +12,7 @@ type WS<'env> = GenesisWorkspace<'env>;
 /// FIXME: understand the details of actually getting the DNA
 /// FIXME: creating entries in the config db
 pub async fn genesis<'env, Api: CellConductorApiT>(
-    workspace: GenesisWorkspace<'env>,
+    mut workspace: GenesisWorkspace<'env>,
     api: Api,
     dna: Dna,
     agent_id: AgentId,
@@ -22,8 +21,8 @@ pub async fn genesis<'env, Api: CellConductorApiT>(
         return Err(WorkflowError::AgentIdInvalid(agent_id.clone()));
     }
 
-    workspace.source_chain.put_entry(Entry::Dna(Box::new(dna)), agent_id);
-    workspace.source_chain.put_entry(Entry::AgentId(agent_id), agent_id);
+    workspace.source_chain.put_entry(Entry::Dna(Box::new(dna)), &agent_id);
+    workspace.source_chain.put_entry(Entry::AgentId(agent_id.clone()), &agent_id);
 
     Ok(WorkflowEffects {
         workspace,
