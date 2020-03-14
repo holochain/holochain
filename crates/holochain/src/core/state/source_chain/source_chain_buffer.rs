@@ -50,7 +50,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
     pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) -> () {
-        let _header = header_for_entry(&entry, agent_id, unimplemented!());
+        let _header = header_for_entry(&entry, agent_id, self.chain_head().cloned());
         self.cas.put((_header, entry));
     }
 
@@ -83,14 +83,14 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
     }
 }
 
-fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Address) -> ChainHeader {
+fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Option<Address>) -> ChainHeader {
     let provenances = &[Provenance::new(agent_id.address(), Signature::fake())];
     let timestamp = chrono::Utc::now().timestamp().into();
     let header = ChainHeader::new(
         entry.entry_type(),
         entry.address(),
         provenances,
-        Some(prev_head),
+        prev_head,
         None,
         None,
         timestamp,
@@ -104,7 +104,6 @@ pub mod tests {
     use super::SourceChainBuf;
     use crate::core::state::source_chain::SourceChainResult;
     use sx_state::{env::ReadManager, test_utils::test_env};
-
 
     #[tokio::test]
     async fn header_for_entry() -> SourceChainResult<()> {

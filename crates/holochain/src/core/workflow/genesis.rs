@@ -1,8 +1,6 @@
-use crate::conductor::api::CellConductorApiT;
-use super::{WorkflowError, WorkflowResult, WorkflowEffects};
+use super::{WorkflowEffects, WorkflowError, WorkflowResult};
+use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
 use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
-use crate::core::state::workspace::GenesisWorkspace;
-
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -17,12 +15,20 @@ pub async fn genesis<'env, Api: CellConductorApiT>(
     dna: Dna,
     agent_id: AgentId,
 ) -> WorkflowResult<GenesisWorkspace<'env>> {
-    if api.dpki_request("is_agent_id_valid".into(), agent_id.pub_sign_key().into()).await? == "INVALID".to_string() {
+    if api
+        .dpki_request("is_agent_id_valid".into(), agent_id.pub_sign_key().into())
+        .await?
+        == "INVALID".to_string()
+    {
         return Err(WorkflowError::AgentIdInvalid(agent_id.clone()));
     }
 
-    workspace.source_chain.put_entry(Entry::Dna(Box::new(dna)), &agent_id);
-    workspace.source_chain.put_entry(Entry::AgentId(agent_id.clone()), &agent_id);
+    workspace
+        .source_chain
+        .put_entry(Entry::Dna(Box::new(dna)), &agent_id);
+    workspace
+        .source_chain
+        .put_entry(Entry::AgentId(agent_id.clone()), &agent_id);
 
     Ok(WorkflowEffects {
         workspace,
@@ -32,8 +38,56 @@ pub async fn genesis<'env, Api: CellConductorApiT>(
     })
 }
 
+#[cfg(test)]
+mod tests {
 
+    use super::genesis;
+    use crate::{
+        conductor::api::MockCellConductorApi,
+        core::{
+            state::{source_chain::SourceChain, workspace::{GenesisWorkspace, Workspace}},
+            test_utils::{fake_agent_id, fake_dna},
+            workflow::WorkflowError,
+        },
+    };
+    use sx_types::prelude::*;
+    use sx_state::{env::*, test_utils::test_env};
 
+    #[tokio::test]
+    async fn genesis_initializes_source_chain() -> Result<(), WorkflowError> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let dna = fake_dna("a");
+        let agent_id = fake_agent_id("a");
+        let dbs = arc.dbs().await?;
+
+        {
+            let reader = env.reader()?;
+            let workspace = GenesisWorkspace::new(&reader, &dbs)?;
+            let mut api = MockCellConductorApi::new();
+            api
+                .expect_sync_dpki_request()
+                .returning(|_, _| Ok("mocked dpki request response".to_string()));
+            let fx = genesis(workspace, api, dna.clone(), agent_id.clone()).await?;
+            let writer = env.writer()?;
+            fx.workspace.commit_txn(writer)?;
+        }
+
+        env.with_reader(|reader| {
+            let source_chain = SourceChain::new(&reader, &dbs)?;
+            assert_eq!(source_chain.agent_id()?, agent_id);
+            // TODO: implement actual source chain iterator
+            let mut it = source_chain.iter_back()?;
+            let (_, agent_header) = it.next().unwrap();
+            let (_, dna_header) = it.next().unwrap();
+            assert!(it.next().is_none());
+            assert_eq!(*agent_header.entry_address(), agent_id.address());
+            assert_eq!(*dna_header.entry_address(), dna.address());
+            Result::<_, WorkflowError>::Ok(())
+        })?;
+        Ok(())
+    }
+}
 
 /* TODO: make doc-able
 

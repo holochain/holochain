@@ -1,6 +1,7 @@
 mod genesis;
 mod invoke_zome;
 
+use crate::core::state::workspace::WorkspaceError;
 use crate::conductor::api::error::ConductorApiError;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
@@ -10,6 +11,8 @@ use std::time::Duration;
 
 use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;
+use sx_state::error::DatabaseError;
+use super::state::source_chain::SourceChainError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
@@ -66,6 +69,17 @@ pub enum WorkflowError {
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] ConductorApiError),
+
+    #[error("Workspace error: {0}")]
+    WorkspaceError(#[from] WorkspaceError),
+
+    #[cfg(test)]
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] DatabaseError),
+
+    #[cfg(test)]
+    #[error("Source chain error: {0}")]
+    SourceChainError(#[from] SourceChainError),
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.

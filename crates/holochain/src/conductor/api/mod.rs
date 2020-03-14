@@ -21,7 +21,7 @@ pub use api_external::*;
 // See https://github.com/asomers/mockall/issues/75
 mock! {
 
-    CellConductorApi {
+    pub CellConductorApi {
 
         fn sync_invoke_zome(
             &self,

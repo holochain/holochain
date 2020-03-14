@@ -8,8 +8,10 @@ pub struct GenesisWorkspace<'env> {
 }
 
 impl<'env> GenesisWorkspace<'env> {
-    pub fn new(_reader: Reader<'env>, _dbs: &DbManager) -> WorkspaceResult<Self> {
-        unimplemented!()
+    pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
+        Ok(Self {
+            source_chain: SourceChainBuf::new(reader, dbs)?
+        })
     }
 }
 
