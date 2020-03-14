@@ -7,7 +7,7 @@ pub struct DatabasePath(PathBuf);
 impl From<CellId> for DatabasePath {
     fn from(id: CellId) -> Self {
         let database_path = PathBuf::new().join(format!("{}", id));
-        DatabasePath(database_path.into())
+        DatabasePath(database_path)
     }
 }
 

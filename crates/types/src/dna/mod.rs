@@ -39,13 +39,13 @@ use crate::{
     },
     entry::entry_type::{AppEntryType, EntryType},
     error::{SkunkError, SkunkResult},
+    persistence::cas::content::{AddressableContent, Content},
     prelude::Address,
 };
 use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use holochain_persistence_api::cas::content::{AddressableContent, Content};
 use multihash;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, json, Value};
@@ -303,10 +303,10 @@ pub mod tests {
             zome::tests::test_zome,
         },
         entry::entry_type::{AppEntryType, EntryType},
+        persistence::cas::content::Address,
         test_utils::test_dna,
     };
     use holochain_json_api::json::JsonString;
-    use holochain_persistence_api::cas::content::Address;
     use std::convert::TryFrom;
 
     #[test]

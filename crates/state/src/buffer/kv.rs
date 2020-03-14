@@ -5,14 +5,14 @@ use crate::{
 };
 use rkv::SingleStore;
 use std::collections::HashMap;
+use tracing::*;
 
 /// Transactional operations on a KV store
-/// Add: add this KV if the key does not yet exist
-/// Mod: set the key to this value regardless of whether or not it already exists
-/// Del: remove the KV
+/// Put: add or replace this KV
+/// Delete: remove the KV
 enum Op<V> {
     Put(Box<V>),
-    Del,
+    Delete,
 }
 
 /// A persisted key-value store with a transient HashMap to store
@@ -49,7 +49,7 @@ where
         use Op::*;
         let val = match self.scratch.get(k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
-            Some(Del) => None,
+            Some(Delete) => None,
             None => self.get_persisted(k)?,
         };
         Ok(val)
@@ -62,7 +62,7 @@ where
 
     pub fn delete(&mut self, k: K) {
         // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Del);
+        let _ = self.scratch.insert(k, Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -102,7 +102,7 @@ where
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
-                Del => self.db.delete(writer, k)?,
+                Delete => self.db.delete(writer, k)?,
             }
         }
         Ok(())
@@ -136,7 +136,7 @@ where
             )),
             None => None,
             x => {
-                dbg!(x);
+                error!(?x);
                 panic!("TODO");
             }
         }
@@ -155,6 +155,7 @@ pub mod tests {
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
+
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
         name: String,
@@ -165,10 +166,13 @@ pub mod tests {
 
     type TestBuf<'a> = KvBuf<'a, &'a str, V>;
 
-    #[test]
-    fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
-        let db = env.inner().open_single("kv", StoreOptions::create())?;
+    #[tokio::test]
+    async fn kv_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_single("kv", StoreOptions::create())?;
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut buf: TestBuf = KvBuf::new(&reader, db)?;
@@ -195,9 +199,10 @@ pub mod tests {
         })
     }
 
-    #[test]
-    fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_empty_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env
             .inner()
             .open_single("kv", StoreOptions::create())
@@ -216,18 +221,19 @@ pub mod tests {
     }
 
     /// TODO break up into smaller tests
-    #[test]
-    fn kv_store_sanity_check() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_store_sanity_check() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
-        let mut writer = env.writer()?;
 
         let testval = TestVal {
             name: "Joe".to_owned(),
         };
 
-        env.with_reader::<DatabaseError, _, _>(|reader| {
+        let writer = env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut writer = env.writer()?;
             let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
 
@@ -244,7 +250,7 @@ pub mod tests {
             let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
             kv2.flush_to_txn(&mut writer)?;
-            Ok(())
+            Ok(writer)
         })?;
 
         // Finish finalizing the transaction

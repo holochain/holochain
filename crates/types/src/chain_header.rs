@@ -4,10 +4,10 @@
 
 use crate::{
     entry::{entry_type::EntryType, Entry},
+    persistence::cas::content::{Address, AddressableContent, Content},
     signature::Provenance,
     time::Iso8601,
 };
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use serde::{Deserialize, Serialize};
 
 use holochain_json_api::{
@@ -150,10 +150,10 @@ pub mod tests {
             entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
             tests::{test_entry, test_entry_a, test_entry_b},
         },
+        persistence::cas::content::{Address, AddressableContent},
         signature::Signature,
         time::test_iso_8601,
     };
-    use holochain_persistence_api::cas::content::{Address, AddressableContent};
 
     /// returns a dummy header for use in tests
     pub fn test_chain_header() -> ChainHeader {
