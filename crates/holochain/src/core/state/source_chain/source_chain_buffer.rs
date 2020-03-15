@@ -4,11 +4,12 @@ use crate::core::state::{
     source_chain::SourceChainError,
 };
 
+use fallible_iterator::FallibleIterator;
 use sx_state::{
     buffer::BufferedStore,
     db::DbManager,
     error::DatabaseResult,
-    prelude::{Readable, Writer},
+    prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
     agent::AgentId,
@@ -50,8 +51,9 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
     pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) -> () {
-        let _header = header_for_entry(&entry, agent_id, self.chain_head().cloned());
-        self.cas.put((_header, entry));
+        let header = header_for_entry(&entry, agent_id, self.chain_head().cloned());
+        self.sequence.put_header(header.address());
+        self.cas.put((header, entry));
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
@@ -70,6 +72,10 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 _ => None,
             })
             .next())
+    }
+
+    pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env, R> {
+        SourceChainBackwardIterator::new(self)
     }
 }
 
@@ -98,22 +104,89 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Option<Address
     header
 }
 
+pub struct SourceChainBackwardIterator<'env, R: Readable> {
+    store: &'env SourceChainBuf<'env, R>,
+    current: Option<Address>,
+}
+
+impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
+    pub fn new(store: &'env SourceChainBuf<'env, R>) -> Self {
+        Self {
+            store,
+            current: store.chain_head().cloned(),
+        }
+    }
+}
+
+/// Follows ChainHeader.link through every previous Entry (of any EntryType) in the chain
+// #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
+impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
+    type Item = ChainHeader;
+    type Error = SourceChainError;
+
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        match &self.current {
+            None => Ok(None),
+            Some(top) => {
+                if let Some(header) = self.store.get_header(top)? {
+                    self.current = header.link();
+                    Ok(Some(header))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
 
     use super::SourceChainBuf;
-    use crate::core::state::source_chain::SourceChainResult;
-    use sx_state::{env::ReadManager, test_utils::test_env};
+    use crate::core::{
+        state::source_chain::SourceChainResult,
+        test_utils::{fake_agent_id, fake_dna},
+    };
+    use fallible_iterator::FallibleIterator;
+    use sx_state::{prelude::*, test_utils::test_env};
+    use sx_types::{entry::Entry, prelude::*};
 
     #[tokio::test]
-    async fn header_for_entry() -> SourceChainResult<()> {
-        // TODO: write test
+    async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let arc = test_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
+
+        let dna = fake_dna("a");
+        let agent_id = fake_agent_id("a");
+
+        let dna_entry = Entry::Dna(Box::new(dna));
+        let agent_entry = Entry::AgentId(agent_id.clone());
+
         env.with_reader(|reader| {
-            let _source_chain = SourceChainBuf::new(&reader, &dbs)?;
+            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            assert!(store.chain_head().is_none());
+            store.put_entry(dna_entry.clone(), &agent_id);
+            store.put_entry(agent_entry.clone(), &agent_id);
+            env.with_commit(|writer| store.flush_to_txn(writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let store = SourceChainBuf::new(&reader, &dbs)?;
+            assert!(store.chain_head().is_some());
+            store.get_entry(&dna_entry.address()).unwrap();
+            store.get_entry(&agent_entry.address()).unwrap();
+            assert_eq!(
+                store
+                    .iter_back()
+                    .map(|h| Ok(store.get_entry(h.entry_address())?))
+                    .collect::<Vec<_>>()
+                    .unwrap(),
+                vec![Some(dna_entry), Some(agent_entry)]
+            );
             Ok(())
         })
     }
+
+    // async fn header_for_entry() -> SourceChainResult<()> {}
 }
