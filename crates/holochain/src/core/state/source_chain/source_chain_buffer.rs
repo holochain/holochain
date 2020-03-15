@@ -182,7 +182,7 @@ pub mod tests {
                     .map(|h| Ok(store.get_entry(h.entry_address())?))
                     .collect::<Vec<_>>()
                     .unwrap(),
-                vec![Some(dna_entry), Some(agent_entry)]
+                vec![Some(agent_entry), Some(dna_entry)]
             );
             Ok(())
         })

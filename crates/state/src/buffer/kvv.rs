@@ -102,7 +102,7 @@ where
         let iter = self.db.get(self.reader, k)?;
         Ok(iter
             .map(|v| match v {
-                Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(bincode::deserialize(buf)?)),
+                Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
                 Ok((_, Some(_))) => Err(DatabaseError::InvalidValue),
                 Ok((_, None)) => Ok(None),
                 Err(e) => Ok(Err(e)?),
@@ -134,12 +134,12 @@ where
             for op in ops {
                 match op {
                     Insert(v) => {
-                        let buf = bincode::serialize(&*v)?;
+                        let buf = rmp_serde::to_vec_named(&*v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.put(writer, k.clone(), &encoded)?;
                     }
                     Delete(v) => {
-                        let buf = bincode::serialize(&*v)?;
+                        let buf = rmp_serde::to_vec_named(&*v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.delete(writer, k.clone(), &encoded).or_else(|err| {
                             // Ignore the case where the key is not found
@@ -167,7 +167,6 @@ pub mod tests {
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
 
-
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
     struct V(pub u32);
 
@@ -184,7 +183,7 @@ pub mod tests {
     #[tokio::test]
     async fn kvv_store_scratch_insert_delete() {
         let arc = test_env();
-let env = arc.guard().await;
+        let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
 
@@ -221,7 +220,7 @@ let env = arc.guard().await;
     #[tokio::test]
     async fn kvv_store_get_list() {
         let arc = test_env();
-let env = arc.guard().await;
+        let env = arc.guard().await;
         let env = arc.env();
 
         let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
@@ -252,7 +251,7 @@ let env = arc.guard().await;
     #[tokio::test]
     async fn kvv_store_duplicate_insert() {
         let arc = test_env();
-let env = arc.guard().await;
+        let env = arc.guard().await;
         let env = arc.env();
 
         fn add_twice(env: &Rkv) {
@@ -288,7 +287,7 @@ let env = arc.guard().await;
     #[tokio::test]
     async fn kvv_store_duplicate_delete() {
         let arc = test_env();
-let env = arc.guard().await;
+        let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
 
@@ -310,7 +309,7 @@ let env = arc.guard().await;
     #[test]
     fn kvv_store_get_missing_key() {
         let arc = test_env();
-let env = arc.guard().await;
+        let env = arc.guard().await;
         let env = arc.env();
         let store: Store = KvvBuf::create(&env, "kvv").unwrap();
         assert_eq!(store.get(&"wompwomp").unwrap(), hashset! {});
