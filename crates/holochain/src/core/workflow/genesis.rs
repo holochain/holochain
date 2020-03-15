@@ -55,7 +55,8 @@ mod tests {
     };
     use fallible_iterator::FallibleIterator;
     use sx_state::{env::*, test_utils::test_env};
-    use sx_types::{observability, prelude::*};
+    use sx_types::{entry::Entry, observability, prelude::*};
+    use tracing::*;
 
     #[tokio::test]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
@@ -81,12 +82,21 @@ mod tests {
             let source_chain = SourceChain::new(&reader, &dbs)?;
             assert_eq!(source_chain.agent_id()?, agent_id);
             source_chain.chain_head().expect("chain head should be set");
-            let mut it = source_chain.iter_back();
-            let agent_header = it.next()?.unwrap();
-            let dna_header = it.next()?.unwrap();
-            assert!(it.next()?.is_none());
-            assert_eq!(*dna_header.entry_address(), dna.address());
-            assert_eq!(*agent_header.entry_address(), agent_id.address());
+            let addresses: Vec<_> = source_chain
+                .iter_back()
+                .map(|h| {
+                    debug!("header: {:?}", h);
+                    Ok(h.entry_address().clone())
+                })
+                .collect()
+                .unwrap();
+            assert_eq!(
+                addresses,
+                vec![
+                    Entry::AgentId(agent_id).address(),
+                    Entry::Dna(Box::new(dna)).address()
+                ]
+            );
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())

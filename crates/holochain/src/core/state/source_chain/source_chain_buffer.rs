@@ -18,6 +18,7 @@ use sx_types::{
     prelude::{Address, AddressableContent},
     signature::{Provenance, Signature},
 };
+use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
     cas: ChainCasBuf<'env, R>,
@@ -92,6 +93,7 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
 fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Option<Address>) -> ChainHeader {
     let provenances = &[Provenance::new(agent_id.address(), Signature::fake())];
     let timestamp = chrono::Utc::now().timestamp().into();
+    trace!("PUT {} {:?}", entry.address(), entry);
     let header = ChainHeader::new(
         entry.entry_type(),
         entry.address(),
@@ -174,8 +176,16 @@ pub mod tests {
         env.with_reader(|reader| {
             let store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_some());
-            store.get_entry(&dna_entry.address()).unwrap();
-            store.get_entry(&agent_entry.address()).unwrap();
+            let dna_entry_fetched = store
+                .get_entry(&dna_entry.address())
+                .expect("error retrieving")
+                .expect("entry not found");
+            let agent_entry_fetched = store
+                .get_entry(&agent_entry.address())
+                .expect("error retrieving")
+                .expect("entry not found");
+            assert_eq!(dna_entry, dna_entry_fetched);
+            assert_eq!(agent_entry, agent_entry_fetched);
             assert_eq!(
                 store
                     .iter_back()
