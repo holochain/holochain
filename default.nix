@@ -45,6 +45,15 @@ with holonix.pkgs;
    ++ (holonix.pkgs.callPackage ./test {
     pkgs = holonix.pkgs;
    }).buildInputs
+
+   # DELETE-ME helper for ignoring missing_docs
+   # until we get all the docs in place
+   # usage: `source hc-allow-missing-docs`
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-allow-missing-docs" ''
+    export RUSTFLAGS="$(echo "$RUSTFLAGS" | sed 's/-D missing_docs//')"
+    ''
+   )])
   ;
  });
 }
