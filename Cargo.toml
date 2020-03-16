@@ -14,7 +14,7 @@ exclude = [
 ]
 
 [patch.crates-io]
-holochain_locksmith = { version = "0.0.43-alpha3", git = "https://github.com/holochain/holochain-rust.git", branch = "unpinned" }
+# holochain_locksmith = { version = "0.0.43-alpha3", git = "https://github.com/holochain/holochain-rust.git", branch = "unpinned" }
 
 # holochain_json_api = { version = "0.0.23", path = "../holochain-serialization/crates/holochain_json_api" }
 # holochain_json_derive = { version = "0.0.23", path = "../holochain-serialization/crates/holochain_json_derive" }

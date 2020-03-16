@@ -25,7 +25,7 @@ pub enum SkunkError {
     CryptoError(#[from] CryptoError),
     Base64DecodeError(#[from] base64::DecodeError),
     Utf8Error(#[from] std::str::Utf8Error),
-    LocksmithError(#[from] holochain_locksmith::LocksmithError),
+    // LocksmithError(#[from] holochain_locksmith::LocksmithError),
 }
 
 impl fmt::Display for SkunkError {
