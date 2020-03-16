@@ -21,12 +21,14 @@ use std::{
 pub struct Timeout(usize);
 
 impl Timeout {
+    /// create a new timeout from a ms usize value
     pub fn new(timeout_ms: usize) -> Self {
         Self(timeout_ms)
     }
 }
 
 impl Default for Timeout {
+    /// default timeout of 60 seconds
     fn default() -> Timeout {
         Timeout(60000)
     }
@@ -402,6 +404,7 @@ pub struct Iso8601(DateTime<FixedOffset>);
 /// its underlying DateTime<Fixed>.
 
 impl Iso8601 {
+    /// create a new Iso8601 from seconds and nano seconds
     pub fn new(secs: i64, nsecs: u32) -> Self {
         Self(FixedOffset::east(0).timestamp(secs, nsecs))
     }
@@ -704,14 +707,13 @@ impl FromStr for Iso8601 {
     }
 }
 
-// The only infallible conversions are from an i64 UNIX timestamp, or a DateTime<FixedOffset>.
-// There are no conversions from String or &str that are infallible.
-//
-//     $ date  --date="2018-10-11T03:23:38+00:00" +%s
-//     1539228218
-//     $ date --date=@1539228218 --rfc-3339=seconds --utc
-//     2018-10-11 03:23:38+00:00
-//
+/// The only infallible conversions are from an i64 UNIX timestamp, or a DateTime<FixedOffset>.
+/// There are no conversions from String or &str that are infallible.
+///
+/// $ date  --date="2018-10-11T03:23:38+00:00" +%s
+/// 1539228218
+/// $ date --date=@1539228218 --rfc-3339=seconds --utc
+/// 2018-10-11 03:23:38+00:00
 pub fn test_iso_8601() -> Iso8601 {
     Iso8601::from(1_539_228_218) // 2018-10-11T03:23:38+00:00
 }

@@ -10,23 +10,28 @@
 use shrinkwraprs::Shrinkwrap;
 use std::{any::Any, collections::HashMap, hash::Hash, marker::PhantomData};
 
+/// Key type for Universal map.
 #[derive(Clone, Debug)]
 pub struct Key<K: Send + Sync, V>(K, PhantomData<V>);
 
+/// The actual UniversalMap struct. See module-level documentation.
 #[derive(Shrinkwrap)]
 pub struct UniversalMap<K: Send + Sync>(HashMap<K, Box<dyn Any + Send + Sync>>);
 
 impl<K: Send + Sync, V> Key<K, V> {
+    /// Create a new Key.
     pub fn new(key: K) -> Self {
         Self(key, PhantomData)
     }
 
+    /// Get a ref to the raw key.
     pub fn key(&self) -> &K {
         &self.0
     }
 }
 
 impl<K: Clone + Send + Sync, V> Key<K, V> {
+    /// If the key is clone-able, swap it out for a specific value type.
     pub fn with_value_type<VV>(&self) -> Key<K, VV> {
         let key: Key<K, VV> = Key::new(self.0.clone());
         key
@@ -46,10 +51,12 @@ impl<K: Hash + Eq + Send + Sync> Default for UniversalMap<K> {
 }
 
 impl<K: Eq + Hash + Send + Sync> UniversalMap<K> {
+    /// Construct a new UniversalMap
     pub fn new() -> Self {
         Self(HashMap::new())
     }
 
+    /// Insert a key/value pair into the UniversalMap.
     pub fn insert<V: 'static + Send + Sync>(
         &mut self,
         key: Key<K, V>,
@@ -59,6 +66,7 @@ impl<K: Eq + Hash + Send + Sync> UniversalMap<K> {
         result
     }
 
+    /// Get a value from the UniversalMap.
     pub fn get<V: 'static + Send + Sync>(&self, key: &Key<K, V>) -> Option<&V> {
         match self.0.get(&key.0) {
             Some(value) => value.downcast_ref::<V>(),
@@ -66,10 +74,12 @@ impl<K: Eq + Hash + Send + Sync> UniversalMap<K> {
         }
     }
 
+    /// Is this UniversalMap empty?
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Get the length of the UniversalMap.
     pub fn len(&self) -> usize {
         self.0.len()
     }
