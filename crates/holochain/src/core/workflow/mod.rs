@@ -1,17 +1,19 @@
 mod genesis;
 mod invoke_zome;
-
-use crate::core::state::workspace::WorkspaceError;
-use crate::conductor::api::error::ConductorApiError;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 
-use crate::core::state::workspace::Workspace;
+use crate::{
+    conductor::api::error::ConductorApiError,
+    core::state::workspace::{Workspace, WorkspaceError},
+};
 use std::time::Duration;
-
 use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;
+
+#[cfg(test)]
 use sx_state::error::DatabaseError;
+#[cfg(test)]
 use super::state::source_chain::SourceChainError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
@@ -61,7 +63,6 @@ impl WorkflowTrigger {
     }
 }
 
-// TODO: flesh out for real
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("AgentId is invalid: {0:?}")]

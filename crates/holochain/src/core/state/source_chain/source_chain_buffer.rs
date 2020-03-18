@@ -9,7 +9,7 @@ use sx_state::{
     buffer::BufferedStore,
     db::DbManager,
     error::DatabaseResult,
-    prelude::{Readable, Reader, Writer},
+    prelude::{Readable, Writer},
 };
 use sx_types::{
     agent::AgentId,
