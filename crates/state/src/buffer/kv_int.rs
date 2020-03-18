@@ -43,6 +43,7 @@ where
     V: BufVal,
     R: Readable,
 {
+    /// Create a new IntKvBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: IntegerStore<K>) -> DatabaseResult<Self> {
         Ok(Self {
             db,
@@ -51,6 +52,8 @@ where
         })
     }
 
+    /// Create a new IntKvBuf from a new read-only transaction, using the same database
+    /// as an existing IntKvBuf. Useful for getting a fresh read-only snapshot of a database.
     pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuf<'env, K, V, RR> {
         IntKvBuf {
             db: self.db,
@@ -59,6 +62,8 @@ where
         }
     }
 
+    /// Get a value, taking the scratch space into account,
+    /// or from persistence if needed
     pub fn get(&self, k: K) -> DatabaseResult<Option<V>> {
         use Op::*;
         let val = match self.scratch.get(&k) {
@@ -69,11 +74,13 @@ where
         Ok(val)
     }
 
+    /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) {
         // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
+    /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) {
         // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Delete);

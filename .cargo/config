@@ -1,2 +1,2 @@
 [build]
-rustflags = "-D missing_docs"
+rustflags = ["-D", "missing_docs"]

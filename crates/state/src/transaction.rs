@@ -16,6 +16,7 @@ use shrinkwraprs::Shrinkwrap;
 pub trait Readable: rkv::Readable {}
 impl<T: rkv::Readable> Readable for T {}
 
+/// Wrapper around `rkv::Reader`, so it can be marked as threadsafe
 #[derive(From, Shrinkwrap)]
 pub struct ThreadsafeRkvReader<'env>(rkv::Reader<'env>);
 
@@ -29,6 +30,7 @@ unsafe impl<'env> Send for ThreadsafeRkvReader<'env> {}
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Sync for ThreadsafeRkvReader<'env> {}
 
+/// Wrapper around [ThreadsafeRkvReader]
 #[derive(From, Shrinkwrap)]
 pub struct Reader<'env>(ThreadsafeRkvReader<'env>);
 
@@ -42,6 +44,8 @@ impl<'env> rkv::Readable for Reader<'env> {
     }
 }
 
+/// Wrapper around `rkv::Writer`, which lifts some of the return values to types recognized by this crate,
+/// rather than the rkv-specific values
 #[derive(From, Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct Writer<'env>(rkv::Writer<'env>);
