@@ -1,3 +1,13 @@
+//! A Conductor is a dynamically changing group of [Cell]s.
+//!
+//! A Conductor can be managed:
+//! - externally, via a [ExternalConductorApi]
+//! - from within a [Cell], via [CellConductorApi]
+//!
+//! In normal use cases, a single Holochain user runs a single Conductor in a single process.
+//! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
+//! users in a testing environment.
+
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
@@ -22,11 +32,13 @@ pub struct CellState {
     _active: bool,
 }
 
-pub struct CellItem {
+///
+struct CellItem {
     cell: Cell,
     _state: CellState,
 }
 
+/// A Conductor is a group of [Cell]s
 pub struct Conductor {
     tx_network: NetSender,
     cells: HashMap<CellId, CellItem>,

@@ -79,31 +79,44 @@ impl CellConductorApiT for CellConductorApi {
     }
 }
 
-/// The "internal" Conductor API, for a Cell to talk to its calling Conductor
+/// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
 pub trait CellConductorApiT: Clone + Send + Sync + Sized {
+
+    /// Invoke a zome function on any cell in this conductor.
+    /// An invocation on a different Cell than this one corresponds to a bridged call.
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 
-    /// TODO: maybe move out into its own trait
+    /// Send a message to the network engine, ignoring the response
     async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
 
-    /// TODO: maybe move out into its own trait
+    /// Send a message to the network engine, and await the response
     async fn network_request(
         &self,
         _message: Lib3hClientProtocol,
     ) -> ConductorApiResult<Lib3hServerProtocol>;
 
+    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its schedule time.
+    /// This is basically a heuristic designed to help things run more smoothly.
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
+    /// Request the crypto system to sign some payload
+    /// TODO: decide on actual signature
     async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature>;
 
+    /// Request the crypto system to encrypt some payload
+    /// TODO: decide on actual signature
     async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
 
+    /// Request the crypto system to decrypt some payload
+    /// TODO: decide on actual signature
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
 
+    /// Make a request to the DPKI service running for this Conductor.
+    /// TODO: decide on actual signature
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 }
