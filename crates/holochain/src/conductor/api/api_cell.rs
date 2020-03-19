@@ -20,6 +20,8 @@ pub struct CellConductorApi {
 }
 
 impl CellConductorApi {
+    /// Instantiate from a Conductor reference and a CellId to identify which Cell
+    /// this API instance is associated with
     pub fn new(lock: Arc<RwLock<Conductor>>, cell_id: CellId) -> Self {
         Self { cell_id, lock }
     }

@@ -7,6 +7,7 @@
 ///
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
+
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 use serde::{Deserialize, Serialize};
 use sx_state::{
@@ -28,6 +29,7 @@ pub struct ChainSequenceItem {
 
 type Store<'e, R> = IntKvBuf<'e, u32, ChainSequenceItem, R>;
 
+/// A BufferedStore for interacting with the ChainSequence database
 pub struct ChainSequenceBuf<'e, R: Readable> {
     db: Store<'e, R>,
     next_index: u32,
@@ -37,11 +39,14 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
 }
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
+    /// Create a new instance from a read-only transaction and a database reference
     pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
         let db: Store<'e, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 
+    /// Create a new instance from a new read-only transaction, using the same database
+    /// as an existing instance. Useful for getting a fresh read-only snapshot of a database.
     pub fn with_reader<RR: Readable>(
         &self,
         reader: &'e RR,
@@ -65,10 +70,13 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
         })
     }
 
+    /// Get the chain head, AKA top chain header. None if the chain is empty.
     pub fn chain_head(&self) -> Option<&Address> {
         self.current_head.as_ref()
     }
 
+    /// Add a header to the chain, setting all other values automatically.
+    /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
     pub fn add_header(&mut self, header_address: Address) {
         self.db.put(
