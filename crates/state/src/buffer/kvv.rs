@@ -110,7 +110,7 @@ where
         let iter = self.db.get(self.reader, k)?;
         Ok(iter
             .map(|v| match v {
-                Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(bincode::deserialize(buf)?)),
+                Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
                 Ok((_, Some(_))) => Err(DatabaseError::InvalidValue),
                 Ok((_, None)) => Ok(None),
                 Err(e) => Ok(Err(e)?),
@@ -142,12 +142,12 @@ where
             for op in ops {
                 match op {
                     Insert(v) => {
-                        let buf = bincode::serialize(&*v)?;
+                        let buf = rmp_serde::to_vec_named(&*v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.put(writer, k.clone(), &encoded)?;
                     }
                     Delete(v) => {
-                        let buf = bincode::serialize(&*v)?;
+                        let buf = rmp_serde::to_vec_named(&*v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.delete(writer, k.clone(), &encoded).or_else(|err| {
                             // Ignore the case where the key is not found

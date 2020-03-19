@@ -39,6 +39,7 @@ impl PartialEq for Cell {
 /// the resources needed to complete that workflow.
 pub struct Cell {
     id: CellId,
+    conductor_api: CellConductorApi,
     state_env: Environment,
 }
 
@@ -82,6 +83,11 @@ impl RunnerCellT for Cell {
     fn state_env(&self) -> Environment {
         self.state_env.clone()
     }
+
+    fn get_conductor_api(&self) -> CellConductorApi {
+        self.conductor_api.clone()
+    }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

@@ -21,7 +21,7 @@ pub use api_external::*;
 // See https://github.com/asomers/mockall/issues/75
 mock! {
 
-    CellConductorApi {
+    pub CellConductorApi {
 
         fn sync_invoke_zome(
             &self,
@@ -43,6 +43,8 @@ mock! {
         fn sync_crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
 
         fn sync_crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
+
+        fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
     }
 
     trait Clone {
@@ -86,4 +88,9 @@ impl CellConductorApiT for MockCellConductorApi {
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
         self.sync_crypto_decrypt(_payload)
     }
+
+    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
+        self.sync_dpki_request(method, args)
+    }
+
 }
