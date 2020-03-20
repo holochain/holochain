@@ -24,6 +24,12 @@ with holonix.pkgs;
  dev-shell = stdenv.mkDerivation (holonix.shell // {
   name = "dev-shell";
 
+  shellHook = holonix.pkgs.lib.concatStrings [
+   holonix.shell.shellHook
+   ''
+   ''
+  ];
+
   buildInputs = [ ]
    ++ holonix.shell.buildInputs
 
@@ -37,6 +43,15 @@ with holonix.pkgs;
    ++ (holonix.pkgs.callPackage ./test {
     pkgs = holonix.pkgs;
    }).buildInputs
+
+   # DELETE-ME helper for ignoring missing_docs
+   # until we get all the docs in place
+   # usage: `source hc-allow-missing-docs`
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-allow-missing-docs" ''
+    export RUSTFLAGS="$RUSTFLAGS -A missing_docs"
+    ''
+   )])
   ;
  });
 }

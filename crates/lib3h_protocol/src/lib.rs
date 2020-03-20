@@ -1,3 +1,5 @@
+// FIXME: uncomment this deny [TK-01128]
+// #![deny(missing_docs)]
 
 mod opaque;
 

@@ -1,6 +1,9 @@
+//! Some common testing helpers.
+
 use crate::{dna::Dna, prelude::*};
 use std::convert::TryFrom;
 
+/// A fixture example dna for unit testing.
 pub fn test_dna(uuid: &str) -> Dna {
     let fixture = format!(
         r#"{{

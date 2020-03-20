@@ -5,12 +5,16 @@ use serde::{Deserialize, Serialize};
 /// Represents the type declaration for zome function parameter
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub struct FnParameter {
+    /// What type is this parameter?
     #[serde(rename = "type")]
     pub parameter_type: String,
+
+    /// What is the name of this parameter?
     pub name: String,
 }
 
 impl FnParameter {
+    /// Construct a new FnParameter
     #[allow(dead_code)]
     pub fn new<S: Into<String>>(n: S, t: S) -> FnParameter {
         FnParameter {
@@ -26,7 +30,11 @@ pub struct FnDeclaration {
     /// The name of this fn declaration.
     #[serde(default)]
     pub name: String,
+
+    /// Input parameters to function.
     pub inputs: Vec<FnParameter>,
+
+    /// Outputs from the function.
     pub outputs: Vec<FnParameter>,
 }
 

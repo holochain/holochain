@@ -87,6 +87,7 @@ pub enum Output {
     None,
 }
 
+/// ParseError is a String
 pub type ParseError = String;
 
 static INIT: Once = Once::new();
@@ -104,7 +105,7 @@ impl FromStr for Output {
     }
 }
 
-pub struct EventFieldVisitor {
+struct EventFieldVisitor {
     json: serde_json::Map<String, serde_json::Value>,
 }
 
@@ -228,7 +229,12 @@ where
 }
 
 pub mod errors {
+    //! Error in the tracing/logging framework
+
     use thiserror::Error;
+
+    /// Error in the tracing/logging framework
+    #[allow(missing_docs)] // should be self-explanitory
     #[derive(Error, Debug)]
     pub enum TracingError {
         #[error(transparent)]

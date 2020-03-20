@@ -7,7 +7,7 @@ use multihash::{encode, Hash};
 use rust_base58::{FromBase58, ToBase58};
 use std::{convert::TryInto, fmt};
 
-// HashString newtype for String
+/// HashString newtype for String
 #[derive(
     PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, DefaultJson, Default, Hash,
 )]
@@ -70,6 +70,7 @@ impl<'a> AsRef<[u8]> for HashString {
 }
 
 impl HashString {
+    /// construct a new HashString
     pub fn new() -> HashString {
         HashString("".to_string())
     }

@@ -1,3 +1,5 @@
+//! Functions dealing with obtaining and referencing singleton LMDB environments
+
 use crate::{
     db::DbManager,
     error::{DatabaseError, DatabaseResult},
@@ -79,14 +81,21 @@ fn rkv_builder(
 pub struct Environment(Arc<RwLock<Rkv>>);
 
 impl Environment {
+    /// Get a read-only lock on the Environment. The most typical use case is
+    /// to get a lock in order to create a read-only transaction. The lock guard
+    /// must outlive the transaction, so it has to be returned here and managed
+    /// explicitly.
     pub async fn guard(&self) -> EnvironmentRef<'_> {
         EnvironmentRef(self.0.read().await)
     }
 
+    /// Access the underlying `Rkv` object
     pub async fn inner(&self) -> RwLockReadGuard<'_, Rkv> {
         self.0.read().await
     }
 
+    /// Get access to the singleton database manager ([DbManager]),
+    /// in order to access individual LMDB databases
     pub async fn dbs(&self) -> DatabaseResult<Arc<DbManager>> {
         let mut map = DB_MANAGERS.write().await;
         let dbs: Arc<DbManager> = match map.entry(self.inner().await.path().into()) {
@@ -99,20 +108,28 @@ impl Environment {
     }
 }
 
+/// Newtype wrapper for a read-only lock guard on the Environment
 pub struct EnvironmentRef<'e>(RwLockReadGuard<'e, Rkv>);
 
+/// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
+    /// Create a new read-only LMDB transaction
     fn reader(&'e self) -> DatabaseResult<Reader<'e>>;
 
+    /// Run a closure, passing in a new read-only transaction
     fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(Reader) -> Result<R, E>;
 }
 
+/// Implementors are able to create a new read-write LMDB transaction
 pub trait WriteManager<'e> {
+    /// Create a new read-write LMDB transaction
     fn writer(&'e self) -> DatabaseResult<Writer<'e>>;
 
+    /// Run a closure, passing in a mutable reference to a read-write
+    /// transaction, and commit the transaction after the closure has run
     fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -153,6 +170,8 @@ impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
 }
 
 impl<'e> EnvironmentRef<'e> {
+
+    /// Access the underlying lock guard
     pub fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
         &self.0
     }

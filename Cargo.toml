@@ -13,7 +13,6 @@ exclude = [
   "pseudocode"
 ]
 
-
 [patch.crates-io]
 # holochain_locksmith = { version = "0.0.43-alpha3", git = "https://github.com/holochain/holochain-rust.git", branch = "unpinned" }
 

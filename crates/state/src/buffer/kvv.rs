@@ -45,6 +45,7 @@ where
     V: BufMultiVal,
     R: Readable,
 {
+    /// Create a new KvvBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: MultiStore) -> DatabaseResult<Self> {
         Ok(Self {
             db,
@@ -53,6 +54,8 @@ where
         })
     }
 
+    /// Get a set of values, taking the scratch space into account,
+    /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<HashSet<V>> {
         use Op::*;
         let mut values = self.get_persisted(k)?;
@@ -71,6 +74,7 @@ where
         Ok(values)
     }
 
+    /// Update the scratch space to record an Insert operation for the KV
     pub fn insert(&mut self, k: K, v: V) {
         self.scratch
             .entry(k)
@@ -81,6 +85,7 @@ where
             .or_insert_with(|| hashset! { Op::Insert(Box::new(v)) });
     }
 
+    /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K, v: V) {
         self.scratch
             .entry(k)
@@ -91,10 +96,13 @@ where
             .or_insert_with(|| hashset! { Op::Delete(Box::new(v)) });
     }
 
-    pub fn delete_all(&mut self, k: K) {
+    /// Clear the scratch space and record a DeleteAll operation
+    /// TODO: implement and make public
+    fn _delete_all(&mut self, k: K) {
         if let Entry::Occupied(mut entry) = self.scratch.entry(k) {
             let _ops = entry.get_mut();
         }
+        unimplemented!()
     }
 
     /// Fetch data from DB, deserialize into V type

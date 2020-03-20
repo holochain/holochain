@@ -9,12 +9,18 @@ use std::collections::BTreeMap;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum Sharing {
+    /// Everyone can see.
     Public,
+
+    /// Only local hApp can access.
     Private,
+
+    /// Published, but encrypted.
     Encrypted,
 }
 
 impl Sharing {
+    /// `true` if the data should be published to the DHT.
     #[rustfmt::skip]
     pub fn can_publish(self) -> bool {
        match self {
@@ -91,6 +97,7 @@ impl LinkedFrom {
     }
 }
 
+/// Serialize ZomeEntryTypes
 pub fn serialize_entry_types<S>(
     entry_types: &ZomeEntryTypes,
     serializer: S,
@@ -105,6 +112,7 @@ where
     map.end()
 }
 
+/// Deserialize ZomeEntryTypes
 pub fn deserialize_entry_types<'de, D>(deserializer: D) -> Result<ZomeEntryTypes, D::Error>
 where
     D: Deserializer<'de>,

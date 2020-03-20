@@ -98,6 +98,7 @@ impl AddressableContent for OtherExampleAddressableContent {
     }
 }
 
+/// Struct to aid in persistence tests - also useful out of this module.
 pub struct AddressableContentTestSuite;
 
 impl AddressableContentTestSuite {
