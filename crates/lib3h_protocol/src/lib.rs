@@ -1,4 +1,5 @@
-#![deny(missing_docs)]
+// FIXME: uncomment this deny
+// #![deny(missing_docs)]
 
 mod opaque;
 

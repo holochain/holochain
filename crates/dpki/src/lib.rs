@@ -1,7 +1,8 @@
 //! Provide a slightly higher-level abstraction over the raw sodium crypto functions for
 //! how we are going to be managing keys in Holochain.
 
-#![deny(missing_docs)]
+// FIXME: uncomment this deny
+// #![deny(missing_docs)]
 
 use lazy_static::lazy_static;
 

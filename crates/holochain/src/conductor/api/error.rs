@@ -1,5 +1,5 @@
 //! Errors occurring during a [CellConductorApi] or [ExternalConductorApi] call
-//!
+
 use sx_types::cell::CellId;
 use thiserror::Error;
 
