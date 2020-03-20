@@ -27,8 +27,6 @@ with holonix.pkgs;
   shellHook = holonix.pkgs.lib.concatStrings [
    holonix.shell.shellHook
    ''
-   # add to RUSTFLAGS requiring all public items be documented
-   export RUSTFLAGS="-D missing_docs $RUSTFLAGS"
    ''
   ];
 
@@ -51,7 +49,7 @@ with holonix.pkgs;
    # usage: `source hc-allow-missing-docs`
    ++ ([(
     holonix.pkgs.writeShellScriptBin "hc-allow-missing-docs" ''
-    export RUSTFLAGS="$(echo "$RUSTFLAGS" | sed 's/-D missing_docs//')"
+    export RUSTFLAGS="$RUSTFLAGS -A missing_docs"
     ''
    )])
   ;

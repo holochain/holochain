@@ -1,6 +1,5 @@
 target/
 .cargo/*
-!.cargo/config
 Cargo.lock
 *.log
 *~
