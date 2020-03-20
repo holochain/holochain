@@ -78,6 +78,7 @@ pub struct Environment(Arc<Rkv>);
 pub trait ReadManager {
     fn reader(&self) -> DatabaseResult<Reader>;
 
+    /// Make chnage to database reader
     fn with_reader<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,

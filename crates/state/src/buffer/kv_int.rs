@@ -1,5 +1,5 @@
 //! An interface to an LMDB key-value store, with integer keys
-//! This is unfortunately pure copypasta from KvBuf, since Rust doesn't support specialization yet
+//! This is unfortunately pure copy past from KvBuf, since Rust doesn't support specialization yet
 //! TODO, find *some* way to DRY up the two
 
 use super::{BufIntKey, BufVal, BufferedStore};
@@ -70,14 +70,14 @@ where
         Ok(val)
     }
 
-    pub fn put(&mut self, k: K, v: V) {
-        // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
+    /// Adds a Put [Op::Put](Op) to the scratch that will be run on commit.
+    pub fn put(&mut self, k: K, v: V) -> bool {
+        self.scratch.insert(k, Op::Put(Box::new(v))).is_some()
     }
 
-    pub fn delete(&mut self, k: K) {
-        // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Del);
+    /// Adds a [Op::Del](Op) to the scratch space that will be run on commit
+    pub fn delete(&mut self, k: K) -> bool {
+        self.scratch.insert(k, Op::Del).is_some()
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -171,6 +171,7 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
+    use std::collections::HashMap;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
@@ -181,6 +182,10 @@ pub mod tests {
     struct V(u32);
 
     type Store<'a> = IntKvBuf<'a, u32, V>;
+
+    fn scratch_state<K, V>(buf: HashMap<K, V>) -> Vec<(K, V)> {
+        buf.into_iter().collect()
+    }
 
     #[test]
     fn kv_iterators() -> DatabaseResult<()> {
@@ -222,8 +227,7 @@ pub mod tests {
         let env = test_env();
         let db = env
             .inner()
-            .open_integer("kv", StoreOptions::create())
-            .unwrap();
+            .open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
             let buf: Store = IntKvBuf::new(&reader, db).unwrap();
@@ -233,6 +237,87 @@ pub mod tests {
 
             assert_eq!(forward, vec![]);
             assert_eq!(reverse, vec![]);
+            Ok(())
+        })
+    }
+    #[test]
+    fn kv_indicate_value_existed() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let env = test_env();
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db)?;
+
+            assert!(!buf.put(1, V(1)));
+            assert!(!buf.put(2, V(2)));
+            assert!(buf.put(1, V(7)));
+            assert!(!buf.delete(4));
+            assert!(buf.delete(2));
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn kv_deleted_persisted() -> DatabaseResult<()> {
+        use tracing::*;
+        sx_types::observability::test_run().ok();
+        let env = test_env();
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(1));
+            buf.put(2, V(2));
+            buf.put(3, V(3));
+            
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.delete(2);
+            
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            debug!(?forward);
+            assert_eq!(forward, vec![(1, V(1)), (3, V(3))]);
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn kv_deleted_buffer() -> DatabaseResult<()> {
+        use tracing::*;
+        sx_types::observability::test_run().ok();
+        let env = test_env();
+        let db = env
+            .inner()
+            .open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(5));
+            buf.put(2, V(4));
+            buf.put(3, V(9));
+            assert_eq!(scratch_state(buf.scratch.clone()), vec![(1, V(5)), (2, V(4)), (3, V(9))]);
+            buf.delete(2);
+            
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            debug!(?forward);
+            assert_eq!(forward, vec![(1, V(1)), (3, V(3))]);
             Ok(())
         })
     }
