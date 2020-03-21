@@ -1,2 +1,2 @@
-mod config;
-pub use config::*;
+
+pub struct Config;
