@@ -11,7 +11,7 @@
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
-    config::Config,
+    config::ConductorConfig,
     error::ConductorResult,
 };
 pub use builder::*;
@@ -68,7 +68,7 @@ impl Conductor {
         &self.tx_network
     }
 
-    pub fn load_config(_config: Config) -> ConductorResult<()> {
+    pub fn load_config(_config: ConductorConfig) -> ConductorResult<()> {
         Ok(())
     }
 }
@@ -91,7 +91,7 @@ mod builder {
     //         self
     //     }
 
-    //     pub fn from_config(self, config: Config) -> ConductorResult<Conductor<Box<dyn Spawn>>> {
+    //     pub fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor<Box<dyn Spawn>>> {
     //         let executor = self.executor.unwrap_or_else(default_executor);
     //         Ok(Conductor {
     //             cells: HashMap::new(),

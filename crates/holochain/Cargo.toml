@@ -37,6 +37,8 @@ petgraph = "0.5.0"
 boolinator = "2.4.0"
 base64 = "0.10.1"
 tracing = "=0.1.13"
+url = "1.7.2"
+url_serde = "0.2.0"
 
 [dev-dependencies]
 anyhow = "1.0.26"
