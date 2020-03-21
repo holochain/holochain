@@ -39,6 +39,7 @@ base64 = "0.10.1"
 tracing = "=0.1.13"
 url = "1.7.2"
 url_serde = "0.2.0"
+derive_more = "0.99.3"
 
 [dev-dependencies]
 anyhow = "1.0.26"

@@ -4,6 +4,7 @@ mod conductor;
 pub mod config;
 pub mod error;
 pub mod interface;
+pub mod manifest;
 
 pub use cell::Cell;
 pub use conductor::Conductor;
