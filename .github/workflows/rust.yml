@@ -1,4 +1,4 @@
-name: Rust
+name: Build & Test
 
 on:
   push:
@@ -14,9 +14,5 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: cachix/install-nix-action@v7
-    - name: Setup Nix
-      run: nix-shell
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+    - name: Test
+      run: nix-shell --run 'cargo test'
