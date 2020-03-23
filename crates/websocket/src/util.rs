@@ -2,13 +2,59 @@
 
 use crate::*;
 
+use serde::{Deserialize, Serialize};
+
 const SCHEME: &str = "ws";
 
 /// internal socket type
 pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
+#[allow(dead_code)]
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) enum RpcMessage {
+    Request { id: String, data: Vec<u8> },
+    Response { id: String, data: Vec<u8> },
+}
+
+impl RpcMessage {
+    pub(crate) fn clone_id(&self) -> String {
+        match self {
+            RpcMessage::Request { id, .. } => id.clone(),
+            RpcMessage::Response { id, .. } => id.clone(),
+        }
+    }
+}
+
+impl std::convert::TryFrom<RpcMessage> for SerializedBytes {
+    type Error = Error;
+
+    fn try_from(t: RpcMessage) -> Result<SerializedBytes> {
+        holochain_serialized_bytes::to_vec_named(&t)
+            .map_err(|e| Error::new(ErrorKind::Other, e))
+            .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
+    }
+}
+
+impl std::convert::TryFrom<SerializedBytes> for RpcMessage {
+    type Error = Error;
+
+    fn try_from(t: SerializedBytes) -> Result<RpcMessage> {
+        holochain_serialized_bytes::from_read_ref(t.bytes())
+            .map_err(|e| Error::new(ErrorKind::Other, e))
+    }
+}
+
 /// internal message sender type
-pub(crate) type RawSender = tokio::sync::mpsc::Sender<tungstenite::Message>;
+pub(crate) type RawSender = tokio::sync::mpsc::Sender<(
+    RpcMessage,
+    Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
+)>;
+
+/// internal message receiver type
+pub(crate) type RawReceiver = tokio::sync::mpsc::Receiver<(
+    RpcMessage,
+    Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
+)>;
 
 /// internal helper to convert addrs to urls
 pub(crate) fn addr_to_url(a: SocketAddr) -> Url2 {
