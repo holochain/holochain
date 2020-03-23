@@ -35,16 +35,19 @@ mod tests {
         println!("got bound addr: {}", binding);
 
         tokio::task::spawn(async move {
-            while let Ok((mut send, mut recv)) = server.accept().await {
-                println!("got incoming connection: {}", recv.remote_addr());
-
+            while let Some(maybe_con) = server.next().await {
                 tokio::task::spawn(async move {
-                    while let Some(Ok(msg)) = recv.next().await {
-                        let msg = msg.into_text().unwrap();
-                        println!("got incoming message: {}", msg);
-                        let msg = tungstenite::Message::Text(format!("echo: {}", msg));
-                        send.send(msg).await.unwrap();
-                    }
+                    let (mut send, mut recv) = maybe_con.await.unwrap();
+                    println!("got incoming connection: {}", recv.remote_addr());
+
+                    tokio::task::spawn(async move {
+                        while let Some(Ok(msg)) = recv.next().await {
+                            let msg = msg.into_text().unwrap();
+                            println!("got incoming message: {}", msg);
+                            let msg = tungstenite::Message::Text(format!("echo: {}", msg));
+                            send.send(msg).await.unwrap();
+                        }
+                    });
                 });
             }
         });
