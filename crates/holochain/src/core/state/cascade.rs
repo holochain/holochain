@@ -21,20 +21,19 @@
 //! Scratch NotFound -> Goto Cas
 //! Cas Found -> Return
 //! Cas NotFound -> Goto Network
-//! else 
+//! else
 //! Network Found -> Return
 //! Network NotFound -> Goto Cache
 //! Cache Found -> Return
 //! Cache NotFound -> None
-//! 
+//!
 //! gets most recent N links with default N (50)
 //! Page number
 //! load_true loads the results into cache
 
-use sx_types::entry::Entry;
 use super::chain_cas::ChainCasBuf;
-use sx_types::persistence::cas::content::Address;
 use sx_state::{buffer::KvvBuf, prelude::Reader};
+use sx_types::{entry::Entry, persistence::cas::content::Address};
 
 #[allow(dead_code)]
 pub struct Cascade<'e> {
@@ -48,14 +47,10 @@ pub struct Cascade<'e> {
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
 impl<'env> Cascade<'env> {
-    pub async fn get(address: Address) -> Entry {
+    pub fn new() -> Self {
         unimplemented!()
     }
-    pub async fn dht_get() {
-        unimplemented!()
-    }
-
-    pub async fn dht_get_links() {
+    pub async fn dht_get(&self, address: Address) -> Entry {
         unimplemented!()
     }
 }

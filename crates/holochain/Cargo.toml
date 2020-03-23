@@ -40,6 +40,7 @@ tracing = "=0.1.13"
 
 [dev-dependencies]
 anyhow = "1.0.26"
+rkv = { git = "https://github.com/holochain/rkv.git" }
 
 [lib]
 name = "holochain_2020"
