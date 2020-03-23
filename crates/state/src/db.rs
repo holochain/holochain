@@ -1,3 +1,5 @@
+//! Functionality for safely accessing LMDB database references.
+
 use crate::{
     env::Environment,
     error::{DatabaseError, DatabaseResult},
@@ -7,11 +9,17 @@ use lazy_static::lazy_static;
 
 use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
 
+/// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum DbName {
+    /// KV store of chain entries, keyed by address
     ChainEntries,
+    /// KV store of chain headers, keyed by address
     ChainHeaders,
+    /// KVV store of chain metadata, storing relationships
     ChainMeta,
+    /// int KV store storing the sequence of committed headers,
+    /// most notably allowing access to the chain head
     ChainSequence,
 }
 
@@ -28,6 +36,7 @@ impl std::fmt::Display for DbName {
 }
 
 impl DbName {
+    /// Associates a [DbKind] to each [DbName]
     pub fn kind(&self) -> DbKind {
         use DbKind::*;
         use DbName::*;
@@ -40,20 +49,31 @@ impl DbName {
     }
 }
 
+/// The various "modes" of viewing LMDB databases
 pub enum DbKind {
+    /// Single-value KV with arbitrary keys, associated with [KvBuf]
     Single,
+    /// Single-value KV with integer keys, associated with [IntKvBuf]
     SingleInt,
+    /// Multi-value KV with arbitrary keys, associated with [KvvBuf]
     Multi,
 }
 
+/// A UniversalMap key used to access persisted database references.
+/// The key type is DbName, the value can be one of the various `rkv`
+/// database types
 pub type DbKey<V> = UmKey<DbName, V>;
 
 lazy_static! {
+    /// The key to access the ChainEntries database
     pub static ref CHAIN_ENTRIES: DbKey<SingleStore> =
-        DbKey::<SingleStore>::new(DbName::ChainEntries);
+    DbKey::<SingleStore>::new(DbName::ChainEntries);
+    /// The key to access the ChainHeaders database
     pub static ref CHAIN_HEADERS: DbKey<SingleStore> =
-        DbKey::<SingleStore>::new(DbName::ChainHeaders);
+    DbKey::<SingleStore>::new(DbName::ChainHeaders);
+    /// The key to access the ChainMeta database
     pub static ref CHAIN_META: DbKey<MultiStore> = DbKey::new(DbName::ChainMeta);
+    /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
 }
 
@@ -80,6 +100,7 @@ impl DbManager {
         Ok(this)
     }
 
+    /// Get a `rkv` Database reference from a key
     pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> DatabaseResult<&V> {
         self.um
             .get(key)
@@ -115,6 +136,8 @@ impl DbManager {
         Ok(())
     }
 
+    /// Get a `rkv` Database reference from a key, or create a new Database
+    /// of the proper type if not yet created
     pub async fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,

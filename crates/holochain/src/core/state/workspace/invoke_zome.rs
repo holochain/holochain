@@ -7,7 +7,7 @@ pub struct InvokeZomeWorkspace<'env> {
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(_reader: Reader<'env>, _dbs: &DbManager) -> WorkspaceResult<Self> {
+    pub fn new(_reader: &Reader<'env>, _dbs: &DbManager) -> WorkspaceResult<Self> {
         unimplemented!()
     }
 }

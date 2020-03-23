@@ -37,8 +37,13 @@ impl PartialEq for Cell {
 /// from the lifetimes of the resources which it holds references to.
 /// Any work it does is through running a workflow, passing references to
 /// the resources needed to complete that workflow.
+///
+/// The [Conductor] manages a collection of Cells, and will call functions
+/// on the Cell when a Conductor API method is called (either a
+/// [CellConductorApi] or an [ExternalConductorApi])
 pub struct Cell {
     id: CellId,
+    conductor_api: CellConductorApi,
     state_env: Environment,
 }
 
@@ -51,6 +56,7 @@ impl Cell {
         &self.id.agent_id()
     }
 
+    /// Entry point for incoming messages from the network that need to be handled
     pub async fn handle_network_message(
         &self,
         _msg: Lib3hToClient,
@@ -58,6 +64,8 @@ impl Cell {
         unimplemented!()
     }
 
+    /// When the Conductor determines that it's time to execute some [AutonomicProcess],
+    /// whether scheduled or through an [AutonomicCue], this function gets called
     pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
         match process {
             AutonomicProcess::SlowHeal => unimplemented!(),
@@ -65,6 +73,7 @@ impl Cell {
         }
     }
 
+    /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
         _conductor_api: CellConductorApi,
@@ -82,6 +91,11 @@ impl RunnerCellT for Cell {
     fn state_env(&self) -> Environment {
         self.state_env.clone()
     }
+
+    fn get_conductor_api(&self) -> CellConductorApi {
+        self.conductor_api.clone()
+    }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

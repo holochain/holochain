@@ -31,8 +31,13 @@ impl Config {
     }
 }
 
+/// Map of EntryType to EntryTypeDef
 pub type ZomeEntryTypes = BTreeMap<EntryType, EntryTypeDef>;
+
+/// Map of String to Trait Functions.
 pub type ZomeTraits = BTreeMap<String, TraitFns>;
+
+/// List of Function Declarations.
 pub type ZomeFnDeclarations = Vec<FnDeclaration>;
 
 /// Represents an individual "zome".
@@ -106,6 +111,7 @@ impl Zome {
         }
     }
 
+    /// List the required bridges for this Zome.
     pub fn get_required_bridges(&self) -> Vec<Bridge> {
         self.bridges
             .iter()
@@ -135,7 +141,7 @@ impl Zome {
             .find(|ref fn_decl| fn_decl.name == fn_name)
     }
 
-    // Helper function for finding out if a given function call is public
+    /// Helper function for finding out if a given function call is public
     pub fn is_fn_public(&self, fn_name: &str) -> bool {
         let pub_trait = ReservedTraitNames::Public.as_str();
         self.traits.iter().any(|(trait_name, trait_fns)| {

@@ -4,6 +4,7 @@ use crate::{
     prelude::{Readable, Reader, Writer},
 };
 use rkv::SingleStore;
+
 use std::collections::HashMap;
 use tracing::*;
 
@@ -37,6 +38,7 @@ where
     V: BufVal,
     R: Readable,
 {
+    /// Create a new KvBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
             db,
@@ -45,6 +47,8 @@ where
         })
     }
 
+    /// Get a value, taking the scratch space into account,
+    /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         use Op::*;
         let val = match self.scratch.get(k) {
@@ -55,11 +59,13 @@ where
         Ok(val)
     }
 
+    /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) {
         // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
+    /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) {
         // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Delete);
@@ -68,7 +74,7 @@ where
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(bincode::deserialize(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }
@@ -98,7 +104,7 @@ where
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
-                    let buf = bincode::serialize(v)?;
+                    let buf = rmp_serde::to_vec_named(v)?;
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
@@ -132,7 +138,7 @@ where
         match self.0.next() {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
                 k,
-                bincode::deserialize(buf).expect("Failed to deserialize value"),
+                rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
             )),
             None => None,
             x => {
@@ -155,7 +161,6 @@ pub mod tests {
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
-
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
         name: String,
@@ -170,9 +175,7 @@ pub mod tests {
     async fn kv_iterators() -> DatabaseResult<()> {
         let arc = test_env();
         let env = arc.guard().await;
-        let db = env
-            .inner()
-            .open_single("kv", StoreOptions::create())?;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut buf: TestBuf = KvBuf::new(&reader, db)?;

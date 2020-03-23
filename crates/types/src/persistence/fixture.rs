@@ -1,3 +1,5 @@
+//! helper functions and data for persistence testing
+
 use crate::persistence::{
     cas::content::{Address, AddressableContent, Content},
     hash::HashString,

@@ -1,10 +1,18 @@
+//! Holochain DnaError type.
+
 use serde::{Deserialize, Serialize};
 use std::{error::Error, fmt};
 
+/// Holochain DnaError type.
 #[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum DnaError {
+    /// ZomeNotFound
     ZomeNotFound(String),
+
+    /// TraitNotFound
     TraitNotFound(String),
+
+    /// ZomeFunctionNotFound
     ZomeFunctionNotFound(String),
 }
 

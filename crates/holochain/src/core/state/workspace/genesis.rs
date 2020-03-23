@@ -2,13 +2,16 @@ use super::Workspace;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use sx_state::{db::DbManager, prelude::*};
 
+// TODO: visibility
 pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuf<'env, Reader<'env>>,
+    pub source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
 impl<'env> GenesisWorkspace<'env> {
-    pub fn new(_reader: Reader<'env>, _dbs: &DbManager) -> WorkspaceResult<Self> {
-        unimplemented!()
+    pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
+        Ok(Self {
+            source_chain: SourceChainBuf::new(reader, dbs)?
+        })
     }
 }
 
