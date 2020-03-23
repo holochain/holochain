@@ -4,17 +4,16 @@ use std::path::PathBuf;
 use sx_types::{cell::CellId, prelude::HashString, shims::AgentPubKey};
 use url::Url;
 
-/// The representation of persisted conductor state
-pub struct ConductorManifest {
-    interfaces: Vec<InterfaceManifest>,
-    cells: Vec<CellManifest>,
-}
 
+///////////////////////////////////////////////////
+
+/// Runtime state for a Cell, containing data which may change throughout the Conductor's execution
 #[derive(Deserialize, Serialize)]
-pub struct CellManifest {
+pub struct CellState {
+    /// Actually the key of the database, TODO: not needed
     id: CellId,
     agent: AgentManifest,
-    instances: Vec<InterfaceHandle>,
+    gateways: Vec<GatewayHandle>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -27,29 +26,16 @@ pub struct AgentManifest {
     holo_remote_key: Option<bool>,
 }
 
-#[derive(Deserialize, Serialize, From, Into)]
-pub struct InterfaceHandle(String);
 
-pub struct InterfaceManifest {
-    driver: InterfaceDriver,
+pub struct GatewayManifest {
+    driver: GatewayDriver,
     admin: bool,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "lowercase")]
-pub enum InterfaceDriver {
+pub enum GatewayDriver {
     Websocket { port: u16 },
     Http { port: u16 },
     DomainSocket { file: PathBuf },
-}
-
-pub struct DnaManifest {
-    location: DnaLocator,
-    hash: HashString,
-}
-
-pub enum DnaLocator {
-    File(PathBuf),
-    Url(Url),
-    Hchc,
 }

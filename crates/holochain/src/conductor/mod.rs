@@ -3,8 +3,9 @@ mod cell;
 mod conductor;
 pub mod config;
 pub mod error;
+pub mod happ_bundle;
 pub mod interface;
-pub mod manifest;
+pub mod state;
 
 pub use cell::Cell;
 pub use conductor::Conductor;
