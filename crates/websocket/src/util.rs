@@ -10,6 +10,7 @@ pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpSt
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub(crate) enum Message {
+    Ping,
     Signal { data: Vec<u8> },
     Request { id: String, data: Vec<u8> },
     Response { id: String, data: Vec<u8> },
@@ -18,6 +19,7 @@ pub(crate) enum Message {
 impl Message {
     pub(crate) fn clone_id(&self) -> Option<String> {
         match self {
+            Message::Ping => None,
             Message::Signal { .. } => None,
             Message::Request { id, .. } => Some(id.clone()),
             Message::Response { id, .. } => Some(id.clone()),

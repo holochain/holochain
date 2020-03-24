@@ -36,6 +36,9 @@ impl tokio::stream::Stream for WebsocketListener {
                     async move {
                         match socket_result {
                             Ok(socket) => {
+                                socket.set_keepalive(Some(std::time::Duration::from_secs(
+                                    config.tcp_keepalive_s as u64,
+                                )))?;
                                 let socket = tokio_tungstenite::accept_async_with_config(
                                     socket,
                                     Some(tungstenite::protocol::WebSocketConfig {

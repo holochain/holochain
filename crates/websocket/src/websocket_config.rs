@@ -6,16 +6,14 @@ pub struct WebsocketConfig {
     /// Scheme to use for urls - e.g. "ws" or "wss". [default = "ws"]
     pub scheme: &'static str,
 
-    /// Time after which the lib will stop tracking individual request ids.
-    /// [default = 30_000]
-    pub default_request_timeout_ms: u64,
+    /// Seconds after which the lib will stop tracking individual request ids.
+    /// [default = 30]
+    pub default_request_timeout_s: usize,
 
     /// We will treat the socket as disconnected if we receive no messages
-    /// in this timeframe.
-    /// If Some(_), this setting will also trigger automatic Ping messages
-    /// at half this timeframe.
-    /// [default = 30_000]
-    pub latency_disconnect_ms: Option<u64>,
+    /// in this timeframe, using the tcp keepalive mechanism.
+    /// [default = 10]
+    pub tcp_keepalive_s: usize,
 
     /// How many items are allowed in the outgoing queue. [default = 10]
     pub max_send_queue: usize,
@@ -31,8 +29,8 @@ impl Default for WebsocketConfig {
     fn default() -> Self {
         Self {
             scheme: "ws",
-            default_request_timeout_ms: 30_000,
-            latency_disconnect_ms: Some(30_000),
+            default_request_timeout_s: 30,
+            tcp_keepalive_s: 30,
             max_send_queue: 10,
             max_message_size: 64 << 20,
             max_frame_size: 16 << 20,
@@ -48,14 +46,14 @@ impl WebsocketConfig {
     }
 
     /// Builder-style setter.
-    pub fn default_request_timeout_ms(mut self, ms: u64) -> Self {
-        self.default_request_timeout_ms = ms;
+    pub fn default_request_timeout_s(mut self, s: usize) -> Self {
+        self.default_request_timeout_s = s;
         self
     }
 
     /// Builder-style setter.
-    pub fn latency_disconnect_ms(mut self, ms: Option<u64>) -> Self {
-        self.latency_disconnect_ms = ms;
+    pub fn tcp_keepalive_s(mut self, s: usize) -> Self {
+        self.tcp_keepalive_s = s;
         self
     }
 
