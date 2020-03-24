@@ -50,3 +50,8 @@ pub struct ConductorConfig {
     /// This config setting selects one of the available services (i.e. CLI prompt, IPC, mock)
     pub passphrase_service: PassphraseServiceConfig,
 }
+
+impl ConductorConfig {
+
+
+}
