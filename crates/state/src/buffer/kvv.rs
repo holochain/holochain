@@ -3,24 +3,43 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use maplit::hashset;
+use either::Either;
 use rkv::MultiStore;
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    hash::Hash,
-};
+use std::collections::HashMap;
 
 /// Transactional operations on a KVV store
+///
 /// Replace is a Delete followed by an Insert
-#[derive(Debug, Hash, PartialEq, Eq)]
-enum Op<V> {
-    Insert(Box<V>),
-    // Replace(Box<(V, V)>),
-    Delete(Box<V>),
-    DeleteAll,
+#[derive(Debug, PartialEq, Eq)]
+enum Op {
+    Insert,
+    Delete,
 }
 
-type Scratch<K, V> = HashMap<K, HashSet<Op<V>>>;
+struct ValuesDelta<V> {
+    delete_all: bool,
+    deltas: HashMap<V, Op>,
+}
+
+impl<V> ValuesDelta<V> {
+    fn all_deleted() -> Self {
+        Self {
+            delete_all: true,
+            deltas: HashMap::default(),
+        }
+    }
+}
+
+// This would be equivalent to the derived impl, except that this
+// doesn't require `V: Default`
+impl<V> Default for ValuesDelta<V> {
+    fn default() -> Self {
+        Self {
+            delete_all: bool::default(),
+            deltas: HashMap::default(),
+        }
+    }
+}
 
 /// A persisted key-value store with a transient HashMap to store
 /// CRUD-like changes without opening a blocking read-write cursor
@@ -36,7 +55,7 @@ where
 {
     db: MultiStore,
     reader: &'env R,
-    scratch: Scratch<K, V>,
+    scratch: HashMap<K, ValuesDelta<V>>,
 }
 
 impl<'env, K, V, R> KvvBuf<'env, K, V, R>
@@ -56,69 +75,72 @@ where
 
     /// Get a set of values, taking the scratch space into account,
     /// or from persistence if needed
-    pub fn get(&self, k: &K) -> DatabaseResult<HashSet<V>> {
-        use Op::*;
-        let mut values = self.get_persisted(k)?;
-        if let Some(ops) = self.scratch.get(k) {
-            for op in ops.into_iter() {
-                let _ = match op {
-                    Insert(v) => values.insert(*v.clone()),
-                    Delete(v) => values.remove(&**v),
-                    DeleteAll => {
-                        let _ = values.drain();
-                        true
+    pub fn get(&self, k: &K) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + '_> {
+        let persisted = self.get_persisted(k)?;
+        Ok(
+            if let Some(ValuesDelta { delete_all, deltas }) = self.scratch.get(k) {
+                Either::Left({
+                    let from_scratch_space = deltas
+                        .iter()
+                        .filter(|(_v, op)| **op == Op::Insert)
+                        .map(|(v, _op)| Ok(v.clone()));
+
+                    if *delete_all {
+                        // If delete_all is set, return only scratch content,
+                        // skipping persisted content (as it will all be deleted)
+                        Either::Left(from_scratch_space)
+                    } else {
+                        Either::Right(
+                            from_scratch_space
+                                // Otherwise, chain it with the persisted content,
+                                // skipping only things that we've specifically deleted.
+                                .chain(persisted.filter(move |r| match r {
+                                    Ok(v) => !deltas.contains_key(v),
+                                    Err(_e) => true,
+                                })),
+                        )
                     }
-                };
-            }
-        }
-        Ok(values)
+                })
+            } else {
+                Either::Right(persisted)
+            },
+        )
     }
 
     /// Update the scratch space to record an Insert operation for the KV
     pub fn insert(&mut self, k: K, v: V) {
         self.scratch
             .entry(k)
-            .and_modify(|ops| {
-                ops.remove(&Op::Delete(Box::new(v.clone())));
-                let _ = ops.insert(Op::Insert(Box::new(v.clone())));
-            })
-            .or_insert_with(|| hashset! { Op::Insert(Box::new(v)) });
+            .or_default()
+            .deltas
+            .insert(v, Op::Insert);
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K, v: V) {
         self.scratch
             .entry(k)
-            .and_modify(|ops| {
-                ops.remove(&Op::Insert(Box::new(v.clone())));
-                let _ = ops.insert(Op::Delete(Box::new(v.clone())));
-            })
-            .or_insert_with(|| hashset! { Op::Delete(Box::new(v)) });
+            .or_default()
+            .deltas
+            .insert(v, Op::Delete);
     }
 
     /// Clear the scratch space and record a DeleteAll operation
-    /// TODO: implement
     pub fn delete_all(&mut self, k: K) {
-        if let Entry::Occupied(mut entry) = self.scratch.entry(k) {
-            let _ops = entry.get_mut();
-        }
-        unimplemented!()
+        self.scratch.insert(k, ValuesDelta::all_deleted());
     }
 
     /// Fetch data from DB, deserialize into V type
-    fn get_persisted(&self, k: &K) -> DatabaseResult<HashSet<V>> {
+    fn get_persisted(&self, k: &K) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + '_> {
         let iter = self.db.get(self.reader, k)?;
-        Ok(iter
-            .map(|v| match v {
-                Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
-                Ok((_, Some(_))) => Err(DatabaseError::InvalidValue),
-                Ok((_, None)) => Ok(None),
-                Err(e) => Ok(Err(e)?),
-            })
-            .collect::<Result<Vec<Option<V>>, DatabaseError>>()?
-            .into_iter()
-            .filter_map(|v| v)
-            .collect())
+        Ok(iter.filter_map(|v| match v {
+            Ok((_, Some(rkv::Value::Blob(buf)))) => {
+                Some(rmp_serde::from_read_ref(buf).map_err(|e| e.into()))
+            }
+            Ok((_, Some(_))) => Some(Err(DatabaseError::InvalidValue)),
+            Ok((_, None)) => None,
+            Err(e) => Some(Err(e.into())),
+        }))
     }
 }
 
@@ -132,22 +154,25 @@ where
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
-        for (k, mut ops) in self.scratch.into_iter() {
-            // If there is a DeleteAll in the set, that signifies that we should
-            // delete everything persisted, but then continue to add inserts from
-            // the ops, if present
-            if ops.take(&DeleteAll).is_some() {
+        for (k, ValuesDelta { delete_all, deltas }) in self.scratch {
+            // If delete_all is set, that we should delete everything persisted,
+            // but then continue to add inserts from the ops, if present
+            if delete_all {
                 self.db.delete_all(writer, k.clone())?;
             }
-            for op in ops {
+
+            for (v, op) in deltas {
                 match op {
-                    Insert(v) => {
-                        let buf = rmp_serde::to_vec_named(&*v)?;
+                    Insert => {
+                        let buf = rmp_serde::to_vec_named(&v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.put(writer, k.clone(), &encoded)?;
                     }
-                    Delete(v) => {
-                        let buf = rmp_serde::to_vec_named(&*v)?;
+                    // Skip deleting unnecessarily if we have already deleted
+                    // everything
+                    Delete if delete_all => {}
+                    Delete => {
+                        let buf = rmp_serde::to_vec_named(&v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.delete(writer, k.clone(), &encoded).or_else(|err| {
                             // Ignore the case where the key is not found
@@ -158,7 +183,6 @@ where
                             }
                         })?;
                     }
-                    DeleteAll => unreachable!(),
                 }
             }
         }
@@ -175,7 +199,6 @@ pub mod tests {
         error::DatabaseError,
         test_utils::test_env,
     };
-    use maplit::hashset;
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
@@ -196,13 +219,13 @@ pub mod tests {
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-            assert_eq!(store.get(&"key"), Ok(hashset! {}));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
 
             store.delete("key", V(0));
-            assert_eq!(store.get(&"key"), Ok(hashset! {}));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
 
             store.insert("key", V(0));
-            assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
 
             env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -218,13 +241,13 @@ pub mod tests {
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-            assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
 
             store.insert("key", V(0));
-            assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
 
             store.delete("key", V(0));
-            assert_eq!(store.get(&"key"), Ok(hashset! {}));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
 
             env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -240,7 +263,7 @@ pub mod tests {
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-            assert_eq!(store.get(&"key"), Ok(hashset! {}));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
             Ok(())
         })
         .unwrap();
