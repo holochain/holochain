@@ -15,6 +15,36 @@ impl WebsocketSender {
         Self { sender }
     }
 
+    /// Emit a signal (message without response) to the remote end of this websocket
+    #[must_use]
+    pub fn signal<SB1>(&mut self, msg: SB1) -> BoxFuture<'static, Result<()>>
+    where
+        SB1: 'static + std::convert::TryInto<SerializedBytes> + Send,
+        <SB1 as std::convert::TryInto<SerializedBytes>>::Error:
+            'static + std::error::Error + Send + Sync,
+    {
+        let mut sender = self.sender.clone();
+        async move {
+            let bytes: SerializedBytes = msg
+                .try_into()
+                .map_err(|e| Error::new(ErrorKind::Other, e))?;
+            let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+            let debug = String::from_utf8_lossy(&bytes).to_string();
+
+            let msg = Message::Signal { data: bytes };
+
+            sender
+                .send((msg, None))
+                .await
+                .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+            println!("sent: {}", debug);
+
+            Ok(())
+        }
+        .boxed()
+    }
+
     /// Make a rpc request of the remote end of this websocket
     #[must_use]
     pub fn request<SB1, SB2>(&mut self, msg: SB1) -> BoxFuture<'static, Result<SB2>>
@@ -33,7 +63,7 @@ impl WebsocketSender {
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
             let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
 
-            let msg = RpcMessage::Request {
+            let msg = Message::Request {
                 id: nanoid::nanoid!(),
                 data: bytes,
             };

@@ -9,36 +9,38 @@ const SCHEME: &str = "ws";
 /// internal socket type
 pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum RpcMessage {
+#[serde(tag = "type")]
+pub(crate) enum Message {
+    Signal { data: Vec<u8> },
     Request { id: String, data: Vec<u8> },
     Response { id: String, data: Vec<u8> },
 }
 
-impl RpcMessage {
-    pub(crate) fn clone_id(&self) -> String {
+impl Message {
+    pub(crate) fn clone_id(&self) -> Option<String> {
         match self {
-            RpcMessage::Request { id, .. } => id.clone(),
-            RpcMessage::Response { id, .. } => id.clone(),
+            Message::Signal { .. } => None,
+            Message::Request { id, .. } => Some(id.clone()),
+            Message::Response { id, .. } => Some(id.clone()),
         }
     }
 }
 
-impl std::convert::TryFrom<RpcMessage> for SerializedBytes {
+impl std::convert::TryFrom<Message> for SerializedBytes {
     type Error = Error;
 
-    fn try_from(t: RpcMessage) -> Result<SerializedBytes> {
+    fn try_from(t: Message) -> Result<SerializedBytes> {
         holochain_serialized_bytes::to_vec_named(&t)
             .map_err(|e| Error::new(ErrorKind::Other, e))
             .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
     }
 }
 
-impl std::convert::TryFrom<SerializedBytes> for RpcMessage {
+impl std::convert::TryFrom<SerializedBytes> for Message {
     type Error = Error;
 
-    fn try_from(t: SerializedBytes) -> Result<RpcMessage> {
+    fn try_from(t: SerializedBytes) -> Result<Message> {
         holochain_serialized_bytes::from_read_ref(t.bytes())
             .map_err(|e| Error::new(ErrorKind::Other, e))
     }
@@ -46,13 +48,13 @@ impl std::convert::TryFrom<SerializedBytes> for RpcMessage {
 
 /// internal message sender type
 pub(crate) type RawSender = tokio::sync::mpsc::Sender<(
-    RpcMessage,
+    Message,
     Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
 )>;
 
 /// internal message receiver type
 pub(crate) type RawReceiver = tokio::sync::mpsc::Receiver<(
-    RpcMessage,
+    Message,
     Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
 )>;
 

@@ -36,41 +36,7 @@ impl tokio::stream::Stream for WebsocketReceiver {
         cx: &mut std::task::Context,
     ) -> std::task::Poll<Option<Self::Item>> {
         // first, check to see if we are ready to send any outgoing items
-        let p = std::pin::Pin::new(&mut self.socket);
-        match futures::sink::Sink::poll_ready(p, cx) {
-            std::task::Poll::Ready(Ok(_)) => {
-                // we are ready to send - check if there is anything to send
-                let p = std::pin::Pin::new(&mut self.recv_outgoing);
-                match futures::stream::Stream::poll_next(p, cx) {
-                    std::task::Poll::Ready(Some((msg, respond))) => {
-                        // prepare the item for send
-                        let msg = match self.priv_prep_send(msg, respond) {
-                            Ok(msg) => msg,
-                            Err(e) => {
-                                return std::task::Poll::Ready(Some(Err(e)));
-                            }
-                        };
-
-                        // send the item
-                        let p = std::pin::Pin::new(&mut self.socket);
-                        if let Err(e) =
-                            futures::sink::Sink::start_send(p, tungstenite::Message::Binary(msg))
-                        {
-                            return std::task::Poll::Ready(Some(Err(Error::new(
-                                ErrorKind::Other,
-                                e,
-                            ))));
-                        }
-                    }
-                    std::task::Poll::Ready(None) => (),
-                    std::task::Poll::Pending => (),
-                }
-            }
-            std::task::Poll::Ready(Err(e)) => {
-                return std::task::Poll::Ready(Some(Err(Error::new(ErrorKind::Other, e))));
-            }
-            std::task::Poll::Pending => (),
-        }
+        Self::priv_poll_send(std::pin::Pin::new(&mut self), cx)?;
 
         // now check if we have any incoming messages
         let p = std::pin::Pin::new(&mut self.socket);
@@ -113,23 +79,78 @@ impl WebsocketReceiver {
         ))
     }
 
+    fn priv_poll_send(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context,
+    ) -> Result<()> {
+        // keep polling until we get a pending to make sure we register a waker
+        loop {
+            let p = std::pin::Pin::new(&mut self.socket);
+            match futures::sink::Sink::poll_ready(p, cx) {
+                std::task::Poll::Ready(Ok(_)) => {
+                    let p = std::pin::Pin::new(&mut self.recv_outgoing);
+                    match tokio::stream::Stream::poll_next(p, cx) {
+                        std::task::Poll::Ready(Some((msg, respond))) => {
+                            // prepare the item for send
+                            let msg = match self.priv_prep_send(msg, respond) {
+                                Ok(msg) => msg,
+                                Err(e) => {
+                                    println!("ERROR");
+                                    return Err(e);
+                                }
+                            };
+
+                            println!("got item to send {}", String::from_utf8_lossy(&msg));
+
+                            // send the item
+                            let p = std::pin::Pin::new(&mut self.socket);
+                            if let Err(e) = futures::sink::Sink::start_send(
+                                p,
+                                tungstenite::Message::Binary(msg),
+                            ) {
+                                println!("ERROR");
+                                return Err(Error::new(ErrorKind::Other, e));
+                            }
+
+                            continue;
+                        }
+                        std::task::Poll::Ready(None) => {
+                            break;
+                        }
+                        std::task::Poll::Pending => {
+                            break;
+                        }
+                    }
+                }
+                std::task::Poll::Ready(Err(e)) => {
+                    return Err(Error::new(ErrorKind::Other, e));
+                }
+                std::task::Poll::Pending => {
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// internal helper for tracking request/response ids
     fn priv_prep_send(
         &mut self,
-        msg: RpcMessage,
+        msg: Message,
         respond: Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
     ) -> Result<Vec<u8>> {
-        let id = msg.clone_id();
-        if respond.is_some() {
-            self.pending_requests.insert(
-                id,
-                RequestItem {
-                    expires_at: std::time::Instant::now()
-                        .checked_add(std::time::Duration::from_millis(REQUEST_TIMEOUT_MS))
-                        .expect("can set expires_at"),
-                    respond,
-                },
-            );
+        if let Some(id) = msg.clone_id() {
+            if respond.is_some() {
+                self.pending_requests.insert(
+                    id,
+                    RequestItem {
+                        expires_at: std::time::Instant::now()
+                            .checked_add(std::time::Duration::from_millis(REQUEST_TIMEOUT_MS))
+                            .expect("can set expires_at"),
+                        respond,
+                    },
+                );
+            }
         }
         let bytes: SerializedBytes = msg.try_into()?;
         let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
@@ -142,17 +163,23 @@ impl WebsocketReceiver {
         msg: Vec<u8>,
     ) -> Result<Option<(SerializedBytes, WebsocketRespond)>> {
         let bytes: SerializedBytes = UnsafeBytes::from(msg).into();
-        let msg: RpcMessage = bytes.try_into()?;
+        let msg: Message = bytes.try_into()?;
         match msg {
-            RpcMessage::Request { id, data } => {
-                //println!("RECEIVED REQ: {} {}", id, String::from_utf8_lossy(&data));
+            Message::Signal { data } => {
+                // we got a signal
+                // this api is a little awkward, emit a no-op respond callback
+                let respond: WebsocketRespond = Box::new(|_| async move { Ok(()) }.boxed());
+                Ok(Some((UnsafeBytes::from(data).into(), respond)))
+            }
+            Message::Request { id, data } => {
+                println!("RECEIVED REQ: {} {}", id, String::from_utf8_lossy(&data));
                 // we got a request
                 //  - set up a responder callback
                 //  - notify our stream subscriber of the message
                 let mut sender = self.send_outgoing.clone();
                 let respond: WebsocketRespond = Box::new(|data| {
                     async move {
-                        let msg = RpcMessage::Response {
+                        let msg = Message::Response {
                             id,
                             data: UnsafeBytes::from(data).into(),
                         };
@@ -166,8 +193,8 @@ impl WebsocketReceiver {
                 });
                 Ok(Some((UnsafeBytes::from(data).into(), respond)))
             }
-            RpcMessage::Response { id, data } => {
-                //println!("RECEIVED RES: {} {}", id, String::from_utf8_lossy(&data));
+            Message::Response { id, data } => {
+                println!("RECEIVED RES: {} {}", id, String::from_utf8_lossy(&data));
                 // check our pending table / match up this response
                 if let Some(mut item) = self.pending_requests.remove(&id) {
                     if let Some(respond) = item.respond.take() {

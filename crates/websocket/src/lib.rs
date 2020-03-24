@@ -70,9 +70,11 @@ mod tests {
                             let msg = TestMessage(format!("echo: {}", msg.0));
                             respond(msg.try_into().unwrap()).await.unwrap();
                         }
+                        println!("exit srv con loop");
                     });
                 });
             }
+            println!("exit listen loop");
         });
 
         let (mut send, mut recv) = websocket_connect(binding).await.unwrap();
@@ -81,7 +83,14 @@ mod tests {
         tokio::task::spawn(async move {
             // we need to process the recv side as well to make the socket work
             while let Some(_) = recv.next().await {}
+            println!("exit cli con loop");
         });
+
+        let msg = TestMessage("test-signal".to_string());
+        send.signal(msg).await.unwrap();
+
+        let msg = TestMessage("test-signal2".to_string());
+        send.signal(msg).await.unwrap();
 
         let msg = TestMessage("test".to_string());
         let rsp: TestMessage = send.request(msg).await.unwrap();
