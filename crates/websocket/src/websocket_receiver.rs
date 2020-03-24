@@ -38,6 +38,7 @@ impl std::error::Error for WebsocketClosed {}
 struct RequestItem {
     expires_at: std::time::Instant,
     respond: Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
+    span: tracing::Span,
 }
 
 /// The read half of a websocket connection.
@@ -166,7 +167,6 @@ impl WebsocketReceiver {
                 let msg = match self.priv_prep_send(msg, respond) {
                     Ok(msg) => msg,
                     Err(e) => {
-                        println!("ERROR");
                         return Err(e);
                     }
                 };
@@ -219,18 +219,23 @@ impl WebsocketReceiver {
     /// internal helper for tracking request/response ids
     fn priv_prep_send(
         &mut self,
-        msg: Message,
+        msg: SendMessage,
         respond: Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
     ) -> Result<tungstenite::Message> {
         match msg {
-            Message::Ping => Ok(tungstenite::Message::Ping(Vec::with_capacity(0))),
-            Message::Close { code, reason } => Ok(tungstenite::Message::Close(Some(
+            // currently we're not exposing ping functionality
+            // but this is how we'd do it:
+            //SendMessage::Ping => Ok(tungstenite::Message::Ping(Vec::with_capacity(0))),
+            SendMessage::Close { code, reason } => Ok(tungstenite::Message::Close(Some(
                 tungstenite::protocol::CloseFrame {
                     code: code.into(),
                     reason: reason.into(),
                 },
             ))),
-            msg => {
+            SendMessage::Message(msg, span) => {
+                let _g = span.enter();
+                let span = tracing::debug_span!("prep_send");
+                let _g = span.enter();
                 if let Some(id) = msg.clone_id() {
                     if respond.is_some() {
                         self.pending_requests.insert(
@@ -242,6 +247,7 @@ impl WebsocketReceiver {
                                     ))
                                     .expect("can set expires_at"),
                                 respond,
+                                span: tracing::debug_span!("await_response"),
                             },
                         );
                     }
@@ -258,28 +264,35 @@ impl WebsocketReceiver {
         let bytes: SerializedBytes = UnsafeBytes::from(msg).into();
         let msg: Message = bytes.try_into()?;
         match msg {
-            Message::Ping => unreachable!(),         // send an actual ping :)
-            Message::Close { .. } => unreachable!(), // send an actual close :)
             Message::Signal { data } => {
+                tracing::trace!(
+                    message = "recieved signal",
+                    data = %String::from_utf8_lossy(&data),
+                );
                 // we got a signal
                 Ok(Some(WebsocketMessage::Signal(
                     UnsafeBytes::from(data).into(),
                 )))
             }
             Message::Request { id, data } => {
-                println!("RECEIVED REQ: {} {}", id, String::from_utf8_lossy(&data));
+                tracing::trace!(
+                    message = "recieved request",
+                    %id,
+                    data = %String::from_utf8_lossy(&data),
+                );
                 // we got a request
                 //  - set up a responder callback
                 //  - notify our stream subscriber of the message
                 let mut sender = self.send_outgoing.clone();
                 let respond: WebsocketRespond = Box::new(|data| {
+                    let span = tracing::debug_span!("respond");
                     async move {
                         let msg = Message::Response {
                             id,
                             data: UnsafeBytes::from(data).into(),
                         };
                         sender
-                            .send((msg, None))
+                            .send((SendMessage::Message(msg, span), None))
                             .await
                             .map_err(|e| Error::new(ErrorKind::Other, e))?;
                         Ok(())
@@ -292,16 +305,19 @@ impl WebsocketReceiver {
                 )))
             }
             Message::Response { id, data } => {
-                println!("RECEIVED RES: {} {}", id, String::from_utf8_lossy(&data));
+                tracing::trace!(
+                    message = "recieved response",
+                    %id,
+                    data = %String::from_utf8_lossy(&data),
+                );
+
                 // check our pending table / match up this response
                 if let Some(mut item) = self.pending_requests.remove(&id) {
+                    let _g = item.span.enter();
                     if let Some(respond) = item.respond.take() {
-                        respond.send(Ok(data)).map_err(|_| {
-                            Error::new(
-                                ErrorKind::Other,
-                                "oneshot channel closed - no one waiting on this response?",
-                            )
-                        })?;
+                        if let Err(e) = respond.send(Ok(data)) {
+                            tracing::warn!(error = ?e);
+                        }
                     }
                 }
                 Ok(None)
@@ -315,7 +331,9 @@ impl WebsocketReceiver {
         self.pending_requests.retain(|_k, v| {
             if v.expires_at < now {
                 if let Some(respond) = v.respond.take() {
-                    let _ = respond.send(Err(ErrorKind::TimedOut.into()));
+                    if let Err(e) = respond.send(Err(ErrorKind::TimedOut.into())) {
+                        tracing::warn!(error = ?e);
+                    }
                 }
                 false
             } else {

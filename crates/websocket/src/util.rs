@@ -7,11 +7,19 @@ use serde::{Deserialize, Serialize};
 /// internal socket type
 pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
+/// internal type to forward messages from Sender to
+/// the Receiver which is actually polling our set of futures streams.
+#[derive(Debug)]
+pub(crate) enum SendMessage {
+    Close { code: u16, reason: String },
+    Message(Message, tracing::Span),
+}
+
+/// not sure if we should expose this or not
+/// this is the actual wire message that is sent over the websocket.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub(crate) enum Message {
-    Ping,
-    Close { code: u16, reason: String },
     Signal { data: Vec<u8> },
     Request { id: String, data: Vec<u8> },
     Response { id: String, data: Vec<u8> },
@@ -20,9 +28,7 @@ pub(crate) enum Message {
 impl Message {
     pub(crate) fn clone_id(&self) -> Option<String> {
         match self {
-            Message::Ping => None,
             Message::Signal { .. } => None,
-            Message::Close { .. } => None,
             Message::Request { id, .. } => Some(id.clone()),
             Message::Response { id, .. } => Some(id.clone()),
         }
@@ -50,13 +56,13 @@ impl std::convert::TryFrom<SerializedBytes> for Message {
 
 /// internal message sender type
 pub(crate) type RawSender = tokio::sync::mpsc::Sender<(
-    Message,
+    SendMessage,
     Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
 )>;
 
 /// internal message receiver type
 pub(crate) type RawReceiver = tokio::sync::mpsc::Receiver<(
-    Message,
+    SendMessage,
     Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
 )>;
 

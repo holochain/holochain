@@ -21,7 +21,7 @@ impl WebsocketSender {
         let mut sender = self.sender.clone();
         async move {
             sender
-                .send((Message::Close { code, reason }, None))
+                .send((SendMessage::Close { code, reason }, None))
                 .await
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
@@ -38,22 +38,20 @@ impl WebsocketSender {
         <SB1 as std::convert::TryInto<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
     {
+        let span = tracing::debug_span!("sender_signal");
         let mut sender = self.sender.clone();
         async move {
             let bytes: SerializedBytes = msg
                 .try_into()
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
             let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
-            let debug = String::from_utf8_lossy(&bytes).to_string();
 
             let msg = Message::Signal { data: bytes };
 
             sender
-                .send((msg, None))
+                .send((SendMessage::Message(msg, span), None))
                 .await
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-            println!("sent: {}", debug);
 
             Ok(())
         }
@@ -71,6 +69,7 @@ impl WebsocketSender {
         <SB2 as std::convert::TryFrom<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
     {
+        let span = tracing::debug_span!("sender_request");
         let mut sender = self.sender.clone();
         async move {
             let bytes: SerializedBytes = msg
@@ -86,7 +85,7 @@ impl WebsocketSender {
             let (send, recv) = tokio::sync::oneshot::channel();
 
             sender
-                .send((msg, Some(send)))
+                .send((SendMessage::Message(msg, span), Some(send)))
                 .await
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
 

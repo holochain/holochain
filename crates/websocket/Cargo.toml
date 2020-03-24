@@ -16,5 +16,6 @@ net2 = "0.2"
 serde = { version = "1", features = ["serde_derive"] }
 tokio = { version = "0.2", features = ["full"] }
 tokio-tungstenite = { version = "0.10.1", features = ["tls"] }
+tracing = "0.1"
 tungstenite = "0.10"
 url2 = "0.0.5"
