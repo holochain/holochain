@@ -54,14 +54,14 @@ mod tests {
         },
     };
     use fallible_iterator::FallibleIterator;
-    use sx_state::{env::*, test_utils::test_env};
+    use sx_state::{env::*, test_utils::test_cell_env};
     use sx_types::{entry::Entry, observability, prelude::*};
     use tracing::*;
 
     #[tokio::test]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
         let dna = fake_dna("a");

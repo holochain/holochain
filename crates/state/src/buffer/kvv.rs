@@ -170,7 +170,7 @@ where
 pub mod tests {
 
     use super::{BufferedStore, KvvBuf, Op};
-    use crate::test_utils::test_env;
+    use crate::test_utils::test_cell_env;
     use maplit::hashset;
     use rkv::Rkv;
     use serde_derive::{Deserialize, Serialize};
@@ -190,7 +190,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvv_store_scratch_insert_delete() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
@@ -227,7 +227,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvv_store_get_list() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let env = arc.env();
 
@@ -258,7 +258,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvv_store_duplicate_insert() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let env = arc.env();
 
@@ -294,7 +294,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvv_store_duplicate_delete() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
@@ -316,7 +316,7 @@ pub mod tests {
 
     #[test]
     fn kvv_store_get_missing_key() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let env = arc.env();
         let store: Store = KvvBuf::create(&env, "kvv").unwrap();

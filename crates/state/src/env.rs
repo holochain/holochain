@@ -44,14 +44,17 @@ fn required_flags() -> EnvironmentFlags {
 }
 
 /// A standard way to create a representation of an LMDB environment suitable for Holochain
-pub fn create_lmdb_env(path: &Path) -> DatabaseResult<Environment> {
+pub fn create_lmdb_env(path: &Path, kind: EnvironmentKind) -> DatabaseResult<Environment> {
     let mut map = ENVIRONMENTS.write();
     let env: Environment = match map.entry(path.into()) {
         hash_map::Entry::Occupied(e) => e.get().clone(),
         hash_map::Entry::Vacant(e) => e
             .insert({
                 let rkv = rkv_builder(None, None)(path)?;
-                Environment(Arc::new(RwLock::new(rkv)))
+                Environment {
+                    arc: Arc::new(RwLock::new(rkv)),
+                    kind,
+                }
             })
             .clone(),
     };
@@ -78,7 +81,10 @@ fn rkv_builder(
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
 #[derive(Clone)]
-pub struct Environment(Arc<RwLock<Rkv>>);
+pub struct Environment {
+    arc: Arc<RwLock<Rkv>>,
+    kind: EnvironmentKind,
+}
 
 impl Environment {
     /// Get a read-only lock on the Environment. The most typical use case is
@@ -86,12 +92,17 @@ impl Environment {
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
     pub async fn guard(&self) -> EnvironmentRef<'_> {
-        EnvironmentRef(self.0.read().await)
+        EnvironmentRef(self.arc.read().await)
     }
 
     /// Access the underlying `Rkv` object
     pub async fn inner(&self) -> RwLockReadGuard<'_, Rkv> {
-        self.0.read().await
+        self.arc.read().await
+    }
+
+    /// Accessor for the [EnvironmentKind] of the Environment
+    pub fn kind(&self) -> &EnvironmentKind {
+        &self.kind
     }
 
     /// Get access to the singleton database manager ([DbManager]),
@@ -107,6 +118,17 @@ impl Environment {
         Ok(dbs)
     }
 }
+
+/// The various types of LMDB environment,
+/// used to specify the list of databases to initialize in the DbManager
+#[derive(Clone)]
+pub enum EnvironmentKind {
+    /// Specifies the environment used by each Cell
+    Cell,
+    /// Specifies the environment used by a Conductor
+    Conductor,
+}
+
 
 /// Newtype wrapper for a read-only lock guard on the Environment
 pub struct EnvironmentRef<'e>(RwLockReadGuard<'e, Rkv>);

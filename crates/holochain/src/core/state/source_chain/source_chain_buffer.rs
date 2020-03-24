@@ -150,12 +150,12 @@ pub mod tests {
         test_utils::{fake_agent_id, fake_dna},
     };
     use fallible_iterator::FallibleIterator;
-    use sx_state::{prelude::*, test_utils::test_env};
+    use sx_state::{prelude::*, test_utils::test_cell_env};
     use sx_types::{entry::Entry, prelude::*};
 
     #[tokio::test]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
