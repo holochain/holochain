@@ -4,8 +4,8 @@ use crate::{
     env::Environment,
     error::{DatabaseError, DatabaseResult},
 };
-use sx_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
+use sx_types::universal_map::{Key as UmKey, UniversalMap};
 
 use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
 
