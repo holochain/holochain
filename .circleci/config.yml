@@ -2,10 +2,10 @@ version: 2.1
 
 jobs:
   can_merge:
-  docker:
-   - image: holochain/holochain-rust:circle.build.develop
-  resource_class: xlarge
-  steps:
+    docker:
+    - image: holochain/holochain-rust:circle.build.develop
+    resource_class: xlarge
+    steps:
       - checkout
       - run:
           command: nix-shell --run hc-merge-test
