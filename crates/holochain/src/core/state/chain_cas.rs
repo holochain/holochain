@@ -1,9 +1,10 @@
-use crate::core::state::source_chain::{
-    ChainInvalidReason, SourceChainError, SourceChainResult,
-};
+use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use sx_state::{
     buffer::{BufferedStore, CasBuf},
-    db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
+    db::{
+        DbManager, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
+        PRIMARY_CHAIN_HEADERS,
+    },
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
     prelude::{Readable, Reader, Writer},
@@ -36,8 +37,14 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     }
 
     pub fn primary(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
-        let entries = *dbs.get(&*CHAIN_ENTRIES)?;
-        let headers = *dbs.get(&*CHAIN_HEADERS)?;
+        let entries = *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?;
+        let headers = *dbs.get(&*PRIMARY_CHAIN_HEADERS)?;
+        Self::new(reader, entries, headers)
+    }
+
+    pub fn cache(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+        let entries = *dbs.get(&*CACHE_CHAIN_ENTRIES)?;
+        let headers = *dbs.get(&*CACHE_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 

@@ -31,13 +31,12 @@ pub mod tests {
     use crate::core::state::workspace::WorkspaceResult;
     use sx_state::{
         buffer::{BufferedStore, KvBuf},
-        db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
+        db::{DbManager, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         prelude::{Reader, Writer},
         test_utils::test_env,
     };
     use sx_types::prelude::*;
-
 
     pub struct TestWorkspace<'env> {
         one: KvBuf<'env, Address, u32>,
@@ -47,8 +46,8 @@ pub mod tests {
     impl<'env> TestWorkspace<'env> {
         pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuf::new(reader, *dbs.get(&*CHAIN_ENTRIES)?)?,
-                two: KvBuf::new(reader, *dbs.get(&*CHAIN_HEADERS)?)?,
+                one: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?)?,
+                two: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_HEADERS)?)?,
             })
         }
     }

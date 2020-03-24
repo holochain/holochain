@@ -45,7 +45,6 @@ impl WasmRibosome {
 }
 
 impl RibosomeT for WasmRibosome {
-
     fn run_callback(self, _data: ()) -> ValidationResult {
         unimplemented!()
     }

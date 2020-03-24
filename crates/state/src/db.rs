@@ -4,33 +4,43 @@ use crate::{
     env::Environment,
     error::{DatabaseError, DatabaseResult},
 };
-use sx_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
+use sx_types::universal_map::{Key as UmKey, UniversalMap};
 
 use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
 
+/// TODO This is incomplete
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum DbName {
-    /// KV store of chain entries, keyed by address
-    ChainEntries,
-    /// KV store of chain headers, keyed by address
-    ChainHeaders,
-    /// KVV store of chain metadata, storing relationships
-    ChainMeta,
+    /// Primary database: KV store of chain entries, keyed by address
+    PrimaryChainEntries,
+    /// Primary database: KV store of chain headers, keyed by address
+    PrimaryChainHeaders,
+    /// Primary database: KVV store of chain metadata, storing relationships
+    PrimaryChainMeta,
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
     ChainSequence,
+    /// Cache database: KV store of chain entries, keyed by address
+    CacheChainEntries,
+    /// Cache database: KV store of chain headers, keyed by address
+    CacheChainHeaders,
+    /// Cache database: KVV store of chain metadata, storing relationships
+    CacheChainMeta,
 }
 
 impl std::fmt::Display for DbName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use DbName::*;
         match self {
-            ChainEntries => write!(f, "ChainEntries"),
-            ChainHeaders => write!(f, "ChainHeaders"),
-            ChainMeta => write!(f, "ChainMeta"),
+            PrimaryChainEntries => write!(f, "PrimaryChainEntries"),
+            PrimaryChainHeaders => write!(f, "PrimaryChainHeaders"),
+            PrimaryChainMeta => write!(f, "PrimaryChainMeta"),
             ChainSequence => write!(f, "ChainSequence"),
+            CacheChainEntries => write!(f, "CacheChainEntries"),
+            CacheChainHeaders => write!(f, "CacheChainHeaders"),
+            CacheChainMeta => write!(f, "CacheChainMeta"),
         }
     }
 }
@@ -41,10 +51,13 @@ impl DbName {
         use DbKind::*;
         use DbName::*;
         match self {
-            ChainEntries => Single,
-            ChainHeaders => Single,
-            ChainMeta => Multi,
+            PrimaryChainEntries => Single,
+            PrimaryChainHeaders => Single,
+            PrimaryChainMeta => Multi,
             ChainSequence => SingleInt,
+            CacheChainEntries => Single,
+            CacheChainHeaders => Single,
+            CacheChainMeta => Multi,
         }
     }
 }
@@ -66,15 +79,27 @@ pub type DbKey<V> = UmKey<DbName, V>;
 
 lazy_static! {
     /// The key to access the ChainEntries database
-    pub static ref CHAIN_ENTRIES: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::ChainEntries);
+    pub static ref PRIMARY_CHAIN_ENTRIES: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::PrimaryChainEntries);
     /// The key to access the ChainHeaders database
-    pub static ref CHAIN_HEADERS: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::ChainHeaders);
+    pub static ref PRIMARY_CHAIN_HEADERS: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::PrimaryChainHeaders);
     /// The key to access the ChainMeta database
-    pub static ref CHAIN_META: DbKey<MultiStore> = DbKey::new(DbName::ChainMeta);
+    pub static ref PRIMARY_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryChainMeta);
+    /// The key to access the ChainMeta database
+    pub static ref PRIMARY_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryChainMeta);
     /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
+    /// The key to access the ChainEntries database
+    pub static ref CACHE_CHAIN_ENTRIES: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::CacheChainEntries);
+    /// The key to access the ChainHeaders database
+    pub static ref CACHE_CHAIN_HEADERS: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::CacheChainHeaders);
+    /// The key to access the ChainMeta database
+    pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
+    /// The key to access the ChainMeta database
+    pub static ref CACHE_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
 }
 
 /// DbManager is intended to be used as a singleton store for LMDB Database references,
@@ -138,7 +163,7 @@ impl DbManager {
 
     /// Get a `rkv` Database reference from a key, or create a new Database
     /// of the proper type if not yet created
-    pub async fn get_or_create<V: 'static + Send + Sync>(
+    async fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,
     ) -> DatabaseResult<&V> {
@@ -151,10 +176,15 @@ impl DbManager {
     }
 
     async fn initialize(&mut self) -> DatabaseResult<()> {
-        self.create(&*CHAIN_ENTRIES).await?;
-        self.create(&*CHAIN_HEADERS).await?;
-        self.create(&*CHAIN_META).await?;
+        self.create(&*PRIMARY_CHAIN_ENTRIES).await?;
+        self.create(&*PRIMARY_CHAIN_HEADERS).await?;
+        self.create(&*PRIMARY_SYSTEM_META).await?;
+        self.create(&*PRIMARY_LINKS_META).await?;
         self.create(&*CHAIN_SEQUENCE).await?;
+        self.create(&*CACHE_CHAIN_ENTRIES).await?;
+        self.create(&*CACHE_CHAIN_HEADERS).await?;
+        self.create(&*CACHE_SYSTEM_META).await?;
+        self.create(&*CACHE_LINKS_META).await?;
         Ok(())
     }
 }

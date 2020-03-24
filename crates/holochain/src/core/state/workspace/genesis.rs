@@ -10,7 +10,7 @@ pub struct GenesisWorkspace<'env> {
 impl<'env> GenesisWorkspace<'env> {
     pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
         Ok(Self {
-            source_chain: SourceChainBuf::new(reader, dbs)?
+            source_chain: SourceChainBuf::new(reader, dbs)?,
         })
     }
 }
