@@ -14,5 +14,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: cachix/install-nix-action@v7
+    - uses: docker://holochain/holochain-rust:circle.build.develop
     - name: Merge Test
       run: nix-shell --run 'hc-merge-test'
