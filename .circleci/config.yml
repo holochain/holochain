@@ -1,9 +1,7 @@
 version: 2.1
 
 jobs:
- # must be called build for local circle cli to work
- # is actually unit tests
-  build:
+  can_merge:
   docker:
    - image: holochain/holochain-rust:circle.build.develop
   resource_class: xlarge
