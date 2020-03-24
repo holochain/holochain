@@ -145,13 +145,14 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
 pub mod tests {
 
     use super::SourceChainBuf;
-    use crate::core::{
-        state::source_chain::SourceChainResult,
-        test_utils::{fake_agent_id, fake_dna},
-    };
+    use crate::core::state::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
     use sx_state::{prelude::*, test_utils::test_cell_env};
-    use sx_types::{entry::Entry, prelude::*};
+    use sx_types::{
+        entry::Entry,
+        prelude::*,
+        test_utils::{fake_agent_id, fake_dna},
+    };
 
     #[tokio::test]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {

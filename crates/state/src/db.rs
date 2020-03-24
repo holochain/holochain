@@ -157,7 +157,7 @@ impl DbManager {
 
     async fn initialize(&mut self) -> DatabaseResult<()> {
         match self.env.kind() {
-            EnvironmentKind::Cell => {
+            EnvironmentKind::Cell(_) => {
                 self.create(&*CHAIN_ENTRIES).await?;
                 self.create(&*CHAIN_HEADERS).await?;
                 self.create(&*CHAIN_META).await?;

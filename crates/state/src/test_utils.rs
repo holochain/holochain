@@ -1,13 +1,15 @@
 //! Helpers for unit tests
 
-use crate::env::{create_lmdb_env, Environment, EnvironmentKind};
+use crate::env::{Environment, EnvironmentKind};
 use shrinkwraprs::Shrinkwrap;
 use tempdir::TempDir;
+use sx_types::test_utils::fake_cell_id;
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory
 /// TODO: return reference to the TempDir so it can be removed
 pub fn test_cell_env() -> TestEnvironment {
-    test_env(EnvironmentKind::Cell)
+    let cell_id = fake_cell_id(&nanoid::nanoid!());
+    test_env(EnvironmentKind::Cell(cell_id))
 }
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Conductor], backed by a temp directory
@@ -18,7 +20,7 @@ pub fn test_conductor_env() -> TestEnvironment {
 
 fn test_env(kind: EnvironmentKind) -> TestEnvironment {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
-    let env = create_lmdb_env(tmpdir.path(), kind).expect("Couldn't create test LMDB environment");
+    let env = Environment::new(tmpdir.path(), kind).expect("Couldn't create test LMDB environment");
     TestEnvironment(env, tmpdir)
 }
 

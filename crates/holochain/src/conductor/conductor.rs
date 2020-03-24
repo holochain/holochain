@@ -22,6 +22,7 @@ use sx_types::{
 };
 // use sx_keystore::keystore::Keystore;
 use sx_types::agent::AgentId;
+use sx_state::env::Environment;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -42,6 +43,7 @@ struct CellItem {
 pub struct Conductor {
     tx_network: NetSender,
     cells: HashMap<CellId, CellItem>,
+    // environment: Environment,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
 }

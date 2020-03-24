@@ -49,13 +49,17 @@ mod tests {
                 source_chain::SourceChain,
                 workspace::{GenesisWorkspace, Workspace},
             },
-            test_utils::{fake_agent_id, fake_dna},
             workflow::WorkflowError,
         },
     };
     use fallible_iterator::FallibleIterator;
     use sx_state::{env::*, test_utils::test_cell_env};
-    use sx_types::{entry::Entry, observability, prelude::*};
+    use sx_types::{
+        entry::Entry,
+        observability,
+        prelude::*,
+        test_utils::{fake_agent_id, fake_dna},
+    };
     use tracing::*;
 
     #[tokio::test]
