@@ -97,8 +97,8 @@ where
     }
 
     /// Clear the scratch space and record a DeleteAll operation
-    /// TODO: implement and make public
-    fn _delete_all(&mut self, k: K) {
+    /// TODO: implement
+    pub fn delete_all(&mut self, k: K) {
         if let Entry::Occupied(mut entry) = self.scratch.entry(k) {
             let _ops = entry.get_mut();
         }
@@ -166,13 +166,17 @@ where
     }
 }
 
-#[cfg(test_TODO_FIX)]
+#[cfg(test)]
 pub mod tests {
 
-    use super::{BufferedStore, KvvBuf, Op};
-    use crate::test_utils::test_env;
+    use super::{BufferedStore, KvvBuf};
+    use crate::{
+        env::{ReadManager, WriteManager},
+        error::DatabaseError,
+        test_utils::test_env,
+    };
     use maplit::hashset;
-    use rkv::Rkv;
+    use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -180,146 +184,132 @@ pub mod tests {
 
     type Store<'a> = KvvBuf<'a, &'a str, V>;
 
-    fn op_insert<T>(v: T) -> Op<T> {
-        Op::Insert(Box::new(v))
-    }
-
-    fn op_delete<T>(v: T) -> Op<T> {
-        Op::Delete(Box::new(v))
-    }
-
     #[tokio::test]
-    async fn kvv_store_scratch_insert_delete() {
+    async fn kvvbuf_basics() {
         let arc = test_env();
         let env = arc.guard().await;
-        let env = arc.env();
-        let wm = WriteManager::new(&env);
 
-        let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
-
-        store.insert("key", V(1));
-        assert_eq!(
-            *store.scratch.get("key").unwrap(),
-            hashset! {op_insert(V(1))}
-        );
-        store.insert("key", V(2));
-        assert_eq!(
-            *store.scratch.get("key").unwrap(),
-            hashset! {op_insert(V(1)), op_insert(V(2))}
-        );
-        store.delete("key", V(1));
-        assert_eq!(
-            *store.scratch.get("key").unwrap(),
-            hashset! {op_delete(V(1)), op_insert(V(2))}
-        );
-        store.insert("key", V(3));
-        assert_eq!(
-            *store.scratch.get("key").unwrap(),
-            hashset! {op_delete(V(1)), op_insert(V(2)), op_insert(V(3))}
-        );
-
-        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+        let multi_store = env
+            .inner()
+            .open_multi("kvv", StoreOptions::create())
             .unwrap();
 
-        let store: Store = KvvBuf::open(&env, "kvv").unwrap();
-        assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
-    }
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(store.get(&"key"), Ok(hashset! {}));
 
-    #[tokio::test]
-    async fn kvv_store_get_list() {
-        let arc = test_env();
-        let env = arc.guard().await;
-        let env = arc.env();
+            store.delete("key", V(0));
+            assert_eq!(store.get(&"key"), Ok(hashset! {}));
 
-        let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
+            store.insert("key", V(0));
+            assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
 
-        store.insert("key", V(1));
-        assert_eq!(
-            *store.scratch.get("key").unwrap(),
-            hashset! {op_insert(V(1))}
-        );
-        store.insert("key", V(2));
-        assert_eq!(
-            *store.scratch.get("key").unwrap(),
-            hashset! {op_insert(V(1)), op_insert(V(2))}
-        );
-        store.delete("key", V(1));
-        assert_eq!(
-            *store.scratch.get("key").unwrap(),
-            hashset! {op_delete(V(1)), op_insert(V(2))}
-        );
-
-        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
-            .unwrap();
-
-        let store: Store = KvvBuf::open(&env, "kvv").unwrap();
-        assert_eq!(store.get(&"key").unwrap(), hashset! {V(2)});
-    }
-
-    #[tokio::test]
-    async fn kvv_store_duplicate_insert() {
-        let arc = test_env();
-        let env = arc.guard().await;
-        let env = arc.env();
-
-        fn add_twice(env: &Rkv) {
-            let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
-            let wm = WriteManager::new(&env);
-
-            store.insert("key", V(1));
-            assert_eq!(
-                *store.scratch.get("key").unwrap(),
-                hashset! {op_insert(V(1))}
-            );
-            store.insert("key", V(1));
-            assert_eq!(
-                *store.scratch.get("key").unwrap(),
-                hashset! {op_insert(V(1))}
-            );
-
-            wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+            env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
-        }
 
-        add_twice(&env);
+            Ok(())
+        })
+        .unwrap();
 
-        let store: Store = KvvBuf::open(&env, "kvv").unwrap();
-        assert_eq!(store.get(&"key").unwrap(), hashset! {V(1)});
-
-        add_twice(&env);
-
-        let store: Store = KvvBuf::open(&env, "kvv").unwrap();
-        assert_eq!(store.get(&"key").unwrap(), hashset! {V(1)});
-    }
-
-    #[tokio::test]
-    async fn kvv_store_duplicate_delete() {
-        let arc = test_env();
-        let env = arc.guard().await;
-        let env = arc.env();
-        let wm = WriteManager::new(&env);
-
-        let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
-        store.insert("key", V(1));
-        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+        let multi_store = env
+            .inner()
+            .open_multi("kvv", StoreOptions::default())
             .unwrap();
 
-        let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
-        store.delete("key", V(1));
-        store.delete("key", V(1));
-        wm.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
+
+            store.insert("key", V(0));
+            assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
+
+            store.delete("key", V(0));
+            assert_eq!(store.get(&"key"), Ok(hashset! {}));
+
+            env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+                .unwrap();
+
+            Ok(())
+        })
+        .unwrap();
+
+        let multi_store = env
+            .inner()
+            .open_multi("kvv", StoreOptions::default())
             .unwrap();
 
-        let store: Store = KvvBuf::open(&env, "kvv").unwrap();
-        assert_eq!(store.get(&"key").unwrap(), hashset! {});
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(store.get(&"key"), Ok(hashset! {}));
+            Ok(())
+        })
+        .unwrap();
     }
 
-    #[test]
-    fn kvv_store_get_missing_key() {
-        let arc = test_env();
-        let env = arc.guard().await;
-        let env = arc.env();
-        let store: Store = KvvBuf::create(&env, "kvv").unwrap();
-        assert_eq!(store.get(&"wompwomp").unwrap(), hashset! {});
-    }
+    // TODO: make pass
+    //
+    // #[tokio::test]
+    // async fn delete_all() {
+    //     let arc = test_env();
+    //     let env = arc.guard().await;
+
+    //     let multi_store = env
+    //         .inner()
+    //         .open_multi("kvv", StoreOptions::create())
+    //         .unwrap();
+
+    //     env.with_reader::<DatabaseError, _, _>(|reader| {
+    //         let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {}));
+
+    //         store.insert("key", V(0));
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
+
+    //         store.insert("key", V(1));
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0), V(1)}));
+
+    //         env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+    //             .unwrap();
+
+    //         Ok(())
+    //     })
+    //     .unwrap();
+
+    //     let multi_store = env
+    //         .inner()
+    //         .open_multi("kvv", StoreOptions::default())
+    //         .unwrap();
+
+    //     env.with_reader::<DatabaseError, _, _>(|reader| {
+    //         let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0), V(1)}));
+
+    //         store.insert("key", V(2));
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0), V(1), V(2)}));
+
+    //         store.delete_all("key");
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {}));
+
+    //         store.insert("key", V(3));
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(3)}));
+
+    //         env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+    //             .unwrap();
+
+    //         Ok(())
+    //     })
+    //     .unwrap();
+
+    //     let multi_store = env
+    //         .inner()
+    //         .open_multi("kvv", StoreOptions::default())
+    //         .unwrap();
+
+    //     env.with_reader::<DatabaseError, _, _>(|reader| {
+    //         let store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(3)}));
+    //         Ok(())
+    //     })
+    //     .unwrap();
+    // }
 }
