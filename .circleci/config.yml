@@ -1,7 +1,8 @@
 version: 2.1
 
 jobs:
-  can_merge:
+  # must be called build
+  build:
     docker:
     - image: holochain/holochain-rust:circle.build.develop
     resource_class: xlarge
