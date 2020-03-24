@@ -100,7 +100,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
         _message: Lib3hClientProtocol,
     ) -> ConductorApiResult<Lib3hServerProtocol>;
 
-    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its schedule time.
+    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
     /// This is basically a heuristic designed to help things run more smoothly.
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 

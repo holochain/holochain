@@ -34,9 +34,8 @@ async fn main() {
 }
 
 async fn example() {
-    let (tx_network, _rx_network) = mpsc::channel(1);
     let (tx_dummy, rx_dummy) = mpsc::unbounded_channel();
-    let conductor = Conductor::new(tx_network);
+    let conductor = Conductor::new().test();
     let lock = Arc::new(RwLock::new(conductor));
     let handle = ExternalConductorApi::new(lock);
     let interface_fut = ChannelInterface::new(rx_dummy).spawn(handle);

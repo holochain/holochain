@@ -1,6 +1,7 @@
 use crate::conductor::{api::error::ConductorApiError, cell::error::CellError};
 use sx_types::cell::{CellHandle, CellId};
 use thiserror::Error;
+use sx_state::error::DatabaseError;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -11,6 +12,9 @@ pub enum ConductorError {
 
     #[error("Conductor API error: {0}")]
     ApiError(#[from] ConductorApiError),
+
+    #[error(transparent)]
+    DatabaseError(#[from] DatabaseError),
 
     #[error("Cell is not active yet.")]
     CellNotActive,

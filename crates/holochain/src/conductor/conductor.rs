@@ -41,21 +41,17 @@ struct CellItem {
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
-    tx_network: NetSender,
+    // tx_network: NetSender,
     cells: HashMap<CellId, CellItem>,
-    // environment: Environment,
+    _environment: Environment,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
 }
 
 impl Conductor {
-    pub fn new(tx_network: NetSender) -> Self {
-        Self {
-            cells: HashMap::new(),
-            tx_network,
-            _handle_map: HashMap::new(),
-            _agent_keys: HashMap::new(),
-        }
+
+    pub fn new() -> ConductorBuilder {
+        ConductorBuilder::new()
     }
 
     pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
@@ -67,7 +63,7 @@ impl Conductor {
     }
 
     pub fn tx_network(&self) -> &NetSender {
-        &self.tx_network
+        unimplemented!()
     }
 
     pub fn load_config(_config: ConductorConfig) -> ConductorResult<()> {
@@ -77,32 +73,40 @@ impl Conductor {
 
 mod builder {
 
-    // use super::*;
+    use super::*;
+    use sx_state::{test_utils::test_conductor_env, env::EnvironmentKind};
+    use crate::conductor::config::EnvironmentPath;
 
-    // pub struct ConductorBuilder {
-    //     executor: Option<Box<dyn Spawn>>,
-    // }
+    pub struct ConductorBuilder {
 
-    // impl ConductorBuilder {
-    //     pub fn new() -> Self {
-    //         Self { executor: None }
-    //     }
+    }
 
-    //     pub fn executor(mut self, executor: Box<dyn Spawn>) -> Self {
-    //         self.executor = Some(Box::new(executor));
-    //         self
-    //     }
+    impl ConductorBuilder {
+        pub fn new() -> Self {
+            Self { }
+        }
 
-    //     pub fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor<Box<dyn Spawn>>> {
-    //         let executor = self.executor.unwrap_or_else(default_executor);
-    //         Ok(Conductor {
-    //             cells: HashMap::new(),
-    //             executor,
-    //         })
-    //     }
-    // }
+        pub fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
+            let env_path: EnvironmentPath = config.environment_path.map(Into::into).unwrap_or_default();
+            let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
+            Ok(Conductor {
+                cells: HashMap::new(),
+                // tx_network,
+                _environment: environment,
+                _handle_map: HashMap::new(),
+                _agent_keys: HashMap::new(),
+            })
+        }
 
-    // fn default_executor() -> Box<dyn Spawn> {
-    //     Box::new(ThreadPool::new().expect("Couldn't create Threadpool executor"))
-    // }
+        pub fn test(self) -> Conductor {
+            let environment = test_conductor_env();
+            Conductor {
+                cells: HashMap::new(),
+                // tx_network,
+                _environment: environment.into(),
+                _handle_map: HashMap::new(),
+                _agent_keys: HashMap::new(),
+            }
+        }
+    }
 }

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use derive_more::{From, Into, AsRef};
 
 mod dpki_config;
 mod logger_config;
@@ -10,9 +11,14 @@ use network_config::NetworkConfig;
 use passphrase_service_config::PassphraseServiceConfig;
 use signal_config::SignalConfig;
 use logger_config::LoggerConfig;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
+    /// The path to the LMDB environment for this conductor.
+    /// If omitted, chooses a default path.
+    pub environment_path: Option<PathBuf>,
+
     /// Configures how logging should behave. Optional.
     pub logger: LoggerConfig,
 
@@ -41,7 +47,7 @@ pub struct ConductorConfig {
     /// keys for new instances
     pub dpki: Option<DpkiConfig>,
 
-    /// Which signals to emit
+    /// Which signals to emitproject_root
     pub signals: SignalConfig,
 
     /// Configure how the conductor should prompt the user for the passphrase to lock/unlock keystores.
@@ -51,7 +57,12 @@ pub struct ConductorConfig {
     pub passphrase_service: PassphraseServiceConfig,
 }
 
-impl ConductorConfig {
+#[derive(From, Into, Debug, PartialEq, AsRef)]
+pub struct EnvironmentPath(PathBuf);
 
-
+impl Default for EnvironmentPath {
+    fn default() -> Self {
+        // TODO: don't use holochain_common?
+        Self(holochain_common::paths::data_root())
+    }
 }
