@@ -1,4 +1,4 @@
-name: Build & Test
+name: Is Ready To Merge
 
 on:
   push:
@@ -7,12 +7,12 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  can_merge:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
     - uses: cachix/install-nix-action@v7
-    - name: Test
-      run: nix-shell --run 'cargo test'
+    - name: Merge Test
+      run: nix-shell --run 'hc-merge-test'
