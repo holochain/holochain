@@ -4,8 +4,6 @@ use crate::*;
 
 use serde::{Deserialize, Serialize};
 
-const SCHEME: &str = "ws";
-
 /// internal socket type
 pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
@@ -59,16 +57,16 @@ pub(crate) type RawReceiver = tokio::sync::mpsc::Receiver<(
 )>;
 
 /// internal helper to convert addrs to urls
-pub(crate) fn addr_to_url(a: SocketAddr) -> Url2 {
-    url2!("{}://{}", SCHEME, a)
+pub(crate) fn addr_to_url(a: SocketAddr, scheme: &str) -> Url2 {
+    url2!("{}://{}", scheme, a)
 }
 
 /// internal helper convert urls to socket addrs for binding / connection
-pub(crate) async fn url_to_addr(url: &Url2) -> Result<SocketAddr> {
-    if url.scheme() != SCHEME || url.host_str().is_none() || url.port().is_none() {
+pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> Result<SocketAddr> {
+    if url.scheme() != scheme || url.host_str().is_none() || url.port().is_none() {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            format!("got: '{}', expected: '{}://host:port'", SCHEME, url),
+            format!("got: '{}', expected: '{}://host:port'", scheme, url),
         ));
     }
 

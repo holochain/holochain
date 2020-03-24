@@ -2,11 +2,18 @@
 
 use crate::*;
 
-const REQUEST_TIMEOUT_MS: u64 = 30000; // 30 seconds
-
 /// Callback for responding to incoming RPC requests
 pub type WebsocketRespond =
     Box<dyn FnOnce(SerializedBytes) -> BoxFuture<'static, Result<()>> + 'static + Send>;
+
+/// You can receive Signals or Requests from the remote side of the websocket.
+pub enum WebsocketMessage {
+    /// A signal does not require a response.
+    Signal(SerializedBytes),
+
+    /// A request that is expecting a response.
+    Request(SerializedBytes, WebsocketRespond),
+}
 
 /// internal request item
 struct RequestItem {
@@ -18,6 +25,7 @@ struct RequestItem {
 /// Note that due to underlying types this receiver must be awaited
 /// for outgoing messages to be sent as well.
 pub struct WebsocketReceiver {
+    config: Arc<WebsocketConfig>,
     remote_addr: Url2,
     socket: RawSocket,
     send_outgoing: RawSender,
@@ -29,7 +37,7 @@ pub struct WebsocketReceiver {
 // so we split the sending out into a channel, and implement Stream such that
 // sending and receiving are both handled simultaneously.
 impl tokio::stream::Stream for WebsocketReceiver {
-    type Item = Result<(SerializedBytes, WebsocketRespond)>;
+    type Item = Result<WebsocketMessage>;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
@@ -43,7 +51,13 @@ impl tokio::stream::Stream for WebsocketReceiver {
         let result = match futures::stream::Stream::poll_next(p, cx) {
             std::task::Poll::Ready(Some(Ok(i))) => match self.priv_check_incoming(i.into_data()) {
                 Ok(Some(output)) => std::task::Poll::Ready(Some(Ok(output))),
-                Ok(None) => std::task::Poll::Pending,
+                Ok(None) => {
+                    // probably received a Response
+                    // need to manually trigger a wake, because
+                    // this wasn't a real Pending - there might be more data
+                    cx.waker().wake_by_ref();
+                    std::task::Poll::Pending
+                }
                 Err(e) => std::task::Poll::Ready(Some(Err(e))),
             },
             std::task::Poll::Ready(Some(Err(e))) => {
@@ -61,15 +75,31 @@ impl tokio::stream::Stream for WebsocketReceiver {
 }
 
 impl WebsocketReceiver {
+    /// Get the url of the remote end of this websocket.
+    pub fn remote_addr(&self) -> &Url2 {
+        &self.remote_addr
+    }
+
+    /// Get the config associated with this listener.
+    pub fn get_config(&self) -> Arc<WebsocketConfig> {
+        self.config.clone()
+    }
+
+    // -- private -- //
+
     /// private constructor
     ///  - plucks the remote address
     ///  - generates our sending channel
-    pub(crate) fn priv_new(socket: RawSocket) -> Result<(WebsocketSender, Self)> {
-        let remote_addr = addr_to_url(socket.get_ref().peer_addr()?);
+    pub(crate) fn priv_new(
+        config: Arc<WebsocketConfig>,
+        socket: RawSocket,
+    ) -> Result<(WebsocketSender, Self)> {
+        let remote_addr = addr_to_url(socket.get_ref().peer_addr()?, config.scheme);
         let (send_outgoing, recv_outgoing) = tokio::sync::mpsc::channel(10);
         Ok((
             WebsocketSender::priv_new(send_outgoing.clone()),
             Self {
+                config,
                 remote_addr,
                 socket,
                 send_outgoing,
@@ -79,56 +109,51 @@ impl WebsocketReceiver {
         ))
     }
 
+    /// internal check for sending outgoing messages
     fn priv_poll_send(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> Result<()> {
-        // keep polling until we get a pending to make sure we register a waker
-        loop {
-            let p = std::pin::Pin::new(&mut self.socket);
-            match futures::sink::Sink::poll_ready(p, cx) {
-                std::task::Poll::Ready(Ok(_)) => {
-                    let p = std::pin::Pin::new(&mut self.recv_outgoing);
-                    match tokio::stream::Stream::poll_next(p, cx) {
-                        std::task::Poll::Ready(Some((msg, respond))) => {
-                            // prepare the item for send
-                            let msg = match self.priv_prep_send(msg, respond) {
-                                Ok(msg) => msg,
-                                Err(e) => {
-                                    println!("ERROR");
-                                    return Err(e);
-                                }
-                            };
-
-                            println!("got item to send {}", String::from_utf8_lossy(&msg));
-
-                            // send the item
-                            let p = std::pin::Pin::new(&mut self.socket);
-                            if let Err(e) = futures::sink::Sink::start_send(
-                                p,
-                                tungstenite::Message::Binary(msg),
-                            ) {
+        let p = std::pin::Pin::new(&mut self.socket);
+        match futures::sink::Sink::poll_ready(p, cx) {
+            std::task::Poll::Ready(Ok(_)) => {
+                let p = std::pin::Pin::new(&mut self.recv_outgoing);
+                match tokio::stream::Stream::poll_next(p, cx) {
+                    std::task::Poll::Ready(Some((msg, respond))) => {
+                        // prepare the item for send
+                        let msg = match self.priv_prep_send(msg, respond) {
+                            Ok(msg) => msg,
+                            Err(e) => {
                                 println!("ERROR");
-                                return Err(Error::new(ErrorKind::Other, e));
+                                return Err(e);
                             }
+                        };
 
-                            continue;
+                        println!("got item to send {}", String::from_utf8_lossy(&msg));
+
+                        // send the item
+                        let p = std::pin::Pin::new(&mut self.socket);
+                        if let Err(e) =
+                            futures::sink::Sink::start_send(p, tungstenite::Message::Binary(msg))
+                        {
+                            println!("ERROR");
+                            return Err(Error::new(ErrorKind::Other, e));
                         }
-                        std::task::Poll::Ready(None) => {
-                            break;
-                        }
-                        std::task::Poll::Pending => {
-                            break;
-                        }
+
+                        // we got Ready on both Sink::poll_ready and
+                        // Stream::poll_next if there is more data,
+                        // we won't be polled again so we need to
+                        // manually trigger the waker.
+                        cx.waker().wake_by_ref();
                     }
-                }
-                std::task::Poll::Ready(Err(e)) => {
-                    return Err(Error::new(ErrorKind::Other, e));
-                }
-                std::task::Poll::Pending => {
-                    break;
+                    std::task::Poll::Ready(None) => (),
+                    std::task::Poll::Pending => (),
                 }
             }
+            std::task::Poll::Ready(Err(e)) => {
+                return Err(Error::new(ErrorKind::Other, e));
+            }
+            std::task::Poll::Pending => (),
         }
         Ok(())
     }
@@ -145,7 +170,9 @@ impl WebsocketReceiver {
                     id,
                     RequestItem {
                         expires_at: std::time::Instant::now()
-                            .checked_add(std::time::Duration::from_millis(REQUEST_TIMEOUT_MS))
+                            .checked_add(std::time::Duration::from_millis(
+                                self.config.default_request_timeout_ms,
+                            ))
                             .expect("can set expires_at"),
                         respond,
                     },
@@ -158,18 +185,15 @@ impl WebsocketReceiver {
     }
 
     /// internal helper for processing incoming data
-    fn priv_check_incoming(
-        &mut self,
-        msg: Vec<u8>,
-    ) -> Result<Option<(SerializedBytes, WebsocketRespond)>> {
+    fn priv_check_incoming(&mut self, msg: Vec<u8>) -> Result<Option<WebsocketMessage>> {
         let bytes: SerializedBytes = UnsafeBytes::from(msg).into();
         let msg: Message = bytes.try_into()?;
         match msg {
             Message::Signal { data } => {
                 // we got a signal
-                // this api is a little awkward, emit a no-op respond callback
-                let respond: WebsocketRespond = Box::new(|_| async move { Ok(()) }.boxed());
-                Ok(Some((UnsafeBytes::from(data).into(), respond)))
+                Ok(Some(WebsocketMessage::Signal(
+                    UnsafeBytes::from(data).into(),
+                )))
             }
             Message::Request { id, data } => {
                 println!("RECEIVED REQ: {} {}", id, String::from_utf8_lossy(&data));
@@ -191,7 +215,10 @@ impl WebsocketReceiver {
                     }
                     .boxed()
                 });
-                Ok(Some((UnsafeBytes::from(data).into(), respond)))
+                Ok(Some(WebsocketMessage::Request(
+                    UnsafeBytes::from(data).into(),
+                    respond,
+                )))
             }
             Message::Response { id, data } => {
                 println!("RECEIVED RES: {} {}", id, String::from_utf8_lossy(&data));
@@ -225,19 +252,25 @@ impl WebsocketReceiver {
             }
         });
     }
-
-    /// Get the url of the remote end of this websocket.
-    pub fn remote_addr(&self) -> &Url2 {
-        &self.remote_addr
-    }
 }
 
 /// Establish a new outgoing websocket connection.
-pub async fn websocket_connect(url: Url2) -> Result<(WebsocketSender, WebsocketReceiver)> {
-    let addr = url_to_addr(&url).await?;
+pub async fn websocket_connect(
+    url: Url2,
+    config: Arc<WebsocketConfig>,
+) -> Result<(WebsocketSender, WebsocketReceiver)> {
+    let addr = url_to_addr(&url, config.scheme).await?;
     let socket = tokio::net::TcpStream::connect(addr).await?;
-    let (socket, _) = tokio_tungstenite::client_async(url.as_str(), socket)
-        .await
-        .map_err(|e| Error::new(ErrorKind::Other, e))?;
-    WebsocketReceiver::priv_new(socket)
+    let (socket, _) = tokio_tungstenite::client_async_with_config(
+        url.as_str(),
+        socket,
+        Some(tungstenite::protocol::WebSocketConfig {
+            max_send_queue: Some(config.max_send_queue),
+            max_message_size: Some(config.max_message_size),
+            max_frame_size: Some(config.max_frame_size),
+        }),
+    )
+    .await
+    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    WebsocketReceiver::priv_new(config, socket)
 }

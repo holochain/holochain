@@ -8,11 +8,15 @@ use std::{
     convert::TryInto,
     io::{Error, ErrorKind, Result},
     net::SocketAddr,
+    sync::Arc,
 };
 use url2::prelude::*;
 
 mod util;
 use util::*;
+
+mod websocket_config;
+pub use websocket_config::*;
 
 mod websocket_sender;
 pub use websocket_sender::*;
@@ -53,7 +57,12 @@ mod tests {
     async fn sanity_test() {
         use tokio::stream::StreamExt;
 
-        let mut server = websocket_bind(url2!("ws://127.0.0.1:0")).await.unwrap();
+        let mut server = websocket_bind(
+            url2!("ws://127.0.0.1:0"),
+            Arc::new(WebsocketConfig::default()),
+        )
+        .await
+        .unwrap();
         let binding = server.local_addr().clone();
         println!("got bound addr: {}", binding);
 
@@ -64,11 +73,19 @@ mod tests {
                     println!("got incoming connection: {}", recv.remote_addr());
 
                     tokio::task::spawn(async move {
-                        while let Some(Ok((data, respond))) = recv.next().await {
-                            let msg: TestMessage = data.try_into().unwrap();
-                            println!("got incoming message: {}", msg.0);
-                            let msg = TestMessage(format!("echo: {}", msg.0));
-                            respond(msg.try_into().unwrap()).await.unwrap();
+                        while let Some(Ok(msg)) = recv.next().await {
+                            match msg {
+                                WebsocketMessage::Signal(data) => {
+                                    let msg: TestMessage = data.try_into().unwrap();
+                                    println!("got signal: {}", msg.0);
+                                }
+                                WebsocketMessage::Request(data, respond) => {
+                                    let msg: TestMessage = data.try_into().unwrap();
+                                    println!("got incoming message: {}", msg.0);
+                                    let msg = TestMessage(format!("echo: {}", msg.0));
+                                    respond(msg.try_into().unwrap()).await.unwrap();
+                                }
+                            }
                         }
                         println!("exit srv con loop");
                     });
@@ -77,7 +94,9 @@ mod tests {
             println!("exit listen loop");
         });
 
-        let (mut send, mut recv) = websocket_connect(binding).await.unwrap();
+        let (mut send, mut recv) = websocket_connect(binding, Arc::new(WebsocketConfig::default()))
+            .await
+            .unwrap();
         println!("got remote addr: {}", recv.remote_addr());
 
         tokio::task::spawn(async move {
