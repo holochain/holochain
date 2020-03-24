@@ -73,18 +73,23 @@ mod tests {
                     println!("got incoming connection: {}", recv.remote_addr());
 
                     tokio::task::spawn(async move {
-                        while let Some(Ok(msg)) = recv.next().await {
-                            match msg {
-                                WebsocketMessage::Signal(data) => {
+                        loop {
+                            match recv.next().await {
+                                Some(Ok(WebsocketMessage::Signal(data))) => {
                                     let msg: TestMessage = data.try_into().unwrap();
                                     println!("got signal: {}", msg.0);
                                 }
-                                WebsocketMessage::Request(data, respond) => {
+                                Some(Ok(WebsocketMessage::Request(data, respond))) => {
                                     let msg: TestMessage = data.try_into().unwrap();
                                     println!("got incoming message: {}", msg.0);
                                     let msg = TestMessage(format!("echo: {}", msg.0));
                                     respond(msg.try_into().unwrap()).await.unwrap();
                                 }
+                                Some(Err(e)) => {
+                                    println!("{:?}", e);
+                                    break;
+                                }
+                                None => break,
                             }
                         }
                         println!("exit srv con loop");
@@ -101,8 +106,17 @@ mod tests {
 
         tokio::task::spawn(async move {
             // we need to process the recv side as well to make the socket work
-            while let Some(_) = recv.next().await {}
-            println!("exit cli con loop");
+            loop {
+                match recv.next().await {
+                    Some(Err(e)) => {
+                        println!("{:?}", e);
+                        break;
+                    }
+                    None => break,
+                    _ => (),
+                }
+            }
+            //println!("exit cli con loop");
         });
 
         let msg = TestMessage("test-signal".to_string());
@@ -115,5 +129,9 @@ mod tests {
         let rsp: TestMessage = send.request(msg).await.unwrap();
 
         println!("got response: {:?}", rsp.0);
+
+        send.close(1000, "test".to_string()).await.unwrap();
+
+        tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
     }
 }

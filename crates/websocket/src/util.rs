@@ -11,6 +11,7 @@ pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpSt
 #[serde(tag = "type")]
 pub(crate) enum Message {
     Ping,
+    Close { code: u16, reason: String },
     Signal { data: Vec<u8> },
     Request { id: String, data: Vec<u8> },
     Response { id: String, data: Vec<u8> },
@@ -21,6 +22,7 @@ impl Message {
         match self {
             Message::Ping => None,
             Message::Signal { .. } => None,
+            Message::Close { .. } => None,
             Message::Request { id, .. } => Some(id.clone()),
             Message::Response { id, .. } => Some(id.clone()),
         }

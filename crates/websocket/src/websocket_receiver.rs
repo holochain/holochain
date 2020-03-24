@@ -15,6 +15,25 @@ pub enum WebsocketMessage {
     Request(SerializedBytes, WebsocketRespond),
 }
 
+/// When a websocket is closed gracefully from the remote end,
+/// this item is included in the ConnectionReset error message.
+#[derive(Debug, Clone)]
+pub struct WebsocketClosed {
+    /// Websocket canonical close code.
+    pub code: u16,
+
+    /// Subjective close reason.
+    pub reason: String,
+}
+
+impl std::fmt::Display for WebsocketClosed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for WebsocketClosed {}
+
 /// internal request item
 struct RequestItem {
     expires_at: std::time::Instant,
@@ -52,6 +71,16 @@ impl tokio::stream::Stream for WebsocketReceiver {
         let result = match futures::stream::Stream::poll_next(p, cx) {
             std::task::Poll::Ready(Some(Ok(i))) => {
                 match i {
+                    tungstenite::Message::Close(close) => {
+                        let (code, reason) = match close {
+                            Some(frame) => (frame.code.into(), frame.reason.into()),
+                            None => (0_u16, "".to_string()),
+                        };
+                        return std::task::Poll::Ready(Some(Err(Error::new(
+                            ErrorKind::ConnectionReset,
+                            WebsocketClosed { code, reason },
+                        ))));
+                    }
                     tungstenite::Message::Ping(data) => {
                         self.pongs.push(data);
                         // trigger wake - there may be more data
@@ -193,27 +222,35 @@ impl WebsocketReceiver {
         msg: Message,
         respond: Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
     ) -> Result<tungstenite::Message> {
-        if let Message::Ping = &msg {
-            return Ok(tungstenite::Message::Ping(Vec::with_capacity(0)));
-        }
-        if let Some(id) = msg.clone_id() {
-            if respond.is_some() {
-                self.pending_requests.insert(
-                    id,
-                    RequestItem {
-                        expires_at: std::time::Instant::now()
-                            .checked_add(std::time::Duration::from_secs(
-                                self.config.default_request_timeout_s as u64,
-                            ))
-                            .expect("can set expires_at"),
-                        respond,
-                    },
-                );
+        match msg {
+            Message::Ping => Ok(tungstenite::Message::Ping(Vec::with_capacity(0))),
+            Message::Close { code, reason } => Ok(tungstenite::Message::Close(Some(
+                tungstenite::protocol::CloseFrame {
+                    code: code.into(),
+                    reason: reason.into(),
+                },
+            ))),
+            msg => {
+                if let Some(id) = msg.clone_id() {
+                    if respond.is_some() {
+                        self.pending_requests.insert(
+                            id,
+                            RequestItem {
+                                expires_at: std::time::Instant::now()
+                                    .checked_add(std::time::Duration::from_secs(
+                                        self.config.default_request_timeout_s as u64,
+                                    ))
+                                    .expect("can set expires_at"),
+                                respond,
+                            },
+                        );
+                    }
+                }
+                let bytes: SerializedBytes = msg.try_into()?;
+                let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+                Ok(tungstenite::Message::Binary(bytes))
             }
         }
-        let bytes: SerializedBytes = msg.try_into()?;
-        let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
-        Ok(tungstenite::Message::Binary(bytes))
     }
 
     /// internal helper for processing incoming data
@@ -221,7 +258,8 @@ impl WebsocketReceiver {
         let bytes: SerializedBytes = UnsafeBytes::from(msg).into();
         let msg: Message = bytes.try_into()?;
         match msg {
-            Message::Ping => unreachable!(), // don't send serialized pings :)
+            Message::Ping => unreachable!(),         // send an actual ping :)
+            Message::Close { .. } => unreachable!(), // send an actual close :)
             Message::Signal { data } => {
                 // we got a signal
                 Ok(Some(WebsocketMessage::Signal(

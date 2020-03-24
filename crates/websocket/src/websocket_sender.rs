@@ -15,6 +15,21 @@ impl WebsocketSender {
         Self { sender }
     }
 
+    /// Close the websocket
+    #[must_use]
+    pub fn close(&mut self, code: u16, reason: String) -> BoxFuture<'static, Result<()>> {
+        let mut sender = self.sender.clone();
+        async move {
+            sender
+                .send((Message::Close { code, reason }, None))
+                .await
+                .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+            Ok(())
+        }
+        .boxed()
+    }
+
     /// Emit a signal (message without response) to the remote end of this websocket
     #[must_use]
     pub fn signal<SB1>(&mut self, msg: SB1) -> BoxFuture<'static, Result<()>>
