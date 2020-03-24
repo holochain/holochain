@@ -43,7 +43,7 @@ async fn get() -> DatabaseResult<()> {
 
     let primary_entries_cas = dbs.get(&*PRIMARY_CHAIN_ENTRIES)?;
 
-    // TODO create a cache and a cas for store and meta
+    // create a cache and a cas for store and meta
     let primary = ChainCasBuf::primary(&reader, &dbs)?;
     let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
 
@@ -53,9 +53,7 @@ async fn get() -> DatabaseResult<()> {
     let jimbo = Entry::AgentId(AgentId::generate_fake("Jimbo"));
     let address = commit(&env_ref, *primary_entries_cas, jimbo.clone())?;
 
-    // TODO Pass in stores as references
-    // TODO How will we create a struct with references? Maybe it should create from
-    // the stores and must only live as long as them.
+    // Pass in stores as references
     let cascade = Cascade::new(&primary, &primary_meta, &cache, &cache_meta);
     let entry = cascade.dht_get(address).await;
     assert_eq!(entry, jimbo);
