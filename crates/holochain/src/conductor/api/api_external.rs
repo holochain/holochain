@@ -17,7 +17,6 @@ pub struct ExternalConductorApi {
 }
 
 impl ExternalConductorApi {
-
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
         Self { conductor_mutex }

@@ -1,9 +1,11 @@
-use crate::conductor::api::{CellConductorApi, CellConductorApiT};
 use super::error::WorkflowRunResult;
-use crate::core::{
-    ribosome::WasmRibosome,
-    state::workspace::{self, Workspace},
-    workflow,
+use crate::{
+    conductor::api::{CellConductorApi, CellConductorApiT},
+    core::{
+        ribosome::WasmRibosome,
+        state::workspace::{self, Workspace},
+        workflow,
+    },
 };
 use futures::future::{BoxFuture, FutureExt};
 use sx_state::{
@@ -61,7 +63,9 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
             } = effects;
             {
                 let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
-                workspace.commit_txn(writer).map_err(Into::<WorkspaceError>::into)?;
+                workspace
+                    .commit_txn(writer)
+                    .map_err(Into::<WorkspaceError>::into)?;
             }
             for WorkflowTrigger { call, interval } in triggers {
                 if let Some(_delay) = interval {

@@ -95,7 +95,6 @@ impl RunnerCellT for Cell {
     fn get_conductor_api(&self) -> CellConductorApi {
         self.conductor_api.clone()
     }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
