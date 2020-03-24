@@ -138,6 +138,7 @@ impl DbManager {
 
     /// Get a `rkv` Database reference from a key, or create a new Database
     /// of the proper type if not yet created
+    /*
     pub async fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,
@@ -148,7 +149,7 @@ impl DbManager {
             self.create(key).await?;
             Ok(self.um.get(key).unwrap().clone())
         }
-    }
+    }*/
 
     async fn initialize(&mut self) -> DatabaseResult<()> {
         self.create(&*CHAIN_ENTRIES).await?;
