@@ -415,13 +415,37 @@ pub async fn websocket_connect(
     let (socket, _) = tokio_tungstenite::client_async_with_config(
         url.as_str(),
         socket,
-        Some(tungstenite::protocol::WebSocketConfig {
-            max_send_queue: Some(config.max_send_queue),
-            max_message_size: Some(config.max_message_size),
-            max_frame_size: Some(config.max_frame_size),
-        }),
+        Some(config.to_tungstenite()),
     )
     .await
     .map_err(|e| Error::new(ErrorKind::Other, e))?;
     WebsocketReceiver::priv_new(config, socket)
+}
+
+/// bla
+pub type WSink = futures::stream::SplitSink<RawSocket, tungstenite::Message>;
+
+/// bla
+pub type WStream = futures::stream::SplitStream<RawSocket>;
+
+/// bla
+pub async fn websocket_connect_split(
+    url: Url2,
+    config: Arc<WebsocketConfig>,
+) -> Result<(WSink, WStream)> {
+    let addr = url_to_addr(&url, config.scheme).await?;
+    let socket = tokio::net::TcpStream::connect(addr).await?;
+    socket.set_keepalive(Some(std::time::Duration::from_secs(
+        config.tcp_keepalive_s as u64,
+    )))?;
+    let (socket, _) = tokio_tungstenite::client_async_with_config(
+        url.as_str(),
+        socket,
+        Some(config.to_tungstenite()),
+    )
+    .await
+    .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    use futures::stream::StreamExt;
+    let (write, read): (WSink, WStream) = socket.split();
+    Ok((write, read))
 }
