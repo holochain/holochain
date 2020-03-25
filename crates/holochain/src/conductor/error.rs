@@ -2,6 +2,7 @@ use crate::conductor::{api::error::ConductorApiError, cell::error::CellError};
 use sx_types::cell::{CellHandle, CellId};
 use thiserror::Error;
 use sx_state::error::DatabaseError;
+use std::path::PathBuf;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -31,19 +32,29 @@ pub enum ConductorError {
     #[error("No such cell: {0}")]
     NoSuchCell(CellHandle),
 
-    #[error("Required bridge missing. Detail: {0}")]
-    RequiredBridgeMissing(String),
+    #[error("No conductor config found at this path: {0}")]
+    ConfigMissing(PathBuf),
 
-    #[error("Configuration error: {0}")]
+    #[error("Configuration consistency error: {0}")]
     ConfigError(String),
 
+    #[error("Config serialization error: {0}")]
+    DeserializationError(#[from] toml::de::Error),
+
+    #[error("Config deserialization error: {0}")]
+    SerializationError(#[from] toml::ser::Error),
+
     #[error("Miscellaneous error: {0}")]
-    Misc(String),
+    Todo(String),
+
+    #[error("Error while performing IO for the Conductor: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
+// TODO: can this be removed?
 impl From<String> for ConductorError {
     fn from(s: String) -> Self {
-        ConductorError::Misc(s)
+        ConductorError::Todo(s)
     }
 }
 

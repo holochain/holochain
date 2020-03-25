@@ -1,23 +1,26 @@
 use serde::{Deserialize, Serialize};
-use derive_more::{From, Into, AsRef};
 
 mod dpki_config;
 mod logger_config;
 mod network_config;
 mod passphrase_service_config;
 mod signal_config;
+use super::{
+    error::{ConductorError, ConductorResult},
+    paths::{ConfigFilePath, EnvironmentRootPath},
+};
 use dpki_config::DpkiConfig;
+use logger_config::LoggerConfig;
 use network_config::NetworkConfig;
 use passphrase_service_config::PassphraseServiceConfig;
 use signal_config::SignalConfig;
-use logger_config::LoggerConfig;
-use std::path::PathBuf;
+use std::{convert::TryFrom, path::{Path, PathBuf}};
 
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
     /// The path to the LMDB environment for this conductor.
     /// If omitted, chooses a default path.
-    pub environment_path: Option<PathBuf>,
+    pub environment_path: EnvironmentRootPath,
 
     /// Configures how logging should behave. Optional.
     pub logger: LoggerConfig,
@@ -57,12 +60,13 @@ pub struct ConductorConfig {
     pub passphrase_service: PassphraseServiceConfig,
 }
 
-#[derive(From, Into, Debug, PartialEq, AsRef)]
-pub struct EnvironmentPath(PathBuf);
-
-impl Default for EnvironmentPath {
-    fn default() -> Self {
-        // TODO: don't use holochain_common?
-        Self(holochain_common::paths::data_root())
+impl ConductorConfig {
+    pub fn load_toml(path: ConfigFilePath) -> ConductorResult<ConductorConfig> {
+        // let path_buf: &Path = path.into();
+        let content_toml = std::fs::read_to_string(path.as_ref()).map_err(|err| match err {
+            e @ std::io::Error{..} if e.kind() == std::io::ErrorKind::NotFound => ConductorError::ConfigMissing(path.into()),
+            _ => err.into(),
+        })?;
+        Ok(toml::from_str(&content_toml)?)
     }
 }

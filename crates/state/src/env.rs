@@ -13,8 +13,8 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::sync::{RwLock, RwLockReadGuard};
 use sx_types::cell::CellId;
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
@@ -22,8 +22,7 @@ const MAX_DBS: u32 = 32;
 lazy_static! {
     static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, Environment>> =
         RwLockSync::new(HashMap::new());
-    static ref DB_MANAGERS: RwLock<HashMap<PathBuf, Arc<DbManager>>> =
-        RwLock::new(HashMap::new());
+    static ref DB_MANAGERS: RwLock<HashMap<PathBuf, Arc<DbManager>>> = RwLock::new(HashMap::new());
 }
 
 fn default_flags() -> EnvironmentFlags {
@@ -43,7 +42,6 @@ fn required_flags() -> EnvironmentFlags {
 fn required_flags() -> EnvironmentFlags {
     EnvironmentFlags::default()
 }
-
 
 fn rkv_builder(
     initial_map_size: Option<usize>,
@@ -71,11 +69,14 @@ pub struct Environment {
 }
 
 impl Environment {
-
     /// Create an environment,
     pub fn new(path_prefix: &Path, kind: EnvironmentKind) -> DatabaseResult<Environment> {
         let mut map = ENVIRONMENTS.write();
         let path = path_prefix.join(kind.path());
+        if !path.is_dir() {
+            std::fs::create_dir(path.clone())
+                .map_err(|_e| DatabaseError::EnvironmentMissing(path.clone()))?;
+        }
         let env: Environment = match map.entry(path.clone()) {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => e
@@ -204,7 +205,6 @@ impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
 }
 
 impl<'e> EnvironmentRef<'e> {
-
     /// Access the underlying lock guard
     pub fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
         &self.0

@@ -75,7 +75,6 @@ mod builder {
 
     use super::*;
     use sx_state::{test_utils::test_conductor_env, env::EnvironmentKind};
-    use crate::conductor::config::EnvironmentPath;
 
     pub struct ConductorBuilder {
 
@@ -87,7 +86,7 @@ mod builder {
         }
 
         pub fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
-            let env_path: EnvironmentPath = config.environment_path.map(Into::into).unwrap_or_default();
+            let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             Ok(Conductor {
                 cells: HashMap::new(),

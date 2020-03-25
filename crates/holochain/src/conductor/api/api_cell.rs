@@ -45,7 +45,7 @@ impl CellConductorApiT for CellConductorApi {
         let mut tx = self.lock.read().await.tx_network().clone();
         tx.send(message)
             .await
-            .map_err(|e| ConductorApiError::Misc(e.to_string()))
+            .map_err(|e| ConductorApiError::Todo(e.to_string()))
     }
 
     async fn network_request(
