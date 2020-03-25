@@ -52,5 +52,3 @@ jobs:
 
     - name: Merge Test
       run: nix-shell --run 'hc-merge-test'
-
-      #bump to re-run
