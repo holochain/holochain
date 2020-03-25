@@ -1,29 +1,48 @@
 //! defines the write/send half of a websocket pair
 
 use crate::*;
+use task_dispatch_incoming::{ToDispatchIncoming, ToDispatchIncomingSender};
+use task_socket_sink::ToSocketSinkSender;
 
 /// The sender half allows making outgoing requests to the websocket
 /// This struct is cheaply clone-able.
 #[derive(Clone)]
 pub struct WebsocketSender {
-    sender: RawSender,
+    send_sink: ToSocketSinkSender,
+    send_dispatch: ToDispatchIncomingSender,
 }
 
 impl WebsocketSender {
     /// internal constructor
-    pub(crate) fn priv_new(sender: RawSender) -> Self {
-        Self { sender }
+    pub(crate) fn priv_new(
+        send_sink: ToSocketSinkSender,
+        send_dispatch: ToDispatchIncomingSender,
+    ) -> Self {
+        Self {
+            send_sink,
+            send_dispatch,
+        }
     }
 
     /// Close the websocket
     #[must_use]
     pub fn close(&mut self, code: u16, reason: String) -> BoxFuture<'static, Result<()>> {
-        let mut sender = self.sender.clone();
+        let mut send_sink = self.send_sink.clone();
         async move {
-            sender
-                .send((SendMessage::Close { code, reason }, None))
+            let (send, recv) = tokio::sync::oneshot::channel();
+
+            send_sink
+                .send((
+                    tungstenite::Message::Close(Some(tungstenite::protocol::CloseFrame {
+                        code: code.into(),
+                        reason: reason.into(),
+                    })),
+                    send,
+                ))
                 .await
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+            recv.await.map_err(|e| Error::new(ErrorKind::Other, e))?;
 
             Ok(())
         }
@@ -38,20 +57,28 @@ impl WebsocketSender {
         <SB1 as std::convert::TryInto<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
     {
-        let span = tracing::debug_span!("sender_signal");
-        let mut sender = self.sender.clone();
+        //let span = tracing::debug_span!("sender_signal");
+        let mut send_sink = self.send_sink.clone();
         async move {
             let bytes: SerializedBytes = msg
                 .try_into()
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
             let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
 
-            let msg = Message::Signal { data: bytes };
+            let msg = WireMessage::Signal { data: bytes };
+            let bytes: SerializedBytes = msg.try_into()?;
+            let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
 
-            sender
-                .send((SendMessage::Message(msg, span), None))
+            let msg = tungstenite::Message::Binary(bytes);
+
+            let (send, recv) = tokio::sync::oneshot::channel();
+
+            send_sink
+                .send((msg, send))
                 .await
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+            recv.await.map_err(|e| Error::new(ErrorKind::Other, e))?;
 
             Ok(())
         }
@@ -69,28 +96,47 @@ impl WebsocketSender {
         <SB2 as std::convert::TryFrom<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
     {
-        let span = tracing::debug_span!("sender_request");
-        let mut sender = self.sender.clone();
+        //let span = tracing::debug_span!("sender_request");
+        let mut send_sink = self.send_sink.clone();
+        let mut send_dispatch = self.send_dispatch.clone();
         async move {
             let bytes: SerializedBytes = msg
                 .try_into()
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
             let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
 
-            let msg = Message::Request {
-                id: nanoid::nanoid!(),
-                data: bytes,
-            };
+            let id = nanoid::nanoid!();
 
-            let (send, recv) = tokio::sync::oneshot::channel();
+            let (send_response, recv_response) = tokio::sync::oneshot::channel();
 
-            sender
-                .send((SendMessage::Message(msg, span), Some(send)))
+            send_dispatch
+                .send(ToDispatchIncoming::RegisterResponse {
+                    id: id.clone(),
+                    respond: send_response,
+                })
                 .await
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
 
-            // --
-            let bytes: Vec<u8> = recv.await.map_err(|e| Error::new(ErrorKind::Other, e))??;
+            let msg = WireMessage::Request { id, data: bytes };
+            let bytes: SerializedBytes = msg.try_into()?;
+            let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
+
+            let msg = tungstenite::Message::Binary(bytes);
+
+            let (send_complete, recv_complete) = tokio::sync::oneshot::channel();
+
+            send_sink
+                .send((msg, send_complete))
+                .await
+                .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+            recv_complete
+                .await
+                .map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+            let bytes = recv_response
+                .await
+                .map_err(|e| Error::new(ErrorKind::Other, e))??;
             let bytes: SerializedBytes = UnsafeBytes::from(bytes).into();
             Ok(SB2::try_from(bytes).map_err(|e| Error::new(ErrorKind::Other, e))?)
         }

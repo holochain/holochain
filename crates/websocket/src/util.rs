@@ -7,64 +7,40 @@ use serde::{Deserialize, Serialize};
 /// internal socket type
 pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
-/// internal type to forward messages from Sender to
-/// the Receiver which is actually polling our set of futures streams.
-#[derive(Debug)]
-pub(crate) enum SendMessage {
-    Close { code: u16, reason: String },
-    Message(Message, tracing::Span),
-}
+/// internal sink type
+pub(crate) type RawSink = futures::stream::SplitSink<RawSocket, tungstenite::Message>;
+
+/// internal stream type
+pub(crate) type RawStream = futures::stream::SplitStream<RawSocket>;
 
 /// not sure if we should expose this or not
 /// this is the actual wire message that is sent over the websocket.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub(crate) enum Message {
+pub(crate) enum WireMessage {
     Signal { data: Vec<u8> },
     Request { id: String, data: Vec<u8> },
     Response { id: String, data: Vec<u8> },
 }
 
-impl Message {
-    pub(crate) fn clone_id(&self) -> Option<String> {
-        match self {
-            Message::Signal { .. } => None,
-            Message::Request { id, .. } => Some(id.clone()),
-            Message::Response { id, .. } => Some(id.clone()),
-        }
-    }
-}
-
-impl std::convert::TryFrom<Message> for SerializedBytes {
+impl std::convert::TryFrom<WireMessage> for SerializedBytes {
     type Error = Error;
 
-    fn try_from(t: Message) -> Result<SerializedBytes> {
+    fn try_from(t: WireMessage) -> Result<SerializedBytes> {
         holochain_serialized_bytes::to_vec_named(&t)
             .map_err(|e| Error::new(ErrorKind::Other, e))
             .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
     }
 }
 
-impl std::convert::TryFrom<SerializedBytes> for Message {
+impl std::convert::TryFrom<SerializedBytes> for WireMessage {
     type Error = Error;
 
-    fn try_from(t: SerializedBytes) -> Result<Message> {
+    fn try_from(t: SerializedBytes) -> Result<WireMessage> {
         holochain_serialized_bytes::from_read_ref(t.bytes())
             .map_err(|e| Error::new(ErrorKind::Other, e))
     }
 }
-
-/// internal message sender type
-pub(crate) type RawSender = tokio::sync::mpsc::Sender<(
-    SendMessage,
-    Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
-)>;
-
-/// internal message receiver type
-pub(crate) type RawReceiver = tokio::sync::mpsc::Receiver<(
-    SendMessage,
-    Option<tokio::sync::oneshot::Sender<Result<Vec<u8>>>>,
-)>;
 
 /// internal helper to convert addrs to urls
 pub(crate) fn addr_to_url(a: SocketAddr, scheme: &str) -> Url2 {

@@ -53,7 +53,7 @@ impl tokio::stream::Stream for WebsocketListener {
                                 )
                                 .await
                                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
-                                WebsocketReceiver::priv_new(config, socket)
+                                build_websocket_pair(config, socket)
                             }
                             Err(e) => Err(Error::new(ErrorKind::Other, e)),
                         }
