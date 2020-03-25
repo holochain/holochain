@@ -18,7 +18,7 @@ jobs:
 
     # Necessary for now for the nix cache:
     # https://github.com/actions/cache/issues/133#issuecomment-599102035
-    - name: Fix ~/.cargo directory permissions
+    - name: Fix /nix/store directory permissions
       run: sudo chown -R $(whoami):$(id -ng) /nix/store
 
     # Necessary for now for the cargo cache:
