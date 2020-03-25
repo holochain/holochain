@@ -9,9 +9,9 @@ use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
 ///
 /// FIXME: understand the details of actually getting the DNA
 /// FIXME: creating entries in the config db
-pub async fn genesis<Api: CellConductorApiT>(
+pub async fn genesis(
     mut workspace: GenesisWorkspace<'_>,
-    api: Api,
+    api: impl CellConductorApiT,
     dna: Dna,
     agent_id: AgentId,
 ) -> WorkflowResult<GenesisWorkspace<'_>> {
