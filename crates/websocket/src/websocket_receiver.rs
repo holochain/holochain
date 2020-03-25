@@ -48,11 +48,41 @@ impl std::fmt::Debug for WebsocketMessage {
     }
 }
 
-/// internal publish messages to the WebsocketReceiver.
-pub(crate) type ToWebsocketReceiver = tokio::sync::mpsc::Sender<WebsocketMessage>;
+/// internal publish messages to the WebsocketReceiver Sender.
+pub(crate) type ToWebsocketReceiverSender = tokio::sync::mpsc::Sender<WebsocketMessage>;
+
+/// internal publish messages to the WebsocketReceiver Receiver.
+type ToWebsocketReceiverReceiver = tokio::sync::mpsc::Receiver<WebsocketMessage>;
 
 /// Receive and handle incoming messages through this Receive channel.
-pub type WebsocketReceiver = tokio::sync::mpsc::Receiver<WebsocketMessage>;
+pub struct WebsocketReceiver {
+    remote_addr: Url2,
+    recv: ToWebsocketReceiverReceiver,
+}
+
+impl WebsocketReceiver {
+    /// get the remote url this websocket is connected to.
+    pub fn remote_addr(&self) -> &Url2 {
+        &self.remote_addr
+    }
+
+    /// internal constructor
+    fn priv_new(remote_addr: Url2, recv: ToWebsocketReceiverReceiver) -> Self {
+        Self { remote_addr, recv }
+    }
+}
+
+impl tokio::stream::Stream for WebsocketReceiver {
+    type Item = WebsocketMessage;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let p = std::pin::Pin::new(&mut self.recv);
+        tokio::stream::Stream::poll_next(p, cx)
+    }
+}
 
 /// Establish a new outgoing websocket connection.
 pub async fn websocket_connect(
@@ -105,7 +135,7 @@ pub(crate) fn build_websocket_pair(
     // the socket stream task forwards incoming data to the dispatcher
     // it also responds to pings by directly sending to the sink
     task_socket_stream::build(
-        remote_addr,
+        remote_addr.clone(),
         send_sink.clone(),
         send_dispatch.clone(),
         raw_stream,
@@ -114,6 +144,6 @@ pub(crate) fn build_websocket_pair(
     // return our send / recv pair
     Ok((
         WebsocketSender::priv_new(send_sink, send_dispatch),
-        recv_pub,
+        WebsocketReceiver::priv_new(remote_addr, recv_pub),
     ))
 }

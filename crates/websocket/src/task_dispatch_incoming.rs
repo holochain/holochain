@@ -27,7 +27,7 @@ pub(crate) type ToDispatchIncomingSender = tokio::sync::mpsc::Sender<ToDispatchI
 pub(crate) fn build(
     config: Arc<WebsocketConfig>,
     remote_addr: Url2,
-    mut send_pub: ToWebsocketReceiver,
+    mut send_pub: ToWebsocketReceiverSender,
     mut send_sink: ToSocketSinkSender,
 ) -> ToDispatchIncomingSender {
     let (send_dispatch, mut recv_dispatch) = tokio::sync::mpsc::channel(config.max_send_queue);
@@ -75,7 +75,7 @@ pub(crate) fn build(
 
 async fn process_incoming_message(
     config: &Arc<WebsocketConfig>,
-    send_pub: &mut ToWebsocketReceiver,
+    send_pub: &mut ToWebsocketReceiverSender,
     send_sink: &mut ToSocketSinkSender,
     dispatch: &mut DispatchIncoming,
     incoming: ToDispatchIncoming,

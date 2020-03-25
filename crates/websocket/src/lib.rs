@@ -31,7 +31,6 @@ pub use websocket_receiver::*;
 mod websocket_listener;
 pub use websocket_listener::*;
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,26 +94,28 @@ mod tests {
                     tokio::task::spawn(async move {
                         loop {
                             match recv.next().await {
-                                Some(Ok(WebsocketMessage::Signal(data))) => {
-                                    let msg: TestMessage = data.try_into().unwrap();
-                                    tracing::info!(
-                                        test = "incoming signal",
-                                        data = %msg.0,
-                                    );
-                                }
-                                Some(Ok(WebsocketMessage::Request(data, respond))) => {
-                                    let msg: TestMessage = data.try_into().unwrap();
-                                    tracing::info!(
-                                        test = "incoming message",
-                                        data = %msg.0,
-                                    );
-                                    let msg = TestMessage(format!("echo: {}", msg.0));
-                                    respond(msg.try_into().unwrap()).await.unwrap();
-                                }
-                                Some(Err(e)) => {
-                                    tracing::error!(error = ?e);
-                                    break;
-                                }
+                                Some(msg) => match msg {
+                                    WebsocketMessage::Close(close) => {
+                                        tracing::error!(error = ?close);
+                                        break;
+                                    }
+                                    WebsocketMessage::Signal(data) => {
+                                        let msg: TestMessage = data.try_into().unwrap();
+                                        tracing::info!(
+                                            test = "incoming signal",
+                                            data = %msg.0,
+                                        );
+                                    }
+                                    WebsocketMessage::Request(data, respond) => {
+                                        let msg: TestMessage = data.try_into().unwrap();
+                                        tracing::info!(
+                                            test = "incoming message",
+                                            data = %msg.0,
+                                        );
+                                        let msg = TestMessage(format!("echo: {}", msg.0));
+                                        respond(msg.try_into().unwrap()).await.unwrap();
+                                    }
+                                },
                                 None => break,
                             }
                         }
@@ -137,12 +138,13 @@ mod tests {
             // we need to process the recv side as well to make the socket work
             loop {
                 match recv.next().await {
-                    Some(Err(e)) => {
-                        tracing::error!(error = ?e);
-                        break;
+                    Some(msg) => {
+                        if let WebsocketMessage::Close(close) = msg {
+                            tracing::error!(error = ?close);
+                            break;
+                        }
                     }
                     None => break,
-                    _ => (),
                 }
             }
             tracing::info!(test = "exit cli con loop");
@@ -167,4 +169,3 @@ mod tests {
         tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
     }
 }
-*/
