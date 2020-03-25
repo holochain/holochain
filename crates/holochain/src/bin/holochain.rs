@@ -7,7 +7,6 @@ use holochain_2020::conductor::{
     Conductor,
 };
 use std::{
-    convert::TryFrom,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -198,8 +197,4 @@ mod tests {
         assert_eq!(config, ConductorConfig::default());
     }
 
-    #[test]
-    fn test_load_or_friendlily_create_config() {
-        let tmp = TempDir::new("test");
-    }
 }

@@ -20,7 +20,6 @@ use sx_types::{
     prelude::*,
 };
 use toml;
-use sx_state::exports::SingleStore;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///

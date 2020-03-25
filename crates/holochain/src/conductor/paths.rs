@@ -1,6 +1,6 @@
 //! Defines default paths for various resources
 
-use derive_more::{AsRef, From, FromStr, Into, Display, Deref};
+use derive_more::{AsRef, Display, From, FromStr, Into};
 use std::path::PathBuf;
 
 pub const QUALIFIER: &str = "org";
@@ -40,7 +40,18 @@ pub fn keys_directory() -> PathBuf {
     config_root().join(KEYS_DIRECTORY)
 }
 
-#[derive(Clone, From, Into, Debug, PartialEq, AsRef, FromStr, Display, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    From,
+    Into,
+    Debug,
+    PartialEq,
+    AsRef,
+    FromStr,
+    Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[display(fmt = "{:?}", _0)]
 pub struct EnvironmentRootPath(PathBuf);
 impl Default for EnvironmentRootPath {
@@ -49,7 +60,18 @@ impl Default for EnvironmentRootPath {
     }
 }
 
-#[derive(Clone, From, Into, Debug, PartialEq, AsRef, FromStr, Display, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    From,
+    Into,
+    Debug,
+    PartialEq,
+    AsRef,
+    FromStr,
+    Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[display(fmt = "{:?}", _0)]
 pub struct ConfigFilePath(PathBuf);
 impl Default for ConfigFilePath {

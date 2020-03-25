@@ -8,6 +8,7 @@
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
 
+use super::state::ConductorState;
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
@@ -16,14 +17,18 @@ use crate::conductor::{
 };
 pub use builder::*;
 use std::collections::HashMap;
+use sx_state::{
+    db,
+    env::{Environment, ReadManager},
+    exports::SingleStore,
+    prelude::WriteManager,
+    typed::{Kv, UnitDbKey},
+};
 use sx_types::{
+    agent::AgentId,
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
-use derive_more::AsRef;
-use sx_types::agent::AgentId;
-use sx_state::{prelude::{Reader, WriteManager}, db, env::{ReadManager, Environment}, exports::SingleStore, typed::{UnitDbKey, Kv}};
-use super::state::ConductorState;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -51,7 +56,6 @@ pub struct Conductor {
 }
 
 impl Conductor {
-
     async fn new(env: Environment) -> ConductorResult<Conductor> {
         let db: SingleStore = env.dbs().await?.get(&db::CONDUCTOR_STATE)?.clone();
         Ok(Conductor {
@@ -79,6 +83,8 @@ impl Conductor {
         unimplemented!()
     }
 
+    // TODO: remove allow once we actually use this function
+    #[allow(dead_code)]
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
@@ -92,16 +98,14 @@ impl Conductor {
         Ok(new_state)
     }
 
+    // TODO: remove allow once we actually use this function
+    #[allow(dead_code)]
     async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
-    async fn get_state_db(&self) -> ConductorResult<ConductorStateDb> {
-        let db: SingleStore = self.env.dbs().await?.get(&db::CONDUCTOR_STATE)?.clone();
-        Ok(Kv::new(db)?)
-    }
 }
 
 type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
@@ -109,15 +113,13 @@ type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
 mod builder {
 
     use super::*;
-    use sx_state::{test_utils::test_conductor_env, env::EnvironmentKind};
+    use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
-    pub struct ConductorBuilder {
-
-    }
+    pub struct ConductorBuilder {}
 
     impl ConductorBuilder {
         pub fn new() -> Self {
-            Self { }
+            Self {}
         }
 
         pub async fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
@@ -133,7 +135,6 @@ mod builder {
         }
     }
 }
-
 
 #[cfg(test)]
 pub mod tests {
@@ -153,10 +154,13 @@ pub mod tests {
             dna: "".to_string(),
         };
 
-        conductor.update_state(|mut state| {
-            state.cells.push(cell_config.clone());
-            Ok(state)
-        }).await.unwrap();
+        conductor
+            .update_state(|mut state| {
+                state.cells.push(cell_config.clone());
+                Ok(state)
+            })
+            .await
+            .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state.cells, [cell_config]);
     }

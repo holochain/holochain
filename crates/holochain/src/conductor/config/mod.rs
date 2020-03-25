@@ -14,7 +14,6 @@ use logger_config::LoggerConfig;
 use network_config::NetworkConfig;
 use passphrase_service_config::PassphraseServiceConfig;
 use signal_config::SignalConfig;
-use std::{convert::TryFrom, path::{Path, PathBuf}};
 
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
@@ -64,7 +63,9 @@ impl ConductorConfig {
     pub fn load_toml(path: ConfigFilePath) -> ConductorResult<ConductorConfig> {
         // let path_buf: &Path = path.into();
         let content_toml = std::fs::read_to_string(path.as_ref()).map_err(|err| match err {
-            e @ std::io::Error{..} if e.kind() == std::io::ErrorKind::NotFound => ConductorError::ConfigMissing(path.into()),
+            e @ std::io::Error { .. } if e.kind() == std::io::ErrorKind::NotFound => {
+                ConductorError::ConfigMissing(path.into())
+            }
             _ => err.into(),
         })?;
         Ok(toml::from_str(&content_toml)?)
