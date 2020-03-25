@@ -202,10 +202,18 @@ pub mod tests {
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
 
-    #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
     struct V(pub u32);
 
     type Store<'a> = KvvBuf<'a, &'a str, V>;
+
+    fn collect_sorted<T: Ord, E, I: IntoIterator<Item = Result<T, E>>>(
+        iter: Result<I, E>,
+    ) -> Result<Vec<T>, E> {
+        let mut vec = iter?.into_iter().collect::<Result<Vec<_>, _>>()?;
+        vec.sort_unstable();
+        Ok(vec)
+    }
 
     #[tokio::test]
     async fn kvvbuf_basics() {
@@ -269,70 +277,71 @@ pub mod tests {
         .unwrap();
     }
 
-    // TODO: make pass
-    //
-    // #[tokio::test]
-    // async fn delete_all() {
-    //     let arc = test_env();
-    //     let env = arc.guard().await;
+    #[tokio::test]
+    async fn delete_all() {
+        let arc = test_env();
+        let env = arc.guard().await;
 
-    //     let multi_store = env
-    //         .inner()
-    //         .open_multi("kvv", StoreOptions::create())
-    //         .unwrap();
+        let multi_store = env
+            .inner()
+            .open_multi("kvv", StoreOptions::create())
+            .unwrap();
 
-    //     env.with_reader::<DatabaseError, _, _>(|reader| {
-    //         let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {}));
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
 
-    //         store.insert("key", V(0));
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0)}));
+            store.insert("key", V(0));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
 
-    //         store.insert("key", V(1));
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0), V(1)}));
+            store.insert("key", V(1));
+            assert_eq!(collect_sorted(store.get(&"key")), Ok(vec![V(0), V(1)]));
 
-    //         env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
-    //             .unwrap();
+            env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+                .unwrap();
 
-    //         Ok(())
-    //     })
-    //     .unwrap();
+            Ok(())
+        })
+        .unwrap();
 
-    //     let multi_store = env
-    //         .inner()
-    //         .open_multi("kvv", StoreOptions::default())
-    //         .unwrap();
+        let multi_store = env
+            .inner()
+            .open_multi("kvv", StoreOptions::default())
+            .unwrap();
 
-    //     env.with_reader::<DatabaseError, _, _>(|reader| {
-    //         let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0), V(1)}));
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(collect_sorted(store.get(&"key")), Ok(vec![V(0), V(1)]));
 
-    //         store.insert("key", V(2));
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(0), V(1), V(2)}));
+            store.insert("key", V(2));
+            assert_eq!(
+                collect_sorted(store.get(&"key")),
+                Ok(vec![V(0), V(1), V(2)])
+            );
 
-    //         store.delete_all("key");
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {}));
+            store.delete_all("key");
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
 
-    //         store.insert("key", V(3));
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(3)}));
+            store.insert("key", V(3));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(3))]);
 
-    //         env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
-    //             .unwrap();
+            env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+                .unwrap();
 
-    //         Ok(())
-    //     })
-    //     .unwrap();
+            Ok(())
+        })
+        .unwrap();
 
-    //     let multi_store = env
-    //         .inner()
-    //         .open_multi("kvv", StoreOptions::default())
-    //         .unwrap();
+        let multi_store = env
+            .inner()
+            .open_multi("kvv", StoreOptions::default())
+            .unwrap();
 
-    //     env.with_reader::<DatabaseError, _, _>(|reader| {
-    //         let store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-    //         assert_eq!(store.get(&"key"), Ok(hashset! {V(3)}));
-    //         Ok(())
-    //     })
-    //     .unwrap();
-    // }
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(3))]);
+            Ok(())
+        })
+        .unwrap();
+    }
 }
