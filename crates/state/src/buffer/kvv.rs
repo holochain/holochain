@@ -93,7 +93,7 @@ where
                         Either::Right(
                             from_scratch_space
                                 // Otherwise, chain it with the persisted content,
-                                // skipping only things that we've specifically deleted.
+                                // skipping only things that we've specifically deleted or returned.
                                 .chain(persisted.filter(move |r| match r {
                                     Ok(v) => !deltas.contains_key(v),
                                     Err(_e) => true,
