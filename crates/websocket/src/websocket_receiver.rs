@@ -41,17 +41,23 @@ struct RequestItem {
     span: tracing::Span,
 }
 
+/// internal websocket receiver state items
+/// this allows us to drop all this in the case of a close
+struct WebsocketReceiverInner {
+    socket: RawSocket,
+    send_outgoing: RawSender,
+    recv_outgoing: RawReceiver,
+    pending_requests: std::collections::HashMap<String, RequestItem>,
+    pongs: Vec<Vec<u8>>,
+}
+
 /// The read half of a websocket connection.
 /// Note that due to underlying types this receiver must be awaited
 /// for outgoing messages to be sent as well.
 pub struct WebsocketReceiver {
     config: Arc<WebsocketConfig>,
     remote_addr: Url2,
-    socket: RawSocket,
-    send_outgoing: RawSender,
-    recv_outgoing: RawReceiver,
-    pending_requests: std::collections::HashMap<String, RequestItem>,
-    pongs: Vec<Vec<u8>>,
+    inner: Option<WebsocketReceiverInner>,
 }
 
 // unfortunately tokio_tungstenite requires mut self for both send and recv
@@ -64,11 +70,18 @@ impl tokio::stream::Stream for WebsocketReceiver {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> std::task::Poll<Option<Self::Item>> {
+        if self.inner.is_none() {
+            return std::task::Poll::Ready(None);
+        }
+
         // first, check to see if we are ready to send any outgoing items
-        Self::priv_poll_can_send(std::pin::Pin::new(&mut self), cx)?;
+        if let Err(e) = Self::priv_poll_can_send(std::pin::Pin::new(&mut self), cx) {
+            drop(self.inner.take());
+            return std::task::Poll::Ready(Some(Err(e)));
+        }
 
         // now check if we have any incoming messages
-        let p = std::pin::Pin::new(&mut self.socket);
+        let p = std::pin::Pin::new(&mut self.inner.as_mut().unwrap().socket);
         let result = match futures::stream::Stream::poll_next(p, cx) {
             std::task::Poll::Ready(Some(Ok(i))) => {
                 match i {
@@ -77,13 +90,20 @@ impl tokio::stream::Stream for WebsocketReceiver {
                             Some(frame) => (frame.code.into(), frame.reason.into()),
                             None => (0_u16, "".to_string()),
                         };
+                        tracing::info!(
+                            message = "closing websocket",
+                            remote_addr = %self.remote_addr,
+                            code = %code,
+                            reason = %reason,
+                        );
+                        drop(self.inner.take());
                         return std::task::Poll::Ready(Some(Err(Error::new(
                             ErrorKind::ConnectionReset,
                             WebsocketClosed { code, reason },
                         ))));
                     }
                     tungstenite::Message::Ping(data) => {
-                        self.pongs.push(data);
+                        self.inner.as_mut().unwrap().pongs.push(data);
                         // trigger wake - there may be more data
                         cx.waker().wake_by_ref();
                         return std::task::Poll::Pending;
@@ -102,13 +122,35 @@ impl tokio::stream::Stream for WebsocketReceiver {
                         cx.waker().wake_by_ref();
                         std::task::Poll::Pending
                     }
-                    Err(e) => std::task::Poll::Ready(Some(Err(e))),
+                    Err(e) => {
+                        tracing::info!(
+                            message = "closing websocket",
+                            remote_addr = %self.remote_addr,
+                            error = ?e,
+                        );
+                        drop(self.inner.take());
+                        return std::task::Poll::Ready(Some(Err(e)));
+                    }
                 }
             }
             std::task::Poll::Ready(Some(Err(e))) => {
-                std::task::Poll::Ready(Some(Err(Error::new(ErrorKind::Other, e))))
+                tracing::info!(
+                    message = "closing websocket",
+                    remote_addr = %self.remote_addr,
+                    error = ?e,
+                );
+                drop(self.inner.take());
+                return std::task::Poll::Ready(Some(Err(Error::new(ErrorKind::Other, e))));
             }
-            std::task::Poll::Ready(None) => std::task::Poll::Ready(None),
+            std::task::Poll::Ready(None) => {
+                tracing::info!(
+                    message = "closing websocket",
+                    remote_addr = %self.remote_addr,
+                    error = "stream end",
+                );
+                drop(self.inner.take());
+                return std::task::Poll::Ready(None);
+            }
             std::task::Poll::Pending => std::task::Poll::Pending,
         };
 
@@ -140,17 +182,23 @@ impl WebsocketReceiver {
         socket: RawSocket,
     ) -> Result<(WebsocketSender, Self)> {
         let remote_addr = addr_to_url(socket.get_ref().peer_addr()?, config.scheme);
+        tracing::info!(
+            message = "websocket handshake success",
+            remote_addr = %remote_addr,
+        );
         let (send_outgoing, recv_outgoing) = tokio::sync::mpsc::channel(10);
         Ok((
             WebsocketSender::priv_new(send_outgoing.clone()),
             Self {
                 config,
                 remote_addr,
-                socket,
-                send_outgoing,
-                recv_outgoing,
-                pending_requests: std::collections::HashMap::new(),
-                pongs: Vec::new(),
+                inner: Some(WebsocketReceiverInner {
+                    socket,
+                    send_outgoing,
+                    recv_outgoing,
+                    pending_requests: std::collections::HashMap::new(),
+                    pongs: Vec::new(),
+                }),
             },
         ))
     }
@@ -160,7 +208,7 @@ impl WebsocketReceiver {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> Result<()> {
-        let p = std::pin::Pin::new(&mut self.recv_outgoing);
+        let p = std::pin::Pin::new(&mut self.inner.as_mut().unwrap().recv_outgoing);
         match tokio::stream::Stream::poll_next(p, cx) {
             std::task::Poll::Ready(Some((msg, respond))) => {
                 // prepare the item for send
@@ -171,8 +219,13 @@ impl WebsocketReceiver {
                     }
                 };
 
+                tracing::trace!(
+                    message = "sending data",
+                    byte_count = %msg.len(),
+                );
+
                 // send the item
-                let p = std::pin::Pin::new(&mut self.socket);
+                let p = std::pin::Pin::new(&mut self.inner.as_mut().unwrap().socket);
                 if let Err(e) = futures::sink::Sink::start_send(p, msg) {
                     return Err(Error::new(ErrorKind::Other, e));
                 }
@@ -191,14 +244,16 @@ impl WebsocketReceiver {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> Result<()> {
-        let p = std::pin::Pin::new(&mut self.socket);
+        let p = std::pin::Pin::new(&mut self.inner.as_mut().unwrap().socket);
         match futures::sink::Sink::poll_ready(p, cx) {
             std::task::Poll::Ready(Ok(_)) => {
-                if self.pongs.is_empty() {
+                if self.inner.as_ref().unwrap().pongs.is_empty() {
                     self.priv_poll_send_item(cx)?;
                 } else {
-                    let pong_data = self.pongs.remove(0);
-                    let p = std::pin::Pin::new(&mut self.socket);
+                    tracing::trace!(message = "sending pong response to ping");
+
+                    let pong_data = self.inner.as_mut().unwrap().pongs.remove(0);
+                    let p = std::pin::Pin::new(&mut self.inner.as_mut().unwrap().socket);
                     if let Err(e) =
                         futures::sink::Sink::start_send(p, tungstenite::Message::Pong(pong_data))
                     {
@@ -238,7 +293,7 @@ impl WebsocketReceiver {
                 let _g = span.enter();
                 if let Some(id) = msg.clone_id() {
                     if respond.is_some() {
-                        self.pending_requests.insert(
+                        self.inner.as_mut().unwrap().pending_requests.insert(
                             id,
                             RequestItem {
                                 expires_at: std::time::Instant::now()
@@ -283,7 +338,7 @@ impl WebsocketReceiver {
                 // we got a request
                 //  - set up a responder callback
                 //  - notify our stream subscriber of the message
-                let mut sender = self.send_outgoing.clone();
+                let mut sender = self.inner.as_ref().unwrap().send_outgoing.clone();
                 let respond: WebsocketRespond = Box::new(|data| {
                     let span = tracing::debug_span!("respond");
                     async move {
@@ -312,7 +367,7 @@ impl WebsocketReceiver {
                 );
 
                 // check our pending table / match up this response
-                if let Some(mut item) = self.pending_requests.remove(&id) {
+                if let Some(mut item) = self.inner.as_mut().unwrap().pending_requests.remove(&id) {
                     let _g = item.span.enter();
                     if let Some(respond) = item.respond.take() {
                         if let Err(e) = respond.send(Ok(data)) {
@@ -328,18 +383,22 @@ impl WebsocketReceiver {
     /// prune any expired pending responses
     fn priv_prune_pending(&mut self) {
         let now = std::time::Instant::now();
-        self.pending_requests.retain(|_k, v| {
-            if v.expires_at < now {
-                if let Some(respond) = v.respond.take() {
-                    if let Err(e) = respond.send(Err(ErrorKind::TimedOut.into())) {
-                        tracing::warn!(error = ?e);
+        self.inner
+            .as_mut()
+            .unwrap()
+            .pending_requests
+            .retain(|_k, v| {
+                if v.expires_at < now {
+                    if let Some(respond) = v.respond.take() {
+                        if let Err(e) = respond.send(Err(ErrorKind::TimedOut.into())) {
+                            tracing::warn!(error = ?e);
+                        }
                     }
+                    false
+                } else {
+                    true
                 }
-                false
-            } else {
-                true
-            }
-        });
+            });
     }
 }
 

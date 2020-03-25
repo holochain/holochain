@@ -39,6 +39,10 @@ impl tokio::stream::Stream for WebsocketListener {
                                 socket.set_keepalive(Some(std::time::Duration::from_secs(
                                     config.tcp_keepalive_s as u64,
                                 )))?;
+                                tracing::debug!(
+                                    message = "accepted incoming raw socket",
+                                    remote_addr = %socket.peer_addr()?,
+                                );
                                 let socket = tokio_tungstenite::accept_async_with_config(
                                     socket,
                                     Some(tungstenite::protocol::WebSocketConfig {
@@ -77,6 +81,10 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
     socket.set_nonblocking(true)?;
     let socket = tokio::net::TcpListener::from_std(socket)?;
     let local_addr = addr_to_url(socket.local_addr()?, config.scheme);
+    tracing::info!(
+        message = "bind",
+        local_addr = %local_addr,
+    );
     Ok(WebsocketListener {
         config,
         local_addr,
