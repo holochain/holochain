@@ -4,6 +4,7 @@ mod conductor;
 pub mod config;
 pub mod error;
 pub mod interface;
+pub mod interactive;
 pub mod state;
 pub mod paths;
 
