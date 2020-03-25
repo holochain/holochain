@@ -1,27 +1,19 @@
-use crate::conductor::api::{CellConductorApi, CellConductorApiT};
 use super::error::WorkflowRunResult;
-use crate::core::{
-    ribosome::WasmRibosome,
-    state::workspace::{self, Workspace},
-    workflow,
+use crate::{
+    conductor::Cell,
+    core::{
+        state::workspace::{self, Workspace},
+        workflow,
+    },
 };
 use futures::future::{BoxFuture, FutureExt};
-use sx_state::{
-    env::{Environment, WriteManager},
-    prelude::*,
-};
+use sx_state::{env::WriteManager, prelude::*};
 use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
 use workspace::WorkspaceError;
 
-pub trait RunnerCellT<Api: CellConductorApiT = CellConductorApi>: Send + Sync {
-    fn state_env(&self) -> Environment;
-    fn get_ribosome(&self) -> WasmRibosome;
-    fn get_conductor_api(&self) -> Api;
-}
+pub struct WorkflowRunner<'c>(&'c Cell);
 
-pub struct WorkflowRunner<'c, Cell: RunnerCellT>(&'c Cell);
-
-impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
+impl<'c> WorkflowRunner<'c> {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
         let environ = self.0.state_env();
         let dbs = environ.dbs().await?;
@@ -61,7 +53,9 @@ impl<'c, Cell: RunnerCellT> WorkflowRunner<'c, Cell> {
             } = effects;
             {
                 let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
-                workspace.commit_txn(writer).map_err(Into::<WorkspaceError>::into)?;
+                workspace
+                    .commit_txn(writer)
+                    .map_err(Into::<WorkspaceError>::into)?;
             }
             for WorkflowTrigger { call, interval } in triggers {
                 if let Some(_delay) = interval {

@@ -11,25 +11,25 @@
 //! The follow diagram shows the composition hierarchy.
 //! The arrows mean "contains at least one of".
 //!
-//! ```
-//! //               Cascade         SourceChain
-//! //                  |                 |
-//! //                  |                 V
-//! //                  |           SourceChainBuf
-//! //                  |                 |
-//! //                  |                 |
-//! //            +----------+      +-----+------+
-//! //            |          |      |            |
-//! //            |          V      V            |
-//! //            V         ChainCasBuf          V
-//! //        CasMetaBuf         |        ChainSequenceBuf
-//! //            |              V               |
-//! //            |           CasBuf             |
-//! //            |              |               |
-//! //            V              V               V
-//! //         KvvBuf          KvBuf          IntKvBuf
-//! //
-//! // (source: https://textik.com/#d7907793784e17e9)
+//! ```none
+//!               Cascade         SourceChain
+//!                  |                 |
+//!                  |                 V
+//!                  |           SourceChainBuf
+//!                  |                 |
+//!                  |                 |
+//!            +----------+      +-----+------+
+//!            |          |      |            |
+//!            |          V      V            |
+//!            V         ChainCasBuf          V
+//!        CasMetaBuf         |        ChainSequenceBuf
+//!            |              V               |
+//!            |           CasBuf             |
+//!            |              |               |
+//!            V              V               V
+//!         KvvBuf          KvBuf          IntKvBuf
+//!
+//! source: https://textik.com/#d7907793784e17e9
 //! ```
 
 pub mod cascade;
