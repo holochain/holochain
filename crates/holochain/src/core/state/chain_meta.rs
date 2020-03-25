@@ -1,3 +1,4 @@
+use mockall::mock;
 use std::collections::HashSet;
 use sx_state::{
     buffer::{BufMultiVal, KvvBuf},
@@ -8,6 +9,18 @@ use sx_state::{
 use sx_types::persistence::cas::content::Address;
 
 type Tag = String;
+
+#[derive(Debug)]
+pub enum Crud {
+    Live,
+    Dead,
+    Pending,
+    Rejected,
+    Abandoned,
+    Confilct,
+    Withdrawn,
+    Purged,
+}
 
 enum Op {
     Add,
@@ -48,12 +61,19 @@ RemoveLink_Action: timestamp
 RemoveLink_Action: hash
 */
 
+pub trait ChainMetaBufT<'env, R = Reader<'env>>
+where
+    R: Readable,
+{
+    fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>>;
+    fn get_crud(&self, address: &Address) -> DatabaseResult<Crud>;
+}
 pub struct ChainMetaBuf<'env, V, R = Reader<'env>>
 where
     V: BufMultiVal,
     R: Readable,
 {
-    system_meta: KvvBuf<'env, Vec<u8>, V, R>,
+    _system_meta: KvvBuf<'env, Vec<u8>, V, R>,
     links_meta: KvvBuf<'env, Vec<u8>, V, R>,
 }
 
@@ -62,17 +82,16 @@ where
     V: BufMultiVal,
     R: Readable,
 {
-    pub fn new(
+    pub(crate) fn new(
         reader: &'env R,
         system_meta: MultiStore,
         links_meta: MultiStore,
     ) -> DatabaseResult<Self> {
         Ok(Self {
-            system_meta: KvvBuf::new(reader, system_meta)?,
+            _system_meta: KvvBuf::new(reader, system_meta)?,
             links_meta: KvvBuf::new(reader, links_meta)?,
         })
     }
-
     pub fn primary(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
         let system_meta = *dbs.get(&*PRIMARY_SYSTEM_META)?;
         let links_meta = *dbs.get(&*PRIMARY_LINKS_META)?;
@@ -84,8 +103,14 @@ where
         let links_meta = *dbs.get(&*CACHE_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
+}
+
+impl<'env, R> ChainMetaBufT<'env, R> for ChainMetaBuf<'env, (), R>
+where
+    R: Readable,
+{
     /// TODO find out whether we need link_type.
-    pub fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>> {
+    fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>> {
         // TODO get removes
         // TODO get adds
         let key = LinkKey {
@@ -93,7 +118,31 @@ where
             base,
             tag,
         };
-        let values = self.links_meta.get(&key.to_key());
+        let _values = self.links_meta.get(&key.to_key());
+        Ok(HashSet::new())
+    }
+    fn get_crud(&self, _address: &Address) -> DatabaseResult<Crud> {
         unimplemented!()
+    }
+}
+
+mock! {
+    pub ChainMetaBuf
+    {
+        fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>>;
+        fn get_crud(&self, address: &Address) -> DatabaseResult<Crud>;
+
+    }
+}
+
+impl<'env, R> ChainMetaBufT<'env, R> for MockChainMetaBuf
+where
+    R: Readable,
+{
+    fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>> {
+        self.get_links(base, tag)
+    }
+    fn get_crud(&self, address: &Address) -> DatabaseResult<Crud> {
+        self.get_crud(address)
     }
 }

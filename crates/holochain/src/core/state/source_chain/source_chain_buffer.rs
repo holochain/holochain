@@ -33,6 +33,16 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         })
     }
 
+    // add a cache test only method that allows this to
+    // be used with the cache database for testing
+    // FIXME This should only be cfg(test) but that doesn't work with integration tests
+    pub fn cache(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+        Ok(Self {
+            cas: ChainCasBuf::cache(reader, dbs)?,
+            sequence: ChainSequenceBuf::new(reader, dbs)?,
+        })
+    }
+
     pub fn chain_head(&self) -> Option<&Address> {
         self.sequence.chain_head()
     }
