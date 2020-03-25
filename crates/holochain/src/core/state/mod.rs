@@ -11,7 +11,7 @@
 //! The follow diagram shows the composition hierarchy.
 //! The arrows mean "contains at least one of".
 //!
-//! ```
+//! ```none
 //!               Cascade         SourceChain
 //!                  |                 |
 //!                  |                 V
