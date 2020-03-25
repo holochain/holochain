@@ -20,9 +20,10 @@ use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
-// use sx_keystore::keystore::Keystore;
+use derive_more::AsRef;
 use sx_types::agent::AgentId;
-use sx_state::env::Environment;
+use sx_state::{prelude::{Reader, WriteManager}, db, env::{ReadManager, Environment}, exports::SingleStore, typed::{UnitDbKey, Kv}};
+use super::state::ConductorState;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -43,14 +44,26 @@ struct CellItem {
 pub struct Conductor {
     // tx_network: NetSender,
     cells: HashMap<CellId, CellItem>,
-    _environment: Environment,
+    env: Environment,
+    state_db: ConductorStateDb,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
 }
 
 impl Conductor {
 
-    pub fn new() -> ConductorBuilder {
+    async fn new(env: Environment) -> ConductorResult<Conductor> {
+        let db: SingleStore = env.dbs().await?.get(&db::CONDUCTOR_STATE)?.clone();
+        Ok(Conductor {
+            env,
+            state_db: Kv::new(db)?,
+            cells: HashMap::new(),
+            _handle_map: HashMap::new(),
+            _agent_keys: HashMap::new(),
+        })
+    }
+
+    pub fn build() -> ConductorBuilder {
         ConductorBuilder::new()
     }
 
@@ -66,10 +79,32 @@ impl Conductor {
         unimplemented!()
     }
 
-    pub fn load_config(_config: ConductorConfig) -> ConductorResult<()> {
-        Ok(())
+    async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+    {
+        let guard = self.env.guard().await;
+        let mut writer = guard.writer()?;
+        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
+        let new_state = f(state)?;
+        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
+        writer.commit()?;
+        Ok(new_state)
+    }
+
+    async fn get_state(&self) -> ConductorResult<ConductorState> {
+        let guard = self.env.guard().await;
+        let reader = guard.reader()?;
+        Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
+    }
+
+    async fn get_state_db(&self) -> ConductorResult<ConductorStateDb> {
+        let db: SingleStore = self.env.dbs().await?.get(&db::CONDUCTOR_STATE)?.clone();
+        Ok(Kv::new(db)?)
     }
 }
+
+type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
 
 mod builder {
 
@@ -85,27 +120,44 @@ mod builder {
             Self { }
         }
 
-        pub fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
+        pub async fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            Ok(Conductor {
-                cells: HashMap::new(),
-                // tx_network,
-                _environment: environment,
-                _handle_map: HashMap::new(),
-                _agent_keys: HashMap::new(),
-            })
+            let conductor = Conductor::new(environment).await?;
+            Ok(conductor)
         }
 
-        pub fn test(self) -> Conductor {
+        pub async fn test(self) -> ConductorResult<Conductor> {
             let environment = test_conductor_env();
-            Conductor {
-                cells: HashMap::new(),
-                // tx_network,
-                _environment: environment.into(),
-                _handle_map: HashMap::new(),
-                _agent_keys: HashMap::new(),
-            }
+            Conductor::new(environment).await
         }
+    }
+}
+
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::{Conductor, ConductorState};
+    use crate::conductor::state::CellConfig;
+
+    #[tokio::test]
+    async fn can_update_state() {
+        let conductor = Conductor::build().test().await.unwrap();
+        let state = conductor.get_state().await.unwrap();
+        assert_eq!(state, ConductorState::default());
+
+        let cell_config = CellConfig {
+            id: "".to_string(),
+            agent: "".to_string(),
+            dna: "".to_string(),
+        };
+
+        conductor.update_state(|mut state| {
+            state.cells.push(cell_config.clone());
+            Ok(state)
+        }).await.unwrap();
+        let state = conductor.get_state().await.unwrap();
+        assert_eq!(state.cells, [cell_config]);
     }
 }

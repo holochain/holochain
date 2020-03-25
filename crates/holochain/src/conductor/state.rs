@@ -20,13 +20,14 @@ use sx_types::{
     prelude::*,
 };
 use toml;
+use sx_state::exports::SingleStore;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///
 /// References between structs (cell configs pointing to
 /// the agent and DNA to be instantiated) are implemented
 /// via string IDs.
-#[derive(Deserialize, Serialize, Clone, Default, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct ConductorState {
     /// List of Agents, this mainly means identities and their keys. Required.
     pub agents: Vec<AgentConfig>,
@@ -43,7 +44,6 @@ pub struct ConductorState {
     /// List of bridges between cells. Optional.
     #[serde(default)]
     pub bridges: Vec<Bridge>,
-
 }
 
 /// The default passphrase service is `Cmd` which will ask for a passphrase via stdout stdin.

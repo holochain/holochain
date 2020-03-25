@@ -77,8 +77,9 @@ async fn main() {
         prompt_for_environment_dir(&env_path).expect("Couldn't auto-create environment dir");
     }
 
-    let conductor: Conductor = Conductor::new()
+    let conductor: Conductor = Conductor::build()
         .from_config(config)
+        .await
         .expect("Could not initialize Conductor from configuration");
 
     let lock = Arc::new(RwLock::new(conductor));
