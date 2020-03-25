@@ -22,3 +22,4 @@ url2 = "0.0.5"
 
 [dev-dependencies]
 tracing-subscriber = "0.2"
+linefeed = "0.6"
