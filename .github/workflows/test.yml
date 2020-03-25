@@ -24,8 +24,7 @@ jobs:
     # Necessary for now for the cargo cache:
     # https://github.com/actions/cache/issues/133#issuecomment-599102035
     - name: Fix ~/.cargo directory permissions
-      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo
-      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/registry
+      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo && sudo chown -R $(whoami):$(id -ng) ~/.cargo/registry
 
     - name: Cache nix
       uses: actions/cache@v1
