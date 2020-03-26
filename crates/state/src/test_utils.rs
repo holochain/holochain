@@ -1,8 +1,8 @@
 //! Helpers for unit tests
 
 use crate::env::{Environment, EnvironmentKind};
-use tempdir::TempDir;
 use sx_types::test_utils::fake_cell_id;
+use tempdir::TempDir;
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory
 pub fn test_cell_env() -> TestEnvironment {

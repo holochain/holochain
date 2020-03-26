@@ -1,7 +1,7 @@
 //! Functionality for safely accessing LMDB database references.
 
 use crate::{
-    env::{EnvironmentKind, Environment},
+    env::{Environment, EnvironmentKind},
     error::{DatabaseError, DatabaseResult},
 };
 use lazy_static::lazy_static;

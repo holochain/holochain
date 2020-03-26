@@ -5,7 +5,7 @@
 
 use crate::db::DbName;
 use failure::Fail;
-use std::{path::PathBuf, backtrace::Backtrace};
+use std::{backtrace::Backtrace, path::PathBuf};
 use thiserror::Error;
 
 #[derive(Error, Debug)]

@@ -5,7 +5,6 @@ mod kv;
 
 pub use kv::*;
 
-
 /// Use this as the key type for LMDB databases which should only have one key.
 ///
 /// This type can only be used as one possible reference, the empty byte slice

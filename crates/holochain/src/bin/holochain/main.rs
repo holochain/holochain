@@ -108,6 +108,7 @@ async fn main() {
     if opt.run_interface_example {
         interface_example(api).await;
     } else {
+        // TODO: kick off actual conductor task here when we're ready for that
         println!("Conductor successfully initialized. Nothing else to do. Bye bye!");
     }
 }
