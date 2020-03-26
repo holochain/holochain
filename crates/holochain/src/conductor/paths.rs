@@ -7,7 +7,9 @@ pub const QUALIFIER: &str = "org";
 pub const ORGANIZATION: &str = "holochain";
 pub const APPLICATION: &str = "holochain";
 pub const KEYS_DIRECTORY: &str = "keys";
+pub const DATABASES_DIRECTORY: &str = "databases";
 pub const DNA_EXTENSION: &str = "dna.json";
+pub const CONFIG_FILENAME: &str = "conductor-config.toml";
 
 /// Returns the project root builder for holochain directories.
 fn project_root() -> Option<directories::ProjectDirs> {
@@ -56,7 +58,7 @@ pub fn keys_directory() -> PathBuf {
 pub struct EnvironmentRootPath(PathBuf);
 impl Default for EnvironmentRootPath {
     fn default() -> Self {
-        Self(data_root().join(PathBuf::from("databases")))
+        Self(data_root().join(PathBuf::from(DATABASES_DIRECTORY)))
     }
 }
 
@@ -76,6 +78,6 @@ impl Default for EnvironmentRootPath {
 pub struct ConfigFilePath(PathBuf);
 impl Default for ConfigFilePath {
     fn default() -> Self {
-        Self(data_root().join(PathBuf::from("conductor-config.toml")))
+        Self(data_root().join(PathBuf::from(CONFIG_FILENAME)))
     }
 }

@@ -74,6 +74,10 @@ async fn main() {
                 display_friendly_missing_config_message(config_path, config_path_default);
                 std::process::exit(ERROR_CODE);
             }
+            Err(ConductorError::DeserializationError(err)) => {
+                display_friendly_malformed_config_message(config_path, err);
+                std::process::exit(ERROR_CODE);
+            }
             result => result.expect("Could not load conductor config"),
         }
     };
@@ -137,6 +141,21 @@ automatically create a default config file.
             path = config_path,
         );
     }
+}
+
+fn display_friendly_malformed_config_message(config_path: ConfigFilePath, error: toml::de::Error) {
+    println!(
+        "
+The specified config file ({})
+could not be parsed, because it is not valid TOML. Please check and fix the
+file, or delete the file and run the conductor again with the -i flag to create
+a valid default configuration. Details:
+
+    {}
+
+    ",
+        config_path, error
+    )
 }
 
 /// Simple example of what an [Interface] looks like in its most basic form,
