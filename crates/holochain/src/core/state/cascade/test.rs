@@ -289,3 +289,65 @@ async fn links_cache_return() -> DatabaseResult<()> {
     // this is implied by the mock not expecting calls
     Ok(())
 }
+
+#[tokio::test]
+async fn links_network_return() -> DatabaseResult<()> {
+    observability::test_run().ok();
+    // setup some data thats in the scratch
+    let env = test_env();
+    let dbs = env.dbs().await?;
+    let env_ref = env.guard().await;
+    let reader = env_ref.reader()?;
+    let mut source_chain = SourceChainBuf::new(&reader, &dbs)?;
+    let cache = SourceChainBuf::cache(&reader, &dbs)?;
+    let jimbo_id = AgentId::generate_fake("jimbos_id");
+    let jimbo = Entry::AgentId(AgentId::generate_fake("Jimbo"));
+    let jessy_id = AgentId::generate_fake("jessy_id");
+    let jessy = Entry::AgentId(AgentId::generate_fake("Jessy"));
+    source_chain.put_entry(jimbo.clone(), &jimbo_id);
+    source_chain.put_entry(jessy.clone(), &jessy_id);
+    let base = jimbo.address();
+    let target = jessy.address();
+    let result = target.clone();
+
+    // Return a link between entries
+    let mut mock_primary_meta = MockChainMetaBuf::new();
+    let mut mock_cache_meta = MockChainMetaBuf::new();
+    mock_primary_meta
+        .expect_get_links()
+        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
+        .returning(move |_, _| Ok(HashSet::new()));
+    mock_cache_meta
+        .expect_get_links()
+        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
+        .returning(move |_, _| Ok(HashSet::new()));
+
+    let mut mock_network = MockNetRequester::new();
+    mock_network
+        .expect_fetch_links()
+        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
+        .returning(move |_, _| {
+            Ok([target.clone()]
+                .iter()
+                .cloned()
+                .collect::<HashSet<Address>>())
+        });
+
+    // call dht_get_links with above base
+    let cascade = Cascade::new(
+        &source_chain.cas(),
+        &mock_primary_meta,
+        &cache.cas(),
+        &mock_cache_meta,
+        mock_network,
+    );
+    let links = cascade.dht_get_links(base, "").await?;
+    let link = links.into_iter().next();
+    // check it returns
+    assert_eq!(link, Some(result));
+    // check it doesn't hit the cache
+    // this is implied by the mock not expecting calls
+    // check it doesn't ask the network
+    // this is implied by the mock not expecting calls
+    Ok(())
+}
