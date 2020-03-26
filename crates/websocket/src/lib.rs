@@ -1,5 +1,18 @@
 #![allow(clippy::needless_doctest_main)]
-//! Holochain utilities for websocket serving and connecting
+//! Holochain utilities for websocket serving and connecting.
+//!
+//! To establish an outgoing connection, use [websocket_connect](fn.websocket_connect.html)
+//! which will return a tuple (
+//! [WebsocketSender](struct.WebsocketSender.html),
+//! [WebsocketReceiver](struct.WebsocketReceiver.html)
+//! ).
+//!
+//! To open a listening socket, use [websocket_bind](fn.websocket_bind.html)
+//! which will give you a [WebsocketListener](struct.WebsocketListener.html)
+//! which is an async Stream whose items resolve to that same tuple (
+//! [WebsocketSender](struct.WebsocketSender.html),
+//! [WebsocketReceiver](struct.WebsocketReceiver.html)
+//! ).
 //!
 //! # Example
 //!

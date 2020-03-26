@@ -4,7 +4,8 @@ use crate::*;
 use task_dispatch_incoming::{ToDispatchIncoming, ToDispatchIncomingSender};
 use task_socket_sink::ToSocketSinkSender;
 
-/// The sender half allows making outgoing requests to the websocket
+/// The Sender/Write half of a split websocket. Use this to make
+/// outgoing requests to the remote end of this websocket connection.
 /// This struct is cheaply clone-able.
 #[derive(Clone)]
 pub struct WebsocketSender {

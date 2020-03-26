@@ -2,7 +2,12 @@
 
 use crate::*;
 
-/// Websocket listening / server socket.
+/// Websocket listening / server socket. This struct is an async Stream -
+/// calling `.next().await` will give you a Future that will in turn resolve
+/// to a split websocket pair (
+/// [WebsocketSender](struct.WebsocketSender.html),
+/// [WebsocketReceiver](struct.WebsocketReceiver.html)
+/// ).
 pub struct WebsocketListener {
     config: Arc<WebsocketConfig>,
     local_addr: Url2,
@@ -67,8 +72,8 @@ impl tokio::stream::Stream for WebsocketListener {
     }
 }
 
-/// Bind a new websocket listening socket,
-/// and begin awaiting incoming connections.
+/// Bind a new websocket listening socket, and begin awaiting incoming connections.
+/// Returns a [WebsocketListener](struct.WebsocketListener.html) instance.
 pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<WebsocketListener> {
     let addr = url_to_addr(&addr, config.scheme).await?;
     let socket = match &addr {

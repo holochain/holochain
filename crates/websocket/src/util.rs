@@ -2,6 +2,7 @@
 
 use crate::*;
 
+/// Implements both sides of TryFrom SerializedBytes for the passed in item.
 /// See holochain_serialized_bytes::holochain_serial! macro.
 /// This is similar, but makes use of std::io::Error for the error type.
 #[macro_export]

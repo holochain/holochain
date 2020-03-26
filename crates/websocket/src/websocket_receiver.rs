@@ -54,7 +54,10 @@ pub(crate) type ToWebsocketReceiverSender = tokio::sync::mpsc::Sender<WebsocketM
 /// internal publish messages to the WebsocketReceiver Receiver.
 type ToWebsocketReceiverReceiver = tokio::sync::mpsc::Receiver<WebsocketMessage>;
 
-/// Receive and handle incoming messages through this Receive channel.
+/// The Receiver/Read half of a split websocket. Use this to receive signals
+/// and respond to rpc requests from the remote end of this websocket connection.
+/// This struct is an async Stream - calling `.next().await` will give you a
+/// [WebsocketMessage](enum.WebsocketMessage.html).
 pub struct WebsocketReceiver {
     remote_addr: Url2,
     recv: ToWebsocketReceiverReceiver,
@@ -84,7 +87,11 @@ impl tokio::stream::Stream for WebsocketReceiver {
     }
 }
 
-/// Establish a new outgoing websocket connection.
+/// Establish a new outgoing websocket connection. Returns a split websocket
+/// connection pair: (
+/// [WebsocketSender](struct.WebsocketSender.html),
+/// [WebsocketReceiver](struct.WebsocketReceiver.html)
+/// ).
 pub async fn websocket_connect(
     url: Url2,
     config: Arc<WebsocketConfig>,
