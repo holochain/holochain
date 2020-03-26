@@ -20,9 +20,6 @@ pub(crate) enum ToDispatchIncoming {
 /// internal ToDispatchIncoming Sender
 pub(crate) type ToDispatchIncomingSender = tokio::sync::mpsc::Sender<ToDispatchIncoming>;
 
-// /// internal ToDispatchIncoming Receiver
-// pub(crate) type ToDispatchIncomingReceiver = tokio::sync::mpsc::Receiver<ToDispatchIncoming>;
-
 /// See module-level documentation for this internal task
 pub(crate) fn build(
     config: Arc<WebsocketConfig>,
@@ -174,6 +171,7 @@ struct ResponseTracker {
 }
 
 impl ResponseTracker {
+    /// internal constructor
     fn priv_new() -> Self {
         Self {
             pending_responses: std::collections::HashMap::new(),

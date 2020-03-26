@@ -8,9 +8,6 @@ pub(crate) type ToSocketSink = (tungstenite::Message, tokio::sync::oneshot::Send
 /// internal ToSocketSink Sender
 pub(crate) type ToSocketSinkSender = tokio::sync::mpsc::Sender<ToSocketSink>;
 
-// /// internal ToSocketSink Receiver
-// pub(crate) type ToSocketSinkReceiver = tokio::sync::mpsc::Receiver<ToSocketSink>;
-
 /// See module-level documentation for this internal task
 pub(crate) fn build<S>(
     config: Arc<WebsocketConfig>,

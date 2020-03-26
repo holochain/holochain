@@ -2,20 +2,39 @@
 
 use crate::*;
 
-use serde::{Deserialize, Serialize};
+/// See holochain_serialized_bytes::holochain_serial! macro.
+/// This is similar, but makes use of std::io::Error for the error type.
+#[macro_export]
+macro_rules! try_from_serialized_bytes {
+    ($s:ident) => {
+        impl ::std::convert::TryFrom<$s> for ::holochain_serialized_bytes::SerializedBytes {
+            type Error = ::std::io::Error;
 
-/// internal socket type
-pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
+            fn try_from(t: $s) -> ::std::io::Result<::holochain_serialized_bytes::SerializedBytes> {
+                ::holochain_serialized_bytes::to_vec_named(&t)
+                    .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
+                    .map(|bytes| {
+                        ::holochain_serialized_bytes::SerializedBytes::from(
+                            ::holochain_serialized_bytes::UnsafeBytes::from(bytes),
+                        )
+                    })
+            }
+        }
 
-// /// internal sink type
-// pub(crate) type RawSink = futures::stream::SplitSink<RawSocket, tungstenite::Message>;
+        impl ::std::convert::TryFrom<::holochain_serialized_bytes::SerializedBytes> for $s {
+            type Error = ::std::io::Error;
 
-// /// internal stream type
-// pub(crate) type RawStream = futures::stream::SplitStream<RawSocket>;
+            fn try_from(t: ::holochain_serialized_bytes::SerializedBytes) -> ::std::io::Result<$s> {
+                ::holochain_serialized_bytes::from_read_ref(t.bytes())
+                    .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
+            }
+        }
+    };
+}
 
 /// not sure if we should expose this or not
 /// this is the actual wire message that is sent over the websocket.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub(crate) enum WireMessage {
     Signal { data: Vec<u8> },
@@ -23,6 +42,14 @@ pub(crate) enum WireMessage {
     Response { id: String, data: Vec<u8> },
 }
 try_from_serialized_bytes!(WireMessage);
+
+#[cfg(test)]
+pub(crate) fn init_tracing() {
+    sx_types::observability::test_run().unwrap();
+}
+
+/// internal socket type
+pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
 /// internal helper to convert addrs to urls
 pub(crate) fn addr_to_url(a: SocketAddr, scheme: &str) -> Url2 {
