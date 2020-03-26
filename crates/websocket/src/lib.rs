@@ -12,6 +12,32 @@ use std::{
 };
 use url2::prelude::*;
 
+/// See holochain_serialized_bytes::holochain_serial! macro.
+/// This is similar, but makes use of std::io::Error for the error type.
+#[macro_export]
+macro_rules! try_from_serialized_bytes {
+    ($s:ident) => {
+        impl std::convert::TryFrom<$s> for SerializedBytes {
+            type Error = Error;
+
+            fn try_from(t: $s) -> Result<SerializedBytes> {
+                ::holochain_serialized_bytes::to_vec_named(&t)
+                    .map_err(|e| Error::new(ErrorKind::Other, e))
+                    .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
+            }
+        }
+
+        impl std::convert::TryFrom<SerializedBytes> for $s {
+            type Error = Error;
+
+            fn try_from(t: SerializedBytes) -> Result<$s> {
+                ::holochain_serialized_bytes::from_read_ref(t.bytes())
+                    .map_err(|e| Error::new(ErrorKind::Other, e))
+            }
+        }
+    };
+}
+
 mod util;
 use util::*;
 
@@ -41,25 +67,7 @@ mod tests {
 
     #[derive(serde::Serialize, serde::Deserialize)]
     struct TestMessage(pub String);
-
-    impl std::convert::TryFrom<TestMessage> for SerializedBytes {
-        type Error = Error;
-
-        fn try_from(t: TestMessage) -> Result<SerializedBytes> {
-            holochain_serialized_bytes::to_vec_named(&t)
-                .map_err(|e| Error::new(ErrorKind::Other, e))
-                .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
-        }
-    }
-
-    impl std::convert::TryFrom<SerializedBytes> for TestMessage {
-        type Error = Error;
-
-        fn try_from(t: SerializedBytes) -> Result<TestMessage> {
-            holochain_serialized_bytes::from_read_ref(t.bytes())
-                .map_err(|e| Error::new(ErrorKind::Other, e))
-        }
-    }
+    try_from_serialized_bytes!(TestMessage);
 
     #[tokio::test]
     async fn sanity_test() {

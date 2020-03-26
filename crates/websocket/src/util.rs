@@ -22,25 +22,7 @@ pub(crate) enum WireMessage {
     Request { id: String, data: Vec<u8> },
     Response { id: String, data: Vec<u8> },
 }
-
-impl std::convert::TryFrom<WireMessage> for SerializedBytes {
-    type Error = Error;
-
-    fn try_from(t: WireMessage) -> Result<SerializedBytes> {
-        holochain_serialized_bytes::to_vec_named(&t)
-            .map_err(|e| Error::new(ErrorKind::Other, e))
-            .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
-    }
-}
-
-impl std::convert::TryFrom<SerializedBytes> for WireMessage {
-    type Error = Error;
-
-    fn try_from(t: SerializedBytes) -> Result<WireMessage> {
-        holochain_serialized_bytes::from_read_ref(t.bytes())
-            .map_err(|e| Error::new(ErrorKind::Other, e))
-    }
-}
+try_from_serialized_bytes!(WireMessage);
 
 /// internal helper to convert addrs to urls
 pub(crate) fn addr_to_url(a: SocketAddr, scheme: &str) -> Url2 {

@@ -9,25 +9,7 @@ use url2::prelude::*;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct BroadcastMessage(pub String);
-
-impl std::convert::TryFrom<BroadcastMessage> for SerializedBytes {
-    type Error = Error;
-
-    fn try_from(t: BroadcastMessage) -> Result<SerializedBytes> {
-        holochain_serialized_bytes::to_vec_named(&t)
-            .map_err(|e| Error::new(ErrorKind::Other, e))
-            .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
-    }
-}
-
-impl std::convert::TryFrom<SerializedBytes> for BroadcastMessage {
-    type Error = Error;
-
-    fn try_from(t: SerializedBytes) -> Result<BroadcastMessage> {
-        holochain_serialized_bytes::from_read_ref(t.bytes())
-            .map_err(|e| Error::new(ErrorKind::Other, e))
-    }
-}
+try_from_serialized_bytes!(BroadcastMessage);
 
 #[tokio::main(threaded_scheduler)]
 async fn main() {
