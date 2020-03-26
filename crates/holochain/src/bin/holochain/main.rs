@@ -62,6 +62,7 @@ async fn main() {
     debug!("config_path: {}", config_path);
 
     let config: ConductorConfig = if opt.interactive {
+        // Load config, offer to create default config if missing
         interactive::load_config_or_prompt_for_default(config_path)
             .expect("Could not load conductor config")
             .unwrap_or_else(|| {
@@ -69,6 +70,7 @@ async fn main() {
                 std::process::exit(ERROR_CODE);
             })
     } else {
+        // Load config, throw friendly error on failure
         match ConductorConfig::load_toml(config_path.as_ref()) {
             Err(ConductorError::ConfigMissing(_)) => {
                 display_friendly_missing_config_message(config_path, config_path_default);
@@ -82,8 +84,8 @@ async fn main() {
         }
     };
 
+    // If interactive mode, give the user a chance to create LMDB env if missing
     let env_path = PathBuf::from(config.environment_path.clone());
-
     if opt.interactive && !env_path.is_dir() {
         match interactive::prompt_for_environment_dir(&env_path) {
             Ok(true) => println!("LMDB environment created."),
@@ -97,12 +99,14 @@ async fn main() {
         }
     }
 
+    // Initialize the Conductor
     let conductor: Conductor = Conductor::build()
         .from_config(config)
         .await
         .expect("Could not initialize Conductor from configuration");
 
     let lock = Arc::new(RwLock::new(conductor));
+    // Create an external API to hand off to any Interfaces
     let api = ExternalConductorApi::new(lock);
 
     if opt.run_interface_example {
