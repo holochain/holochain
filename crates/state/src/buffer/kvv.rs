@@ -353,4 +353,43 @@ pub mod tests {
         })
         .unwrap();
     }
+
+    #[tokio::test]
+    async fn idempotent_inserts() {
+        let arc = test_env();
+        let env = arc.guard().await;
+
+        let multi_store = env
+            .inner()
+            .open_multi("kvv", StoreOptions::create())
+            .unwrap();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
+
+            store.insert("key", V(0));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
+
+            store.insert("key", V(0));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
+
+            env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
+                .unwrap();
+
+            Ok(())
+        })
+        .unwrap();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
+
+            store.insert("key", V(0));
+            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
+
+            Ok(())
+        })
+        .unwrap();
+    }
 }
