@@ -3,7 +3,7 @@ use crate::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    core::{ribosome::WasmRibosome, runner::RunnerCellT},
+    core::ribosome::WasmRibosome,
 };
 use std::hash::{Hash, Hasher};
 use sx_state::env::Environment;
@@ -81,18 +81,19 @@ impl Cell {
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         unimplemented!()
     }
-}
 
-impl RunnerCellT for Cell {
-    fn get_ribosome(&self) -> WasmRibosome {
+    // TODO: tighten up visibility: only WorkflowRunner needs to access this
+    pub(crate) fn get_ribosome(&self) -> WasmRibosome {
         unimplemented!()
     }
 
-    fn state_env(&self) -> Environment {
+    // TODO: tighten up visibility: only WorkflowRunner needs to access this
+    pub(crate) fn state_env(&self) -> Environment {
         self.state_env.clone()
     }
 
-    fn get_conductor_api(&self) -> CellConductorApi {
+    // TODO: tighten up visibility: only WorkflowRunner needs to access this
+    pub(crate) fn get_conductor_api(&self) -> CellConductorApi {
         self.conductor_api.clone()
     }
 }
