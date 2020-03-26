@@ -13,6 +13,8 @@ use sx_types::observability::{self, Output};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
+const ERROR_CODE: i32 = 42;
+
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]
 struct Opt {
@@ -64,13 +66,13 @@ async fn main() {
             .expect("Could not load conductor config")
             .unwrap_or_else(|| {
                 println!("Cannot continue without configuration");
-                std::process::exit(1);
+                std::process::exit(ERROR_CODE);
             })
     } else {
         match ConductorConfig::load_toml(config_path.as_ref()) {
             Err(ConductorError::ConfigMissing(_)) => {
                 display_friendly_missing_config_message(config_path, config_path_default);
-                std::process::exit(1);
+                std::process::exit(ERROR_CODE);
             }
             result => result.expect("Could not load conductor config"),
         }
@@ -83,7 +85,7 @@ async fn main() {
             Ok(true) => println!("LMDB environment created."),
             Ok(false) => {
                 println!("Cannot continue without LMDB environment set.");
-                std::process::exit(1);
+                std::process::exit(ERROR_CODE);
             }
             result => {
                 result.expect("Couldn't auto-create environment dir");

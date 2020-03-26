@@ -44,6 +44,7 @@ directories = "2.0.2"
 
 [dev-dependencies]
 anyhow = "1.0.26"
+assert_cli = "0.6.3"
 
 [lib]
 name = "holochain_2020"
