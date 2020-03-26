@@ -7,13 +7,14 @@ mod passphrase_service_config;
 mod signal_config;
 use super::{
     error::{ConductorError, ConductorResult},
-    paths::{ConfigFilePath, EnvironmentRootPath},
+    paths::EnvironmentRootPath,
 };
 use dpki_config::DpkiConfig;
 use logger_config::LoggerConfig;
 use network_config::NetworkConfig;
 use passphrase_service_config::PassphraseServiceConfig;
 use signal_config::SignalConfig;
+use std::path::Path;
 
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
@@ -60,9 +61,9 @@ pub struct ConductorConfig {
 }
 
 impl ConductorConfig {
-    pub fn load_toml(path: ConfigFilePath) -> ConductorResult<ConductorConfig> {
+    pub fn load_toml(path: &Path) -> ConductorResult<ConductorConfig> {
         // let path_buf: &Path = path.into();
-        let content_toml = std::fs::read_to_string(path.as_ref()).map_err(|err| match err {
+        let content_toml = std::fs::read_to_string(path).map_err(|err| match err {
             e @ std::io::Error { .. } if e.kind() == std::io::ErrorKind::NotFound => {
                 ConductorError::ConfigMissing(path.into())
             }

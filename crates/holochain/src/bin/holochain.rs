@@ -1,16 +1,13 @@
 use holochain_2020::conductor::{
     api::ExternalConductorApi,
     config::ConductorConfig,
-//    error::{ConductorError, ConductorResult},
+    error::ConductorError,
     interactive,
     interface::{channel::ChannelInterface, Interface},
     paths::ConfigFilePath,
     Conductor,
 };
-use std::{
-    path::{PathBuf},
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use sx_types::observability::{self, Output};
 use tokio::sync::{mpsc, RwLock};
@@ -58,6 +55,7 @@ async fn main() {
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
     debug!("observability initialized");
 
+    let config_path_default = opt.config_path.is_none();
     let config_path: ConfigFilePath = opt.config_path.map(Into::into).unwrap_or_default();
     debug!("config_path: {}", config_path);
 
@@ -69,14 +67,28 @@ async fn main() {
                 std::process::exit(1);
             })
     } else {
-        ConductorConfig::load_toml(config_path).expect("Could not load conductor config")
+        match ConductorConfig::load_toml(config_path.as_ref()) {
+            Err(ConductorError::ConfigMissing(_)) => {
+                display_friendly_missing_config_message(config_path, config_path_default);
+                std::process::exit(1);
+            }
+            result => result.expect("Could not load conductor config"),
+        }
     };
 
     let env_path = PathBuf::from(config.environment_path.clone());
 
     if opt.interactive && !env_path.is_dir() {
-        interactive::prompt_for_environment_dir(&env_path)
-            .expect("Couldn't auto-create environment dir");
+        match interactive::prompt_for_environment_dir(&env_path) {
+            Ok(true) => println!("LMDB environment created."),
+            Ok(false) => {
+                println!("Cannot continue without LMDB environment set.");
+                std::process::exit(1);
+            }
+            result => {
+                result.expect("Couldn't auto-create environment dir");
+            }
+        }
     }
 
     let conductor: Conductor = Conductor::build()
@@ -94,6 +106,40 @@ async fn main() {
     }
 }
 
+fn display_friendly_missing_config_message(config_path: ConfigFilePath, config_path_default: bool) {
+    if config_path_default {
+        println!(
+            "
+Error: The conductor is set up to load its configuration from the default path:
+
+    {path}
+
+but this file doesn't exist. If you meant to specify a path, run this command
+again with the -c option. Otherwise, please either create a TOML config file at
+this path yourself, or rerun the command with the '-i' flag, which will help you
+automatically create a default config file.
+        ",
+            path = config_path,
+        );
+    } else {
+        println!(
+            "
+Error: You asked to load configuration from the path:
+
+    {path}
+
+but this file doesn't exist. Please either create a TOML config file at this
+path yourself, or rerun the command with the '-i' flag, which will help you
+automatically create a default config file.
+        ",
+            path = config_path,
+        );
+    }
+}
+
+/// Simple example of what an [Interface] looks like in its most basic form,
+/// and how to interact with it.
+/// TODO: remove once we have real Interfaces
 async fn interface_example(api: ExternalConductorApi) {
     let (mut tx_dummy, rx_dummy) = mpsc::channel(100);
 

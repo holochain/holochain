@@ -52,7 +52,7 @@ pub fn keys_directory() -> PathBuf {
     serde::Serialize,
     serde::Deserialize,
 )]
-#[display(fmt = "{:?}", _0)]
+#[display(fmt = "{}", "_0.display()")]
 pub struct EnvironmentRootPath(PathBuf);
 impl Default for EnvironmentRootPath {
     fn default() -> Self {
@@ -72,7 +72,7 @@ impl Default for EnvironmentRootPath {
     serde::Serialize,
     serde::Deserialize,
 )]
-#[display(fmt = "{:?}", _0)]
+#[display(fmt = "{}", "_0.display()")]
 pub struct ConfigFilePath(PathBuf);
 impl Default for ConfigFilePath {
     fn default() -> Self {
