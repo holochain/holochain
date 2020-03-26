@@ -3,7 +3,6 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use either::Either;
 use rkv::MultiStore;
 use std::collections::HashMap;
 
@@ -76,6 +75,14 @@ where
     /// Get a set of values, taking the scratch space into account,
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + '_> {
+        // Depending on which branches get taken, this function could return
+        // any of three different iterator types, in order to unify all three
+        // into a single type, we return (in the happy path) a value of type
+        // ```
+        // Either<__GetPersistedIter, Either<__ScratchSpaceITer, Chain<...>>>
+        // ```
+        use either::Either;
+
         let persisted = self.get_persisted(k)?;
 
         let values_delta = if let Some(v) = self.scratch.get(k) {
