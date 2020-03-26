@@ -51,6 +51,7 @@ pub(crate) fn build(
                 Ok(should_continue) => {
                     if !should_continue {
                         // end this task
+                        break;
                     }
                 }
                 Err(e) => {
@@ -211,5 +212,170 @@ impl ResponseTracker {
                 true
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::stream::StreamExt;
+
+    struct Prep {
+        recv_pub: tokio::sync::mpsc::Receiver<WebsocketMessage>,
+        recv_sink:
+            tokio::sync::mpsc::Receiver<(tungstenite::Message, tokio::sync::oneshot::Sender<()>)>,
+        send_dispatch: ToDispatchIncomingSender,
+    }
+
+    fn prep_test() -> Prep {
+        let (send_pub, recv_pub) = tokio::sync::mpsc::channel(1);
+        let (send_sink, recv_sink) = tokio::sync::mpsc::channel(1);
+
+        let send_dispatch = build(
+            Arc::new(WebsocketConfig::default().default_request_timeout_s(1)),
+            url2!("test://"),
+            send_pub,
+            send_sink,
+        );
+
+        Prep {
+            recv_pub,
+            recv_sink,
+            send_dispatch,
+        }
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct TestMessage(String);
+    try_from_serialized_bytes!(TestMessage);
+
+    fn test_signal(s: &str) -> ToDispatchIncoming {
+        let data: SerializedBytes = TestMessage(s.to_string()).try_into().unwrap();
+        let data: Vec<u8> = UnsafeBytes::from(data).into();
+
+        let msg = WireMessage::Signal { data };
+        let data: SerializedBytes = msg.try_into().unwrap();
+        ToDispatchIncoming::IncomingBytes(data)
+    }
+
+    fn test_request(s: &str) -> ToDispatchIncoming {
+        let data: SerializedBytes = TestMessage(s.to_string()).try_into().unwrap();
+        let data: Vec<u8> = UnsafeBytes::from(data).into();
+
+        let msg = WireMessage::Request {
+            id: nanoid::nanoid!(),
+            data,
+        };
+        let data: SerializedBytes = msg.try_into().unwrap();
+        ToDispatchIncoming::IncomingBytes(data)
+    }
+
+    fn test_register_response() -> (
+        String,
+        ToDispatchIncoming,
+        tokio::sync::oneshot::Receiver<Result<SerializedBytes>>,
+    ) {
+        let (respond, recv) = tokio::sync::oneshot::channel();
+        let id = nanoid::nanoid!();
+        (
+            id.clone(),
+            ToDispatchIncoming::RegisterResponse { id, respond },
+            recv,
+        )
+    }
+
+    fn test_response(id: String, s: &str) -> ToDispatchIncoming {
+        let data: SerializedBytes = TestMessage(s.to_string()).try_into().unwrap();
+        let data: Vec<u8> = UnsafeBytes::from(data).into();
+
+        let msg = WireMessage::Response { id, data };
+        let data: SerializedBytes = msg.try_into().unwrap();
+        ToDispatchIncoming::IncomingBytes(data)
+    }
+
+    fn test_close() -> ToDispatchIncoming {
+        ToDispatchIncoming::Close(WebsocketClosed {
+            code: 42,
+            reason: "test-reason".to_string(),
+        })
+    }
+
+    #[tokio::test]
+    async fn test_task_dispatch_incoming() {
+        init_tracing();
+
+        let Prep {
+            mut recv_pub,
+            mut recv_sink,
+            mut send_dispatch,
+        } = prep_test();
+
+        let (mut my_sink_send, mut my_sink_recv) = tokio::sync::mpsc::channel(1);
+
+        tokio::task::spawn(async move {
+            while let Some((msg, complete)) = recv_sink.next().await {
+                let msg: WireMessage = match msg {
+                    tungstenite::Message::Binary(msg) => {
+                        let msg: SerializedBytes = UnsafeBytes::from(msg).into();
+                        msg.try_into().unwrap()
+                    }
+                    _ => panic!("unexpected tungstenite type"),
+                };
+                my_sink_send.send(msg).await.unwrap();
+                complete.send(()).unwrap();
+            }
+        });
+
+        send_dispatch.send(test_signal("test1")).await.unwrap();
+
+        assert_eq!(
+            "WebsocketMessage::Signal { bytes: 6 }",
+            &format!("{:?}", recv_pub.next().await.unwrap()),
+        );
+
+        send_dispatch.send(test_request("test2")).await.unwrap();
+
+        let (msg, respond) = match recv_pub.next().await.unwrap() {
+            WebsocketMessage::Request(msg, respond) => (msg, respond),
+            _ => panic!("unexpected recv_pub type"),
+        };
+        let msg: TestMessage = msg.try_into().unwrap();
+
+        assert_eq!("test2", &msg.0);
+
+        respond(TestMessage("test3".to_string()).try_into().unwrap())
+            .await
+            .unwrap();
+
+        match my_sink_recv.next().await.unwrap() {
+            WireMessage::Response { id: _, data } => {
+                let msg: SerializedBytes = UnsafeBytes::from(data).into();
+                let msg: TestMessage = msg.try_into().unwrap();
+                assert_eq!("test3", &msg.0,);
+            }
+            _ => panic!("unexpected response"),
+        }
+
+        let (id, msg, recv) = test_register_response();
+
+        send_dispatch.send(msg).await.unwrap();
+
+        send_dispatch
+            .send(test_response(id, "test4"))
+            .await
+            .unwrap();
+
+        assert_eq!("Ok(\"test4\")", &format!("{:?}", recv.await.unwrap()));
+
+        send_dispatch.send(test_close()).await.unwrap();
+
+        assert_eq!(
+            "WebsocketMessage::Close { close: WebsocketClosed { code: 42, reason: \"test-reason\" } }",
+            &format!("{:?}", recv_pub.next().await.unwrap()),
+        );
+
+        assert_eq!("None", &format!("{:?}", recv_pub.next().await));
+
+        assert_eq!("None", &format!("{:?}", my_sink_recv.next().await));
     }
 }

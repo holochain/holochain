@@ -37,11 +37,11 @@ impl std::fmt::Debug for WebsocketMessage {
                 .field("bytes", &data.bytes().len())
                 .finish(),
             WebsocketMessage::Request(data, _) => f
-                .debug_struct("WebsocketMessage::Signal")
+                .debug_struct("WebsocketMessage::Request")
                 .field("bytes", &data.bytes().len())
                 .finish(),
             WebsocketMessage::Close(close) => f
-                .debug_struct("WebsocketMessage::Signal")
+                .debug_struct("WebsocketMessage::Close")
                 .field("close", &close)
                 .finish(),
         }
