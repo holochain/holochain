@@ -36,14 +36,14 @@ pub(crate) fn build(
             message = "starting dispatch incoming task",
             %remote_addr,
         );
-        let mut dispatch = DispatchIncoming::priv_new();
+        let mut tracker = ResponseTracker::priv_new();
         use tokio::stream::StreamExt;
         while let Some(incoming) = recv_dispatch.next().await {
             match process_incoming_message(
                 &config,
                 &mut send_pub,
                 &mut send_sink,
-                &mut dispatch,
+                &mut tracker,
                 incoming,
             )
             .await
@@ -63,7 +63,7 @@ pub(crate) fn build(
                     break;
                 }
             }
-            dispatch.prune_expired();
+            tracker.prune_expired();
         }
         tracing::info!(
             message = "dispatch incoming task ended",
@@ -73,14 +73,16 @@ pub(crate) fn build(
     send_dispatch
 }
 
+/// internal process a single incoming message
 async fn process_incoming_message(
     config: &Arc<WebsocketConfig>,
     send_pub: &mut ToWebsocketReceiverSender,
     send_sink: &mut ToSocketSinkSender,
-    dispatch: &mut DispatchIncoming,
+    tracker: &mut ResponseTracker,
     incoming: ToDispatchIncoming,
 ) -> Result<bool> {
     match incoming {
+        // our sender half would like to register a callback for RPC response
         ToDispatchIncoming::RegisterResponse { id, respond } => {
             let item = ResponseItem {
                 expires_at: std::time::Instant::now()
@@ -91,8 +93,9 @@ async fn process_incoming_message(
                 respond: Some(respond),
                 span: tracing::debug_span!("await_response"),
             };
-            dispatch.register_response(id, item);
+            tracker.register_response(id, item);
         }
+        // we have incoming data on the raw socket
         ToDispatchIncoming::IncomingBytes(bytes) => {
             let msg: WireMessage = bytes.try_into()?;
             match msg {
@@ -137,10 +140,11 @@ async fn process_incoming_message(
                 WireMessage::Response { id, data } => {
                     let data: SerializedBytes = UnsafeBytes::from(data).into();
                     tracing::trace!(message = "recieved response", ?data,);
-                    dispatch.handle_response(id, data);
+                    tracker.handle_response(id, data);
                 }
             }
         }
+        // our raw socket is closed
         ToDispatchIncoming::Close(closed) => {
             send_pub
                 .send(WebsocketMessage::Close(closed))
@@ -156,27 +160,31 @@ async fn process_incoming_message(
     Ok(true)
 }
 
+/// internal track a response callback
 struct ResponseItem {
     expires_at: std::time::Instant,
     respond: Option<tokio::sync::oneshot::Sender<Result<SerializedBytes>>>,
     span: tracing::Span,
 }
 
-struct DispatchIncoming {
+/// internal struct for tracking response callbacks
+struct ResponseTracker {
     pending_responses: std::collections::HashMap<String, ResponseItem>,
 }
 
-impl DispatchIncoming {
+impl ResponseTracker {
     fn priv_new() -> Self {
         Self {
             pending_responses: std::collections::HashMap::new(),
         }
     }
 
+    /// register a response item to be invoked later if we get that response
     fn register_response(&mut self, id: String, item: ResponseItem) {
         self.pending_responses.insert(id, item);
     }
 
+    /// we received a response, try to match it up to a pending callback
     fn handle_response(&mut self, id: String, data: SerializedBytes) {
         if let Some(mut item) = self.pending_responses.remove(&id) {
             let _g = item.span.enter();
@@ -188,6 +196,7 @@ impl DispatchIncoming {
         }
     }
 
+    /// check for any expired response callbacks - trigger timeout errors
     fn prune_expired(&mut self) {
         let now = std::time::Instant::now();
         self.pending_responses.retain(|_k, v| {
