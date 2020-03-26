@@ -2,10 +2,10 @@ use holochain_2020::core::{
     net::MockNetRequester,
     state::{cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf},
 };
+use mockall::*;
 use std::collections::HashSet;
 use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_env};
 use sx_types::{agent::AgentId, entry::Entry, persistence::cas::content::AddressableContent};
-use mockall::*;
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {

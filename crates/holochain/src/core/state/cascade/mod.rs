@@ -145,23 +145,39 @@ where
         base: Address,
         tag: S,
     ) -> DatabaseResult<HashSet<Address>> {
+        // Am I an authority?
+        let authority = self.primary.get_entry(&base)?.is_some();
         let tag = tag.into();
-        // Cas
-        let links = self.primary_meta.get_links(&base, tag.clone())?;
+        if authority {
+            // Cas
+            let links = self.primary_meta.get_links(&base, tag.clone())?;
 
-        // Cache
-        let links = if links.len() == 0 {
-            self.cache_meta.get_links(&base, tag.clone())?
+            // Cache
+            let links = if links.len() == 0 {
+                self.cache_meta.get_links(&base, tag.clone())?
+            } else {
+                links
+            };
+            // Network
+            if links.len() == 0 {
+                self.network
+                    .fetch_links(&base, tag)
+                    .map_err(|e| DatabaseError::Other(e.into()))
+            } else {
+                Ok(links)
+            }
         } else {
-            links
-        };
-        // Network
-        if links.len() == 0 {
-            self.network
-                .fetch_links(&base, tag)
-                .map_err(|e| DatabaseError::Other(e.into()))
-        } else {
-            Ok(links)
+            // Network
+            let links = self
+                .network
+                .fetch_links(&base, tag.clone())
+                .map_err(|e| DatabaseError::Other(e.into()))?;
+            // Cache
+            if links.len() == 0 {
+                self.cache_meta.get_links(&base, tag)
+            } else {
+                Ok(links)
+            }
         }
     }
 }

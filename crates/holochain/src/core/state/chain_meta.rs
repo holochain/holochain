@@ -22,11 +22,13 @@ pub enum Crud {
     Purged,
 }
 
+#[allow(dead_code)]
 enum Op {
     Add,
     Remove,
 }
 
+#[allow(dead_code)]
 struct LinkKey<'a> {
     base: &'a Address,
     op: Op,
