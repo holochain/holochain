@@ -109,7 +109,7 @@ impl<'env, R> ChainMetaBufT<'env, R> for ChainMetaBuf<'env, (), R>
 where
     R: Readable,
 {
-    /// TODO find out whether we need link_type.
+    // TODO find out whether we need link_type.
     fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>> {
         // TODO get removes
         // TODO get adds
