@@ -36,10 +36,7 @@ mod tests {
     use super::*;
 
     fn init_tracing() {
-        let subscriber = tracing_subscriber::FmtSubscriber::builder()
-            .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
-            .finish();
-        tracing::subscriber::set_global_default(subscriber).expect("failed to set subscriber");
+        sx_types::observability::test_run().unwrap();
     }
 
     #[derive(serde::Serialize, serde::Deserialize)]
