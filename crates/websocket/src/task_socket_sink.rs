@@ -76,10 +76,10 @@ mod tests {
 
         or.await.unwrap();
 
-        assert_eq!("test1", &recv.next().await.unwrap().into_text().unwrap(),);
+        assert_eq!("test1", &recv.next().await.unwrap().into_text().unwrap());
 
         drop(send);
 
-        assert_eq!(None, recv.next().await,);
+        assert_eq!(None, recv.next().await);
     }
 }

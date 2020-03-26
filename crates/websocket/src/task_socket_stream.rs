@@ -5,12 +5,17 @@ use task_dispatch_incoming::{ToDispatchIncoming, ToDispatchIncomingSender};
 use task_socket_sink::ToSocketSinkSender;
 
 /// See module-level documentation for this internal task
-pub(crate) fn build(
+pub(crate) fn build<S>(
     remote_addr: Url2,
     mut send_sink: ToSocketSinkSender,
     mut send_dispatch: ToDispatchIncomingSender,
-    mut stream: RawStream,
-) {
+    mut stream: S,
+) where
+    S: 'static
+        + std::marker::Unpin
+        + tokio::stream::Stream<Item = std::result::Result<tungstenite::Message, tungstenite::Error>>
+        + Send,
+{
     tokio::task::spawn(async move {
         tracing::trace!(
             message = "starting socket stream task",
@@ -69,7 +74,7 @@ pub(crate) fn build(
     });
 }
 
-#[allow(dead_code)]
+/// internal process an individual incoming websocket message
 async fn process_incoming_message(
     remote_addr: &Url2,
     send_sink: &mut ToSocketSinkSender,
@@ -119,4 +124,89 @@ async fn process_incoming_message(
 
     // task can continue
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::stream::StreamExt;
+
+    struct Prep {
+        recv_sink:
+            tokio::sync::mpsc::Receiver<(tungstenite::Message, tokio::sync::oneshot::Sender<()>)>,
+        recv_dispatch: tokio::sync::mpsc::Receiver<task_dispatch_incoming::ToDispatchIncoming>,
+        send_stream: tokio::sync::mpsc::Sender<
+            std::result::Result<tungstenite::Message, tungstenite::Error>,
+        >,
+    }
+
+    fn prep_test() -> Prep {
+        let (send_sink, recv_sink) = tokio::sync::mpsc::channel(1);
+        let (send_dispatch, recv_dispatch) = tokio::sync::mpsc::channel(1);
+        let (send_stream, recv_stream) = tokio::sync::mpsc::channel(1);
+
+        build(url2!("test://"), send_sink, send_dispatch, recv_stream);
+
+        Prep {
+            recv_sink,
+            recv_dispatch,
+            send_stream,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_task_socket_stream() {
+        init_tracing();
+
+        let Prep {
+            mut recv_sink,
+            mut recv_dispatch,
+            mut send_stream,
+        } = prep_test();
+
+        send_stream
+            .send(Ok(tungstenite::Message::Ping(b"test".to_vec())))
+            .await
+            .unwrap();
+
+        let (msg, complete) = recv_sink.next().await.unwrap();
+        complete.send(()).unwrap();
+        assert_eq!("Pong([116, 101, 115, 116])", &format!("{:?}", msg));
+
+        #[derive(serde::Serialize, serde::Deserialize)]
+        struct Bob(String);
+        try_from_serialized_bytes!(Bob);
+        let msg = Bob("test".to_string());
+        let msg: SerializedBytes = msg.try_into().unwrap();
+        let msg: Vec<u8> = UnsafeBytes::from(msg).into();
+
+        send_stream
+            .send(Ok(tungstenite::Message::Binary(msg)))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            "IncomingBytes(\"test\")",
+            &format!("{:?}", recv_dispatch.next().await.unwrap()),
+        );
+
+        send_stream
+            .send(Ok(tungstenite::Message::Close(Some(
+                tungstenite::protocol::CloseFrame {
+                    code: 42.into(),
+                    reason: "test".to_string().into(),
+                },
+            ))))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            "Close(WebsocketClosed { code: 42, reason: \"test\" })",
+            &format!("{:?}", recv_dispatch.next().await.unwrap()),
+        );
+
+        assert_eq!("None", &format!("{:?}", recv_dispatch.next().await));
+
+        assert_eq!("None", &format!("{:?}", recv_sink.next().await));
+    }
 }

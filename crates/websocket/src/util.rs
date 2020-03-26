@@ -10,8 +10,8 @@ pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpSt
 // /// internal sink type
 // pub(crate) type RawSink = futures::stream::SplitSink<RawSocket, tungstenite::Message>;
 
-/// internal stream type
-pub(crate) type RawStream = futures::stream::SplitStream<RawSocket>;
+// /// internal stream type
+// pub(crate) type RawStream = futures::stream::SplitStream<RawSocket>;
 
 /// not sure if we should expose this or not
 /// this is the actual wire message that is sent over the websocket.
