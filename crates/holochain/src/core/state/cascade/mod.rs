@@ -139,14 +139,29 @@ where
             Search::Found(entry) => return Ok(Some(entry)),
             Search::NotFound => return Ok(None),
         }
-
     }
     pub async fn dht_get_links<S: Into<String>>(
         &self,
         base: Address,
         tag: S,
     ) -> DatabaseResult<HashSet<Address>> {
-        self.primary_meta.get_links(&base, tag.into())
+        let tag = tag.into();
+        // Cas
+        let links = self.primary_meta.get_links(&base, tag.clone())?;
+
+        // Cache
+        let links = if links.len() == 0 {
+            self.cache_meta.get_links(&base, tag.clone())?
+        } else {
+            links
+        };
+        // Network
+        if links.len() == 0 {
+            self.network
+                .fetch_links(&base, tag)
+                .map_err(|e| DatabaseError::Other(e.into()))
+        } else {
+            Ok(links)
+        }
     }
 }
-
