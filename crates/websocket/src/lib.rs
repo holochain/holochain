@@ -17,22 +17,26 @@ use url2::prelude::*;
 #[macro_export]
 macro_rules! try_from_serialized_bytes {
     ($s:ident) => {
-        impl std::convert::TryFrom<$s> for SerializedBytes {
-            type Error = Error;
+        impl ::std::convert::TryFrom<$s> for ::holochain_serialized_bytes::SerializedBytes {
+            type Error = ::std::io::Error;
 
-            fn try_from(t: $s) -> Result<SerializedBytes> {
+            fn try_from(t: $s) -> ::std::io::Result<::holochain_serialized_bytes::SerializedBytes> {
                 ::holochain_serialized_bytes::to_vec_named(&t)
-                    .map_err(|e| Error::new(ErrorKind::Other, e))
-                    .map(|bytes| SerializedBytes::from(UnsafeBytes::from(bytes)))
+                    .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
+                    .map(|bytes| {
+                        ::holochain_serialized_bytes::SerializedBytes::from(
+                            ::holochain_serialized_bytes::UnsafeBytes::from(bytes),
+                        )
+                    })
             }
         }
 
-        impl std::convert::TryFrom<SerializedBytes> for $s {
-            type Error = Error;
+        impl ::std::convert::TryFrom<::holochain_serialized_bytes::SerializedBytes> for $s {
+            type Error = ::std::io::Error;
 
-            fn try_from(t: SerializedBytes) -> Result<$s> {
+            fn try_from(t: ::holochain_serialized_bytes::SerializedBytes) -> ::std::io::Result<$s> {
                 ::holochain_serialized_bytes::from_read_ref(t.bytes())
-                    .map_err(|e| Error::new(ErrorKind::Other, e))
+                    .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
             }
         }
     };

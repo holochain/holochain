@@ -1,9 +1,5 @@
-use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_websocket::*;
-use std::{
-    convert::TryInto,
-    io::{Error, ErrorKind, Result},
-};
+use std::convert::TryInto;
 use tokio::stream::StreamExt;
 use url2::prelude::*;
 
