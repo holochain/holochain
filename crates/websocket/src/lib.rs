@@ -62,12 +62,13 @@ mod websocket_listener;
 pub use websocket_listener::*;
 
 #[cfg(test)]
+pub(crate) fn init_tracing() {
+    sx_types::observability::test_run().unwrap();
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-
-    fn init_tracing() {
-        sx_types::observability::test_run().unwrap();
-    }
 
     #[derive(serde::Serialize, serde::Deserialize)]
     struct TestMessage(pub String);

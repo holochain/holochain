@@ -12,11 +12,15 @@ pub(crate) type ToSocketSinkSender = tokio::sync::mpsc::Sender<ToSocketSink>;
 // pub(crate) type ToSocketSinkReceiver = tokio::sync::mpsc::Receiver<ToSocketSink>;
 
 /// See module-level documentation for this internal task
-pub(crate) fn build(
+pub(crate) fn build<S>(
     config: Arc<WebsocketConfig>,
     remote_addr: Url2,
-    mut sink: RawSink,
-) -> ToSocketSinkSender {
+    mut sink: S,
+) -> ToSocketSinkSender
+where
+    S: 'static + std::marker::Unpin + futures::sink::Sink<tungstenite::Message> + Send,
+    <S as futures::sink::Sink<tungstenite::Message>>::Error: std::fmt::Debug,
+{
     let (send_sink, mut recv_sink) =
         tokio::sync::mpsc::channel::<ToSocketSink>(config.max_send_queue);
     tokio::task::spawn(async move {
@@ -40,4 +44,42 @@ pub(crate) fn build(
         );
     });
     send_sink
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prep_test() -> (
+        ToSocketSinkSender,
+        futures::channel::mpsc::Receiver<tungstenite::Message>,
+    ) {
+        let (sink, stream) = futures::channel::mpsc::channel(1);
+
+        (
+            build(Arc::new(WebsocketConfig::default()), url2!("test://"), sink),
+            stream,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_task_socket_sink() {
+        init_tracing();
+
+        use tokio::stream::StreamExt;
+
+        let (mut send, mut recv) = prep_test();
+        let (os, or) = tokio::sync::oneshot::channel();
+        send.send((tungstenite::Message::Text("test1".to_string()), os))
+            .await
+            .unwrap();
+
+        or.await.unwrap();
+
+        assert_eq!("test1", &recv.next().await.unwrap().into_text().unwrap(),);
+
+        drop(send);
+
+        assert_eq!(None, recv.next().await,);
+    }
 }

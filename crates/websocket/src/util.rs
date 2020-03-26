@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 /// internal socket type
 pub(crate) type RawSocket = tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>;
 
-/// internal sink type
-pub(crate) type RawSink = futures::stream::SplitSink<RawSocket, tungstenite::Message>;
+// /// internal sink type
+// pub(crate) type RawSink = futures::stream::SplitSink<RawSocket, tungstenite::Message>;
 
 /// internal stream type
 pub(crate) type RawStream = futures::stream::SplitStream<RawSocket>;
