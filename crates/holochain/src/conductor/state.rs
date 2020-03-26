@@ -16,7 +16,7 @@ use sx_types::{
         bridges::{BridgePresence, BridgeReference},
         Dna,
     },
-    error::{SkunkError},
+    error::SkunkError,
     prelude::*,
 };
 use toml;
@@ -181,14 +181,12 @@ impl ConductorState {
         //
         // Get caller's config. DNA config, and DNA:
         //
-        let caller_config = self
-            .cell_by_id(&bridge_config.caller_id)
-            .ok_or_else(|| {
-                format!(
-                    "cell configuration \"{}\" not found, mentioned in bridge",
-                    bridge_config.caller_id
-                )
-            })?;
+        let caller_config = self.cell_by_id(&bridge_config.caller_id).ok_or_else(|| {
+            format!(
+                "cell configuration \"{}\" not found, mentioned in bridge",
+                bridge_config.caller_id
+            )
+        })?;
 
         let caller_dna_config = self.dna_by_id(&caller_config.dna).ok_or_else(|| {
             format!(
@@ -210,14 +208,12 @@ impl ConductorState {
         //
         // Get callee's config. DNA config, and DNA:
         //
-        let callee_config = self
-            .cell_by_id(&bridge_config.callee_id)
-            .ok_or_else(|| {
-                format!(
-                    "cell configuration \"{}\" not found, mentioned in bridge",
-                    bridge_config.callee_id
-                )
-            })?;
+        let callee_config = self.cell_by_id(&bridge_config.callee_id).ok_or_else(|| {
+            format!(
+                "cell configuration \"{}\" not found, mentioned in bridge",
+                bridge_config.callee_id
+            )
+        })?;
 
         let callee_dna_config = self.dna_by_id(&callee_config.dna).ok_or_else(|| {
             format!(
@@ -352,10 +348,7 @@ impl ConductorState {
 
     /// Returns all defined cell IDs
     pub fn cell_ids(&self) -> Vec<String> {
-        self.cells
-            .iter()
-            .map(|cell| cell.id.clone())
-            .collect()
+        self.cells.iter().map(|cell| cell.id.clone()).collect()
     }
 
     /// This function uses the petgraph crate to model the bridge connections in this config
@@ -364,9 +357,7 @@ impl ConductorState {
     /// such that this ordering of cells can be used to spawn them and simultaneously create
     /// initialize the bridges and be able to assert that any callee already exists (which makes
     /// this task much easier).
-    pub fn cell_ids_sorted_by_bridge_dependencies(
-        &self,
-    ) -> Result<Vec<String>, ConductorError> {
+    pub fn cell_ids_sorted_by_bridge_dependencies(&self) -> Result<Vec<String>, ConductorError> {
         let mut graph = DiGraph::<&str, &str>::new();
 
         // Add cell ids to the graph which returns the indices the graph is using.
@@ -385,21 +376,23 @@ impl ConductorState {
             .collect();
 
         // Create vector of edges (with node indices) from bridges:
-        let edges: Vec<(&NodeIndex<u32>, &NodeIndex<u32>)> = self.bridges
+        let edges: Vec<(&NodeIndex<u32>, &NodeIndex<u32>)> = self
+            .bridges
             .iter()
-            .map(|bridge| -> Result<(&NodeIndex<u32>, &NodeIndex<u32>), ConductorError> {
-                let start = index_map.get(&bridge.caller_id);
-                let end = index_map.get(&bridge.callee_id);
-                if let (Some(start_inner), Some(end_inner)) = (start, end) {
-                    Ok((start_inner, end_inner))
-                }
-                else {
-                    Err(ConductorError::ConfigError(format!(
+            .map(
+                |bridge| -> Result<(&NodeIndex<u32>, &NodeIndex<u32>), ConductorError> {
+                    let start = index_map.get(&bridge.caller_id);
+                    let end = index_map.get(&bridge.callee_id);
+                    if let (Some(start_inner), Some(end_inner)) = (start, end) {
+                        Ok((start_inner, end_inner))
+                    } else {
+                        Err(ConductorError::ConfigError(format!(
                         "cell configuration not found, mentioned in bridge configuration: {} -> {}",
                         bridge.caller_id, bridge.callee_id,
                     )))
-                }
-            })
+                    }
+                },
+            )
             .collect::<Result<Vec<_>, _>>()?;
 
         // Add edges to graph:
@@ -456,7 +449,6 @@ impl ConductorState {
 
         self
     }
-
 }
 
 /// An agent has a name/ID and is optionally defined by a private key that resides in a file
@@ -904,7 +896,14 @@ pub mod tests {
         let config: ConductorState =
             load_configuration(toml).expect("Failed to load config from toml string");
 
-        assert_eq!(config.check_consistency(&mut test_dna_loader()), Err("DNA configuration \"WRONG DNA ID\" not found, mentioned in cell \"app spec cell\"".to_string().into()));
+        assert_eq!(
+            config.check_consistency(&mut test_dna_loader()),
+            Err(
+                "DNA configuration \"WRONG DNA ID\" not found, mentioned in cell \"app spec cell\""
+                    .to_string()
+                    .into()
+            )
+        );
     }
 
     #[test]
@@ -1053,8 +1052,8 @@ pub mod tests {
     handle = "DPKI"
     "#,
         );
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
         assert_eq!(config.check_consistency(&mut test_dna_loader()), Ok(()));
 
         // "->": calls
@@ -1092,8 +1091,8 @@ pub mod tests {
     handle = "test-callee"
     "#,
         );
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
         assert_eq!(
             config.check_consistency(&mut test_dna_loader()),
             Err("Cyclic dependency in bridge configuration"
@@ -1122,8 +1121,8 @@ pub mod tests {
     handle = "something"
     "#,
         );
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
         assert_eq!(
             config.check_consistency(&mut test_dna_loader()),
             Err(
@@ -1154,8 +1153,8 @@ pub mod tests {
     handle = "happ-store"
     "#,
         );
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
         let bridged_ids: Vec<_> = config
             .bridge_dependencies(String::from("app1"))
             .iter()
@@ -1230,8 +1229,8 @@ pub mod tests {
     port = 3000
     dna_interface = "<not existant>"
     "#;
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
         assert_eq!(
             config.check_consistency(&mut test_dna_loader()),
             Err("DNA Interface configuration \"<not existant>\" not found, mentioned in UI interface \"ui-interface-1\"".to_string().into())
@@ -1264,8 +1263,8 @@ pub mod tests {
     cell_id = "bogus cell"
     init_params = "{}"
     "#;
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
         assert_eq!(
             config.check_consistency(&mut test_dna_loader()),
             Err(
@@ -1310,8 +1309,8 @@ pub mod tests {
             type = "file"
         "#;
 
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
 
         assert_eq!(config.check_cells_storage(), Ok(()));
         Ok(())
@@ -1346,8 +1345,8 @@ pub mod tests {
             type = "file"
         "#;
 
-        let config =
-            load_configuration::<ConductorState>(&toml).expect("ConductorState should be syntactically correct");
+        let config = load_configuration::<ConductorState>(&toml)
+            .expect("ConductorState should be syntactically correct");
 
         assert_eq!(
             config.check_cells_storage(),

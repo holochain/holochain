@@ -38,7 +38,6 @@ pub mod tests {
     };
     use sx_types::prelude::*;
 
-
     pub struct TestWorkspace<'env> {
         one: KvBuf<'env, Address, u32>,
         two: KvBuf<'env, Address, bool>,

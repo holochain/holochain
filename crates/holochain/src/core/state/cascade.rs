@@ -1,6 +1,6 @@
 use super::chain_cas::ChainCasBuf;
-use sx_types::persistence::cas::content::Address;
 use sx_state::{buffer::KvvBuf, prelude::Reader};
+use sx_types::persistence::cas::content::Address;
 
 #[allow(dead_code)]
 pub struct Cascade<'e> {

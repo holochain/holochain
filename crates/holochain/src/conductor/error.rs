@@ -1,8 +1,8 @@
 use crate::conductor::{api::error::ConductorApiError, cell::error::CellError};
+use std::path::PathBuf;
+use sx_state::error::DatabaseError;
 use sx_types::cell::{CellHandle, CellId};
 use thiserror::Error;
-use sx_state::error::DatabaseError;
-use std::path::PathBuf;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 

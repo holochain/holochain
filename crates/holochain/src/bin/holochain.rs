@@ -1,14 +1,14 @@
 use holochain_2020::conductor::{
     api::ExternalConductorApi,
     config::ConductorConfig,
-    error::{ConductorError, ConductorResult},
-    interface::{channel::ChannelInterface, Interface},
+//    error::{ConductorError, ConductorResult},
     interactive,
+    interface::{channel::ChannelInterface, Interface},
     paths::ConfigFilePath,
     Conductor,
 };
 use std::{
-    path::{Path, PathBuf},
+    path::{PathBuf},
     sync::Arc,
 };
 use structopt::StructOpt;
@@ -31,15 +31,25 @@ struct Opt {
     )]
     structured: Output,
 
-    #[structopt(short = "c", help = "Path to a TOML file containing conductor configuration")]
+    #[structopt(
+        short = "c",
+        help = "Path to a TOML file containing conductor configuration"
+    )]
     config_path: Option<PathBuf>,
 
-    #[structopt(short = "i", long, help = "Receive helpful prompts to create missing files and directories,
-    useful when running a conductor for the first time")]
+    #[structopt(
+        short = "i",
+        long,
+        help = "Receive helpful prompts to create missing files and directories,
+    useful when running a conductor for the first time"
+    )]
     interactive: bool,
 
-    #[structopt(long = "example", help = "Run a very basic interface example, just to have something to do")]
-    run_interface_example: bool
+    #[structopt(
+        long = "example",
+        help = "Run a very basic interface example, just to have something to do"
+    )]
+    run_interface_example: bool,
 }
 
 #[tokio::main]
@@ -65,7 +75,8 @@ async fn main() {
     let env_path = PathBuf::from(config.environment_path.clone());
 
     if opt.interactive && !env_path.is_dir() {
-        interactive::prompt_for_environment_dir(&env_path).expect("Couldn't auto-create environment dir");
+        interactive::prompt_for_environment_dir(&env_path)
+            .expect("Couldn't auto-create environment dir");
     }
 
     let conductor: Conductor = Conductor::build()

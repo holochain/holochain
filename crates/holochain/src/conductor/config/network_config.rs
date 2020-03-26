@@ -7,6 +7,6 @@ use url::Url;
 pub enum NetworkConfig {
     Sim2h {
         #[serde(with = "url_serde")]
-        url: Url
-    }
+        url: Url,
+    },
 }

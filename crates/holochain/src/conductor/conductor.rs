@@ -105,7 +105,6 @@ impl Conductor {
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
-
 }
 
 type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
