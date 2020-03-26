@@ -77,34 +77,36 @@ where
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + '_> {
         let persisted = self.get_persisted(k)?;
-        Ok(
-            if let Some(ValuesDelta { delete_all, deltas }) = self.scratch.get(k) {
-                Either::Left({
-                    let from_scratch_space = deltas
-                        .iter()
-                        .filter(|(_v, op)| **op == Op::Insert)
-                        .map(|(v, _op)| Ok(v.clone()));
 
-                    if *delete_all {
-                        // If delete_all is set, return only scratch content,
-                        // skipping persisted content (as it will all be deleted)
-                        Either::Left(from_scratch_space)
-                    } else {
-                        Either::Right(
-                            from_scratch_space
-                                // Otherwise, chain it with the persisted content,
-                                // skipping only things that we've specifically deleted or returned.
-                                .chain(persisted.filter(move |r| match r {
-                                    Ok(v) => !deltas.contains_key(v),
-                                    Err(_e) => true,
-                                })),
-                        )
-                    }
-                })
-            } else {
-                Either::Right(persisted)
-            },
-        )
+        let values_delta = if let Some(v) = self.scratch.get(k) {
+            v
+        } else {
+            return Ok(Either::Left(persisted));
+        };
+        let ValuesDelta { delete_all, deltas } = values_delta;
+
+        let from_scratch_space = deltas
+            .iter()
+            .filter(|(_v, op)| **op == Op::Insert)
+            .map(|(v, _op)| Ok(v.clone()));
+
+        let iter = if *delete_all {
+            // If delete_all is set, return only scratch content,
+            // skipping persisted content (as it will all be deleted)
+            Either::Left(from_scratch_space)
+        } else {
+            Either::Right(
+                from_scratch_space
+                    // Otherwise, chain it with the persisted content,
+                    // skipping only things that we've specifically deleted or returned.
+                    .chain(persisted.filter(move |r| match r {
+                        Ok(v) => !deltas.contains_key(v),
+                        Err(_e) => true,
+                    })),
+            )
+        };
+
+        Ok(Either::Right(iter))
     }
 
     /// Update the scratch space to record an Insert operation for the KV
