@@ -131,7 +131,6 @@ mock! {
     {
         fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>>;
         fn get_crud(&self, address: &Address) -> DatabaseResult<Crud>;
-
     }
 }
 
