@@ -1,4 +1,6 @@
 #![warn(unused_extern_crates)]
+#![deny(missing_docs)]
+
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -36,7 +38,7 @@ use sx_types::{
 };
 use holochain_json_api::{error::JsonError, json::JsonString};
 use holochain_locksmith::Mutex;
-use holochain_persistence_api::cas::content::{Address, AddressableContent};
+use sx_types::persistence::cas::content::{Address, AddressableContent};
 
 use holochain_net::p2p_config::P2pConfig;
 

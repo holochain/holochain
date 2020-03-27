@@ -1,10 +1,10 @@
 [package]
 name = "sx_types"
 version = "0.0.1"
-description = "holochain skunkworx common types"
+description = "Holochain common types"
 license = "GPL-3.0-only"
-homepage = "https://github.com/holochain/holochain-rust"
-documentation = "https://github.com/holochain/holochain-rust"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
@@ -14,10 +14,9 @@ edition = "2018"
 base64 = "0.10.1"
 chrono = "0.4.6"
 hcid = "0.0.6"
-holochain_persistence_api = "0.0.18"
-holochain_json_api = "0.0.23"
-holochain_json_derive = "0.0.23"
-holochain_locksmith = "0.0.43-alpha3"
+holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+# holochain_locksmith = "0.0.43-alpha3"
 lib3h_crypto_api = "0.0.38"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = ["derive"] }
@@ -35,3 +34,5 @@ tracing-serde = "=0.1.1"
 maplit = "1.0.2"
 thiserror = "1.0.10"
 derive_more = "0.99.3"
+rust-base58 = "0.0.4"
+shrinkwraprs = "0.3.0"

@@ -1,3 +1,10 @@
+//! This crate provides the elementary BufferedStores:
+//!
+//! - [KvBuffer]: a SingleStore with a scratch space
+//! - [KvIntBuffer]: an IntegerStore with a scratch space
+//! - [KvvBuffer]: a MultiStore with a scratch space
+//! - [CasBuffer]: a [KvBuffer] which enforces that keys must be the "address" of the values (content)
+
 mod cas;
 mod kv;
 mod kv_int;
@@ -16,22 +23,26 @@ use std::hash::Hash;
 /// but could be used in Workspaces i.e. iterating over a Vec<dyn BufferedStore>
 /// is all that needs to happen to commit the workspace changes
 pub trait BufferedStore<'env> {
+    /// The error type for `flush_to_txn` errors
     type Error: std::error::Error;
-    // fn iter(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;
-    // fn iter_reverse(&self) -> WorkspaceResult<Box<dyn Iterator<Item=(V)> + 'env>>;
+
+    /// Flush the scratch space to the read-write transaction, staging the changes
+    /// for an actual database update
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error>;
 }
 
+/// Trait alias for the combination of constraints needed for keys in [KvBuf] and [KvvBuf]
 pub trait BufKey: Hash + Eq + AsRef<[u8]> {}
 impl<T> BufKey for T where T: Hash + Eq + AsRef<[u8]> {}
 
-/// Traits required for the [IntKvBuf](kv_int::IntKvBuf) key
+/// Trait alias for the combination of constraints needed for keys in [IntKvBuf](kv_int::IntKvBuf)
 pub trait BufIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 impl<T> BufIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 
-/// Traits required for the [IntKvBuf](kv_int::IntKvBuf) value
+/// Trait alias for the combination of constraints needed for values in [KvBuf](kv::KvBuf) and [IntKvBuf](kv_int::IntKvBuf)
 pub trait BufVal: Clone + Serialize + DeserializeOwned {}
 impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned {}
 
+/// Trait alias for the combination of constraints needed for values in [KvvBuf]
 pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned {}
 impl<T> BufMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned {}

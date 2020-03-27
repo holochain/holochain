@@ -6,12 +6,14 @@
 //! over to the appropriate error type in this crate.
 
 use holochain_json_api::error::JsonError;
-use holochain_persistence_api::error::PersistenceError;
 use lib3h_crypto_api::CryptoError;
 use serde_json::Error as SerdeError;
 use std::fmt;
 use thiserror::Error;
 
+/// Holochain high-level error type
+/// TODO - Stop calling this "Skunk"
+#[allow(missing_docs)] // these are self explanitory
 #[derive(Error, Debug)]
 pub enum SkunkError {
     Todo(String),
@@ -21,10 +23,9 @@ pub enum SkunkError {
     SerdeError(#[from] SerdeError),
     JsonError(#[from] JsonError),
     CryptoError(#[from] CryptoError),
-    PersistenceError(#[from] PersistenceError),
     Base64DecodeError(#[from] base64::DecodeError),
     Utf8Error(#[from] std::str::Utf8Error),
-    LocksmithError(#[from] holochain_locksmith::LocksmithError),
+    // LocksmithError(#[from] holochain_locksmith::LocksmithError),
 }
 
 impl fmt::Display for SkunkError {
@@ -46,7 +47,6 @@ impl PartialEq for SkunkError {
             (SerdeError(a), SerdeError(b)) => a.to_string() == b.to_string(),
             (JsonError(a), JsonError(b)) => a == b,
             (CryptoError(a), CryptoError(b)) => a == b,
-            (PersistenceError(a), PersistenceError(b)) => a == b,
             (Base64DecodeError(a), Base64DecodeError(b)) => a == b,
             _ => false,
         }
@@ -60,9 +60,12 @@ impl From<String> for SkunkError {
 }
 
 impl SkunkError {
+    /// Construct an new Error type from something that can be converted to a String
     pub fn new<S: Into<String>>(s: S) -> Self {
         SkunkError::Todo(s.into())
     }
 }
 
+/// High-level Holochain Result type
+/// TODO - Stop calling this "Skunk"
 pub type SkunkResult<T> = Result<T, SkunkError>;

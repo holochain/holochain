@@ -18,8 +18,9 @@ use std::{
     sync::{Arc, RwLock},
 };
 use tracing::*;
-// use wasmi::Module;
-// TODO: dummy shim for wasm, will be replaced by wasmer soon
+
+/// use wasmi::Module;
+/// TODO: dummy shim for wasm, will be replaced by wasmer soon
 pub struct Module;
 
 /// Wrapper around wasmi::Module since it does not implement Clone, Debug, PartialEq, Eq,
@@ -27,23 +28,28 @@ pub struct Module;
 #[derive(Clone)]
 pub struct ModuleArc(Arc<Module>);
 impl ModuleArc {
+    /// Construct a new ModuleArc newtype - just an Arc around Module
     pub fn new(module: Module) -> Self {
         ModuleArc(Arc::new(module))
     }
 }
+
 impl PartialEq for ModuleArc {
     fn eq(&self, _other: &ModuleArc) -> bool {
         //*self == *other
         false
     }
 }
+
 impl Eq for ModuleArc {}
+
 impl Deref for ModuleArc {
     type Target = Arc<Module>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
+
 impl fmt::Debug for ModuleArc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ModuleMutex")

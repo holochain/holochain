@@ -1,13 +1,16 @@
+//! Utility items related to data persistence.
+
 use crate::cell::CellId;
 use std::path::{Path, PathBuf};
 
+/// Path to persistence storage.
 #[derive(Clone, Debug)]
 pub struct DatabasePath(PathBuf);
 
 impl From<CellId> for DatabasePath {
     fn from(id: CellId) -> Self {
         let database_path = PathBuf::new().join(format!("{}", id));
-        DatabasePath(database_path.into())
+        DatabasePath(database_path)
     }
 }
 

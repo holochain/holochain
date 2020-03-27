@@ -45,6 +45,7 @@ where
     V: BufMultiVal,
     R: Readable,
 {
+    /// Create a new KvvBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: MultiStore) -> DatabaseResult<Self> {
         Ok(Self {
             db,
@@ -53,6 +54,8 @@ where
         })
     }
 
+    /// Get a set of values, taking the scratch space into account,
+    /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<HashSet<V>> {
         use Op::*;
         let mut values = self.get_persisted(k)?;
@@ -71,6 +74,7 @@ where
         Ok(values)
     }
 
+    /// Update the scratch space to record an Insert operation for the KV
     pub fn insert(&mut self, k: K, v: V) {
         self.scratch
             .entry(k)
@@ -81,8 +85,8 @@ where
             .or_insert_with(|| hashset! { Op::Insert(Box::new(v)) });
     }
 
+    /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K, v: V) {
-        // let deletion = Op::Delete(Box::new(v));
         self.scratch
             .entry(k)
             .and_modify(|ops| {
@@ -92,10 +96,13 @@ where
             .or_insert_with(|| hashset! { Op::Delete(Box::new(v)) });
     }
 
-    pub fn delete_all(&mut self, k: K) {
+    /// Clear the scratch space and record a DeleteAll operation
+    /// TODO: implement and make public
+    fn _delete_all(&mut self, k: K) {
         if let Entry::Occupied(mut entry) = self.scratch.entry(k) {
             let _ops = entry.get_mut();
         }
+        unimplemented!()
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -103,14 +110,10 @@ where
         let iter = self.db.get(self.reader, k)?;
         Ok(iter
             .map(|v| match v {
-                Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(bincode::deserialize(buf)?)),
+                Ok((_, Some(rkv::Value::Blob(buf)))) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
                 Ok((_, Some(_))) => Err(DatabaseError::InvalidValue),
                 Ok((_, None)) => Ok(None),
                 Err(e) => Ok(Err(e)?),
-                // Err(e) => match e {
-                //     rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => Ok(None),
-                //     e => Ok(Err(e)?)
-                // },
             })
             .collect::<Result<Vec<Option<V>>, DatabaseError>>()?
             .into_iter()
@@ -139,12 +142,12 @@ where
             for op in ops {
                 match op {
                     Insert(v) => {
-                        let buf = bincode::serialize(&*v)?;
+                        let buf = rmp_serde::to_vec_named(&*v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.put(writer, k.clone(), &encoded)?;
                     }
                     Delete(v) => {
-                        let buf = bincode::serialize(&*v)?;
+                        let buf = rmp_serde::to_vec_named(&*v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.delete(writer, k.clone(), &encoded).or_else(|err| {
                             // Ignore the case where the key is not found
@@ -185,9 +188,10 @@ pub mod tests {
         Op::Delete(Box::new(v))
     }
 
-    #[test]
-    fn kvv_store_scratch_insert_delete() {
+    #[tokio::test]
+    async fn kvv_store_scratch_insert_delete() {
         let arc = test_env();
+        let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
 
@@ -221,9 +225,10 @@ pub mod tests {
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2), V(3)});
     }
 
-    #[test]
-    fn kvv_store_get_list() {
+    #[tokio::test]
+    async fn kvv_store_get_list() {
         let arc = test_env();
+        let env = arc.guard().await;
         let env = arc.env();
 
         let mut store: Store = KvvBuf::create(&env, "kvv").unwrap();
@@ -251,9 +256,10 @@ pub mod tests {
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(2)});
     }
 
-    #[test]
-    fn kvv_store_duplicate_insert() {
+    #[tokio::test]
+    async fn kvv_store_duplicate_insert() {
         let arc = test_env();
+        let env = arc.guard().await;
         let env = arc.env();
 
         fn add_twice(env: &Rkv) {
@@ -286,9 +292,10 @@ pub mod tests {
         assert_eq!(store.get(&"key").unwrap(), hashset! {V(1)});
     }
 
-    #[test]
-    fn kvv_store_duplicate_delete() {
+    #[tokio::test]
+    async fn kvv_store_duplicate_delete() {
         let arc = test_env();
+        let env = arc.guard().await;
         let env = arc.env();
         let wm = WriteManager::new(&env);
 
@@ -310,6 +317,7 @@ pub mod tests {
     #[test]
     fn kvv_store_get_missing_key() {
         let arc = test_env();
+        let env = arc.guard().await;
         let env = arc.env();
         let store: Store = KvvBuf::create(&env, "kvv").unwrap();
         assert_eq!(store.get(&"wompwomp").unwrap(), hashset! {});

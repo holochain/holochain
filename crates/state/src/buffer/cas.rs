@@ -21,18 +21,22 @@ where
     V: BufVal + AddressableContent,
     R: Readable,
 {
+    /// Create a new CasBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: rkv::SingleStore) -> DatabaseResult<Self> {
         Ok(Self(KvBuf::new(reader, db)?))
     }
 
+    /// Get a value from the underlying [KvBuf]
     pub fn get(&self, k: &Address) -> DatabaseResult<Option<V>> {
         self.0.get(k)
     }
 
+    /// Put a value into the underlying [KvBuf]
     pub fn put(&mut self, v: V) -> () {
         self.0.put(v.address(), v)
     }
 
+    /// Delete a value from the underlying [KvBuf]
     pub fn delete(&mut self, k: Address) -> () {
         self.0.delete(k)
     }

@@ -4,16 +4,16 @@ use crate::{
     prelude::{Readable, Reader, Writer},
 };
 use rkv::SingleStore;
+
 use std::collections::HashMap;
 use tracing::*;
 
 /// Transactional operations on a KV store
-/// Add: add this KV if the key does not yet exist
-/// Mod: set the key to this value regardless of whether or not it already exists
-/// Del: remove the KV
+/// Put: add or replace this KV
+/// Delete: remove the KV
 enum Op<V> {
     Put(Box<V>),
-    Del,
+    Delete,
 }
 
 /// A persisted key-value store with a transient HashMap to store
@@ -38,6 +38,7 @@ where
     V: BufVal,
     R: Readable,
 {
+    /// Create a new KvBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
             db,
@@ -46,30 +47,34 @@ where
         })
     }
 
+    /// Get a value, taking the scratch space into account,
+    /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         use Op::*;
         let val = match self.scratch.get(k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
-            Some(Del) => None,
+            Some(Delete) => None,
             None => self.get_persisted(k)?,
         };
         Ok(val)
     }
 
+    /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) {
         // FIXME, maybe give indication of whether the value existed or not
         let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
+    /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) {
         // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Del);
+        let _ = self.scratch.insert(k, Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(bincode::deserialize(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }
@@ -99,11 +104,11 @@ where
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
-                    let buf = bincode::serialize(v)?;
+                    let buf = rmp_serde::to_vec_named(v)?;
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
-                Del => self.db.delete(writer, k)?,
+                Delete => self.db.delete(writer, k)?,
             }
         }
         Ok(())
@@ -133,7 +138,7 @@ where
         match self.0.next() {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
                 k,
-                bincode::deserialize(buf).expect("Failed to deserialize value"),
+                rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
             )),
             None => None,
             x => {
@@ -166,9 +171,10 @@ pub mod tests {
 
     type TestBuf<'a> = KvBuf<'a, &'a str, V>;
 
-    #[test]
-    fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
@@ -196,9 +202,10 @@ pub mod tests {
         })
     }
 
-    #[test]
-    fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_empty_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env
             .inner()
             .open_single("kv", StoreOptions::create())
@@ -217,18 +224,19 @@ pub mod tests {
     }
 
     /// TODO break up into smaller tests
-    #[test]
-    fn kv_store_sanity_check() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_store_sanity_check() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
-        let mut writer = env.writer()?;
 
         let testval = TestVal {
             name: "Joe".to_owned(),
         };
 
-        env.with_reader::<DatabaseError, _, _>(|reader| {
+        let writer = env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut writer = env.writer()?;
             let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
 
@@ -245,7 +253,7 @@ pub mod tests {
             let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
             kv2.flush_to_txn(&mut writer)?;
-            Ok(())
+            Ok(writer)
         })?;
 
         // Finish finalizing the transaction

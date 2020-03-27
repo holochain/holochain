@@ -1,3 +1,5 @@
+//! Categorization of source chain entries.
+
 use crate::error::SkunkError;
 use holochain_json_api::{error::JsonError, json::JsonString};
 use std::{
@@ -13,6 +15,7 @@ macro_rules! sys_prefix {
     };
 }
 
+/// Each DNA can specify app entry types - these are unique by utf8 string
 #[derive(
     Debug, Clone, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Eq, DefaultJson,
 )]
@@ -42,11 +45,12 @@ impl ToString for AppEntryType {
     }
 }
 
-// Enum for listing all System Entry Types
-// Variant `Data` is for user defined entry types
+/// Enum for listing all System Entry Types
+/// Variant `Data` is for user defined entry types
 #[derive(
     Debug, Clone, PartialEq, Hash, Serialize, Deserialize, DefaultJson, PartialOrd, Ord, Eq,
 )]
+#[allow(missing_docs)]
 pub enum EntryType {
     App(AppEntryType),
 
@@ -82,15 +86,19 @@ impl TryFrom<EntryType> for AppEntryType {
 }
 
 impl EntryType {
+    /// is this an application specific entry type?
     pub fn is_app(&self) -> bool {
         match self {
             EntryType::App(_) => true,
             _ => false,
         }
     }
+
+    /// or is this a system-defined entry type?
     pub fn is_sys(&self) -> bool {
         !self.is_app()
     }
+
     /// Checks entry_type_name is valid
     pub fn has_valid_app_name(entry_type_name: &str) -> bool {
         // TODO #445 - do a real regex test instead

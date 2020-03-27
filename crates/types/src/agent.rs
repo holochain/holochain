@@ -1,13 +1,20 @@
-use crate::{entry::Entry, error::SkunkResult, prelude::DefaultJson};
+//! agent module
+
+use crate::{
+    entry::Entry,
+    error::SkunkResult,
+    persistence::cas::content::{Address, AddressableContent, Content},
+    prelude::DefaultJson,
+};
 use hcid::*;
 use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, str};
 
+/// Base32...as a String?
 pub type Base32 = String;
 
 /// AgentId represents an agent in the Holochain framework.
@@ -58,10 +65,12 @@ impl AgentId {
         Ok(str::from_utf8(&key_b32).unwrap().to_owned())
     }
 
+    /// Agent nick-name
     pub fn nick(&self) -> &String {
         &self.nick
     }
 
+    /// public signing key
     pub fn pub_sign_key(&self) -> &Base32 {
         &self.pub_sign_key
     }
@@ -89,14 +98,21 @@ impl AddressableContent for AgentId {
     }
 }
 
+// should these not be in the tests module?!?
+
+/// Valid test agent id
 pub static GOOD_ID: &str = "HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa";
+/// Invalid test agent id
 pub static BAD_ID: &str = "HcScIkRaAaaaaaaaaaAaaaBBBBaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa";
+/// Invalid test agent id #2
 pub static TOO_BAD_ID: &str = "HcScIkRaAaaaaaaaaaBBBBBBBBaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa";
 
+/// get a valid test agent id
 pub fn test_agent_id() -> AgentId {
     AgentId::new("bob", GOOD_ID.to_string())
 }
 
+/// get a named test agent id
 pub fn test_agent_id_with_name(name: &str) -> AgentId {
     AgentId::new(name, name.to_string())
 }

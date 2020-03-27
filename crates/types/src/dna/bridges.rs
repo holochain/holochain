@@ -1,5 +1,7 @@
-use crate::dna::fn_declarations::Trait;
-use holochain_persistence_api::cas::content::Address;
+//! A bridge is the definition of a connection to another DNA that runs under the same agency,
+//! i.e. in the same conductor.
+
+use crate::{dna::fn_declarations::Trait, persistence::cas::content::Address};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -44,12 +46,18 @@ pub struct Bridge {
 pub enum BridgeReference {
     /// A bridge reference that defines another DNA statically by its address (i.e. hash).
     /// If this variant is used the other DNA gets locked in as per DNA address
-    Address { dna_address: Address },
+    Address {
+        /// Address to remote DNA.
+        dna_address: Address,
+    },
 
     /// A bridge reference that defines another DNA loosely by expecting a DNA that implements
     /// a given set of traits, i.e. that has specific sets of zome functions with
     /// matching signatures.
-    Trait { traits: BTreeMap<String, Trait> },
+    Trait {
+        /// Traits pointing to remote DNA.
+        traits: BTreeMap<String, Trait>,
+    },
 }
 
 /// Required or optional

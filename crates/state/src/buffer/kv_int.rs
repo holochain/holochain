@@ -12,13 +12,12 @@ use rkv::IntegerStore;
 use std::collections::HashMap;
 use tracing::*;
 
-/// Transactional operations on a KV store
-/// Add: add this KV if the key does not yet exist
-/// Mod: set the key to this value regardless of whether or not it already exists
-/// Del: remove the KV
+/// Transactional operations on a KV store with integer keys
+/// Put: add or replace this KV
+/// Delete: remove the KV
 enum Op<V> {
     Put(Box<V>),
-    Del,
+    Delete,
 }
 
 /// A persisted key-value store with a transient HashMap to store
@@ -44,6 +43,7 @@ where
     V: BufVal,
     R: Readable,
 {
+    /// Create a new IntKvBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: IntegerStore<K>) -> DatabaseResult<Self> {
         Ok(Self {
             db,
@@ -52,19 +52,23 @@ where
         })
     }
 
+    /// Create a new IntKvBuf from a new read-only transaction, using the same database
+    /// as an existing IntKvBuf. Useful for getting a fresh read-only snapshot of a database.
     pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> IntKvBuf<'env, K, V, RR> {
         IntKvBuf {
-            db: self.db.clone(),
+            db: self.db,
             reader,
             scratch: HashMap::new(),
         }
     }
 
+    /// Get a value, taking the scratch space into account,
+    /// or from persistence if needed
     pub fn get(&self, k: K) -> DatabaseResult<Option<V>> {
         use Op::*;
         let val = match self.scratch.get(&k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
-            Some(Del) => None,
+            Some(Delete) => None,
             None => self.get_persisted(k)?,
         };
         Ok(val)
@@ -83,7 +87,7 @@ where
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: K) -> DatabaseResult<Option<V>> {
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(bincode::deserialize(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }
@@ -113,11 +117,11 @@ where
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
-                    let buf = bincode::serialize(v)?;
+                    let buf = rmp_serde::to_vec_named(v)?;
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, *k, &encoded)?;
                 }
-                Del => self.db.delete(writer, *k)?,
+                Delete => self.db.delete(writer, *k)?,
             }
         }
         Ok(())
@@ -149,7 +153,7 @@ where
         match self.0.next() {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
                 K::from_bytes(k).expect("Failed to deserialize key"),
-                bincode::deserialize(buf).expect("Failed to deserialize value"),
+                rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
             )),
             None => None,
             x => {
@@ -189,7 +193,8 @@ pub mod tests {
 
     #[test]
     fn kv_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
@@ -222,9 +227,10 @@ pub mod tests {
         })
     }
 
-    #[test]
-    fn kv_empty_iterators() -> DatabaseResult<()> {
-        let env = test_env();
+    #[tokio::test]
+    async fn kv_empty_iterators() -> DatabaseResult<()> {
+        let arc = test_env();
+        let env = arc.guard().await;
         let db = env
             .inner()
             .open_integer("kv", StoreOptions::create())?;

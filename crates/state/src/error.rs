@@ -1,3 +1,8 @@
+//! All possible errors when working with LMDB databases
+
+// missing_docs allowed here since the errors already have self-descriptive strings
+#![allow(missing_docs)]
+
 use crate::db::DbName;
 use failure::Fail;
 use std::backtrace::Backtrace;
@@ -28,10 +33,12 @@ pub enum DatabaseError {
         backtrace: Backtrace,
     },
 
-    #[error("Error with bincode encoding/decoding: {0}")]
-    BincodeError(#[from] bincode::Error),
+    #[error("Error encoding to MsgPack: {0}")]
+    MsgPackEncodeError(#[from] rmp_serde::encode::Error),
 
-    #[cfg(test)]
+    #[error("Error decoding to MsgPack: {0}")]
+    MsgPackDecodeError(#[from] rmp_serde::decode::Error),
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

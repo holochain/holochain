@@ -12,17 +12,18 @@ use crate::{
         entry_type::{AppEntryType, EntryType},
     },
     link::Link,
+    persistence::cas::content::{Address, AddressableContent, Content},
     prelude::*,
 };
 use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
-use holochain_persistence_api::cas::content::{Address, AddressableContent, Content};
 use multihash::Hash;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
 use std::convert::TryFrom;
 
+/// Should probably be a newtype.
 pub type AppEntryValue = JsonString;
 
 fn serialize_app_entry<S>(
@@ -58,22 +59,38 @@ where
 #[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Entry {
+    /// An App (user defined) Entry
     #[serde(serialize_with = "serialize_app_entry")]
     #[serde(deserialize_with = "deserialize_app_entry")]
     App(AppEntryType, AppEntryValue),
 
+    /// The DNA entry defines the rules for an application.
     Dna(Box<Dna>),
+
+    /// The AgentId entry defines who has agency over the source chain.
     AgentId(AgentId),
+
+    /// A deletion entry.
     Deletion(DeletionEntry),
+
+    /// Create a link entry.
     LinkAdd(Link),
+
+    /// Mark a link as removed (though the add entry will persist).
     LinkRemove((Link, Vec<Address>)),
+
     // ChainHeader(ChainHeader),
     // ChainMigrate(ChainMigrate),
+
+    /// Claim a capability.
     CapTokenClaim(CapTokenClaim),
+
+    /// Grant a capability.
     CapTokenGrant(CapTokenGrant),
 }
 
 impl Entry {
+    /// Get the type of this entry.
     pub fn entry_type(&self) -> EntryType {
         match &self {
             Entry::App(app_entry_type, _) => EntryType::App(app_entry_type.to_owned()),
@@ -117,6 +134,7 @@ impl AddressableContent for Entry {
     }
 }
 
+/// The address of an entry.
 pub struct EntryAddress(Address);
 
 #[cfg(test)]
@@ -128,10 +146,7 @@ pub mod tests {
         entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
     };
 
-    use holochain_persistence_api::cas::{
-        content::{AddressableContent, AddressableContentTestSuite},
-        storage::{test_content_addressable_storage, ExampleContentAddressableStorage},
-    };
+    use crate::persistence::cas::content::{AddressableContent, AddressableContentTestSuite};
 
     /// dummy entry value
     #[cfg_attr(tarpaulin, skip)]
@@ -302,15 +317,5 @@ pub mod tests {
             test_entry(),
             expected_entry_address(),
         );
-    }
-
-    #[test]
-    /// show CAS round trip
-    fn cas_round_trip_test() {
-        let entries = vec![test_entry()];
-        AddressableContentTestSuite::addressable_content_round_trip::<
-            Entry,
-            ExampleContentAddressableStorage,
-        >(entries, test_content_addressable_storage());
     }
 }
