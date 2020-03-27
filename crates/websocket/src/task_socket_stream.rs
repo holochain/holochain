@@ -115,6 +115,7 @@ async fn process_incoming_message(
         incoming => {
             let bytes = incoming.into_data();
             let bytes: SerializedBytes = UnsafeBytes::from(bytes).into();
+            tracing::trace!(message = "incoming data", ?bytes,);
             send_dispatch
                 .send(ToDispatchIncoming::IncomingBytes(bytes))
                 .await

@@ -9,6 +9,8 @@ try_from_serialized_bytes!(BroadcastMessage);
 
 #[tokio::main(threaded_scheduler)]
 async fn main() {
+    sx_types::observability::test_run().unwrap();
+
     let mut listener = websocket_bind(
         url2!("ws://127.0.0.1:12345"),
         std::sync::Arc::new(WebsocketConfig::default()),

@@ -38,9 +38,20 @@ macro_rules! try_from_serialized_bytes {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub(crate) enum WireMessage {
-    Signal { data: Vec<u8> },
-    Request { id: String, data: Vec<u8> },
-    Response { id: String, data: Vec<u8> },
+    Signal {
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
+    Request {
+        id: String,
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
+    Response {
+        id: String,
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
 }
 try_from_serialized_bytes!(WireMessage);
 
