@@ -21,8 +21,7 @@ const MAX_DBS: u32 = 32;
 lazy_static! {
     static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, Environment>> =
         RwLockSync::new(HashMap::new());
-    static ref DB_MANAGERS: RwLock<HashMap<PathBuf, Arc<DbManager>>> =
-        RwLock::new(HashMap::new());
+    static ref DB_MANAGERS: RwLock<HashMap<PathBuf, Arc<DbManager>>> = RwLock::new(HashMap::new());
 }
 
 fn default_flags() -> EnvironmentFlags {
@@ -170,7 +169,6 @@ impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
 }
 
 impl<'e> EnvironmentRef<'e> {
-
     /// Access the underlying lock guard
     pub fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
         &self.0

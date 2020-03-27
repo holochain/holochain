@@ -12,9 +12,9 @@ use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;
 
 #[cfg(test)]
-use sx_state::error::DatabaseError;
-#[cfg(test)]
 use super::state::source_chain::SourceChainError;
+#[cfg(test)]
+use sx_state::error::DatabaseError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.

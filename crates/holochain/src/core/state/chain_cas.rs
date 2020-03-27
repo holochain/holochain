@@ -1,6 +1,4 @@
-use crate::core::state::source_chain::{
-    ChainInvalidReason, SourceChainError, SourceChainResult,
-};
+use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use sx_state::{
     buffer::{BufferedStore, CasBuf},
     db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
