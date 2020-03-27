@@ -82,7 +82,6 @@ impl CellConductorApiT for CellConductorApi {
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
 pub trait CellConductorApiT: Clone + Send + Sync + Sized {
-
     /// Invoke a zome function on any cell in this conductor.
     /// An invocation on a different Cell than this one corresponds to a bridged call.
     async fn invoke_zome(

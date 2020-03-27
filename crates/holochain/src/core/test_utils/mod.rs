@@ -1,4 +1,4 @@
-use sx_types::{agent::AgentId, cell::CellId, test_utils::test_dna, dna::Dna};
+use sx_types::{agent::AgentId, cell::CellId, dna::Dna, test_utils::test_dna};
 
 pub fn fake_cell_id(name: &str) -> CellId {
     (name.clone().into(), fake_agent_id(name)).into()
