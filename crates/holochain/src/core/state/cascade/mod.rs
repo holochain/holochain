@@ -1,11 +1,14 @@
+//! # Cascade
+//! ## Dimensions
 //! get vs get_links
 //! default vs options
-//! fast vs strict #set by app dev
+//! fast vs strict (is set by app dev)
 //!
-//! get Default - Get's the latest version
-//! Scratch if Live -> Return
-//! Scratch if Dead -> None
+//! ## Get
+//! ### Default - Get's the latest version
+//! Scratch Live -> Return
 //! Scratch NotFound -> Goto Cas
+//! Scratch _ -> None
 //! Cas Live -> Return
 //! Cas NotFound -> Goto cache
 //! Cas _ -> None
@@ -14,8 +17,8 @@
 //! Cache NotFound -> Goto Network
 //! Cache _ -> None
 //!
-//! get_links Default - Get's the latest version
-//! Always try authority
+//! ## Get Links
+//! ### Default - Get's the latest version
 //! if I'm an authority
 //! Scratch Found-> Return
 //! Scratch NotFound -> Goto Cas
@@ -27,8 +30,10 @@
 //! Cache Found -> Return
 //! Cache NotFound -> None
 //!
+//! ## Pagination
 //! gets most recent N links with default N (50)
 //! Page number
+//! ## Loading
 //! load_true loads the results into cache
 
 use super::{
@@ -47,9 +52,6 @@ use tracing::*;
 #[cfg(test)]
 mod test;
 
-/// TODO Network is not handled here, must either return
-/// the fact that a network get is required or take a reference to the network.
-#[allow(dead_code)]
 pub struct Cascade<'env, C, N>
 where
     C: ChainMetaBufT<'env>,

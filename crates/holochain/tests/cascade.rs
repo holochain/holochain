@@ -5,7 +5,7 @@ use holochain_2020::core::{
 use mockall::*;
 use std::collections::HashSet;
 use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_env};
-use sx_types::{agent::AgentId, entry::Entry, persistence::cas::content::AddressableContent};
+use sx_types::{agent::AgentId, entry::Entry, persistence::cas::content::AddressableContent, prelude::Address};
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {
@@ -18,23 +18,30 @@ async fn get_links() -> DatabaseResult<()> {
     let cache = SourceChainBuf::cache(&reader, &dbs)?;
 
     // create a cache and a cas for store and meta
-    //let mut primary_meta = MockChainMetaBuf::primary(&reader, &dbs)?;
     let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
-
-    //let cache_meta = MockChainMetaBuf::cache(&reader, &dbs)?;
     let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
 
     let jimbo_id = AgentId::generate_fake("Jimbo");
     let jimbo = Entry::AgentId(jimbo_id.clone());
+    let jessy_id = AgentId::generate_fake("jessy_id");
+    let jessy = Entry::AgentId(AgentId::generate_fake("Jessy"));
     let base = jimbo.address();
-    // TODO use a source chain buffer instead of adding a manual commit
+    let target = jessy.address();
+    let result = target.clone();
     source_chain.put_entry(jimbo, &jimbo_id);
+    source_chain.put_entry(jessy, &jessy_id);
 
     let mut mock_network = MockNetRequester::new();
     mock_network
         .expect_fetch_links()
         .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| Ok(HashSet::new()));
+        .returning(move |_, _| {
+            Ok([target.clone()]
+                .iter()
+                .cloned()
+                .collect::<HashSet<Address>>())
+        });
+
     // Pass in stores as references
     let cascade = Cascade::new(
         &source_chain.cas(),
@@ -43,7 +50,8 @@ async fn get_links() -> DatabaseResult<()> {
         &cache_meta,
         mock_network,
     );
-    let links = cascade.dht_get_links(base, "").await;
-    assert_eq!(links, Ok(HashSet::new()));
+    let links = cascade.dht_get_links(base, "").await?;
+    let link = links.into_iter().next();
+    assert_eq!(link, Some(result));
     Ok(())
 }

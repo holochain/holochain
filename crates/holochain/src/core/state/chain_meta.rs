@@ -44,6 +44,7 @@ impl<'a> LinkKey<'a> {
 }
 
 /*
+TODO impliment these types
 AddLink:
 Base: hash
 Target: hash
