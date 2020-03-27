@@ -13,8 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - uses: docker://holochain/holonix:latest.develop
-#    - uses: cachix/install-nix-action@v7
+#    - uses: docker://holochain/holonix:latest.develop
+    - uses: cachix/install-nix-action@v7
 
     # Necessary for now for the nix cache:
     # https://github.com/actions/cache/issues/133#issuecomment-599102035
