@@ -4,8 +4,8 @@ use crate::{
     env::Environment,
     error::{DatabaseError, DatabaseResult},
 };
-use sx_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
+use sx_types::universal_map::{Key as UmKey, UniversalMap};
 
 use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
 
@@ -146,7 +146,7 @@ impl DbManager {
             return Ok(self.um.get(key).unwrap());
         } else {
             self.create(key).await?;
-            Ok(self.um.get(key).unwrap().clone())
+            Ok(self.um.get(key).unwrap())
         }
     }
 

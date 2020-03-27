@@ -10,15 +10,15 @@ use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
 /// FIXME: understand the details of actually getting the DNA
 /// FIXME: creating entries in the config db
 pub async fn genesis<'env>(
-    mut workspace: GenesisWorkspace<'env>,
+    mut workspace: GenesisWorkspace<'_>,
     api: impl CellConductorApiT,
     dna: Dna,
     agent_id: AgentId,
-) -> WorkflowResult<GenesisWorkspace<'env>> {
+) -> WorkflowResult<GenesisWorkspace<'_>> {
     if api
         .dpki_request("is_agent_id_valid".into(), agent_id.pub_sign_key().into())
         .await?
-        == "INVALID".to_string()
+        == "INVALID"
     {
         return Err(WorkflowError::AgentIdInvalid(agent_id.clone()));
     }

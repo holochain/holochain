@@ -1,12 +1,14 @@
 use crate::core::wasm_engine::WasmEngine;
+use holochain_wasmer_host::WasmError;
 use mockall::automock;
 use sx_types::{
-    dna::Dna,
+    dna::{wasm::DnaWasm, Dna},
     entry::Entry,
     error::SkunkResult,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
+use wasmer_runtime::{imports, Instance};
 
 #[automock]
 pub trait RibosomeT: Sized {
@@ -42,10 +44,14 @@ impl WasmRibosome {
             _engine: WasmEngine,
         }
     }
+
+    pub fn instance(wasm: DnaWasm) -> Result<Instance, WasmError> {
+        let imports = imports! {};
+        holochain_wasmer_host::instantiate::instantiate(&wasm.code, &wasm.code, &imports)
+    }
 }
 
 impl RibosomeT for WasmRibosome {
-
     fn run_callback(self, _data: ()) -> ValidationResult {
         unimplemented!()
     }
