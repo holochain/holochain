@@ -53,6 +53,11 @@ struct Opt {
 
 #[tokio::main]
 async fn main() {
+    // Sets up a human-readable panic message with a request for bug reports
+    //
+    // See https://docs.rs/human-panic/1.0.3/human_panic/
+    human_panic::setup_panic!();
+
     let opt = Opt::from_args();
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
     debug!("observability initialized");
