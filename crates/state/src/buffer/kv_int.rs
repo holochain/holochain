@@ -15,7 +15,7 @@ use tracing::*;
 /// Transactional operations on a KV store with integer keys
 /// Put: add or replace this KV
 /// Delete: remove the KV
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum Op<V> {
     Put(Box<V>),
     Delete,
@@ -122,7 +122,10 @@ where
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, *k, &encoded)?;
                 }
-                Delete => self.db.delete(writer, *k)?,
+                Delete => match self.db.delete(writer, *k) {
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    r @ _ => r?,
+                },
             }
         }
         Ok(())
@@ -168,7 +171,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{BufferedStore, IntKvBuf};
+    use super::{BufferedStore, IntKvBuf, *};
     use crate::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,
@@ -176,8 +179,6 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    use std::collections::HashMap;
-    use super::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
@@ -188,6 +189,22 @@ pub mod tests {
     struct V(u32);
 
     type Store<'a> = IntKvBuf<'a, u32, V>;
+
+    macro_rules! res {
+        ($key:expr, $op:ident, $val:expr) => {
+            ($key, Op::$op(Box::new(V($val))))
+        };
+        ($key:expr, $op:ident) => {
+            ($key, Op::$op)
+        };
+    }
+
+    fn test_buf(a: &HashMap<u32, Op<V>>, b: impl Iterator<Item = (u32, Op<V>)>) {
+        for (k, v) in b {
+            let val = a.get(&k).expect("Missing key");
+            assert_eq!(*val, v);
+        }
+    }
 
     #[tokio::test]
     async fn kv_iterators() -> DatabaseResult<()> {
@@ -296,7 +313,6 @@ pub mod tests {
 
     #[tokio::test]
     async fn kv_deleted_buffer() -> DatabaseResult<()> {
-        use tracing::*;
         sx_types::observability::test_run().ok();
         let arc = test_env();
         let env = arc.guard().await;
@@ -308,15 +324,19 @@ pub mod tests {
             buf.put(1, V(5));
             buf.put(2, V(4));
             buf.put(3, V(9));
-            for (k, v) in [(1, 5), (2, 4), (3, 9)].iter() {
-                let val = buf.scratch.get(k).expect("Missing key");
-                match val {
-                    Op::Put(a) => assert_eq!(a.0, *v),
-                    _ => unreachable!(),
-                }
-
-            }
+            test_buf(
+                &buf.scratch,
+                [res!(1, Put, 5), res!(2, Put, 4), res!(3, Put, 9)]
+                    .iter()
+                    .cloned(),
+            );
             buf.delete(2);
+            test_buf(
+                &buf.scratch,
+                [res!(1, Put, 5), res!(3, Put, 9), res!(2, Delete)]
+                    .iter()
+                    .cloned(),
+            );
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
@@ -324,8 +344,7 @@ pub mod tests {
             let buf: Store = IntKvBuf::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
-            debug!(?forward);
-            assert_eq!(forward, vec![(1, V(1)), (3, V(3))]);
+            assert_eq!(forward, vec![(1, V(5)), (3, V(9))]);
             Ok(())
         })
     }
