@@ -81,7 +81,6 @@ pub enum Entry {
 
     // ChainHeader(ChainHeader),
     // ChainMigrate(ChainMigrate),
-
     /// Claim a capability.
     CapTokenClaim(CapTokenClaim),
 

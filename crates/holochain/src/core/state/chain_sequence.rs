@@ -7,7 +7,6 @@
 ///
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
-
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 use serde::{Deserialize, Serialize};
 use sx_state::{

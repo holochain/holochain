@@ -192,9 +192,7 @@ pub mod tests {
     async fn kv_iterators() -> DatabaseResult<()> {
         let arc = test_env();
         let env = arc.guard().await;
-        let db = env
-            .inner()
-            .open_integer("kv", StoreOptions::create())?;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
             let mut buf: Store = IntKvBuf::new(&reader, db)?;
