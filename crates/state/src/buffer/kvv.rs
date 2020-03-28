@@ -20,7 +20,7 @@ struct ValuesDelta<V> {
     deltas: HashMap<V, Op>,
 }
 
-impl<V> ValuesDelta<V> {
+impl<V: std::hash::Hash + Eq> ValuesDelta<V> {
     fn all_deleted() -> Self {
         Self {
             delete_all: true,
@@ -31,7 +31,7 @@ impl<V> ValuesDelta<V> {
 
 // This would be equivalent to the derived impl, except that this
 // doesn't require `V: Default`
-impl<V> Default for ValuesDelta<V> {
+impl<V: std::hash::Hash + Eq> Default for ValuesDelta<V> {
     fn default() -> Self {
         Self {
             delete_all: bool::default(),
