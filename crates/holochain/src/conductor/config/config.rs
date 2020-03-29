@@ -6,8 +6,6 @@ use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     env,
-    fs::File,
-    io::prelude::*,
     net::Ipv4Addr,
     path::PathBuf,
     sync::Arc,
@@ -604,7 +602,7 @@ impl Config {
 /// An agent has a name/ID and is optionally defined by a private key that resides in a file
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct AgentConfig {
-    pub id: String,
+    pub id: SerializedBytes,
     pub name: String,
     pub public_address: Base32,
     pub keystore_file: String,
@@ -617,7 +615,7 @@ pub struct AgentConfig {
 
 impl From<AgentConfig> for AgentId {
     fn from(config: AgentConfig) -> Self {
-        AgentId::try_from(JsonString::from_json(&config.id)).expect("bad agent json")
+        AgentId::try_from(config.id.clone()).expect("bad agent serialization")
     }
 }
 
@@ -636,10 +634,8 @@ pub struct DnaConfig {
 impl TryFrom<DnaConfig> for Dna {
     type Error = SkunkError;
     fn try_from(dna_config: DnaConfig) -> Result<Self, Self::Error> {
-        let mut f = File::open(dna_config.file)?;
-        let mut contents = String::new();
-        f.read_to_string(&mut contents)?;
-        Dna::try_from(JsonString::from_json(&contents)).map_err(|err| err.into())
+        let b: Vec<u8> = std::fs::read(dna_config.file)?;
+        Dna::try_from(SerializedBytes::from(UnsafeBytes::from(b))).map_err(|err| err.into())
     }
 }
 

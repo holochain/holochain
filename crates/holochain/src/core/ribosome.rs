@@ -7,7 +7,7 @@ use sx_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use wasmer_runtime::{imports, Instance};
+use wasmer_runtime::{imports, ImportObject, Instance};
 
 #[automock]
 pub trait RibosomeT: Sized {
@@ -59,6 +59,7 @@ impl WasmRibosome {
         //         "some_other_fn" => func!(closure2)
         //     }
         // };
+        imports! {}
     }
 }
 
@@ -71,18 +72,19 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        cell_conductor_api: CellConductorApi,
-        // _bundle: &mut SourceChainCommitBundle<'env>,
+        // cell_conductor_api: CellConductorApi,
+        _bundle: &mut SourceChainCommitBundle<'env>,
         _invocation: ZomeInvocation,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse> {
-        let dna = self.dna;
-        let wasm = dna.get_wasm(zome_name);
-
-        let payload: SerializedBytes = invocation.payload;
-
-        let instance = self.instance(&wasm, &wasm, &imports);
-
-        holochain_wasmer_host::guest::call(instance, "fn_to_call", payload);
+        // let dna = self.dna;
+        // let wasm = dna.get_wasm(zome_name);
+        //
+        // let payload: SerializedBytes = invocation.payload;
+        //
+        // let instance = self.instance(&wasm, &wasm, &imports);
+        //
+        // holochain_wasmer_host::guest::call(instance, "fn_to_call", payload);
+        unimplemented!();
     }
 }

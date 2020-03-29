@@ -4,6 +4,7 @@ use std::sync::Arc;
 use sx_types::{
     cell::{CellHandle, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    prelude::*,
     shims::*,
 };
 use tokio::sync::RwLock;
@@ -32,7 +33,7 @@ impl ExternalConductorApi {
     }
 
     /// Call an admin function to modify this Conductor's behavior
-    pub async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
+    pub async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<SerializedBytes> {
         unimplemented!()
     }
 }
