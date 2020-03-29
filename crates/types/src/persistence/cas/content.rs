@@ -80,12 +80,14 @@ impl AddressableContentTestSuite {
         address: Address,
     ) where
         T: AddressableContent + Debug + PartialEq + Clone,
+        <T as TryInto<SerializedBytes>>::Error: Debug,
+        <T as TryFrom<SerializedBytes>>::Error: Debug,
     {
-        let addressable_content = T::try_from_content(&content)
-            .expect("could not create AddressableContent from Content");
+        let addressable_content: T =
+            T::try_from(content).expect("could not create AddressableContent from Content");
 
         assert_eq!(addressable_content, expected_content);
-        assert_eq!(content, addressable_content.content());
+        assert_eq!(content, addressable_content.try_into().unwrap());
         assert_eq!(address, addressable_content.address());
     }
 
@@ -94,16 +96,23 @@ impl AddressableContentTestSuite {
     where
         T: AddressableContent + Debug + PartialEq + Clone,
         K: AddressableContent + Debug + PartialEq + Clone,
+        <T as TryInto<SerializedBytes>>::Error: Debug,
+        <T as TryFrom<SerializedBytes>>::Error: Debug,
+        <K as TryInto<SerializedBytes>>::Error: Debug,
+        <K as TryFrom<SerializedBytes>>::Error: Debug,
     {
-        let addressable_content =
-            T::try_from(content.clone()).expect("could not create AddressableContent from Content");
-        let other_addressable_content =
-            K::try_from(content.clone()).expect("could not create AddressableContent from Content");
+        let addressable_content: T = content
+            .clone()
+            .try_into()
+            .expect("could not create AddressableContent from Content");
+        let other_addressable_content: K = content
+            .clone()
+            .try_into()
+            .expect("could not create AddressableContent from Content");
 
-        assert_eq!(
-            addressable_content.content(),
-            other_addressable_content.content()
-        );
+        let a: Content = addressable_content.try_into().unwrap();
+        let b: Content = other_addressable_content.try_into().unwrap();
+        assert_eq!(a, b,);
         assert_eq!(
             addressable_content.address(),
             other_addressable_content.address()

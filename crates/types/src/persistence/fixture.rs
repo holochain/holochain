@@ -1,12 +1,11 @@
 //! helper functions and data for persistence testing
 
-use crate::persistence::hash::HashString;
+use crate::persistence::{cas::content::Addressable, hash::HashString};
 use holochain_serialized_bytes::prelude::*;
-use persistence::cas::content::Addressable;
 
 /// dummy hash based on the key of test_entry_a()
 pub fn test_hash_a() -> HashString {
-    test_entry_a().address()
+    SerializedBytes::try_from(test_entry_a()).unwrap().address()
 }
 
 pub fn test_entry_a() -> ExampleEntry {
@@ -25,7 +24,7 @@ pub fn test_eav_value() -> ExampleEntry {
     test_entry_b()
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExampleEntry {
     pub data: String,
 }
