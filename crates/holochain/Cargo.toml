@@ -36,7 +36,7 @@ base64 = "0.10.1"
 tracing = "=0.1.13"
 wasmer-runtime = "=0.13.1"
 holochain_wasmer_host = "=0.0.20"
-holochain_serialized_bytes = "=0.0.32"
+holochain_serialized_bytes = "=0.0.36"
 
 [dev-dependencies]
 anyhow = "1.0.26"

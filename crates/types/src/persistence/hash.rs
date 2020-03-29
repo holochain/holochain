@@ -2,15 +2,15 @@
 //! to keep track of places where a string is the product of a hash function,
 //! and as a base type for Address to use.
 
-use holochain_json_api::{error::JsonError, json::JsonString};
 use multihash::{encode, Hash};
 use rust_base58::{FromBase58, ToBase58};
 use std::{convert::TryInto, fmt};
 
+/// the default hashing algorithm
+pub const DEFAULT_HASH: Hash = Hash::SHA2256;
+
 /// HashString newtype for String
-#[derive(
-    PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, DefaultJson, Default, Hash,
-)]
+#[derive(PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash)]
 pub struct HashString(String);
 
 impl fmt::Display for HashString {

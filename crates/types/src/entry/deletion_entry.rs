@@ -1,11 +1,10 @@
-use crate::persistence::cas::content::Address;
-use holochain_json_api::{error::JsonError, json::JsonString};
+use crate::{persistence::cas::content::Address, prelude::*};
 
 //-------------------------------------------------------------------------------------------------
 // DeletionEntry
 //-------------------------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DefaultJson, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SerializedBytes, Eq)]
 pub struct DeletionEntry {
     deleted_entry_address: Address,
 }

@@ -39,20 +39,13 @@ use crate::{
     },
     entry::entry_type::{AppEntryType, EntryType},
     error::{SkunkError, SkunkResult},
-    persistence::cas::content::Addressable,
     prelude::Address,
 };
 use holochain_serialized_bytes::prelude::*;
-use multihash;
 use std::{
     collections::BTreeMap,
     hash::{Hash, Hasher},
 };
-
-/// serde helper, provides a default empty object
-fn empty_object() -> Value {
-    json!({})
-}
 
 /// serde helper, provides a default newly generated v4 uuid
 fn zero_uuid() -> String {
@@ -63,7 +56,7 @@ fn zero_uuid() -> String {
 pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Clone, Debug, DefaultJson)]
+#[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes)]
 pub struct Dna {
     /// The top-level "name" of a holochain application.
     #[serde(default)]
@@ -86,8 +79,7 @@ pub struct Dna {
     pub dna_spec_version: String,
 
     /// Any arbitrary application properties can be included in this object.
-    #[serde(default = "empty_object")]
-    pub properties: Value,
+    pub properties: SerializedBytes,
 
     /// An array of zomes associated with your holochain application.
     #[serde(default)]
@@ -96,30 +88,21 @@ pub struct Dna {
 
 impl Eq for Dna {}
 
-impl Dna {
-    /// Create a new in-memory dna structure with some default values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sx_types::dna::Dna;
-    ///
-    /// let dna = Dna::empty();
-    /// assert_eq!("", dna.name);
-    ///
-    /// ```
-    pub fn empty() -> Self {
+impl Default for Dna {
+    fn default() -> Self {
         Self {
-            name: String::new(),
-            description: String::new(),
-            version: String::new(),
+            name: String::default(),
+            description: String::default(),
+            version: String::default(),
             uuid: zero_uuid(),
             dna_spec_version: String::from("2.0"),
-            properties: empty_object(),
-            zomes: BTreeMap::new(),
+            properties: SerializedBytes::default(),
+            zomes: BTreeMap::default(),
         }
     }
+}
 
+impl Dna {
     /// Generate a pretty-printed json string from an in-memory dna struct.
     ///
     /// # Examples
@@ -223,13 +206,6 @@ impl Dna {
         None
     }
 
-    /// Get DNA multihash.
-    pub fn multihash(&self) -> Result<Vec<u8>, SkunkError> {
-        let s = String::from(JsonString::from(self.to_owned()));
-        multihash::encode(multihash::Hash::SHA2256, &s.into_bytes())
-            .map_err(|error| SkunkError::new(error.to_string()))
-    }
-
     /// List the required bridges.
     pub fn get_required_bridges(&self) -> Vec<Bridge> {
         self.zomes
@@ -265,7 +241,7 @@ impl Dna {
 
 impl Hash for Dna {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let s = String::from(JsonString::from(self.to_owned()));
+        let s: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(self).unwrap()).into();
         s.hash(state);
     }
 }
@@ -273,7 +249,7 @@ impl Hash for Dna {
 impl PartialEq for Dna {
     fn eq(&self, other: &Dna) -> bool {
         // need to guarantee that PartialEq and Hash always agree
-        JsonString::from(self.to_owned()) == JsonString::from(other.to_owned())
+        SerializedBytes::try_from(self).unwrap() == SerializedBytes::try_from(other).unwrap()
     }
 }
 

@@ -4,7 +4,6 @@ use std::sync::Arc;
 use sx_types::{
     cell::{CellHandle, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*,
     shims::*,
 };
 use tokio::sync::RwLock;

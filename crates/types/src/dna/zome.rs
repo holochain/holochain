@@ -41,7 +41,7 @@ pub type ZomeTraits = BTreeMap<String, TraitFns>;
 pub type ZomeFnDeclarations = Vec<FnDeclaration>;
 
 /// Represents an individual "zome".
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DefaultJson)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SerializedBytes)]
 pub struct Zome {
     /// A description of this zome.
     #[serde(default)]

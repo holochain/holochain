@@ -5,10 +5,10 @@
 use crate::{
     entry::{entry_type::EntryType, Entry},
     persistence::cas::content::Address,
+    prelude::*,
     signature::Provenance,
     time::Iso8601,
 };
-use holochain_serialized_bytes::prelude::*;
 
 /// ChainHeader + Entry.
 pub struct HeaderWithEntry(ChainHeader, Entry);
@@ -36,7 +36,7 @@ impl HeaderWithEntry {
 // @TODO - serialize properties as defined in ChainHeadersEntrySchema from golang alpha 1
 // @see https://github.com/holochain/holochain-proto/blob/4d1b8c8a926e79dfe8deaa7d759f930b66a5314f/entry_headers.go#L7
 // @see https://github.com/holochain/holochain-rust/issues/75
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, SerializedBytes, SerializedBytesAddress)]
 pub struct ChainHeader {
     /// the type of this entry
     /// system types may have associated "subconscious" behavior
@@ -58,7 +58,7 @@ pub struct ChainHeader {
 
 impl PartialEq for ChainHeader {
     fn eq(&self, other: &ChainHeader) -> bool {
-        self.address() == other.address()
+        self.to_owned().address() == other.to_owned().address()
     }
 }
 

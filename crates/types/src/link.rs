@@ -1,14 +1,13 @@
 //! Links interrelate entries in a source chain.
 
-use crate::persistence::cas::content::Address;
-use holochain_json_api::{error::JsonError, json::JsonString};
+use crate::{persistence::cas::content::Address, prelude::*};
 use regex::Regex;
 
 type LinkType = String;
 type LinkTag = String;
 
 /// Links interrelate entries in a source chain.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, DefaultJson)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, SerializedBytes)]
 pub struct Link {
     base: Address,
     target: Address,

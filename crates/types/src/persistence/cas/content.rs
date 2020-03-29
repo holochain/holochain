@@ -37,6 +37,22 @@ impl Addressable for Content {
     }
 }
 
+#[macro_export]
+/// implement Addressable for someting that can TryFrom SerializedBytes
+macro_rules! addressable_serializable {
+    ( $t:ty ) => {
+        impl $crate::persistence::cas::content::Addressable for $t {
+            fn address(&self) -> $crate::persistence::cas::content::Address {
+                let serialized_bytes = $crate::prelude::SerializedBytes::try_from(self).unwrap();
+                $crate::persistence::cas::content::Address::encode_from_bytes(
+                    serialized_bytes.bytes(),
+                    $crate::persistence::hash::DEFAULT_HASH,
+                )
+            }
+        }
+    };
+}
+
 /// AddressableContent allows anything Addressable that can also round trip through Content
 /// Content itself satisfies this
 pub trait AddressableContent = Addressable + TryInto<Content> + TryFrom<Content>;
@@ -84,10 +100,10 @@ impl AddressableContentTestSuite {
         <T as TryFrom<SerializedBytes>>::Error: Debug,
     {
         let addressable_content: T =
-            T::try_from(content).expect("could not create AddressableContent from Content");
+            T::try_from(content.clone()).expect("could not create AddressableContent from Content");
 
         assert_eq!(addressable_content, expected_content);
-        assert_eq!(content, addressable_content.try_into().unwrap());
+        assert_eq!(content, addressable_content.clone().try_into().unwrap());
         assert_eq!(address, addressable_content.address());
     }
 
@@ -106,12 +122,11 @@ impl AddressableContentTestSuite {
             .try_into()
             .expect("could not create AddressableContent from Content");
         let other_addressable_content: K = content
-            .clone()
             .try_into()
             .expect("could not create AddressableContent from Content");
 
-        let a: Content = addressable_content.try_into().unwrap();
-        let b: Content = other_addressable_content.try_into().unwrap();
+        let a: Content = addressable_content.clone().try_into().unwrap();
+        let b: Content = other_addressable_content.clone().try_into().unwrap();
         assert_eq!(a, b,);
         assert_eq!(
             addressable_content.address(),

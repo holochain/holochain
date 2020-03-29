@@ -23,7 +23,7 @@ pub type AppEntryValue = SerializedBytes;
 
 /// Structure holding actual data in a source chain "Item"
 /// data is stored as a JsonString
-#[derive(Clone, Debug, Serialize, Deserialize, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, SerializedBytes)]
 #[allow(clippy::large_enum_variant)]
 pub enum Entry {
     /// An App (user defined) Entry
@@ -83,9 +83,11 @@ impl Addressable for Entry {
         match &self {
             Entry::AgentId(agent_id) => agent_id.address(),
             // @TODO deal with unwrap here
-            _ => {
-                Address::encode_from_bytes(Content::try_from(self).unwrap().bytes(), Hash::SHA2256)
-            }
+            // @TODO deal with the clone here
+            _ => Address::encode_from_bytes(
+                Content::try_from(self.clone()).unwrap().bytes(),
+                Hash::SHA2256,
+            ),
         }
     }
 }

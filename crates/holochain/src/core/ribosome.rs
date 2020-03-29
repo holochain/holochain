@@ -47,21 +47,18 @@ impl WasmRibosome {
         holochain_wasmer_host::instantiate::instantiate(&wasm.code, &wasm.code, &imports)
     }
 
-    fn meta_extraction() {}
-
-    fn imports() {
-        let commit_entry_arc = Arc::new(self);
-        let commit_entry_closure = move |ctx: &Ctx, allocation_ptr: RemotePtr| {
-            commit_entry(Arc::clone(conductor_api));
-        };
-
-        let imports = imports! {
-            "env" => {
-                "commit_entry" => func!(commit_entry_closure),
-                "some_other_fn" => func!(closure2),
-            }
-
-        };
+    fn imports() -> ImportObject {
+        // let commit_entry_arc = Arc::new(self);
+        // let commit_entry_closure = move |ctx: &Ctx, allocation_ptr: RemotePtr| {
+        //     commit_entry(Arc::clone(conductor_api));
+        // };
+        //
+        // let imports = imports! {
+        //     "env" => {
+        //         "commit_entry" => func!(commit_entry_closure),
+        //         "some_other_fn" => func!(closure2)
+        //     }
+        // };
     }
 }
 

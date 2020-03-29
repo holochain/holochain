@@ -15,6 +15,7 @@ use tracing::*;
 /// Represents web assembly code.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DnaWasm {
+    /// the wasm bytes from a .wasm file
     pub code: Arc<Vec<u8>>,
 }
 
