@@ -10,7 +10,7 @@ use crate::{
     },
     entry::entry_type::EntryType,
 };
-use holochain_json_api::{error::JsonError, json::JsonString};
+use holochain_serialized_bytes::prelude::*;
 use std::collections::BTreeMap;
 
 /// Represents the "config" object on a "zome".

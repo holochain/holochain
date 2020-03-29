@@ -4,18 +4,11 @@
 
 use crate::{
     entry::{entry_type::EntryType, Entry},
-    persistence::cas::content::{Address, AddressableContent, Content},
+    persistence::cas::content::Address,
     signature::Provenance,
     time::Iso8601,
 };
-use serde::{Deserialize, Serialize};
-
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
-
-use std::convert::TryInto;
+use holochain_serialized_bytes::prelude::*;
 
 /// ChainHeader + Entry.
 pub struct HeaderWithEntry(ChainHeader, Entry);
@@ -131,16 +124,6 @@ impl ChainHeader {
     /// entry_signature getter
     pub fn provenances(&self) -> &Vec<Provenance> {
         &self.provenances
-    }
-}
-
-impl AddressableContent for ChainHeader {
-    fn content(&self) -> Content {
-        self.to_owned().into()
-    }
-
-    fn try_from_content(content: &Content) -> JsonResult<Self> {
-        content.to_owned().try_into()
     }
 }
 

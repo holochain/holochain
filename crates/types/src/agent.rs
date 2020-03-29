@@ -1,18 +1,13 @@
 //! agent module
 
 use crate::{
-    entry::Entry,
     error::SkunkResult,
-    persistence::cas::content::{Address, AddressableContent, Content},
+    persistence::cas::content::{Address, Addressable},
     prelude::DefaultJson,
 };
 use hcid::*;
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
-use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, str};
+use holochain_serialized_bytes::prelude::*;
+use std::str;
 
 /// Base32...as a String?
 pub type Base32 = String;
@@ -76,25 +71,10 @@ impl AgentId {
     }
 }
 
-impl AddressableContent for AgentId {
+impl Addressable for AgentId {
     /// for an Agent, the address is their public base32 encoded public signing key string
     fn address(&self) -> Address {
         self.pub_sign_key.clone().into()
-    }
-
-    /// get the entry content
-    fn content(&self) -> Content {
-        Entry::AgentId(self.to_owned()).into()
-    }
-
-    // build from entry content
-    fn try_from_content(content: &Content) -> JsonResult<Self> {
-        match Entry::try_from(content)? {
-            Entry::AgentId(agent_id) => Ok(agent_id),
-            _ => Err(JsonError::SerializationError(
-                "Attempted to load AgentId from non AgentID entry".into(),
-            )),
-        }
     }
 }
 

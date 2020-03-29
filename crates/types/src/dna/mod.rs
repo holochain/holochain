@@ -39,19 +39,13 @@ use crate::{
     },
     entry::entry_type::{AppEntryType, EntryType},
     error::{SkunkError, SkunkResult},
-    persistence::cas::content::{AddressableContent, Content},
+    persistence::cas::content::Addressable,
     prelude::Address,
 };
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
+use holochain_serialized_bytes::prelude::*;
 use multihash;
-use serde::{Deserialize, Serialize};
-use serde_json::{self, json, Value};
 use std::{
     collections::BTreeMap,
-    convert::TryFrom,
     hash::{Hash, Hasher},
 };
 
@@ -98,16 +92,6 @@ pub struct Dna {
     /// An array of zomes associated with your holochain application.
     #[serde(default)]
     pub zomes: BTreeMap<String, zome::Zome>,
-}
-
-impl AddressableContent for Dna {
-    fn content(&self) -> Content {
-        Content::from(self.to_owned())
-    }
-
-    fn try_from_content(content: &Content) -> JsonResult<Self> {
-        Ok(Dna::try_from(content.to_owned())?)
-    }
 }
 
 impl Eq for Dna {}

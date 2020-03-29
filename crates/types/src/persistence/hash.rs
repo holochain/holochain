@@ -79,16 +79,6 @@ impl HashString {
     pub fn encode_from_bytes(bytes: &[u8], hash_type: Hash) -> HashString {
         HashString::from(encode(hash_type, bytes).unwrap().to_base58())
     }
-
-    /// convert a string as bytes to a b58 hashed string
-    pub fn encode_from_str(s: &str, hash_type: Hash) -> HashString {
-        HashString::encode_from_bytes(s.as_bytes(), hash_type)
-    }
-
-    /// magic all in one fn, take a JsonString + hash type and get a hashed b58 string back
-    pub fn encode_from_json_string(json_string: JsonString, hash_type: Hash) -> HashString {
-        HashString::encode_from_str(&String::from(json_string), hash_type)
-    }
 }
 
 #[cfg(test)]

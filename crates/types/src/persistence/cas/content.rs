@@ -4,7 +4,7 @@
 //! A test suite for AddressableContent is also implemented here.
 
 use crate::persistence::hash::HashString;
-use holochain_json_api::{error::JsonError, json::*};
+use holochain_serialized_bytes::prelude::*;
 
 use multihash::Hash;
 use std::fmt::Debug;
@@ -14,44 +14,32 @@ use std::fmt::Debug;
 /// consider what would happen if we had multi GB addresses...
 pub type Address = HashString;
 
-/// the Content is a JsonString
+/// the Content is any SerializedBytes
 /// this is the only way to be confident in persisting all Rust types across all backends
-pub type Content = JsonString;
+pub type Content = SerializedBytes;
 
 /// can be stored as serialized content
 /// the content is the address, there is no "location" like a file system or URL
 /// @see https://en.wikipedia.org/wiki/Content-addressable_storage
-pub trait AddressableContent {
+pub trait Addressable {
     /// the Address the Content would be available at once stored in a ContentAddressableStorage
     /// default implementation is provided as hashing Content with sha256
     /// the default implementation should cover most use-cases
     /// it is critical that there are no hash collisions across all stored AddressableContent
     /// it is recommended to implement an "address space" prefix for address algorithms that don't
     /// offer strong cryptographic guarantees like sha et. al.
+    fn address(&self) -> Address;
+}
+
+impl Addressable for Content {
     fn address(&self) -> Address {
-        Address::encode_from_str(&String::from(self.content()), Hash::SHA2256)
-    }
-
-    /// the Content that would be stored in a ContentAddressableStorage
-    /// the default implementation covers anything that implements From<Foo> for JsonString
-    fn content(&self) -> Content;
-
-    /// restore/deserialize the original struct/type from serialized Content
-    /// the default implementation covers anything that implements From<JsonString> for Foo
-    fn try_from_content(content: &Content) -> Result<Self, JsonError>
-    where
-        Self: Sized;
-}
-
-impl AddressableContent for Content {
-    fn content(&self) -> Content {
-        self.clone()
-    }
-
-    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
-        Ok(content.clone())
+        Address::encode_from_bytes(self.bytes(), Hash::SHA2256)
     }
 }
+
+/// AddressableContent allows anything Addressable that can also round trip through Content
+/// Content itself satisfies this
+pub trait AddressableContent = Addressable + TryInto<Content> + TryFrom<Content>;
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, Deserialize)]
 /// some struct that can be content addressed
@@ -60,15 +48,9 @@ pub struct ExampleAddressableContent {
     content: Content,
 }
 
-impl AddressableContent for ExampleAddressableContent {
-    fn content(&self) -> Content {
-        self.content.clone()
-    }
-
-    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
-        Ok(ExampleAddressableContent {
-            content: content.clone(),
-        })
+impl Addressable for ExampleAddressableContent {
+    fn address(&self) -> Address {
+        self.content.address()
     }
 }
 
@@ -81,20 +63,9 @@ pub struct OtherExampleAddressableContent {
 }
 
 /// address is calculated eagerly rather than on call
-impl AddressableContent for OtherExampleAddressableContent {
+impl Addressable for OtherExampleAddressableContent {
     fn address(&self) -> Address {
         self.address.clone()
-    }
-
-    fn content(&self) -> Content {
-        self.content.clone()
-    }
-
-    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
-        Ok(OtherExampleAddressableContent {
-            content: content.clone(),
-            address: Address::encode_from_str(&String::from(content), Hash::SHA2256),
-        })
     }
 }
 
@@ -124,10 +95,10 @@ impl AddressableContentTestSuite {
         T: AddressableContent + Debug + PartialEq + Clone,
         K: AddressableContent + Debug + PartialEq + Clone,
     {
-        let addressable_content = T::try_from_content(&content)
-            .expect("could not create AddressableContent from Content");
-        let other_addressable_content = K::try_from_content(&content)
-            .expect("could not create AddressableContent from Content");
+        let addressable_content =
+            T::try_from(content.clone()).expect("could not create AddressableContent from Content");
+        let other_addressable_content =
+            K::try_from(content.clone()).expect("could not create AddressableContent from Content");
 
         assert_eq!(
             addressable_content.content(),

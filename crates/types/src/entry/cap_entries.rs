@@ -1,9 +1,8 @@
 use crate::{entry::Entry, error::SkunkError};
 
-use crate::persistence::cas::content::{Address, AddressableContent};
+use crate::persistence::cas::content::Address;
 
-use holochain_json_api::{error::JsonError, json::JsonString};
-
+use holochain_serialized_bytes::prelude::*;
 use std::{collections::BTreeMap, str::FromStr};
 
 //--------------------------------------------------------------------------------------------------

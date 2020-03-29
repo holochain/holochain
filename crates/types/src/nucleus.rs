@@ -17,7 +17,7 @@ pub struct ZomeInvocation {
     pub zome_name: ZomeName,
     pub cap: CapabilityRequest,
     pub fn_name: String,
-    pub args: JsonString,
+    pub payload: SerializedBytes,
     pub provenance: AgentId,
     pub as_at: Address,
 }

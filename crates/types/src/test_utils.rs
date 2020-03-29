@@ -1,6 +1,6 @@
 //! Some common testing helpers.
 
-use crate::{dna::Dna, prelude::*};
+use crate::dna::Dna;
 use std::convert::TryFrom;
 
 /// A fixture example dna for unit testing.

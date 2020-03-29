@@ -5,7 +5,7 @@
 //! As we decide which previous code to use, we should port those error types
 //! over to the appropriate error type in this crate.
 
-use holochain_json_api::error::JsonError;
+use holochain_serialized_bytes::SerializedBytesError;
 use lib3h_crypto_api::CryptoError;
 use serde_json::Error as SerdeError;
 use std::fmt;
@@ -21,7 +21,7 @@ pub enum SkunkError {
     IoError(#[from] std::io::Error),
     HcidError(#[from] hcid::HcidError),
     SerdeError(#[from] SerdeError),
-    JsonError(#[from] JsonError),
+    SerializedBytesError(#[from] SerializedBytesError),
     CryptoError(#[from] CryptoError),
     Base64DecodeError(#[from] base64::DecodeError),
     Utf8Error(#[from] std::str::Utf8Error),
@@ -45,7 +45,7 @@ impl PartialEq for SkunkError {
             (IoError(a), IoError(b)) => a.to_string() == b.to_string(),
             (HcidError(a), HcidError(b)) => a.to_string() == b.to_string(),
             (SerdeError(a), SerdeError(b)) => a.to_string() == b.to_string(),
-            (JsonError(a), JsonError(b)) => a == b,
+            (SerializedBytesError(a), SerializedBytesError(b)) => a == b,
             (CryptoError(a), CryptoError(b)) => a == b,
             (Base64DecodeError(a), Base64DecodeError(b)) => a == b,
             _ => false,

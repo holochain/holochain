@@ -12,56 +12,21 @@ use crate::{
         entry_type::{AppEntryType, EntryType},
     },
     link::Link,
-    persistence::cas::content::{Address, AddressableContent, Content},
+    persistence::cas::content::{Address, Addressable, Content},
     prelude::*,
 };
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
+use holochain_serialized_bytes::prelude::*;
 use multihash::Hash;
-use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
-use std::convert::TryFrom;
 
 /// Should probably be a newtype.
-pub type AppEntryValue = JsonString;
-
-fn serialize_app_entry<S>(
-    app_entry_type: &AppEntryType,
-    app_entry_value: &AppEntryValue,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut state = serializer.serialize_tuple(2)?;
-    state.serialize_element(&app_entry_type.to_string())?;
-    state.serialize_element(&app_entry_value.to_string())?;
-    state.end()
-}
-
-fn deserialize_app_entry<'de, D>(deserializer: D) -> Result<(AppEntryType, AppEntryValue), D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct SerializedAppEntry(String, String);
-
-    let serialized_app_entry = SerializedAppEntry::deserialize(deserializer)?;
-    Ok((
-        AppEntryType::from(serialized_app_entry.0),
-        AppEntryValue::from_json(&serialized_app_entry.1),
-    ))
-}
+pub type AppEntryValue = SerializedBytes;
 
 /// Structure holding actual data in a source chain "Item"
 /// data is stored as a JsonString
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Entry {
     /// An App (user defined) Entry
-    #[serde(serialize_with = "serialize_app_entry")]
-    #[serde(deserialize_with = "deserialize_app_entry")]
     App(AppEntryType, AppEntryValue),
 
     /// The DNA entry defines the rules for an application.
@@ -113,23 +78,15 @@ impl PartialEq for Entry {
     }
 }
 
-impl AddressableContent for Entry {
+impl Addressable for Entry {
     fn address(&self) -> Address {
         match &self {
             Entry::AgentId(agent_id) => agent_id.address(),
-            _ => Address::encode_from_str(&String::from(self.content()), Hash::SHA2256),
+            // @TODO deal with unwrap here
+            _ => {
+                Address::encode_from_bytes(Content::try_from(self).unwrap().bytes(), Hash::SHA2256)
+            }
         }
-    }
-
-    fn content(&self) -> Content {
-        match &self {
-            // Entry::ChainHeader(chain_header) => chain_header.into(),
-            _ => self.into(),
-        }
-    }
-
-    fn try_from_content(content: &Content) -> JsonResult<Entry> {
-        Entry::try_from(content.to_owned())
     }
 }
 

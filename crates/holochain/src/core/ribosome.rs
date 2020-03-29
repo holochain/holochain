@@ -1,4 +1,3 @@
-use crate::core::wasm_engine::WasmEngine;
 use holochain_wasmer_host::WasmError;
 use mockall::automock;
 use sx_types::{
@@ -35,19 +34,34 @@ pub trait RibosomeT: Sized {
 /// Total hack just to have something to look at
 /// The only WasmRibosome is a Wasm ribosome.
 pub struct WasmRibosome {
-    _engine: WasmEngine,
+    _dna: Dna,
 }
 
 impl WasmRibosome {
     pub fn new(_dna: Dna) -> Self {
-        Self {
-            _engine: WasmEngine,
-        }
+        Self { _dna }
     }
 
-    pub fn instance(wasm: DnaWasm) -> Result<Instance, WasmError> {
+    fn instance(wasm: DnaWasm) -> Result<Instance, WasmError> {
         let imports = imports! {};
         holochain_wasmer_host::instantiate::instantiate(&wasm.code, &wasm.code, &imports)
+    }
+
+    fn meta_extraction() {}
+
+    fn imports() {
+        let commit_entry_arc = Arc::new(self);
+        let commit_entry_closure = move |ctx: &Ctx, allocation_ptr: RemotePtr| {
+            commit_entry(Arc::clone(conductor_api));
+        };
+
+        let imports = imports! {
+            "env" => {
+                "commit_entry" => func!(commit_entry_closure),
+                "some_other_fn" => func!(closure2),
+            }
+
+        };
     }
 }
 
@@ -60,10 +74,18 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        _bundle: &mut SourceChainCommitBundle<'env>,
+        cell_conductor_api: CellConductorApi,
+        // _bundle: &mut SourceChainCommitBundle<'env>,
         _invocation: ZomeInvocation,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse> {
-        unimplemented!()
+        let dna = self.dna;
+        let wasm = dna.get_wasm(zome_name);
+
+        let payload: SerializedBytes = invocation.payload;
+
+        let instance = self.instance(&wasm, &wasm, &imports);
+
+        holochain_wasmer_host::guest::call(instance, "fn_to_call", payload);
     }
 }
