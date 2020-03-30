@@ -25,12 +25,30 @@ struct Opt {
     structured: Output,
 }
 
-#[tokio::main]
-async fn main() {
+async fn async_main() {
     println!("Running silly ChannelInterface example");
     let opt = Opt::from_args();
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
     example().await;
+}
+
+fn main() {
+    tokio::runtime::Builder::new()
+        // we use both IO and Time tokio utilities
+        .enable_all()
+        // we want to use multiple threads
+        .threaded_scheduler()
+        // we want to use thread count matching cpu count
+        // (sometimes tokio by default only uses half cpu core threads)
+        .core_threads(num_cpus::get())
+        // give our threads a descriptive name (they'll be numbered too)
+        .thread_name("holochain-tokio-thread")
+        // build the runtime
+        .build()
+        // panic if we cannot (we cannot run without it)
+        .expect("can build tokio runtime")
+        // the async_main function should only end if our program is done
+        .block_on(async_main())
 }
 
 async fn example() {
