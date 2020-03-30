@@ -1,15 +1,18 @@
 { pkgs }:
 let
-  name = "hcp-test";
 
-  script = pkgs.writeShellScriptBin name
-  ''
+  t0 = pkgs.writeShellScriptBin "hc-test" ''
+  RUST_BACKTRACE=1 \
+  cargo test
+  '';
+
+  t1 = pkgs.writeShellScriptBin "hc-merge-test" ''
   RUST_BACKTRACE=1 \
   hn-rust-fmt-check \
   && hn-rust-clippy \
-  && cargo test
+  && hc-test
   '';
 in
 {
- buildInputs = [ script ];
+ buildInputs = [ t0 t1  ];
 }

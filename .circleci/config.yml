@@ -1,0 +1,13 @@
+version: 2.1
+
+jobs:
+  # must be called build
+  build:
+    docker:
+#    - image: holochain/holochain-rust:circle.build.develop
+     - image: holochain/holonix:latest.develop
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          command: nix-shell --run hc-merge-test

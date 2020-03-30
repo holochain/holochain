@@ -27,6 +27,9 @@ with holonix.pkgs;
   shellHook = holonix.pkgs.lib.concatStrings [
    holonix.shell.shellHook
    ''
+    export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
+    export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
+    export CARGO_CACHE_RUSTC_INFO=1
    ''
   ];
 
