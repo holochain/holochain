@@ -22,9 +22,6 @@ pub struct ConductorConfig {
     /// If omitted, chooses a default path.
     pub environment_path: EnvironmentRootPath,
 
-    /// Configures how logging should behave. Optional.
-    //pub logger: LoggerConfig,
-
     /// Config options for the network module. Optional.
     pub network: Option<NetworkConfig>,
 
@@ -50,14 +47,20 @@ pub struct ConductorConfig {
     /// keys for new instances
     pub dpki: Option<DpkiConfig>,
 
-    /// Which signals to emitproject_root
-    //pub signals: SignalConfig,
-
     /// Configure how the conductor should prompt the user for the passphrase to lock/unlock keystores.
     /// The conductor is independent of the specialized implementation of the trait
     /// PassphraseService. It just needs something to provide a passphrase when needed.
     /// This config setting selects one of the available services (i.e. CLI prompt, IPC, mock)
     pub passphrase_service: PassphraseServiceConfig,
+    //
+    //
+    // /// Which signals to emit
+    // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
+    // pub signals: SignalConfig,
+    //
+    // /// Configures how logging should behave. Optional.
+    // TODO: it's an open question whether we want to keep any of the legacy LoggerConfig
+    // pub logger: LoggerConfig,
 }
 
 /// helper fnction function to load a `Config` from a toml string.
@@ -71,7 +74,6 @@ where
 impl ConductorConfig {
     /// create a ConductorConfig struct from a toml file path
     pub fn load_toml(path: &Path) -> ConductorResult<ConductorConfig> {
-        // let path_buf: &Path = path.into();
         let config_toml = std::fs::read_to_string(path).map_err(|err| match err {
             e @ std::io::Error { .. } if e.kind() == std::io::ErrorKind::NotFound => {
                 ConductorError::ConfigMissing(path.into())
@@ -96,7 +98,7 @@ pub mod tests {
             format!("{:?}", result)
         );
 
-        // successfull load test in conductor/ineractive
+        // successful load test in conductor/interactive
     }
 
     #[test]
