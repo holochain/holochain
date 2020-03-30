@@ -28,7 +28,7 @@ lazy_static = "1.4.0"
 chrono = "0.4.6"
 tempdir = "0.3.7"
 mockall = "0.6.0"
-tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
+tokio = { version = "0.2.11", features = ["full"] }
 owning_ref = "0.4.1"
 anyhow = "1.0.26"
 parking_lot = "0.10.0"
@@ -37,6 +37,7 @@ petgraph = "0.5.0"
 boolinator = "2.4.0"
 base64 = "0.10.1"
 tracing = "=0.1.13"
+num_cpus = "1.8"
 
 [dev-dependencies]
 anyhow = "1.0.26"
