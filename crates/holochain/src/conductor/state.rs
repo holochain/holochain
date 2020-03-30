@@ -45,27 +45,6 @@ pub struct ConductorState {
     pub bridges: Vec<Bridge>,
 }
 
-/// The default passphrase service is `Cmd` which will ask for a passphrase via stdout stdin.
-/// In the context of a UI that wraps the conductor, this way of providing passphrases
-/// is not feasible.
-/// Setting the type to "unixsocket" and providing a path to a file socket enables
-/// arbitrary UIs to connect to the conductor and prompt the user for a passphrase.
-/// The according `PassphraseServiceUnixSocket` will send a request message over the socket
-/// then receives bytes as passphrase until a newline is sent.
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum PassphraseServiceConfig {
-    Cmd,
-    UnixSocket { path: String },
-    Mock { passphrase: String },
-}
-
-impl Default for PassphraseServiceConfig {
-    fn default() -> PassphraseServiceConfig {
-        PassphraseServiceConfig::Cmd
-    }
-}
-
 /// Check for duplicate items in a list of strings
 fn detect_dupes<'a, I: Iterator<Item = &'a String>>(
     name: &'static str,
@@ -159,16 +138,6 @@ impl ConductorState {
         }
 
         let _ = self.cell_ids_sorted_by_bridge_dependencies()?;
-
-        #[cfg(not(unix))]
-        {
-            if let PassphraseServiceConfig::UnixSocket { path } = self.passphrase_service.clone() {
-                let _ = path;
-                return Err(String::from(
-                    "Passphrase service type 'unixsocket' is not available on non-Unix systems",
-                ));
-            }
-        }
 
         Ok(())
     }
