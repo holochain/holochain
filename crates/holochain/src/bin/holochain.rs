@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use structopt::StructOpt;
 use holochain_2020::conductor::{
     api::ExternalConductorApi,
     interface::{channel::ChannelInterface, Interface},
     Conductor,
 };
+use std::sync::Arc;
+use structopt::StructOpt;
 use sx_types::observability::{self, Output};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;

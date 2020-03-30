@@ -348,4 +348,104 @@ pub mod tests {
             Ok(())
         })
     }
+
+    #[tokio::test]
+    async fn kv_get_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(5));
+            buf.put(2, V(4));
+            buf.put(3, V(9));
+            let n = buf.get(2)?;
+            assert_eq!(n, Some(V(4)));
+
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_get_persisted() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(1));
+            buf.put(2, V(2));
+            buf.put(3, V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let n = buf.get(2)?;
+            assert_eq!(n, Some(V(2)));
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_get_del_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(5));
+            buf.put(2, V(4));
+            buf.put(3, V(9));
+            buf.delete(2);
+            let n = buf.get(2)?;
+            assert_eq!(n, None);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_get_del_persisted() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(1));
+            buf.put(2, V(2));
+            buf.put(3, V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.delete(2);
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let n = buf.get(2)?;
+            assert_eq!(n, None);
+            Ok(())
+        })
+    }
 }

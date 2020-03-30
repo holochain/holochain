@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 
+use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
 use async_trait::async_trait;
 use mockall::mock;
@@ -10,8 +11,6 @@ use sx_types::{
     shims::*,
     signature::Signature,
 };
-use super::CellConductorApiT;
-
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
 // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
@@ -90,5 +89,4 @@ impl CellConductorApiT for MockCellConductorApi {
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
         self.sync_dpki_request(method, args)
     }
-
 }
