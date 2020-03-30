@@ -13,4 +13,4 @@ pub use conductor::Conductor;
 
 //FIXME should this be here?
 // #[cfg(test)]
-// pub mod test_fixtures;
+// mod test_fixtures;

@@ -21,7 +21,7 @@ use sx_types::{
 };
 use toml;
 
-#[cfg(all(test, sx_refactor))]
+#[cfg(test)]
 mod tests;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
