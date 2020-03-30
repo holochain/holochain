@@ -78,6 +78,6 @@ impl Default for EnvironmentRootPath {
 pub struct ConfigFilePath(PathBuf);
 impl Default for ConfigFilePath {
     fn default() -> Self {
-        Self(data_root().join(PathBuf::from(CONFIG_FILENAME)))
+        Self(config_root().join(PathBuf::from(CONFIG_FILENAME)))
     }
 }
