@@ -197,7 +197,9 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
         &Event<'_>,
     ) -> std::fmt::Result = format_event;
 
-    let subscriber = FmtSubscriber::builder().with_target(true);
+    let subscriber = FmtSubscriber::builder()
+        .with_target(true)
+        .with_writer(std::io::stderr);
 
     match output {
         Output::Json => {

@@ -1,12 +1,36 @@
 //! Helpers for unit tests
 
-use crate::env::{create_lmdb_env, Environment};
-
+use crate::env::{Environment, EnvironmentKind};
+use sx_types::test_utils::fake_cell_id;
 use tempdir::TempDir;
 
-/// Create an [Environment] backed by a temp directory
-/// TODO: return reference to the TempDir so it can be removed
-pub fn test_env() -> Environment {
-    let tmpdir = TempDir::new("skunkworx").unwrap();
-    create_lmdb_env(tmpdir.path()).expect("Couldn't create test LMDB environment")
+/// Create an [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory
+pub fn test_cell_env() -> TestEnvironment {
+    let cell_id = fake_cell_id(&nanoid::nanoid!());
+    test_env(EnvironmentKind::Cell(cell_id))
 }
+
+/// Create an [TestEnvironment] of [EnvironmentKind::Conductor], backed by a temp directory
+pub fn test_conductor_env() -> TestEnvironment {
+    test_env(EnvironmentKind::Conductor)
+}
+
+fn test_env(kind: EnvironmentKind) -> TestEnvironment {
+    let tmpdir = TempDir::new("holochain-test-environments").unwrap();
+    let env = Environment::new(tmpdir.path(), kind).expect("Couldn't create test LMDB environment");
+    env
+    // TestEnvironment(env, tmpdir)
+}
+
+type TestEnvironment = Environment;
+
+// FIXME: Currently the test environments using TempDirs above immediately
+// delete the temp dirs after installation. If we ever have cases where we
+// want to flush to disk, this will probably fail. In that case we want to
+// use something like this, which owns the TempDir so it lives long enough
+//
+// /// A wrapper around an Environment which includes a reference to a TempDir,
+// /// so that when the TestEnvironment goes out of scope, the tempdir is deleted
+// /// from the filesystem
+// #[derive(Shrinkwrap)]
+// pub struct TestEnvironment(#[shrinkwrap(main_field)] Environment, TempDir);

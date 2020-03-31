@@ -1,0 +1,14 @@
+[package]
+name = "holochain_legacy"
+version = "0.0.1"
+description = "Code pulled from holochain-rust"
+license = "GPL-3.0-only"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+
+[dependencies]
+
+[dev-dependencies]
+

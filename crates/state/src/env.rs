@@ -13,6 +13,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use sx_types::cell::CellId;
 use tokio::sync::{RwLock, RwLockReadGuard};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
@@ -42,21 +43,6 @@ fn required_flags() -> EnvironmentFlags {
     EnvironmentFlags::default()
 }
 
-/// A standard way to create a representation of an LMDB environment suitable for Holochain
-pub fn create_lmdb_env(path: &Path) -> DatabaseResult<Environment> {
-    let mut map = ENVIRONMENTS.write();
-    let env: Environment = match map.entry(path.into()) {
-        hash_map::Entry::Occupied(e) => e.get().clone(),
-        hash_map::Entry::Vacant(e) => e
-            .insert({
-                let rkv = rkv_builder(None, None)(path)?;
-                Environment(Arc::new(RwLock::new(rkv)))
-            })
-            .clone(),
-    };
-    Ok(env)
-}
-
 fn rkv_builder(
     initial_map_size: Option<usize>,
     flags: Option<EnvironmentFlags>,
@@ -77,20 +63,51 @@ fn rkv_builder(
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
 #[derive(Clone)]
-pub struct Environment(Arc<RwLock<Rkv>>);
+pub struct Environment {
+    arc: Arc<RwLock<Rkv>>,
+    kind: EnvironmentKind,
+}
 
 impl Environment {
+    /// Create an environment,
+    pub fn new(path_prefix: &Path, kind: EnvironmentKind) -> DatabaseResult<Environment> {
+        let mut map = ENVIRONMENTS.write();
+        let path = path_prefix.join(kind.path());
+        if !path.is_dir() {
+            std::fs::create_dir(path.clone())
+                .map_err(|_e| DatabaseError::EnvironmentMissing(path.clone()))?;
+        }
+        let env: Environment = match map.entry(path.clone()) {
+            hash_map::Entry::Occupied(e) => e.get().clone(),
+            hash_map::Entry::Vacant(e) => e
+                .insert({
+                    let rkv = rkv_builder(None, None)(&path)?;
+                    Environment {
+                        arc: Arc::new(RwLock::new(rkv)),
+                        kind,
+                    }
+                })
+                .clone(),
+        };
+        Ok(env)
+    }
+
     /// Get a read-only lock on the Environment. The most typical use case is
     /// to get a lock in order to create a read-only transaction. The lock guard
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
     pub async fn guard(&self) -> EnvironmentRef<'_> {
-        EnvironmentRef(self.0.read().await)
+        EnvironmentRef(self.arc.read().await)
     }
 
     /// Access the underlying `Rkv` object
     pub async fn inner(&self) -> RwLockReadGuard<'_, Rkv> {
-        self.0.read().await
+        self.arc.read().await
+    }
+
+    /// Accessor for the [EnvironmentKind] of the Environment
+    pub fn kind(&self) -> &EnvironmentKind {
+        &self.kind
     }
 
     /// Get access to the singleton database manager ([DbManager]),
@@ -104,6 +121,25 @@ impl Environment {
                 .clone(),
         };
         Ok(dbs)
+    }
+}
+
+/// The various types of LMDB environment, used to specify the list of databases to initialize in the DbManager
+#[derive(Clone)]
+pub enum EnvironmentKind {
+    /// Specifies the environment used by each Cell
+    Cell(CellId),
+    /// Specifies the environment used by a Conductor
+    Conductor,
+}
+
+impl EnvironmentKind {
+    /// Constuct a partial Path based on the kind
+    fn path(&self) -> PathBuf {
+        match self {
+            EnvironmentKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
+            EnvironmentKind::Conductor => PathBuf::from("conductor"),
+        }
     }
 }
 

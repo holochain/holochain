@@ -7,6 +7,3 @@ pub mod state;
 pub mod validation;
 pub mod wasm_engine;
 pub mod workflow;
-
-#[cfg(test)]
-pub mod test_utils;
