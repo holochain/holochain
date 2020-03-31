@@ -31,15 +31,15 @@ impl WorkflowRunner {
         match call {
             WorkflowCall::InvokeZome(invocation) => {
                 let workspace = workspace::InvokeZomeWorkspace::new(&reader, &dbs)?;
-                let result =
+                let effects =
                     workflow::invoke_zome(workspace, self.0.get_ribosome(), invocation).await?;
-                self.finish(result).await?;
+                self.finish(effects).await?;
             }
             WorkflowCall::Genesis(dna, agent_id) => {
                 let workspace = workspace::GenesisWorkspace::new(&reader, &dbs)?;
                 let api = self.0.get_conductor_api();
-                let result = workflow::genesis(workspace, api, *dna, agent_id).await?;
-                self.finish(result).await?;
+                let effects = workflow::genesis(workspace, api, *dna, agent_id).await?;
+                self.finish(effects).await?;
             }
         }
         Ok(())
