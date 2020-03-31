@@ -6,17 +6,25 @@ use crate::{
         workflow::{self, WorkflowCall, WorkflowEffects, WorkflowTrigger},
     },
 };
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::{join_all, BoxFuture, FutureExt};
+use std::sync::Arc;
 use sx_state::{env::WriteManager, prelude::*};
 use workflow::{WorkflowCallback, WorkflowSignal};
 
-pub struct WorkflowRunner<'c>(&'c Cell);
+/// Functionality for running a Workflow for a Cell.
+///
+/// The Cell is put into an Arc because it is possible for a Workflow to spawn
+/// additional workflows, which may run on separate threads, hence the Cell
+/// reference needs to be long-lived and threadsafe.
+///
+/// FIXME: see finish_triggers for note on task spawning
+pub struct WorkflowRunner(Arc<Cell>);
 
-impl<'c> WorkflowRunner<'c> {
+impl WorkflowRunner {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
-        let environ = self.0.state_env();
-        let dbs = environ.dbs().await?;
+        let environ = self.clone().0.state_env();
         let env = environ.guard().await;
+        let dbs = environ.dbs().await?;
         let reader = env.reader()?;
 
         // TODO: is it possible to DRY this up with a macro?
@@ -37,13 +45,16 @@ impl<'c> WorkflowRunner<'c> {
         Ok(())
     }
 
-    fn finish<W: 'c + Workspace>(
-        &self,
+    /// Apply the WorkflowEffects to finalize the Workflow.
+    /// 1. Persist DB changes via `Workspace::commit_txn`
+    /// 2. Call any Wasm callbacks
+    /// 3. Emit any Signals
+    /// 4. Trigger any subsequent Workflows
+    fn finish<'a, W: 'a + Workspace>(
+        &'a self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
         async move {
-            let arc = self.0.state_env();
-            let env = arc.guard().await;
             let WorkflowEffects {
                 workspace,
                 triggers,
@@ -54,22 +65,14 @@ impl<'c> WorkflowRunner<'c> {
             self.finish_workspace(workspace).await?;
             self.finish_callbacks(callbacks).await?;
             self.finish_signals(signals).await?;
-
-            for WorkflowTrigger { call, interval } in triggers {
-                if let Some(_delay) = interval {
-                    // FIXME: implement or discard
-                    unimplemented!()
-                } else {
-                    self.run_workflow(call).await?
-                }
-            }
+            self.finish_triggers(triggers).await?;
 
             Ok(())
         }
         .boxed()
     }
 
-    async fn finish_workspace<W: 'c + Workspace>(&self, workspace: W) -> WorkflowRunResult<()> {
+    async fn finish_workspace<W: Workspace>(&self, workspace: W) -> WorkflowRunResult<()> {
         let arc = self.0.state_env();
         let env = arc.guard().await;
         let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
@@ -79,20 +82,40 @@ impl<'c> WorkflowRunner<'c> {
         Ok(())
     }
 
-    async fn finish_callbacks<'a>(
-        &'a self,
-        callbacks: Vec<WorkflowCallback>,
-    ) -> WorkflowRunResult<()> {
+    async fn finish_callbacks(&self, callbacks: Vec<WorkflowCallback>) -> WorkflowRunResult<()> {
         for _callback in callbacks {
             // TODO
         }
         Ok(())
     }
 
-    async fn finish_signals<'a>(&'a self, signals: Vec<WorkflowSignal>) -> WorkflowRunResult<()> {
+    async fn finish_signals(&self, signals: Vec<WorkflowSignal>) -> WorkflowRunResult<()> {
         for _signal in signals {
             // TODO
         }
         Ok(())
+    }
+
+    /// Spawn new tasks for each workflow trigger specified
+    ///
+    /// FIXME: this currently causes all workflow triggers to run on the same
+    /// task as the causative workflow. If there is an explosion of workflow
+    /// triggers, this will be a problem, and we will have to actually spawn
+    /// a new task for each. The difficulty with that is that tokio::spawn
+    /// requires the future to be 'static, which is currently not the case due
+    /// to our LMDB Environment lifetimes.
+    async fn finish_triggers(&self, triggers: Vec<WorkflowTrigger>) -> WorkflowRunResult<()> {
+        let calls: Vec<_> = triggers
+            .into_iter()
+            .map(|WorkflowTrigger { call, interval }| {
+                if let Some(_delay) = interval {
+                    // FIXME: implement or discard
+                    unimplemented!()
+                } else {
+                    self.run_workflow(call)
+                }
+            })
+            .collect();
+        join_all(calls).await.into_iter().collect()
     }
 }
