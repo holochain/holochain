@@ -25,20 +25,20 @@ impl<'c> WorkflowRunner<'c> {
                 let workspace = workspace::InvokeZomeWorkspace::new(&reader, &dbs)?;
                 let result =
                     workflow::invoke_zome(workspace, self.0.get_ribosome(), invocation).await?;
-                self.finish_workflow(result).await?;
+                self.finish(result).await?;
             }
             WorkflowCall::Genesis(dna, agent_id) => {
                 let workspace = workspace::GenesisWorkspace::new(&reader, &dbs)?;
                 let api = self.0.get_conductor_api();
                 let result = workflow::genesis(workspace, api, *dna, agent_id).await?;
-                self.finish_workflow(result).await?;
+                self.finish(result).await?;
             }
         }
         Ok(())
     }
 
-    fn finish_workflow<'a, W: 'a + Workspace>(
-        &'a self,
+    fn finish<W: 'c + Workspace>(
+        &self,
         effects: WorkflowEffects<W>,
     ) -> BoxFuture<WorkflowRunResult<()>> {
         async move {
@@ -69,10 +69,7 @@ impl<'c> WorkflowRunner<'c> {
         .boxed()
     }
 
-    async fn finish_workspace<'a, W: 'a + Workspace>(
-        &'a self,
-        workspace: W,
-    ) -> WorkflowRunResult<()> {
+    async fn finish_workspace<W: 'c + Workspace>(&self, workspace: W) -> WorkflowRunResult<()> {
         let arc = self.0.state_env();
         let env = arc.guard().await;
         let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
