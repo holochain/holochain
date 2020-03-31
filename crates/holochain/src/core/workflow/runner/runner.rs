@@ -8,6 +8,7 @@ use crate::{
 };
 use futures::future::{BoxFuture, FutureExt};
 use sx_state::{env::WriteManager, prelude::*};
+use workflow::{WorkflowCallback, WorkflowSignal};
 
 pub struct WorkflowRunner<'c>(&'c Cell);
 
@@ -49,12 +50,11 @@ impl<'c> WorkflowRunner<'c> {
                 callbacks,
                 signals,
             } = effects;
-            {
-                let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
-                workspace
-                    .commit_txn(writer)
-                    .map_err(Into::<WorkspaceError>::into)?;
-            }
+
+            self.finish_workspace(workspace).await?;
+            self.finish_callbacks(callbacks).await?;
+            self.finish_signals(signals).await?;
+
             for WorkflowTrigger { call, interval } in triggers {
                 if let Some(_delay) = interval {
                     // FIXME: implement or discard
@@ -63,15 +63,39 @@ impl<'c> WorkflowRunner<'c> {
                     self.run_workflow(call).await?
                 }
             }
-            for _callback in callbacks {
-                // TODO
-            }
-            for _signal in signals {
-                // TODO
-            }
 
             Ok(())
         }
         .boxed()
+    }
+
+    async fn finish_workspace<'a, W: 'a + Workspace>(
+        &'a self,
+        workspace: W,
+    ) -> WorkflowRunResult<()> {
+        let arc = self.0.state_env();
+        let env = arc.guard().await;
+        let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
+        workspace
+            .commit_txn(writer)
+            .map_err(Into::<WorkspaceError>::into)?;
+        Ok(())
+    }
+
+    async fn finish_callbacks<'a>(
+        &'a self,
+        callbacks: Vec<WorkflowCallback>,
+    ) -> WorkflowRunResult<()> {
+        for _callback in callbacks {
+            // TODO
+        }
+        Ok(())
+    }
+
+    async fn finish_signals<'a>(&'a self, signals: Vec<WorkflowSignal>) -> WorkflowRunResult<()> {
+        for _signal in signals {
+            // TODO
+        }
+        Ok(())
     }
 }

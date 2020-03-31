@@ -37,9 +37,12 @@ pub enum WorkflowCall {
 pub struct WorkflowEffects<W: Workspace> {
     pub workspace: W,
     pub triggers: Vec<WorkflowTrigger>,
-    pub callbacks: Vec<()>,
-    pub signals: Vec<()>,
+    pub callbacks: Vec<WorkflowCallback>,
+    pub signals: Vec<WorkflowSignal>,
 }
+
+pub type WorkflowCallback = ();
+pub type WorkflowSignal = ();
 
 #[derive(Clone, Debug)]
 pub struct WorkflowTrigger {
