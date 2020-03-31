@@ -1,16 +1,11 @@
 use holochain_2020::conductor::{
-    api::ExternalConductorApi,
-    config::ConductorConfig,
-    error::ConductorError,
-    interactive,
-    interface::{channel::ChannelInterface, Interface},
-    paths::ConfigFilePath,
-    Conductor,
+    api::*, config::ConductorConfig, error::ConductorError, interactive, interface::channel::*,
+    paths::ConfigFilePath, Conductor,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{convert::TryInto, path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use sx_types::observability::{self, Output};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::RwLock;
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
@@ -190,15 +185,23 @@ a valid default configuration. Details:
 /// and how to interact with it.
 /// TODO: remove once we have real Interfaces
 async fn interface_example(api: ExternalConductorApi) {
-    let (mut tx_dummy, rx_dummy) = mpsc::channel(100);
-
-    let interface_fut = ChannelInterface::new(rx_dummy).spawn(api);
+    let (mut sender, join_handle) = create_demo_channel_interface(api);
     let driver_fut = async move {
         for _ in 0..50 as u32 {
-            debug!("sending dummy msg");
-            tx_dummy.send(true).await.unwrap();
+            use futures::{future::FutureExt, sink::SinkExt};
+            sender
+                .send((
+                    ConductorRequest::Admin {
+                        request: Box::new(AdminMethod::Start("cell-handle".into())),
+                    }
+                    .try_into()
+                    .unwrap(),
+                    Box::new(|_| async move { Ok(()) }.boxed()),
+                ))
+                .await
+                .unwrap();
         }
-        tx_dummy.send(false).await.unwrap();
     };
-    tokio::join!(interface_fut, driver_fut);
+    driver_fut.await;
+    join_handle.await.unwrap();
 }

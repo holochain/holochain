@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 /// The interface that a Conductor exposes to the outside world.
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
+#[derive(Clone)]
 pub struct ExternalConductorApi {
     conductor_mutex: Arc<RwLock<Conductor>>,
 }

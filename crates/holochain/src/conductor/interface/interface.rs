@@ -1,5 +1,4 @@
 use crate::conductor::api::*;
-use async_trait::async_trait;
 
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
@@ -151,11 +150,6 @@ pub fn attach_external_conductor_api(
             }
         }
     })
-}
-
-#[async_trait]
-pub trait Interface {
-    async fn spawn(self, api: ExternalConductorApi);
 }
 
 #[cfg(test)]
