@@ -76,13 +76,13 @@ where
     }
 
     /// Adds a Put [Op::Put](Op) to the scratch that will be run on commit.
-    pub fn put(&mut self, k: K, v: V) -> bool {
-        self.scratch.insert(k, Op::Put(Box::new(v))).is_some()
+    pub fn put(&mut self, k: K, v: V) {
+        self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
     /// Adds a [Op::Delete](Op) to the scratch space that will be run on commit
-    pub fn delete(&mut self, k: K) -> bool {
-        self.scratch.insert(k, Op::Delete).is_some()
+    pub fn delete(&mut self, k: K) {
+        self.scratch.insert(k, Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -124,7 +124,7 @@ where
                 }
                 Delete => match self.db.delete(writer, *k) {
                     Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
-                    r @ _ => r?,
+                    r => r?,
                 },
             }
         }
@@ -260,7 +260,7 @@ pub mod tests {
         })
     }
     #[tokio::test]
-    async fn kv_indicate_value_existed() -> DatabaseResult<()> {
+    async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
         let arc = test_env();
         let env = arc.guard().await;
@@ -268,11 +268,10 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf: Store = IntKvBuf::new(&reader, db)?;
 
-            assert!(!buf.put(1, V(1)));
-            assert!(!buf.put(2, V(2)));
-            assert!(buf.put(1, V(7)));
-            assert!(!buf.delete(4));
-            assert!(buf.delete(2));
+            buf.put(1, V(1));
+            assert_eq!(Some(V(1)), buf.get(1)?);
+            buf.put(1, V(2));
+            assert_eq!(Some(V(2)), buf.get(1)?);
             Ok(())
         })
     }
