@@ -1,3 +1,7 @@
+//! Errors that can occur while running ZomeApi functions
+
+#![allow(missing_docs)]
+
 use sx_types::error::SkunkError;
 use thiserror::Error;
 
