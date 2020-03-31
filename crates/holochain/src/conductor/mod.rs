@@ -3,11 +3,14 @@ mod cell;
 mod conductor;
 pub mod config;
 pub mod error;
+pub mod interactive;
 pub mod interface;
+pub mod paths;
+pub mod state;
 
 pub use cell::Cell;
 pub use conductor::Conductor;
 
 //FIXME should this be here?
 // #[cfg(test)]
-// pub mod test_fixtures;
+// mod test_fixtures;
