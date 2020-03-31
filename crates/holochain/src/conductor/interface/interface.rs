@@ -1,22 +1,40 @@
 use crate::conductor::api::ExternalConductorApi;
 use async_trait::async_trait;
 
+use futures::{
+    channel::mpsc::{channel, Receiver, Sender},
+    future::{BoxFuture, FutureExt},
+    sink::{Sink, SinkExt},
+    stream::{Stream, StreamExt},
+};
 use holochain_serialized_bytes::SerializedBytes;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
-pub struct ExternIfaceSignalSender<S: TryInto<SerializedBytes>> {
-    sender: tokio::sync::mpsc::Sender<SerializedBytes>,
-    phantom: std::marker::PhantomData<S>,
+/// Allows the conductor or cell to forward signals to connected clients
+pub struct ConductorSideSignalSender<Sig>
+where
+    Sig: 'static + Send + TryInto<SerializedBytes>,
+{
+    sender: Sender<Result<SerializedBytes, ()>>,
+    phantom: std::marker::PhantomData<Sig>,
 }
 
-impl<S: TryInto<SerializedBytes>> ExternIfaceSignalSender<S> {
-    pub async fn send(&mut self, data: S) -> Result<(), ()> {
-        self.sender.send(data.try_into().map_err(|_| ())?).await.map_err(|_|())
+impl<Sig> ConductorSideSignalSender<Sig>
+where
+    Sig: 'static + Send + TryInto<SerializedBytes>,
+{
+    /// send the signal to the connected client
+    pub async fn send(&mut self, data: Sig) -> Result<(), ()> {
+        self.sender
+            .send(data.try_into().map_err(|_| ()))
+            .await
+            .map_err(|_| ())
     }
 
     // -- private -- //
 
-    fn priv_new(sender: tokio::sync::mpsc::Sender<SerializedBytes>) -> Self {
+    /// internal constructor
+    fn priv_new(sender: Sender<Result<SerializedBytes, ()>>) -> Self {
         Self {
             sender,
             phantom: std::marker::PhantomData,
@@ -24,43 +42,66 @@ impl<S: TryInto<SerializedBytes>> ExternIfaceSignalSender<S> {
     }
 }
 
-// TODO - the request/response part from the remote(websocket)
+/// callback type to handle incoming requests from a connected client
+pub type ConductorSideResponder<Res> =
+    Box<dyn FnOnce(Res) -> BoxFuture<'static, Result<(), ()>> + 'static + Send>;
 
-pub fn create_interface<S: TryInto<SerializedBytes>>(channel_size: usize) -> ExternIfaceSignalSender<S> {
-    let (send_signal, _recv_signal) = tokio::sync::mpsc::channel(channel_size);
+/// receive a stream of incoming requests from a connected client
+pub type ConductorSideRequestReceiver<Req, Res> =
+    Receiver<Result<(Req, ConductorSideResponder<Res>), ()>>;
 
-    ExternIfaceSignalSender::priv_new(send_signal)
+/// the external side callback type to use when implementing a client interface
+pub type ExternalSideResponder =
+    Box<dyn FnOnce(SerializedBytes) -> BoxFuture<'static, Result<(), ()>> + 'static + Send>;
+
+/// construct a new api interface to allow clients to connect to conductor or cell
+/// supply this function with:
+/// - a signal sender(sink)
+/// - a request(and response callback) stream
+pub fn create_interface_channel<Sig, Req, Res, XSig, XReq>(
+    x_sig: XSig,
+    x_req: XReq,
+) -> (
+    ConductorSideSignalSender<Sig>,
+    ConductorSideRequestReceiver<Req, Res>,
+)
+where
+    Sig: 'static + Send + TryInto<SerializedBytes>,
+    Req: 'static + Send + TryFrom<SerializedBytes>,
+    Res: 'static + Send + TryInto<SerializedBytes>,
+    XSig: 'static + Send + Sink<SerializedBytes, Error = ()>,
+    XReq: 'static + Send + Stream<Item = (SerializedBytes, ExternalSideResponder)>,
+{
+    let (sig_send, sig_recv) = channel(10);
+    tokio::task::spawn(sig_recv.forward(x_sig));
+
+    let (req_send, req_recv) = channel(10);
+    tokio::task::spawn(
+        x_req
+            .map(|(data, respond)| {
+                let respond: ConductorSideResponder<Res> = Box::new(move |res| {
+                    async move {
+                        let res: SerializedBytes = res.try_into().map_err(|_| ())?;
+                        respond(res).await?;
+                        Ok(())
+                    }
+                    .boxed()
+                });
+                Ok(match Req::try_from(data) {
+                    Ok(data) => Ok((data, respond)),
+                    Err(_) => Err(()),
+                })
+            })
+            .forward(req_send),
+    );
+
+    (ConductorSideSignalSender::priv_new(sig_send), req_recv)
 }
 
 #[async_trait]
 pub trait Interface {
     async fn spawn(self, api: ExternalConductorApi);
 }
-
-/*
-#[async_trait]
-pub trait InterfaceConductorSide: 'static + Send {
-}
-
-#[async_trait]
-pub trait InterfaceExternalSide: 'static + Send {
-}
-
-pub type DynInterfaceExternalSide = Box<dyn InterfaceExternalSide + 'static + Send>;
-
-pub struct InterfaceJoint<C: InterfaceConductorSide> {
-    conductor_side: C,
-    external_sides: Vec<DynInterfaceExternalSide>,
-}
-
-impl<C: InterfaceConductorSide> InterfaceJoint<C> {
-    pub fn new(conductor_side: C) -> Self {
-        Self {
-            conductor_side,
-        }
-    }
-}
-*/
 
 #[cfg(test)]
 mod tests {
