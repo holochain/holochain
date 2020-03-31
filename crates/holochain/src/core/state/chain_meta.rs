@@ -17,7 +17,7 @@ pub enum Crud {
     Pending,
     Rejected,
     Abandoned,
-    Confilct,
+    Conflict,
     Withdrawn,
     Purged,
 }
