@@ -11,7 +11,7 @@ pub type ZomeName = String;
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[allow(missing_docs)] // members are self-explanitory
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocation {
     pub cell_id: CellId,
     pub zome_name: ZomeName,
@@ -23,4 +23,5 @@ pub struct ZomeInvocation {
 }
 
 /// Is this a stub??
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocationResponse;

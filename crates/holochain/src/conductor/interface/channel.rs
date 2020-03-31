@@ -1,5 +1,5 @@
 use crate::conductor::{
-    api::{AdminMethod, ExternalConductorApi},
+    api::{AdminMethod, ConductorRequest, ExternalConductorApi},
     interface::interface::Interface,
 };
 use async_trait::async_trait;
@@ -21,13 +21,14 @@ impl ChannelInterface {
 
 #[async_trait]
 impl Interface for ChannelInterface {
-    #[instrument(skip(self, api))]
-    async fn spawn(mut self, mut api: ExternalConductorApi) {
+    async fn spawn(mut self, api: ExternalConductorApi) {
         debug!("spawn start");
         while let Some(true) = self.rx.recv().await {
-            if let Err(err) = api.admin(AdminMethod::Start("cell-handle".into())).await {
-                error!("Error calling admin interface function: {}", err);
-            };
+            let _ = api
+                .handle_request(ConductorRequest::Admin {
+                    request: Box::new(AdminMethod::Start("cell-handle".into())),
+                })
+                .await;
         }
     }
 }

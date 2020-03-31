@@ -1,4 +1,4 @@
-use crate::conductor::api::ExternalConductorApi;
+use crate::conductor::api::*;
 use async_trait::async_trait;
 
 use futures::{
@@ -78,8 +78,7 @@ pub type ConductorSideResponder<Res> =
     Box<dyn FnOnce(Res) -> BoxFuture<'static, InterfaceResult<()>> + 'static + Send>;
 
 /// receive a stream of incoming requests from a connected client
-pub type ConductorSideRequestReceiver<Req, Res> =
-    Receiver<InterfaceResult<(Req, ConductorSideResponder<Res>)>>;
+pub type ConductorSideRequestReceiver<Req, Res> = Receiver<(Req, ConductorSideResponder<Res>)>;
 
 /// the external side callback type to use when implementing a client interface
 #[must_use]
@@ -100,9 +99,10 @@ pub fn create_interface_channel<Sig, Req, Res, XSig, XReq>(
 where
     Sig: 'static + Send + TryInto<SerializedBytes>,
     Req: 'static + Send + TryFrom<SerializedBytes>,
+    <Req as TryFrom<SerializedBytes>>::Error: std::fmt::Debug + Send,
     Res: 'static + Send + TryInto<SerializedBytes>,
     XSig: 'static + Send + Sink<SerializedBytes>,
-    <XSig as Sink<SerializedBytes>>::Error: Send,
+    <XSig as Sink<SerializedBytes>>::Error: std::fmt::Debug + Send,
     XReq: 'static + Send + Stream<Item = (SerializedBytes, ExternalSideResponder)>,
 {
     // pretty straight forward to forward the signal sender : )
@@ -126,17 +126,31 @@ where
                     .boxed()
                 });
 
-                // translate the req into the concrete type
-                Ok(match Req::try_from(data) {
-                    Ok(data) => Ok((data, respond)),
-                    Err(_) => Err(InterfaceError::SerializedBytesConvert),
-                })
+                // we cannot procede if the data is not serializable
+                // let's fail fast here for now
+                let data = Req::try_from(data).expect("deserialize failed");
+
+                Ok((data, respond))
             })
             .forward(req_send),
     );
 
     // return the sender and the request/response stream
     (ConductorSideSignalSender::priv_new(sig_send), req_recv)
+}
+
+/// bind a conductor-side request receiver to a particular conductor api
+pub fn attach_external_conductor_api(
+    api: ExternalConductorApi,
+    mut recv: ConductorSideRequestReceiver<ConductorRequest, ConductorResponse>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::task::spawn(async move {
+        while let Some((request, respond)) = recv.next().await {
+            if let Err(e) = respond(api.handle_request(request).await).await {
+                tracing::error!(error = ?e);
+            }
+        }
+    })
 }
 
 #[async_trait]
@@ -189,7 +203,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (req, respond) = chan_req_recv.next().await.unwrap().unwrap();
+        let (req, respond) = chan_req_recv.next().await.unwrap();
 
         assert_eq!("test_req_1", &req.0,);
 

@@ -2,10 +2,8 @@ use super::error::ConductorApiResult;
 use crate::conductor::conductor::Conductor;
 use std::sync::Arc;
 use sx_types::{
-    cell::{CellHandle, CellId},
+    cell::CellHandle,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*,
-    shims::*,
 };
 use tokio::sync::RwLock;
 
@@ -22,10 +20,36 @@ impl ExternalConductorApi {
         Self { conductor_mutex }
     }
 
-    /// Invoke a zome function on any cell in this conductor.
-    pub async fn invoke_zome(
+    pub async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
+        match self.handle_request_inner(request).await {
+            Ok(response) => response,
+            Err(e) => ConductorResponse::Error {
+                debug: format!("{:?}", e),
+            },
+        }
+    }
+
+    async fn handle_request_inner(
         &self,
-        _cell_id: &CellId,
+        request: ConductorRequest,
+    ) -> ConductorApiResult<ConductorResponse> {
+        match request {
+            ConductorRequest::ZomeInvocation { cell, request } => {
+                Ok(ConductorResponse::ZomeInvocationResponse {
+                    response: Box::new(self.invoke_zome(&cell, *request).await?),
+                })
+            }
+            ConductorRequest::Admin { request } => Ok(ConductorResponse::AdminResponse {
+                response: Box::new(self.admin(*request).await?),
+            }),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// Invoke a zome function on any cell in this conductor.
+    async fn invoke_zome(
+        &self,
+        _cell_handle: &CellHandle,
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         let _conductor = self.conductor_mutex.read().await;
@@ -33,28 +57,62 @@ impl ExternalConductorApi {
     }
 
     /// Call an admin function to modify this Conductor's behavior
-    pub async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
+    async fn admin(&self, _method: AdminMethod) -> ConductorApiResult<AdminResponse> {
         unimplemented!()
     }
 }
 
-#[allow(missing_docs)]
-/// The set of messages that a conductor understands how to handle
-pub enum ConductorProtocol {
-    Admin(Box<AdminMethod>),
-    Crypto(Box<Crypto>),
-    Network(Box<Lib3hServerProtocol>),
-    Test(Box<Test>),
-    ZomeInvocation(Box<CellHandle>, Box<ZomeInvocation>),
+/// The set of messages that a conductor understands how to respond
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
+pub enum ConductorResponse {
+    Error {
+        debug: String,
+    },
+    AdminResponse {
+        response: Box<AdminResponse>,
+    },
+    ZomeInvocationResponse {
+        response: Box<ZomeInvocationResponse>,
+    },
 }
+holochain_serialized_bytes::holochain_serial!(ConductorResponse);
 
 #[allow(missing_docs)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum AdminResponse {
+    Stub,
+}
+
+/// The set of messages that a conductor understands how to handle
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
+pub enum ConductorRequest {
+    Admin {
+        request: Box<AdminMethod>,
+    },
+    Crypto {
+        request: Box<Crypto>,
+    },
+    Test {
+        request: Box<Test>,
+    },
+    ZomeInvocation {
+        cell: Box<CellHandle>,
+        request: Box<ZomeInvocation>,
+    },
+}
+holochain_serialized_bytes::holochain_serial!(ConductorRequest);
+
+#[allow(missing_docs)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum AdminMethod {
     Start(CellHandle),
     Stop(CellHandle),
 }
 
 #[allow(missing_docs)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Crypto {
     Sign(String),
     Decrypt(String),
@@ -62,11 +120,13 @@ pub enum Crypto {
 }
 
 #[allow(missing_docs)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Test {
     AddAgent(AddAgentArgs),
 }
 
 #[allow(dead_code, missing_docs)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AddAgentArgs {
     id: String,
     name: String,
