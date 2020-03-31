@@ -436,6 +436,8 @@ pub mod tests {
             let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
 
             buf.delete(2);
+            let n = buf.get(2)?;
+            assert_eq!(n, None);
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
