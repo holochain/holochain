@@ -45,7 +45,7 @@ impl CellConductorApiT for CellConductorApi {
         let mut tx = self.lock.read().await.tx_network().clone();
         tx.send(message)
             .await
-            .map_err(|e| ConductorApiError::Misc(e.to_string()))
+            .map_err(|e| ConductorApiError::Todo(e.to_string()))
     }
 
     async fn network_request(
@@ -99,7 +99,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
         _message: Lib3hClientProtocol,
     ) -> ConductorApiResult<Lib3hServerProtocol>;
 
-    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its schedule time.
+    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
     /// This is basically a heuristic designed to help things run more smoothly.
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 

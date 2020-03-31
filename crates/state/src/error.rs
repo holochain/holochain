@@ -5,7 +5,7 @@
 
 use crate::db::DbName;
 use failure::Fail;
-use std::backtrace::Backtrace;
+use std::{backtrace::Backtrace, path::PathBuf};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,6 +15,9 @@ pub enum DatabaseError {
 
     #[error("An LMDB store was not created/initialized: {0}")]
     StoreNotInitialized(DbName),
+
+    #[error("LMDB environment directory does not exist at configured path: {0}")]
+    EnvironmentMissing(PathBuf),
 
     #[error("There is an unexpected value in an LMDB database (TODO: more info)")]
     InvalidValue,

@@ -206,7 +206,7 @@ pub mod tests {
     use crate::{
         env::{ReadManager, WriteManager},
         error::DatabaseError,
-        test_utils::test_env,
+        test_utils::test_cell_env,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -226,7 +226,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvvbuf_basics() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
 
         let multi_store = env
@@ -288,7 +288,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn delete_all() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
 
         let multi_store = env
@@ -356,7 +356,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn idempotent_inserts() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
 
         let multi_store = env
