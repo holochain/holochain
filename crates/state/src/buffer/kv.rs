@@ -11,6 +11,7 @@ use tracing::*;
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
 /// Delete: remove the KV
+#[derive(Clone, Debug, PartialEq)]
 enum Op<V> {
     Put(Box<V>),
     Delete,
@@ -61,14 +62,12 @@ where
 
     /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) {
-        // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
+        self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) {
-        // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Delete);
+        self.scratch.insert(k, Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -108,7 +107,10 @@ where
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
-                Delete => self.db.delete(writer, k)?,
+                Delete => match self.db.delete(writer, k) {
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    r => r?,
+                },
             }
         }
         Ok(())
@@ -152,7 +154,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{BufferedStore, KvBuf};
+    use super::{BufferedStore, KvBuf, Op};
     use crate::{
         env::{ReadManager, WriteManager},
         error::{DatabaseError, DatabaseResult},
@@ -160,6 +162,7 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
+    use std::collections::HashMap;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
@@ -170,6 +173,22 @@ pub mod tests {
     struct V(u32);
 
     type TestBuf<'a> = KvBuf<'a, &'a str, V>;
+
+    macro_rules! res {
+        ($key:expr, $op:ident, $val:expr) => {
+            ($key, Op::$op(Box::new(V($val))))
+        };
+        ($key:expr, $op:ident) => {
+            ($key, Op::$op)
+        };
+    }
+
+    fn test_buf(a: &HashMap<&str, Op<V>>, b: impl Iterator<Item = (&'static str, Op<V>)>) {
+        for (k, v) in b {
+            let val = a.get(&k).expect("Missing key");
+            assert_eq!(*val, v);
+        }
+    }
 
     #[tokio::test]
     async fn kv_iterators() -> DatabaseResult<()> {
@@ -269,6 +288,203 @@ pub mod tests {
                 kv2b.get_persisted(&"salutations".to_owned())?,
                 Some("folks".to_owned())
             );
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
+        env.with_reader(|reader| {
+            let mut buf = KvBuf::new(&reader, db)?;
+
+            buf.put("a", V(1));
+            assert_eq!(Some(V(1)), buf.get(&"a")?);
+            buf.put("a", V(2));
+            assert_eq!(Some(V(2)), buf.get(&"a")?);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_deleted_persisted() -> DatabaseResult<()> {
+        use tracing::*;
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf = KvBuf::new(&reader, db).unwrap();
+
+            buf.put("a", V(1));
+            buf.put("b", V(2));
+            buf.put("c", V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let mut buf: KvBuf<_, V> = KvBuf::new(&reader, db).unwrap();
+
+            buf.delete("b");
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let buf: KvBuf<&str, _> = KvBuf::new(&reader, db).unwrap();
+
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            debug!(?forward);
+            assert_eq!(
+                forward,
+                vec![("a".as_bytes(), V(1)), ("c".as_bytes(), V(3))]
+            );
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_deleted_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf = KvBuf::new(&reader, db).unwrap();
+
+            buf.put("a", V(5));
+            buf.put("b", V(4));
+            buf.put("c", V(9));
+            test_buf(
+                &buf.scratch,
+                [res!("a", Put, 5), res!("b", Put, 4), res!("c", Put, 9)]
+                    .iter()
+                    .cloned(),
+            );
+            buf.delete("b");
+            test_buf(
+                &buf.scratch,
+                [res!("a", Put, 5), res!("c", Put, 9), res!("b", Delete)]
+                    .iter()
+                    .cloned(),
+            );
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let buf: KvBuf<&str, _> = KvBuf::new(&reader, db).unwrap();
+
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            assert_eq!(
+                forward,
+                vec![("a".as_bytes(), V(5)), ("c".as_bytes(), V(9))]
+            );
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_get_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf = KvBuf::new(&reader, db).unwrap();
+
+            buf.put("a", V(5));
+            buf.put("b", V(4));
+            buf.put("c", V(9));
+            let n = buf.get(&"b")?;
+            assert_eq!(n, Some(V(4)));
+
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_get_persisted() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf = KvBuf::new(&reader, db).unwrap();
+
+            buf.put("a", V(1));
+            buf.put("b", V(2));
+            buf.put("c", V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let buf = KvBuf::new(&reader, db).unwrap();
+
+            let n = buf.get(&"b")?;
+            assert_eq!(n, Some(V(2)));
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_get_del_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf = KvBuf::new(&reader, db).unwrap();
+
+            buf.put("a", V(5));
+            buf.put("b", V(4));
+            buf.put("c", V(9));
+            buf.delete("b");
+            let n = buf.get(&"b")?;
+            assert_eq!(n, None);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kv_get_del_persisted() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_single("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf = KvBuf::new(&reader, db).unwrap();
+
+            buf.put("a", V(1));
+            buf.put("b", V(2));
+            buf.put("c", V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let mut buf: KvBuf<_, V> = KvBuf::new(&reader, db).unwrap();
+
+            buf.delete("b");
+            let n = buf.get(&"b")?;
+            assert_eq!(n, None);
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let buf: KvBuf<_, V> = KvBuf::new(&reader, db).unwrap();
+
+            let n = buf.get(&"b")?;
+            assert_eq!(n, None);
             Ok(())
         })
     }
