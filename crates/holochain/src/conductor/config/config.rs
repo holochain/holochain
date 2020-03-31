@@ -338,7 +338,7 @@ impl Config {
         })?;
 
         let callee_dna_file = callee_dna_config.file;
-        let callee_dna =
+        let callee_dna: Dna =
             Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(callee_dna_file.clone()))
                 .map_err(|err| {
                     format!(

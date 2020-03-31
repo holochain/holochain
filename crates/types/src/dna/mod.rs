@@ -46,6 +46,7 @@ use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };
+use holochain_serialized_bytes::prelude::*;
 use multihash;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, json, Value};
@@ -69,7 +70,8 @@ fn zero_uuid() -> String {
 pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Clone, Debug, DefaultJson)]
+// TODO: Remove DefaultJson impl when tests have been updated
+#[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes, DefaultJson)]
 pub struct Dna {
     /// The top-level "name" of a holochain application.
     #[serde(default)]
@@ -98,16 +100,6 @@ pub struct Dna {
     /// An array of zomes associated with your holochain application.
     #[serde(default)]
     pub zomes: BTreeMap<String, zome::Zome>,
-}
-
-impl AddressableContent for Dna {
-    fn content(&self) -> Content {
-        Content::from(self.to_owned())
-    }
-
-    fn try_from_content(content: &Content) -> JsonResult<Self> {
-        Ok(Dna::try_from(content.to_owned())?)
-    }
 }
 
 impl Eq for Dna {}
@@ -201,51 +193,6 @@ impl Dna {
         })
     }
 
-    /// Return the name of the zome holding a specified app entry_type
-    pub fn get_zome_name_for_app_entry_type(
-        &self,
-        app_entry_type: &AppEntryType,
-    ) -> Option<String> {
-        let entry_type_name = String::from(app_entry_type.to_owned());
-        // pre-condition: must be a valid app entry_type name
-        assert!(EntryType::has_valid_app_name(&entry_type_name));
-        // Browse through the zomes
-        for (zome_name, zome) in &self.zomes {
-            for zome_entry_type_name in zome.entry_types.keys() {
-                if *zome_entry_type_name
-                    == EntryType::App(AppEntryType::from(entry_type_name.to_string()))
-                {
-                    return Some(zome_name.clone());
-                }
-            }
-        }
-        None
-    }
-
-    /// Return the entry_type definition of a specified app entry_type
-    pub fn get_entry_type_def(&self, entry_type_name: &str) -> Option<&EntryTypeDef> {
-        // pre-condition: must be a valid app entry_type name
-        assert!(EntryType::has_valid_app_name(entry_type_name));
-        // Browse through the zomes
-        for zome in self.zomes.values() {
-            for (zome_entry_type_name, entry_type_def) in &zome.entry_types {
-                if *zome_entry_type_name
-                    == EntryType::App(AppEntryType::from(entry_type_name.to_string()))
-                {
-                    return Some(entry_type_def);
-                }
-            }
-        }
-        None
-    }
-
-    /// Get DNA multihash.
-    pub fn multihash(&self) -> Result<Vec<u8>, SkunkError> {
-        let s = String::from(JsonString::from(self.to_owned()));
-        multihash::encode(multihash::Hash::SHA2256, &s.into_bytes())
-            .map_err(|error| SkunkError::new(error.to_string()))
-    }
-
     /// List the required bridges.
     pub fn get_required_bridges(&self) -> Vec<Bridge> {
         self.zomes
@@ -263,7 +210,7 @@ impl Dna {
             .iter()
             .map(|(zome_name, zome)| {
                 // currently just check the zome has some code
-                if zome.code.code.len() > 0 {
+                if zome.code.len() > 0 {
                     Ok(())
                 } else {
                     Err(SkunkError::new(format!("Zome {} has no code!", zome_name)))
@@ -281,15 +228,28 @@ impl Dna {
 
 impl Hash for Dna {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let s = String::from(JsonString::from(self.to_owned()));
-        s.hash(state);
+        let bytes = SerializedBytes::try_from(self).expect("Serialization cannot fail");
+        bytes.hash(state);
     }
 }
 
 impl PartialEq for Dna {
     fn eq(&self, other: &Dna) -> bool {
+        let left = SerializedBytes::try_from(self).expect("Serialization cannot fail");
+        let right = SerializedBytes::try_from(other).expect("Serialization cannot fail");
+
         // need to guarantee that PartialEq and Hash always agree
-        JsonString::from(self.to_owned()) == JsonString::from(other.to_owned())
+        left == right
+    }
+}
+
+// TODO: impl Addressable for Dna, when available
+// TODO: use real hash, when available
+impl Dna {
+    /// The address of the DNA
+    pub fn address(&self) -> Address {
+        let bytes = SerializedBytes::try_from(self).expect("Serialization cannot fail");
+        Address::encode_from_bytes(bytes.bytes(), multihash::Hash::SHA2256)
     }
 }
 
@@ -375,23 +335,6 @@ pub mod tests {
     }
 
     #[test]
-    fn test_dna_get_function_with_zome_name() {
-        let dna = test_dna("a");
-        let result = dna.get_function_with_zome_name("foo zome", "foo fun");
-        assert_eq!(
-            format!("{:?}", result),
-            "Err(ZomeNotFound(\"Zome \\\'foo zome\\\' not found\"))"
-        );
-        let result = dna.get_function_with_zome_name("test", "foo fun");
-        assert_eq!(format!("{:?}",result),"Err(ZomeFunctionNotFound(\"Zome function \\\'foo fun\\\' not found in Zome \\\'test\\\'\"))");
-        let fun = dna.get_function_with_zome_name("test", "test").unwrap();
-        assert_eq!(
-            format!("{:?}", fun),
-            "FnDeclaration { name: \"test\", inputs: [], outputs: [] }"
-        );
-    }
-
-    #[test]
     fn test_dna_verify() {
         let dna = test_dna("a");
         assert!(dna.verify().is_ok())
@@ -417,21 +360,6 @@ pub mod tests {
 
     fn test_empty_dna() -> Dna {
         Dna::empty()
-    }
-
-    #[test]
-    fn get_entry_type_def_test() {
-        let mut dna = test_empty_dna();
-        let mut zome = test_zome();
-        let entry_type = EntryType::App(AppEntryType::from("bar"));
-        let entry_type_def = EntryTypeDef::new();
-
-        zome.entry_types
-            .insert(entry_type.into(), entry_type_def.clone());
-        dna.zomes.insert("zome".to_string(), zome);
-
-        assert_eq!(None, dna.get_entry_type_def("foo"));
-        assert_eq!(Some(&entry_type_def), dna.get_entry_type_def("bar"));
     }
 
     #[test]
@@ -620,7 +548,7 @@ pub mod tests {
         ))
         .unwrap();
 
-        assert_eq!(vec![0, 1, 2, 3], *dna.zomes.get("zome1").unwrap().code.code);
+        assert_eq!(vec![0, 1, 2, 3], *dna.zomes.get("zome1").unwrap().code);
     }
 
     #[test]
@@ -742,8 +670,8 @@ pub mod tests {
         ))
         .unwrap();
 
-        let wasm = dna.get_wasm_from_zome_name("test zome");
-        assert_eq!("AAECAw==", base64::encode(&*wasm.unwrap().code));
+        let wasm = dna.get_wasm_from_zome_name("test zome").unwrap();
+        assert_eq!("AAECAw==", base64::encode(&wasm));
 
         let fail = dna.get_wasm_from_zome_name("non existant zome");
         assert_eq!(None, fail);
@@ -786,15 +714,6 @@ pub mod tests {
             }"#,
         ))
         .unwrap();
-
-        assert_eq!(
-            dna.get_zome_name_for_app_entry_type(&AppEntryType::from("test type"))
-                .unwrap(),
-            "test zome".to_string()
-        );
-        assert!(dna
-            .get_zome_name_for_app_entry_type(&AppEntryType::from("non existant entry type"))
-            .is_none());
     }
 
     #[test]

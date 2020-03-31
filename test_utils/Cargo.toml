@@ -16,8 +16,8 @@ holochain_core = { version = "0.0.42-alpha5" }
 sx_types = { path = "../crates/types" }
 holochain_wasm_utils = { version = "0.0.42-alpha5" }
 holochain_locksmith = { version = "0.0.43-alpha3" }
-holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
-holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_json_api = { version = "0.0.36", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_json_derive = { version = "0.0.36", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 lib3h_sodium = "0.0.38"
 wabt = "0.7.4"
 tempfile = "3.0.7"

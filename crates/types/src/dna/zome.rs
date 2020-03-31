@@ -11,6 +11,7 @@ use crate::{
     entry::entry_type::EntryType,
 };
 use holochain_json_api::{error::JsonError, json::JsonString};
+use holochain_serialized_bytes::prelude::*;
 use std::collections::BTreeMap;
 
 /// Represents the "config" object on a "zome".
@@ -41,7 +42,8 @@ pub type ZomeTraits = BTreeMap<String, TraitFns>;
 pub type ZomeFnDeclarations = Vec<FnDeclaration>;
 
 /// Represents an individual "zome".
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DefaultJson)]
+// TODO: remove DefaultJson derive once tests are updated
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DefaultJson, SerializedBytes)]
 pub struct Zome {
     /// A description of this zome.
     #[serde(default)]
@@ -55,8 +57,6 @@ pub struct Zome {
 
     /// An array of entry_types associated with this zome.
     #[serde(default)]
-    #[serde(serialize_with = "serialize_entry_types")]
-    #[serde(deserialize_with = "deserialize_entry_types")]
     pub entry_types: ZomeEntryTypes,
 
     /// An array of traits defined in this zome.
@@ -118,20 +118,6 @@ impl Zome {
             .filter(|bridge| bridge.presence == BridgePresence::Required)
             .cloned()
             .collect()
-    }
-
-    /// Add a function declaration to a Zome
-    pub fn add_fn_declaration(
-        &mut self,
-        name: String,
-        inputs: Vec<FnParameter>,
-        outputs: Vec<FnParameter>,
-    ) {
-        self.fn_declarations.push(FnDeclaration {
-            name,
-            inputs,
-            outputs,
-        });
     }
 
     /// Return a Function declaration from a Zome
@@ -207,27 +193,13 @@ pub mod tests {
     }
 
     #[test]
-    fn test_zome_add_fn_declaration() {
-        let mut zome = Zome::empty();
-        assert_eq!(zome.fn_declarations.len(), 0);
-        zome.add_fn_declaration(
-            String::from("hello"),
-            vec![],
-            vec![FnParameter {
-                name: String::from("greeting"),
-                parameter_type: String::from("String"),
-            }],
-        );
-        assert_eq!(zome.fn_declarations.len(), 1);
-
-        let expected = "[FnDeclaration { name: \"hello\", inputs: [], outputs: [FnParameter { parameter_type: \"String\", name: \"greeting\" }] }]";
-        assert_eq!(expected, format!("{:?}", zome.fn_declarations),);
-    }
-
-    #[test]
     fn test_zome_get_function() {
         let mut zome = Zome::empty();
-        zome.add_fn_declaration(String::from("test"), vec![], vec![]);
+        zome.fn_declarations.push(FnDeclaration {
+            name: String::from("test"),
+            inputs: vec![],
+            outputs: vec![],
+        });
         let result = zome.get_function("foo func");
         assert!(result.is_none());
         let fun = zome.get_function("test").unwrap();
