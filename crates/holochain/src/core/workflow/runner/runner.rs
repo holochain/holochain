@@ -2,14 +2,12 @@ use super::error::WorkflowRunResult;
 use crate::{
     conductor::Cell,
     core::{
-        state::workspace::{self, Workspace},
-        workflow,
+        state::workspace::{self, Workspace, WorkspaceError},
+        workflow::{self, WorkflowCall, WorkflowEffects, WorkflowTrigger},
     },
 };
 use futures::future::{BoxFuture, FutureExt};
 use sx_state::{env::WriteManager, prelude::*};
-use workflow::{WorkflowCall, WorkflowEffects, WorkflowTrigger};
-use workspace::WorkspaceError;
 
 pub struct WorkflowRunner<'c>(&'c Cell);
 

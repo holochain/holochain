@@ -1,5 +1,6 @@
 mod genesis;
 mod invoke_zome;
+pub mod runner;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 
