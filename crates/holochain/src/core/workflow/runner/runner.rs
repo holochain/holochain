@@ -22,7 +22,7 @@ pub struct WorkflowRunner(Arc<Cell>);
 
 impl WorkflowRunner {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
-        let environ = self.clone().0.state_env();
+        let environ = Arc::clone(&self.0).state_env();
         let env = environ.guard().await;
         let dbs = environ.dbs().await?;
         let reader = env.reader()?;
