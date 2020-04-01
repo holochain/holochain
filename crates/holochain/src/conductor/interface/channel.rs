@@ -7,8 +7,8 @@ use holochain_serialized_bytes::SerializedBytes;
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
 /// interact with a ExternalConductorApi
-pub fn create_demo_channel_interface(
-    api: ExternalConductorApi,
+pub fn create_demo_channel_interface<A: ExternalConductorApi>(
+    api: A,
 ) -> (
     futures::channel::mpsc::Sender<(SerializedBytes, ExternalSideResponder)>,
     tokio::task::JoinHandle<()>,

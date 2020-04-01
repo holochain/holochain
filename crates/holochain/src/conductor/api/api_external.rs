@@ -8,56 +8,70 @@ use sx_types::{
 use tokio::sync::RwLock;
 
 /// The interface that a Conductor exposes to the outside world.
-/// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
-/// other Api references
-#[derive(Clone)]
-pub struct ExternalConductorApi {
-    conductor_mutex: Arc<RwLock<Conductor>>,
-}
+#[async_trait::async_trait]
+pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
+    /// Invoke a zome function on any cell in this conductor.
+    async fn invoke_zome(
+        &self,
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResponse>;
 
-impl ExternalConductorApi {
-    /// Create a new instance from a shared Conductor reference
-    pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
-        Self { conductor_mutex }
-    }
+    /// Call an admin function to modify this Conductor's behavior
+    async fn admin(&self, method: AdminMethod) -> ConductorApiResult<AdminResponse>;
 
-    pub async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
-        match self.handle_request_inner(request).await {
+    // -- provided -- //
+
+    async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
+        let res: ConductorApiResult<ConductorResponse> = (move || {
+            async move {
+                match request {
+                    ConductorRequest::ZomeInvocation { request } => {
+                        Ok(ConductorResponse::ZomeInvocationResponse {
+                            response: Box::new(self.invoke_zome(*request).await?),
+                        })
+                    }
+                    ConductorRequest::Admin { request } => Ok(ConductorResponse::AdminResponse {
+                        response: Box::new(self.admin(*request).await?),
+                    }),
+                    _ => unimplemented!(),
+                }
+            }
+        })()
+        .await;
+
+        match res {
             Ok(response) => response,
             Err(e) => ConductorResponse::Error {
                 debug: format!("{:?}", e),
             },
         }
     }
+}
 
-    async fn handle_request_inner(
-        &self,
-        request: ConductorRequest,
-    ) -> ConductorApiResult<ConductorResponse> {
-        match request {
-            ConductorRequest::ZomeInvocation { cell, request } => {
-                Ok(ConductorResponse::ZomeInvocationResponse {
-                    response: Box::new(self.invoke_zome(&cell, *request).await?),
-                })
-            }
-            ConductorRequest::Admin { request } => Ok(ConductorResponse::AdminResponse {
-                response: Box::new(self.admin(*request).await?),
-            }),
-            _ => unimplemented!(),
-        }
+/// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
+/// other Api references
+#[derive(Clone)]
+pub struct StdExternalConductorApi {
+    conductor_mutex: Arc<RwLock<Conductor>>,
+}
+
+impl StdExternalConductorApi {
+    /// Create a new instance from a shared Conductor reference
+    pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
+        Self { conductor_mutex }
     }
+}
 
-    /// Invoke a zome function on any cell in this conductor.
+#[async_trait::async_trait]
+impl ExternalConductorApi for StdExternalConductorApi {
     async fn invoke_zome(
         &self,
-        _cell_handle: &CellHandle,
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         let _conductor = self.conductor_mutex.read().await;
         unimplemented!()
     }
 
-    /// Call an admin function to modify this Conductor's behavior
     async fn admin(&self, _method: AdminMethod) -> ConductorApiResult<AdminResponse> {
         unimplemented!()
     }
@@ -89,19 +103,10 @@ pub enum AdminResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum ConductorRequest {
-    Admin {
-        request: Box<AdminMethod>,
-    },
-    Crypto {
-        request: Box<Crypto>,
-    },
-    Test {
-        request: Box<Test>,
-    },
-    ZomeInvocation {
-        cell: Box<CellHandle>,
-        request: Box<ZomeInvocation>,
-    },
+    Admin { request: Box<AdminMethod> },
+    Crypto { request: Box<Crypto> },
+    Test { request: Box<Test> },
+    ZomeInvocation { request: Box<ZomeInvocation> },
 }
 holochain_serialized_bytes::holochain_serial!(ConductorRequest);
 

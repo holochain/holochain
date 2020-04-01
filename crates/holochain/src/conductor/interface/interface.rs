@@ -139,8 +139,8 @@ where
 }
 
 /// bind a conductor-side request receiver to a particular conductor api
-pub fn attach_external_conductor_api(
-    api: ExternalConductorApi,
+pub fn attach_external_conductor_api<A: ExternalConductorApi>(
+    api: A,
     mut recv: ConductorSideRequestReceiver<ConductorRequest, ConductorResponse>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn(async move {
