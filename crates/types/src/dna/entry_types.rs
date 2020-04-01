@@ -172,43 +172,4 @@ mod tests {
         assert!(Sharing::Public.can_publish());
         assert!(!Sharing::Private.can_publish());
     }
-
-    // #[test]
-    // fn build_and_compare() {
-    //     let fixture: EntryTypeDef = serde_json::from_str(
-    //         r#"{
-    //             "properties": "{\"description\": \"A test entry\"}",
-    //             "sharing": "public",
-    //             "links_to": [
-    //                 {
-    //                     "target_type": "test",
-    //                     "link_type": "test"
-    //                 }
-    //             ],
-    //             "linked_from": [
-    //                 {
-    //                     "base_type": "HcSysAgentKeyHash",
-    //                     "link_type": "authored_posts"
-    //                 }
-    //             ]
-    //         }"#,
-    //     )
-    //     .unwrap();
-    //
-    //     let mut entry = EntryTypeDef::new();
-    //     entry.properties = JsonString::from("{\"description\": \"A test entry\"}");
-    //     entry.sharing = Sharing::Public;
-    //
-    //     let mut link = LinksTo::new();
-    //     link.target_type = String::from("test");
-    //     link.link_type = String::from("test");
-    //     entry.links_to.push(link);
-    //
-    //     let mut linked = LinkedFrom::new();
-    //     linked.base_type = String::from("HcSysAgentKeyHash");
-    //     linked.link_type = String::from("authored_posts");
-    //     entry.linked_from.push(linked);
-    //
-    //     assert_eq!(fixture, entry);
-    // }
 }

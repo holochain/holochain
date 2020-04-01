@@ -22,6 +22,7 @@ pub extern "C" fn foo(_: RemotePtr) -> RemotePtr {
  ret!(WasmExternResponse::new(response_sb));
 }
 
+// @TODO something for validations and callbacks
 // #[no_mangle]
 // /// always returns "foo" in a TestString
 // pub extern "C" fn foo_validation(_: RemotePtr) -> RemotePtr {

@@ -182,26 +182,6 @@ pub mod tests {
         assert_eq!(fixture, zome);
     }
 
-    // #[test]
-    // fn zome_json_test() {
-    //     let mut entry_types = BTreeMap::new();
-    //     entry_types.insert(EntryType::from("foo"), EntryTypeDef::new());
-    //     let mut zome = Zome::empty();
-    //     zome.entry_types = entry_types;
-    //
-    //     let expected = "{\"description\":\"\",\"config\":{},\"entry_types\":{\"foo\":{\"properties\":\"{}\",\"sharing\":\"public\",\"links_to\":[],\"linked_from\":[]}},\"traits\":{},\"fn_declarations\":[],\"code\":{\"code\":\"\"},\"bridges\":[]}";
-    //
-    //     assert_eq!(
-    //         JsonString::from_json(expected),
-    //         JsonString::from(zome.clone()),
-    //     );
-    //
-    //     assert_eq!(
-    //         zome,
-    //         Zome::try_from(JsonString::from_json(expected)).unwrap(),
-    //     );
-    // }
-
     #[test]
     fn test_zome_add_fn_declaration() {
         let mut zome = Zome::default();
