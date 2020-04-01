@@ -17,7 +17,6 @@ rkv = { git = "https://github.com/holochain/rkv.git" }
 rmp-serde = "0.14.3"
 serde = "1.0.104"
 serde_derive = "1.0.104"
-maplit = "1.0.2"
 failure = "0.1.6"
 shrinkwraprs = "0.3.0"
 lazy_static = "1.4.0"
@@ -29,6 +28,8 @@ anyhow = "1.0.26"
 tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 derive_more = "0.99.3"
 async-trait = "0.1.24"
+nanoid = "0.3.0"
+either = "1.5.0"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "0.0.46-alpha1" }

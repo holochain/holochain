@@ -1,6 +1,8 @@
 //! Some common testing helpers.
 
 use crate::{
+    agent::AgentId,
+    cell::CellId,
     dna::{
         bridges::Bridge,
         entry_types::EntryTypeDef,
@@ -73,7 +75,7 @@ pub fn test_zome() -> Zome {
 }
 
 /// A fixture example dna for unit testing.
-pub fn test_dna(uuid: &str) -> Dna {
+pub fn fake_dna(uuid: &str) -> Dna {
     Dna {
         name: "test".into(),
         description: "test".into(),
@@ -91,4 +93,14 @@ pub fn test_dna(uuid: &str) -> Dna {
         },
         ..Default::default()
     }
+}
+
+/// A fixture example CellId for unit testing.
+pub fn fake_cell_id(name: &str) -> CellId {
+    (name.to_string().into(), fake_agent_id(name)).into()
+}
+
+/// A fixture example AgentId for unit testing.
+pub fn fake_agent_id(name: &str) -> AgentId {
+    AgentId::generate_fake(name)
 }

@@ -1,7 +1,7 @@
 //! Functionality for safely accessing LMDB database references.
 
 use crate::{
-    env::Environment,
+    env::{Environment, EnvironmentKind},
     error::{DatabaseError, DatabaseResult},
 };
 use lazy_static::lazy_static;
@@ -21,6 +21,9 @@ pub enum DbName {
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
     ChainSequence,
+    /// database which stores a single key-value pair, encoding the
+    /// mutable state for the entire Conductor
+    ConductorState,
 }
 
 impl std::fmt::Display for DbName {
@@ -31,6 +34,7 @@ impl std::fmt::Display for DbName {
             ChainHeaders => write!(f, "ChainHeaders"),
             ChainMeta => write!(f, "ChainMeta"),
             ChainSequence => write!(f, "ChainSequence"),
+            ConductorState => write!(f, "ConductorState"),
         }
     }
 }
@@ -45,6 +49,7 @@ impl DbName {
             ChainHeaders => Single,
             ChainMeta => Multi,
             ChainSequence => SingleInt,
+            ConductorState => Single,
         }
     }
 }
@@ -66,15 +71,15 @@ pub type DbKey<V> = UmKey<DbName, V>;
 
 lazy_static! {
     /// The key to access the ChainEntries database
-    pub static ref CHAIN_ENTRIES: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::ChainEntries);
+    pub static ref CHAIN_ENTRIES: DbKey<SingleStore> = DbKey::<SingleStore>::new(DbName::ChainEntries);
     /// The key to access the ChainHeaders database
-    pub static ref CHAIN_HEADERS: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::ChainHeaders);
+    pub static ref CHAIN_HEADERS: DbKey<SingleStore> = DbKey::<SingleStore>::new(DbName::ChainHeaders);
     /// The key to access the ChainMeta database
     pub static ref CHAIN_META: DbKey<MultiStore> = DbKey::new(DbName::ChainMeta);
     /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
+    /// The key to access the ConductorState database
+    pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
 }
 
 /// DbManager is intended to be used as a singleton store for LMDB Database references,
@@ -138,6 +143,7 @@ impl DbManager {
 
     /// Get a `rkv` Database reference from a key, or create a new Database
     /// of the proper type if not yet created
+    /*
     pub async fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,
@@ -148,13 +154,20 @@ impl DbManager {
             self.create(key).await?;
             Ok(self.um.get(key).unwrap())
         }
-    }
+    }*/
 
     async fn initialize(&mut self) -> DatabaseResult<()> {
-        self.create(&*CHAIN_ENTRIES).await?;
-        self.create(&*CHAIN_HEADERS).await?;
-        self.create(&*CHAIN_META).await?;
-        self.create(&*CHAIN_SEQUENCE).await?;
+        match self.env.kind() {
+            EnvironmentKind::Cell(_) => {
+                self.create(&*CHAIN_ENTRIES).await?;
+                self.create(&*CHAIN_HEADERS).await?;
+                self.create(&*CHAIN_META).await?;
+                self.create(&*CHAIN_SEQUENCE).await?;
+            }
+            EnvironmentKind::Conductor => {
+                self.create(&*CONDUCTOR_STATE).await?;
+            }
+        }
         Ok(())
     }
 }

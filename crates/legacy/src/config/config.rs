@@ -199,7 +199,7 @@ impl Config {
         detect_dupes("dna", self.dnas.iter().map(|c| &c.id))?;
 
         detect_dupes("instance", self.instances.iter().map(|c| &c.id))?;
-        self.check_instances_storage()?;
+        self.check_cells_storage()?;
 
         detect_dupes("interface", self.interfaces.iter().map(|c| &c.id))?;
 
@@ -564,38 +564,6 @@ impl Config {
             .collect();
 
         self
-    }
-
-    /// This function checks if there is duplicated file storage from the instances section of a provided
-    /// TOML configuration file. For efficiency purposes, we short-circuit on the first encounter of a
-    /// duplicated values.
-    fn check_instances_storage(&self) -> Result<(), String> {
-        let storage_paths: Vec<&str> = self
-            .instances
-            .iter()
-            .filter_map(|stg_config| match stg_config.storage {
-                StorageConfig::File { ref path }
-                | StorageConfig::Lmdb { ref path, .. }
-                | StorageConfig::Pickle { ref path } => Some(path.as_str()),
-                _ => None,
-            })
-            .collect();
-
-        // Here we don't use the already implemented 'detect_dupes' function because we don't need
-        // to keep track of all the duplicated values of storage instances. But instead we use the
-        // return value of 'HashSet.insert()' conbined with the short-circuiting propriety of
-        // 'iter().all()' so we don't iterate on all the possible value once we found a duplicated
-        // storage entry.
-        let mut path_set: HashSet<&str> = HashSet::new();
-        let has_uniq_values = storage_paths.iter().all(|&x| path_set.insert(x));
-
-        if !has_uniq_values {
-            Err(String::from(
-                "Forbidden duplicated file storage value encountered.",
-            ))
-        } else {
-            Ok(())
-        }
     }
 }
 
@@ -1580,7 +1548,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_check_instances_storage() -> Result<(), String> {
+    fn test_check_cells_storage() -> Result<(), String> {
         let toml = r#"
         [[agents]]
         id = "test agent 1"
@@ -1616,12 +1584,12 @@ pub mod tests {
         let config =
             load_configuration::<Config>(&toml).expect("Config should be syntactically correct");
 
-        assert_eq!(config.check_instances_storage(), Ok(()));
+        assert_eq!(config.check_cells_storage(), Ok(()));
         Ok(())
     }
 
     #[test]
-    fn test_check_instances_storage_err() -> Result<(), String> {
+    fn test_check_cells_storage_err() -> Result<(), String> {
         // Here we have a forbidden duplicated 'instances.storage'
         let toml = r#"
         [[agents]]
@@ -1653,7 +1621,7 @@ pub mod tests {
             load_configuration::<Config>(&toml).expect("Config should be syntactically correct");
 
         assert_eq!(
-            config.check_instances_storage(),
+            config.check_cells_storage(),
             Err(String::from(
                 "Forbidden duplicated file storage value encountered."
             ))

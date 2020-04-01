@@ -226,7 +226,7 @@ pub mod tests {
     use crate::{
         dna::{entry_types::EntryTypeDef, zome::tests::test_zome},
         entry::entry_type::{AppEntryType, EntryType},
-        test_utils::test_dna,
+        test_utils::fake_dna,
     };
 
     #[test]
@@ -237,7 +237,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_get_zome() {
-        let dna = test_dna("a");
+        let dna = fake_dna("a");
         let result = dna.get_zome("foo zome");
         assert_eq!(
             format!("{:?}", result),
@@ -249,7 +249,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_get_trait() {
-        let dna = test_dna("a");
+        let dna = fake_dna("a");
         let zome = dna.get_zome("test").unwrap();
         let result = dna.get_trait(zome, "foo trait");
         assert!(result.is_none());
@@ -259,7 +259,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_get_trait_with_zome_name() {
-        let dna = test_dna("a");
+        let dna = fake_dna("a");
         let result = dna.get_trait_fns_with_zome_name("foo zome", "foo trait");
         assert_eq!(
             format!("{:?}", result),
@@ -288,7 +288,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_get_function_with_zome_name() {
-        let dna = test_dna("a");
+        let dna = fake_dna("a");
         let result = dna.get_function_with_zome_name("foo zome", "foo fun");
         assert_eq!(
             format!("{:?}", result),
@@ -305,7 +305,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_verify() {
-        let dna = test_dna("a");
+        let dna = fake_dna("a");
         assert!(dna.verify().is_ok())
     }
 
