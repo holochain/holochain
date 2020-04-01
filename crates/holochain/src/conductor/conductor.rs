@@ -57,7 +57,7 @@ pub struct Conductor {
 
 impl Conductor {
     async fn new(env: Environment) -> ConductorResult<Conductor> {
-        let db: SingleStore = env.dbs().await?.get(&db::CONDUCTOR_STATE)?.clone();
+        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
         Ok(Conductor {
             env,
             state_db: Kv::new(db)?,
