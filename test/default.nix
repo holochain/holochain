@@ -1,5 +1,6 @@
 { pkgs }:
 let
+  name = "hcp-test";
 
   script = pkgs.writeShellScriptBin name
   ''
@@ -13,5 +14,5 @@ let
   '';
 in
 {
- buildInputs = [ t0 t1  ];
+ buildInputs = [ script ];
 }
