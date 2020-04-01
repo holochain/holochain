@@ -52,7 +52,6 @@ impl ToString for AppEntryType {
 #[allow(missing_docs)]
 pub enum EntryType {
     App(AppEntryType),
-
     Dna,
     AgentId,
     Deletion,

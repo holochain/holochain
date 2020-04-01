@@ -858,14 +858,17 @@ pub mod tests {
             assert_eq!(&deserialized.to_string(), ps_out);
 
             // JSON serialization via JsonSring
-            let period_ser = JsonString::from(&period);
-            assert_eq!(period_ser.to_string(), format!("\"{}\"", ps_out));
+            let period_ser = SerializedBytes::try_from(&period)?;
+            assert_eq!(format!("{:?}", period_ser), format!("\"{}\"", ps_out));
             let period_des = Period::try_from(period_ser);
             assert!(period_des.is_ok());
             assert_eq!(&period_des.unwrap().to_string(), ps_out);
 
             // JSON round-tripping w/o serde or intermediates
-            assert_eq!(Period::try_from(JsonString::from(period))?, Period(*dur));
+            assert_eq!(
+                Period::try_from(SerializedBytes::try_from(period)?)?,
+                Period(*dur)
+            );
 
             Ok(())
         })
@@ -1060,8 +1063,11 @@ pub mod tests {
                     assert_eq!(deserialized.to_string(), "2018-10-11T03:23:38+00:00");
 
                     // JSON serialization via JsonString
-                    let iso_8601_ser = JsonString::from(&iso);
-                    assert_eq!(iso_8601_ser.to_string(), "\"2018-10-11T03:23:38+00:00\"");
+                    let iso_8601_ser = SerializedBytes::try_from(&iso).unwrap();
+                    assert_eq!(
+                        format!("{:?}", iso_8601_ser),
+                        "\"2018-10-11T03:23:38+00:00\""
+                    );
                     let iso_8601_des = Iso8601::try_from(iso_8601_ser);
                     assert!(iso_8601_des.is_ok());
                     assert_eq!(
@@ -1071,7 +1077,8 @@ pub mod tests {
 
                     // JSON round-tripping w/o serde or intermediates
                     assert_eq!(
-                        Iso8601::try_from(JsonString::from(iso)).map_err(|err| err.into()),
+                        Iso8601::try_from(SerializedBytes::try_from(&iso).unwrap())
+                            .map_err(|err| err.into()),
                         Iso8601::try_from("2018-10-11T03:23:38+00:00")
                     );
 

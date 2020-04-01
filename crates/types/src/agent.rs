@@ -99,12 +99,14 @@ pub fn test_agent_id_with_name(name: &str) -> AgentId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::persistence::cas::content::Content;
 
     pub fn test_identity_value() -> Content {
-        Content::from_json(&format!(
-            "{{\"nick\":\"bob\",\"pub_sign_key\":\"{}\"}}",
-            GOOD_ID
-        ))
+        Content::try_from(AgentId {
+            nick: "bob".to_string(),
+            pub_sign_key: GOOD_ID.to_string(),
+        })
+        .unwrap()
     }
 
     #[test]
@@ -140,21 +142,6 @@ mod tests {
     #[test]
     /// show ToString implementation for Agent
     fn agent_to_string_test() {
-        assert_eq!(test_identity_value(), test_agent_id().into());
-    }
-
-    #[test]
-    /// show AddressableContent implementation for Agent
-    fn agent_addressable_content_test() {
-        let expected_content =
-            Content::from_json("{\"AgentId\":{\"nick\":\"bob\",\"pub_sign_key\":\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\"}}");
-        // content()
-        assert_eq!(expected_content, test_agent_id().content(),);
-
-        // from_content()
-        assert_eq!(
-            test_agent_id(),
-            AgentId::try_from_content(&expected_content).unwrap(),
-        );
+        assert_eq!(test_identity_value(), test_agent_id().try_into().unwrap());
     }
 }

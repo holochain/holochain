@@ -16,7 +16,7 @@ use tracing::*;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
-    pub code: Arc<Vec<u8>>,
+    code: Arc<Vec<u8>>,
 }
 
 impl TryFrom<DnaWasm> for SerializedBytes {
@@ -48,6 +48,11 @@ impl DnaWasm {
             code: Arc::new(vec![]),
         }
     }
+
+    /// get a new Arc to the Vec<u8> bytes for the wasm
+    pub fn code(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.code)
+    }
 }
 
 impl fmt::Debug for DnaWasm {
@@ -68,10 +73,9 @@ impl Hash for DnaWasm {
     }
 }
 
-impl DnaWasm {
-    /// Creates a new instance from given WASM binary
-    pub fn from_bytes(wasm: Vec<u8>) -> Self {
-        DnaWasm {
+impl From<Vec<u8>> for DnaWasm {
+    fn from(wasm: Vec<u8>) -> Self {
+        Self {
             code: Arc::new(wasm),
         }
     }

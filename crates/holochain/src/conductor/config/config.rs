@@ -602,7 +602,7 @@ impl Config {
 /// An agent has a name/ID and is optionally defined by a private key that resides in a file
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct AgentConfig {
-    pub id: SerializedBytes,
+    pub id: String,
     pub name: String,
     pub public_address: Base32,
     pub keystore_file: String,
@@ -613,11 +613,11 @@ pub struct AgentConfig {
     pub test_agent: Option<bool>,
 }
 
-impl From<AgentConfig> for AgentId {
-    fn from(config: AgentConfig) -> Self {
-        AgentId::try_from(config.id.clone()).expect("bad agent serialization")
-    }
-}
+// impl From<AgentConfig> for AgentId {
+//     fn from(config: AgentConfig) -> Self {
+//         AgentId::try_from(&config.id).expect("bad agent serialization")
+//     }
+// }
 
 /// A DNA is represented by a DNA file.
 /// A hash can optionally be provided, which could be used to validate that the DNA being installed

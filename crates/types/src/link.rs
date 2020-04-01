@@ -1,6 +1,7 @@
 //! Links interrelate entries in a source chain.
 
-use crate::{persistence::cas::content::Address, prelude::*};
+use crate::persistence::cas::content::Address;
+use holochain_serialized_bytes::prelude::*;
 use regex::Regex;
 
 type LinkType = String;

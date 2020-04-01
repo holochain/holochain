@@ -1,7 +1,7 @@
-use holochain_wasmer_host::WasmError;
 use mockall::automock;
+use std::sync::Arc;
 use sx_types::{
-    dna::{wasm::DnaWasm, Dna},
+    dna::Dna,
     entry::Entry,
     error::SkunkResult,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
@@ -34,17 +34,20 @@ pub trait RibosomeT: Sized {
 /// Total hack just to have something to look at
 /// The only WasmRibosome is a Wasm ribosome.
 pub struct WasmRibosome {
-    _dna: Dna,
+    dna: Dna,
 }
 
 impl WasmRibosome {
-    pub fn new(_dna: Dna) -> Self {
-        Self { _dna }
+    pub fn new(dna: Dna) -> Self {
+        Self { dna }
     }
 
-    fn instance(wasm: DnaWasm) -> Result<Instance, WasmError> {
-        let imports = imports! {};
-        holochain_wasmer_host::instantiate::instantiate(&wasm.code, &wasm.code, &imports)
+    pub fn instance(&self, zome_name: &str) -> SkunkResult<Instance> {
+        let wasm: Arc<Vec<u8>> = self.dna.get_zome(zome_name)?.code.code();
+        let imports: ImportObject = WasmRibosome::imports();
+        Ok(holochain_wasmer_host::instantiate::instantiate(
+            &wasm, &wasm, &imports,
+        )?)
     }
 
     fn imports() -> ImportObject {
