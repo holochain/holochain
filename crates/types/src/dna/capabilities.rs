@@ -14,7 +14,7 @@ use holochain_serialized_bytes::prelude::*;
 /// a struct to hold the capability information needed to make any capability request,
 /// namely the provenance of the request (the agent address and signature) and the
 /// actual token being used to make the request
-#[derive(Serialize, Deserialize, Clone, Default, Debug, Eq, PartialEq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct CapabilityRequest {
     /// Address of capability token.
     pub cap_token: Address,

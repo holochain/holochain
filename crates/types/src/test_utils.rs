@@ -5,37 +5,40 @@ use crate::{
     cell::CellId,
     dna::{
         bridges::Bridge,
+        capabilities::CapabilityRequest,
         entry_types::EntryTypeDef,
         fn_declarations::{FnDeclaration, TraitFns},
         wasm::DnaWasm,
         zome::{Config, Zome, ZomeFnDeclarations},
         Dna,
     },
+    nucleus::ZomeInvocationPayload,
     prelude::*,
+    signature::{Provenance, Signature},
 };
 use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
-struct TestProperties {
+struct FakeProperties {
     test: String,
 }
 
 /// simple EntryTypeDef fixture
-pub fn test_entry_type() -> EntryTypeDef {
+pub fn fake_entry_type() -> EntryTypeDef {
     EntryTypeDef {
         ..Default::default()
     }
 }
 
 /// simple TraitFns fixture
-pub fn test_traits() -> TraitFns {
+pub fn fake_traits() -> TraitFns {
     TraitFns {
         functions: vec![String::from("test")],
     }
 }
 
 /// simple ZomeFnDeclarations fixture
-pub fn test_fn_declarations() -> ZomeFnDeclarations {
+pub fn fake_fn_declarations() -> ZomeFnDeclarations {
     vec![FnDeclaration {
         name: "test".into(),
         inputs: vec![],
@@ -44,33 +47,33 @@ pub fn test_fn_declarations() -> ZomeFnDeclarations {
 }
 
 /// simple DnaWasm fixture
-pub fn test_code() -> DnaWasm {
+pub fn fake_dna_wasm() -> DnaWasm {
     DnaWasm::from(vec![0_u8])
 }
 
 /// simple Bridges fixture
-pub fn test_bridges() -> Vec<Bridge> {
+pub fn fake_bridges() -> Vec<Bridge> {
     vec![]
 }
 
 /// simple Zome fixture
-pub fn test_zome() -> Zome {
+pub fn fake_zome() -> Zome {
     Zome {
         description: "test".into(),
         config: Config::default(),
         entry_types: {
             let mut v = BTreeMap::new();
-            v.insert("test".into(), test_entry_type());
+            v.insert("test".into(), fake_entry_type());
             v
         },
         traits: {
             let mut v = BTreeMap::new();
-            v.insert("hc_public".into(), test_traits());
+            v.insert("hc_public".into(), fake_traits());
             v
         },
-        fn_declarations: test_fn_declarations(),
-        code: test_code(),
-        bridges: test_bridges(),
+        fn_declarations: fake_fn_declarations(),
+        code: fake_dna_wasm(),
+        bridges: fake_bridges(),
     }
 }
 
@@ -81,17 +84,17 @@ pub fn fake_dna(uuid: &str) -> Dna {
         description: "test".into(),
         version: "test".into(),
         uuid: uuid.into(),
-        properties: TestProperties {
+        properties: FakeProperties {
             test: "test".into(),
         }
         .try_into()
         .unwrap(),
         zomes: {
             let mut v = BTreeMap::new();
-            v.insert("test".into(), test_zome());
+            v.insert("test".into(), fake_zome());
             v
         },
-        ..Default::default()
+        dna_spec_version: Default::default(),
     }
 }
 
@@ -103,4 +106,28 @@ pub fn fake_cell_id(name: &str) -> CellId {
 /// A fixture example AgentId for unit testing.
 pub fn fake_agent_id(name: &str) -> AgentId {
     AgentId::generate_fake(name)
+}
+
+/// A fixture example CapabilityRequest for unit testing.
+pub fn fake_capability_request() -> CapabilityRequest {
+    CapabilityRequest {
+        cap_token: Address::from("fake"),
+        provenance: fake_provenance(),
+    }
+}
+
+/// A fixture example ZomeInvocationPayload for unit testing.
+pub fn fake_zome_invocation_payload() -> ZomeInvocationPayload {
+    ZomeInvocationPayload::try_from(SerializedBytes::try_from(UnsafeBytes::from(vec![0])).unwrap())
+        .unwrap()
+}
+
+/// A fixture example Signature for unit testing.
+pub fn fake_signature() -> Signature {
+    Signature::from("fake")
+}
+
+/// A fixture example Provenance for unit testing.
+pub fn fake_provenance() -> Provenance {
+    Provenance::new("fake".into(), fake_signature())
 }

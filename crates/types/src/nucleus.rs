@@ -1,6 +1,6 @@
 //! Types related to making calls into Zomes.
 
-use crate::{agent::AgentId, cell::CellId, prelude::*, shims::*};
+use crate::{agent::AgentId, cell::CellId, dna::capabilities::CapabilityRequest, prelude::*};
 use sx_wasm_types::WasmExternResponse;
 
 /// The ZomeId is a pair of CellId and ZomeName.
@@ -10,13 +10,13 @@ pub type ZomeId = (CellId, ZomeName);
 pub type ZomeName = String;
 
 /// wraps payload so that we are compatible with host::guest::call()
-#[derive(Clone, Debug, Serialize, Default, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct ZomeInvocationPayload(SerializedBytes);
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[allow(missing_docs)] // members are self-explanitory
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ZomeInvocation {
     pub cell_id: CellId,
     pub zome_name: ZomeName,

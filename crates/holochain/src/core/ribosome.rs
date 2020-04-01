@@ -85,38 +85,56 @@ pub mod tests {
 
     use super::WasmRibosome;
     use crate::core::ribosome::RibosomeT;
-    use std::convert::TryInto;
+    use std::{collections::BTreeMap, convert::TryInto};
     use sx_types::{
-        dna::{zome::Zome, Dna},
+        dna::{wasm::DnaWasm, zome::Zome, Dna},
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
+        prelude::Address,
         shims::SourceChainCommitBundle,
+        test_utils::{
+            fake_agent_id, fake_capability_request, fake_cell_id, fake_zome_invocation_payload,
+        },
     };
     use sx_wasm_test_utils::{test_wasm, TestWasm};
     use sx_wasm_types::WasmExternResponse;
     use test_wasm_common::TestString;
 
+    fn zome_from_code(code: DnaWasm) -> Zome {
+        let mut zome = Zome::empty();
+        zome.code = code;
+        zome
+    }
+
+    fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
+        let mut dna = Dna::empty();
+        dna.zomes = zomes;
+        dna
+    }
+
+    fn zome_invocation_from_names(zome_name: &str, fn_name: &str) -> ZomeInvocation {
+        ZomeInvocation {
+            zome_name: zome_name.into(),
+            fn_name: fn_name.into(),
+            cell_id: fake_cell_id("bob"),
+            cap: fake_capability_request(),
+            payload: fake_zome_invocation_payload(),
+            provenance: fake_agent_id("bob"),
+            as_at: Address::from("fake"),
+        }
+    }
+
     #[test]
     fn invoke_foo_test() {
-        let ribosome = WasmRibosome::new(Dna {
-            zomes: {
-                let mut v = std::collections::BTreeMap::new();
-                v.insert(
-                    String::from("foo"),
-                    Zome {
-                        code: test_wasm(&"../..".into(), TestWasm::Foo),
-                        ..Default::default()
-                    },
-                );
-                v
-            },
-            ..Default::default()
-        });
+        let ribosome = WasmRibosome::new(dna_from_zomes({
+            let mut v = std::collections::BTreeMap::new();
+            v.insert(
+                String::from("foo"),
+                zome_from_code(test_wasm(&"../..".into(), TestWasm::Foo)),
+            );
+            v
+        }));
 
-        let invocation = ZomeInvocation {
-            zome_name: "foo".into(),
-            fn_name: "foo".into(),
-            ..Default::default()
-        };
+        let invocation = zome_invocation_from_names("foo", "foo");
 
         assert_eq!(
             ZomeInvocationResponse::ZomeApiFn(WasmExternResponse::new(

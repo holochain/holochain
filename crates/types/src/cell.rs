@@ -8,7 +8,7 @@ use std::fmt;
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
-#[derive(Clone, Debug, Hash, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct CellId(DnaAddress, AgentId);
 
 /// A conductor-specific name for a Cell

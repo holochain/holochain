@@ -4,8 +4,6 @@ use crate::prelude::*;
 pub struct AgentPubKey;
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapToken;
-#[derive(Clone, Debug, Default, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
-pub struct CapabilityRequest;
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct DhtOp;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]

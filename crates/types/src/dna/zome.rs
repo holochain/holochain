@@ -77,8 +77,9 @@ pub struct Zome {
 
 impl Eq for Zome {}
 
-impl Default for Zome {
-    fn default() -> Zome {
+impl Zome {
+    /// Create an empty zome, useful for tests
+    pub fn empty() -> Zome {
         Zome {
             description: String::default(),
             config: Config::default(),
@@ -89,9 +90,7 @@ impl Default for Zome {
             bridges: Vec::default(),
         }
     }
-}
 
-impl Zome {
     /// Allow sane defaults for `Zome::new()`.
     pub fn new(
         description: &str,
@@ -156,8 +155,8 @@ pub mod tests {
     use crate::dna::{fn_declarations::FnParameter, zome::Zome};
     use serde_json;
 
-    pub fn test_zome() -> Zome {
-        Zome::default()
+    pub fn fake_zome() -> Zome {
+        Zome::empty()
     }
 
     #[test]
@@ -176,7 +175,7 @@ pub mod tests {
         )
         .unwrap();
 
-        let mut zome = Zome::default();
+        let mut zome = fake_zome();
         zome.description = String::from("test");
 
         assert_eq!(fixture, zome);
@@ -184,7 +183,7 @@ pub mod tests {
 
     #[test]
     fn test_zome_add_fn_declaration() {
-        let mut zome = Zome::default();
+        let mut zome = fake_zome();
         assert_eq!(zome.fn_declarations.len(), 0);
         zome.add_fn_declaration(
             String::from("hello"),
@@ -202,7 +201,7 @@ pub mod tests {
 
     #[test]
     fn test_zome_get_function() {
-        let mut zome = Zome::default();
+        let mut zome = fake_zome();
         zome.add_fn_declaration(String::from("test"), vec![], vec![]);
         let result = zome.get_function("foo func");
         assert!(result.is_none());
