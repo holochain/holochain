@@ -59,6 +59,7 @@ pub mod error;
 pub mod exports;
 pub mod prelude;
 pub mod transaction;
+pub mod typed;
 
 // NB: would be nice to put this under cfg(test), but then it's not visible from other crates,
 // since cfg(test) only applies to the crate in which you run tests

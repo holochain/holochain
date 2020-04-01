@@ -158,7 +158,7 @@ pub mod tests {
     use crate::{
         env::{ReadManager, WriteManager},
         error::{DatabaseError, DatabaseResult},
-        test_utils::test_env,
+        test_utils::test_cell_env,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -192,7 +192,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kv_iterators() -> DatabaseResult<()> {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
@@ -223,7 +223,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kv_empty_iterators() -> DatabaseResult<()> {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env
             .inner()
@@ -245,7 +245,7 @@ pub mod tests {
     /// TODO break up into smaller tests
     #[tokio::test]
     async fn kv_store_sanity_check() -> DatabaseResult<()> {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;

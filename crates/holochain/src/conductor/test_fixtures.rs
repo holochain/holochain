@@ -1,11 +1,37 @@
-use sx_test_utils::create_test_dna_with_wat;
-use sx_types::dna::fn_declarations::FnDeclaration;
-use crate::config::DnaLoader;
-use std::convert::TryFrom;
-use std::{path::PathBuf, sync::Arc};
-use sx_types::dna::{Dna, bridges::Bridge};
-use sx_types::error::SkunkError;
-use sx_types::prelude::*;
+use super::state::DnaLoader;
+use std::{convert::TryFrom, path::PathBuf, sync::Arc};
+use sx_types::{
+    dna::{bridges::Bridge, fn_declarations::FnDeclaration, Dna},
+    error::SkunkError,
+    prelude::*,
+};
+
+/// Create DNA from WAT
+pub fn create_test_dna_with_wat(zome_name: &str, wat: Option<&str>) -> Dna {
+    // Default WASM code returns 1337 as integer
+    let default_wat = r#"
+            (module
+                (memory (;0;) 1)
+                (func (export "public_test_fn") (param $p0 i64) (result i64)
+                    i64.const 6
+                )
+                (data (i32.const 0)
+                    "1337.0"
+                )
+                (export "memory" (memory 0))
+            )
+        "#;
+    let wat_str = wat.unwrap_or_else(|| &default_wat);
+
+    // Test WASM code that returns 1337 as integer
+    let wasm_binary = Wat2Wasm::new()
+        .canonicalize_lebs(false)
+        .write_debug_names(true)
+        .convert(wat_str)
+        .unwrap();
+
+    create_test_dna_with_wasm(zome_name, wasm_binary.as_ref().to_vec())
+}
 
 pub fn test_dna_loader() -> DnaLoader {
     let loader = Box::new(|path: &PathBuf| {
