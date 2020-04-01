@@ -30,6 +30,7 @@ tracing-serde = "=0.1.1"
 holochain_serialized_bytes = "=0.0.36"
 holochain_wasmer_common = "=0.0.22"
 sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
+sx_wasm_types = { path = "../wasm_types" }
 
 # possibly dispensable
 maplit = "1.0.2"

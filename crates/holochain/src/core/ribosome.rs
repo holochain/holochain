@@ -7,6 +7,7 @@ use sx_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
+use sx_wasm_types::WasmExternResponse;
 use wasmer_runtime::{imports, ImportObject, Instance};
 
 #[automock]
@@ -70,12 +71,12 @@ impl RibosomeT for WasmRibosome {
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse> {
-        let response: ZomeInvocationResponse = holochain_wasmer_host::guest::call(
+        let wasm_extern_response: WasmExternResponse = holochain_wasmer_host::guest::call(
             &mut self.instance(&invocation)?,
             &invocation.fn_name,
             invocation.payload,
         )?;
-        Ok(response)
+        Ok(ZomeInvocationResponse::ZomeApiFn(wasm_extern_response))
     }
 }
 
@@ -84,12 +85,15 @@ pub mod tests {
 
     use super::WasmRibosome;
     use crate::core::ribosome::RibosomeT;
+    use std::convert::TryInto;
     use sx_types::{
         dna::{zome::Zome, Dna},
-        nucleus::ZomeInvocation,
+        nucleus::{ZomeInvocation, ZomeInvocationResponse},
         shims::SourceChainCommitBundle,
     };
     use sx_wasm_test_utils::{test_wasm, TestWasm};
+    use sx_wasm_types::WasmExternResponse;
+    use test_wasm_common::TestString;
 
     #[test]
     fn invoke_foo_test() {
@@ -114,9 +118,13 @@ pub mod tests {
             ..Default::default()
         };
 
-        println!(
-            "{:?}",
-            ribosome.call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+        assert_eq!(
+            ZomeInvocationResponse::ZomeApiFn(WasmExternResponse::new(
+                TestString::from(String::from("foo")).try_into().unwrap()
+            )),
+            ribosome
+                .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+                .unwrap()
         );
     }
 }

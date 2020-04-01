@@ -1,6 +1,7 @@
 //! Types related to making calls into Zomes.
 
 use crate::{agent::AgentId, cell::CellId, prelude::*, shims::*};
+use sx_wasm_types::WasmExternResponse;
 
 /// The ZomeId is a pair of CellId and ZomeName.
 pub type ZomeId = (CellId, ZomeName);
@@ -27,5 +28,8 @@ pub struct ZomeInvocation {
 }
 
 /// Is this a stub??
-#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
-pub struct ZomeInvocationResponse(SerializedBytes);
+#[derive(Debug, PartialEq)]
+pub enum ZomeInvocationResponse {
+    /// arbitrary functions exposed by zome devs to the outside world
+    ZomeApiFn(WasmExternResponse),
+}
