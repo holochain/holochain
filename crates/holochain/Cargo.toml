@@ -35,11 +35,12 @@ boolinator = "2.4.0"
 base64 = "0.10.1"
 tracing = "=0.1.13"
 wasmer-runtime = "=0.13.1"
-holochain_wasmer_host = "=0.0.21"
+holochain_wasmer_host = "=0.0.22"
 holochain_serialized_bytes = "=0.0.36"
 
 [dev-dependencies]
 anyhow = "1.0.26"
+sx_wasm_test_utils = { path = "../../test_utils/wasm" }
 
 [lib]
 name = "holochain_2020"

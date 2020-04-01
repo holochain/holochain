@@ -1,10 +1,12 @@
-use sx_dpki::{key_bundle::KeyBundle, SEED_SIZE};
 use holochain_locksmith::Mutex;
-use sx_types::persistence::cas::content::{Address, AddressableContent};
 use jsonrpc_ws_server::jsonrpc_core::{self, types::params::Params, IoHandler};
 use lib3h_sodium::secbuf::SecBuf;
 use std::{collections::HashMap, sync::Arc};
-use sx_types::agent::AgentId;
+use sx_dpki::{key_bundle::KeyBundle, SEED_SIZE};
+use sx_types::{
+    agent::AgentId,
+    persistence::cas::content::{Address, AddressableContent},
+};
 
 lazy_static! {
     pub static ref TEST_AGENT_KEYBUNDLES: Mutex<HashMap<Address, Arc<Mutex<KeyBundle>>>> =

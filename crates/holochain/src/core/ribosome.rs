@@ -42,8 +42,9 @@ impl WasmRibosome {
         Self { dna }
     }
 
-    pub fn instance(&self, zome_name: &str) -> SkunkResult<Instance> {
-        let wasm: Arc<Vec<u8>> = self.dna.get_zome(zome_name)?.code.code();
+    pub fn instance(&self, invocation: &ZomeInvocation) -> SkunkResult<Instance> {
+        let zome = self.dna.get_zome(&invocation.zome_name)?;
+        let wasm: Arc<Vec<u8>> = zome.code.code();
         let imports: ImportObject = WasmRibosome::imports();
         Ok(holochain_wasmer_host::instantiate::instantiate(
             &wasm, &wasm, &imports,
@@ -51,17 +52,6 @@ impl WasmRibosome {
     }
 
     fn imports() -> ImportObject {
-        // let commit_entry_arc = Arc::new(self);
-        // let commit_entry_closure = move |ctx: &Ctx, allocation_ptr: RemotePtr| {
-        //     commit_entry(Arc::clone(conductor_api));
-        // };
-        //
-        // let imports = imports! {
-        //     "env" => {
-        //         "commit_entry" => func!(commit_entry_closure),
-        //         "some_other_fn" => func!(closure2)
-        //     }
-        // };
         imports! {}
     }
 }
@@ -77,17 +67,56 @@ impl RibosomeT for WasmRibosome {
         self,
         // cell_conductor_api: CellConductorApi,
         _bundle: &mut SourceChainCommitBundle<'env>,
-        _invocation: ZomeInvocation,
+        invocation: ZomeInvocation,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse> {
-        // let dna = self.dna;
-        // let wasm = dna.get_wasm(zome_name);
-        //
-        // let payload: SerializedBytes = invocation.payload;
-        //
-        // let instance = self.instance(&wasm, &wasm, &imports);
-        //
-        // holochain_wasmer_host::guest::call(instance, "fn_to_call", payload);
-        unimplemented!();
+        let response: ZomeInvocationResponse = holochain_wasmer_host::guest::call(
+            &mut self.instance(&invocation)?,
+            &invocation.fn_name,
+            invocation.payload,
+        )?;
+        Ok(response)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::WasmRibosome;
+    use crate::core::ribosome::RibosomeT;
+    use sx_types::{
+        dna::{zome::Zome, Dna},
+        nucleus::ZomeInvocation,
+        shims::SourceChainCommitBundle,
+    };
+    use sx_wasm_test_utils::{test_wasm, TestWasm};
+
+    #[test]
+    fn invoke_foo_test() {
+        let ribosome = WasmRibosome::new(Dna {
+            zomes: {
+                let mut v = std::collections::BTreeMap::new();
+                v.insert(
+                    String::from("foo"),
+                    Zome {
+                        code: test_wasm(TestWasm::Foo),
+                        ..Default::default()
+                    },
+                );
+                v
+            },
+            ..Default::default()
+        });
+
+        let invocation = ZomeInvocation {
+            zome_name: "foo".into(),
+            fn_name: "foo".into(),
+            ..Default::default()
+        };
+
+        println!(
+            "{:?}",
+            ribosome.call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+        );
     }
 }

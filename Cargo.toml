@@ -10,7 +10,8 @@ members = [
 ]
 
 exclude = [
-  "pseudocode"
+  "pseudocode",
+  "test_utils/wasm"
 ]
 
 [patch.crates-io]

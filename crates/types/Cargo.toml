@@ -28,7 +28,7 @@ tracing-core = "=0.1.10"
 tracing-subscriber = "=0.2.3"
 tracing-serde = "=0.1.1"
 holochain_serialized_bytes = "=0.0.36"
-holochain_wasmer_common = "=0.0.21"
+holochain_wasmer_common = "=0.0.22"
 sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
 
 # possibly dispensable
