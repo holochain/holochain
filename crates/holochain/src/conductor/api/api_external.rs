@@ -22,21 +22,19 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
     // -- provided -- //
 
     async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
-        let res: ConductorApiResult<ConductorResponse> = (move || {
-            async move {
-                match request {
-                    ConductorRequest::ZomeInvocation { request } => {
-                        Ok(ConductorResponse::ZomeInvocationResponse {
-                            response: Box::new(self.invoke_zome(*request).await?),
-                        })
-                    }
-                    ConductorRequest::Admin { request } => Ok(ConductorResponse::AdminResponse {
-                        response: Box::new(self.admin(*request).await?),
-                    }),
-                    _ => unimplemented!(),
+        let res: ConductorApiResult<ConductorResponse> = async move {
+            match request {
+                ConductorRequest::ZomeInvocation { request } => {
+                    Ok(ConductorResponse::ZomeInvocationResponse {
+                        response: Box::new(self.invoke_zome(*request).await?),
+                    })
                 }
+                ConductorRequest::Admin { request } => Ok(ConductorResponse::AdminResponse {
+                    response: Box::new(self.admin(*request).await?),
+                }),
+                _ => unimplemented!(),
             }
-        })()
+        }
         .await;
 
         match res {
