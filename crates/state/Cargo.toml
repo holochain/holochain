@@ -13,7 +13,7 @@ sx_types = { path = "../types"}
 futures = "0.3.1"
 thiserror = "1.0.10"
 mockall = "0.6.0"
-rkv = { git = "https://github.com/holochain/rkv.git" }
+rkv = "=0.10.4"
 rmp-serde = "0.14.3"
 serde = "1.0.104"
 serde_derive = "1.0.104"
