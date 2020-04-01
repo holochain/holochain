@@ -10,7 +10,7 @@ let
   RUST_BACKTRACE=1 \
   hn-rust-fmt-check \
   && hn-rust-clippy \
-  && cargo test
+  && cargo test -- --nocapture
   '';
 in
 {

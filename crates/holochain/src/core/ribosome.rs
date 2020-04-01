@@ -99,7 +99,7 @@ pub mod tests {
                 v.insert(
                     String::from("foo"),
                     Zome {
-                        code: test_wasm(TestWasm::Foo),
+                        code: test_wasm(&"../..".into(), TestWasm::Foo),
                         ..Default::default()
                     },
                 );
