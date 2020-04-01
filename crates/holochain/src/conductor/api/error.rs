@@ -12,7 +12,7 @@ pub enum ConductorApiError {
 
     /// Miscellaneous error
     #[error("Miscellaneous error: {0}")]
-    Misc(String),
+    Todo(String),
 }
 
 /// Type alias
