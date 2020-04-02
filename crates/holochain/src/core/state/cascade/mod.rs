@@ -113,7 +113,7 @@ where
             .unwrap_or_else(|| Search::Continue);
 
         // Cache
-        let search = match search {
+        match search {
             Search::Continue => self
                 .cache
                 .get_entry(&address)?
@@ -126,20 +126,9 @@ where
                             Crud::Pending => Search::Continue,
                             _ => Search::NotFound,
                         })
-                })
-                .unwrap_or_else(|| Search::Continue),
-            Search::Found(entry) => return Ok(Some(entry)),
-            Search::NotFound => return Ok(None),
-        };
-
-        // Network
-        match search {
-            Search::Continue => self
-                .network
-                .fetch_entry(&address)
-                .map_err(|e| DatabaseError::Other(e.into())),
-            Search::Found(entry) => return Ok(Some(entry)),
-            Search::NotFound => return Ok(None),
+                }),
+            Search::Found(entry) => Ok(Some(entry)),
+            Search::NotFound => Ok(None),
         }
     }
     pub async fn dht_get_links<S: Into<String>>(
@@ -155,25 +144,12 @@ where
             let links = self.primary_meta.get_links(&base, tag.clone())?;
 
             // Cache
-            let links = if links.len() == 0 {
-                self.cache_meta.get_links(&base, tag.clone())?
-            } else {
-                links
-            };
-            // Network
             if links.len() == 0 {
-                self.network
-                    .fetch_links(&base, tag)
-                    .map_err(|e| DatabaseError::Other(e.into()))
+                self.cache_meta.get_links(&base, tag.clone())
             } else {
                 Ok(links)
             }
         } else {
-            // Network
-            let links = self
-                .network
-                .fetch_links(&base, tag.clone())
-                .map_err(|e| DatabaseError::Other(e.into()))?;
             // Cache
             if links.len() == 0 {
                 self.cache_meta.get_links(&base, tag)
