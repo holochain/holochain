@@ -23,8 +23,8 @@ async fn get_links() -> DatabaseResult<()> {
 
     let jimbo_id = AgentId::generate_fake("Jimbo");
     let jimbo = Entry::AgentId(jimbo_id.clone());
-    let jessy_id = AgentId::generate_fake("jessy_id");
-    let jessy = Entry::AgentId(AgentId::generate_fake("Jessy"));
+    let jessy_id = AgentId::generate_fake("Jessy");
+    let jessy = Entry::AgentId(jessy_id.clone());
     let base = jimbo.address();
     let target = jessy.address();
     let result = target.clone();
