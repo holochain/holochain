@@ -70,19 +70,6 @@ pub struct Dna {
 impl Eq for Dna {}
 
 impl Dna {
-    /// Return an empty, invalid Dna, useful for testing
-    pub fn empty() -> Self {
-        Self {
-            name: String::default(),
-            description: String::default(),
-            version: String::default(),
-            uuid: zero_uuid(),
-            dna_spec_version: String::from("2.0"),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: BTreeMap::default(),
-        }
-    }
-
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &str) -> Result<&zome::Zome, DnaError> {
         self.zomes
@@ -220,7 +207,6 @@ impl PartialEq for Dna {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     extern crate base64;
     use crate::{
         dna::entry_types::EntryTypeDef,
@@ -230,8 +216,8 @@ pub mod tests {
 
     #[test]
     fn test_dna_new() {
-        let dna = Dna::empty();
-        assert_eq!(format!("{:?}",dna),"Dna { name: \"\", description: \"\", version: \"\", uuid: \"00000000-0000-0000-0000-000000000000\", dna_spec_version: \"2.0\", properties: null, zomes: {} }")
+        let dna = fake_dna("test_dna_new");
+        assert_eq!(format!("{:?}",dna),"Dna { name: \"\", description: \"\", version: \"\", uuid: \"test_dna_new\", dna_spec_version: \"2.0\", properties: null, zomes: {} }")
     }
 
     #[test]
@@ -326,13 +312,9 @@ pub mod tests {
 
     // static UNIT_UUID: &'static str = "00000000-0000-0000-0000-000000000000";
 
-    fn test_empty_dna() -> Dna {
-        Dna::empty()
-    }
-
     #[test]
     fn get_entry_type_def_test() {
-        let mut dna = test_empty_dna();
+        let mut dna = fake_dna("get_entry_type_def_test");
         let mut zome = fake_zome();
         let entry_type = EntryType::App(AppEntryType::from("bar"));
         let entry_type_def = EntryTypeDef::new();
@@ -429,7 +411,7 @@ pub mod tests {
 
     // #[test]
     // fn default_value_test() {
-    //     let mut dna = Dna::empty();
+    //     let mut dna = fake_dna();
     //     dna.uuid = String::from(UNIT_UUID);
     //
     //     let mut zome = zome::Zome::empty();

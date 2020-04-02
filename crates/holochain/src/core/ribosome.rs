@@ -92,7 +92,8 @@ pub mod tests {
         prelude::Address,
         shims::SourceChainCommitBundle,
         test_utils::{
-            fake_agent_id, fake_capability_request, fake_cell_id, fake_zome_invocation_payload,
+            fake_agent_id, fake_capability_request, fake_cell_id, fake_dna, fake_zome,
+            fake_zome_invocation_payload,
         },
     };
     use sx_wasm_test_utils::{test_wasm, TestWasm};
@@ -106,7 +107,7 @@ pub mod tests {
     }
 
     fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
-        let mut dna = fake_dna();
+        let mut dna = fake_dna("uuid");
         dna.zomes = zomes;
         dna
     }
