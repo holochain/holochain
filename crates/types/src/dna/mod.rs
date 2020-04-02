@@ -215,12 +215,6 @@ pub mod tests {
     };
 
     #[test]
-    fn test_dna_new() {
-        let dna = fake_dna("test_dna_new");
-        assert_eq!(format!("{:?}",dna),"Dna { name: \"\", description: \"\", version: \"\", uuid: \"test_dna_new\", dna_spec_version: \"2.0\", properties: null, zomes: {} }")
-    }
-
-    #[test]
     fn test_dna_get_zome() {
         let dna = fake_dna("a");
         let result = dna.get_zome("foo zome");

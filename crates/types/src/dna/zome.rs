@@ -140,38 +140,21 @@ impl Zome {
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        dna::{fn_declarations::FnParameter, zome::Zome},
+        dna::fn_declarations::{FnDeclaration, FnParameter},
         test_utils::fake_zome,
     };
-    use serde_json;
-
-    #[test]
-    fn build_and_compare() {
-        let fixture: Zome = serde_json::from_str(
-            r#"{
-                "description": "test",
-                "config": {},
-                "entry_types": {},
-                "fn_delcarations": [],
-                "traits": {},
-                "code": {
-                    "code": []
-                }
-            }"#,
-        )
-        .unwrap();
-
-        let mut zome = fake_zome();
-        zome.description = String::from("test");
-
-        assert_eq!(fixture, zome);
-    }
 
     #[test]
     fn test_zome_add_fn_declaration() {
-        let mut zome = fake_zome();
-        assert_eq!(zome.fn_declarations.len(), 0);
-        zome.add_fn_declaration(
+        let base = {
+            let mut zome = fake_zome();
+            zome.fn_declarations = vec![];
+            zome
+        };
+
+        assert_eq!(base.fn_declarations.len(), 0);
+        let mut actual = base.clone();
+        actual.add_fn_declaration(
             String::from("hello"),
             vec![],
             vec![FnParameter {
@@ -179,10 +162,18 @@ pub mod tests {
                 parameter_type: String::from("String"),
             }],
         );
-        assert_eq!(zome.fn_declarations.len(), 1);
+        assert_eq!(actual.fn_declarations.len(), 1);
 
-        let expected = "[FnDeclaration { name: \"hello\", inputs: [], outputs: [FnParameter { parameter_type: \"String\", name: \"greeting\" }] }]";
-        assert_eq!(expected, format!("{:?}", zome.fn_declarations),);
+        let mut expected = base.clone();
+        expected.fn_declarations.push(FnDeclaration {
+            name: String::from("hello"),
+            inputs: vec![],
+            outputs: vec![FnParameter {
+                name: String::from("greeting"),
+                parameter_type: String::from("String"),
+            }],
+        });
+        assert_eq!(expected, actual);
     }
 
     #[test]
