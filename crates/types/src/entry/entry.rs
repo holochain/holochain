@@ -101,9 +101,9 @@ pub mod tests {
     use crate::{
         agent::test_agent_id,
         entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
+        persistence::cas::content::Addressable,
+        test_utils::fake_dna,
     };
-
-    use crate::{persistence::cas::content::Addressable, test_utils::fake_dna};
 
     #[derive(Serialize, Deserialize, SerializedBytes)]
     struct SerializedString(String);
