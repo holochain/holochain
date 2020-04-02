@@ -12,8 +12,7 @@ use crate::{
         entry_type::{AppEntryType, EntryType},
     },
     link::Link,
-    persistence::cas::content::{Address, Addressable, Content},
-    prelude::*,
+    persistence::cas::content::{Address, Addressable},
 };
 use holochain_serialized_bytes::prelude::*;
 use multihash::Hash;
@@ -85,7 +84,7 @@ impl Addressable for Entry {
             // @TODO deal with unwrap here
             // @TODO deal with the clone here
             _ => Address::encode_from_bytes(
-                Content::try_from(self.clone()).unwrap().bytes(),
+                SerializedBytes::try_from(self.clone()).unwrap().bytes(),
                 Hash::SHA2256,
             ),
         }
@@ -104,19 +103,19 @@ pub mod tests {
         entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
     };
 
-    use crate::persistence::cas::content::AddressableContent;
+    use crate::persistence::cas::content::Addressable;
 
     #[derive(Serialize, Deserialize, SerializedBytes)]
     struct SerializedString(String);
 
     /// dummy entry value
     #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value() -> Content {
-        Content::try_from(()).unwrap()
+    pub fn test_entry_value() -> SerializedBytes {
+        SerializedBytes::try_from(()).unwrap()
     }
 
-    pub fn test_entry_content() -> Content {
-        Content::try_from(Entry::App(test_app_entry_type(), test_entry_value())).unwrap()
+    pub fn test_entry_content() -> SerializedBytes {
+        SerializedBytes::try_from(Entry::App(test_app_entry_type(), test_entry_value())).unwrap()
     }
 
     /// dummy entry content, same as test_entry_value()

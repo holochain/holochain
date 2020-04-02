@@ -13,10 +13,6 @@ use multihash::Hash;
 /// consider what would happen if we had multi GB addresses...
 pub type Address = HashString;
 
-/// the Content is any SerializedBytes
-/// this is the only way to be confident in persisting all Rust types across all backends
-pub type Content = SerializedBytes;
-
 /// can be stored as serialized content
 /// the content is the address, there is no "location" like a file system or URL
 /// @see https://en.wikipedia.org/wiki/Content-addressable_storage
@@ -30,7 +26,7 @@ pub trait Addressable {
     fn address(&self) -> Address;
 }
 
-impl Addressable for Content {
+impl Addressable for SerializedBytes {
     fn address(&self) -> Address {
         Address::encode_from_bytes(self.bytes(), Hash::SHA2256)
     }
@@ -51,7 +47,3 @@ macro_rules! addressable_serializable {
         }
     };
 }
-
-/// AddressableContent allows anything Addressable that can also round trip through Content
-/// Content itself satisfies this
-pub trait AddressableContent = Addressable + TryInto<Content> + TryFrom<Content>;

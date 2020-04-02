@@ -99,10 +99,9 @@ pub fn test_agent_id_with_name(name: &str) -> AgentId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::persistence::cas::content::Content;
 
-    pub fn test_identity_value() -> Content {
-        Content::try_from(AgentId {
+    pub fn test_identity_value() -> SerializedBytes {
+        SerializedBytes::try_from(AgentId {
             nick: "bob".to_string(),
             pub_sign_key: GOOD_ID.to_string(),
         })

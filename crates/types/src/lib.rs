@@ -1,5 +1,4 @@
 //! Common holochain types crate.
-#![feature(trait_alias)]
 #![deny(missing_docs)]
 
 /// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)

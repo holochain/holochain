@@ -1,6 +1,9 @@
 //! helper functions and data for persistence testing
 
-use crate::{persistence::hash::HashString, prelude::*};
+use crate::{
+    persistence::{cas::content::Addressable, hash::HashString},
+    prelude::*,
+};
 
 /// dummy hash based on the key of test_entry_a()
 pub fn test_hash_a() -> HashString {

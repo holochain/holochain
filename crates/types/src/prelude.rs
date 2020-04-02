@@ -3,7 +3,7 @@
 pub use crate::{
     addressable_serializable,
     persistence::{
-        cas::content::{Address, AddressableContent, Content},
+        cas::content::{Address, Addressable},
         hash::HashString,
     },
 };
