@@ -21,7 +21,7 @@ pub fn create_demo_channel_interface<A: ExternalConductorApi>(
         ConductorSideRequestReceiver<ConductorRequest, ConductorResponse>,
     ) = create_interface_channel(send_sig, recv_req);
 
-    let join_handle = attach_external_conductor_api(api.clone(), chan_req_recv);
+    let join_handle = attach_external_conductor_api(api, chan_req_recv);
 
     (send_req, join_handle)
 }
