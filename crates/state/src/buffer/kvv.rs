@@ -20,7 +20,7 @@ struct ValuesDelta<V> {
     deltas: HashMap<V, Op>,
 }
 
-impl<V> ValuesDelta<V> {
+impl<V: std::hash::Hash + Eq> ValuesDelta<V> {
     fn all_deleted() -> Self {
         Self {
             delete_all: true,
@@ -31,7 +31,7 @@ impl<V> ValuesDelta<V> {
 
 // This would be equivalent to the derived impl, except that this
 // doesn't require `V: Default`
-impl<V> Default for ValuesDelta<V> {
+impl<V: std::hash::Hash + Eq> Default for ValuesDelta<V> {
     fn default() -> Self {
         Self {
             delete_all: bool::default(),
@@ -206,7 +206,7 @@ pub mod tests {
     use crate::{
         env::{ReadManager, WriteManager},
         error::DatabaseError,
-        test_utils::test_env,
+        test_utils::test_cell_env,
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
@@ -226,7 +226,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvvbuf_basics() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
 
         let multi_store = env
@@ -288,7 +288,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn delete_all() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
 
         let multi_store = env
@@ -356,7 +356,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn idempotent_inserts() {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
 
         let multi_store = env

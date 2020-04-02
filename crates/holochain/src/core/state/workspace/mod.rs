@@ -34,7 +34,7 @@ pub mod tests {
         db::{DbManager, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         prelude::{Reader, Writer},
-        test_utils::test_env,
+        test_utils::test_cell_env,
     };
     use sx_types::prelude::*;
 
@@ -63,7 +63,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn workspace_sanity_check() -> WorkspaceResult<()> {
-        let arc = test_env();
+        let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
         let addr1 = Address::from("hi".to_owned());

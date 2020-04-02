@@ -1,7 +1,7 @@
 //! Functionality for safely accessing LMDB database references.
 
 use crate::{
-    env::Environment,
+    env::{Environment, EnvironmentKind},
     error::{DatabaseError, DatabaseResult},
 };
 use lazy_static::lazy_static;
@@ -28,6 +28,9 @@ pub enum DbName {
     CacheChainHeaders,
     /// Cache database: KVV store of chain metadata, storing relationships
     CacheChainMeta,
+    /// database which stores a single key-value pair, encoding the
+    /// mutable state for the entire Conductor
+    ConductorState,
 }
 
 impl std::fmt::Display for DbName {
@@ -41,6 +44,7 @@ impl std::fmt::Display for DbName {
             CacheChainEntries => write!(f, "CacheChainEntries"),
             CacheChainHeaders => write!(f, "CacheChainHeaders"),
             CacheChainMeta => write!(f, "CacheChainMeta"),
+            ConductorState => write!(f, "ConductorState"),
         }
     }
 }
@@ -58,6 +62,7 @@ impl DbName {
             CacheChainEntries => Single,
             CacheChainHeaders => Single,
             CacheChainMeta => Multi,
+            ConductorState => Single,
         }
     }
 }
@@ -100,6 +105,8 @@ lazy_static! {
     pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
     /// The key to access the ChainMeta database
     pub static ref CACHE_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
+    /// The key to access the ConductorState database
+    pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
 }
 
 /// DbManager is intended to be used as a singleton store for LMDB Database references,
@@ -163,7 +170,8 @@ impl DbManager {
 
     /// Get a `rkv` Database reference from a key, or create a new Database
     /// of the proper type if not yet created
-    async fn get_or_create<V: 'static + Send + Sync>(
+    /*
+    pub async fn get_or_create<V: 'static + Send + Sync>(
         &mut self,
         key: &DbKey<V>,
     ) -> DatabaseResult<&V> {
@@ -173,18 +181,25 @@ impl DbManager {
             self.create(key).await?;
             Ok(self.um.get(key).unwrap().clone())
         }
-    }
+    }*/
 
     async fn initialize(&mut self) -> DatabaseResult<()> {
-        self.create(&*PRIMARY_CHAIN_ENTRIES).await?;
-        self.create(&*PRIMARY_CHAIN_HEADERS).await?;
-        self.create(&*PRIMARY_SYSTEM_META).await?;
-        self.create(&*PRIMARY_LINKS_META).await?;
-        self.create(&*CHAIN_SEQUENCE).await?;
-        self.create(&*CACHE_CHAIN_ENTRIES).await?;
-        self.create(&*CACHE_CHAIN_HEADERS).await?;
-        self.create(&*CACHE_SYSTEM_META).await?;
-        self.create(&*CACHE_LINKS_META).await?;
+        match self.env.kind() {
+            EnvironmentKind::Cell(_) => {
+                self.create(&*PRIMARY_CHAIN_ENTRIES).await?;
+                self.create(&*PRIMARY_CHAIN_HEADERS).await?;
+                self.create(&*PRIMARY_SYSTEM_META).await?;
+                self.create(&*PRIMARY_LINKS_META).await?;
+                self.create(&*CHAIN_SEQUENCE).await?;
+                self.create(&*CACHE_CHAIN_ENTRIES).await?;
+                self.create(&*CACHE_CHAIN_HEADERS).await?;
+                self.create(&*CACHE_SYSTEM_META).await?;
+                self.create(&*CACHE_LINKS_META).await?;
+            }
+            EnvironmentKind::Conductor => {
+                self.create(&*CONDUCTOR_STATE).await?;
+            }
+        }
         Ok(())
     }
 }

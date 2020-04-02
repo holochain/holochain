@@ -8,20 +8,27 @@
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
 
+use super::state::ConductorState;
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
-    config::Config,
+    config::ConductorConfig,
     error::ConductorResult,
 };
 pub use builder::*;
 use std::collections::HashMap;
+use sx_state::{
+    db,
+    env::{Environment, ReadManager},
+    exports::SingleStore,
+    prelude::WriteManager,
+    typed::{Kv, UnitDbKey},
+};
 use sx_types::{
+    agent::AgentId,
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
-// use sx_keystore::keystore::Keystore;
-use sx_types::agent::AgentId;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -40,20 +47,28 @@ struct CellItem {
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
-    tx_network: NetSender,
+    // tx_network: NetSender,
     cells: HashMap<CellId, CellItem>,
+    env: Environment,
+    state_db: ConductorStateDb,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
 }
 
 impl Conductor {
-    pub fn new(tx_network: NetSender) -> Self {
-        Self {
+    async fn new(env: Environment) -> ConductorResult<Conductor> {
+        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
+        Ok(Conductor {
+            env,
+            state_db: Kv::new(db)?,
             cells: HashMap::new(),
-            tx_network,
             _handle_map: HashMap::new(),
             _agent_keys: HashMap::new(),
-        }
+        })
+    }
+
+    pub fn build() -> ConductorBuilder {
+        ConductorBuilder::new()
     }
 
     pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
@@ -65,42 +80,87 @@ impl Conductor {
     }
 
     pub fn tx_network(&self) -> &NetSender {
-        &self.tx_network
+        unimplemented!()
     }
 
-    pub fn load_config(_config: Config) -> ConductorResult<()> {
-        Ok(())
+    // TODO: remove allow once we actually use this function
+    #[allow(dead_code)]
+    async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+    {
+        let guard = self.env.guard().await;
+        let mut writer = guard.writer()?;
+        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
+        let new_state = f(state)?;
+        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
+        writer.commit()?;
+        Ok(new_state)
+    }
+
+    // TODO: remove allow once we actually use this function
+    #[allow(dead_code)]
+    async fn get_state(&self) -> ConductorResult<ConductorState> {
+        let guard = self.env.guard().await;
+        let reader = guard.reader()?;
+        Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 }
 
+type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
+
 mod builder {
 
-    // use super::*;
+    use super::*;
+    use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
-    // pub struct ConductorBuilder {
-    //     executor: Option<Box<dyn Spawn>>,
-    // }
+    pub struct ConductorBuilder {}
 
-    // impl ConductorBuilder {
-    //     pub fn new() -> Self {
-    //         Self { executor: None }
-    //     }
+    impl ConductorBuilder {
+        pub fn new() -> Self {
+            Self {}
+        }
 
-    //     pub fn executor(mut self, executor: Box<dyn Spawn>) -> Self {
-    //         self.executor = Some(Box::new(executor));
-    //         self
-    //     }
+        pub async fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
+            let env_path = config.environment_path;
+            let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
+            let conductor = Conductor::new(environment).await?;
+            Ok(conductor)
+        }
 
-    //     pub fn from_config(self, config: Config) -> ConductorResult<Conductor<Box<dyn Spawn>>> {
-    //         let executor = self.executor.unwrap_or_else(default_executor);
-    //         Ok(Conductor {
-    //             cells: HashMap::new(),
-    //             executor,
-    //         })
-    //     }
-    // }
+        pub async fn test(self) -> ConductorResult<Conductor> {
+            let environment = test_conductor_env();
+            Conductor::new(environment).await
+        }
+    }
+}
 
-    // fn default_executor() -> Box<dyn Spawn> {
-    //     Box::new(ThreadPool::new().expect("Couldn't create Threadpool executor"))
-    // }
+#[cfg(test)]
+pub mod tests {
+
+    use super::{Conductor, ConductorState};
+    use crate::conductor::state::CellConfig;
+
+    #[tokio::test]
+    async fn can_update_state() {
+        let conductor = Conductor::build().test().await.unwrap();
+        let state = conductor.get_state().await.unwrap();
+        assert_eq!(state, ConductorState::default());
+
+        let cell_config = CellConfig {
+            id: "".to_string(),
+            agent: "".to_string(),
+            dna: "".to_string(),
+        };
+
+        conductor
+            .update_state(|mut state| {
+                state.cells.push(cell_config.clone());
+                Ok(state)
+            })
+            .await
+            .unwrap();
+        let state = conductor.get_state().await.unwrap();
+        assert_eq!(state.cells, [cell_config]);
+    }
 }

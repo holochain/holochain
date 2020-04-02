@@ -10,11 +10,11 @@ use tracing::*;
 /// which is driven externally by a channel in order to
 /// interact with a ExternalConductorApi
 pub struct ChannelInterface {
-    rx: mpsc::UnboundedReceiver<bool>,
+    rx: mpsc::Receiver<bool>,
 }
 
 impl ChannelInterface {
-    pub fn new(rx: mpsc::UnboundedReceiver<bool>) -> Self {
+    pub fn new(rx: mpsc::Receiver<bool>) -> Self {
         Self { rx }
     }
 }

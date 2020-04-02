@@ -28,20 +28,26 @@ lazy_static = "1.4.0"
 chrono = "0.4.6"
 tempdir = "0.3.7"
 mockall = "0.6.0"
-tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
+tokio = { version = "0.2.11", features = ["full"] }
 owning_ref = "0.4.1"
 anyhow = "1.0.26"
 parking_lot = "0.10.0"
-toml = "0.5.0"
+toml = "0.5.6"
 petgraph = "0.5.0"
 boolinator = "2.4.0"
 base64 = "0.10.1"
 tracing = "=0.1.13"
 tracing-futures = "=0.2.3"
+url = "1.7.2"
+url_serde = "0.2.0"
+derive_more = "0.99.3"
+directories = "2.0.2"
+human-panic = "1.0.3"
+num_cpus = "1.8"
 
 [dev-dependencies]
 anyhow = "1.0.26"
-rkv = { git = "https://github.com/holochain/rkv.git" }
+assert_cli = "0.6.3"
 
 [lib]
 name = "holochain_2020"
@@ -49,4 +55,4 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "holochain-2020"
-path = "src/bin/holochain.rs"
+path = "src/bin/holochain/main.rs"
