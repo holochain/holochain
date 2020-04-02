@@ -2,9 +2,9 @@
 #![cfg_attr(tarpaulin, skip)]
 #![warn(unused_extern_crates)]
 
+extern crate proc_macro;
+use quote::quote;
 use syn;
-#[macro_use]
-extern crate quote;
 
 use proc_macro::TokenStream;
 fn impl_default_serialized_bytes_address_macro(ast: &syn::DeriveInput) -> TokenStream {

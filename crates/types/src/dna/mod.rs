@@ -78,7 +78,7 @@ impl Dna {
             version: String::default(),
             uuid: zero_uuid(),
             dna_spec_version: String::from("2.0"),
-            properties: SerializedBytes::default(),
+            properties: SerializedBytes::try_from(()).unwrap(),
             zomes: BTreeMap::default(),
         }
     }

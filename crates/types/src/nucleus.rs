@@ -13,6 +13,13 @@ pub type ZomeName = String;
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct ZomeInvocationPayload(SerializedBytes);
 
+impl ZomeInvocationPayload {
+    /// Create a payload from serialized data
+    pub fn new(bytes: SerializedBytes) -> Self {
+        Self(bytes)
+    }
+}
+
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[allow(missing_docs)] // members are self-explanitory
