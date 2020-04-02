@@ -7,6 +7,10 @@ use url2::prelude::*;
 struct BroadcastMessage(pub String);
 try_from_serialized_bytes!(BroadcastMessage);
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct ResponseMessage(pub String);
+try_from_serialized_bytes!(ResponseMessage);
+
 #[tokio::main(threaded_scheduler)]
 async fn main() {
     let (mut send_socket, mut recv_socket) = websocket_connect(
@@ -40,7 +44,13 @@ async fn main() {
         match res {
             Ok(Some(line)) => match line {
                 linefeed::reader::ReadResult::Input(s) => {
-                    send_socket.signal(BroadcastMessage(s)).await.unwrap();
+                    if s.starts_with("req ") {
+                        let mut s = s.splitn(2, ' ');
+                        let resp: ResponseMessage = send_socket.request(BroadcastMessage(s.nth(1).unwrap().to_string())).await.unwrap();
+                        writeln!(rl, "Request response: {}", resp.0).unwrap();
+                    } else {
+                        send_socket.signal(BroadcastMessage(s)).await.unwrap();
+                    }
                 }
                 linefeed::reader::ReadResult::Eof => {
                     eprintln!("\nEof");

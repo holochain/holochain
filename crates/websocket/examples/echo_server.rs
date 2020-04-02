@@ -7,6 +7,10 @@ use url2::prelude::*;
 struct BroadcastMessage(pub String);
 try_from_serialized_bytes!(BroadcastMessage);
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct ResponseMessage(pub String);
+try_from_serialized_bytes!(ResponseMessage);
+
 #[tokio::main(threaded_scheduler)]
 async fn main() {
     sx_types::observability::test_run().unwrap();
@@ -37,6 +41,12 @@ async fn main() {
                             let msg: BroadcastMessage = msg.try_into().unwrap();
                             eprintln!("BROADCASTING: {}", msg.0);
                             loc_send_b.send(msg).unwrap();
+                        }
+                        WebsocketMessage::Request(msg, response) => {
+                            let msg: BroadcastMessage = msg.try_into().unwrap();
+                            eprintln!("RESPONDING to: {}", msg.0);
+                            let response_msg = ResponseMessage(format!("Hello, {}", msg.0));
+                            response(response_msg.try_into().unwrap()).await.unwrap();
                         }
                         msg => {
                             eprintln!("ERROR: {:?}", msg);
