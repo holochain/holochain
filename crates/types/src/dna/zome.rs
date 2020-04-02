@@ -78,19 +78,6 @@ pub struct Zome {
 impl Eq for Zome {}
 
 impl Zome {
-    /// Create an empty zome, useful for tests
-    pub fn empty() -> Zome {
-        Zome {
-            description: String::default(),
-            config: Config::default(),
-            entry_types: BTreeMap::default(),
-            fn_declarations: Vec::default(),
-            traits: BTreeMap::default(),
-            code: DnaWasm::new_invalid(),
-            bridges: Vec::default(),
-        }
-    }
-
     /// Allow sane defaults for `Zome::new()`.
     pub fn new(
         description: &str,
@@ -152,12 +139,11 @@ impl Zome {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::dna::{fn_declarations::FnParameter, zome::Zome};
+    use crate::{
+        dna::{fn_declarations::FnParameter, zome::Zome},
+        test_utils::fake_zome,
+    };
     use serde_json;
-
-    pub fn fake_zome() -> Zome {
-        Zome::empty()
-    }
 
     #[test]
     fn build_and_compare() {

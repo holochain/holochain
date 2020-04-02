@@ -100,13 +100,13 @@ pub mod tests {
     use test_wasm_common::TestString;
 
     fn zome_from_code(code: DnaWasm) -> Zome {
-        let mut zome = Zome::empty();
+        let mut zome = fake_zome();
         zome.code = code;
         zome
     }
 
     fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
-        let mut dna = Dna::empty();
+        let mut dna = fake_dna();
         dna.zomes = zomes;
         dna
     }
