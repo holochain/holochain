@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fs::File,
-    io::prelude::*,
+    fs,
     path::PathBuf,
     sync::Arc,
 };
@@ -19,7 +18,6 @@ use sx_types::{
     error::SkunkError,
     prelude::*,
 };
-use toml;
 
 #[cfg(test)]
 mod tests;
@@ -87,7 +85,7 @@ impl ConductorState {
 
         detect_dupes("interface", self.interfaces.iter().map(|c| &c.id))?;
 
-        for ref cell in self.cells.iter() {
+        for cell in self.cells.iter() {
             self.agent_by_id(&cell.agent).is_some().ok_or_else(|| {
                 format!(
                     "Agent configuration {} not found, mentioned in cell {}",
@@ -125,8 +123,8 @@ impl ConductorState {
             }
         }
 
-        for ref interface in self.interfaces.iter() {
-            for ref cell in interface.cells.iter() {
+        for interface in self.interfaces.iter() {
+            for cell in interface.cells.iter() {
                 self.cell_by_id(&cell.id).is_some().ok_or_else(|| {
                     format!(
                         "cell configuration \"{}\" not found, mentioned in interface",
@@ -282,13 +280,13 @@ impl ConductorState {
 
     /// Returns the agent configuration with the given ID if present
     pub fn agent_by_id(&self, id: &str) -> Option<AgentConfig> {
-        self.agents.iter().find(|ac| &ac.id == id).cloned()
+        self.agents.iter().find(|ac| ac.id == *id).cloned()
     }
 
     /// Returns the agent configuration with the given ID if present
     pub fn update_agent_address_by_id(&mut self, id: &str, agent_id: &AgentId) {
         self.agents.iter_mut().for_each(|ac| {
-            if &ac.id == id {
+            if ac.id == *id {
                 ac.public_address = agent_id.pub_sign_key().clone()
             }
         })
@@ -296,26 +294,26 @@ impl ConductorState {
 
     /// Returns the DNA configuration with the given ID if present
     pub fn dna_by_id(&self, id: &str) -> Option<DnaConfig> {
-        self.dnas.iter().find(|dc| &dc.id == id).cloned()
+        self.dnas.iter().find(|dc| dc.id == *id).cloned()
     }
 
     /// Returns the DNA configuration with the given ID if present
     pub fn update_dna_hash_by_id(&mut self, id: &str, hash: String) -> bool {
         self.dnas
             .iter_mut()
-            .find(|dc| &dc.id == id)
+            .find(|dc| dc.id == *id)
             .map(|dna| dna.hash = hash)
             .is_some()
     }
 
     /// Returns the cell configuration with the given ID if present
     pub fn cell_by_id(&self, id: &str) -> Option<CellConfig> {
-        self.cells.iter().find(|ic| &ic.id == id).cloned()
+        self.cells.iter().find(|ic| ic.id == *id).cloned()
     }
 
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfig> {
-        self.interfaces.iter().find(|ic| &ic.id == id).cloned()
+        self.interfaces.iter().find(|ic| ic.id == *id).cloned()
     }
 
     /// Returns all defined cell IDs
@@ -399,7 +397,7 @@ impl ConductorState {
 
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
-    pub fn save_remove_cell(mut self, id: &String) -> Self {
+    pub fn save_remove_cell(mut self, id: &str) -> Self {
         self.cells = self
             .cells
             .into_iter()
@@ -458,9 +456,7 @@ pub struct DnaConfig {
 impl TryFrom<DnaConfig> for Dna {
     type Error = SkunkError;
     fn try_from(dna_config: DnaConfig) -> Result<Self, Self::Error> {
-        let mut f = File::open(dna_config.file)?;
-        let mut contents = String::new();
-        f.read_to_string(&mut contents)?;
+        let contents = fs::read_to_string(dna_config.file)?;
         Dna::try_from(JsonString::from_json(&contents)).map_err(|err| err.into())
     }
 }

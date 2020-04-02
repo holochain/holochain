@@ -61,7 +61,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
-    pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) -> () {
+    pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) {
         let header = header_for_entry(&entry, agent_id, self.chain_head().cloned());
         self.sequence.put_header(header.address());
         self.cas.put((header, entry));
@@ -104,7 +104,7 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Option<Address
     let provenances = &[Provenance::new(agent_id.address(), Signature::fake())];
     let timestamp = chrono::Utc::now().timestamp().into();
     trace!("PUT {} {:?}", entry.address(), entry);
-    let header = ChainHeader::new(
+    ChainHeader::new(
         entry.entry_type(),
         entry.address(),
         provenances,
@@ -112,8 +112,7 @@ fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Option<Address
         None,
         None,
         timestamp,
-    );
-    header
+    )
 }
 
 pub struct SourceChainBackwardIterator<'env, R: Readable> {

@@ -1,3 +1,4 @@
+#![allow(clippy::ptr_arg)]
 use mockall::mock;
 use std::collections::HashSet;
 use sx_state::{

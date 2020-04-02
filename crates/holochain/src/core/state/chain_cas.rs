@@ -81,18 +81,18 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn put(&mut self, v: (ChainHeader, Entry)) -> () {
+    pub fn put(&mut self, v: (ChainHeader, Entry)) {
         let (header, entry) = v;
         self.entries.put(entry);
         self.headers.put(header);
     }
 
     /// TODO: consolidate into single delete which handles entry and header together
-    pub fn delete_entry(&mut self, k: Address) -> () {
+    pub fn delete_entry(&mut self, k: Address) {
         self.entries.delete(k)
     }
 
-    pub fn delete_header(&mut self, k: Address) -> () {
+    pub fn delete_header(&mut self, k: Address) {
         self.headers.delete(k)
     }
 

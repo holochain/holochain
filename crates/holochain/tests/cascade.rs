@@ -1,15 +1,12 @@
-use holochain_2020::core::{
-    net::MockNetRequester,
-    state::{cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf},
+use holochain_2020::core::state::{
+    cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
 };
-use mockall::*;
-use std::collections::HashSet;
-use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_env};
-use sx_types::{agent::AgentId, entry::Entry, persistence::cas::content::AddressableContent, prelude::Address};
+use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
+use sx_types::{agent::AgentId, entry::Entry, persistence::cas::content::AddressableContent};
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {
-    let env = test_env();
+    let env = test_cell_env();
     let dbs = env.dbs().await?;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
@@ -26,21 +23,8 @@ async fn get_links() -> DatabaseResult<()> {
     let jessy_id = AgentId::generate_fake("Jessy");
     let jessy = Entry::AgentId(jessy_id.clone());
     let base = jimbo.address();
-    let target = jessy.address();
-    let result = target.clone();
     source_chain.put_entry(jimbo, &jimbo_id);
     source_chain.put_entry(jessy, &jessy_id);
-
-    let mut mock_network = MockNetRequester::new();
-    mock_network
-        .expect_fetch_links()
-        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| {
-            Ok([target.clone()]
-                .iter()
-                .cloned()
-                .collect::<HashSet<Address>>())
-        });
 
     // Pass in stores as references
     let cascade = Cascade::new(
@@ -48,10 +32,9 @@ async fn get_links() -> DatabaseResult<()> {
         &primary_meta,
         &cache.cas(),
         &cache_meta,
-        mock_network,
     );
     let links = cascade.dht_get_links(base, "").await?;
     let link = links.into_iter().next();
-    assert_eq!(link, Some(result));
+    assert_eq!(link, None);
     Ok(())
 }

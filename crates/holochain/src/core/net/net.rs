@@ -1,3 +1,4 @@
+#![allow(clippy::ptr_arg)]
 use mockall::automock;
 use std::collections::HashSet;
 use sx_types::{entry::Entry, error::SkunkResult, prelude::*};

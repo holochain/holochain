@@ -40,30 +40,23 @@ use super::{
     chain_cas::ChainCasBuf,
     chain_meta::{ChainMetaBufT, Crud},
 };
-use crate::core::net::NetRequester;
 use std::collections::HashSet;
-use sx_state::{
-    error::{DatabaseError, DatabaseResult},
-    prelude::Reader,
-};
+use sx_state::{error::DatabaseResult, prelude::Reader};
 use sx_types::{entry::Entry, persistence::cas::content::Address};
 use tracing::*;
 
 #[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, C, N>
+pub struct Cascade<'env, C>
 where
     C: ChainMetaBufT<'env>,
-    N: NetRequester,
 {
     primary: &'env ChainCasBuf<'env, Reader<'env>>,
     primary_meta: &'env C,
 
     cache: &'env ChainCasBuf<'env, Reader<'env>>,
     cache_meta: &'env C,
-
-    network: N,
 }
 
 enum Search {
@@ -74,10 +67,9 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'env, C, N> Cascade<'env, C, N>
+impl<'env, C> Cascade<'env, C>
 where
     C: ChainMetaBufT<'env>,
-    N: NetRequester,
 {
     /// Take references to cas and cache
     pub fn new(
@@ -85,14 +77,12 @@ where
         primary_meta: &'env C,
         cache: &'env ChainCasBuf<'env, Reader<'env>>,
         cache_meta: &'env C,
-        network: N,
     ) -> Self {
         Cascade {
             primary,
             primary_meta,
             cache,
             cache_meta,
-            network,
         }
     }
     #[instrument(skip(self))]
@@ -121,16 +111,18 @@ where
                     self.cache_meta
                         .get_crud(&address)
                         .ok()
-                        .map(|crud| match crud {
-                            Crud::Live => Search::Found(entry),
-                            Crud::Pending => Search::Continue,
-                            _ => Search::NotFound,
+                        .and_then(|crud| match crud {
+                            Crud::Live => Some(entry),
+                            _ => None,
                         })
-                }),
+                })
+                .map(Ok)
+                .transpose(),
             Search::Found(entry) => Ok(Some(entry)),
             Search::NotFound => Ok(None),
         }
     }
+
     pub async fn dht_get_links<S: Into<String>>(
         &self,
         base: Address,
@@ -144,18 +136,14 @@ where
             let links = self.primary_meta.get_links(&base, tag.clone())?;
 
             // Cache
-            if links.len() == 0 {
-                self.cache_meta.get_links(&base, tag.clone())
+            if links.is_empty() {
+                self.cache_meta.get_links(&base, tag)
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            if links.len() == 0 {
-                self.cache_meta.get_links(&base, tag)
-            } else {
-                Ok(links)
-            }
+            self.cache_meta.get_links(&base, tag)
         }
     }
 }

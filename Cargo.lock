@@ -726,6 +726,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+ "tracing-futures",
  "url 1.7.2",
  "url_serde",
 ]
@@ -1270,6 +1271,26 @@ checksum = "29c127eea4a29ec6c85d153c59dc1213f33ec74cead30fe4730aecc88cc1fd92"
 dependencies = [
  "fixedbitset",
  "indexmap",
+]
+
+[[package]]
+name = "pin-project"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7804a463a8d9572f13453c516a5faea534a2403d7ced2f0c7e100eeff072772c"
+dependencies = [
+ "pin-project-internal",
+]
+
+[[package]]
+name = "pin-project-internal"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "385322a45f2ecf3410c68d2a549a4a2685e8051d0f278e39743ff4e451cb9b3f"
+dependencies = [
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.17",
 ]
 
 [[package]]
@@ -2141,6 +2162,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0aa83a9a47081cd522c09c81b31aec2c9273424976f922ad61c053b58350b715"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "tracing-futures"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58b0b7fd92dc7b71f29623cc6836dd7200f32161a2313dd78be233a8405694f6"
+dependencies = [
+ "pin-project",
+ "tracing",
 ]
 
 [[package]]
