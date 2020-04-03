@@ -24,7 +24,7 @@ holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/h
 holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 fallible-iterator = "0.2.0"
 thiserror = "1.0.10"
-lazy_static = "1.2.0"
+lazy_static = "1.4.0"
 chrono = "0.4.6"
 tempdir = "0.3.7"
 mockall = "0.6.0"
