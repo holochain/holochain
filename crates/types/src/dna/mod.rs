@@ -207,12 +207,21 @@ impl PartialEq for Dna {
 
 #[cfg(test)]
 pub mod tests {
-    extern crate base64;
     use crate::{
-        dna::entry_types::EntryTypeDef,
+        dna::{
+            bridges::{Bridge, BridgePresence, BridgeReference},
+            entry_types::{EntryTypeDef, Sharing},
+            fn_declarations::{FnDeclaration, FnParameter, Trait},
+            wasm::DnaWasm,
+            zome::{Config, Zome},
+            Dna,
+        },
         entry::entry_type::{AppEntryType, EntryType},
+        persistence::cas::content::Address,
         test_utils::{fake_dna, fake_zome},
     };
+    use holochain_serialized_bytes::prelude::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_dna_get_zome() {
@@ -288,21 +297,35 @@ pub mod tests {
         assert!(dna.verify().is_ok())
     }
 
-    // #[test]
-    // fn test_dna_verify_fail() {
-    //     // should error because code is empty
-    //     let dna = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "zomes": {
-    //                 "my_zome": {
-    //                     "code": {"code": ""}
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //     assert!(dna.verify().is_err())
-    // }
+    #[test]
+    fn test_dna_verify_fail() {
+        // should error because code is empty
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("my_zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: BTreeMap::new(),
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::new_invalid(),
+                        bridges: vec![],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
+        assert!(dna.verify().is_err())
+    }
 
     // static UNIT_UUID: &'static str = "00000000-0000-0000-0000-000000000000";
 
@@ -321,442 +344,211 @@ pub mod tests {
         assert_eq!(Some(&entry_type_def), dna.get_entry_type_def("bar"));
     }
 
-    // #[test]
-    // fn can_parse_and_output_json() {
-    //     let dna = test_empty_dna();
-    //
-    //     let serialized = serde_json::to_string(&dna).unwrap();
-    //
-    //     let deserialized: Dna = serde_json::from_str(&serialized).unwrap();
-    //
-    //     assert_eq!(String::from("2.0"), deserialized.dna_spec_version);
-    // }
+    #[test]
+    fn get_wasm_from_zome_name() {
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("test zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: BTreeMap::new(),
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::from(vec![1, 2, 3]),
+                        bridges: vec![],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
+        let wasm = dna.get_wasm_from_zome_name("test zome").unwrap();
+        assert_eq!(vec![1, 2, 3], *wasm.code());
 
-    // #[test]
-    // fn can_parse_and_output_json_helpers() {
-    //     let dna = test_empty_dna();
-    //
-    //     let json_string = JsonString::from(dna);
-    //
-    //     let deserialized = Dna::try_from(json_string).unwrap();
-    //
-    //     assert_eq!(String::from("2.0"), deserialized.dna_spec_version);
-    // }
+        let fail = dna.get_wasm_from_zome_name("non existant zome");
+        assert_eq!(None, fail);
+    }
 
-    // #[test]
-    // fn parse_and_serialize_compare() {
-    //     let fixture = String::from(
-    //         r#"{
-    //             "name": "test",
-    //             "description": "test",
-    //             "version": "test",
-    //             "uuid": "00000000-0000-0000-0000-000000000000",
-    //             "dna_spec_version": "2.0",
-    //             "properties": {
-    //                 "test": "test"
-    //             },
-    //             "zomes": {
-    //                 "test": {
-    //                     "description": "test",
-    //                     "config": {},
-    //                     "entry_types": {
-    //                         "test": {
-    //                             "properties": "test",
-    //                             "sharing": "public",
-    //                             "links_to": [
-    //                                 {
-    //                                     "target_type": "test",
-    //                                     "link_type": "test"
-    //                                 }
-    //                             ],
-    //                             "linked_from": []
-    //                         }
-    //                     },
-    //                     "traits": {
-    //                         "hc_public": {
-    //                             "functions": ["test"]
-    //                         }
-    //                     },
-    //                     "fn_declarations": [
-    //                         {
-    //                             "name": "test",
-    //                             "inputs": [],
-    //                             "outputs": []
-    //                         }
-    //                     ],
-    //                     "code": {
-    //                         "code": "AAECAw=="
-    //                     },
-    //                     "bridges": []
-    //                 }
-    //             }
-    //         }"#,
-    //     )
-    //     .replace(char::is_whitespace, "");
-    //
-    //     let dna = Dna::try_from(JsonString::from_json(&fixture.clone())).unwrap();
-    //
-    //     println!("{}", dna.to_json_pretty().unwrap());
-    //
-    //     let serialized = String::from(JsonString::from(dna)).replace(char::is_whitespace, "");
-    //
-    //     assert_eq!(fixture, serialized);
-    // }
+    #[test]
+    fn test_get_zome_name_for_entry_type() {
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("test zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: {
+                            let mut v = BTreeMap::new();
+                            v.insert(
+                                AppEntryType::from("test type").into(),
+                                EntryTypeDef {
+                                    sharing: Sharing::Public,
+                                    linked_from: vec![],
+                                    links_to: vec![],
+                                    properties: SerializedBytes::try_from(()).unwrap(),
+                                },
+                            );
+                            v
+                        },
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::from(vec![1, 2, 3]),
+                        bridges: vec![],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
 
-    // #[test]
-    // fn default_value_test() {
-    //     let mut dna = fake_dna();
-    //     dna.uuid = String::from(UNIT_UUID);
-    //
-    //     let mut zome = zome::Zome::empty();
-    //     zome.entry_types
-    //         .insert("".into(), entry_types::EntryTypeDef::new());
-    //     dna.zomes.insert("".to_string(), zome);
-    //
-    //     let expected = JsonString::from(dna.clone());
-    //     println!("{:?}", expected);
-    //
-    //     let fixture = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "name": "",
-    //             "description": "",
-    //             "version": "",
-    //             "uuid": "00000000-0000-0000-0000-000000000000",
-    //             "dna_spec_version": "2.0",
-    //             "properties": {},
-    //             "zomes": {
-    //                 "": {
-    //                     "description": "",
-    //                     "config": {},
-    //                     "entry_types": {
-    //                         "": {
-    //                             "description": "",
-    //                             "sharing": "public",
-    //                             "links_to": [],
-    //                             "linked_from": []
-    //                         }
-    //                     },
-    //                     "traits": {},
-    //                     "fn_declarations": [],
-    //                     "code": {"code": ""}
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //
-    //     assert_eq!(dna, fixture);
-    // }
+        assert_eq!(
+            dna.get_zome_name_for_app_entry_type(&AppEntryType::from("test type"))
+                .unwrap(),
+            "test zome".to_string()
+        );
+        assert!(dna
+            .get_zome_name_for_app_entry_type(&AppEntryType::from("non existant entry type"))
+            .is_none());
+    }
 
-    // #[test]
-    // fn parse_with_defaults_dna() {
-    //     let dna = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //
-    //     assert!(dna.uuid.len() > 0);
-    // }
-
-    // #[test]
-    // fn parse_with_defaults_entry_type() {
-    //     let dna = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "zomes": {
-    //                 "zome1": {
-    //                     "code": {
-    //                         "code": ""
-    //                     },
-    //                     "entry_types": {
-    //                         "type1": {}
-    //                     }
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //
-    //     assert_eq!(
-    //         dna.zomes
-    //             .get("zome1")
-    //             .unwrap()
-    //             .entry_types
-    //             .get(&"type1".into())
-    //             .unwrap()
-    //             .sharing,
-    //         entry_types::Sharing::Public
-    //     );
-    // }
-
-    // #[test]
-    // fn parse_wasm() {
-    //     let dna = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "zomes": {
-    //                 "zome1": {
-    //                     "entry_types": {
-    //                         "type1": {}
-    //                     },
-    //                     "code": {
-    //                         "code": "AAECAw=="
-    //                     }
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //
-    //     assert_eq!(
-    //         vec![0, 1, 2, 3],
-    //         *dna.zomes.get("zome1").unwrap().code.code()
-    //     );
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn parse_fail_if_bad_type_dna() {
-    //     Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "name": 42
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn parse_fail_if_bad_type_zome() {
-    //     Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "zomes": {
-    //                 "zome1": {
-    //                     "description": 42
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn parse_fail_if_bad_type_entry_type() {
-    //     Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "zomes": {
-    //                 "zome1": {
-    //                     "entry_types": {
-    //                         "test": {
-    //                             "properties": 42
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    // }
-
-    // #[test]
-    // fn get_wasm_from_zome_name() {
-    //     let dna = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "name": "test",
-    //             "description": "test",
-    //             "version": "test",
-    //             "uuid": "00000000-0000-0000-0000-000000000000",
-    //             "dna_spec_version": "2.0",
-    //             "properties": {
-    //                 "test": "test"
-    //             },
-    //             "zomes": {
-    //                 "test zome": {
-    //                     "name": "test zome",
-    //                     "description": "test",
-    //                     "config": {},
-    //                     "entry_types": {},
-    //                     "traits": {
-    //                         "hc_public": {
-    //                         }
-    //                     },
-    //                     "fn_declarations": [],
-    //                     "code": {
-    //                         "code": "AAECAw=="
-    //                     }
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //
-    //     let wasm = dna.get_wasm_from_zome_name("test zome");
-    //     assert_eq!("AAECAw==", base64::encode(&*wasm.unwrap().code()));
-    //
-    //     let fail = dna.get_wasm_from_zome_name("non existant zome");
-    //     assert_eq!(None, fail);
-    // }
-
-    // #[test]
-    // fn test_get_zome_name_for_entry_type() {
-    //     let dna = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "name": "test",
-    //             "description": "test",
-    //             "version": "test",
-    //             "uuid": "00000000-0000-0000-0000-000000000000",
-    //             "dna_spec_version": "2.0",
-    //             "properties": {
-    //                 "test": "test"
-    //             },
-    //             "zomes": {
-    //                 "test zome": {
-    //                     "name": "test zome",
-    //                     "description": "test",
-    //                     "config": {},
-    //                     "traits": {
-    //                         "hc_public": {
-    //                             "functions": []
-    //                         }
-    //                     },
-    //                     "fn_declarations": [],
-    //                     "entry_types": {
-    //                         "test type": {
-    //                             "description": "",
-    //                             "sharing": "public"
-    //                         }
-    //                     },
-    //                     "code": {
-    //                         "code": ""
-    //                     }
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //
-    //     assert_eq!(
-    //         dna.get_zome_name_for_app_entry_type(&AppEntryType::from("test type"))
-    //             .unwrap(),
-    //         "test zome".to_string()
-    //     );
-    //     assert!(dna
-    //         .get_zome_name_for_app_entry_type(&AppEntryType::from("non existant entry type"))
-    //         .is_none());
-    // }
-
-    // #[test]
-    // fn test_get_required_bridges() {
-    //     let dna = Dna::try_from(JsonString::from_json(
-    //         r#"{
-    //             "name": "test",
-    //             "description": "test",
-    //             "version": "test",
-    //             "uuid": "00000000-0000-0000-0000-000000000000",
-    //             "dna_spec_version": "2.0",
-    //             "properties": {
-    //                 "test": "test"
-    //             },
-    //             "zomes": {
-    //                 "test zome": {
-    //                     "name": "test zome",
-    //                     "description": "test",
-    //                     "config": {},
-    //                     "traits": {
-    //                         "hc_public": {
-    //                             "functions": []
-    //                         }
-    //                     },
-    //                     "fn_declarations": [],
-    //                     "entry_types": {
-    //                         "test type": {
-    //                             "description": "",
-    //                             "sharing": "public"
-    //                         }
-    //                     },
-    //                     "code": {
-    //                         "code": ""
-    //                     },
-    //                     "bridges": [
-    //                         {
-    //                             "presence": "required",
-    //                             "handle": "DPKI",
-    //                             "reference": {
-    //                                 "dna_address": "Qmabcdef1234567890"
-    //                             }
-    //                         },
-    //                         {
-    //                             "presence": "optional",
-    //                             "handle": "Vault",
-    //                             "reference": {
-    //                                 "traits": {
-    //                                     "persona_management": {
-    //                                         "functions": [
-    //                                             {
-    //                                                 "name": "get_persona",
-    //                                                 "inputs": [{"name": "domain", "type": "string"}],
-    //                                                 "outputs": [{"name": "persona", "type": "json"}]
-    //                                             }
-    //                                         ]
-    //                                     }
-    //                                 }
-    //                             }
-    //                         },
-    //                         {
-    //                             "presence": "required",
-    //                             "handle": "HCHC",
-    //                             "reference": {
-    //                                 "traits": {
-    //                                     "happ_directory": {
-    //                                         "functions": [
-    //                                             {
-    //                                                 "name": "get_happs",
-    //                                                 "inputs": [],
-    //                                                 "outputs": [{"name": "happs", "type": "json"}]
-    //                                             }
-    //                                         ]
-    //                                     }
-    //                                 }
-    //                             }
-    //                         }
-    //                     ]
-    //                 }
-    //             }
-    //         }"#,
-    //     ))
-    //     .unwrap();
-    //
-    //     assert_eq!(
-    //         dna.get_required_bridges(),
-    //         vec![
-    //             Bridge {
-    //                 presence: BridgePresence::Required,
-    //                 handle: String::from("DPKI"),
-    //                 reference: BridgeReference::Address {
-    //                     dna_address: Address::from("Qmabcdef1234567890"),
-    //                 }
-    //             },
-    //             Bridge {
-    //                 presence: BridgePresence::Required,
-    //                 handle: String::from("HCHC"),
-    //                 reference: BridgeReference::Trait {
-    //                     traits: maplit::btreemap! {
-    //                         String::from("happ_directory") => Trait {
-    //                             functions: vec![
-    //                                 FnDeclaration {
-    //                                     name: String::from("get_happs"),
-    //                                     inputs: vec![],
-    //                                     outputs: vec![FnParameter{
-    //                                         name: String::from("happs"),
-    //                                         parameter_type: String::from("json"),
-    //                                     }],
-    //                                 }
-    //                             ]
-    //                         }
-    //                     }
-    //                 },
-    //             },
-    //         ]
-    //     );
-    // }
+    #[test]
+    fn test_get_required_bridges() {
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("test zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: {
+                            let mut v = BTreeMap::new();
+                            v.insert(
+                                AppEntryType::from("test type").into(),
+                                EntryTypeDef {
+                                    sharing: Sharing::Public,
+                                    linked_from: vec![],
+                                    links_to: vec![],
+                                    properties: SerializedBytes::try_from(()).unwrap(),
+                                },
+                            );
+                            v
+                        },
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::from(vec![1, 2, 3]),
+                        bridges: vec![
+                            Bridge {
+                                handle: String::from("Vault"),
+                                presence: BridgePresence::Optional,
+                                reference: BridgeReference::Trait {
+                                    traits: {
+                                        let mut v = BTreeMap::new();
+                                        v.insert(
+                                            String::from("persona_management"),
+                                            Trait {
+                                                functions: vec![FnDeclaration {
+                                                    name: String::from("get_happs"),
+                                                    inputs: vec![],
+                                                    outputs: vec![FnParameter {
+                                                        name: "happs".into(),
+                                                        parameter_type: "json".into(),
+                                                    }],
+                                                }],
+                                            },
+                                        );
+                                        v
+                                    },
+                                },
+                            },
+                            Bridge {
+                                handle: String::from("HCHC"),
+                                presence: BridgePresence::Required,
+                                reference: BridgeReference::Trait {
+                                    traits: {
+                                        let mut v = BTreeMap::new();
+                                        v.insert(
+                                            String::from("happ_directory"),
+                                            Trait {
+                                                functions: vec![FnDeclaration {
+                                                    name: String::from("get_happs"),
+                                                    inputs: vec![],
+                                                    outputs: vec![FnParameter {
+                                                        name: "happs".into(),
+                                                        parameter_type: "json".into(),
+                                                    }],
+                                                }],
+                                            },
+                                        );
+                                        v
+                                    },
+                                },
+                            },
+                            Bridge {
+                                handle: String::from("DPKI"),
+                                presence: BridgePresence::Required,
+                                reference: BridgeReference::Address {
+                                    dna_address: Address::from("Qmabcdef1234567890"),
+                                },
+                            },
+                        ],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
+        assert_eq!(
+            dna.get_required_bridges(),
+            vec![
+                Bridge {
+                    presence: BridgePresence::Required,
+                    handle: String::from("HCHC"),
+                    reference: BridgeReference::Trait {
+                        traits: maplit::btreemap! {
+                            String::from("happ_directory") => Trait {
+                                functions: vec![
+                                    FnDeclaration {
+                                        name: String::from("get_happs"),
+                                        inputs: vec![],
+                                        outputs: vec![FnParameter{
+                                            name: String::from("happs"),
+                                            parameter_type: String::from("json"),
+                                        }],
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                },
+                Bridge {
+                    presence: BridgePresence::Required,
+                    handle: String::from("DPKI"),
+                    reference: BridgeReference::Address {
+                        dna_address: Address::from("Qmabcdef1234567890"),
+                    }
+                },
+            ]
+        );
+    }
 }
