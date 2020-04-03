@@ -34,6 +34,42 @@ pub trait CryptoPlugin: 'static + Send + Sync {
         data: &'b mut DynCryptoBytes,
         key: Option<&'b mut DynCryptoBytes>,
     ) -> BoxFuture<'b, CryptoResult<DynCryptoBytes>>;
+
+    /// size of seed needed for signature keys
+    fn sign_seed_bytes(&self) -> usize;
+
+    /// size of signature public key
+    fn sign_public_key_bytes(&self) -> usize;
+
+    /// size of signature secret key
+    fn sign_secret_key_bytes(&self) -> usize;
+
+    /// size of an actual signature
+    fn sign_bytes(&self) -> usize;
+
+    /// generate a signature keypair optionally based off a seed
+    #[must_use]
+    fn sign_keypair<'a, 'b>(
+        &'a self,
+        seed: Option<&'b mut DynCryptoBytes>,
+    ) -> BoxFuture<'b, CryptoResult<(DynCryptoBytes, DynCryptoBytes)>>;
+
+    /// sign some data
+    #[must_use]
+    fn sign<'a, 'b>(
+        &'a self,
+        message: &'b mut DynCryptoBytes,
+        secret_key: &'b mut DynCryptoBytes,
+    ) -> BoxFuture<'b, CryptoResult<DynCryptoBytes>>;
+
+    /// verify some signature data
+    #[must_use]
+    fn sign_verify<'a, 'b>(
+        &'a self,
+        signature: &'b mut DynCryptoBytes,
+        message: &'b mut DynCryptoBytes,
+        public_key: &'b mut DynCryptoBytes,
+    ) -> BoxFuture<'b, CryptoResult<bool>>;
 }
 
 /// dyn reference to a crypto plugin

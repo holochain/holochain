@@ -259,6 +259,145 @@ impl plugin::CryptoPlugin for SodiumCryptoPlugin {
         }
         .boxed()
     }
+
+    fn sign_seed_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_SEEDBYTES as usize
+    }
+
+    fn sign_public_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_PUBLICKEYBYTES as usize
+    }
+
+    fn sign_secret_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_SECRETKEYBYTES as usize
+    }
+
+    fn sign_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_BYTES as usize
+    }
+
+    fn sign_keypair<'a, 'b>(
+        &'a self,
+        seed: Option<&'b mut DynCryptoBytes>,
+    ) -> BoxFuture<'b, CryptoResult<(DynCryptoBytes, DynCryptoBytes)>> {
+        let sec_key = self.secure_buffer(self.sign_secret_key_bytes());
+        let pub_key_bytes = self.sign_public_key_bytes();
+        let seed_bytes = self.sign_seed_bytes();
+        async move {
+            tokio::task::block_in_place(move || {
+                let mut sec_key = sec_key?;
+                let mut pub_key = crypto_insecure_buffer(pub_key_bytes)?;
+
+                match seed {
+                    Some(seed) => {
+                        if seed.len() != seed_bytes {
+                            return Err(CryptoError::BadSeedSize);
+                        }
+                        let mut pub_key = pub_key.write();
+                        let mut sec_key = sec_key.write();
+                        let seed = seed.read();
+                        unsafe {
+                            if rust_sodium_sys::crypto_sign_seed_keypair(
+                                raw_ptr_char!(pub_key),
+                                raw_ptr_char!(sec_key),
+                                raw_ptr_char_immut!(seed),
+                            ) != 0 as libc::c_int
+                            {
+                                return Err("keypair failed".into());
+                            }
+                        }
+                    }
+                    None => {
+                        let mut pub_key = pub_key.write();
+                        let mut sec_key = sec_key.write();
+                        unsafe {
+                            if rust_sodium_sys::crypto_sign_keypair(
+                                raw_ptr_char!(pub_key),
+                                raw_ptr_char!(sec_key),
+                            ) != 0 as libc::c_int
+                            {
+                                return Err("keypair failed".into());
+                            }
+                        }
+                    }
+                }
+
+                Ok((pub_key, sec_key))
+            })
+        }
+        .boxed()
+    }
+
+    fn sign<'a, 'b>(
+        &'a self,
+        message: &'b mut DynCryptoBytes,
+        secret_key: &'b mut DynCryptoBytes,
+    ) -> BoxFuture<'b, CryptoResult<DynCryptoBytes>> {
+        let sign_bytes = self.sign_bytes();
+        let sec_key_bytes = self.sign_secret_key_bytes();
+        async move {
+            tokio::task::block_in_place(move || {
+                if secret_key.len() != sec_key_bytes {
+                    return Err(CryptoError::BadSecretKeySize);
+                }
+                let mut signature = crypto_insecure_buffer(sign_bytes)?;
+
+                {
+                    let message_len = message.len();
+                    let message = message.read();
+                    let secret_key = secret_key.read();
+                    let mut signature = signature.write();
+
+                    unsafe {
+                        if rust_sodium_sys::crypto_sign_detached(
+                            raw_ptr_char!(signature),
+                            std::ptr::null_mut(),
+                            raw_ptr_char_immut!(message),
+                            message_len as libc::c_ulonglong,
+                            raw_ptr_char_immut!(secret_key),
+                        ) != 0 as libc::c_int
+                        {
+                            return Err("signature failed".into());
+                        }
+                    }
+                }
+
+                Ok(signature)
+            })
+        }
+        .boxed()
+    }
+
+    fn sign_verify<'a, 'b>(
+        &'a self,
+        signature: &'b mut DynCryptoBytes,
+        message: &'b mut DynCryptoBytes,
+        public_key: &'b mut DynCryptoBytes,
+    ) -> BoxFuture<'b, CryptoResult<bool>> {
+        let pub_key_bytes = self.sign_public_key_bytes();
+        async move {
+            tokio::task::block_in_place(move || {
+                if public_key.len() != pub_key_bytes {
+                    return Err(CryptoError::BadPublicKeySize);
+                }
+
+                let signature = signature.read();
+                let message_len = message.len();
+                let message = message.read();
+                let public_key = public_key.read();
+
+                Ok(unsafe {
+                    rust_sodium_sys::crypto_sign_verify_detached(
+                        raw_ptr_char_immut!(signature),
+                        raw_ptr_char_immut!(message),
+                        message_len as libc::c_ulonglong,
+                        raw_ptr_char_immut!(public_key),
+                    )
+                } == 0 as libc::c_int)
+            })
+        }
+        .boxed()
+    }
 }
 
 /// initialize the crypto system plugin with our internal libsodium implementation

@@ -1,6 +1,37 @@
 #![deny(missing_docs)]
 
 //! holochain_crypto provides cryptographic functions
+//!
+//! # Example
+//!
+//! ```
+//! # async fn async_main () {
+//! use sx_crypto::*;
+//! let (mut pub_key, mut sec_key) = crypto_sign_keypair(None).await.unwrap();
+//!
+//! let mut message = crypto_secure_buffer(8).unwrap();
+//! let mut sig = crypto_sign(&mut message, &mut sec_key).await.unwrap();
+//!
+//! assert!(crypto_sign_verify(&mut sig, &mut message, &mut pub_key)
+//!     .await
+//!     .unwrap());
+//!
+//! {
+//!     let mut sig = sig.write();
+//!     sig[0] = (std::num::Wrapping(sig[0]) + std::num::Wrapping(1)).0;
+//! }
+//!
+//! assert!(!crypto_sign_verify(&mut sig, &mut message, &mut pub_key)
+//!     .await
+//!     .unwrap());
+//! # }
+//! # fn main () {
+//! #     tokio::runtime::Builder::new().threaded_scheduler()
+//! #         .build().unwrap().block_on(async move {
+//! #             tokio::task::spawn(async_main()).await
+//! #         });
+//! # }
+//! ```
 
 use rust_sodium_holochain_fork_sys as rust_sodium_sys;
 
@@ -67,6 +98,31 @@ mod tests {
                 "[200, 4, 206, 25, 142, 195, 55, 227, 220, 118, 43, 221, 26, 9, 174, 206]",
                 &format!("{:?}", hash.read().deref()),
             );
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn sodium_sign_no_seed() {
+        let _ = crypto_init_sodium();
+        tokio::task::spawn(async move {
+            let mut message = crypto_secure_buffer(8).unwrap();
+            let (mut pub_key, mut sec_key) = crypto_sign_keypair(None).await.unwrap();
+            let mut sig = crypto_sign(&mut message, &mut sec_key).await.unwrap();
+
+            assert!(crypto_sign_verify(&mut sig, &mut message, &mut pub_key)
+                .await
+                .unwrap());
+
+            {
+                let mut sig = sig.write();
+                sig[0] = (std::num::Wrapping(sig[0]) + std::num::Wrapping(1)).0;
+            }
+
+            assert!(!crypto_sign_verify(&mut sig, &mut message, &mut pub_key)
+                .await
+                .unwrap());
         })
         .await
         .unwrap();

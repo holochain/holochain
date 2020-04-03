@@ -10,11 +10,29 @@ pub enum CryptoError {
     /// the key size for this call didn't fall within constraints
     BadKeySize,
 
+    /// the public key size for this call didn't fall within constraints
+    BadPublicKeySize,
+
+    /// the secret key size for this call didn't fall within constraints
+    BadSecretKeySize,
+
+    /// improper size for seed
+    BadSeedSize,
+
     /// bad bounds for write operation
     WriteOverflow,
 
     /// error in tokio task
     JoinError(#[from] tokio::task::JoinError),
+
+    /// generic internal error
+    Other(String),
+}
+
+impl From<&str> for CryptoError {
+    fn from(s: &str) -> Self {
+        CryptoError::Other(s.into())
+    }
 }
 
 impl std::fmt::Display for CryptoError {
