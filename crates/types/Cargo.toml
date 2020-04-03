@@ -14,8 +14,8 @@ edition = "2018"
 base64 = "0.10.1"
 chrono = "0.4.6"
 hcid = "0.0.6"
-holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
-holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_json_api = { version = "0.0.36", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
+holochain_json_derive = { version = "0.0.36", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 # holochain_locksmith = "0.0.43-alpha3"
 lib3h_crypto_api = "0.0.38"
 regex = "1.1.2"
