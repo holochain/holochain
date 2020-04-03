@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (name.clone().into(), fake_agent_id(name)).into()
+    (name.to_string().into(), fake_agent_id(name)).into()
 }
 
 /// A fixture example AgentId for unit testing.

@@ -1,5 +1,6 @@
 mod genesis;
 mod invoke_zome;
+pub mod runner;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 
@@ -36,9 +37,12 @@ pub enum WorkflowCall {
 pub struct WorkflowEffects<W: Workspace> {
     pub workspace: W,
     pub triggers: Vec<WorkflowTrigger>,
-    pub callbacks: Vec<()>,
-    pub signals: Vec<()>,
+    pub callbacks: Vec<WorkflowCallback>,
+    pub signals: Vec<WorkflowSignal>,
 }
+
+pub type WorkflowCallback = ();
+pub type WorkflowSignal = ();
 
 #[derive(Clone, Debug)]
 pub struct WorkflowTrigger {
