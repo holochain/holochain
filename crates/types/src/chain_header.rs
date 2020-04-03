@@ -4,18 +4,11 @@
 
 use crate::{
     entry::{entry_type::EntryType, Entry},
-    persistence::cas::content::{Address, AddressableContent, Content},
+    persistence::cas::content::{Address, Addressable},
+    prelude::*,
     signature::Provenance,
     time::Iso8601,
 };
-use serde::{Deserialize, Serialize};
-
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
-
-use std::convert::TryInto;
 
 /// ChainHeader + Entry.
 pub struct HeaderWithEntry(ChainHeader, Entry);
@@ -43,7 +36,7 @@ impl HeaderWithEntry {
 // @TODO - serialize properties as defined in ChainHeadersEntrySchema from golang alpha 1
 // @see https://github.com/holochain/holochain-proto/blob/4d1b8c8a926e79dfe8deaa7d759f930b66a5314f/entry_headers.go#L7
 // @see https://github.com/holochain/holochain-rust/issues/75
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, SerializedBytes, SerializedBytesAddress)]
 pub struct ChainHeader {
     /// the type of this entry
     /// system types may have associated "subconscious" behavior
@@ -65,7 +58,7 @@ pub struct ChainHeader {
 
 impl PartialEq for ChainHeader {
     fn eq(&self, other: &ChainHeader) -> bool {
-        self.address() == other.address()
+        self.to_owned().address() == other.to_owned().address()
     }
 }
 
@@ -134,16 +127,6 @@ impl ChainHeader {
     }
 }
 
-impl AddressableContent for ChainHeader {
-    fn content(&self) -> Content {
-        self.to_owned().into()
-    }
-
-    fn try_from_content(content: &Content) -> JsonResult<Self> {
-        content.to_owned().try_into()
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -154,7 +137,7 @@ pub mod tests {
             entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
             tests::{test_entry, test_entry_a, test_entry_b},
         },
-        persistence::cas::content::{Address, AddressableContent},
+        persistence::cas::content::Address,
         signature::Signature,
         time::test_iso_8601,
     };

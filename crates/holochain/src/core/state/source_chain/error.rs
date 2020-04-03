@@ -1,4 +1,4 @@
-use holochain_json_api::error::JsonError;
+use holochain_serialized_bytes::prelude::*;
 use sx_state::error::DatabaseError;
 use sx_types::prelude::*;
 use thiserror::Error;
@@ -23,7 +23,7 @@ pub enum SourceChainError {
     MalformedEntry(Address),
 
     #[error("Serialization error: {0}")]
-    SerializationError(#[from] JsonError),
+    SerializationError(#[from] SerializedBytesError),
 
     #[error("Workspace error: {0}")]
     DatabaseError(#[from] DatabaseError),

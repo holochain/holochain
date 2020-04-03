@@ -21,7 +21,7 @@ use sx_state::error::DatabaseError;
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
 #[derive(Clone, Debug)]
 pub enum WorkflowCall {
-    InvokeZome(ZomeInvocation),
+    InvokeZome(Box<ZomeInvocation>),
     Genesis(Box<Dna>, AgentId),
     // AppValidation(Vec<DhtOp>),
     // {
