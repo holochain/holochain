@@ -7,20 +7,32 @@
 //! ```
 //! # async fn async_main () {
 //! use sx_crypto::*;
+//!
+//! // Make sure to call a system init function!
+//! // Otherwise, you'll get `PluginNotInitialized` errors from the api.
+//! let _ = crypto_init_sodium();
+//!
+//! // To sign things, we need to create a keypair.
 //! let (mut pub_key, mut sec_key) = crypto_sign_keypair(None).await.unwrap();
 //!
+//! // Let's just sign a message of 8 zeroes.
 //! let mut message = crypto_secure_buffer(8).unwrap();
+//!
+//! // Get this signature!
 //! let mut sig = crypto_sign(&mut message, &mut sec_key).await.unwrap();
 //!
+//! // Make sure the signature is valid!
 //! assert!(crypto_sign_verify(&mut sig, &mut message, &mut pub_key)
 //!     .await
 //!     .unwrap());
 //!
+//! // Let's tweak the signature so it becomes invalid.
 //! {
 //!     let mut sig = sig.write();
 //!     sig[0] = (std::num::Wrapping(sig[0]) + std::num::Wrapping(1)).0;
 //! }
 //!
+//! // Make sure the invalid signature is invalid!
 //! assert!(!crypto_sign_verify(&mut sig, &mut message, &mut pub_key)
 //!     .await
 //!     .unwrap());
