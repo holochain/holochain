@@ -1,12 +1,24 @@
 //! Types related to making calls into Zomes.
 
-use crate::{agent::AgentId, cell::CellId, prelude::*, shims::*};
+use crate::{agent::AgentId, cell::CellId, dna::capabilities::CapabilityRequest, prelude::*};
+use sx_wasm_types::WasmExternResponse;
 
 /// The ZomeId is a pair of CellId and ZomeName.
 pub type ZomeId = (CellId, ZomeName);
 
 /// ZomeName as a String (should this be a newtype?)
 pub type ZomeName = String;
+
+/// wraps payload so that we are compatible with host::guest::call()
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+pub struct ZomeInvocationPayload(SerializedBytes);
+
+impl ZomeInvocationPayload {
+    /// Create a payload from serialized data
+    pub fn new(bytes: SerializedBytes) -> Self {
+        Self(bytes)
+    }
+}
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
@@ -17,11 +29,14 @@ pub struct ZomeInvocation {
     pub zome_name: ZomeName,
     pub cap: CapabilityRequest,
     pub fn_name: String,
-    pub args: JsonString,
+    pub payload: ZomeInvocationPayload,
     pub provenance: AgentId,
     pub as_at: Address,
 }
 
-/// Is this a stub??
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ZomeInvocationResponse;
+/// Response to a zome invocation
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub enum ZomeInvocationResponse {
+    /// arbitrary functions exposed by zome devs to the outside world
+    ZomeApiFn(WasmExternResponse),
+}

@@ -32,7 +32,7 @@ impl WorkflowRunner {
             WorkflowCall::InvokeZome(invocation) => {
                 let workspace = workspace::InvokeZomeWorkspace::new(&reader, &dbs)?;
                 let effects =
-                    workflow::invoke_zome(workspace, self.0.get_ribosome(), invocation).await?;
+                    workflow::invoke_zome(workspace, self.0.get_ribosome(), *invocation).await?;
                 self.finish(effects).await?;
             }
             WorkflowCall::Genesis(dna, agent_id) => {

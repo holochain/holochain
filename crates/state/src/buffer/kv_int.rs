@@ -1,5 +1,5 @@
 //! An interface to an LMDB key-value store, with integer keys
-//! This is unfortunately pure copypasta from KvBuf, since Rust doesn't support specialization yet
+//! This is unfortunately pure copy past from KvBuf, since Rust doesn't support specialization yet
 //! TODO, find *some* way to DRY up the two
 
 use super::{BufIntKey, BufVal, BufferedStore};
@@ -15,6 +15,7 @@ use tracing::*;
 /// Transactional operations on a KV store with integer keys
 /// Put: add or replace this KV
 /// Delete: remove the KV
+#[derive(Clone, Debug, PartialEq)]
 enum Op<V> {
     Put(Box<V>),
     Delete,
@@ -74,16 +75,14 @@ where
         Ok(val)
     }
 
-    /// Update the scratch space to record a Put operation for the KV
+    /// Adds a Put [Op::Put](Op) to the scratch that will be run on commit.
     pub fn put(&mut self, k: K, v: V) {
-        // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Put(Box::new(v)));
+        self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
-    /// Update the scratch space to record a Delete operation for the KV
+    /// Adds a [Op::Delete](Op) to the scratch space that will be run on commit
     pub fn delete(&mut self, k: K) {
-        // FIXME, maybe give indication of whether the value existed or not
-        let _ = self.scratch.insert(k, Op::Delete);
+        self.scratch.insert(k, Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -123,7 +122,10 @@ where
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, *k, &encoded)?;
                 }
-                Delete => self.db.delete(writer, *k)?,
+                Delete => match self.db.delete(writer, *k) {
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    r => r?,
+                },
             }
         }
         Ok(())
@@ -169,7 +171,7 @@ where
 #[cfg(test)]
 pub mod tests {
 
-    use super::{BufferedStore, IntKvBuf};
+    use super::{BufferedStore, IntKvBuf, *};
     use crate::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,
@@ -188,8 +190,24 @@ pub mod tests {
 
     type Store<'a> = IntKvBuf<'a, u32, V>;
 
+    macro_rules! res {
+        ($key:expr, $op:ident, $val:expr) => {
+            ($key, Op::$op(Box::new(V($val))))
+        };
+        ($key:expr, $op:ident) => {
+            ($key, Op::$op)
+        };
+    }
+
+    fn test_buf(a: &HashMap<u32, Op<V>>, b: impl Iterator<Item = (u32, Op<V>)>) {
+        for (k, v) in b {
+            let val = a.get(&k).expect("Missing key");
+            assert_eq!(*val, v);
+        }
+    }
+
     #[tokio::test]
-    async fn kv_iterators() -> DatabaseResult<()> {
+    async fn kvint_iterators() -> DatabaseResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
@@ -225,13 +243,10 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn kv_empty_iterators() -> DatabaseResult<()> {
+    async fn kvint_empty_iterators() -> DatabaseResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let db = env
-            .inner()
-            .open_integer("kv", StoreOptions::create())
-            .unwrap();
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
         env.with_reader(|reader| {
             let buf: Store = IntKvBuf::new(&reader, db).unwrap();
@@ -241,6 +256,196 @@ pub mod tests {
 
             assert_eq!(forward, vec![]);
             assert_eq!(reverse, vec![]);
+            Ok(())
+        })
+    }
+    #[tokio::test]
+    async fn kvint_indicate_value_overwritten() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db)?;
+
+            buf.put(1, V(1));
+            assert_eq!(Some(V(1)), buf.get(1)?);
+            buf.put(1, V(2));
+            assert_eq!(Some(V(2)), buf.get(1)?);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kvint_deleted_persisted() -> DatabaseResult<()> {
+        use tracing::*;
+        sx_types::observability::test_run().ok();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(1));
+            buf.put(2, V(2));
+            buf.put(3, V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.delete(2);
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            debug!(?forward);
+            assert_eq!(forward, vec![(1, V(1)), (3, V(3))]);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kvint_deleted_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(5));
+            buf.put(2, V(4));
+            buf.put(3, V(9));
+            test_buf(
+                &buf.scratch,
+                [res!(1, Put, 5), res!(2, Put, 4), res!(3, Put, 9)]
+                    .iter()
+                    .cloned(),
+            );
+            buf.delete(2);
+            test_buf(
+                &buf.scratch,
+                [res!(1, Put, 5), res!(3, Put, 9), res!(2, Delete)]
+                    .iter()
+                    .cloned(),
+            );
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            assert_eq!(forward, vec![(1, V(5)), (3, V(9))]);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kvint_get_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(5));
+            buf.put(2, V(4));
+            buf.put(3, V(9));
+            let n = buf.get(2)?;
+            assert_eq!(n, Some(V(4)));
+
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kvint_get_persisted() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(1));
+            buf.put(2, V(2));
+            buf.put(3, V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let n = buf.get(2)?;
+            assert_eq!(n, Some(V(2)));
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kvint_get_del_buffer() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(5));
+            buf.put(2, V(4));
+            buf.put(3, V(9));
+            buf.delete(2);
+            let n = buf.get(2)?;
+            assert_eq!(n, None);
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn kvint_get_del_persisted() -> DatabaseResult<()> {
+        sx_types::observability::test_run().ok();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env.inner().open_integer("kv", StoreOptions::create())?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.put(1, V(1));
+            buf.put(2, V(2));
+            buf.put(3, V(3));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let mut buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            buf.delete(2);
+            let n = buf.get(2)?;
+            assert_eq!(n, None);
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let buf: Store = IntKvBuf::new(&reader, db).unwrap();
+
+            let n = buf.get(2)?;
+            assert_eq!(n, None);
             Ok(())
         })
     }

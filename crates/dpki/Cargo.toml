@@ -1,6 +1,6 @@
 [package]
 name = "sx_dpki"
-version = "0.0.42-alpha5"
+version = "0.0.46-alpha1"
 description = "holochain dpki"
 license = "GPL-3.0-only"
 homepage = "https://github.com/Holo-host/holochain-2020"
@@ -18,4 +18,4 @@ serde = { version = "1.0.104", features = ["derive"] }
 serde_json = { version = "1.0.48", features = ["preserve_order"] }
 hcid = "0.0.6"
 bip39 = "0.6.0-beta.1"
-holochain_common = { version = "0.0.42-alpha5" }
+holochain_common = { version = "0.0.46-alpha1" }

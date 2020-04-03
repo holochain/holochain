@@ -7,18 +7,18 @@ use crate::{
     prelude::Writer,
     transaction::Readable,
 };
-use sx_types::prelude::{Address, AddressableContent};
+use sx_types::prelude::{Address, Addressable};
 
 /// A wrapper around a KvBuf where keys are always Addresses,
 /// and values are always AddressableContent.
 pub struct CasBuf<'env, V, R>(KvBuf<'env, Address, V, R>)
 where
-    V: BufVal + AddressableContent,
+    V: BufVal + Addressable,
     R: Readable;
 
 impl<'env, V, R> CasBuf<'env, V, R>
 where
-    V: BufVal + AddressableContent,
+    V: BufVal + Addressable,
     R: Readable,
 {
     /// Create a new CasBuf from a read-only transaction and a database reference
@@ -32,12 +32,12 @@ where
     }
 
     /// Put a value into the underlying [KvBuf]
-    pub fn put(&mut self, v: V) -> () {
+    pub fn put(&mut self, v: V) {
         self.0.put(v.address(), v)
     }
 
     /// Delete a value from the underlying [KvBuf]
-    pub fn delete(&mut self, k: Address) -> () {
+    pub fn delete(&mut self, k: Address) {
         self.0.delete(k)
     }
 
@@ -49,7 +49,7 @@ where
 
 impl<'env, V, R> BufferedStore<'env> for CasBuf<'env, V, R>
 where
-    V: BufVal + AddressableContent,
+    V: BufVal + Addressable,
     R: Readable,
 {
     type Error = DatabaseError;

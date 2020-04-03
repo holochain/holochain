@@ -1,9 +1,8 @@
 //! The Iso8601 type is defined here. It is used in particular within ChainHeader to enforce that
 //! their timestamps are defined in a useful and consistent way.
 
-use crate::error::SkunkError;
+use crate::{error::SkunkError, prelude::*};
 use chrono::{offset::FixedOffset, DateTime, TimeZone};
-use holochain_json_api::{error::JsonError, json::JsonString};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -17,7 +16,7 @@ use std::{
 
 /// Represents a timeout for an HDK function. The usize interface defaults to ms.  Also convertible
 /// to/from a std::time::Duration (which is also unsigned) at full precision.
-#[derive(Clone, Deserialize, Debug, Eq, PartialEq, Hash, Serialize, DefaultJson)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq, Hash, Serialize, SerializedBytes)]
 pub struct Timeout(usize);
 
 impl Timeout {
@@ -60,7 +59,7 @@ impl From<usize> for Timeout {
 /// u/μ/micros/microsecond, n/nanos/nanosecond, singular or plural.  The humantime and
 /// parse_duration crates are complex, incompatible with each other, depend on crates and/or do not
 /// compile to WASM.
-#[derive(Clone, Eq, PartialEq, Hash, DefaultJson)]
+#[derive(Clone, Eq, PartialEq, Hash, SerializedBytes)]
 pub struct Period(Duration);
 
 /// Serialization w/ serde_json to/from String.  This means that a timestamp will be deserialized to
@@ -396,7 +395,7 @@ impl From<&Duration> for Period {
 ///    Debug:   Iso8601(2018-10-11T03:23:38+00:00)
 ///
 /// More info on the relevant [wikipedia article](https://en.wikipedia.org/wiki/ISO_8601).
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, DefaultJson)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct Iso8601(DateTime<FixedOffset>);
 
 /// Infallible conversions into and from an Iso8601.  The only infallible ways to create an Iso8601
@@ -859,14 +858,17 @@ pub mod tests {
             assert_eq!(&deserialized.to_string(), ps_out);
 
             // JSON serialization via JsonSring
-            let period_ser = JsonString::from(&period);
-            assert_eq!(period_ser.to_string(), format!("\"{}\"", ps_out));
+            let period_ser = SerializedBytes::try_from(&period)?;
+            assert_eq!(format!("{:?}", period_ser), format!("\"{}\"", ps_out));
             let period_des = Period::try_from(period_ser);
             assert!(period_des.is_ok());
             assert_eq!(&period_des.unwrap().to_string(), ps_out);
 
             // JSON round-tripping w/o serde or intermediates
-            assert_eq!(Period::try_from(JsonString::from(period))?, Period(*dur));
+            assert_eq!(
+                Period::try_from(SerializedBytes::try_from(period)?)?,
+                Period(*dur)
+            );
 
             Ok(())
         })
@@ -1061,8 +1063,11 @@ pub mod tests {
                     assert_eq!(deserialized.to_string(), "2018-10-11T03:23:38+00:00");
 
                     // JSON serialization via JsonString
-                    let iso_8601_ser = JsonString::from(&iso);
-                    assert_eq!(iso_8601_ser.to_string(), "\"2018-10-11T03:23:38+00:00\"");
+                    let iso_8601_ser = SerializedBytes::try_from(&iso).unwrap();
+                    assert_eq!(
+                        format!("{:?}", iso_8601_ser),
+                        "\"2018-10-11T03:23:38+00:00\""
+                    );
                     let iso_8601_des = Iso8601::try_from(iso_8601_ser);
                     assert!(iso_8601_des.is_ok());
                     assert_eq!(
@@ -1072,7 +1077,8 @@ pub mod tests {
 
                     // JSON round-tripping w/o serde or intermediates
                     assert_eq!(
-                        Iso8601::try_from(JsonString::from(iso)).map_err(|err| err.into()),
+                        Iso8601::try_from(SerializedBytes::try_from(&iso).unwrap())
+                            .map_err(|err| err.into()),
                         Iso8601::try_from("2018-10-11T03:23:38+00:00")
                     );
 

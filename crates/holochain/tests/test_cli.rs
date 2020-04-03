@@ -2,7 +2,6 @@ use assert_cli::Assert;
 use tempdir::TempDir;
 
 #[test]
-#[ignore] // this test takes too long
 fn first_experience_with_holochain_is_a_friendly_one() {
     let tmp = TempDir::new("").unwrap();
     let path = tmp.path().join("missing-config.toml");
@@ -19,7 +18,6 @@ fn first_experience_with_holochain_is_a_friendly_one() {
 }
 
 #[test]
-#[ignore] // this test takes too long
 fn malformed_toml_error_is_friendly() {
     let tmp = TempDir::new("").unwrap();
     let path = tmp.path().join("malformed-config.toml");
@@ -40,7 +38,6 @@ fn malformed_toml_error_is_friendly() {
 }
 
 #[test]
-#[ignore] // this test takes too long
 fn invalid_config_error_is_friendly() {
     let tmp = TempDir::new("").unwrap();
     let path = tmp.path().join("malformed-config.toml");

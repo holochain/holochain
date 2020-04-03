@@ -1,12 +1,15 @@
 //! reexport some common things
 
-pub use crate::persistence::{
-    cas::content::{Address, AddressableContent, Content},
-    hash::HashString,
+pub use crate::{
+    addressable_serializable,
+    persistence::{
+        cas::content::{Address, Addressable},
+        hash::HashString,
+    },
 };
-pub use holochain_json_api::json::{JsonString, RawString};
-pub use holochain_json_derive::DefaultJson;
+pub use holochain_serialized_bytes::prelude::*;
 pub use std::convert::{TryFrom, TryInto};
+pub use sx_types_derive::SerializedBytesAddress;
 
 /// stub
 pub struct Todo;
