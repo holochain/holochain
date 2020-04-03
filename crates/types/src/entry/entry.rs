@@ -103,7 +103,7 @@ pub mod tests {
         entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
     };
 
-    use crate::persistence::cas::content::Addressable;
+    use crate::{persistence::cas::content::Addressable, test_utils::fake_dna};
 
     #[derive(Serialize, Deserialize, SerializedBytes)]
     struct SerializedString(String);
@@ -201,7 +201,7 @@ pub mod tests {
 
     #[cfg_attr(tarpaulin, skip)]
     pub fn test_unpublishable_entry() -> Entry {
-        Entry::Dna(Box::new(Dna::empty()))
+        Entry::Dna(Box::new(fake_dna("uuid")))
     }
 
     #[test]
