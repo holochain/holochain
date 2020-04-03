@@ -28,12 +28,12 @@ pub trait CryptoPlugin: 'static + Send + Sync {
 
     /// calculate the generic (blake2b) hash of the input data
     #[must_use]
-    fn generic_hash<'a, 'b>(
+    fn generic_hash_into<'a, 'b>(
         &'a self,
-        size: usize,
+        into_hash: &'b mut DynCryptoBytes,
         data: &'b mut DynCryptoBytes,
         key: Option<&'b mut DynCryptoBytes>,
-    ) -> BoxFuture<'b, CryptoResult<DynCryptoBytes>>;
+    ) -> BoxFuture<'b, CryptoResult<()>>;
 
     /// size of seed needed for signature keys
     fn sign_seed_bytes(&self) -> usize;

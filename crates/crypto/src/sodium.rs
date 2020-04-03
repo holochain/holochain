@@ -215,17 +215,23 @@ impl plugin::CryptoPlugin for SodiumCryptoPlugin {
         rust_sodium_sys::crypto_generichash_KEYBYTES_MAX as usize
     }
 
-    fn generic_hash<'a, 'b>(
+    fn generic_hash_into<'a, 'b>(
         &'a self,
-        size: usize,
+        into_hash: &'b mut DynCryptoBytes,
         data: &'b mut DynCryptoBytes,
         key: Option<&'b mut DynCryptoBytes>,
-    ) -> BoxFuture<'b, CryptoResult<DynCryptoBytes>> {
+    ) -> BoxFuture<'b, CryptoResult<()>> {
+        let hash_min_bytes = self.generic_hash_min_bytes();
+        let hash_max_bytes = self.generic_hash_max_bytes();
         let key_min_bytes = self.generic_hash_key_min_bytes();
         let key_max_bytes = self.generic_hash_key_max_bytes();
         async move {
             tokio::task::block_in_place(move || {
-                let mut hash = crypto_insecure_buffer(size)?;
+                let hash_len = into_hash.len();
+                if hash_len < hash_min_bytes || hash_len > hash_max_bytes {
+                    return Err(CryptoError::BadHashSize);
+                }
+
                 {
                     let key_lock;
                     let mut key_len = 0_usize;
@@ -241,12 +247,12 @@ impl plugin::CryptoPlugin for SodiumCryptoPlugin {
 
                     let len = data.len();
                     let read_lock = data.read();
-                    let mut write_lock = hash.write();
+                    let mut write_lock = into_hash.write();
 
                     unsafe {
                         rust_sodium_sys::crypto_generichash(
                             raw_ptr_char!(write_lock),
-                            size,
+                            hash_len,
                             raw_ptr_char_immut!(read_lock),
                             len as libc::c_ulonglong,
                             raw_key,
@@ -254,7 +260,7 @@ impl plugin::CryptoPlugin for SodiumCryptoPlugin {
                         );
                     }
                 }
-                Ok(hash)
+                Ok(())
             })
         }
         .boxed()

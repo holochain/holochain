@@ -55,14 +55,28 @@ pub fn crypto_generic_hash_key_max_bytes() -> CryptoResult<usize> {
 
 /// calculate the generic (blake2b) hash for the given data
 /// with the optional blake2b key
+pub async fn crypto_generic_hash_into(
+    into_hash: &mut DynCryptoBytes,
+    data: &mut DynCryptoBytes,
+    key: Option<&mut DynCryptoBytes>,
+) -> CryptoResult<()> {
+    plugin::get_global_crypto_plugin()?
+        .generic_hash_into(into_hash, data, key)
+        .await
+}
+
+/// calculate the generic (blake2b) hash for the given data
+/// with the optional blake2b key
 pub async fn crypto_generic_hash(
     size: usize,
     data: &mut DynCryptoBytes,
     key: Option<&mut DynCryptoBytes>,
 ) -> CryptoResult<DynCryptoBytes> {
+    let mut into_hash = crypto_insecure_buffer(size)?;
     plugin::get_global_crypto_plugin()?
-        .generic_hash(size, data, key)
-        .await
+        .generic_hash_into(&mut into_hash, data, key)
+        .await?;
+    Ok(into_hash)
 }
 
 /// size of seed needed for signature keys
