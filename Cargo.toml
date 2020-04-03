@@ -26,5 +26,5 @@ lib3h_crypto_api = { version = "0.0.38", git = "https://github.com/holochain/lib
 
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 #rkv = { path = "../../rust/rkv" }
-lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git", branch = "err-on-empty-dup-iter" }
+lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git", branch = "fix_TK-01180" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }

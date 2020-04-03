@@ -58,9 +58,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.27"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "991d0a1a3e790c835fd54ab41742a59251338d8c7577fe7d7f0170c7072be708"
+checksum = "bab5c215748dc1ad11a145359b1067107ae0f8ca5e99844fa64067ed5bf198e3"
 dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
@@ -837,7 +837,7 @@ checksum = "dea0c0405123bba743ee3f91f49b1c7cfb684eef0da0a50110f758ccf24cdff0"
 [[package]]
 name = "lmdb-rkv"
 version = "0.14.0"
-source = "git+https://github.com/holochain/lmdb-rs.git?branch=err-on-empty-dup-iter#5102b44296235463fa76bf16ef1c937e43438138"
+source = "git+https://github.com/holochain/lmdb-rs.git?branch=fix_TK-01180#efb5fbeeaf4cc3b1d464ca4a87d967de9ce3e37f"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -848,7 +848,7 @@ dependencies = [
 [[package]]
 name = "lmdb-rkv-sys"
 version = "0.11.0"
-source = "git+https://github.com/holochain/lmdb-rs.git?branch=err-on-empty-dup-iter#5102b44296235463fa76bf16ef1c937e43438138"
+source = "git+https://github.com/holochain/lmdb-rs.git?branch=fix_TK-01180#efb5fbeeaf4cc3b1d464ca4a87d967de9ce3e37f"
 dependencies = [
  "cc",
  "libc",
@@ -2008,9 +2008,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.14"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2751672f9da075d045c67fdb0068be9850ab7b231fa77bb51d6fd35da9c0bb0d"
+checksum = "619cdb2245c40c42d563089b72e80c5df659513d667a017598439ef7a7b1ffe1"
 dependencies = [
  "bytes",
  "fnv",
