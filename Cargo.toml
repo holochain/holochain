@@ -7,10 +7,12 @@ members = [
   "crates/holochain",
   "crates/state",
   "crates/types",
+  "crates/websocket",
 ]
 
 exclude = [
-  "pseudocode"
+  "pseudocode",
+  "test_utils/wasm"
 ]
 
 [patch.crates-io]

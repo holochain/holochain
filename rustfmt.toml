@@ -1,1 +1,4 @@
-merge_imports = true
+reorder_imports = true
+
+# unstable but desirable:
+# merge_imports = true

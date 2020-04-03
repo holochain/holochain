@@ -5,8 +5,7 @@ use crate::{
     persistence::cas::content::Address,
     signature::{Provenance, Signature},
 };
-use holochain_json_api::{error::JsonError, json::JsonString};
-use serde::{Deserialize, Serialize};
+use holochain_serialized_bytes::prelude::*;
 
 //--------------------------------------------------------------------------------------------------
 // CapabilityRequest
@@ -15,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// a struct to hold the capability information needed to make any capability request,
 /// namely the provenance of the request (the agent address and signature) and the
 /// actual token being used to make the request
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash, DefaultJson)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct CapabilityRequest {
     /// Address of capability token.
     pub cap_token: Address,

@@ -175,7 +175,7 @@ where
                 trace!("{:?}", line!());
                 Ok(Either::Left(persisted))
             }
-            Err(DatabaseError::LmdbStoreError { source, .. }) => match source.into_inner() {
+            Err(DatabaseError::LmdbStoreError(err)) => match err.into_inner() {
                 rkv::StoreError::LmdbError(rkv::LmdbError::NotFound) => {
                     trace!("{:?}", line!());
                     Ok(Either::Right(empty))

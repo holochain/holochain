@@ -12,14 +12,14 @@
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "v0.0.72";
+   ref = "2020-02-27-rust-stable";
 
    # the sha of what is downloaded from the above ref
    # note: even if you change the above ref it will not be redownloaded until
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
-   sha256 = "090h5gqmfm40vkqhf1ky1n3ml24f5py04bvn50dkw0v8xzmsl4sk";
+   sha256 = "0qklf0gwl4fdzlx19zfy0mvpmxcki7cd4d4y6vnw1bimh8hdvjkp";
 
    # the github owner of the holonix repo
    owner = "holochain";
