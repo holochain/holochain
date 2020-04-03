@@ -191,8 +191,8 @@ async fn interface_example(api: StdExternalConductorApi) {
             use futures::{future::FutureExt, sink::SinkExt};
             sender
                 .send((
-                    ConductorRequest::Admin {
-                        request: Box::new(AdminMethod::Start("cell-handle".into())),
+                    ConductorRequest::AdminRequest {
+                        request: Box::new(AdminRequest::Start("cell-handle".into())),
                     }
                     .try_into()
                     .unwrap(),

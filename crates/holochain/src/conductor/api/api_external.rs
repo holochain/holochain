@@ -17,19 +17,19 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 
     /// Call an admin function to modify this Conductor's behavior
-    async fn admin(&self, method: AdminMethod) -> ConductorApiResult<AdminResponse>;
+    async fn admin(&self, method: AdminRequest) -> ConductorApiResult<AdminResponse>;
 
     // -- provided -- //
 
     async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
         let res: ConductorApiResult<ConductorResponse> = async move {
             match request {
-                ConductorRequest::ZomeInvocation { request } => {
+                ConductorRequest::ZomeInvocationRequest { request } => {
                     Ok(ConductorResponse::ZomeInvocationResponse {
                         response: Box::new(self.invoke_zome(*request).await?),
                     })
                 }
-                ConductorRequest::Admin { request } => Ok(ConductorResponse::AdminResponse {
+                ConductorRequest::AdminRequest { request } => Ok(ConductorResponse::AdminResponse {
                     response: Box::new(self.admin(*request).await?),
                 }),
                 _ => unimplemented!(),
@@ -70,7 +70,7 @@ impl ExternalConductorApi for StdExternalConductorApi {
         unimplemented!()
     }
 
-    async fn admin(&self, _method: AdminMethod) -> ConductorApiResult<AdminResponse> {
+    async fn admin(&self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> {
         unimplemented!()
     }
 }
@@ -101,23 +101,23 @@ pub enum AdminResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum ConductorRequest {
-    Admin { request: Box<AdminMethod> },
-    Crypto { request: Box<Crypto> },
-    Test { request: Box<Test> },
-    ZomeInvocation { request: Box<ZomeInvocation> },
+    AdminRequest { request: Box<AdminRequest> },
+    CryptoRequest { request: Box<CryptoRequest> },
+    TestRequest { request: Box<TestRequest> },
+    ZomeInvocationRequest { request: Box<ZomeInvocation> },
 }
 holochain_serialized_bytes::holochain_serial!(ConductorRequest);
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum AdminMethod {
+pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
 }
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum Crypto {
+pub enum CryptoRequest {
     Sign(String),
     Decrypt(String),
     Encrypt(String),
@@ -125,7 +125,7 @@ pub enum Crypto {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum Test {
+pub enum TestRequest {
     AddAgent(AddAgentArgs),
 }
 
