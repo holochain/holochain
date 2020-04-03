@@ -13,7 +13,7 @@ use std::fmt::Debug;
 type Tag = String;
 
 #[derive(Debug)]
-pub enum Crud {
+pub enum EntryDhtStatus {
     Live,
     Dead,
     Pending,
@@ -71,7 +71,7 @@ where
     R: Readable,
 {
     fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>>;
-    fn get_crud(&self, address: &Address) -> DatabaseResult<Crud>;
+    fn get_crud(&self, address: &Address) -> DatabaseResult<EntryDhtStatus>;
 }
 pub struct ChainMetaBuf<'env, V, R = Reader<'env>>
 where
@@ -126,7 +126,7 @@ where
         let _values = self.links_meta.get(&key.to_key());
         Ok(HashSet::new())
     }
-    fn get_crud(&self, _address: &Address) -> DatabaseResult<Crud> {
+    fn get_crud(&self, _address: &Address) -> DatabaseResult<EntryDhtStatus> {
         unimplemented!()
     }
 }
@@ -135,7 +135,7 @@ mock! {
     pub ChainMetaBuf
     {
         fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>>;
-        fn get_crud(&self, address: &Address) -> DatabaseResult<Crud>;
+        fn get_crud(&self, address: &Address) -> DatabaseResult<EntryDhtStatus>;
     }
 }
 
@@ -146,7 +146,7 @@ where
     fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>> {
         self.get_links(base, tag)
     }
-    fn get_crud(&self, address: &Address) -> DatabaseResult<Crud> {
+    fn get_crud(&self, address: &Address) -> DatabaseResult<EntryDhtStatus> {
         self.get_crud(address)
     }
 }

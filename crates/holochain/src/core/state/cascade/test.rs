@@ -1,6 +1,6 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_meta::{Crud, MockChainMetaBuf},
+    chain_meta::{EntryDhtStatus, MockChainMetaBuf},
     source_chain::SourceChainBuf,
 };
 use mockall::*;
@@ -9,13 +9,8 @@ use sx_state::{
     db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
     test_utils::test_cell_env,
 };
-use sx_types::{
-    agent::AgentId,
-    entry::Entry,
-    observability,
-    prelude::{Address, AddressableContent},
-};
-
+use sx_types::persistence::cas::content::Addressable;
+use sx_types::{agent::AgentId, entry::Entry, observability, prelude::Address};
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
@@ -74,7 +69,7 @@ async fn live_local_return() -> DatabaseResult<()> {
     mock_primary_meta
         .expect_get_crud()
         .with(predicate::eq(address.clone()))
-        .returning(|_| Ok(Crud::Live));
+        .returning(|_| Ok(EntryDhtStatus::Live));
 
     // call dht_get with above address
     let cascade = Cascade::new(
@@ -115,7 +110,7 @@ async fn dead_local_none() -> DatabaseResult<()> {
     mock_primary_meta
         .expect_get_crud()
         .with(predicate::eq(address.clone()))
-        .returning(|_| Ok(Crud::Dead));
+        .returning(|_| Ok(EntryDhtStatus::Dead));
 
     // call dht_get with above address
     let cascade = Cascade::new(
@@ -156,7 +151,7 @@ async fn notfound_goto_cache_live() -> DatabaseResult<()> {
     mock_cache_meta
         .expect_get_crud()
         .with(predicate::eq(address.clone()))
-        .returning(|_| Ok(Crud::Live));
+        .returning(|_| Ok(EntryDhtStatus::Live));
 
     // call dht_get with above address
     let cascade = Cascade::new(

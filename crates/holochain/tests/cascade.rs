@@ -2,7 +2,9 @@ use holochain_2020::core::state::{
     cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
 };
 use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
-use sx_types::{agent::AgentId, entry::Entry, persistence::cas::content::AddressableContent};
+use sx_types::{agent::AgentId, entry::Entry};
+
+use sx_types::persistence::cas::content::Addressable;
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {

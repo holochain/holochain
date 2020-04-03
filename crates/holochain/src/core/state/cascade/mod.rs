@@ -38,7 +38,7 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    chain_meta::{ChainMetaBufT, Crud},
+    chain_meta::{ChainMetaBufT, EntryDhtStatus},
 };
 use std::collections::HashSet;
 use sx_state::{error::DatabaseResult, prelude::Reader};
@@ -93,7 +93,7 @@ where
             .get_entry(&address)?
             .and_then(|entry| {
                 self.primary_meta.get_crud(&address).ok().map(|crud| {
-                    if let Crud::Live = crud {
+                    if let EntryDhtStatus::Live = crud {
                         Search::Found(entry)
                     } else {
                         Search::NotFound
@@ -112,7 +112,7 @@ where
                         .get_crud(&address)
                         .ok()
                         .and_then(|crud| match crud {
-                            Crud::Live => Some(entry),
+                            EntryDhtStatus::Live => Some(entry),
                             _ => None,
                         })
                 })

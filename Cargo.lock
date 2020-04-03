@@ -947,7 +947,7 @@ checksum = "dea0c0405123bba743ee3f91f49b1c7cfb684eef0da0a50110f758ccf24cdff0"
 [[package]]
 name = "lmdb-rkv"
 version = "0.14.0"
-source = "git+https://github.com/holochain/lmdb-rs.git?branch=err-on-empty-dup-iter#5102b44296235463fa76bf16ef1c937e43438138"
+source = "git+https://github.com/holochain/lmdb-rs.git#460436146fab02d9523ac1b810fddc2eb4984655"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -958,7 +958,7 @@ dependencies = [
 [[package]]
 name = "lmdb-rkv-sys"
 version = "0.11.0"
-source = "git+https://github.com/holochain/lmdb-rs.git?branch=err-on-empty-dup-iter#5102b44296235463fa76bf16ef1c937e43438138"
+source = "git+https://github.com/holochain/lmdb-rs.git#460436146fab02d9523ac1b810fddc2eb4984655"
 dependencies = [
  "cc",
  "libc",
