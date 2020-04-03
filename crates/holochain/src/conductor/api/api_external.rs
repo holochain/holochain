@@ -29,9 +29,11 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
                         response: Box::new(self.invoke_zome(*request).await?),
                     })
                 }
-                ConductorRequest::AdminRequest { request } => Ok(ConductorResponse::AdminResponse {
-                    response: Box::new(self.admin(*request).await?),
-                }),
+                ConductorRequest::AdminRequest { request } => {
+                    Ok(ConductorResponse::AdminResponse {
+                        response: Box::new(self.admin(*request).await?),
+                    })
+                }
                 _ => unimplemented!(),
             }
         }
