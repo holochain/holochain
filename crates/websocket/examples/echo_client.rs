@@ -46,7 +46,10 @@ async fn main() {
                 linefeed::reader::ReadResult::Input(s) => {
                     if s.starts_with("req ") {
                         let mut s = s.splitn(2, ' ');
-                        let resp: ResponseMessage = send_socket.request(BroadcastMessage(s.nth(1).unwrap().to_string())).await.unwrap();
+                        let resp: ResponseMessage = send_socket
+                            .request(BroadcastMessage(s.nth(1).unwrap().to_string()))
+                            .await
+                            .unwrap();
                         writeln!(rl, "Request response: {}", resp.0).unwrap();
                     } else {
                         send_socket.signal(BroadcastMessage(s)).await.unwrap();
