@@ -149,7 +149,7 @@ impl DbManager {
         key: &DbKey<V>,
     ) -> DatabaseResult<&V> {
         if self.um.get(key).is_some() {
-            return Ok(self.um.get(key).unwrap());
+            Ok(self.um.get(key).unwrap())
         } else {
             self.create(key).await?;
             Ok(self.um.get(key).unwrap())

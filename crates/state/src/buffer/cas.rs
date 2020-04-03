@@ -32,12 +32,12 @@ where
     }
 
     /// Put a value into the underlying [KvBuf]
-    pub fn put(&mut self, v: V) -> () {
+    pub fn put(&mut self, v: V) {
         self.0.put(v.address(), v)
     }
 
     /// Delete a value from the underlying [KvBuf]
-    pub fn delete(&mut self, k: Address) -> () {
+    pub fn delete(&mut self, k: Address) {
         self.0.delete(k)
     }
 

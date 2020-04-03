@@ -35,11 +35,11 @@ pub trait BufferedStore<'env> {
 pub trait BufKey: Hash + Eq + AsRef<[u8]> {}
 impl<T> BufKey for T where T: Hash + Eq + AsRef<[u8]> {}
 
-/// Trait alias for the combination of constraints needed for keys in [IntKvBuf]
+/// Trait alias for the combination of constraints needed for keys in [IntKvBuf](kv_int::IntKvBuf)
 pub trait BufIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 impl<T> BufIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 
-/// Trait alias for the combination of constraints needed for values in [KvBuf] and [IntKvBuf]
+/// Trait alias for the combination of constraints needed for values in [KvBuf](kv::KvBuf) and [IntKvBuf](kv_int::IntKvBuf)
 pub trait BufVal: Clone + Serialize + DeserializeOwned {}
 impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned {}
 
