@@ -81,10 +81,10 @@ impl Addressable for Entry {
     fn address(&self) -> Address {
         match &self {
             Entry::AgentId(agent_id) => agent_id.address(),
-            // @TODO deal with unwrap here
-            // @TODO deal with the clone here
             _ => Address::encode_from_bytes(
-                SerializedBytes::try_from(self.clone()).unwrap().bytes(),
+                SerializedBytes::try_from(self)
+                    .expect("tried to address an entry that is not serializable")
+                    .bytes(),
                 Hash::SHA2256,
             ),
         }
