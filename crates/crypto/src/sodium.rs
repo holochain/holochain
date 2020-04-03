@@ -1,11 +1,187 @@
 use crate::*;
 
+use libc::c_void;
+
+#[derive(PartialEq)]
+enum ProtectState {
+    NoAccess,
+    ReadOnly,
+    ReadWrite,
+}
+
+struct SecureBufferRead<'a>(&'a SecureBuffer);
+
+impl<'a> Drop for SecureBufferRead<'a> {
+    fn drop(&mut self) {
+        self.0.set_no_access();
+    }
+}
+
+impl<'a> std::ops::Deref for SecureBufferRead<'a> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl<'a> CryptoBytesRead<'a> for SecureBufferRead<'a> {}
+
+struct SecureBufferWrite<'a>(&'a mut SecureBuffer);
+
+impl<'a> Drop for SecureBufferWrite<'a> {
+    fn drop(&mut self) {
+        self.0.set_no_access();
+    }
+}
+
+impl<'a> std::ops::Deref for SecureBufferWrite<'a> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl<'a> std::ops::DerefMut for SecureBufferWrite<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0
+    }
+}
+
+impl<'a> CryptoBytesRead<'a> for SecureBufferWrite<'a> {}
+impl<'a> CryptoBytesWrite<'a> for SecureBufferWrite<'a> {}
+
+struct SecureBuffer {
+    z: *mut c_void,
+    s: usize,
+    p: std::cell::RefCell<ProtectState>,
+}
+
+// the sodium_malloc c_void is safe to Send
+unsafe impl Send for SecureBuffer {}
+
+impl Drop for SecureBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            rust_sodium_sys::sodium_free(self.z);
+        }
+    }
+}
+
+impl std::fmt::Debug for SecureBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self.p.borrow() {
+            ProtectState::NoAccess => write!(f, "SecureBuffer( {:?} )", "<NO_ACCESS>"),
+            _ => write!(f, "SecureBuffer( {:?} )", *self),
+        }
+    }
+}
+
+impl std::ops::Deref for SecureBuffer {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        if *self.p.borrow() == ProtectState::NoAccess {
+            panic!("Deref, but state is NoAccess");
+        }
+        unsafe { &std::slice::from_raw_parts(self.z as *const u8, self.s)[..self.s] }
+    }
+}
+
+impl std::ops::DerefMut for SecureBuffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        if *self.p.borrow() != ProtectState::ReadWrite {
+            panic!("DerefMut, but state is not ReadWrite");
+        }
+        unsafe { &mut std::slice::from_raw_parts_mut(self.z as *mut u8, self.s)[..self.s] }
+    }
+}
+
+impl SecureBuffer {
+    pub fn new(size: usize) -> Self {
+        let z = unsafe {
+            // sodium_malloc requires memory-aligned sizes,
+            // round up to the nearest 8 bytes.
+            let align_size = (size + 7) & !7;
+            let z = rust_sodium_sys::sodium_malloc(align_size);
+            if z.is_null() {
+                panic!("sodium_malloc could not allocate");
+            }
+            rust_sodium_sys::sodium_memzero(z, align_size);
+            rust_sodium_sys::sodium_mprotect_noaccess(z);
+            z
+        };
+
+        SecureBuffer {
+            z,
+            s: size,
+            p: std::cell::RefCell::new(ProtectState::NoAccess),
+        }
+    }
+
+    fn set_no_access(&self) {
+        if *self.p.borrow() == ProtectState::NoAccess {
+            panic!("already no access... bad logic");
+        }
+        unsafe {
+            rust_sodium_sys::sodium_mprotect_noaccess(self.z);
+        }
+        *self.p.borrow_mut() = ProtectState::NoAccess;
+    }
+
+    fn set_readable(&self) {
+        if *self.p.borrow() != ProtectState::NoAccess {
+            panic!("not no access... bad logic");
+        }
+        unsafe {
+            rust_sodium_sys::sodium_mprotect_readonly(self.z);
+        }
+        *self.p.borrow_mut() = ProtectState::ReadOnly;
+    }
+
+    fn set_writable(&self) {
+        if *self.p.borrow() != ProtectState::NoAccess {
+            panic!("not no access... bad logic");
+        }
+        unsafe {
+            rust_sodium_sys::sodium_mprotect_readwrite(self.z);
+        }
+        *self.p.borrow_mut() = ProtectState::ReadWrite;
+    }
+}
+
+impl CryptoBytes for SecureBuffer {
+    fn clone(&self) -> DynCryptoBytes {
+        let mut out = SecureBuffer::new(self.s);
+        out.copy_from(0, &self.read()).expect("could not write new");
+        Box::new(out)
+    }
+
+    fn len(&self) -> usize {
+        self.s
+    }
+
+    fn is_empty(&self) -> bool {
+        self.s == 0
+    }
+
+    fn read(&self) -> DynCryptoBytesRead {
+        self.set_readable();
+        Box::new(SecureBufferRead(self))
+    }
+
+    fn write(&mut self) -> DynCryptoBytesWrite {
+        self.set_writable();
+        Box::new(SecureBufferWrite(self))
+    }
+}
+
 struct SodiumCryptoPlugin;
 
 impl plugin::CryptoPlugin for SodiumCryptoPlugin {
     fn secure_buffer(&self, size: usize) -> CryptoResult<DynCryptoBytes> {
-        // TODO - change this to secure bytes
-        Ok(InsecureBytes::new(size))
+        Ok(Box::new(SecureBuffer::new(size)))
     }
 
     fn randombytes_buf<'a, 'b>(

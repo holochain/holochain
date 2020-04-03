@@ -10,6 +10,9 @@ pub enum CryptoError {
     /// the key size for this call didn't fall within constraints
     BadKeySize,
 
+    /// bad bounds for write operation
+    WriteOverflow,
+
     /// error in tokio task
     JoinError(#[from] tokio::task::JoinError),
 }

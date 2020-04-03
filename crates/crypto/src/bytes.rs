@@ -1,3 +1,5 @@
+use crate::*;
+
 /// read guard for crypto bytes
 pub trait CryptoBytesRead<'lt>: 'lt + std::ops::Deref<Target = [u8]> {}
 
@@ -26,6 +28,18 @@ pub trait CryptoBytes: 'static + Send + std::fmt::Debug {
 
     /// get a write guard for this byte buffer
     fn write(&mut self) -> DynCryptoBytesWrite;
+
+    /// copy data from another byte array into this buffer
+    fn copy_from(&mut self, offset: usize, data: &[u8]) -> CryptoResult<()> {
+        if offset + data.len() > self.len() {
+            return Err(CryptoError::WriteOverflow);
+        }
+        unsafe {
+            let mut b = self.write();
+            std::ptr::copy(data.as_ptr(), (*b).as_mut_ptr().add(offset), data.len());
+        }
+        Ok(())
+    }
 }
 
 /// dyn reference to crypto bytes
