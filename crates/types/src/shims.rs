@@ -1,16 +1,14 @@
-use holochain_json_api::{error::JsonError, json::JsonString};
+use crate::prelude::*;
 
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct AgentPubKey;
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapToken;
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
-pub struct CapabilityRequest;
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct DhtOp;
-#[derive(Clone, Debug, Default, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct LogRules;
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct Sim2hConfig;
 
 pub struct Lib3hToClient;
@@ -26,6 +24,7 @@ pub enum ValidationResult {
     Pending,
 }
 
+#[derive(Default)]
 pub struct SourceChainCommitBundle<'env>(std::marker::PhantomData<&'env ()>);
 impl<'env> SourceChainCommitBundle<'env> {
     pub fn new() -> Self {

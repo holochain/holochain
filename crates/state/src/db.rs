@@ -152,7 +152,7 @@ impl DbManager {
             Ok(self.um.get(key).unwrap())
         } else {
             self.create(key).await?;
-            Ok(self.um.get(key).unwrap().clone())
+            Ok(self.um.get(key).unwrap())
         }
     }*/
 

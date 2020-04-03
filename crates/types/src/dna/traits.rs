@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     /// test that ReservedTraitNames can be created from a canonical string
-    fn test_traits_from_str() {
+    fn fake_traits_from_str() {
         assert_eq!(
             Ok(ReservedTraitNames::Public),
             ReservedTraitNames::from_str("hc_public"),
