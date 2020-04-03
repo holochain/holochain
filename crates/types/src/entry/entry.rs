@@ -12,56 +12,20 @@ use crate::{
         entry_type::{AppEntryType, EntryType},
     },
     link::Link,
-    persistence::cas::content::{Address, AddressableContent, Content},
-    prelude::*,
+    persistence::cas::content::{Address, Addressable},
 };
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
+use holochain_serialized_bytes::prelude::*;
 use multihash::Hash;
-use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serializer};
-use std::convert::TryFrom;
 
 /// Should probably be a newtype.
-pub type AppEntryValue = JsonString;
-
-fn serialize_app_entry<S>(
-    app_entry_type: &AppEntryType,
-    app_entry_value: &AppEntryValue,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut state = serializer.serialize_tuple(2)?;
-    state.serialize_element(&app_entry_type.to_string())?;
-    state.serialize_element(&app_entry_value.to_string())?;
-    state.end()
-}
-
-fn deserialize_app_entry<'de, D>(deserializer: D) -> Result<(AppEntryType, AppEntryValue), D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct SerializedAppEntry(String, String);
-
-    let serialized_app_entry = SerializedAppEntry::deserialize(deserializer)?;
-    Ok((
-        AppEntryType::from(serialized_app_entry.0),
-        AppEntryValue::from_json(&serialized_app_entry.1),
-    ))
-}
+pub type AppEntryValue = SerializedBytes;
 
 /// Structure holding actual data in a source chain "Item"
 /// data is stored as a JsonString
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, SerializedBytes)]
 #[allow(clippy::large_enum_variant)]
 pub enum Entry {
     /// An App (user defined) Entry
-    #[serde(serialize_with = "serialize_app_entry")]
-    #[serde(deserialize_with = "deserialize_app_entry")]
     App(AppEntryType, AppEntryValue),
 
     /// The DNA entry defines the rules for an application.
@@ -113,23 +77,17 @@ impl PartialEq for Entry {
     }
 }
 
-impl AddressableContent for Entry {
+impl Addressable for Entry {
     fn address(&self) -> Address {
         match &self {
             Entry::AgentId(agent_id) => agent_id.address(),
-            _ => Address::encode_from_str(&String::from(self.content()), Hash::SHA2256),
+            _ => Address::encode_from_bytes(
+                SerializedBytes::try_from(self)
+                    .expect("tried to address an entry that is not serializable")
+                    .bytes(),
+                Hash::SHA2256,
+            ),
         }
-    }
-
-    fn content(&self) -> Content {
-        match &self {
-            // Entry::ChainHeader(chain_header) => chain_header.into(),
-            _ => self.into(),
-        }
-    }
-
-    fn try_from_content(content: &Content) -> JsonResult<Entry> {
-        Entry::try_from(content.to_owned())
     }
 }
 
@@ -143,34 +101,37 @@ pub mod tests {
     use crate::{
         agent::test_agent_id,
         entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
+        persistence::cas::content::Addressable,
+        test_utils::fake_dna,
     };
 
-    use crate::persistence::cas::content::{AddressableContent, AddressableContentTestSuite};
+    #[derive(Serialize, Deserialize, SerializedBytes)]
+    struct SerializedString(String);
 
     /// dummy entry value
     #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value() -> JsonString {
-        JsonString::from(RawString::from("test entry value"))
+    pub fn test_entry_value() -> SerializedBytes {
+        SerializedBytes::try_from(()).unwrap()
     }
 
-    pub fn test_entry_content() -> Content {
-        Content::from("{\"App\":[\"testEntryType\",\"\\\"test entry value\\\"\"]}")
+    pub fn test_entry_content() -> SerializedBytes {
+        SerializedBytes::try_from(Entry::App(test_app_entry_type(), test_entry_value())).unwrap()
     }
 
     /// dummy entry content, same as test_entry_value()
     #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_a() -> JsonString {
+    pub fn test_entry_value_a() -> SerializedBytes {
         test_entry_value()
     }
 
     /// dummy entry content, differs from test_entry_value()
     #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_b() -> JsonString {
-        JsonString::from(RawString::from("other test entry value"))
+    pub fn test_entry_value_b() -> SerializedBytes {
+        SerializedBytes::try_from(SerializedString(String::from("other test entry value"))).unwrap()
     }
     #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_c() -> JsonString {
-        RawString::from("value C").into()
+    pub fn test_entry_value_c() -> SerializedBytes {
+        SerializedBytes::try_from(SerializedString(String::from("value C"))).unwrap()
     }
 
     #[cfg_attr(tarpaulin, skip)]
@@ -184,18 +145,21 @@ pub mod tests {
         Entry::App(test_app_entry_type(), test_entry_value())
     }
     #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_with_value(value: &'static str) -> Entry {
-        Entry::App(test_app_entry_type(), JsonString::from_json(&value))
+    pub fn test_entry_with_value<T: TryInto<SerializedBytes>>(value: T) -> Entry
+    where
+        <T as TryInto<SerializedBytes>>::Error: std::fmt::Debug,
+    {
+        Entry::App(test_app_entry_type(), value.try_into().unwrap())
     }
 
-    pub fn expected_serialized_entry_content() -> JsonString {
-        JsonString::from_json("{\"App\":[\"testEntryType\",\"\\\"test entry value\\\"\"]}")
+    pub fn expected_serialized_entry_content() -> SerializedBytes {
+        SerializedBytes::try_from(test_entry()).unwrap()
     }
 
     /// the correct address for test_entry()
     #[cfg_attr(tarpaulin, skip)]
     pub fn expected_entry_address() -> Address {
-        Address::from("Qma6RfzvZRL127UCEVEktPhQ7YSS1inxEFw7SjEsfMJcrq".to_string())
+        Address::from("QmWiGDegSfEUxw5qsco39QeGuZLqiunN928g3uPDdQw2QZ".to_string())
     }
 
     /// dummy entry, same as test_entry()
@@ -218,7 +182,9 @@ pub mod tests {
     pub fn test_entry_unique() -> Entry {
         Entry::App(
             test_app_entry_type(),
-            RawString::from(snowflake::ProcessUniqueId::new().to_string()).into(),
+            SerializedString(snowflake::ProcessUniqueId::new().to_string())
+                .try_into()
+                .unwrap(),
         )
     }
 
@@ -235,7 +201,7 @@ pub mod tests {
 
     #[cfg_attr(tarpaulin, skip)]
     pub fn test_unpublishable_entry() -> Entry {
-        Entry::Dna(Box::new(Dna::empty()))
+        Entry::Dna(Box::new(fake_dna("uuid")))
     }
 
     #[test]
@@ -255,66 +221,5 @@ pub mod tests {
     /// test entry.address() against a known value
     fn known_address() {
         assert_eq!(expected_entry_address(), test_entry().address());
-    }
-
-    #[test]
-    /// show From<Entry> for JsonString
-    fn json_string_from_entry_test() {
-        assert_eq!(
-            test_entry().content(),
-            JsonString::from(Entry::from(test_entry()))
-        );
-    }
-
-    #[test]
-    /// show From<Content> for Entry
-    fn entry_from_content_test() {
-        assert_eq!(
-            test_entry(),
-            Entry::try_from(test_entry().content()).unwrap()
-        );
-    }
-
-    #[test]
-    /// tests for entry.content()
-    fn content_test() {
-        let content = test_entry_content();
-        let entry = Entry::try_from_content(&content).unwrap();
-
-        assert_eq!(content, entry.content());
-    }
-
-    #[test]
-    /// test that we can round trip through JSON
-    fn json_round_trip() {
-        let entry = test_entry();
-        let expected = expected_serialized_entry_content();
-        assert_eq!(expected, JsonString::from(Entry::from(entry.clone())));
-        assert_eq!(entry, Entry::try_from(expected.clone()).unwrap());
-        assert_eq!(entry, Entry::from(entry.clone()));
-
-        let sys_entry = test_sys_entry();
-        let expected = JsonString::from_json(&format!(
-            "{{\"AgentId\":{{\"nick\":\"{}\",\"pub_sign_key\":\"{}\"}}}}",
-            "bob",
-            crate::agent::GOOD_ID,
-        ));
-        assert_eq!(expected, JsonString::from(Entry::from(sys_entry.clone())));
-        assert_eq!(
-            &sys_entry,
-            &Entry::from(Entry::try_from(expected.clone()).unwrap())
-        );
-        assert_eq!(&sys_entry, &Entry::from(Entry::from(sys_entry.clone())),);
-    }
-
-    #[test]
-    /// show AddressableContent implementation
-    fn addressable_content_test() {
-        // from_content()
-        AddressableContentTestSuite::addressable_content_trait_test::<Entry>(
-            test_entry_content(),
-            test_entry(),
-            expected_entry_address(),
-        );
     }
 }

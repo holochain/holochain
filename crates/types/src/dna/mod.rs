@@ -2,24 +2,6 @@
 //!
 //! It includes utilities for representing dna structures in memory,
 //! as well as serializing and deserializing dna, mainly to json format.
-//!
-//! # Examples
-//!
-//! ```
-//! use sx_types::dna::Dna;
-//! use holochain_json_api::json::JsonString;
-//! use std::convert::TryFrom;
-//!
-//! let name = String::from("My Holochain DNA");
-//!
-//! let mut dna = Dna::empty();
-//! dna.name = name.clone();
-//!
-//! let json = JsonString::from(dna.clone());
-//!
-//! let dna2 = Dna::try_from(json).expect("could not restore DNA from JSON");
-//! assert_eq!(name, dna2.name);
-//! ```
 
 pub mod bridges;
 pub mod capabilities;
@@ -39,26 +21,12 @@ use crate::{
     },
     entry::entry_type::{AppEntryType, EntryType},
     error::{SkunkError, SkunkResult},
-    persistence::cas::content::{AddressableContent, Content},
-    prelude::Address,
+    prelude::{Address, *},
 };
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
-use multihash;
-use serde::{Deserialize, Serialize};
-use serde_json::{self, json, Value};
 use std::{
     collections::BTreeMap,
-    convert::TryFrom,
     hash::{Hash, Hasher},
 };
-
-/// serde helper, provides a default empty object
-fn empty_object() -> Value {
-    json!({})
-}
 
 /// serde helper, provides a default newly generated v4 uuid
 fn zero_uuid() -> String {
@@ -69,7 +37,7 @@ fn zero_uuid() -> String {
 pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Clone, Debug, DefaultJson)]
+#[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
 pub struct Dna {
     /// The top-level "name" of a holochain application.
     #[serde(default)]
@@ -92,65 +60,16 @@ pub struct Dna {
     pub dna_spec_version: String,
 
     /// Any arbitrary application properties can be included in this object.
-    #[serde(default = "empty_object")]
-    pub properties: Value,
+    pub properties: SerializedBytes,
 
     /// An array of zomes associated with your holochain application.
     #[serde(default)]
     pub zomes: BTreeMap<String, zome::Zome>,
 }
 
-impl AddressableContent for Dna {
-    fn content(&self) -> Content {
-        Content::from(self.to_owned())
-    }
-
-    fn try_from_content(content: &Content) -> JsonResult<Self> {
-        Ok(Dna::try_from(content.to_owned())?)
-    }
-}
-
 impl Eq for Dna {}
 
 impl Dna {
-    /// Create a new in-memory dna structure with some default values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sx_types::dna::Dna;
-    ///
-    /// let dna = Dna::empty();
-    /// assert_eq!("", dna.name);
-    ///
-    /// ```
-    pub fn empty() -> Self {
-        Self {
-            name: String::new(),
-            description: String::new(),
-            version: String::new(),
-            uuid: zero_uuid(),
-            dna_spec_version: String::from("2.0"),
-            properties: empty_object(),
-            zomes: BTreeMap::new(),
-        }
-    }
-
-    /// Generate a pretty-printed json string from an in-memory dna struct.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sx_types::dna::Dna;
-    ///
-    /// let dna = Dna::empty();
-    /// println!("json: {}", dna.to_json_pretty().expect("DNA should serialize"));
-    ///
-    /// ```
-    pub fn to_json_pretty(&self) -> serde_json::Result<String> {
-        serde_json::to_string_pretty(self)
-    }
-
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &str) -> Result<&zome::Zome, DnaError> {
         self.zomes
@@ -239,13 +158,6 @@ impl Dna {
         None
     }
 
-    /// Get DNA multihash.
-    pub fn multihash(&self) -> Result<Vec<u8>, SkunkError> {
-        let s = String::from(JsonString::from(self.to_owned()));
-        multihash::encode(multihash::Hash::SHA2256, &s.into_bytes())
-            .map_err(|error| SkunkError::new(error.to_string()))
-    }
-
     /// List the required bridges.
     pub fn get_required_bridges(&self) -> Vec<Bridge> {
         self.zomes
@@ -263,7 +175,7 @@ impl Dna {
             .iter()
             .map(|(zome_name, zome)| {
                 // currently just check the zome has some code
-                if zome.code.code.len() > 0 {
+                if zome.code.code().len() > 0 {
                     Ok(())
                 } else {
                     Err(SkunkError::new(format!("Zome {} has no code!", zome_name)))
@@ -281,7 +193,7 @@ impl Dna {
 
 impl Hash for Dna {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let s = String::from(JsonString::from(self.to_owned()));
+        let s: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(self).unwrap()).into();
         s.hash(state);
     }
 }
@@ -289,39 +201,27 @@ impl Hash for Dna {
 impl PartialEq for Dna {
     fn eq(&self, other: &Dna) -> bool {
         // need to guarantee that PartialEq and Hash always agree
-        JsonString::from(self.to_owned()) == JsonString::from(other.to_owned())
+        SerializedBytes::try_from(self).unwrap() == SerializedBytes::try_from(other).unwrap()
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    extern crate base64;
     use crate::{
         dna::{
             bridges::{Bridge, BridgePresence, BridgeReference},
-            entry_types::EntryTypeDef,
+            entry_types::{EntryTypeDef, Sharing},
             fn_declarations::{FnDeclaration, FnParameter, Trait},
-            zome::tests::test_zome,
+            wasm::DnaWasm,
+            zome::{Config, Zome},
+            Dna,
         },
         entry::entry_type::{AppEntryType, EntryType},
         persistence::cas::content::Address,
-        test_utils::fake_dna,
+        test_utils::{fake_dna, fake_zome},
     };
-    use holochain_json_api::json::JsonString;
-    use std::convert::TryFrom;
-
-    #[test]
-    fn test_dna_new() {
-        let dna = Dna::empty();
-        assert_eq!(format!("{:?}",dna),"Dna { name: \"\", description: \"\", version: \"\", uuid: \"00000000-0000-0000-0000-000000000000\", dna_spec_version: \"2.0\", properties: Object({}), zomes: {} }")
-    }
-
-    #[test]
-    fn test_dna_to_json_pretty() {
-        let dna = Dna::empty();
-        assert_eq!(format!("{:?}",dna.to_json_pretty()),"Ok(\"{\\n  \\\"name\\\": \\\"\\\",\\n  \\\"description\\\": \\\"\\\",\\n  \\\"version\\\": \\\"\\\",\\n  \\\"uuid\\\": \\\"00000000-0000-0000-0000-000000000000\\\",\\n  \\\"dna_spec_version\\\": \\\"2.0\\\",\\n  \\\"properties\\\": {},\\n  \\\"zomes\\\": {}\\n}\")")
-    }
+    use holochain_serialized_bytes::prelude::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_dna_get_zome() {
@@ -400,29 +300,39 @@ pub mod tests {
     #[test]
     fn test_dna_verify_fail() {
         // should error because code is empty
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-                "zomes": {
-                    "my_zome": {
-                        "code": {"code": ""}
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("my_zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: BTreeMap::new(),
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::new_invalid(),
+                        bridges: vec![],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
         assert!(dna.verify().is_err())
     }
 
-    static UNIT_UUID: &'static str = "00000000-0000-0000-0000-000000000000";
-
-    fn test_empty_dna() -> Dna {
-        Dna::empty()
-    }
+    // static UNIT_UUID: &'static str = "00000000-0000-0000-0000-000000000000";
 
     #[test]
     fn get_entry_type_def_test() {
-        let mut dna = test_empty_dna();
-        let mut zome = test_zome();
+        let mut dna = fake_dna("get_entry_type_def_test");
+        let mut zome = fake_zome();
         let entry_type = EntryType::App(AppEntryType::from("bar"));
         let entry_type_def = EntryTypeDef::new();
 
@@ -435,315 +345,33 @@ pub mod tests {
     }
 
     #[test]
-    fn can_parse_and_output_json() {
-        let dna = test_empty_dna();
-
-        let serialized = serde_json::to_string(&dna).unwrap();
-
-        let deserialized: Dna = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(String::from("2.0"), deserialized.dna_spec_version);
-    }
-
-    #[test]
-    fn can_parse_and_output_json_helpers() {
-        let dna = test_empty_dna();
-
-        let json_string = JsonString::from(dna);
-
-        let deserialized = Dna::try_from(json_string).unwrap();
-
-        assert_eq!(String::from("2.0"), deserialized.dna_spec_version);
-    }
-
-    #[test]
-    fn parse_and_serialize_compare() {
-        let fixture = String::from(
-            r#"{
-                "name": "test",
-                "description": "test",
-                "version": "test",
-                "uuid": "00000000-0000-0000-0000-000000000000",
-                "dna_spec_version": "2.0",
-                "properties": {
-                    "test": "test"
-                },
-                "zomes": {
-                    "test": {
-                        "description": "test",
-                        "config": {},
-                        "entry_types": {
-                            "test": {
-                                "properties": "test",
-                                "sharing": "public",
-                                "links_to": [
-                                    {
-                                        "target_type": "test",
-                                        "link_type": "test"
-                                    }
-                                ],
-                                "linked_from": []
-                            }
-                        },
-                        "traits": {
-                            "hc_public": {
-                                "functions": ["test"]
-                            }
-                        },
-                        "fn_declarations": [
-                            {
-                                "name": "test",
-                                "inputs": [],
-                                "outputs": []
-                            }
-                        ],
-                        "code": {
-                            "code": "AAECAw=="
-                        },
-                        "bridges": []
-                    }
-                }
-            }"#,
-        )
-        .replace(char::is_whitespace, "");
-
-        let dna = Dna::try_from(JsonString::from_json(&fixture.clone())).unwrap();
-
-        println!("{}", dna.to_json_pretty().unwrap());
-
-        let serialized = String::from(JsonString::from(dna)).replace(char::is_whitespace, "");
-
-        assert_eq!(fixture, serialized);
-    }
-
-    #[test]
-    fn default_value_test() {
-        let mut dna = Dna::empty();
-        dna.uuid = String::from(UNIT_UUID);
-
-        let mut zome = zome::Zome::empty();
-        zome.entry_types
-            .insert("".into(), entry_types::EntryTypeDef::new());
-        dna.zomes.insert("".to_string(), zome);
-
-        let expected = JsonString::from(dna.clone());
-        println!("{:?}", expected);
-
-        let fixture = Dna::try_from(JsonString::from_json(
-            r#"{
-                "name": "",
-                "description": "",
-                "version": "",
-                "uuid": "00000000-0000-0000-0000-000000000000",
-                "dna_spec_version": "2.0",
-                "properties": {},
-                "zomes": {
-                    "": {
-                        "description": "",
-                        "config": {},
-                        "entry_types": {
-                            "": {
-                                "description": "",
-                                "sharing": "public",
-                                "links_to": [],
-                                "linked_from": []
-                            }
-                        },
-                        "traits": {},
-                        "fn_declarations": [],
-                        "code": {"code": ""}
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
-
-        assert_eq!(dna, fixture);
-    }
-
-    #[test]
-    fn parse_with_defaults_dna() {
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-            }"#,
-        ))
-        .unwrap();
-
-        assert!(dna.uuid.len() > 0);
-    }
-
-    #[test]
-    fn parse_with_defaults_entry_type() {
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-                "zomes": {
-                    "zome1": {
-                        "code": {
-                            "code": ""
-                        },
-                        "entry_types": {
-                            "type1": {}
-                        }
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
-
-        assert_eq!(
-            dna.zomes
-                .get("zome1")
-                .unwrap()
-                .entry_types
-                .get(&"type1".into())
-                .unwrap()
-                .sharing,
-            entry_types::Sharing::Public
-        );
-    }
-
-    #[test]
-    fn parse_wasm() {
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-                "zomes": {
-                    "zome1": {
-                        "entry_types": {
-                            "type1": {}
-                        },
-                        "code": {
-                            "code": "AAECAw=="
-                        }
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
-
-        assert_eq!(vec![0, 1, 2, 3], *dna.zomes.get("zome1").unwrap().code.code);
-    }
-
-    #[test]
-    #[should_panic]
-    fn parse_fail_if_bad_type_dna() {
-        Dna::try_from(JsonString::from_json(
-            r#"{
-                "name": 42
-            }"#,
-        ))
-        .unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn parse_fail_if_bad_type_zome() {
-        Dna::try_from(JsonString::from_json(
-            r#"{
-                "zomes": {
-                    "zome1": {
-                        "description": 42
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn parse_fail_if_bad_type_entry_type() {
-        Dna::try_from(JsonString::from_json(
-            r#"{
-                "zomes": {
-                    "zome1": {
-                        "entry_types": {
-                            "test": {
-                                "properties": 42
-                            }
-                        }
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
-    }
-
-    #[test]
-    fn parse_accepts_arbitrary_dna_properties() {
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-                "properties": {
-                    "str": "hello",
-                    "num": 3.14159,
-                    "bool": true,
-                    "null": null,
-                    "arr": [1, 2],
-                    "obj": {"a": 1, "b": 2}
-                }
-            }"#,
-        ))
-        .unwrap();
-
-        let props = dna.properties.as_object().unwrap();
-
-        assert_eq!("hello", props.get("str").unwrap().as_str().unwrap());
-        assert_eq!(3.14159, props.get("num").unwrap().as_f64().unwrap());
-        assert_eq!(true, props.get("bool").unwrap().as_bool().unwrap());
-        assert!(props.get("null").unwrap().is_null());
-        assert_eq!(
-            1_i64,
-            props.get("arr").unwrap().as_array().unwrap()[0]
-                .as_i64()
-                .unwrap()
-        );
-        assert_eq!(
-            1_i64,
-            props
-                .get("obj")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get("a")
-                .unwrap()
-                .as_i64()
-                .unwrap()
-        );
-    }
-
-    #[test]
     fn get_wasm_from_zome_name() {
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-                "name": "test",
-                "description": "test",
-                "version": "test",
-                "uuid": "00000000-0000-0000-0000-000000000000",
-                "dna_spec_version": "2.0",
-                "properties": {
-                    "test": "test"
-                },
-                "zomes": {
-                    "test zome": {
-                        "name": "test zome",
-                        "description": "test",
-                        "config": {},
-                        "entry_types": {},
-                        "traits": {
-                            "hc_public": {
-                            }
-                        },
-                        "fn_declarations": [],
-                        "code": {
-                            "code": "AAECAw=="
-                        }
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
-
-        let wasm = dna.get_wasm_from_zome_name("test zome");
-        assert_eq!("AAECAw==", base64::encode(&*wasm.unwrap().code));
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("test zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: BTreeMap::new(),
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::from(vec![1, 2, 3]),
+                        bridges: vec![],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
+        let wasm = dna.get_wasm_from_zome_name("test zome").unwrap();
+        assert_eq!(vec![1, 2, 3], *wasm.code());
 
         let fail = dna.get_wasm_from_zome_name("non existant zome");
         assert_eq!(None, fail);
@@ -751,41 +379,42 @@ pub mod tests {
 
     #[test]
     fn test_get_zome_name_for_entry_type() {
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-                "name": "test",
-                "description": "test",
-                "version": "test",
-                "uuid": "00000000-0000-0000-0000-000000000000",
-                "dna_spec_version": "2.0",
-                "properties": {
-                    "test": "test"
-                },
-                "zomes": {
-                    "test zome": {
-                        "name": "test zome",
-                        "description": "test",
-                        "config": {},
-                        "traits": {
-                            "hc_public": {
-                                "functions": []
-                            }
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("test zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: {
+                            let mut v = BTreeMap::new();
+                            v.insert(
+                                AppEntryType::from("test type").into(),
+                                EntryTypeDef {
+                                    sharing: Sharing::Public,
+                                    linked_from: vec![],
+                                    links_to: vec![],
+                                    properties: SerializedBytes::try_from(()).unwrap(),
+                                },
+                            );
+                            v
                         },
-                        "fn_declarations": [],
-                        "entry_types": {
-                            "test type": {
-                                "description": "",
-                                "sharing": "public"
-                            }
-                        },
-                        "code": {
-                            "code": ""
-                        }
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::from(vec![1, 2, 3]),
+                        bridges: vec![],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
 
         assert_eq!(
             dna.get_zome_name_for_app_entry_type(&AppEntryType::from("test type"))
@@ -799,95 +428,99 @@ pub mod tests {
 
     #[test]
     fn test_get_required_bridges() {
-        let dna = Dna::try_from(JsonString::from_json(
-            r#"{
-                "name": "test",
-                "description": "test",
-                "version": "test",
-                "uuid": "00000000-0000-0000-0000-000000000000",
-                "dna_spec_version": "2.0",
-                "properties": {
-                    "test": "test"
-                },
-                "zomes": {
-                    "test zome": {
-                        "name": "test zome",
-                        "description": "test",
-                        "config": {},
-                        "traits": {
-                            "hc_public": {
-                                "functions": []
-                            }
+        let dna = Dna {
+            name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            dna_spec_version: String::new(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            uuid: String::new(),
+            zomes: {
+                let mut v = BTreeMap::new();
+                v.insert(
+                    String::from("test zome"),
+                    Zome {
+                        description: String::new(),
+                        entry_types: {
+                            let mut v = BTreeMap::new();
+                            v.insert(
+                                AppEntryType::from("test type").into(),
+                                EntryTypeDef {
+                                    sharing: Sharing::Public,
+                                    linked_from: vec![],
+                                    links_to: vec![],
+                                    properties: SerializedBytes::try_from(()).unwrap(),
+                                },
+                            );
+                            v
                         },
-                        "fn_declarations": [],
-                        "entry_types": {
-                            "test type": {
-                                "description": "",
-                                "sharing": "public"
-                            }
-                        },
-                        "code": {
-                            "code": ""
-                        },
-                        "bridges": [
-                            {
-                                "presence": "required",
-                                "handle": "DPKI",
-                                "reference": {
-                                    "dna_address": "Qmabcdef1234567890"
-                                }
+                        fn_declarations: vec![],
+                        traits: BTreeMap::new(),
+                        code: DnaWasm::from(vec![1, 2, 3]),
+                        bridges: vec![
+                            Bridge {
+                                handle: String::from("Vault"),
+                                presence: BridgePresence::Optional,
+                                reference: BridgeReference::Trait {
+                                    traits: {
+                                        let mut v = BTreeMap::new();
+                                        v.insert(
+                                            String::from("persona_management"),
+                                            Trait {
+                                                functions: vec![FnDeclaration {
+                                                    name: String::from("get_happs"),
+                                                    inputs: vec![],
+                                                    outputs: vec![FnParameter {
+                                                        name: "happs".into(),
+                                                        parameter_type: "json".into(),
+                                                    }],
+                                                }],
+                                            },
+                                        );
+                                        v
+                                    },
+                                },
                             },
-                            {
-                                "presence": "optional",
-                                "handle": "Vault",
-                                "reference": {
-                                    "traits": {
-                                        "persona_management": {
-                                            "functions": [
-                                                {
-                                                    "name": "get_persona",
-                                                    "inputs": [{"name": "domain", "type": "string"}],
-                                                    "outputs": [{"name": "persona", "type": "json"}]
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
+                            Bridge {
+                                handle: String::from("HCHC"),
+                                presence: BridgePresence::Required,
+                                reference: BridgeReference::Trait {
+                                    traits: {
+                                        let mut v = BTreeMap::new();
+                                        v.insert(
+                                            String::from("happ_directory"),
+                                            Trait {
+                                                functions: vec![FnDeclaration {
+                                                    name: String::from("get_happs"),
+                                                    inputs: vec![],
+                                                    outputs: vec![FnParameter {
+                                                        name: "happs".into(),
+                                                        parameter_type: "json".into(),
+                                                    }],
+                                                }],
+                                            },
+                                        );
+                                        v
+                                    },
+                                },
                             },
-                            {
-                                "presence": "required",
-                                "handle": "HCHC",
-                                "reference": {
-                                    "traits": {
-                                        "happ_directory": {
-                                            "functions": [
-                                                {
-                                                    "name": "get_happs",
-                                                    "inputs": [],
-                                                    "outputs": [{"name": "happs", "type": "json"}]
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                }
-            }"#,
-        ))
-        .unwrap();
-
+                            Bridge {
+                                handle: String::from("DPKI"),
+                                presence: BridgePresence::Required,
+                                reference: BridgeReference::Address {
+                                    dna_address: Address::from("Qmabcdef1234567890"),
+                                },
+                            },
+                        ],
+                        config: Config::default(),
+                    },
+                );
+                v
+            },
+        };
         assert_eq!(
             dna.get_required_bridges(),
             vec![
-                Bridge {
-                    presence: BridgePresence::Required,
-                    handle: String::from("DPKI"),
-                    reference: BridgeReference::Address {
-                        dna_address: Address::from("Qmabcdef1234567890"),
-                    }
-                },
                 Bridge {
                     presence: BridgePresence::Required,
                     handle: String::from("HCHC"),
@@ -907,6 +540,13 @@ pub mod tests {
                             }
                         }
                     },
+                },
+                Bridge {
+                    presence: BridgePresence::Required,
+                    handle: String::from("DPKI"),
+                    reference: BridgeReference::Address {
+                        dna_address: Address::from("Qmabcdef1234567890"),
+                    }
                 },
             ]
         );

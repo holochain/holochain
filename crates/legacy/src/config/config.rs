@@ -6,8 +6,6 @@ use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     env,
-    fs::File,
-    io::prelude::*,
     net::Ipv4Addr,
     path::PathBuf,
     sync::Arc,
@@ -583,12 +581,6 @@ pub struct AgentConfig {
     pub test_agent: Option<bool>,
 }
 
-impl From<AgentConfig> for AgentId {
-    fn from(config: AgentConfig) -> Self {
-        AgentId::try_from(JsonString::from_json(&config.id)).expect("bad agent json")
-    }
-}
-
 /// A DNA is represented by a DNA file.
 /// A hash can optionally be provided, which could be used to validate that the DNA being installed
 /// is the DNA that was intended to be installed.
@@ -604,10 +596,8 @@ pub struct DnaConfig {
 impl TryFrom<DnaConfig> for Dna {
     type Error = SkunkError;
     fn try_from(dna_config: DnaConfig) -> Result<Self, Self::Error> {
-        let mut f = File::open(dna_config.file)?;
-        let mut contents = String::new();
-        f.read_to_string(&mut contents)?;
-        Dna::try_from(JsonString::from_json(&contents)).map_err(|err| err.into())
+        let b: Vec<u8> = std::fs::read(dna_config.file)?;
+        Dna::try_from(SerializedBytes::from(UnsafeBytes::from(b))).map_err(|err| err.into())
     }
 }
 

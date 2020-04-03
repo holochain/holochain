@@ -4,8 +4,6 @@ use petgraph::{algo::toposort, graph::DiGraph, prelude::NodeIndex};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
-    fs,
     path::PathBuf,
     sync::Arc,
 };
@@ -435,12 +433,6 @@ pub struct AgentConfig {
     pub test_agent: Option<bool>,
 }
 
-impl From<AgentConfig> for AgentId {
-    fn from(config: AgentConfig) -> Self {
-        AgentId::try_from(JsonString::from_json(&config.id)).expect("bad agent json")
-    }
-}
-
 /// A DNA is represented by a DNA file.
 /// A hash can optionally be provided, which could be used to validate that the DNA being installed
 /// is the DNA that was intended to be installed.
@@ -451,14 +443,6 @@ pub struct DnaConfig {
     pub hash: String,
     #[serde(default)]
     pub uuid: Option<String>,
-}
-
-impl TryFrom<DnaConfig> for Dna {
-    type Error = SkunkError;
-    fn try_from(dna_config: DnaConfig) -> Result<Self, Self::Error> {
-        let contents = fs::read_to_string(dna_config.file)?;
-        Dna::try_from(JsonString::from_json(&contents)).map_err(|err| err.into())
-    }
 }
 
 /// An cell combines a DNA with an agent.

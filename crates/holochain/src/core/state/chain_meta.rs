@@ -8,6 +8,7 @@ use sx_state::{
     prelude::*,
 };
 use sx_types::persistence::cas::content::Address;
+use std::fmt::Debug;
 
 type Tag = String;
 
@@ -83,7 +84,7 @@ where
 
 impl<'env, V, R> ChainMetaBuf<'env, V, R>
 where
-    V: BufMultiVal,
+    V: BufMultiVal + Debug,
     R: Readable,
 {
     pub(crate) fn new(
