@@ -22,7 +22,7 @@ pub struct WorkflowRunner(Arc<Cell>);
 
 impl WorkflowRunner {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
-        let environ = self.clone().0.state_env();
+        let environ = Arc::clone(&self.0).state_env();
         let env = environ.guard().await;
         let dbs = environ.dbs().await?;
         let reader = env.reader()?;
@@ -32,7 +32,7 @@ impl WorkflowRunner {
             WorkflowCall::InvokeZome(invocation) => {
                 let workspace = workspace::InvokeZomeWorkspace::new(&reader, &dbs)?;
                 let effects =
-                    workflow::invoke_zome(workspace, self.0.get_ribosome(), invocation).await?;
+                    workflow::invoke_zome(workspace, self.0.get_ribosome(), *invocation).await?;
                 self.finish(effects).await?;
             }
             WorkflowCall::Genesis(dna, agent_id) => {

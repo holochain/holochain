@@ -62,8 +62,7 @@ impl<K: Eq + Hash + Send + Sync> UniversalMap<K> {
         key: Key<K, V>,
         value: V,
     ) -> Option<Box<dyn Any + Send + Sync>> {
-        let result = self.0.insert(key.0, Box::new(value));
-        result
+        self.0.insert(key.0, Box::new(value))
     }
 
     /// Get a value from the UniversalMap.

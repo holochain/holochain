@@ -33,7 +33,7 @@ impl ExternalConductorApi {
     }
 
     /// Call an admin function to modify this Conductor's behavior
-    pub async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<JsonString> {
+    pub async fn admin(&mut self, _method: AdminMethod) -> ConductorApiResult<SerializedBytes> {
         unimplemented!()
     }
 }

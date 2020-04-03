@@ -1,7 +1,6 @@
 //! Categorization of source chain entries.
 
-use crate::error::SkunkError;
-use holochain_json_api::{error::JsonError, json::JsonString};
+use crate::{error::SkunkError, prelude::*};
 use std::{
     convert::TryFrom,
     fmt::{Display, Formatter, Result as FmtResult},
@@ -17,7 +16,7 @@ macro_rules! sys_prefix {
 
 /// Each DNA can specify app entry types - these are unique by utf8 string
 #[derive(
-    Debug, Clone, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Eq, DefaultJson,
+    Debug, Clone, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Eq, SerializedBytes,
 )]
 pub struct AppEntryType(String);
 
@@ -48,12 +47,11 @@ impl ToString for AppEntryType {
 /// Enum for listing all System Entry Types
 /// Variant `Data` is for user defined entry types
 #[derive(
-    Debug, Clone, PartialEq, Hash, Serialize, Deserialize, DefaultJson, PartialOrd, Ord, Eq,
+    Debug, Clone, PartialEq, Hash, Serialize, Deserialize, SerializedBytes, PartialOrd, Ord, Eq,
 )]
 #[allow(missing_docs)]
 pub enum EntryType {
     App(AppEntryType),
-
     Dna,
     AgentId,
     Deletion,

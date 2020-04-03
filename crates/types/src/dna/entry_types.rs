@@ -1,8 +1,8 @@
 //! File holding all the structs for handling entry types defined by DNA.
 
-use crate::{dna::zome::ZomeEntryTypes, entry::entry_type::EntryType};
-use holochain_json_api::{error::JsonError, json::JsonString};
-use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
+use crate::{dna::zome::ZomeEntryTypes, entry::entry_type::EntryType, serde::ser::SerializeMap};
+use holochain_serialized_bytes::prelude::*;
+use serde::{de::Deserializer, ser::Serializer};
 use std::collections::BTreeMap;
 
 /// Enum for Zome EntryType "sharing" property.
@@ -127,11 +127,10 @@ where
 }
 
 /// Represents an individual object in the "zome" "entry_types" array.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash, DefaultJson)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub struct EntryTypeDef {
     /// Metdata associated with this entry def (e.g. description, examples, index/UI hints)
-    #[serde(default = "empty_properties")]
-    pub properties: JsonString,
+    pub properties: SerializedBytes,
 
     /// The sharing model of this entry type (public, private, encrypted).
     #[serde(default)]
@@ -146,14 +145,10 @@ pub struct EntryTypeDef {
     pub linked_from: Vec<LinkedFrom>,
 }
 
-fn empty_properties() -> JsonString {
-    JsonString::empty_object()
-}
-
 impl Default for EntryTypeDef {
     fn default() -> Self {
         EntryTypeDef {
-            properties: JsonString::empty_object(),
+            properties: SerializedBytes::try_from(()).unwrap(),
             sharing: Sharing::default(),
             links_to: Vec::default(),
             linked_from: Vec::default(),
@@ -171,50 +166,10 @@ impl EntryTypeDef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
 
     #[test]
     fn can_publish() {
         assert!(Sharing::Public.can_publish());
         assert!(!Sharing::Private.can_publish());
-    }
-
-    #[test]
-    fn build_and_compare() {
-        let fixture: EntryTypeDef = serde_json::from_str(
-            r#"{
-                "properties": "{\"description\": \"A test entry\"}",
-                "sharing": "public",
-                "links_to": [
-                    {
-                        "target_type": "test",
-                        "link_type": "test"
-                    }
-                ],
-                "linked_from": [
-                    {
-                        "base_type": "HcSysAgentKeyHash",
-                        "link_type": "authored_posts"
-                    }
-                ]
-            }"#,
-        )
-        .unwrap();
-
-        let mut entry = EntryTypeDef::new();
-        entry.properties = JsonString::from("{\"description\": \"A test entry\"}");
-        entry.sharing = Sharing::Public;
-
-        let mut link = LinksTo::new();
-        link.target_type = String::from("test");
-        link.link_type = String::from("test");
-        entry.links_to.push(link);
-
-        let mut linked = LinkedFrom::new();
-        linked.base_type = String::from("HcSysAgentKeyHash");
-        linked.link_type = String::from("authored_posts");
-        entry.linked_from.push(linked);
-
-        assert_eq!(fixture, entry);
     }
 }

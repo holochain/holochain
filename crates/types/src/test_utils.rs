@@ -1,11 +1,106 @@
 //! Some common testing helpers.
 
-use crate::{agent::AgentId, cell::CellId, dna::Dna, prelude::*};
-use std::convert::TryFrom;
+use crate::{
+    agent::AgentId,
+    cell::CellId,
+    dna::{
+        bridges::Bridge,
+        capabilities::CapabilityRequest,
+        entry_types::EntryTypeDef,
+        fn_declarations::{FnDeclaration, TraitFns},
+        wasm::DnaWasm,
+        zome::{Config, Zome, ZomeFnDeclarations},
+        Dna,
+    },
+    nucleus::ZomeInvocationPayload,
+    prelude::*,
+    signature::{Provenance, Signature},
+};
+use std::collections::BTreeMap;
+
+#[derive(Serialize, Deserialize, SerializedBytes)]
+struct FakeProperties {
+    test: String,
+}
+
+/// simple EntryTypeDef fixture
+pub fn fake_entry_type() -> EntryTypeDef {
+    EntryTypeDef {
+        ..Default::default()
+    }
+}
+
+/// simple TraitFns fixture
+pub fn fake_traits() -> TraitFns {
+    TraitFns {
+        functions: vec![String::from("test")],
+    }
+}
+
+/// simple ZomeFnDeclarations fixture
+pub fn fake_fn_declarations() -> ZomeFnDeclarations {
+    vec![FnDeclaration {
+        name: "test".into(),
+        inputs: vec![],
+        outputs: vec![],
+    }]
+}
+
+/// simple DnaWasm fixture
+pub fn fake_dna_wasm() -> DnaWasm {
+    DnaWasm::from(vec![0_u8])
+}
+
+/// simple Bridges fixture
+pub fn fake_bridges() -> Vec<Bridge> {
+    vec![]
+}
+
+/// simple Zome fixture
+pub fn fake_zome() -> Zome {
+    Zome {
+        description: "test".into(),
+        config: Config::default(),
+        entry_types: {
+            let mut v = BTreeMap::new();
+            v.insert("test".into(), fake_entry_type());
+            v
+        },
+        traits: {
+            let mut v = BTreeMap::new();
+            v.insert("hc_public".into(), fake_traits());
+            v
+        },
+        fn_declarations: fake_fn_declarations(),
+        code: fake_dna_wasm(),
+        bridges: fake_bridges(),
+    }
+}
+
+/// A fixture example dna for unit testing.
+pub fn fake_dna(uuid: &str) -> Dna {
+    Dna {
+        name: "test".into(),
+        description: "test".into(),
+        version: "test".into(),
+        uuid: uuid.into(),
+        properties: FakeProperties {
+            test: "test".into(),
+        }
+        .try_into()
+        .unwrap(),
+        zomes: {
+            let mut v = BTreeMap::new();
+            v.insert("test".into(), fake_zome());
+            v
+        },
+        dna_spec_version: Default::default(),
+    }
+}
 
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (name.clone().into(), fake_agent_id(name)).into()
+    (name.to_string().into(), fake_agent_id(name)).into()
 }
 
 /// A fixture example AgentId for unit testing.
@@ -13,55 +108,25 @@ pub fn fake_agent_id(name: &str) -> AgentId {
     AgentId::generate_fake(name)
 }
 
-/// A fixture example Dna for unit testing.
-pub fn fake_dna(uuid: &str) -> Dna {
-    let fixture = format!(
-        r#"{{
-                "name": "test",
-                "description": "test",
-                "version": "test",
-                "uuid": "{}",
-                "dna_spec_version": "2.0",
-                "properties": {{
-                    "test": "test"
-                }},
-                "zomes": {{
-                    "test": {{
-                        "description": "test",
-                        "config": {{}},
-                        "entry_types": {{
-                            "test": {{
-                                "description": "test",
-                                "sharing": "public",
-                                "links_to": [
-                                    {{
-                                        "target_type": "test",
-                                        "link_type": "test"
-                                    }}
-                                ],
-                                "linked_from": []
-                            }}
-                        }},
-                        "traits": {{
-                            "hc_public": {{
-                                "functions": ["test"]
-                            }}
-                        }},
-                        "fn_declarations": [
-                            {{
-                                "name": "test",
-                                "inputs": [],
-                                "outputs": []
-                            }}
-                        ],
-                        "code": {{
-                            "code": "AAECAw=="
-                        }},
-                        "bridges": []
-                    }}
-                }}
-            }}"#,
-        uuid
-    );
-    Dna::try_from(JsonString::from_json(&fixture)).unwrap()
+/// A fixture example CapabilityRequest for unit testing.
+pub fn fake_capability_request() -> CapabilityRequest {
+    CapabilityRequest {
+        cap_token: Address::from("fake"),
+        provenance: fake_provenance(),
+    }
+}
+
+/// A fixture example ZomeInvocationPayload for unit testing.
+pub fn fake_zome_invocation_payload() -> ZomeInvocationPayload {
+    ZomeInvocationPayload::new(SerializedBytes::try_from(()).unwrap())
+}
+
+/// A fixture example Signature for unit testing.
+pub fn fake_signature() -> Signature {
+    Signature::from("fake")
+}
+
+/// A fixture example Provenance for unit testing.
+pub fn fake_provenance() -> Provenance {
+    Provenance::new("fake".into(), fake_signature())
 }

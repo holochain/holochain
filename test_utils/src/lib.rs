@@ -3,12 +3,6 @@
 
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate holochain_json_derive;
 
 pub mod mock_signing;
 
@@ -21,6 +15,8 @@ use holochain_core::{
     nucleus::actions::call_zome_function::make_cap_request_for_call,
     signal::{signal_channel, Signal, SignalReceiver},
 };
+use holochain_json_api::{error::JsonError, json::JsonString};
+use holochain_locksmith::Mutex;
 use sx_types::{
     crud_status::CrudStatus,
     dna::{
@@ -35,10 +31,8 @@ use sx_types::{
         entry_type::{test_app_entry_type, AppEntryType, EntryType},
         Entry, EntryWithMeta,
     },
+    persistence::cas::content::{Address, AddressableContent},
 };
-use holochain_json_api::{error::JsonError, json::JsonString};
-use holochain_locksmith::Mutex;
-use sx_types::persistence::cas::content::{Address, AddressableContent};
 
 use holochain_net::p2p_config::P2pConfig;
 
@@ -65,15 +59,6 @@ use wabt::Wat2Wasm;
 
 lazy_static! {
     pub static ref DYNAMO_DB_LOCAL_TEST_HOST_PATH: &'static str = "http://localhost:8001";
-}
-
-/// Load WASM from filesystem
-pub fn create_wasm_from_file(path: &PathBuf) -> Vec<u8> {
-    let mut file = File::open(path)
-        .unwrap_or_else(|err| panic!("Couldn't create WASM from file: {:?}; {}", path, err));
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).unwrap();
-    buf
 }
 
 /// Create DNA from WAT
@@ -333,7 +318,7 @@ pub fn hc_setup_and_call_zome_fn<J: Into<JsonString>>(
         "test_zome",
         cap_request,
         fn_name,
-        &params_string
+        &params_string,
     )
 }
 
@@ -530,7 +515,7 @@ pub fn make_test_call(
         "test_zome",
         cap_call,
         fn_name,
-        params
+        params,
     )
 }
 
