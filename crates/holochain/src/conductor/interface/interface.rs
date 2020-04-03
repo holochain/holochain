@@ -72,7 +72,6 @@ where
 }
 
 /// callback type to handle incoming requests from a connected client
-#[must_use]
 pub type ConductorSideResponder<Res> =
     Box<dyn FnOnce(Res) -> BoxFuture<'static, InterfaceResult<()>> + 'static + Send>;
 
@@ -80,7 +79,6 @@ pub type ConductorSideResponder<Res> =
 pub type ConductorSideRequestReceiver<Req, Res> = Receiver<(Req, ConductorSideResponder<Res>)>;
 
 /// the external side callback type to use when implementing a client interface
-#[must_use]
 pub type ExternalSideResponder =
     Box<dyn FnOnce(SerializedBytes) -> BoxFuture<'static, InterfaceResult<()>> + 'static + Send>;
 
