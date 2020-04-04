@@ -671,7 +671,7 @@ dependencies = [
  "hcid 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_common 0.0.43-alpha3 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_serialized_bytes 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "holochain_wasmer_host 0.0.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holochain_wasmer_host 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "human-panic 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mockall 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -694,7 +694,6 @@ dependencies = [
  "tracing 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "url_serde 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasmer-runtime 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -729,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.22"
+version = "0.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byte-slice-cast 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -740,12 +739,12 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.22"
+version = "0.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byte-slice-cast 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_serialized_bytes 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "holochain_wasmer_common 0.0.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holochain_wasmer_common 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmer-runtime 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1896,7 +1895,7 @@ dependencies = [
  "derive_more 0.99.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "hcid 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_serialized_bytes 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "holochain_wasmer_common 0.0.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holochain_wasmer_common 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lib3h_crypto_api 0.0.38 (git+https://github.com/holochain/lib3h.git?branch=unpinned)",
  "maplit 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2018,7 +2017,7 @@ name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "holochain_wasmer_common 0.0.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holochain_wasmer_common 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2550,8 +2549,8 @@ dependencies = [
 "checksum holochain_common 0.0.43-alpha3 (registry+https://github.com/rust-lang/crates.io-index)" = "b1ea372338cb6550b0fa7f62b35c6d986e541181d9167083965adf6e15940b2d"
 "checksum holochain_serialized_bytes 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)" = "a05a1ab3ce45baaeb3ea2d5c7a09b4902e698c76cad85005089cc8a05353c5d8"
 "checksum holochain_serialized_bytes_derive 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)" = "2ca00b5ce8e8228b4a7eb097bbad4dd013d6fc85973760713ff36c396db26b20"
-"checksum holochain_wasmer_common 0.0.22 (registry+https://github.com/rust-lang/crates.io-index)" = "2d8727c16b3fadcdfee09043b8577438a91d4cffc5ecc006274b54ce9ff80241"
-"checksum holochain_wasmer_host 0.0.22 (registry+https://github.com/rust-lang/crates.io-index)" = "55d862293b55322c324a980677bc8d0abaa5c007629deb83f73e4674b492bde8"
+"checksum holochain_wasmer_common 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dc9561fb0cf8eecae7c161087b1f34b43b8d7abb5f2e111272ddd0f12f5e3c6b"
+"checksum holochain_wasmer_host 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)" = "2106a54eb7117cb98d519e272a3208b7aa530fe81e5f5950ad30610812128948"
 "checksum human-panic 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "39f357a500abcbd7c5f967c1d45c8838585b36743823b9d43488f24850534e36"
 "checksum idna 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "38f09e0f0b1fb55fdee1f17470ad800da77af5186a1a76c026b679358b7e844e"
 "checksum idna 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "02e2673c30ee86b5b96a9cb52ad15718aa1f966f5ab9ad54a8b95d5ca33120a9"

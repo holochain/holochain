@@ -13,6 +13,7 @@ pub fn create_wasm_from_file(path: &PathBuf) -> DnaWasm {
 
 pub enum TestWasm {
     Foo,
+    Imports,
 }
 
 impl From<TestWasm> for PathBuf {
@@ -20,7 +21,10 @@ impl From<TestWasm> for PathBuf {
         match test_wasm {
             TestWasm::Foo => {
                 "test_utils/wasm/target/foo/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
-            }
+            },
+            TestWasm::Imports => {
+                "test_utils/wasm/target/imports/wasm32-unknown-unknown/release/test_wasm_imports.wasm"
+            },
         }
         .into()
     }

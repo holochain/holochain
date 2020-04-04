@@ -9,14 +9,21 @@ pub type ZomeId = (CellId, ZomeName);
 /// ZomeName as a String (should this be a newtype?)
 pub type ZomeName = String;
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 /// wraps payload so that we are compatible with host::guest::call()
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct ZomeInvocationPayload(SerializedBytes);
 
-impl ZomeInvocationPayload {
-    /// Create a payload from serialized data
-    pub fn new(bytes: SerializedBytes) -> Self {
-        Self(bytes)
+impl TryFrom<ZomeInvocationPayload> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(zome_invocation_payload: ZomeInvocationPayload) -> Result<Self, Self::Error> {
+        Ok(zome_invocation_payload.0)
+    }
+}
+
+impl TryFrom<SerializedBytes> for ZomeInvocationPayload {
+    type Error = SerializedBytesError;
+    fn try_from(serialized_bytes: SerializedBytes) -> Result<Self, Self::Error> {
+        Ok(Self(serialized_bytes))
     }
 }
 

@@ -118,7 +118,7 @@ pub fn fake_capability_request() -> CapabilityRequest {
 
 /// A fixture example ZomeInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> ZomeInvocationPayload {
-    ZomeInvocationPayload::new(SerializedBytes::try_from(()).unwrap())
+    ZomeInvocationPayload::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }
 
 /// A fixture example Signature for unit testing.

@@ -21,26 +21,3 @@ pub extern "C" fn foo(_: RemotePtr) -> RemotePtr {
  let response_sb: SerializedBytes = try_result!(response.try_into(), "failed to serialize TestString");
  ret!(WasmExternResponse::new(response_sb));
 }
-
-// @TODO something for validations and callbacks
-// #[no_mangle]
-// /// always returns "foo" in a TestString
-// pub extern "C" fn foo_validation(_: RemotePtr) -> RemotePtr {
-//  // // this is whatever the dev wants we don't know
-//  // let response = TestString::from(String::from("foo"));
-//  //
-//  // // imagine this is inside the hdk
-//  // let response_sb: SerializedBytes = try_result!(repsonse.try_into());
-//  ret!(ValidationResponse::Pass);
-// }
-//
-// #[no_mangle]
-// /// always returns "foo" in a TestString
-// pub extern "C" fn foo_callback(_: RemotePtr) -> RemotePtr {
-//  // // this is whatever the dev wants we don't know
-//  // let response = TestString::from(String::from("foo"));
-//  //
-//  // // imagine this is inside the hdk
-//  // let response_sb: SerializedBytes = try_result!(repsonse.try_into());
-//  ret!(ReceiveResponse(sb));
-// }

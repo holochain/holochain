@@ -224,7 +224,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_foo"
+name = "test_wasm_imports"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
