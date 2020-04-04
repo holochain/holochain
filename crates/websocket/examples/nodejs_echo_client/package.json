@@ -1,0 +1,11 @@
+{
+  "name": "nodejs_echo_client",
+  "version": "0.0.1",
+  "main": "nodejs_echo_client.js",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "isomorphic-ws": "^4.0.1",
+    "msgpack-lite": "^0.1.26",
+    "ws": "^7.2.3"
+  }
+}

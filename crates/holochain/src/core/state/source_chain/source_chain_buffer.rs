@@ -15,7 +15,7 @@ use sx_types::{
     agent::AgentId,
     chain_header::ChainHeader,
     entry::Entry,
-    prelude::{Address, Addressable},
+    prelude::*,
     signature::{Provenance, Signature},
 };
 use tracing::*;

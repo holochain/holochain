@@ -4,7 +4,6 @@
 
 use crate::{
     entry::{entry_type::EntryType, Entry},
-    persistence::cas::content::{Address, Addressable},
     prelude::*,
     signature::Provenance,
     time::Iso8601,
@@ -137,7 +136,7 @@ pub mod tests {
             entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
             tests::{test_entry, test_entry_a, test_entry_b},
         },
-        persistence::cas::content::Address,
+        persistence::cas::content::{Address, Addressable},
         signature::Signature,
         time::test_iso_8601,
     };
