@@ -1,3 +1,5 @@
+use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_host::prelude::*;
 use mockall::automock;
 use std::sync::Arc;
 use sx_types::{
@@ -8,8 +10,6 @@ use sx_types::{
     shims::*,
 };
 use sx_wasm_types::*;
-use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_host::prelude::*;
 
 #[automock]
 pub trait RibosomeT: Sized {
@@ -40,33 +40,34 @@ pub struct WasmRibosome {
     dna: Dna,
 }
 
-    fn debug(
-        _ribosome: Arc<WasmRibosome>,
-        _invocation: Arc<ZomeInvocation>,
-        input: DebugInput,
-    ) -> DebugOutput {
-        println!("{}", input.inner());
-        ()
-    }
+fn debug(
+    _ribosome: Arc<WasmRibosome>,
+    _invocation: Arc<ZomeInvocation>,
+    input: DebugInput,
+) -> DebugOutput {
+    println!("{}", input.inner());
+    ()
+}
 
-    fn globals(
-        _ribosome: Arc<WasmRibosome>,
-        _invocation: Arc<ZomeInvocation>,
-        _input: GlobalsInput,
-    ) -> GlobalsOutput {
-        ()
-    }
+fn globals(
+    _ribosome: Arc<WasmRibosome>,
+    _invocation: Arc<ZomeInvocation>,
+    _input: GlobalsInput,
+) -> GlobalsOutput {
+    ()
+}
 
-    fn sys_time(
-        _ribosome: Arc<WasmRibosome>,
-        _invocation: Arc<ZomeInvocation>,
-        _input: SysTimeInput,
-    ) -> SysTimeOutput {
-        let start = std::time::SystemTime::now();
-        let since_the_epoch = start.duration_since(std::time::UNIX_EPOCH).expect("Time went backwards");
-        SysTimeOutput::new(since_the_epoch)
-    }
-
+fn sys_time(
+    _ribosome: Arc<WasmRibosome>,
+    _invocation: Arc<ZomeInvocation>,
+    _input: SysTimeInput,
+) -> SysTimeOutput {
+    let start = std::time::SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("Time went backwards");
+    SysTimeOutput::new(since_the_epoch)
+}
 
 impl WasmRibosome {
     pub fn new(dna: Dna) -> Self {
@@ -97,7 +98,10 @@ impl WasmRibosome {
                     let output_sb: SerializedBytes = $host_function(
                         std::sync::Arc::clone(&closure_self_arc),
                         std::sync::Arc::clone(&closure_invocation_arc),
-                        $crate::holochain_wasmer_host::guest::from_guest_ptr(ctx, guest_allocation_ptr)?,
+                        $crate::holochain_wasmer_host::guest::from_guest_ptr(
+                            ctx,
+                            guest_allocation_ptr,
+                        )?,
                     )
                     .try_into()?;
                     let output_allocation_ptr: AllocationPtr = output_sb.into();
@@ -145,23 +149,23 @@ impl RibosomeT for WasmRibosome {
 
 #[cfg(all(test, feature = "wasmtest"))]
 pub mod wasm_test {
-    use sx_types::prelude::Address;
+    use super::WasmRibosome;
     use crate::core::ribosome::RibosomeT;
+    use holochain_serialized_bytes::prelude::*;
+    use sx_types::{
+        nucleus::{ZomeInvocation, ZomeInvocationPayload, ZomeInvocationResponse},
+        prelude::Address,
+        shims::SourceChainCommitBundle,
+        test_utils::{fake_agent_id, fake_capability_request, fake_cell_id},
+    };
+    use sx_wasm_test_utils::{test_wasm, TestWasm};
     use sx_wasm_types::*;
     use test_wasm_common::TestString;
-    use sx_types::shims::SourceChainCommitBundle;
-    use holochain_serialized_bytes::prelude::*;
-    use sx_types::nucleus::{ZomeInvocation, ZomeInvocationPayload, ZomeInvocationResponse};
-    use sx_wasm_test_utils::{test_wasm, TestWasm};
-    use super::WasmRibosome;
-    use sx_types::test_utils::{fake_agent_id, fake_capability_request, fake_cell_id};
 
-    use std::{collections::BTreeMap};
+    use std::collections::BTreeMap;
     use sx_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
-        test_utils::{
-            fake_dna, fake_zome,
-        },
+        test_utils::{fake_dna, fake_zome},
     };
 
     fn zome_from_code(code: DnaWasm) -> Zome {
@@ -176,13 +180,19 @@ pub mod wasm_test {
         dna
     }
 
-    fn zome_invocation_from_names(zome_name: &str, fn_name: &str, payload: SerializedBytes) -> ZomeInvocation {
+    fn zome_invocation_from_names(
+        zome_name: &str,
+        fn_name: &str,
+        payload: SerializedBytes,
+    ) -> ZomeInvocation {
         ZomeInvocation {
             zome_name: zome_name.into(),
             fn_name: fn_name.into(),
             cell_id: fake_cell_id("bob"),
             cap: fake_capability_request(),
-            payload: ZomeInvocationPayload::try_from(payload).expect("getting a zome invocation payload from serialized bytes should never fail"),
+            payload: ZomeInvocationPayload::try_from(payload).expect(
+                "getting a zome invocation payload from serialized bytes should never fail",
+            ),
             provenance: fake_agent_id("bob"),
             as_at: Address::from("fake"),
         }
@@ -207,7 +217,8 @@ pub mod wasm_test {
     fn invoke_foo_test() {
         let ribosome = test_ribosome();
 
-        let invocation = zome_invocation_from_names("foo", "foo", SerializedBytes::try_from(()).unwrap());
+        let invocation =
+            zome_invocation_from_names("foo", "foo", SerializedBytes::try_from(()).unwrap());
 
         assert_eq!(
             ZomeInvocationResponse::ZomeApiFn(WasmExternResponse::new(
@@ -223,8 +234,14 @@ pub mod wasm_test {
     fn invoke_import_debug_test() {
         let ribosome = test_ribosome();
 
-        let invocation = zome_invocation_from_names("imports", "debug", DebugInput::new("debug works!").try_into().unwrap());
+        let invocation = zome_invocation_from_names(
+            "imports",
+            "debug",
+            DebugInput::new("debug works!").try_into().unwrap(),
+        );
 
-        ribosome.call_zome_function(&mut SourceChainCommitBundle::default(), invocation).unwrap();
+        ribosome
+            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+            .unwrap();
     }
 }

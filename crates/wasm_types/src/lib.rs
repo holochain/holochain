@@ -1,5 +1,5 @@
-use holochain_serialized_bytes::prelude::*;
 use core::time::Duration;
+use holochain_serialized_bytes::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct WasmExternResponse(SerializedBytes);
