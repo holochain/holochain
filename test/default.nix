@@ -10,8 +10,7 @@ let
   cargo build \
     --release \
     --manifest-path test_utils/wasm/${name}/Cargo.toml \
-    --target wasm32-unknown-unknown \
-    -Z unstable-options
+    --target wasm32-unknown-unknown
   '';
   build-wasms = pkgs.writeShellScriptBin "hc-test-wasms-build"
   (pkgs.lib.concatMapStrings build-wasm wasms);
