@@ -19,8 +19,14 @@ let
   t0 = pkgs.writeShellScriptBin "hc-test"
   ''
   set -euxo pipefail
-  hc-test-wasms-build
   RUST_BACKTRACE=1 cargo test -- --nocapture
+  '';
+
+  test-wasm = pkgs.writeShellScriptBin "hc-test-wasm"
+  ''
+  set -euxo pipefail
+  hc-test-wasms-build
+  RUST_BACKTRACE=1 cargo test --manifest-path crates/holochain/Cargo.toml --features wasmtest -- --nocapture
   '';
 
   t1 = pkgs.writeShellScriptBin "hc-merge-test"
@@ -28,9 +34,10 @@ let
   RUST_BACKTRACE=1 \
   hn-rust-fmt-check \
   && hn-rust-clippy \
-  && hc-test
+  && hc-test \
+  && hc-test-wasm
   '';
 in
 {
- buildInputs = [ t0 t1 build-wasms ];
+ buildInputs = [ t0 t1 build-wasms test-wasm ];
 }

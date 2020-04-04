@@ -90,7 +90,7 @@ fn save_default_config_toml(path: &Path) -> ConductorResult<ConductorConfig> {
     Ok(default)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "wasmtest")))]
 mod tests {
 
     use super::save_default_config_toml;

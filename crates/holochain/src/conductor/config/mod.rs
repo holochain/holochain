@@ -84,7 +84,7 @@ impl ConductorConfig {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "wasmtest")))]
 pub mod tests {
     use super::*;
     use std::path::Path;

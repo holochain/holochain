@@ -18,7 +18,7 @@ use sx_types::{
 };
 use toml;
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "wasmtest")))]
 mod tests;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.

@@ -141,7 +141,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "wasmtest")))]
 pub mod tests {
 
     use super::SourceChainBuf;

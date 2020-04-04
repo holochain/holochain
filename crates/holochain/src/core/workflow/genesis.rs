@@ -38,7 +38,7 @@ pub async fn genesis(
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "wasmtest")))]
 mod tests {
 
     use super::genesis;

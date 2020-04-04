@@ -143,25 +143,26 @@ impl RibosomeT for WasmRibosome {
     }
 }
 
-#[cfg(test)]
-pub mod tests {
-
-    use super::WasmRibosome;
+#[cfg(all(test, feature = "wasmtest"))]
+pub mod wasm_test {
+    use sx_types::prelude::Address;
     use crate::core::ribosome::RibosomeT;
-    use std::{collections::BTreeMap, convert::TryInto};
-    use sx_types::{
-        dna::{wasm::DnaWasm, zome::Zome, Dna},
-        nucleus::{ZomeInvocation, ZomeInvocationPayload, ZomeInvocationResponse},
-        prelude::Address,
-        shims::SourceChainCommitBundle,
-        test_utils::{
-            fake_agent_id, fake_capability_request, fake_cell_id, fake_dna, fake_zome,
-        },
-    };
-    use sx_wasm_test_utils::{test_wasm, TestWasm};
     use sx_wasm_types::*;
     use test_wasm_common::TestString;
+    use sx_types::shims::SourceChainCommitBundle;
     use holochain_serialized_bytes::prelude::*;
+    use sx_types::nucleus::{ZomeInvocation, ZomeInvocationPayload, ZomeInvocationResponse};
+    use sx_wasm_test_utils::{test_wasm, TestWasm};
+    use super::WasmRibosome;
+    use sx_types::test_utils::{fake_agent_id, fake_capability_request, fake_cell_id};
+
+    use std::{collections::BTreeMap};
+    use sx_types::{
+        dna::{wasm::DnaWasm, zome::Zome, Dna},
+        test_utils::{
+            fake_dna, fake_zome,
+        },
+    };
 
     fn zome_from_code(code: DnaWasm) -> Zome {
         let mut zome = fake_zome();

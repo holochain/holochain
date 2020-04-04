@@ -1,3 +1,5 @@
+#![cfg(all(test, not(feature = "wasmtest")))]
+
 use assert_cli::Assert;
 use tempdir::TempDir;
 
