@@ -1,6 +1,6 @@
 use crate::{
     conductor::{
-        api::{error::ConductorApiResult, CellConductorApi},
+        api::{error::ConductorApiResult, RealCellConductorApi},
         cell::error::CellResult,
     },
     core::ribosome::WasmRibosome,
@@ -43,7 +43,7 @@ impl PartialEq for Cell {
 /// [CellConductorApi] or an [ExternalConductorApi])
 pub struct Cell {
     id: CellId,
-    conductor_api: CellConductorApi,
+    conductor_api: RealCellConductorApi,
     state_env: Environment,
 }
 
@@ -76,7 +76,7 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
-        _conductor_api: CellConductorApi,
+        _conductor_api: RealCellConductorApi,
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         unimplemented!()
@@ -93,7 +93,7 @@ impl Cell {
     }
 
     // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn get_conductor_api(&self) -> CellConductorApi {
+    pub(crate) fn get_conductor_api(&self) -> RealCellConductorApi {
         self.conductor_api.clone()
     }
 }

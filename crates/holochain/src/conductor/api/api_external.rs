@@ -51,11 +51,11 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
 #[derive(Clone)]
-pub struct StdExternalConductorApi {
+pub struct RealExternalConductorApi {
     conductor_mutex: Arc<RwLock<Conductor>>,
 }
 
-impl StdExternalConductorApi {
+impl RealExternalConductorApi {
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
         Self { conductor_mutex }
@@ -63,7 +63,7 @@ impl StdExternalConductorApi {
 }
 
 #[async_trait::async_trait]
-impl ExternalConductorApi for StdExternalConductorApi {
+impl ExternalConductorApi for RealExternalConductorApi {
     async fn invoke_zome(
         &self,
         _invocation: ZomeInvocation,

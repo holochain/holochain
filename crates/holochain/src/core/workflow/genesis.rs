@@ -1,5 +1,5 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
-use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
+use crate::{conductor::api::CellConductorApi, core::state::workspace::GenesisWorkspace};
 use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
 
 /// Initialize the source chain with the initial entries:
@@ -11,7 +11,7 @@ use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
 /// FIXME: creating entries in the config db
 pub async fn genesis(
     mut workspace: GenesisWorkspace<'_>,
-    api: impl CellConductorApiT,
+    api: impl CellConductorApi,
     dna: Dna,
     agent_id: AgentId,
 ) -> WorkflowResult<GenesisWorkspace<'_>> {

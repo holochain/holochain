@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::CellConductorApiT;
+use super::CellConductorApi;
 use crate::conductor::api::error::ConductorApiResult;
 use async_trait::async_trait;
 use mockall::mock;
@@ -50,7 +50,7 @@ mock! {
 }
 
 #[async_trait]
-impl CellConductorApiT for MockCellConductorApi {
+impl CellConductorApi for MockCellConductorApi {
     async fn invoke_zome(
         &self,
         cell_id: &CellId,

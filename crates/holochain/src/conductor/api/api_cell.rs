@@ -11,15 +11,15 @@ use sx_types::{
 };
 use tokio::sync::RwLock;
 
-/// The concrete implementation of [CellConductorApiT], which is used to give
+/// The concrete implementation of [CellConductorApi], which is used to give
 /// Cells an API for calling back to their [Conductor].
 #[derive(Clone)]
-pub struct CellConductorApi {
+pub struct RealCellConductorApi {
     lock: Arc<RwLock<Conductor>>,
     cell_id: CellId,
 }
 
-impl CellConductorApi {
+impl RealCellConductorApi {
     /// Instantiate from a Conductor reference and a CellId to identify which Cell
     /// this API instance is associated with
     pub fn new(lock: Arc<RwLock<Conductor>>, cell_id: CellId) -> Self {
@@ -28,7 +28,7 @@ impl CellConductorApi {
 }
 
 #[async_trait]
-impl CellConductorApiT for CellConductorApi {
+impl CellConductorApi for RealCellConductorApi {
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
@@ -81,7 +81,7 @@ impl CellConductorApiT for CellConductorApi {
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
-pub trait CellConductorApiT: Clone + Send + Sync + Sized {
+pub trait CellConductorApi: Clone + Send + Sync + Sized {
     /// Invoke a zome function on any cell in this conductor.
     /// An invocation on a different Cell than this one corresponds to a bridged call.
     async fn invoke_zome(

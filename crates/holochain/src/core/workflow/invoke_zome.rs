@@ -1,10 +1,10 @@
 use super::{WorkflowEffects, WorkflowResult};
-use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use crate::core::{ribosome::Ribosome, state::workspace::InvokeZomeWorkspace};
 use sx_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env>(
     workspace: InvokeZomeWorkspace<'_>,
-    _ribosome: impl RibosomeT,
+    _ribosome: impl Ribosome,
     _invocation: ZomeInvocation,
 ) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
     Ok(WorkflowEffects {
@@ -21,7 +21,7 @@ pub mod tests {
     use crate::{
         agent::{source_chain::tests::test_initialized_chain, SourceChainCommitBundle},
         conductor_api::MockCellConductorApi,
-        ribosome::MockRibosomeT,
+        ribosome::MockRibosome,
         test_utils::fake_cell_id,
     };
     use sx_types::{entry::Entry, error::SkunkResult};
@@ -43,7 +43,7 @@ pub mod tests {
             cap: CapabilityRequest,
         };
 
-        let mut ribosome = MockRibosomeT::new();
+        let mut ribosome = MockRibosome::new();
         ribosome
             .expect_call_zome_function()
             .times(1)
@@ -62,7 +62,7 @@ pub mod tests {
     // have to wait until the whole WasmRibosome thing is more fleshed out.
     // struct FakeRibosome;
 
-    // impl RibosomeT for FakeRibosome {
+    // impl Ribosome for FakeRibosome {
     //     fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult {
     //         unimplemented!()
     //     }

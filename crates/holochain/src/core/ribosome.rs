@@ -11,7 +11,7 @@ use sx_wasm_types::WasmExternResponse;
 use wasmer_runtime::{imports, ImportObject, Instance};
 
 #[automock]
-pub trait RibosomeT: Sized {
+pub trait Ribosome: Sized {
     fn run_validation(self, _entry: Entry) -> ValidationResult {
         // TODO: turn entry into "data"
         self.run_callback(())
@@ -57,7 +57,7 @@ impl WasmRibosome {
     }
 }
 
-impl RibosomeT for WasmRibosome {
+impl Ribosome for WasmRibosome {
     fn run_callback(self, _data: ()) -> ValidationResult {
         unimplemented!()
     }
@@ -66,7 +66,7 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        // cell_conductor_api: CellConductorApi,
+        // cell_conductor_api: RealCellConductorApi,
         _bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
@@ -84,7 +84,7 @@ impl RibosomeT for WasmRibosome {
 pub mod tests {
 
     use super::WasmRibosome;
-    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::Ribosome;
     use std::{collections::BTreeMap, convert::TryInto};
     use sx_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
