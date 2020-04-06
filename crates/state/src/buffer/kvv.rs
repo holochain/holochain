@@ -415,7 +415,6 @@ pub mod tests {
         .unwrap();
     }
 
-    
     #[tokio::test]
     async fn idempotent_inserts() {
         let arc = test_cell_env();
@@ -455,7 +454,6 @@ pub mod tests {
         .unwrap();
     }
 
-    
     #[tokio::test]
     async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -473,7 +471,6 @@ pub mod tests {
         })
     }
 
-    
     #[tokio::test]
     async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -495,7 +492,6 @@ pub mod tests {
         })
     }
 
-    
     #[tokio::test]
     async fn kvv_deleted_persisted() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -526,7 +522,6 @@ pub mod tests {
         })
     }
 
-    
     #[tokio::test]
     async fn kvv_deleted_buffer() -> DatabaseResult<()> {
         use Op::*;
@@ -572,7 +567,6 @@ pub mod tests {
         })
     }
 
-    
     #[tokio::test]
     async fn kvv_get_buffer() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -593,7 +587,6 @@ pub mod tests {
         })
     }
 
-    
     #[tokio::test]
     async fn kvv_get_persisted() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -620,7 +613,6 @@ pub mod tests {
         })
     }
 
-    
     #[tokio::test]
     async fn kvv_get_del_buffer() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -641,7 +633,6 @@ pub mod tests {
         })
     }
 
-    
     #[tokio::test]
     async fn kvv_get_del_persisted() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
