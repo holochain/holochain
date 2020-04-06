@@ -6,13 +6,13 @@ use futures::{
     sink::{Sink, SinkExt},
     stream::{Stream, StreamExt},
 };
-use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use std::convert::{TryFrom, TryInto};
 
 /// Interface Error Type
 #[derive(Debug, thiserror::Error)]
 pub enum InterfaceError {
-    SerializedBytesConvert,
+    SerializedBytes(#[from] SerializedBytesError),
     SendError,
     Other(String),
 }
@@ -41,7 +41,7 @@ pub type InterfaceResult<T> = Result<T, InterfaceError>;
 /// Allows the conductor or cell to forward signals to connected clients
 pub struct ConductorSideSignalSender<Sig>
 where
-    Sig: 'static + Send + TryInto<SerializedBytes>,
+    Sig: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     sender: Sender<SerializedBytes>,
     phantom: std::marker::PhantomData<Sig>,
@@ -49,13 +49,11 @@ where
 
 impl<Sig> ConductorSideSignalSender<Sig>
 where
-    Sig: 'static + Send + TryInto<SerializedBytes>,
+    Sig: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     /// send the signal to the connected client
     pub async fn send(&mut self, data: Sig) -> InterfaceResult<()> {
-        let data: SerializedBytes = data
-            .try_into()
-            .map_err(|_| InterfaceError::SerializedBytesConvert)?;
+        let data: SerializedBytes = data.try_into()?;
         self.sender.send(data).await?;
         Ok(())
     }
@@ -76,7 +74,8 @@ pub type ConductorSideResponder<Res> =
     Box<dyn FnOnce(Res) -> BoxFuture<'static, InterfaceResult<()>> + 'static + Send>;
 
 /// receive a stream of incoming requests from a connected client
-pub type ConductorSideRequestReceiver<Req, Res> = Receiver<(Req, ConductorSideResponder<Res>)>;
+pub type ConductorSideRequestReceiver<Req, Res> =
+    Receiver<InterfaceResult<(Req, ConductorSideResponder<Res>)>>;
 
 /// the external side callback type to use when implementing a client interface
 pub type ExternalSideResponder =
@@ -87,47 +86,58 @@ pub type ExternalSideResponder =
 /// - a signal sender(sink)
 /// - a request(and response callback) stream
 pub fn create_interface_channel<Sig, Req, Res, XSig, XReq>(
+    // the "external signal sink" - A sender that accepts already serialized
+    // SerializedBytes.
     x_sig: XSig,
+    // the "external request stream" - A stream that provides serialized
+    // SerializedBytes - as well as ExternalSideResponder callbacks.
     x_req: XReq,
 ) -> (
+    // creates a conductor side sender that accepts concrete signal types.
     ConductorSideSignalSender<Sig>,
+    // creates a conductor side receiver that produces concrete request types.
     ConductorSideRequestReceiver<Req, Res>,
 )
 where
-    Sig: 'static + Send + TryInto<SerializedBytes>,
-    Req: 'static + Send + TryFrom<SerializedBytes>,
+    Sig: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
+    Req: 'static + Send + TryFrom<SerializedBytes, Error = SerializedBytesError>,
     <Req as TryFrom<SerializedBytes>>::Error: std::fmt::Debug + Send,
-    Res: 'static + Send + TryInto<SerializedBytes>,
+    Res: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
     XSig: 'static + Send + Sink<SerializedBytes>,
     <XSig as Sink<SerializedBytes>>::Error: std::fmt::Debug + Send,
     XReq: 'static + Send + Stream<Item = (SerializedBytes, ExternalSideResponder)>,
 {
     // pretty straight forward to forward the signal sender : )
     let (sig_send, sig_recv) = channel(10);
-    tokio::task::spawn(sig_recv.map(|x| Ok(x)).forward(x_sig));
+
+    // we can ignore this JoinHandle, because if conductor is dropped,
+    // both sides of this forward will be dropped and the task will end.
+    let _ = tokio::task::spawn(sig_recv.map(|x: SerializedBytes| Ok(x)).forward(x_sig));
 
     // we need to do some translations on the request/response flow
     let (req_send, req_recv) = channel(10);
-    tokio::task::spawn(
+
+    // we can ignore this JoinHandle, because if conductor is dropped,
+    // both sides of this forward will be dropped and the task will end.
+    let _ = tokio::task::spawn(
         x_req
             .map(|(data, respond)| {
                 // translate the response from concrete type to SerializedBytes
                 let respond: ConductorSideResponder<Res> = Box::new(move |res| {
                     async move {
-                        let res: SerializedBytes = res
-                            .try_into()
-                            .map_err(|_| InterfaceError::SerializedBytesConvert)?;
+                        let res: SerializedBytes = res.try_into()?;
                         respond(res).await?;
                         Ok(())
                     }
                     .boxed()
                 });
 
-                // we cannot procede if the data is not serializable
-                // let's fail fast here for now
-                let data = Req::try_from(data).expect("deserialize failed");
+                let data = match Req::try_from(data) {
+                    Ok(data) => data,
+                    Err(e) => return Ok(Err(e.into())),
+                };
 
-                Ok((data, respond))
+                Ok(Ok((data, respond)))
             })
             .forward(req_send),
     );
@@ -142,9 +152,16 @@ pub fn attach_external_conductor_api<A: ExternalConductorApi>(
     mut recv: ConductorSideRequestReceiver<ConductorRequest, ConductorResponse>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn(async move {
-        while let Some((request, respond)) = recv.next().await {
-            if let Err(e) = respond(api.handle_request(request).await).await {
-                tracing::error!(error = ?e);
+        while let Some(msg) = recv.next().await {
+            match msg {
+                Ok((request, respond)) => {
+                    if let Err(e) = respond(api.handle_request(request).await).await {
+                        tracing::error!(error = ?e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(error = ?e);
+                }
             }
         }
     })
@@ -195,7 +212,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (req, respond) = chan_req_recv.next().await.unwrap();
+        let (req, respond) = chan_req_recv.next().await.unwrap().unwrap();
 
         assert_eq!("test_req_1", &req.0,);
 

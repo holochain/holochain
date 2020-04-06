@@ -16,8 +16,12 @@ pub fn create_demo_channel_interface<A: ExternalConductorApi>(
     let (send_sig, _recv_sig) = futures::channel::mpsc::channel(1);
     let (send_req, recv_req) = futures::channel::mpsc::channel(1);
 
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct Stub;
+    holochain_serialized_bytes::holochain_serial!(Stub);
+
     let (_chan_sig_send, chan_req_recv): (
-        ConductorSideSignalSender<SerializedBytes>, // stub impl signals
+        ConductorSideSignalSender<Stub>, // stub impl signals
         ConductorSideRequestReceiver<ConductorRequest, ConductorResponse>,
     ) = create_interface_channel(send_sig, recv_req);
 
