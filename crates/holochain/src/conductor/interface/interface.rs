@@ -85,13 +85,13 @@ pub type ExternalSideResponder =
 /// supply this function with:
 /// - a signal sender(sink)
 /// - a request(and response callback) stream
-pub fn create_interface_channel<Sig, Req, Res, XSig, XReq>(
+pub fn create_interface_channel<Sig, Req, Res, ExternSig, ExternReq>(
     // the "external signal sink" - A sender that accepts already serialized
     // SerializedBytes.
-    x_sig: XSig,
+    extern_sig: ExternSig,
     // the "external request stream" - A stream that provides serialized
     // SerializedBytes - as well as ExternalSideResponder callbacks.
-    x_req: XReq,
+    extern_req: ExternReq,
 ) -> (
     // creates a conductor side sender that accepts concrete signal types.
     ConductorSideSignalSender<Sig>,
@@ -103,16 +103,16 @@ where
     Req: 'static + Send + TryFrom<SerializedBytes, Error = SerializedBytesError>,
     <Req as TryFrom<SerializedBytes>>::Error: std::fmt::Debug + Send,
     Res: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
-    XSig: 'static + Send + Sink<SerializedBytes>,
-    <XSig as Sink<SerializedBytes>>::Error: std::fmt::Debug + Send,
-    XReq: 'static + Send + Stream<Item = (SerializedBytes, ExternalSideResponder)>,
+    ExternSig: 'static + Send + Sink<SerializedBytes>,
+    <ExternSig as Sink<SerializedBytes>>::Error: std::fmt::Debug + Send,
+    ExternReq: 'static + Send + Stream<Item = (SerializedBytes, ExternalSideResponder)>,
 {
     // pretty straight forward to forward the signal sender : )
     let (sig_send, sig_recv) = channel(10);
 
     // we can ignore this JoinHandle, because if conductor is dropped,
     // both sides of this forward will be dropped and the task will end.
-    let _ = tokio::task::spawn(sig_recv.map(|x: SerializedBytes| Ok(x)).forward(x_sig));
+    let _ = tokio::task::spawn(sig_recv.map(|x: SerializedBytes| Ok(x)).forward(extern_sig));
 
     // we need to do some translations on the request/response flow
     let (req_send, req_recv) = channel(10);
@@ -120,7 +120,7 @@ where
     // we can ignore this JoinHandle, because if conductor is dropped,
     // both sides of this forward will be dropped and the task will end.
     let _ = tokio::task::spawn(
-        x_req
+        extern_req
             .map(|(data, respond)| {
                 // translate the response from concrete type to SerializedBytes
                 let respond: ConductorSideResponder<Res> = Box::new(move |res| {
