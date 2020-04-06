@@ -1,16 +1,11 @@
 use holochain_2020::conductor::{
-    api::ExternalConductorApi,
-    config::ConductorConfig,
-    error::ConductorError,
-    interactive,
-    interface::{channel::ChannelInterface, Interface},
-    paths::ConfigFilePath,
-    Conductor,
+    api::*, config::ConductorConfig, error::ConductorError, interactive, interface::channel::*,
+    paths::ConfigFilePath, Conductor,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{convert::TryInto, path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use sx_types::observability::{self, Output};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::RwLock;
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
@@ -130,7 +125,7 @@ async fn async_main() {
 
     let lock = Arc::new(RwLock::new(conductor));
     // Create an external API to hand off to any Interfaces
-    let api = ExternalConductorApi::new(lock);
+    let api = StdExternalConductorApi::new(lock);
 
     if opt.run_interface_example {
         interface_example(api).await;
@@ -189,16 +184,24 @@ a valid default configuration. Details:
 /// Simple example of what an [Interface] looks like in its most basic form,
 /// and how to interact with it.
 /// TODO: remove once we have real Interfaces
-async fn interface_example(api: ExternalConductorApi) {
-    let (mut tx_dummy, rx_dummy) = mpsc::channel(100);
-
-    let interface_fut = ChannelInterface::new(rx_dummy).spawn(api);
+async fn interface_example(api: StdExternalConductorApi) {
+    let (mut sender, join_handle) = create_demo_channel_interface(api);
     let driver_fut = async move {
         for _ in 0..50 as u32 {
-            debug!("sending dummy msg");
-            tx_dummy.send(true).await.unwrap();
+            use futures::{future::FutureExt, sink::SinkExt};
+            sender
+                .send((
+                    ConductorRequest::AdminRequest {
+                        request: Box::new(AdminRequest::Start("cell-handle".into())),
+                    }
+                    .try_into()
+                    .unwrap(),
+                    Box::new(|_| async move { Ok(()) }.boxed()),
+                ))
+                .await
+                .unwrap();
         }
-        tx_dummy.send(false).await.unwrap();
     };
-    tokio::join!(interface_fut, driver_fut);
+    driver_fut.await;
+    join_handle.await.unwrap();
 }

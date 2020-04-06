@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct WasmExternResponse(SerializedBytes);
 
 impl WasmExternResponse {

@@ -8,12 +8,14 @@ use std::fmt;
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CellId(DnaAddress, AgentId);
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
-#[derive(Clone, Debug, Display, Hash, PartialEq, Eq, From, Into)]
+#[derive(
+    Clone, Debug, Display, Hash, PartialEq, Eq, From, Into, serde::Serialize, serde::Deserialize,
+)]
 pub struct CellHandle(String);
 
 impl From<&str> for CellHandle {
