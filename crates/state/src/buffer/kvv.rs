@@ -284,7 +284,6 @@ pub mod tests {
         Ok(vec)
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvvbuf_basics() {
         let arc = test_cell_env();
@@ -347,7 +346,6 @@ pub mod tests {
         .unwrap();
     }
 
-    #[ignore]
     #[tokio::test]
     async fn delete_all() {
         sx_types::observability::test_run().ok();
@@ -417,7 +415,6 @@ pub mod tests {
         .unwrap();
     }
 
-    #[ignore]
     #[tokio::test]
     async fn idempotent_inserts() {
         let arc = test_cell_env();
@@ -457,7 +454,6 @@ pub mod tests {
         .unwrap();
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -475,7 +471,6 @@ pub mod tests {
         })
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -497,7 +492,6 @@ pub mod tests {
         })
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_deleted_persisted() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -528,7 +522,6 @@ pub mod tests {
         })
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_deleted_buffer() -> DatabaseResult<()> {
         use Op::*;
@@ -574,7 +567,6 @@ pub mod tests {
         })
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_get_buffer() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -595,7 +587,6 @@ pub mod tests {
         })
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_get_persisted() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -622,7 +613,6 @@ pub mod tests {
         })
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_get_del_buffer() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -643,7 +633,6 @@ pub mod tests {
         })
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kvv_get_del_persisted() -> DatabaseResult<()> {
         sx_types::observability::test_run().ok();
@@ -675,10 +664,6 @@ pub mod tests {
 
         env.with_reader(|reader| {
             let buf: KvvBuf<_, V> = KvvBuf::new(&reader, db).unwrap();
-
-            let mut n = buf.get(&"b")?;
-            assert_eq!(n.next(), Some(Ok(V(1))));
-            assert_eq!(n.next(), Some(Ok(V(3))));
 
             let mut n = buf.get(&"b")?;
             assert_eq!(n.next(), None);
