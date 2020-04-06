@@ -92,6 +92,7 @@ where
         }
     }
     #[instrument(skip(self))]
+    /// Get an entry from the cas or cache depending on it's metadata
     pub async fn dht_get(&self, address: Address) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
@@ -129,6 +130,7 @@ where
         }
     }
 
+    /// Get an links from the cas or cache depending on it's metadata
     pub async fn dht_get_links<S: Into<String>>(
         &self,
         base: Address,
