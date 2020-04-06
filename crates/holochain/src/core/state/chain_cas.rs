@@ -52,6 +52,10 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         self.entries.get(entry_address)
     }
 
+    pub fn contains(&self, entry_address: &Address) -> DatabaseResult<bool> {
+        self.entries.get(entry_address).map(|e| e.is_some())
+    }
+
     pub fn get_header(&self, header_address: &Address) -> DatabaseResult<Option<ChainHeader>> {
         self.headers.get(header_address)
     }

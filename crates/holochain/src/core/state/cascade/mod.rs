@@ -59,9 +59,15 @@ where
     cache_meta: &'env C,
 }
 
+/// The state of the cascade search
 enum Search {
+    /// The entry is found and we can stop
     Found(Entry),
+    /// We haven't found the entry yet but we should
+    /// continue searching down the cascade 
     Continue,
+    /// We haven't found the entry and should
+    /// not continue searching down the cascade
     NotFound,
 }
 
@@ -129,7 +135,7 @@ where
         tag: S,
     ) -> DatabaseResult<HashSet<Address>> {
         // Am I an authority?
-        let authority = self.primary.get_entry(&base)?.is_some();
+        let authority = self.primary.contains(&base)?;
         let tag = tag.into();
         if authority {
             // Cas
