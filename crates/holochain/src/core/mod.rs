@@ -1,6 +1,7 @@
 //! The module defining the core Holochain [Workflow]s
 
 // FIXME: remove this when entire lib is documented
+// (in which case the deny will go at the lib level)
 #![deny(missing_docs)]
 
 // pub mod dht;

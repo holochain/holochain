@@ -22,7 +22,7 @@ use sx_wasm_types::WasmExternResponse;
 use wasmer_runtime::{imports, ImportObject, Instance};
 
 /// Represents a type which has not been decided upon yet
-pub struct Todo;
+pub enum Todo {}
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
@@ -42,14 +42,11 @@ pub trait RibosomeT: Sized {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    ///
-    /// Note: it would be nice to pass the bundle by value and then return it at the end,
-    /// but automock doesn't support lifetimes that appear in return values
     fn call_zome_function<'env>(
         self,
+        // FIXME: Use [SourceChain] instead
         _bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
-        // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse>;
 }
 
@@ -88,9 +85,10 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        // cell_conductor_api: CellConductorApi,
+        // FIXME: Use [SourceChain] instead
         _bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
+        // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse> {
         let wasm_extern_response: WasmExternResponse = holochain_wasmer_host::guest::call(
