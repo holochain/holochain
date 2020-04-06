@@ -32,6 +32,69 @@ wasm_io_types!(
     // a lazy_static! or similar
     [GlobalsInput, ()],
     [GlobalsOutput, crate::globals::ZomeGlobals],
+    // call is entirely arbitrary so we need to send and receive SerializedBytes
+    [CallInput, SerializedBytes],
+    [CallOutput, SerializedBytes],
+    // @TODO
+    [CapabilityInput, ()],
+    [CapabilityOutput, ()],
+    // @TODO
+    [CommitEntryInput, ()],
+    [CommitEntryOutput, ()],
+    // @TODO
+    [DecryptInput, ()],
+    [DecryptOutput, ()],
+    // @TODO
+    [EncryptInput, ()],
+    [EncryptOutput, ()],
+    // @TODO
+    [ShowEnvInput, ()],
+    [ShowEnvOutput, ()],
+    // @TODO
+    [PropertyInput, ()],
+    [PropertyOutput, ()],
+    // @TODO
+    [QueryInput, ()],
+    [QueryOutput, ()],
+    // @TODO
+    [RemoveLinkInput, ()],
+    [RemoveLinkOutput, ()],
+    // @TODO
+    [SendInput, ()],
+    [SendOutput, ()],
+    // @TODO
+    [SignInput, ()],
+    [SignOutput, ()],
+    // @TODO
+    [SleepInput, core::time::Duration],
+    [SleepOutput, ()],
+    // @TODO
+    [UpdateEntryInput, ()],
+    [UpdateEntryOutput, ()],
+    // @TODO
+    [EmitSignalInput, ()],
+    [EmitSignalOutput, ()],
+    // @TODO
+    [RemoveEntryInput, ()],
+    [RemoveEntryOutput, ()],
+    // @TODO
+    [LinkEntriesInput, ()],
+    [LinkEntriesOutput, ()],
+    // @TODO
+    [KeystoreInput, ()],
+    [KeystoreOutput, ()],
+    // @TODO
+    [GetLinksInput, ()],
+    [GetLinksOutput, ()],
+    // @TODO
+    [GetEntryInput, ()],
+    [GetEntryOutput, ()],
+    // @TODO
+    [EntryTypePropertiesInput, ()],
+    [EntryTypePropertiesOutput, ()],
+    // @TODO
+    [EntryAddressInput, ()],
+    [EntryAddressOutput, ()],
     // the current system time, in the opinion of the host, as a Duration
     [SysTimeInput, ()],
     [SysTimeOutput, core::time::Duration],

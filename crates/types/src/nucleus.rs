@@ -1,6 +1,7 @@
 //! Types related to making calls into Zomes.
 
 use crate::{agent::AgentId, cell::CellId, dna::capabilities::CapabilityRequest, prelude::*};
+// use std::sync::Arc;
 use sx_zome_types::*;
 
 /// The ZomeId is a pair of CellId and ZomeName.
@@ -11,7 +12,6 @@ pub type ZomeName = String;
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
-/// don't clone this as `payload` could be anywhere up to the 4GB wasm limit
 #[derive(Debug)]
 pub struct ZomeInvocation {
     /// the cell ID
