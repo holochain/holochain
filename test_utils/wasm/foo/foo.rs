@@ -2,7 +2,7 @@ extern crate wee_alloc;
 
 use test_wasm_common::TestString;
 use holochain_wasmer_guest::*;
-use sx_wasm_types::WasmExternResponse;
+use sx_zome_types::*;
 
 // Use `wee_alloc` as the global allocator.
 #[global_allocator]
@@ -19,5 +19,5 @@ pub extern "C" fn foo(_: RemotePtr) -> RemotePtr {
 
  // imagine this is inside the hdk
  let response_sb: SerializedBytes = try_result!(response.try_into(), "failed to serialize TestString");
- ret!(WasmExternResponse::new(response_sb));
+ ret!(ZomeExternGuestOutput::new(response_sb));
 }

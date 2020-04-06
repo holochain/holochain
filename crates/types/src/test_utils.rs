@@ -12,11 +12,11 @@ use crate::{
         zome::{Config, Zome, ZomeFnDeclarations},
         Dna,
     },
-    nucleus::ZomeInvocationPayload,
     prelude::*,
     signature::{Provenance, Signature},
 };
 use std::collections::BTreeMap;
+use sx_zome_types::ZomeExternHostInput;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {
@@ -117,8 +117,8 @@ pub fn fake_capability_request() -> CapabilityRequest {
 }
 
 /// A fixture example ZomeInvocationPayload for unit testing.
-pub fn fake_zome_invocation_payload() -> ZomeInvocationPayload {
-    ZomeInvocationPayload::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
+pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
+    ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }
 
 /// A fixture example Signature for unit testing.

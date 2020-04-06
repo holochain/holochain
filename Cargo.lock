@@ -838,7 +838,7 @@ dependencies = [
  "sx_state",
  "sx_types",
  "sx_wasm_test_utils",
- "sx_wasm_types",
+ "sx_zome_types",
  "tempdir",
  "test_wasm_common",
  "thiserror",
@@ -2430,15 +2430,13 @@ dependencies = [
  "lazy_static",
  "lib3h_crypto_api",
  "maplit",
- "multihash",
  "regex",
- "rust-base58",
  "serde",
  "serde_json",
  "shrinkwraprs",
  "snowflake",
  "sx_types_derive",
- "sx_wasm_types",
+ "sx_zome_types",
  "thiserror",
  "tracing",
  "tracing-core",
@@ -2462,10 +2460,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "sx_wasm_types"
+name = "sx_zome_types"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
+ "multihash",
+ "rust-base58",
  "serde",
 ]
 

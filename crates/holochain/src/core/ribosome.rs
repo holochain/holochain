@@ -9,7 +9,8 @@ use sx_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use sx_wasm_types::*;
+use sx_zome_types::globals::ZomeGlobals;
+use sx_zome_types::*;
 
 #[automock]
 pub trait RibosomeT: Sized {
@@ -46,15 +47,24 @@ fn debug(
     input: DebugInput,
 ) -> DebugOutput {
     println!("{}", input.inner());
-    ()
+    DebugOutput::new(())
 }
 
 fn globals(
-    _ribosome: Arc<WasmRibosome>,
+    ribosome: Arc<WasmRibosome>,
     _invocation: Arc<ZomeInvocation>,
     _input: GlobalsInput,
 ) -> GlobalsOutput {
-    ()
+    GlobalsOutput::new(ZomeGlobals {
+        agent_address: "".into(),      // @TODO
+        agent_id_str: "".into(),       // @TODO
+        agent_initial_hash: "".into(), // @TODO
+        agent_latest_hash: "".into(),  // @TODO
+        dna_address: "".into(),        // @TODO
+        dna_name: ribosome.dna.name.clone(),
+        properties: SerializedBytes::try_from(()).unwrap(), // @TODO
+        public_token: "".into(),                            // @TODO
+    })
 }
 
 fn sys_time(
@@ -74,19 +84,19 @@ impl WasmRibosome {
         Self { dna }
     }
 
-    pub fn instance(&self, invocation: &ZomeInvocation) -> SkunkResult<Instance> {
+    pub fn instance(&self, invocation: Arc<ZomeInvocation>) -> SkunkResult<Instance> {
         let zome = self.dna.get_zome(&invocation.zome_name)?;
         let wasm: Arc<Vec<u8>> = zome.code.code();
-        let imports: ImportObject = WasmRibosome::imports(self, invocation);
+        let imports: ImportObject = WasmRibosome::imports(self, Arc::clone(&invocation));
         Ok(holochain_wasmer_host::instantiate::instantiate(
             &wasm, &wasm, &imports,
         )?)
     }
 
-    fn imports(&self, invocation: &ZomeInvocation) -> ImportObject {
+    fn imports(&self, invocation: Arc<ZomeInvocation>) -> ImportObject {
         // it is important that WasmRibosome and ZomeInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
-        let invocation_arc = std::sync::Arc::new(invocation.clone());
+        let invocation_arc = std::sync::Arc::clone(&invocation);
 
         macro_rules! invoke_host_function {
             ( $host_function:ident ) => {{
@@ -138,8 +148,8 @@ impl RibosomeT for WasmRibosome {
         invocation: ZomeInvocation,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse> {
-        let wasm_extern_response: WasmExternResponse = holochain_wasmer_host::guest::call(
-            &mut self.instance(&invocation)?,
+        let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
+            &mut self.instance(Arc::new(invocation))?,
             &invocation.fn_name,
             invocation.payload,
         )?;
@@ -153,13 +163,13 @@ pub mod wasm_test {
     use crate::core::ribosome::RibosomeT;
     use holochain_serialized_bytes::prelude::*;
     use sx_types::{
-        nucleus::{ZomeInvocation, ZomeInvocationPayload, ZomeInvocationResponse},
+        nucleus::{ZomeInvocation, ZomeInvocationResponse},
         prelude::Address,
         shims::SourceChainCommitBundle,
         test_utils::{fake_agent_id, fake_capability_request, fake_cell_id},
     };
     use sx_wasm_test_utils::{test_wasm, TestWasm};
-    use sx_wasm_types::*;
+    use sx_zome_types::*;
     use test_wasm_common::TestString;
 
     use std::collections::BTreeMap;
@@ -190,7 +200,7 @@ pub mod wasm_test {
             fn_name: fn_name.into(),
             cell_id: fake_cell_id("bob"),
             cap: fake_capability_request(),
-            payload: ZomeInvocationPayload::try_from(payload).expect(
+            payload: ZomeExternHostInput::try_from(payload).expect(
                 "getting a zome invocation payload from serialized bytes should never fail",
             ),
             provenance: fake_agent_id("bob"),
@@ -221,7 +231,7 @@ pub mod wasm_test {
             zome_invocation_from_names("foo", "foo", SerializedBytes::try_from(()).unwrap());
 
         assert_eq!(
-            ZomeInvocationResponse::ZomeApiFn(WasmExternResponse::new(
+            ZomeInvocationResponse::ZomeApiFn(ZomeExternGuestOutput::new(
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
@@ -237,7 +247,9 @@ pub mod wasm_test {
         let invocation = zome_invocation_from_names(
             "imports",
             "debug",
-            DebugInput::new("debug works!").try_into().unwrap(),
+            DebugInput::new(format!("debug {:?}", "works!"))
+                .try_into()
+                .unwrap(),
         );
 
         ribosome

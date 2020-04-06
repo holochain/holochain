@@ -20,7 +20,6 @@ regex = "1.1.2"
 serde = { version = "1.0.104", features = ["derive", "rc"] }
 serde_json = "1.0.47"
 lazy_static = "1.4.0"
-multihash = "0.8.0"
 snowflake = "1.3.0"
 backtrace = "0.3.27"
 tracing = "=0.1.13"
@@ -30,11 +29,10 @@ tracing-serde = "=0.1.1"
 holochain_serialized_bytes = "=0.0.36"
 holochain_wasmer_common = "=0.0.24"
 sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
-sx_wasm_types = { path = "../wasm_types" }
+sx_zome_types = { path = "../zome_types" }
 
 # possibly dispensable
 maplit = "1.0.2"
 thiserror = "1.0.10"
 derive_more = "0.99.3"
-rust-base58 = "0.0.4"
 shrinkwraprs = "0.3.0"

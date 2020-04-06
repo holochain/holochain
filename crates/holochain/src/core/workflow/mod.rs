@@ -8,6 +8,7 @@ use crate::{
     conductor::api::error::ConductorApiError,
     core::state::workspace::{Workspace, WorkspaceError},
 };
+use std::sync::Arc;
 use std::time::Duration;
 use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;
@@ -21,8 +22,8 @@ use sx_state::error::DatabaseError;
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
 #[derive(Clone, Debug)]
 pub enum WorkflowCall {
-    InvokeZome(Box<ZomeInvocation>),
-    Genesis(Box<Dna>, AgentId),
+    InvokeZome(Arc<ZomeInvocation>),
+    Genesis(Arc<Dna>, AgentId),
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,

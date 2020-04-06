@@ -1,7 +1,7 @@
 //! Types related to making calls into Zomes.
 
 use crate::{agent::AgentId, cell::CellId, dna::capabilities::CapabilityRequest, prelude::*};
-use sx_wasm_types::WasmExternResponse;
+use sx_zome_types::*;
 
 /// The ZomeId is a pair of CellId and ZomeName.
 pub type ZomeId = (CellId, ZomeName);
@@ -9,35 +9,24 @@ pub type ZomeId = (CellId, ZomeName);
 /// ZomeName as a String (should this be a newtype?)
 pub type ZomeName = String;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-/// wraps payload so that we are compatible with host::guest::call()
-pub struct ZomeInvocationPayload(SerializedBytes);
-
-impl TryFrom<ZomeInvocationPayload> for SerializedBytes {
-    type Error = SerializedBytesError;
-    fn try_from(zome_invocation_payload: ZomeInvocationPayload) -> Result<Self, Self::Error> {
-        Ok(zome_invocation_payload.0)
-    }
-}
-
-impl TryFrom<SerializedBytes> for ZomeInvocationPayload {
-    type Error = SerializedBytesError;
-    fn try_from(serialized_bytes: SerializedBytes) -> Result<Self, Self::Error> {
-        Ok(Self(serialized_bytes))
-    }
-}
-
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
-#[allow(missing_docs)] // members are self-explanitory
-#[derive(Clone, Debug)]
+/// don't clone this as `payload` could be anywhere up to the 4GB wasm limit
+#[derive(Debug)]
 pub struct ZomeInvocation {
+    /// the cell ID
     pub cell_id: CellId,
+    /// the zome name
     pub zome_name: ZomeName,
+    /// a capability request
     pub cap: CapabilityRequest,
+    /// the zome fn to call
     pub fn_name: String,
-    pub payload: ZomeInvocationPayload,
+    /// the serialized data to make available to the zome call
+    pub payload: ZomeExternHostInput,
+    /// the provenance of the call
     pub provenance: AgentId,
+    /// the hash of the top header at the time of call
     pub as_at: Address,
 }
 
@@ -45,5 +34,5 @@ pub struct ZomeInvocation {
 #[derive(Debug, PartialEq)]
 pub enum ZomeInvocationResponse {
     /// arbitrary functions exposed by zome devs to the outside world
-    ZomeApiFn(WasmExternResponse),
+    ZomeApiFn(ZomeExternGuestOutput),
 }

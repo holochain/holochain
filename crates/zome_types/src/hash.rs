@@ -10,7 +10,18 @@ use std::{convert::TryInto, fmt};
 pub const DEFAULT_HASH: Hash = Hash::SHA2256;
 
 /// HashString newtype for String
-#[derive(PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash)]
+#[derive(
+    PartialOrd,
+    PartialEq,
+    Eq,
+    Ord,
+    Clone,
+    Debug,
+    crate::Serialize,
+    crate::Deserialize,
+    Default,
+    Hash,
+)]
 pub struct HashString(String);
 
 impl fmt::Display for HashString {

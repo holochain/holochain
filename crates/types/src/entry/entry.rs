@@ -15,7 +15,6 @@ use crate::{
     persistence::cas::content::{Address, Addressable},
 };
 use holochain_serialized_bytes::prelude::*;
-use multihash::Hash;
 
 /// Should probably be a newtype.
 pub type AppEntryValue = SerializedBytes;
@@ -85,7 +84,7 @@ impl Addressable for Entry {
                 SerializedBytes::try_from(self)
                     .expect("tried to address an entry that is not serializable")
                     .bytes(),
-                Hash::SHA2256,
+                crate::sx_zome_types::hash::DEFAULT_HASH,
             ),
         }
     }
