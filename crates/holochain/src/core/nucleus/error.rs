@@ -1,4 +1,4 @@
-//! Errors that can occur while running ZomeApi functions
+//! Errors that can occur while running [ZomeApi] functions
 
 #![allow(missing_docs)]
 

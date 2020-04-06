@@ -1,13 +1,12 @@
 //! A Ribosome is a structure which knows how to execute hApp code.
 //!
 //! We have only one instance of this: [WasmRibosome]. The abstract trait exists
-//! so that we can write mocks against the RibosomeT interface, as well as
+//! so that we can write mocks against the `RibosomeT` interface, as well as
 //! opening the possiblity that we might support applications written in other
 //! languages and environments.
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
-#![allow(missing_docs)]
 
 use mockall::automock;
 use std::sync::Arc;
@@ -29,12 +28,13 @@ pub enum Todo {}
 #[automock]
 pub trait RibosomeT: Sized {
     /// Helper function for running a validation callback. Just calls
-    /// run_callback under the hood.
+    /// [`run_callback`][] under the hood.
+    /// [`run_callback`]: #method.run_callback
     fn run_validation(self, _entry: Entry) -> ValidationResult {
         unimplemented!()
     }
 
-    /// Run a callback function defined in a zome.
+    /// Runs a callback function defined in a zome.
     ///
     /// This is differentiated from calling a zome function, even though in both
     /// cases it amounts to a FFI call of a guest function.
