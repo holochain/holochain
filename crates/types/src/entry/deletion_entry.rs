@@ -1,11 +1,10 @@
-use crate::persistence::cas::content::Address;
-use holochain_json_api::{error::JsonError, json::JsonString};
+use crate::{persistence::cas::content::Address, prelude::*};
 
 //-------------------------------------------------------------------------------------------------
 // DeletionEntry
 //-------------------------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, DefaultJson, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SerializedBytes, Eq)]
 pub struct DeletionEntry {
     deleted_entry_address: Address,
 }
@@ -25,7 +24,7 @@ impl DeletionEntry {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{entry::entry::tests::test_entry_a, prelude::*};
+    use crate::{entry::entry::tests::test_entry_a, persistence::cas::content::Addressable};
 
     pub fn test_deletion_entry() -> DeletionEntry {
         let entry = test_entry_a();

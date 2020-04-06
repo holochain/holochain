@@ -1,18 +1,12 @@
 //! agent module
 
 use crate::{
-    entry::Entry,
     error::SkunkResult,
-    persistence::cas::content::{Address, AddressableContent, Content},
-    prelude::DefaultJson,
+    persistence::cas::content::{Address, Addressable},
 };
 use hcid::*;
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
-};
-use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, str};
+use holochain_serialized_bytes::prelude::*;
+use std::str;
 
 /// Base32...as a String?
 pub type Base32 = String;
@@ -20,7 +14,7 @@ pub type Base32 = String;
 /// AgentId represents an agent in the Holochain framework.
 /// This data struct is meant be stored in the CAS and source-chain.
 /// Its key is the public signing key, and is also used as its address.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, DefaultJson, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, SerializedBytes, Eq, Hash)]
 pub struct AgentId {
     /// a nickname for referencing this agent
     nick: String,
@@ -76,25 +70,10 @@ impl AgentId {
     }
 }
 
-impl AddressableContent for AgentId {
+impl Addressable for AgentId {
     /// for an Agent, the address is their public base32 encoded public signing key string
     fn address(&self) -> Address {
         self.pub_sign_key.clone().into()
-    }
-
-    /// get the entry content
-    fn content(&self) -> Content {
-        Entry::AgentId(self.to_owned()).into()
-    }
-
-    // build from entry content
-    fn try_from_content(content: &Content) -> JsonResult<Self> {
-        match Entry::try_from(content)? {
-            Entry::AgentId(agent_id) => Ok(agent_id),
-            _ => Err(JsonError::SerializationError(
-                "Attempted to load AgentId from non AgentID entry".into(),
-            )),
-        }
     }
 }
 
@@ -121,11 +100,12 @@ pub fn test_agent_id_with_name(name: &str) -> AgentId {
 mod tests {
     use super::*;
 
-    pub fn test_identity_value() -> Content {
-        Content::from_json(&format!(
-            "{{\"nick\":\"bob\",\"pub_sign_key\":\"{}\"}}",
-            GOOD_ID
-        ))
+    pub fn test_identity_value() -> SerializedBytes {
+        SerializedBytes::try_from(AgentId {
+            nick: "bob".to_string(),
+            pub_sign_key: GOOD_ID.to_string(),
+        })
+        .unwrap()
     }
 
     #[test]
@@ -161,21 +141,6 @@ mod tests {
     #[test]
     /// show ToString implementation for Agent
     fn agent_to_string_test() {
-        assert_eq!(test_identity_value(), test_agent_id().into());
-    }
-
-    #[test]
-    /// show AddressableContent implementation for Agent
-    fn agent_addressable_content_test() {
-        let expected_content =
-            Content::from_json("{\"AgentId\":{\"nick\":\"bob\",\"pub_sign_key\":\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\"}}");
-        // content()
-        assert_eq!(expected_content, test_agent_id().content(),);
-
-        // from_content()
-        assert_eq!(
-            test_agent_id(),
-            AgentId::try_from_content(&expected_content).unwrap(),
-        );
+        assert_eq!(test_identity_value(), test_agent_id().try_into().unwrap());
     }
 }

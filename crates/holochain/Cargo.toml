@@ -15,13 +15,11 @@ hcid = "0.0.6"
 futures = "0.3.1"
 sx_state = { path = "../state" }
 sx_types = { path = "../types" }
+sx_wasm_types = { path = "../wasm_types" }
 serde = { version = "1.0.104", features = ["derive"] }
-serde_json = "1.0.48"
 shrinkwraprs = "0.3.0"
 structopt = "=0.3.11"
 holochain_common = "0.0.43-alpha3"
-holochain_json_api = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
-holochain_json_derive = { version = "0.0.23", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 fallible-iterator = "0.2.0"
 thiserror = "1.0.10"
 lazy_static = "1.4.0"
@@ -37,6 +35,9 @@ petgraph = "0.5.0"
 boolinator = "2.4.0"
 base64 = "0.10.1"
 tracing = "=0.1.13"
+wasmer-runtime = "=0.13.1"
+holochain_wasmer_host = "=0.0.22"
+holochain_serialized_bytes = "=0.0.36"
 url = "1.7.2"
 url_serde = "0.2.0"
 derive_more = "0.99.3"
@@ -47,6 +48,8 @@ num_cpus = "1.8"
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cli = "0.6.3"
+sx_wasm_test_utils = { path = "../../test_utils/wasm" }
+test_wasm_common = { path = "../../test_utils/wasm_common" }
 
 [lib]
 name = "holochain_2020"

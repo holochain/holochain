@@ -1,12 +1,9 @@
 //! Common holochain types crate.
-
 #![deny(missing_docs)]
 
 /// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)
 #[macro_use]
 extern crate serde;
-#[macro_use]
-extern crate holochain_json_derive;
 
 pub mod agent;
 pub mod autonomic;
