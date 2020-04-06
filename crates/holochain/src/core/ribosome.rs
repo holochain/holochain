@@ -277,7 +277,9 @@ impl WasmRibosome {
         let wasm: Arc<Vec<u8>> = zome.code.code();
         let imports: ImportObject = WasmRibosome::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
-            &self.wasm_cache_key(&zome_name), &wasm, &imports,
+            &self.wasm_cache_key(&zome_name),
+            &wasm,
+            &imports,
         )?)
     }
 
@@ -491,7 +493,6 @@ pub mod wasm_test {
 
         assert_eq!(output.dna_name, "test",);
 
-
         let ribosome = test_ribosome();
         let invocation = zome_invocation_from_names(
             "imports",
@@ -499,10 +500,17 @@ pub mod wasm_test {
             GlobalsInput::new(()).try_into().unwrap(),
         );
         let t0 = now();
-        ribosome.call_zome_function(&mut SourceChainCommitBundle::default(), invocation).unwrap();
+        ribosome
+            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+            .unwrap();
         let t1 = now();
 
-        println!("x: {} {} {}", t0.as_nanos(), t1.as_nanos(), t1.as_nanos() - t0.as_nanos());
+        println!(
+            "x: {} {} {}",
+            t0.as_nanos(),
+            t1.as_nanos(),
+            t1.as_nanos() - t0.as_nanos()
+        );
     }
 
     #[test]
@@ -539,11 +547,18 @@ pub mod wasm_test {
 
     #[test]
     fn invoke_import_sleep_test() {
-        test_ribosome().call_zome_function(&mut SourceChainCommitBundle::default(), zome_invocation_from_names(
-            "imports",
-            "sleep",
-            SleepInput::new(Duration::from_millis(0)).try_into().unwrap(),
-        )).unwrap();
+        test_ribosome()
+            .call_zome_function(
+                &mut SourceChainCommitBundle::default(),
+                zome_invocation_from_names(
+                    "imports",
+                    "sleep",
+                    SleepInput::new(Duration::from_millis(0))
+                        .try_into()
+                        .unwrap(),
+                ),
+            )
+            .unwrap();
 
         let ribosome = test_ribosome();
 
@@ -552,19 +567,19 @@ pub mod wasm_test {
         let invocation = zome_invocation_from_names(
             "imports",
             "sleep",
-            SleepInput::new(Duration::from_millis(0)).try_into().unwrap(),
+            SleepInput::new(Duration::from_millis(0))
+                .try_into()
+                .unwrap(),
         );
 
         ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation).unwrap();
+            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+            .unwrap();
         let t1 = now().as_millis();
 
         let diff0 = i128::try_from(t1).unwrap() - i128::try_from(t0).unwrap();
 
-        assert!(
-            diff0 < 2,
-            format!("t0, t1, diff0: {} {} {}", t0, t1, diff0)
-        );
+        assert!(diff0 < 2, format!("t0, t1, diff0: {} {} {}", t0, t1, diff0));
 
         let ribosome = test_ribosome();
 
@@ -573,20 +588,20 @@ pub mod wasm_test {
         let invocation = zome_invocation_from_names(
             "imports",
             "sleep",
-            SleepInput::new(Duration::from_millis(3)).try_into().unwrap(),
+            SleepInput::new(Duration::from_millis(3))
+                .try_into()
+                .unwrap(),
         );
 
         ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation).unwrap();
-            let t3 = now();
+            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+            .unwrap();
+        let t3 = now();
 
-        let diff1 = i128::try_from(t3.as_millis()).unwrap() - i128::try_from(t2.as_millis()).unwrap();
+        let diff1 =
+            i128::try_from(t3.as_millis()).unwrap() - i128::try_from(t2.as_millis()).unwrap();
 
-        assert!(
-            2 < diff1
-        );
-        assert!(
-            diff1 < 5
-        );
+        assert!(2 < diff1);
+        assert!(diff1 < 5);
     }
 }
