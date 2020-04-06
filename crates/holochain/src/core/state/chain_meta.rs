@@ -1,6 +1,7 @@
 #![allow(clippy::ptr_arg)]
 use mockall::mock;
 use std::collections::HashSet;
+use std::fmt::Debug;
 use sx_state::{
     buffer::{BufMultiVal, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
@@ -8,7 +9,6 @@ use sx_state::{
     prelude::*,
 };
 use sx_types::persistence::cas::content::Address;
-use std::fmt::Debug;
 
 type Tag = String;
 

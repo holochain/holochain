@@ -2,6 +2,8 @@
 #![cfg_attr(tarpaulin, skip)]
 #![warn(unused_extern_crates)]
 
+extern crate proc_macro;
+
 use quote::quote;
 use syn;
 

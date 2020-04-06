@@ -114,7 +114,7 @@ mod builder {
     use super::*;
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
-    #[derive(Default)]    
+    #[derive(Default)]
     pub struct ConductorBuilder {}
 
     impl ConductorBuilder {
