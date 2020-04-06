@@ -16,6 +16,7 @@ futures = "0.3.1"
 sx_state = { path = "../state" }
 sx_types = { path = "../types" }
 sx_wasm_types = { path = "../wasm_types" }
+holochain_websocket = { path = "../websocket" }
 serde = { version = "1.0.104", features = ["derive"] }
 shrinkwraprs = "0.3.0"
 structopt = "=0.3.11"
@@ -44,6 +45,7 @@ derive_more = "0.99.3"
 directories = "2.0.2"
 human-panic = "1.0.3"
 num_cpus = "1.8"
+url2 = "0.0.5"
 
 [dev-dependencies]
 anyhow = "1.0.26"

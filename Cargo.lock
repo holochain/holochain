@@ -825,6 +825,7 @@ dependencies = [
  "holochain_common",
  "holochain_serialized_bytes",
  "holochain_wasmer_host",
+ "holochain_websocket",
  "human-panic",
  "lazy_static",
  "mockall",
@@ -846,6 +847,7 @@ dependencies = [
  "toml",
  "tracing",
  "url 1.7.2",
+ "url2",
  "url_serde",
  "wasmer-runtime",
 ]

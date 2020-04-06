@@ -1,9 +1,11 @@
 use super::error::ConductorApiResult;
-use crate::conductor::conductor::Conductor;
+use crate::{conductor::conductor::Conductor, core::signal::Signal};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use sx_types::{
     cell::CellHandle,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    prelude::*,
 };
 use tokio::sync::RwLock;
 
@@ -21,29 +23,25 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
 
     // -- provided -- //
 
-    async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
-        let res: ConductorApiResult<ConductorResponse> = async move {
+    async fn handle_request(&self, request: InterfaceMsgIncoming) -> InterfaceMsgOutgoing {
+        let res: ConductorApiResult<InterfaceMsgOutgoing> = async move {
             match request {
-                ConductorRequest::ZomeInvocationRequest { request } => {
-                    Ok(ConductorResponse::ZomeInvocationResponse {
-                        response: Box::new(self.invoke_zome(*request).await?),
-                    })
+                InterfaceMsgIncoming::ZomeInvocationRequest(request) => {
+                    Ok(InterfaceMsgOutgoing::ZomeInvocationResponse(Box::new(
+                        self.invoke_zome(*request).await?,
+                    )))
                 }
-                ConductorRequest::AdminRequest { request } => {
-                    Ok(ConductorResponse::AdminResponse {
-                        response: Box::new(self.admin(*request).await?),
-                    })
-                }
-                _ => unimplemented!(),
+                InterfaceMsgIncoming::AdminRequest(request) => Ok(
+                    InterfaceMsgOutgoing::AdminResponse(Box::new(self.admin(*request).await?)),
+                ),
+                InterfaceMsgIncoming::CryptoRequest(request) => unimplemented!(),
             }
         }
         .await;
 
         match res {
             Ok(response) => response,
-            Err(e) => ConductorResponse::Error {
-                debug: format!("{:?}", e),
-            },
+            Err(e) => InterfaceMsgOutgoing::Error(format!("{:?}", e)),
         }
     }
 }
@@ -78,61 +76,58 @@ impl ExternalConductorApi for RealExternalConductorApi {
 }
 
 /// The set of messages that a conductor understands how to respond
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type")]
-pub enum ConductorResponse {
-    Error {
-        debug: String,
-    },
-    AdminResponse {
-        response: Box<AdminResponse>,
-    },
-    ZomeInvocationResponse {
-        response: Box<ZomeInvocationResponse>,
-    },
+// TODO: do we actually want a separate variant for each type of response, or
+// just general ones for Signal, Response, and Error?
+#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+#[serde(tag = "type", content = "data")]
+#[serde(rename_all = "snake_case")]
+pub enum InterfaceMsgOutgoing {
+    Error(String),
+    Signal(Box<Signal>),
+    AdminResponse(Box<AdminResponse>),
+    CryptoResponse(Box<CryptoResponse>),
+    ZomeInvocationResponse(Box<ZomeInvocationResponse>),
 }
-holochain_serialized_bytes::holochain_serial!(ConductorResponse);
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum AdminResponse {
     Stub,
 }
 
-/// The set of messages that a conductor understands how to handle
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type")]
-pub enum ConductorRequest {
-    AdminRequest { request: Box<AdminRequest> },
-    CryptoRequest { request: Box<CryptoRequest> },
-    TestRequest { request: Box<TestRequest> },
-    ZomeInvocationRequest { request: Box<ZomeInvocation> },
+#[allow(missing_docs)]
+#[derive(Debug, Serialize, Deserialize)]
+pub enum CryptoResponse {
+    Stub,
 }
-holochain_serialized_bytes::holochain_serial!(ConductorRequest);
+
+/// The set of messages that a conductor understands how to handle
+#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+#[serde(tag = "type", content = "data")]
+#[serde(rename_all = "snake_case")]
+pub enum InterfaceMsgIncoming {
+    AdminRequest(Box<AdminRequest>),
+    CryptoRequest(Box<CryptoRequest>),
+    ZomeInvocationRequest(Box<ZomeInvocation>),
+}
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum CryptoRequest {
     Sign(String),
     Decrypt(String),
     Encrypt(String),
 }
 
-#[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum TestRequest {
-    AddAgent(AddAgentArgs),
-}
-
 #[allow(dead_code, missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AddAgentArgs {
     id: String,
     name: String,

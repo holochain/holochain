@@ -29,12 +29,12 @@ async fn main() {
         let loc_send_b = send_b.clone();
         let mut loc_recv_b = send_b.subscribe();
 
-        tokio::task::spawn(async move {
+        let _ = tokio::task::spawn(async move {
             let (mut send_socket, mut recv_socket) = maybe_con.await.unwrap();
 
             eprintln!("CONNECTION: {}", recv_socket.remote_addr());
 
-            tokio::task::spawn(async move {
+            let _ = tokio::task::spawn(async move {
                 while let Some(msg) = recv_socket.next().await {
                     match msg {
                         WebsocketMessage::Signal(msg) => {
@@ -56,7 +56,7 @@ async fn main() {
                 }
             });
 
-            tokio::task::spawn(async move {
+            let _ = tokio::task::spawn(async move {
                 while let Some(Ok(msg)) = loc_recv_b.next().await {
                     send_socket.signal(msg).await.unwrap();
                 }
