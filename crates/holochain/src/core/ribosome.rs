@@ -1,3 +1,13 @@
+//! A Ribosome is a structure which knows how to execute hApp code.
+//!
+//! We have only one instance of this: [WasmRibosome]. The abstract trait exists
+//! so that we can write mocks against the `RibosomeT` interface, as well as
+//! opening the possiblity that we might support applications written in other
+//! languages and environments.
+
+// This allow is here because #[automock] automaticaly creates a struct without
+// documentation, and there seems to be no way to add docs to it after the fact
+
 use mockall::automock;
 use std::sync::Arc;
 use sx_types::{
@@ -10,25 +20,33 @@ use sx_types::{
 use sx_wasm_types::WasmExternResponse;
 use wasmer_runtime::{imports, ImportObject, Instance};
 
+/// Represents a type which has not been decided upon yet
+pub enum Todo {}
+
+/// Interface for a Ribosome. Currently used only for mocking, as our only
+/// real concrete type is [WasmRibosome]
 #[automock]
 pub trait RibosomeT: Sized {
+    /// Helper function for running a validation callback. Just calls
+    /// [`run_callback`][] under the hood.
+    /// [`run_callback`]: #method.run_callback
     fn run_validation(self, _entry: Entry) -> ValidationResult {
-        // TODO: turn entry into "data"
-        self.run_callback(())
+        unimplemented!()
     }
 
-    fn run_callback(self, data: ()) -> ValidationResult;
+    /// Runs a callback function defined in a zome.
+    ///
+    /// This is differentiated from calling a zome function, even though in both
+    /// cases it amounts to a FFI call of a guest function.
+    fn run_callback(self, data: ()) -> Todo;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    ///
-    /// Note: it would be nice to pass the bundle by value and then return it at the end,
-    /// but automock doesn't support lifetimes that appear in return values
     fn call_zome_function<'env>(
         self,
-        bundle: &mut SourceChainCommitBundle<'env>,
+        // FIXME: Use [SourceChain] instead
+        _bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
-        // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse>;
 }
 
@@ -39,6 +57,7 @@ pub struct WasmRibosome {
 }
 
 impl WasmRibosome {
+    /// Create a new instance
     pub fn new(dna: Dna) -> Self {
         Self { dna }
     }
@@ -58,7 +77,7 @@ impl WasmRibosome {
 }
 
 impl RibosomeT for WasmRibosome {
-    fn run_callback(self, _data: ()) -> ValidationResult {
+    fn run_callback(self, _data: ()) -> Todo {
         unimplemented!()
     }
 
@@ -66,9 +85,10 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        // cell_conductor_api: CellConductorApi,
+        // FIXME: Use [SourceChain] instead
         _bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
+        // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> SkunkResult<ZomeInvocationResponse> {
         let wasm_extern_response: WasmExternResponse = holochain_wasmer_host::guest::call(
