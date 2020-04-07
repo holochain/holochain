@@ -64,7 +64,7 @@ enum Search {
     /// The entry is found and we can stop
     Found(Entry),
     /// We haven't found the entry yet but we should
-    /// continue searching down the cascade 
+    /// continue searching down the cascade
     Continue,
     /// We haven't found the entry and should
     /// not continue searching down the cascade
