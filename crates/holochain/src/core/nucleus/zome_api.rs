@@ -1,12 +1,14 @@
-use super::error::ZomeApiResult;
-use crate::core::net::NetRequester;
-use sx_types::{
-    nucleus::{ZomeId, ZomeInvocation, ZomeInvocationResponse},
-    shims::SourceChainCommitBundle,
-};
+//! Placeholder for the ZomeApi interface. May be deleted.
 
+use super::error::ZomeApiResult;
+use sx_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
+
+/// The ZomeApi defines the functions which are imported into the Wasm runtime,
+/// i.e. the core API which is made accessible to hApps for interacting with Holochain.
 pub trait ZomeApi {
+    /// Invoke a zome function
     fn call(&self, invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResponse>;
+
     // fn commit_capability_claim();
     // fn commit_capability_grant();
     // fn commit_entry();
@@ -40,30 +42,4 @@ pub trait ZomeApi {
     // fn update_entry();
     // fn version();
     // fn version_hash();
-}
-
-pub struct ZomeEnvironment<'env, N: NetRequester> {
-    _bundle: SourceChainCommitBundle<'env>,
-    _net_requester: N,
-    _zome_id: ZomeId,
-}
-
-impl<'env, N: NetRequester> ZomeEnvironment<'env, N> {
-    pub fn new(
-        _bundle: SourceChainCommitBundle<'env>,
-        _net_requester: N,
-        _zome_id: ZomeId,
-    ) -> Self {
-        Self {
-            _bundle,
-            _net_requester,
-            _zome_id,
-        }
-    }
-}
-
-impl<'env, N: NetRequester> ZomeApi for ZomeEnvironment<'env, N> {
-    fn call(&self, _invocation: ZomeInvocation) -> ZomeApiResult<ZomeInvocationResponse> {
-        unimplemented!()
-    }
 }
