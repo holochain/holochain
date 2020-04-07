@@ -44,6 +44,12 @@ struct Opt {
         help = "Run a very basic interface example, just to have something to do"
     )]
     run_interface_example: bool,
+
+    #[structopt(
+        long,
+        help = "Runs holochain with the admin interface enabled"
+    )]
+    admin: bool,
 }
 
 fn main() {
