@@ -1,0 +1,22 @@
+[package]
+name = "sx_crypto"
+version = "0.0.1"
+description = "libsodium wrapper providing memory secure api access"
+license = "Apache-2.0"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "nacl", "libsodium", "cryptography"]
+categories = ["cryptography"]
+edition = "2018"
+
+[dependencies]
+futures = "0.3"
+lazy_static = "1"
+libc = "0.2"
+rust_sodium_holochain_fork-sys = "=0.10.4"
+tokio = { version = "0.2", features = ["full"] }
+thiserror = "1"
+
+[dev-dependencies]
+blake2b_simd = "0.5.10"
