@@ -5,13 +5,20 @@ use crate::core::signal::Signal;
 use super::error::{InterfaceError, InterfaceResult};
 use futures::select;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_websocket::{websocket_bind, WebsocketConfig, WebsocketMessage, WebsocketReceiver};
+use holochain_websocket::{
+    websocket_bind, WebsocketConfig, WebsocketMessage, WebsocketReceiver, WebsocketSender,
+};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 use tokio::stream::StreamExt;
 use tokio::sync::broadcast;
 use tracing::*;
 use url2::url2;
+
+enum InterfaceKind {
+    App,
+    Admin,
+}
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
@@ -39,10 +46,34 @@ pub fn create_demo_channel_interface<A: ExternalConductorApi>(
     (send_req, join_handle)
 }
 
+/// Create an Admin Interface, which only receives AdminRequest messages
+/// from the external client
+pub async fn create_admin_interface(port: u16) -> InterfaceResult<()> {
+    trace!("Initializing Admin interface");
+    let mut listener = websocket_bind(
+        url2!("ws://127.0.0.1:{}", port),
+        Arc::new(WebsocketConfig::default()),
+    )
+    .await?;
+    trace!("LISTENING AT: {}", listener.local_addr());
+    let mut listener_handles = Vec::new();
+    while let Some(maybe_con) = listener.next().await {
+        let (_, recv_socket) = maybe_con.await?;
+        listener_handles.push(tokio::task::spawn(recv_incoming_msgs(recv_socket)));
+    }
+    for h in listener_handles {
+        h.await?;
+    }
+    Ok(())
+}
+
+/// Create an App Interface, which includes the ability to receive signals
+/// from Cells via a broadcast channel
 pub async fn create_app_interface(
     port: u16,
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<()> {
+    trace!("Initializing App interface");
     let mut listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
@@ -53,66 +84,104 @@ pub async fn create_app_interface(
     while let Some(maybe_con) = listener.next().await {
         let (send_socket, recv_socket) = maybe_con.await?;
         let signal_rx = signal_broadcaster.subscribe();
-        listener_handles.push(tokio::task::spawn(recv_msgs_and_signals(
+        listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
             recv_socket,
             signal_rx,
+            send_socket,
         )));
     }
     for h in listener_handles {
-        h.await?;
+        h.await??;
     }
     Ok(())
 }
 
-async fn recv_msgs(mut recv_socket: WebsocketReceiver) -> () {
+/// Polls for messages coming in from the external client.
+/// Used by Admin interface.
+async fn recv_incoming_msgs(mut recv_socket: WebsocketReceiver) -> () {
     while let Some(msg) = recv_socket.next().await {
-        if let Err(_todo) = handle_msg(msg).await {
+        if let Err(_todo) = handle_incoming_message(msg, InterfaceKind::Admin).await {
             break;
         }
     }
 }
 
-async fn recv_msgs_and_signals(
-    recv_socket: WebsocketReceiver,
-    signal_rx: broadcast::Receiver<Signal>,
+/// Polls for messages coming in from the external client while simultaneously
+/// polling for signals being broadcast from the Cells associated with this
+/// App interface.
+async fn recv_incoming_msgs_and_outgoing_signals(
+    mut recv_socket: WebsocketReceiver,
+    mut signal_rx: broadcast::Receiver<Signal>,
+    mut signal_tx: WebsocketSender,
 ) -> InterfaceResult<()> {
     trace!("CONNECTION: {}", recv_socket.remote_addr());
 
-    let mut rx = {
-        signal_rx
-            .map(|signal| {
-                InterfaceResult::Ok(WebsocketMessage::Signal(SerializedBytes::try_from(
-                    signal.map_err(InterfaceError::SignalReceive)?,
-                )?))
-            })
-            .merge(recv_socket.map(Ok))
-    };
+    loop {
+        tokio::select! {
+            // If we receive a Signal broadcasted from a Cell, push it out
+            // across the interface
+            signal = signal_rx.next() => {
+                if let Some(signal) = signal {
+                    let bytes = SerializedBytes::try_from(
+                        signal.map_err(InterfaceError::SignalReceive)?,
+                    )?;
+                    signal_tx.signal(bytes).await?;
+                } else {
+                    debug!("Closing interface: signal stream empty");
+                    break;
+                }
+            },
 
-    while let Some(msg) = rx.next().await {
-        if let Ok(msg) = msg {
-            if let Err(_todo) = handle_msg(msg).await {
-                unimplemented!()
-            }
-        } else {
-            unimplemented!()
+            // If we receive a message from outside, handle it
+            msg = recv_socket.next() => {
+                if let Some(msg) = msg {
+                    handle_incoming_message(msg, InterfaceKind::App).await?
+                } else {
+                    debug!("Closing interface: message stream empty");
+                    break;
+                }
+            },
         }
     }
+
     Ok(())
 }
 
-async fn handle_msg(msg: WebsocketMessage) -> InterfaceResult<()> {
-    match msg {
-        WebsocketMessage::Request(msg, response) => {
-            let sb: SerializedBytes =
-                SerializedBytes::try_from(ConductorResponse::AdminResponse {
-                    response: Box::new(AdminResponse::DnaAdded),
-                })?;
-            response(sb).await?;
-            Ok(())
-        }
-        msg => {
-            debug!("Other message: {:?}", msg);
-            unimplemented!()
-        }
+async fn handle_incoming_message(
+    ws_msg: WebsocketMessage,
+    interface_kind: InterfaceKind,
+) -> InterfaceResult<()> {
+    match ws_msg {
+        WebsocketMessage::Request(bytes, respond) => match interface_kind {
+            InterfaceKind::Admin => {
+                let request = AdminRequest::try_from(bytes)?;
+                Ok(respond(handle_incoming_admin_request(request).await?.try_into()?).await?)
+            }
+            InterfaceKind::App => {
+                let request = ConductorRequest::try_from(bytes)?;
+                Ok(respond(handle_incoming_app_request(request).await?.try_into()?).await?)
+            }
+        },
+        WebsocketMessage::Signal(_) => Err(InterfaceError::UnexpectedMessage(
+            "Got an unexpected Signal while handing incoming message".to_string(),
+        )),
+        WebsocketMessage::Close(_) => unimplemented!(),
     }
+}
+
+async fn handle_incoming_admin_request(request: AdminRequest) -> InterfaceResult<AdminResponse> {
+    Ok(match request {
+        _ => AdminResponse::DnaAdded,
+    })
+}
+
+// TODO: rename ConductorRequest to AppRequest or something
+async fn handle_incoming_app_request(
+    request: ConductorRequest,
+) -> InterfaceResult<ConductorResponse> {
+    Ok(match request {
+        _ => ConductorResponse::Error {
+            debug: "TODO".into(),
+        },
+    })
 }

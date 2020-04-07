@@ -6,6 +6,7 @@ pub enum InterfaceError {
     SerializedBytes(#[from] SerializedBytesError),
     JoinError(#[from] tokio::task::JoinError),
     SignalReceive(tokio::sync::broadcast::RecvError),
+    UnexpectedMessage(String),
     SendError,
     Other(String),
     // FIXME: update error types in holochain_websocket to use a more specific

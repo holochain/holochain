@@ -111,7 +111,7 @@ pub enum ConductorResponse {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum AdminResponse {
     Stub,
     DnaAdded,
@@ -128,7 +128,7 @@ pub enum ConductorRequest {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
