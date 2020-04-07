@@ -1,5 +1,85 @@
 #![deny(missing_docs)]
-//! holo_hash
+//! holo_hash::HoloHash is a hashing framework for Holochain.
+//!
+//! Note that not all HoloHashes are true hashes -
+//!
+//! For example AgentHash actually stores the PublicKey of the agent's
+//! libsodium signature keypair.
+//!
+//! HoloHash implements `Display` providing a `to_string()` function accessing
+//! the hash as a user friendly string. It also provides TryFrom for string
+//! types allowing you to parse this string representation.
+//!
+//! HoloHash includes a 4 byte (or u32) dht "location" that serves dual purposes.
+//!  - It is used as a checksum when parsing string representations.
+//!  - It is used as a u32 in our dht sharding algorithm.
+//!
+//! HoloHash implements SerializedBytes to make it easy to cross ffi barriers
+//! such as WASM and the UI websocket.
+//!
+//! # Example
+//!
+//! ```
+//! use holo_hash::*;
+//! use std::convert::TryInto;
+//! use holochain_serialized_bytes::SerializedBytes;
+//!
+//! let entry: HoloHash =
+//!     "uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
+//!     .try_into()
+//!     .unwrap();
+//!
+//! assert_eq!(3860645936, entry.location());
+//!
+//! let bytes: SerializedBytes = entry.try_into().unwrap();
+//!
+//! assert_eq!(
+//!     "{\"type\":\"EntryHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
+//!     &format!("{:?}", bytes),
+//! );
+//! ```
+//!
+//! # Advanced
+//!
+//! Calculating hashes takes time - In a futures context we don't want to block.
+//! HoloHash provides sync (blocking) and async (non-blocking) apis for hashing.
+//!
+//! ```
+//! use holo_hash::*;
+//!
+//! let entry_content = b"test entry content";
+//!
+//! let entry_hash: HoloHash = EntryHash::with_data_sync(entry_content).into();
+//!
+//! // if in a futures context you should await instead to not block executor:
+//! // let entry_hash = EntryHash::with_data(entry_content).await;
+//!
+//! assert_eq!(
+//!     "EntryHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",
+//!     &format!("{:?}", entry_hash),
+//! );
+//!
+//! ```
+//!
+//! ## Sometimes your data doesn't want to be re-hashed:
+//!
+//! ```
+//! use holo_hash::*;
+//!
+//! // pretend our pub key is all 0xdb bytes
+//! let agent_pub_key = vec![0xdb; 32];
+//!
+//! let agent_id: HoloHash = AgentHash::with_pre_hashed_sync(agent_pub_key).into();
+//!
+//! // if in a futures context you should await instead to not block executor:
+//! // let agent_id = AgentHash::with_pre_hashed(agent_pub_key).await;
+//!
+//! assert_eq!(
+//!     "AgentHash(uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv)",
+//!     &format!("{:?}", agent_id),
+//! );
+//!
+//! ```
 
 /// Holo Hash Error Type.
 #[derive(Debug, thiserror::Error)]
@@ -239,6 +319,12 @@ macro_rules! new_holo_hash {
 
             fn try_from(s: String) -> Result<Self, Self::Error> {
                 $name::try_from(&s)
+            }
+        }
+
+        impl ::std::convert::From<$name> for HoloHash {
+            fn from(h: $name) -> Self {
+                HoloHash::$name(h)
             }
         }
     };
