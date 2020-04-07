@@ -827,6 +827,7 @@ dependencies = [
  "holochain_wasmer_host",
  "human-panic",
  "lazy_static",
+ "maplit",
  "mockall",
  "num_cpus",
  "owning_ref",

@@ -1,4 +1,6 @@
 //! # Cascade
+//! This module is still a work in progress.
+//! Here is some pseudocode we are using to build it.
 //! ## Dimensions
 //! get vs get_links
 //! default vs options
@@ -7,28 +9,28 @@
 //! ## Get
 //! ### Default - Get's the latest version
 //! Scratch Live -> Return
-//! Scratch NotFound -> Goto Cas
+//! Scratch NotInCascade -> Goto Cas
 //! Scratch _ -> None
 //! Cas Live -> Return
-//! Cas NotFound -> Goto cache
+//! Cas NotInCascade -> Goto cache
 //! Cas _ -> None
 //! Cache Live -> Return
 //! Cache Pending -> Goto Network
-//! Cache NotFound -> Goto Network
+//! Cache NotInCascade -> Goto Network
 //! Cache _ -> None
 //!
 //! ## Get Links
 //! ### Default - Get's the latest version
 //! if I'm an authority
 //! Scratch Found-> Return
-//! Scratch NotFound -> Goto Cas
+//! Scratch NotInCascade -> Goto Cas
 //! Cas Found -> Return
-//! Cas NotFound -> Goto Network
+//! Cas NotInCascade -> Goto Network
 //! else
 //! Network Found -> Return
-//! Network NotFound -> Goto Cache
+//! Network NotInCascade -> Goto Cache
 //! Cache Found -> Return
-//! Cache NotFound -> None
+//! Cache NotInCascade -> None
 //!
 //! ## Pagination
 //! gets most recent N links with default N (50)
@@ -68,7 +70,9 @@ enum Search {
     Continue,
     /// We haven't found the entry and should
     /// not continue searching down the cascade
-    NotFound,
+    // TODO This information is currently not passed back to
+    // the caller however it might be useful.
+    NotInCascade,
 }
 
 /// Should these functions be sync or async?
@@ -91,19 +95,23 @@ where
             cache_meta,
         }
     }
+
     #[instrument(skip(self))]
     /// Gets an entry from the cas or cache depending on it's metadata
-    pub async fn dht_get(&self, address: Address) -> DatabaseResult<Option<Entry>> {
+    // TODO asyncify slow blocking functions here
+    // The default behavior is to skip deleted or replaced entries.
+    // TODO: Implement customization of this behavior with an options/builder struct
+    pub async fn dht_get(&self, address: &Address) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
             .primary
-            .get_entry(&address)?
+            .get_entry(address)?
             .and_then(|entry| {
                 self.primary_meta.get_crud(&address).ok().map(|crud| {
                     if let EntryDhtStatus::Live = crud {
                         Search::Found(entry)
                     } else {
-                        Search::NotFound
+                        Search::NotInCascade
                     }
                 })
             })
@@ -111,24 +119,24 @@ where
 
         // Cache
         match search {
-            Search::Continue => Ok(self
-                .cache
-                .get_entry(&address)?
-                .and_then(|entry| {
-                    self.cache_meta
-                        .get_crud(&address)
-                        .ok()
-                        .and_then(|crud| match crud {
-                            EntryDhtStatus::Live => Some(entry),
-                            _ => None,
-                        })
-                })),
+            Search::Continue => Ok(self.cache.get_entry(address)?.and_then(|entry| {
+                self.cache_meta
+                    .get_crud(address)
+                    .ok()
+                    .and_then(|crud| match crud {
+                        EntryDhtStatus::Live => Some(entry),
+                        _ => None,
+                    })
+            })),
             Search::Found(entry) => Ok(Some(entry)),
-            Search::NotFound => Ok(None),
+            Search::NotInCascade => Ok(None),
         }
     }
 
     /// Gets an links from the cas or cache depending on it's metadata
+    // TODO asyncify slow blocking functions here
+    // The default behavior is to skip deleted or replaced entries.
+    // TODO: Implement customization of this behavior with an options/builder struct
     pub async fn dht_get_links<S: Into<String>>(
         &self,
         base: Address,

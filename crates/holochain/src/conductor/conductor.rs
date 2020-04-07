@@ -122,8 +122,7 @@ mod builder {
             Self {}
         }
 
-        #[allow(clippy::wrong_self_convention)]
-        pub async fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
+        pub async fn with_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment).await?;

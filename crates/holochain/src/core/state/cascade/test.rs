@@ -3,6 +3,7 @@ use crate::core::state::{
     chain_meta::{EntryDhtStatus, MockChainMetaBuf},
     source_chain::SourceChainBuf,
 };
+use maplit::hashset;
 use mockall::*;
 use std::collections::HashSet;
 use sx_state::{
@@ -11,6 +12,7 @@ use sx_state::{
 };
 use sx_types::persistence::cas::content::Addressable;
 use sx_types::{agent::AgentId, entry::Entry, observability, prelude::Address};
+
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
@@ -78,7 +80,7 @@ async fn live_local_return() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(address).await?;
+    let entry = cascade.dht_get(&address).await?;
     // check it returns
     assert_eq!(entry, Some(jimbo));
     // check it doesn't hit the cache
@@ -119,7 +121,7 @@ async fn dead_local_none() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(address).await?;
+    let entry = cascade.dht_get(&address).await?;
     // check it returns none
     assert_eq!(entry, None);
     // check it doesn't hit the cache
@@ -160,7 +162,7 @@ async fn notfound_goto_cache_live() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(address).await?;
+    let entry = cascade.dht_get(&address).await?;
     // check it returns
     assert_eq!(entry, Some(jimbo));
     // check it doesn't hit the primary
@@ -193,7 +195,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(address).await?;
+    let entry = cascade.dht_get(&address).await?;
     // check it returns
     assert_eq!(entry, None);
     // check it doesn't hit the primary
@@ -230,12 +232,7 @@ async fn links_local_return() -> DatabaseResult<()> {
     mock_primary_meta
         .expect_get_links()
         .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| {
-            Ok([target.clone()]
-                .iter()
-                .cloned()
-                .collect::<HashSet<Address>>())
-        });
+        .returning(move |_, _| Ok(hashset! {target.clone()}));
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -245,9 +242,8 @@ async fn links_local_return() -> DatabaseResult<()> {
         &mock_cache_meta,
     );
     let links = cascade.dht_get_links(base, "").await?;
-    let link = links.into_iter().next();
     // check it returns
-    assert_eq!(link, Some(result));
+    assert_eq!(links, hashset! {result});
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -286,12 +282,7 @@ async fn links_cache_return() -> DatabaseResult<()> {
     mock_cache_meta
         .expect_get_links()
         .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| {
-            Ok([target.clone()]
-                .iter()
-                .cloned()
-                .collect::<HashSet<Address>>())
-        });
+        .returning(move |_, _| Ok(hashset! {target.clone()}));
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -301,9 +292,8 @@ async fn links_cache_return() -> DatabaseResult<()> {
         &mock_cache_meta,
     );
     let links = cascade.dht_get_links(base, "").await?;
-    let link = links.into_iter().next();
     // check it returns
-    assert_eq!(link, Some(result));
+    assert_eq!(links, hashset! {result});
     Ok(())
 }
 
@@ -332,12 +322,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     mock_cache_meta
         .expect_get_links()
         .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| {
-            Ok([target.clone()]
-                .iter()
-                .cloned()
-                .collect::<HashSet<Address>>())
-        });
+        .returning(move |_, _| Ok(hashset! {target.clone()}));
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -347,9 +332,8 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         &mock_cache_meta,
     );
     let links = cascade.dht_get_links(base, "").await?;
-    let link = links.into_iter().next();
     // check it returns
-    assert_eq!(link, Some(result));
+    assert_eq!(links, hashset! {result});
     // check it doesn't hit the primary
     // this is implied by the mock not expecting calls
     Ok(())
