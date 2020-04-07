@@ -1,13 +1,14 @@
 use assert_cmd::prelude::*;
+use holochain_2020::conductor::api::{
+    AdminRequest, AdminResponse, ConductorRequest, ConductorResponse,
+};
+use holochain_websocket::*;
+use std::sync::Arc;
 use std::{
     io::Read,
     process::{Child, Command, ExitStatus, Stdio},
 };
-use holochain_websocket::*;
-use std::convert::TryInto;
-use tokio::{runtime::Runtime, stream::StreamExt};
 use url2::prelude::*;
-use std::sync::Arc;
 
 type StdResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -43,7 +44,7 @@ async fn call_admin() -> StdResult {
     std::thread::sleep(std::time::Duration::from_secs(1));
     let started = holochain.try_wait();
     check_started(started, &mut holochain);
-   
+
     run_websocket(port).await?;
 
     holochain.kill().expect("Failed to kill holochain");
@@ -60,9 +61,24 @@ async fn run_websocket(port: u16) -> StdResult {
     if let Err(ref e) = r {
         dbg!(e);
     }
-    let (mut send_socket, mut recv_socket) = r?;
-    send_socket.signal(()).await?;
+    let (mut send_socket, _) = r?;
+    let request = Box::new(AdminRequest::AddDna);
+    let response: ConductorResponse = send_socket
+        .request(ConductorRequest::AdminRequest { request })
+        .await?;
+    let r = match response {
+        ConductorResponse::AdminResponse { response } => {
+            if let AdminResponse::DnaAdded = *response {
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    };
+    assert!(r);
+
+    //assert_eq!(response, ConductorResponse::AdminResponse{ response: Box::new(AdminResponse::DnaAdded) });
 
     Ok(())
-
 }

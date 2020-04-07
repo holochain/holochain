@@ -114,6 +114,7 @@ holochain_serialized_bytes::holochain_serial!(ConductorResponse);
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum AdminResponse {
     Stub,
+    DnaAdded,
 }
 
 /// The set of messages that a conductor understands how to handle
@@ -132,6 +133,7 @@ holochain_serialized_bytes::holochain_serial!(ConductorRequest);
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
+    AddDna,
 }
 
 #[allow(missing_docs)]
