@@ -3,11 +3,18 @@ use crate::{conductor::conductor::Conductor, core::signal::Signal};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use sx_types::{
-    cell::CellHandle,
+    cell::{CellHandle, CellId},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,
 };
 use tokio::sync::RwLock;
+
+// Breaking this out to its own struct
+// should probably break up ConductorApiRequest/Result accordingly, other enums as well?
+pub trait AdminConductorApi {
+    /// Call an admin function to modify this Conductor's behavior
+    async fn admin(&mut self, method: AdminRequest) -> ConductorApiResult<AdminResponse>;
+}
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -18,12 +25,9 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 
-    /// Call an admin function to modify this Conductor's behavior
-    async fn admin(&self, method: AdminRequest) -> ConductorApiResult<AdminResponse>;
-
     // -- provided -- //
 
-    async fn handle_request(&self, request: InterfaceMsgIncoming) -> InterfaceMsgOutgoing {
+    async fn handle_request(&mut self, request: InterfaceMsgIncoming) -> InterfaceMsgOutgoing {
         let res: ConductorApiResult<InterfaceMsgOutgoing> = async move {
             match request {
                 InterfaceMsgIncoming::ZomeInvocationRequest(request) => {
@@ -51,6 +55,8 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct RealExternalConductorApi {
     conductor_mutex: Arc<RwLock<Conductor>>,
+    cells: HashSet<CellId>,
+    // signal_tx: unimplemented!(),
 }
 
 impl RealExternalConductorApi {
@@ -70,7 +76,7 @@ impl ExternalConductorApi for RealExternalConductorApi {
         unimplemented!()
     }
 
-    async fn admin(&self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> {
+    async fn admin(&mut self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> {
         unimplemented!()
     }
 }
@@ -116,6 +122,8 @@ pub enum InterfaceMsgIncoming {
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
+    AddCellToInterface(CellId),
+    RemoveCellFromInterface(CellId),
 }
 
 #[allow(missing_docs)]
