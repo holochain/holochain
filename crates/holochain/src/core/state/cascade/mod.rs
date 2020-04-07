@@ -111,7 +111,7 @@ where
 
         // Cache
         match search {
-            Search::Continue => self
+            Search::Continue => Ok(self
                 .cache
                 .get_entry(&address)?
                 .and_then(|entry| {
@@ -122,9 +122,7 @@ where
                             EntryDhtStatus::Live => Some(entry),
                             _ => None,
                         })
-                })
-                .map(Ok)
-                .transpose(),
+                })),
             Search::Found(entry) => Ok(Some(entry)),
             Search::NotFound => Ok(None),
         }
