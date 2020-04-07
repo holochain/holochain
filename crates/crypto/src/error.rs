@@ -25,6 +25,9 @@ pub enum CryptoError {
     /// bad bounds for write operation
     WriteOverflow,
 
+    /// Internal libsodium error
+    InternalSodium,
+
     /// error in tokio task
     JoinError(#[from] tokio::task::JoinError),
 

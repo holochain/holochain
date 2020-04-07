@@ -1,5 +1,7 @@
 use crate::*;
 
+mod safe_sodium;
+
 use libc::c_void;
 
 #[derive(PartialEq)]
@@ -189,10 +191,8 @@ impl plugin::CryptoPlugin for SodiumCryptoPlugin {
         buf: &'b mut DynCryptoBytes,
     ) -> BoxFuture<'b, CryptoResult<()>> {
         async move {
-            tokio::task::block_in_place(move || unsafe {
-                let len = buf.len();
-                let mut write_lock = buf.write();
-                rust_sodium_sys::randombytes_buf(raw_ptr_void!(write_lock), len);
+            tokio::task::block_in_place(move || {
+                safe_sodium::randombytes_buf(&mut buf.write());
             });
             Ok(())
         }
@@ -233,32 +233,18 @@ impl plugin::CryptoPlugin for SodiumCryptoPlugin {
                 }
 
                 {
-                    let key_lock;
-                    let mut key_len = 0_usize;
-                    let mut raw_key = std::ptr::null();
-                    if let Some(key) = key {
-                        key_len = key.len();
-                        if key_len < key_min_bytes || key_len > key_max_bytes {
+                    let _tmp;
+                    let key: Option<&[u8]> = if let Some(key) = key {
+                        if key.len() < key_min_bytes || key.len() > key_max_bytes {
                             return Err(CryptoError::BadKeySize);
                         }
-                        key_lock = key.read();
-                        raw_key = raw_ptr_char_immut!(key_lock);
-                    }
+                        _tmp = key.read();
+                        Some(&_tmp)
+                    } else {
+                        None
+                    };
 
-                    let len = data.len();
-                    let read_lock = data.read();
-                    let mut write_lock = into_hash.write();
-
-                    unsafe {
-                        rust_sodium_sys::crypto_generichash(
-                            raw_ptr_char!(write_lock),
-                            hash_len,
-                            raw_ptr_char_immut!(read_lock),
-                            len as libc::c_ulonglong,
-                            raw_key,
-                            key_len,
-                        );
-                    }
+                    safe_sodium::crypto_generichash(&mut into_hash.write(), &data.read(), key)?;
                 }
                 Ok(())
             })
