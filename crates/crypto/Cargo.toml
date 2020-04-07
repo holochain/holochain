@@ -17,3 +17,6 @@ libc = "0.2"
 rust_sodium_holochain_fork-sys = "=0.10.4"
 tokio = { version = "0.2", features = ["full"] }
 thiserror = "1"
+
+[dev-dependencies]
+blake2b_simd = "0.5.10"

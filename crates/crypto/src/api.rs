@@ -79,6 +79,25 @@ pub async fn crypto_generic_hash(
     Ok(into_hash)
 }
 
+/// calculate the u32 dht "location" given arbitrary input bytes
+pub async fn crypto_dht_location(data: &mut DynCryptoBytes) -> CryptoResult<u32> {
+    let blake2b = crypto_generic_hash(16, data, None).await?;
+    let blake2b: &[u8] = &blake2b.read();
+    let mut out: [u8; 4] = [blake2b[0], blake2b[1], blake2b[2], blake2b[3]];
+    for i in (4..16).step_by(4) {
+        out[0] ^= blake2b[i];
+        out[1] ^= blake2b[i + 1];
+        out[2] ^= blake2b[i + 2];
+        out[3] ^= blake2b[i + 3];
+    }
+    Ok(
+        (out[0] as u32)
+            + ((out[1] as u32) << 8)
+            + ((out[2] as u32) << 16)
+            + ((out[3] as u32) << 24),
+    )
+}
+
 /// size of seed needed for signature keys
 pub fn crypto_sign_seed_bytes() -> CryptoResult<usize> {
     Ok(plugin::get_global_crypto_plugin()?.sign_seed_bytes())

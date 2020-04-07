@@ -115,6 +115,57 @@ mod tests {
         .unwrap();
     }
 
+    #[test]
+    fn double_check_same_blake2b_hash() {
+        assert_eq!(
+            "[200, 4, 206, 25, 142, 195, 55, 227, 220, 118, 43, 221, 26, 9, 174, 206]",
+            &format!(
+                "{:?}",
+                blake2b_simd::Params::new()
+                    .hash_length(16)
+                    .hash(&vec![0; 8])
+                    .as_bytes(),
+            ),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn sodium_dht_location() {
+        let _ = crypto_init_sodium();
+        tokio::task::spawn(async move {
+            let mut buf = crypto_secure_buffer(8).unwrap();
+            assert_eq!(
+                "[0, 0, 0, 0, 0, 0, 0, 0]",
+                &format!("{:?}", buf.read().deref()),
+            );
+
+            let loc = crypto_dht_location(&mut buf).await.unwrap();
+            assert_eq!(3917265024, loc);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test]
+    fn double_check_same_blake2b_loc() {
+        let hash = blake2b_simd::Params::new()
+            .hash_length(16)
+            .hash(&vec![0; 8]);
+        let hash = hash.as_bytes();
+        let mut out: [u8; 4] = [hash[0], hash[1], hash[2], hash[3]];
+        for i in (4..16).step_by(4) {
+            out[0] ^= hash[i];
+            out[1] ^= hash[i + 1];
+            out[2] ^= hash[i + 2];
+            out[3] ^= hash[i + 3];
+        }
+        let loc = (out[0] as u32)
+            + ((out[1] as u32) << 8)
+            + ((out[2] as u32) << 16)
+            + ((out[3] as u32) << 24);
+        assert_eq!(3917265024, loc);
+    }
+
     #[tokio::test(threaded_scheduler)]
     async fn sodium_sign_no_seed() {
         let _ = crypto_init_sodium();
