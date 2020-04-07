@@ -1,5 +1,6 @@
 use super::error::ConductorApiResult;
 use crate::conductor::conductor::Conductor;
+use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
 use sx_types::{
     cell::CellHandle,
@@ -95,7 +96,7 @@ impl ExternalConductorApi for StdExternalConductorApi {
 }
 
 /// The set of messages that a conductor understands how to respond
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum ConductorResponse {
     Error {
@@ -108,7 +109,6 @@ pub enum ConductorResponse {
         response: Box<ZomeInvocationResponse>,
     },
 }
-holochain_serialized_bytes::holochain_serial!(ConductorResponse);
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -118,7 +118,7 @@ pub enum AdminResponse {
 }
 
 /// The set of messages that a conductor understands how to handle
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum ConductorRequest {
     AdminRequest { request: Box<AdminRequest> },
@@ -126,7 +126,6 @@ pub enum ConductorRequest {
     TestRequest { request: Box<TestRequest> },
     ZomeInvocationRequest { request: Box<ZomeInvocation> },
 }
-holochain_serialized_bytes::holochain_serial!(ConductorRequest);
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

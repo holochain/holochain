@@ -4,8 +4,13 @@ use holochain_serialized_bytes::SerializedBytesError;
 #[derive(Debug, thiserror::Error)]
 pub enum InterfaceError {
     SerializedBytes(#[from] SerializedBytesError),
+    JoinError(#[from] tokio::task::JoinError),
+    SignalReceive(tokio::sync::broadcast::RecvError),
     SendError,
     Other(String),
+    // FIXME: update error types in holochain_websocket to use a more specific
+    // type than io::Error
+    IoTodo(#[from] std::io::Error),
 }
 
 impl std::fmt::Display for InterfaceError {
