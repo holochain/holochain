@@ -7,8 +7,11 @@ use structopt::StructOpt;
 use sx_types::observability::{self, Output};
 use tokio::sync::RwLock;
 use tracing::*;
+use websocket_example::websocket_example;
 
 const ERROR_CODE: i32 = 42;
+type Port = u16;
+mod websocket_example;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]
@@ -45,10 +48,10 @@ struct Opt {
     )]
     run_interface_example: bool,
 
-    #[structopt(
-        long,
-        help = "Runs holochain with the admin interface enabled"
-    )]
+    #[structopt(long, help = "Run a basic websocket interface example")]
+    websocket_example: Option<Port>,
+
+    #[structopt(long, help = "Runs holochain with the admin interface enabled")]
     admin: bool,
 }
 
@@ -135,6 +138,10 @@ async fn async_main() {
 
     if opt.run_interface_example {
         interface_example(api).await;
+    } else if let Some(port) = opt.websocket_example {
+        websocket_example(port)
+            .await
+            .expect("Couldn't run websocket example");
     } else {
         // TODO: kick off actual conductor task here when we're ready for that
         println!("Conductor successfully initialized. Nothing else to do. Bye bye!");
