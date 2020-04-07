@@ -3,6 +3,13 @@ use std::{
     io::Read,
     process::{Child, Command, ExitStatus, Stdio},
 };
+use holochain_websocket::*;
+use std::convert::TryInto;
+use tokio::{runtime::Runtime, stream::StreamExt};
+use url2::prelude::*;
+use std::sync::Arc;
+
+type StdResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 fn check_started(started: Result<Option<ExitStatus>, std::io::Error>, holochain: &mut Child) {
     if let Ok(Some(status)) = started {
@@ -21,13 +28,14 @@ fn check_started(started: Result<Option<ExitStatus>, std::io::Error>, holochain:
     }
 }
 
-#[test]
-fn call_admin() {
+#[tokio::test]
+async fn call_admin() -> StdResult {
+    let port = 9000;
     let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
     cmd.arg("--admin");
     cmd.arg("--structured");
     cmd.arg("--websocket-example");
-    cmd.arg("9000");
+    cmd.arg(port.to_string());
     cmd.env("RUST_LOG", "debug");
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -35,6 +43,26 @@ fn call_admin() {
     std::thread::sleep(std::time::Duration::from_secs(1));
     let started = holochain.try_wait();
     check_started(started, &mut holochain);
+   
+    run_websocket(port).await?;
 
     holochain.kill().expect("Failed to kill holochain");
+    Ok(())
+}
+
+async fn run_websocket(port: u16) -> StdResult {
+    //let (mut send_socket, mut recv_socket) = websocket_connect(
+    let r = websocket_connect(
+        url2!("ws://127.0.0.1:{}", port),
+        Arc::new(WebsocketConfig::default()),
+    )
+    .await;
+    if let Err(ref e) = r {
+        dbg!(e);
+    }
+    let (mut send_socket, mut recv_socket) = r?;
+    send_socket.signal(()).await?;
+
+    Ok(())
+
 }
