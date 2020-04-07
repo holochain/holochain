@@ -7,6 +7,7 @@ members = [
   "crates/holochain",
   "crates/state",
   "crates/types",
+  "crates/crypto",
   "crates/websocket",
 ]
 
