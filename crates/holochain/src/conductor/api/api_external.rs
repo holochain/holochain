@@ -11,9 +11,26 @@ use tokio::sync::RwLock;
 
 // Breaking this out to its own struct
 // should probably break up ConductorApiRequest/Result accordingly, other enums as well?
+#[async_trait::async_trait]
 pub trait AdminConductorApi {
     /// Call an admin function to modify this Conductor's behavior
     async fn admin(&mut self, method: AdminRequest) -> ConductorApiResult<AdminResponse>;
+
+    async fn handle_request(&mut self, request: InterfaceMsgIncoming) -> InterfaceMsgOutgoing {
+        let res: ConductorApiResult<InterfaceMsgOutgoing> = async move {
+            match request {
+                InterfaceMsgIncoming::AdminRequest(request) => Ok(
+                    InterfaceMsgOutgoing::AdminResponse(Box::new(self.admin(*request).await?)),
+                ),
+            }
+        }
+        .await;
+
+        match res {
+            Ok(response) => response,
+            Err(e) => InterfaceMsgOutgoing::Error(format!("{:?}", e)),
+        }
+    }
 }
 
 /// The interface that a Conductor exposes to the outside world.
@@ -35,9 +52,6 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
                         self.invoke_zome(*request).await?,
                     )))
                 }
-                InterfaceMsgIncoming::AdminRequest(request) => Ok(
-                    InterfaceMsgOutgoing::AdminResponse(Box::new(self.admin(*request).await?)),
-                ),
                 InterfaceMsgIncoming::CryptoRequest(request) => unimplemented!(),
             }
         }
@@ -55,7 +69,6 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct RealExternalConductorApi {
     conductor_mutex: Arc<RwLock<Conductor>>,
-    cells: HashSet<CellId>,
     // signal_tx: unimplemented!(),
 }
 
@@ -73,10 +86,6 @@ impl ExternalConductorApi for RealExternalConductorApi {
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         let _conductor = self.conductor_mutex.read().await;
-        unimplemented!()
-    }
-
-    async fn admin(&mut self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> {
         unimplemented!()
     }
 }
