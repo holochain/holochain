@@ -1,6 +1,6 @@
 mod interface;
 
 pub mod channel;
-mod handler;
+pub mod error;
 
 pub use interface::*;

@@ -1,0 +1,30 @@
+use holochain_serialized_bytes::SerializedBytesError;
+
+/// Interface Error Type
+#[derive(Debug, thiserror::Error)]
+pub enum InterfaceError {
+    SerializedBytes(#[from] SerializedBytesError),
+    SendError,
+    Other(String),
+}
+
+impl std::fmt::Display for InterfaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl From<String> for InterfaceError {
+    fn from(o: String) -> Self {
+        InterfaceError::Other(o)
+    }
+}
+
+impl From<futures::channel::mpsc::SendError> for InterfaceError {
+    fn from(_: futures::channel::mpsc::SendError) -> Self {
+        InterfaceError::SendError
+    }
+}
+
+/// Interface Result Type
+pub type InterfaceResult<T> = Result<T, InterfaceError>;

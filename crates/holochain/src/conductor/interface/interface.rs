@@ -1,5 +1,5 @@
+use super::error::InterfaceResult;
 use crate::conductor::api::*;
-
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
     future::{BoxFuture, FutureExt},
@@ -8,35 +8,6 @@ use futures::{
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use std::convert::{TryFrom, TryInto};
-
-/// Interface Error Type
-#[derive(Debug, thiserror::Error)]
-pub enum InterfaceError {
-    SerializedBytes(#[from] SerializedBytesError),
-    SendError,
-    Other(String),
-}
-
-impl std::fmt::Display for InterfaceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl From<String> for InterfaceError {
-    fn from(o: String) -> Self {
-        InterfaceError::Other(o)
-    }
-}
-
-impl From<futures::channel::mpsc::SendError> for InterfaceError {
-    fn from(_: futures::channel::mpsc::SendError) -> Self {
-        InterfaceError::SendError
-    }
-}
-
-/// Interface Result Type
-pub type InterfaceResult<T> = Result<T, InterfaceError>;
 
 /// Allows the conductor or cell to forward signals to connected clients
 pub struct ConductorSideSignalSender<Sig>

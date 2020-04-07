@@ -7,6 +7,7 @@ use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
 
+// TODO: use actual error type
 type StdResult<T = ()> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
 
 pub async fn websocket_example(port: Port) -> StdResult {
@@ -15,9 +16,9 @@ pub async fn websocket_example(port: Port) -> StdResult {
         Arc::new(WebsocketConfig::default()),
     )
     .await?;
-    info!("LISTENING AT: {}", listener.local_addr());
+    debug!("LISTENING AT: {}", listener.local_addr());
     let mut listener_handles = Vec::new();
-    if let Some(maybe_con) = listener.next().await {
+    while let Some(maybe_con) = listener.next().await {
         let (_, recv_socket) = maybe_con.await?;
         listener_handles.push(tokio::task::spawn(recv_msgs(recv_socket)));
     }
