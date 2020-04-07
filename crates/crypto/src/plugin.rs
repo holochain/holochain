@@ -75,39 +75,14 @@ pub trait CryptoPlugin: 'static + Send + Sync {
 /// dyn reference to a crypto plugin
 pub type DynCryptoPlugin = Arc<dyn CryptoPlugin + 'static>;
 
-// -- stolen from tracing-core -- //
-const UNINITIALIZED: usize = 0;
-const INITIALIZING: usize = 1;
-const INITIALIZED: usize = 2;
-static CRYPTO_PLUGIN_INIT: AtomicUsize = AtomicUsize::new(UNINITIALIZED);
-static mut CRYPTO_PLUGIN: Option<DynCryptoPlugin> = None;
+mod safe_global_plugin;
 
 /// internal get the crypto plugin reference
 pub(crate) fn get_global_crypto_plugin() -> CryptoResult<DynCryptoPlugin> {
-    if CRYPTO_PLUGIN_INIT.load(Ordering::SeqCst) != INITIALIZED {
-        return Err(CryptoError::PluginNotInitialized);
-    }
-    unsafe {
-        // This is safe given the invariant that setting the global dispatcher
-        // also sets `GLOBAL_INIT` to `INITIALIZED`.
-        Ok(CRYPTO_PLUGIN.as_ref().expect(
-            "invariant violated: CRYPTO_PLUGIN must be initialized before CRYPTO_PLUGIN_INIT is set",
-        ).clone())
-    }
+    safe_global_plugin::get()
 }
 
 /// set the global system crypto plugin
 pub fn set_global_crypto_plugin(crypto_plugin: DynCryptoPlugin) -> CryptoResult<()> {
-    if CRYPTO_PLUGIN_INIT.compare_and_swap(UNINITIALIZED, INITIALIZING, Ordering::SeqCst)
-        == UNINITIALIZED
-    {
-        unsafe {
-            CRYPTO_PLUGIN = Some(crypto_plugin);
-        }
-        CRYPTO_PLUGIN_INIT.store(INITIALIZED, Ordering::SeqCst);
-        Ok(())
-    } else {
-        Err(CryptoError::PluginAlreadyInitialized)
-    }
+    safe_global_plugin::set(crypto_plugin)
 }
-// -- end stolen from tracing-core -- //

@@ -7,6 +7,9 @@ pub enum CryptoError {
     /// you already called set_global_crypto_plugin
     PluginAlreadyInitialized,
 
+    /// we were unable to allocate memory
+    AllocationFailed,
+
     /// the output hash size for this call didn't fall within constraints
     BadHashSize,
 
@@ -18,6 +21,9 @@ pub enum CryptoError {
 
     /// the secret key size for this call didn't fall within constraints
     BadSecretKeySize,
+
+    /// improper size for signature
+    BadSignatureSize,
 
     /// improper size for seed
     BadSeedSize,

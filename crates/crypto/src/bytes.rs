@@ -1,5 +1,7 @@
 use crate::*;
 
+mod safe_mem_copy;
+
 /// read guard for crypto bytes
 pub trait CryptoBytesRead<'lt>: 'lt + std::ops::Deref<Target = [u8]> {}
 
@@ -31,14 +33,7 @@ pub trait CryptoBytes: 'static + Send + std::fmt::Debug {
 
     /// copy data from another byte array into this buffer
     fn copy_from(&mut self, offset: usize, data: &[u8]) -> CryptoResult<()> {
-        if offset + data.len() > self.len() {
-            return Err(CryptoError::WriteOverflow);
-        }
-        unsafe {
-            let mut b = self.write();
-            std::ptr::copy(data.as_ptr(), (*b).as_mut_ptr().add(offset), data.len());
-        }
-        Ok(())
+        safe_mem_copy::safe_mem_copy(&mut self.write(), offset, data)
     }
 }
 
