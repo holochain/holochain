@@ -8,10 +8,10 @@ documentation = "https://github.com/Holo-host/holochain-2020"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
+# !!! IMPORTANT !!!
+# everything you put here will be __compiled into every wasm everywhere__
+# think very carefully before adding anything at all
 [dependencies]
 holochain_serialized_bytes = "=0.0.36"
-serde = { version = "1.0.104", features = ["derive"] }
-multihash = "0.8.0"
-rust-base58 = "0.0.4"
+serde = { version = "1.0.104", features = ["derive", "rc"] }
+sx_address_types = { version = "0.0.1", path = "../address_types" }

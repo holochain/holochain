@@ -1,9 +1,11 @@
 //! A "Cell" represents a DNA/AgentId pair - a space where one dna/agent
 //! can track its source chain and service network requests / responses.
 
-use crate::{agent::AgentId, dna::DnaAddress, persistence::cas::content::Addressable};
 use derive_more::{Display, From, Into};
 use std::fmt;
+use sx_address::prelude::*;
+use sx_zome_types::agent::AgentId;
+use sx_zome_types::dna::DnaAddress;
 
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary

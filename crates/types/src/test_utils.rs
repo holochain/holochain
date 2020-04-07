@@ -1,21 +1,18 @@
 //! Some common testing helpers.
 
-use crate::{
-    agent::AgentId,
-    cell::CellId,
-    dna::{
-        bridges::Bridge,
-        capabilities::CapabilityRequest,
-        entry_types::EntryTypeDef,
-        fn_declarations::{FnDeclaration, TraitFns},
-        wasm::DnaWasm,
-        zome::{Config, Zome, ZomeFnDeclarations},
-        Dna,
-    },
-    prelude::*,
-    signature::{Provenance, Signature},
-};
+use crate::{cell::CellId, prelude::*};
 use std::collections::BTreeMap;
+use sx_zome_types::agent::AgentId;
+use sx_zome_types::dna::{
+    bridges::Bridge,
+    capabilities::CapabilityRequest,
+    entry_types::EntryTypeDef,
+    fn_declarations::{FnDeclaration, TraitFns},
+    wasm::DnaWasm,
+    zome::{Config, Zome, ZomeFnDeclarations},
+    Dna,
+};
+use sx_zome_types::signature::{Provenance, Signature};
 use sx_zome_types::ZomeExternHostInput;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]

@@ -1,0 +1,16 @@
+[package]
+name = "sx_address_types"
+version = "0.0.1"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+description = "Provides types for Holochain addresses."
+edition="2018"
+keywords = ["holochain", "holo", "bytes", "serde", "derive"]
+categories = ["parsing"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/sx_address_types"
+repository = "https://github.com/Holo-Host/holochain-2020"
+
+[dependencies]
+serde = { version = "1.0.104", features = ["derive"] }
+holochain_serialized_bytes = "=0.0.36"

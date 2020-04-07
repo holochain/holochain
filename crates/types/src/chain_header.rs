@@ -2,12 +2,8 @@
 //! in the sense that it implements the pointers between hashes that a hash chain relies on, which
 //! are then used to check the integrity of data using cryptographic hash functions.
 
-use crate::{
-    entry::{entry_type::EntryType, Entry},
-    prelude::*,
-    signature::Provenance,
-    time::Iso8601,
-};
+use crate::{prelude::*, time::Iso8601};
+use sx_zome_types::signature::Provenance;
 
 /// ChainHeader + Entry.
 pub struct HeaderWithEntry(ChainHeader, Entry);

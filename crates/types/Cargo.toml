@@ -28,7 +28,6 @@ tracing-subscriber = "=0.2.3"
 tracing-serde = "=0.1.1"
 holochain_serialized_bytes = "=0.0.36"
 holochain_wasmer_common = "=0.0.24"
-sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
 sx_zome_types = { path = "../zome_types" }
 
 # possibly dispensable

@@ -5,12 +5,12 @@
 //! As we decide which previous code to use, we should port those error types
 //! over to the appropriate error type in this crate.
 
-use crate::dna::error::DnaError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_wasmer_common::WasmError;
 use lib3h_crypto_api::CryptoError;
 use serde_json::Error as SerdeError;
 use std::fmt;
+use sx_zome_types::dna::error::DnaError;
 use thiserror::Error;
 
 /// Holochain high-level error type

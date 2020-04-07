@@ -1,6 +1,8 @@
 //! Types related to making calls into Zomes.
 
-use crate::{agent::AgentId, cell::CellId, dna::capabilities::CapabilityRequest, prelude::*};
+use crate::{cell::CellId, prelude::*};
+use sx_zome_types::agent::AgentId;
+use sx_zome_types::dna::capabilities::CapabilityRequest;
 // use std::sync::Arc;
 use sx_zome_types::*;
 
