@@ -91,7 +91,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         self.headers.put(header);
     }
 
-    /// TODO: consolidate into single delete which handles entry and header together
+    // TODO: consolidate into single delete which handles entry and header together
     pub fn delete_entry(&mut self, k: Address) {
         self.entries.delete(k)
     }

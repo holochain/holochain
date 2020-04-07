@@ -63,7 +63,7 @@ where
 enum Search {
     /// The entry is found and we can stop
     Found(Entry),
-    /// We haven't found the entry yet but we should
+    /// We haven't found the entry yet and should
     /// continue searching down the cascade
     Continue,
     /// We haven't found the entry and should
@@ -77,7 +77,7 @@ impl<'env, C> Cascade<'env, C>
 where
     C: ChainMetaBufT<'env>,
 {
-    /// Take references to cas and cache
+    /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
         primary: &'env ChainCasBuf<'env, Reader<'env>>,
         primary_meta: &'env C,
@@ -92,7 +92,7 @@ where
         }
     }
     #[instrument(skip(self))]
-    /// Get an entry from the cas or cache depending on it's metadata
+    /// Gets an entry from the cas or cache depending on it's metadata
     pub async fn dht_get(&self, address: Address) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
@@ -130,7 +130,7 @@ where
         }
     }
 
-    /// Get an links from the cas or cache depending on it's metadata
+    /// Gets an links from the cas or cache depending on it's metadata
     pub async fn dht_get_links<S: Into<String>>(
         &self,
         base: Address,
