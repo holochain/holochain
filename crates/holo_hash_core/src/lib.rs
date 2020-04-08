@@ -40,7 +40,11 @@ pub trait HoloHashCoreHash:
     + Ord
     + serde::Serialize
     + serde::Deserialize<'static>
+    + std::convert::Into<HoloHashCore>
 {
+    /// Get the full byte array including the base 32 bytes and the 4 byte loc
+    fn get_raw(&self) -> &[u8];
+
     /// Fetch just the core 32 bytes (without the 4 location bytes)
     fn get_bytes(&self) -> &[u8];
 
@@ -67,6 +71,10 @@ macro_rules! core_holo_hash {
             }
 
             impl HoloHashCoreHash for $name {
+                fn get_raw(&self) -> &[u8] {
+                    &self.0
+                }
+
                 fn get_bytes(&self) -> &[u8] {
                     &self.0[..self.0.len() - 4]
                 }
@@ -106,6 +114,14 @@ macro_rules! core_holo_hash {
         holochain_serialized_bytes::holochain_serial!(HoloHashCore);
 
         impl HoloHashCoreHash for HoloHashCore {
+            fn get_raw(&self) -> &[u8] {
+                match self {
+                    $(
+                        HoloHashCore::$name(i) => i.get_raw(),
+                    )*
+                }
+            }
+
             fn get_bytes(&self) -> &[u8] {
                 match self {
                     $(
@@ -191,12 +207,17 @@ mod tests {
         use holochain_serialized_bytes::SerializedBytes;
         use std::convert::TryInto;
 
-        let h: HoloHashCore = DnaHash::new(vec![0xdb; 36]).into();
+        let h_orig: HoloHashCore = DnaHash::new(vec![0xdb; 36]).into();
+
+        let h = h_orig.clone();
         let h: SerializedBytes = h.try_into().unwrap();
 
         assert_eq!(
             "{\"type\":\"DnaHash\",\"hash\":[219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219,219]}",
             &format!("{:?}", h),
         );
+
+        let h: HoloHashCore = h.try_into().unwrap();
+        assert_eq!(h_orig, h);
     }
 }

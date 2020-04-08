@@ -29,7 +29,7 @@
 //!     .try_into()
 //!     .unwrap();
 //!
-//! assert_eq!(3860645936, entry.location());
+//! assert_eq!(3860645936, entry.get_loc());
 //!
 //! let bytes: SerializedBytes = entry.try_into().unwrap();
 //!
@@ -80,6 +80,8 @@
 //! );
 //!
 //! ```
+
+pub use holo_hash_core::HoloHashCoreHash;
 
 /// Holo Hash Error Type.
 #[derive(Debug, thiserror::Error)]
@@ -184,14 +186,6 @@ fn holo_dht_location_bytes(data: &[u8]) -> Vec<u8> {
     out
 }
 
-/// internal convert 4 location bytes into a u32 location
-fn holo_dht_location_to_loc(bytes: &[u8]) -> u32 {
-    (bytes[0] as u32)
-        + ((bytes[1] as u32) << 8)
-        + ((bytes[2] as u32) << 16)
-        + ((bytes[3] as u32) << 24)
-}
-
 /// internal REPR for holo hash
 fn holo_hash_encode(prefix: &[u8], data: &[u8]) -> String {
     format!(
@@ -225,210 +219,6 @@ fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError> {
     Ok(s.to_vec())
 }
 
-macro_rules! new_holo_hash {
-    ($doc:expr, $name:ident, $prefix:expr,) => {
-        #[doc = $doc]
-        #[derive(Clone, serde::Serialize, serde::Deserialize)]
-        pub struct $name(#[serde(with = "serde_bytes")] Vec<u8>);
-
-        impl $name {
-            /// Construct a new hash instance from raw data (blocking).
-            pub fn with_data_sync(data: &[u8]) -> Self {
-                $name::with_pre_hashed_sync(blake2b_256(data))
-            }
-
-            /// Construct a new hash instance from raw data.
-            #[cfg(feature = "async")]
-            pub async fn with_data(data: &[u8]) -> Self {
-                tokio::task::block_in_place(|| {
-                    $name::with_data_sync(data)
-                })
-            }
-
-            /// Construct a new hash instance from an already generated hash.
-            pub fn with_pre_hashed_sync(mut hash: Vec<u8>) -> Self {
-                assert_eq!(32, hash.len(), "only 32 byte hashes supported");
-                hash.append(&mut holo_dht_location_bytes(&hash));
-                Self(hash)
-            }
-
-            /// Construct a new hash instance from an already generated hash.
-            #[cfg(feature = "async")]
-            pub async fn with_pre_hashed(hash: Vec<u8>) -> Self {
-                tokio::task::block_in_place(|| {
-                    $name::with_pre_hashed_sync(hash)
-                })
-            }
-
-            /// Fetch just the core 32 bytes (without the 4 location bytes)
-            pub fn as_bytes(&self) -> &[u8] {
-                &self.0[..self.0.len() - 4]
-            }
-
-            /// Fetch the holo dht location for this hash
-            pub fn location(&self) -> u32 {
-                holo_dht_location_to_loc(&self.0[self.0.len() - 4..])
-            }
-        }
-
-        impl ::std::fmt::Debug for $name {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                write!(f, "{}({})", stringify!($name), holo_hash_encode($prefix, &self.0))
-            }
-        }
-
-        impl ::std::fmt::Display for $name {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                write!(f, "{}", holo_hash_encode($prefix, &self.0))
-            }
-        }
-
-        impl ::std::hash::Hash for $name {
-            fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
-                // only use the first 32 bytes for hashing
-                // the 4 byte location at the end is akin to a checksum
-                self.as_bytes().hash(state)
-            }
-        }
-
-        impl ::std::cmp::PartialEq for $name {
-            fn eq(&self, other: &Self) -> bool {
-                self.as_bytes() == other.as_bytes()
-            }
-        }
-
-        impl ::std::convert::TryFrom<&str> for $name {
-            type Error = HoloHashError;
-
-            fn try_from(s: &str) -> Result<Self, Self::Error> {
-                Ok(Self(holo_hash_decode($prefix, s.as_ref())?))
-            }
-        }
-
-        impl ::std::convert::TryFrom<&String> for $name {
-            type Error = HoloHashError;
-
-            fn try_from(s: &String) -> Result<Self, Self::Error> {
-                let s: &str = &s;
-                $name::try_from(s)
-            }
-        }
-
-        impl ::std::convert::TryFrom<String> for $name {
-            type Error = HoloHashError;
-
-            fn try_from(s: String) -> Result<Self, Self::Error> {
-                $name::try_from(&s)
-            }
-        }
-
-        impl ::std::convert::From<$name> for HoloHash {
-            fn from(h: $name) -> Self {
-                HoloHash::$name(h)
-            }
-        }
-    };
-}
-
-new_holo_hash!(
-    "Represents a Holo/Holochain DnaHash - The hash of a specific hApp DNA. (uhC0k...)",
-    DnaHash,
-    DNA_PREFIX,
-);
-
-new_holo_hash!(
-    "Represents a Holo/Holochain NetIdHash - Network Ids let you create hard dht network divisions. (uhCIk...)",
-    NetIdHash,
-    NET_ID_PREFIX,
-);
-
-new_holo_hash!(
-    "Represents a Holo/Holochain AgentHash - A libsodium signature public key. (uhCAk...)",
-    AgentHash,
-    AGENT_PREFIX,
-);
-
-new_holo_hash!(
-    "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
-    EntryHash,
-    ENTRY_PREFIX,
-);
-
-new_holo_hash!(
-    "Represents a Holo/Holochain DhtOpHash - The hash used is tuned by dht ops. (uhCQk...)",
-    DhtOpHash,
-    DHTOP_PREFIX,
-);
-
-/// A unification of holo_hash types
-#[derive(Clone, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", content = "hash")]
-pub enum HoloHash {
-    /// DnaHash (uhC0k...)
-    DnaHash(DnaHash),
-
-    /// NetIdHash (uhCIk...)
-    NetIdHash(NetIdHash),
-
-    /// AgentHash (uhCAk...)
-    AgentHash(AgentHash),
-
-    /// EntryHash (uhCEk...)
-    EntryHash(EntryHash),
-
-    /// DhtOpHash (uhCQk...)
-    DhtOpHash(DhtOpHash),
-}
-holochain_serialized_bytes::holochain_serial!(HoloHash);
-
-impl HoloHash {
-    /// Fetch just the core 32 bytes (without the 4 location bytes)
-    pub fn as_bytes(&self) -> &[u8] {
-        match self {
-            HoloHash::DnaHash(i) => i.as_bytes(),
-            HoloHash::NetIdHash(i) => i.as_bytes(),
-            HoloHash::AgentHash(i) => i.as_bytes(),
-            HoloHash::EntryHash(i) => i.as_bytes(),
-            HoloHash::DhtOpHash(i) => i.as_bytes(),
-        }
-    }
-
-    /// Fetch the holo dht location for this hash
-    pub fn location(&self) -> u32 {
-        match self {
-            HoloHash::DnaHash(i) => i.location(),
-            HoloHash::NetIdHash(i) => i.location(),
-            HoloHash::AgentHash(i) => i.location(),
-            HoloHash::EntryHash(i) => i.location(),
-            HoloHash::DhtOpHash(i) => i.location(),
-        }
-    }
-}
-
-impl std::fmt::Debug for HoloHash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HoloHash::DnaHash(i) => write!(f, "{:?}", i),
-            HoloHash::NetIdHash(i) => write!(f, "{:?}", i),
-            HoloHash::AgentHash(i) => write!(f, "{:?}", i),
-            HoloHash::EntryHash(i) => write!(f, "{:?}", i),
-            HoloHash::DhtOpHash(i) => write!(f, "{:?}", i),
-        }
-    }
-}
-
-impl std::fmt::Display for HoloHash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HoloHash::DnaHash(i) => write!(f, "{}", i),
-            HoloHash::NetIdHash(i) => write!(f, "{}", i),
-            HoloHash::AgentHash(i) => write!(f, "{}", i),
-            HoloHash::EntryHash(i) => write!(f, "{}", i),
-            HoloHash::DhtOpHash(i) => write!(f, "{}", i),
-        }
-    }
-}
-
 /// internal parse helper for HoloHash enum.
 fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
     use std::convert::TryFrom;
@@ -445,29 +235,221 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
     }
 }
 
-impl ::std::convert::TryFrom<&str> for HoloHash {
-    type Error = HoloHashError;
+macro_rules! new_holo_hash {
+    ( $( $doc:expr , $name:ident , $prefix:expr , )* ) => {
+        $(
+            #[doc = $doc]
+            #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+            pub struct $name(holo_hash_core::$name);
 
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        holo_hash_parse(s)
-    }
+            impl $name {
+                /// Construct a new hash instance from an already generated hash.
+                pub fn with_pre_hashed_sync(mut hash: Vec<u8>) -> Self {
+                    assert_eq!(32, hash.len(), "only 32 byte hashes supported");
+                    hash.append(&mut holo_dht_location_bytes(&hash));
+                    Self(holo_hash_core::$name::new(hash))
+                }
+
+                /// Construct a new hash instance from an already generated hash.
+                #[cfg(feature = "async")]
+                pub async fn with_pre_hashed(hash: Vec<u8>) -> Self {
+                    tokio::task::block_in_place(|| {
+                        $name::with_pre_hashed_sync(hash)
+                    })
+                }
+
+                /// Construct a new hash instance from raw data (blocking).
+                pub fn with_data_sync(data: &[u8]) -> Self {
+                    $name::with_pre_hashed_sync(blake2b_256(data))
+                }
+
+                /// Construct a new hash instance from raw data.
+                #[cfg(feature = "async")]
+                pub async fn with_data(data: &[u8]) -> Self {
+                    tokio::task::block_in_place(|| {
+                        $name::with_data_sync(data)
+                    })
+                }
+            }
+
+            impl HoloHashCoreHash for $name {
+                fn get_raw(&self) -> &[u8] {
+                    self.0.get_raw()
+                }
+
+                fn get_bytes(&self) -> &[u8] {
+                    self.0.get_bytes()
+                }
+
+                fn get_loc(&self) -> u32 {
+                    self.0.get_loc()
+                }
+            }
+
+            impl std::fmt::Debug for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}({})", stringify!($name), holo_hash_encode($prefix, self.0.get_raw()))
+                }
+            }
+
+            impl ::std::fmt::Display for $name {
+                fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                    write!(f, "{}", holo_hash_encode($prefix, self.0.get_raw()))
+                }
+            }
+
+            impl ::std::convert::From<$name> for holo_hash_core::HoloHashCore {
+                fn from(h: $name) -> Self {
+                    holo_hash_core::HoloHashCore::$name(h.0)
+                }
+            }
+
+            impl ::std::convert::From<$name> for HoloHash {
+                fn from(h: $name) -> Self {
+                    HoloHash::$name(h)
+                }
+            }
+
+            impl ::std::convert::TryFrom<&str> for $name {
+                type Error = HoloHashError;
+
+                fn try_from(s: &str) -> Result<Self, Self::Error> {
+                    Ok(Self(holo_hash_core::$name::new(holo_hash_decode($prefix, s.as_ref())?)))
+                }
+            }
+
+            impl ::std::convert::TryFrom<&String> for $name {
+                type Error = HoloHashError;
+
+                fn try_from(s: &String) -> Result<Self, Self::Error> {
+                    let s: &str = &s;
+                    $name::try_from(s)
+                }
+            }
+
+            impl ::std::convert::TryFrom<String> for $name {
+                type Error = HoloHashError;
+
+                fn try_from(s: String) -> Result<Self, Self::Error> {
+                    $name::try_from(&s)
+                }
+            }
+        )*
+
+        /// An unified enum representing the holo hash types.
+        #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+        #[serde(tag = "type", content = "hash")]
+        pub enum HoloHash {
+            $(
+                #[doc = $doc]
+                $name($name),
+            )*
+        }
+        holochain_serialized_bytes::holochain_serial!(HoloHash);
+
+        impl HoloHashCoreHash for HoloHash {
+            fn get_raw(&self) -> &[u8] {
+                match self {
+                    $(
+                        HoloHash::$name(i) => i.get_raw(),
+                    )*
+                }
+            }
+
+            fn get_bytes(&self) -> &[u8] {
+                match self {
+                    $(
+                        HoloHash::$name(i) => i.get_bytes(),
+                    )*
+                }
+            }
+
+            fn get_loc(&self) -> u32 {
+                match self {
+                    $(
+                        HoloHash::$name(i) => i.get_loc(),
+                    )*
+                }
+            }
+        }
+
+        impl ::std::convert::From<HoloHash> for holo_hash_core::HoloHashCore {
+            fn from(h: HoloHash) -> Self {
+                match h {
+                    $(
+                        HoloHash::$name(i) => i.0.into(),
+                    )*
+                }
+            }
+        }
+
+        impl std::fmt::Debug for HoloHash {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $(
+                        HoloHash::$name(i) => write!(f, "{:?}", i),
+                    )*
+                }
+            }
+        }
+
+        impl std::fmt::Display for HoloHash {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $(
+                        HoloHash::$name(i) => write!(f, "{}", i),
+                    )*
+                }
+            }
+        }
+
+        impl ::std::convert::TryFrom<&str> for HoloHash {
+            type Error = HoloHashError;
+
+            fn try_from(s: &str) -> Result<Self, Self::Error> {
+                holo_hash_parse(s)
+            }
+        }
+
+        impl ::std::convert::TryFrom<&String> for HoloHash {
+            type Error = HoloHashError;
+
+            fn try_from(s: &String) -> Result<Self, Self::Error> {
+                let s: &str = &s;
+                HoloHash::try_from(s)
+            }
+        }
+
+        impl ::std::convert::TryFrom<String> for HoloHash {
+            type Error = HoloHashError;
+
+            fn try_from(s: String) -> Result<Self, Self::Error> {
+                HoloHash::try_from(&s)
+            }
+        }
+    };
 }
 
-impl ::std::convert::TryFrom<&String> for HoloHash {
-    type Error = HoloHashError;
+new_holo_hash! {
+    "Represents a Holo/Holochain DnaHash - The hash of a specific hApp DNA. (uhC0k...)",
+    DnaHash,
+    DNA_PREFIX,
 
-    fn try_from(s: &String) -> Result<Self, Self::Error> {
-        let s: &str = &s;
-        HoloHash::try_from(s)
-    }
-}
+    "Represents a Holo/Holochain NetIdHash - Network Ids let you create hard dht network divisions. (uhCIk...)",
+    NetIdHash,
+    NET_ID_PREFIX,
 
-impl ::std::convert::TryFrom<String> for HoloHash {
-    type Error = HoloHashError;
+    "Represents a Holo/Holochain AgentHash - A libsodium signature public key. (uhCAk...)",
+    AgentHash,
+    AGENT_PREFIX,
 
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        HoloHash::try_from(&s)
-    }
+    "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
+    EntryHash,
+    ENTRY_PREFIX,
+
+    "Represents a Holo/Holochain DhtOpHash - The hash used is tuned by dht ops. (uhCQk...)",
+    DhtOpHash,
+    DHTOP_PREFIX,
 }
 
 #[cfg(test)]
@@ -501,7 +483,7 @@ mod tests {
         let h: HoloHash = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.location());
+        assert_eq!(3860645936, h.get_loc());
         assert_eq!(
             "DnaHash(uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -510,7 +492,7 @@ mod tests {
         let h: HoloHash = "uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.location());
+        assert_eq!(3860645936, h.get_loc());
         assert_eq!(
             "NetIdHash(uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -519,7 +501,7 @@ mod tests {
         let h: HoloHash = "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.location());
+        assert_eq!(3860645936, h.get_loc());
         assert_eq!(
             "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -528,7 +510,7 @@ mod tests {
         let h: HoloHash = "uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.location());
+        assert_eq!(3860645936, h.get_loc());
         assert_eq!(
             "EntryHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -537,7 +519,7 @@ mod tests {
         let h: HoloHash = "uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.location());
+        assert_eq!(3860645936, h.get_loc());
         assert_eq!(
             "DhtOpHash(uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -549,7 +531,7 @@ mod tests {
         let hash = vec![0xdb; 32];
         let hash: &[u8] = &hash;
         let agent_id = AgentHash::with_pre_hashed_sync(hash.to_vec());
-        assert_eq!(hash, agent_id.as_bytes(),);
+        assert_eq!(hash, agent_id.get_bytes());
     }
 
     #[cfg(feature = "async")]
@@ -559,7 +541,7 @@ mod tests {
             let hash = vec![0xdb; 32];
             let hash: &[u8] = &hash;
             let agent_id = AgentHash::with_pre_hashed(hash.to_vec()).await;
-            assert_eq!(hash, agent_id.as_bytes(),);
+            assert_eq!(hash, agent_id.get_bytes());
         })
         .await
         .unwrap();
@@ -593,7 +575,7 @@ mod tests {
         let agent_id: AgentHash = "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, agent_id.location());
+        assert_eq!(3860645936, agent_id.get_loc());
     }
 
     #[test]
@@ -645,7 +627,7 @@ mod tests {
     #[test]
     fn agent_id_sync_loc() {
         let agent_id = AgentHash::with_data_sync(&vec![0xdb; 32]);
-        assert_eq!(3860645936, agent_id.location());
+        assert_eq!(3860645936, agent_id.get_loc());
     }
 
     #[cfg(feature = "async")]
@@ -653,7 +635,7 @@ mod tests {
     async fn agent_id_loc() {
         tokio::task::spawn(async move {
             let agent_id = AgentHash::with_data(&vec![0xdb; 32]).await;
-            assert_eq!(3860645936, agent_id.location());
+            assert_eq!(3860645936, agent_id.get_loc());
         })
         .await
         .unwrap();
