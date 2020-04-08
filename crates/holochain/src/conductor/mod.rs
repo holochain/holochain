@@ -1,5 +1,6 @@
 pub mod api;
 mod cell;
+#[allow(clippy::module_inception)]
 mod conductor;
 pub mod config;
 pub mod error;

@@ -114,6 +114,7 @@ mod builder {
     use super::*;
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
+    #[derive(Default)]
     pub struct ConductorBuilder {}
 
     impl ConductorBuilder {
@@ -121,7 +122,7 @@ mod builder {
             Self {}
         }
 
-        pub async fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
+        pub async fn with_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment).await?;
