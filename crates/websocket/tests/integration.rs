@@ -41,7 +41,6 @@ async fn integration_test() {
                     test = "incoming connection",
                     remote_addr = %recv.remote_addr(),
                 );
-            
                 while let Some(msg) = recv.next().await {
                     match msg {
                         WebsocketMessage::Close(close) => {
