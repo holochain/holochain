@@ -1,5 +1,5 @@
 use super::error::ConductorApiResult;
-use crate::conductor::conductor::Conductor;
+use crate::conductor::{interface::error::InterfaceResult, conductor::Conductor};
 use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
 use sx_types::{
@@ -12,6 +12,11 @@ use tokio::sync::RwLock;
 // pub trait ExternalConductorApi<Req, Res>: 'static + Send + Sync + Clone {
 //     async fn handle_request(&self, request: Req) -> Res;
 // }
+
+#[async_trait::async_trait]
+pub trait InterfaceApi: 'static + Send + Sync + Clone {
+    async fn handle_request(&self, bytes: SerializedBytes) -> InterfaceResult<SerializedBytes>;
+}
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -68,7 +73,19 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct StdAdminInterfaceApi;
 
-impl AdminInterfaceApi for StdAdminInterfaceApi {}
+#[async_trait::async_trait]
+impl AdminInterfaceApi for StdAdminInterfaceApi {
+    async fn admin(&self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> { unimplemented!() }
+}
+
+#[async_trait::async_trait]
+impl InterfaceApi for StdAdminInterfaceApi {
+    async fn handle_request(&self, bytes: SerializedBytes) -> InterfaceResult<SerializedBytes> {
+        let request = AdminRequest::try_from(bytes)?;
+        let r = AdminInterfaceApi::handle_request(self, request).await.try_into()?;
+        Ok(r)
+    }
+}
 
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
@@ -95,6 +112,14 @@ impl AppInterfaceApi for StdAppInterfaceApi {
     }
 }
 
+#[async_trait::async_trait]
+impl InterfaceApi for StdAppInterfaceApi {
+    async fn handle_request(&self, bytes: SerializedBytes) -> InterfaceResult<SerializedBytes> {
+        let request = AppRequest::try_from(bytes)?;
+        let r = AppInterfaceApi::handle_request(self, request).await.try_into()?;
+        Ok(r)
+    }
+}
 /// The set of messages that a conductor understands how to respond
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]

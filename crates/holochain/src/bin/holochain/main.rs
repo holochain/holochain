@@ -7,11 +7,8 @@ use structopt::StructOpt;
 use sx_types::observability::{self, Output};
 use tokio::sync::RwLock;
 use tracing::*;
-use websocket_example::websocket_example;
 
 const ERROR_CODE: i32 = 42;
-type Port = u16;
-mod websocket_example;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]
@@ -47,9 +44,6 @@ struct Opt {
         help = "Run a very basic interface example, just to have something to do"
     )]
     run_interface_example: bool,
-
-    #[structopt(long, help = "Run a basic websocket interface example")]
-    websocket_example: Option<Port>,
 
     #[structopt(long, help = "Runs holochain with the admin interface enabled")]
     admin: bool,
@@ -138,10 +132,6 @@ async fn async_main() {
 
     if opt.run_interface_example {
         interface_example(api).await;
-    } else if let Some(port) = opt.websocket_example {
-        websocket_example(port)
-            .await
-            .expect("Couldn't run websocket example");
     } else {
         // TODO: kick off actual conductor task here when we're ready for that
         println!("Conductor successfully initialized. Nothing else to do. Bye bye!");
@@ -204,11 +194,9 @@ async fn interface_example(api: StdAppInterfaceApi) {
             use futures::{future::FutureExt, sink::SinkExt};
             sender
                 .send((
-                    AppRequest::AdminRequest {
-                        request: Box::new(AdminRequest::Start("cell-handle".into())),
-                    }
-                    .try_into()
-                    .unwrap(),
+                    AdminRequest::Start("cell-handle".into())
+                        .try_into()
+                        .unwrap(),
                     Box::new(|_| async move { Ok(()) }.boxed()),
                 ))
                 .await

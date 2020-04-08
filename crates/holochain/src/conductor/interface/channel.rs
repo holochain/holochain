@@ -3,25 +3,16 @@ use crate::core::signal::Signal;
 //use async_trait::async_trait;
 //use tracing::*;
 use super::error::{InterfaceError, InterfaceResult};
-use futures::select;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_websocket::{
     websocket_bind, WebsocketConfig, WebsocketMessage, WebsocketReceiver, WebsocketSender,
 };
-use std::convert::{TryFrom, TryInto};
+use std::convert::{TryFrom};
 use std::sync::Arc;
 use tokio::stream::StreamExt;
 use tokio::sync::broadcast;
 use tracing::*;
 use url2::url2;
-
-enum ApiKind<
-    App: AppInterfaceApi = StdAppInterfaceApi,
-    Admin: AdminInterfaceApi = StdAdminInterfaceApi,
-> {
-    App(App),
-    Admin(Admin),
-}
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
@@ -51,10 +42,7 @@ pub fn create_demo_channel_interface<A: AppInterfaceApi>(
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub async fn create_admin_interface<A: AdminInterfaceApi>(
-    api: A,
-    port: u16,
-) -> InterfaceResult<()> {
+pub async fn create_admin_interface<A: InterfaceApi>(api: A, port: u16) -> InterfaceResult<()> {
     trace!("Initializing Admin interface");
     let mut listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
@@ -68,7 +56,8 @@ pub async fn create_admin_interface<A: AdminInterfaceApi>(
     while let Some(maybe_con) = listener.next().await {
         let (_, recv_socket) = maybe_con.await?;
         listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-            api,
+            // FIXME not sure if clone is correct here
+            api.clone(),
             recv_socket,
         )));
     }
@@ -80,7 +69,7 @@ pub async fn create_admin_interface<A: AdminInterfaceApi>(
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
-pub async fn create_app_interface<A: AppInterfaceApi>(
+pub async fn create_app_interface<A: InterfaceApi>(
     api: A,
     port: u16,
     signal_broadcaster: broadcast::Sender<Signal>,
@@ -99,7 +88,8 @@ pub async fn create_app_interface<A: AppInterfaceApi>(
         let (send_socket, recv_socket) = maybe_con.await?;
         let signal_rx = signal_broadcaster.subscribe();
         listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
-            api,
+            // FIXME not sure if clone is correct here
+            api.clone(),
             recv_socket,
             signal_rx,
             send_socket,
@@ -113,12 +103,13 @@ pub async fn create_app_interface<A: AppInterfaceApi>(
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs<A: AdminInterfaceApi>(
+async fn recv_incoming_admin_msgs<A: InterfaceApi>(
     api: A,
     mut recv_socket: WebsocketReceiver,
 ) -> () {
     while let Some(msg) = recv_socket.next().await {
-        if let Err(_todo) = handle_incoming_message(msg, ApiKind::Admin(api)).await {
+        // FIXME I'm not sure if cloning is the right thing to do here
+        if let Err(_todo) = handle_incoming_message(msg, api.clone()).await {
             break;
         }
     }
@@ -127,7 +118,7 @@ async fn recv_incoming_admin_msgs<A: AdminInterfaceApi>(
 /// Polls for messages coming in from the external client while simultaneously
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
-async fn recv_incoming_msgs_and_outgoing_signals<A: AppInterfaceApi>(
+async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     api: A,
     mut recv_socket: WebsocketReceiver,
     mut signal_rx: broadcast::Receiver<Signal>,
@@ -154,7 +145,8 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: AppInterfaceApi>(
             // If we receive a message from outside, handle it
             msg = recv_socket.next() => {
                 if let Some(msg) = msg {
-                    handle_incoming_message(msg, ApiKind::<A, _>::App(api)).await.map_err(InterfaceError::RequestHandler)?
+                    // FIXME I'm not sure if cloning is the right thing to do here
+                    handle_incoming_message(msg, api.clone()).await?
                 } else {
                     debug!("Closing interface: message stream empty");
                     break;
@@ -166,21 +158,14 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: AppInterfaceApi>(
     Ok(())
 }
 
-async fn handle_incoming_message(
-    ws_msg: WebsocketMessage,
-    api_kind: ApiKind,
-) -> InterfaceResult<()> {
+async fn handle_incoming_message<A>(ws_msg: WebsocketMessage, api: A) -> InterfaceResult<()>
+where
+    A: InterfaceApi,
+{
     match ws_msg {
-        WebsocketMessage::Request(bytes, respond) => match api_kind {
-            ApiKind::Admin(api) => {
-                let request = AdminRequest::try_from(bytes)?;
-                Ok(respond(api.handle_request(request).await.try_into()?).await?)
-            }
-            ApiKind::App(api) => {
-                let request = AppRequest::try_from(bytes)?;
-                Ok(respond(api.handle_request(request).await.try_into()?).await?)
-            }
-        },
+        WebsocketMessage::Request(bytes, respond) => {
+            Ok(respond(api.handle_request(bytes).await?).await?)
+        }
         // FIXME this will kill this interface, is that what we want?
         WebsocketMessage::Signal(_) => Err(InterfaceError::UnexpectedMessage(
             "Got an unexpected Signal while handing incoming message".to_string(),
