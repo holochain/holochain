@@ -3,10 +3,15 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentId,
 //! cannot fail, so the function return types reflect that.
 
-use super::{ChainInvalidReason, SourceChainBuf, SourceChainError, SourceChainResult};
 use shrinkwraprs::Shrinkwrap;
 use sx_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
 use sx_types::{agent::AgentId, prelude::Address};
+
+pub use error::*;
+pub use source_chain_buffer::*;
+
+mod error;
+mod source_chain_buffer;
 
 /// A wrapper around [SourceChainBuf] with the assumption that the source chain has been initialized,
 /// i.e. has undergone Genesis.
