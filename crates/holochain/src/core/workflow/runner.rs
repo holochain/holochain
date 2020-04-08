@@ -1,4 +1,3 @@
-use super::error::WorkflowRunResult;
 use crate::{
     conductor::Cell,
     core::{
@@ -10,6 +9,10 @@ use futures::future::{join_all, BoxFuture, FutureExt};
 use std::sync::Arc;
 use sx_state::{env::WriteManager, prelude::*};
 use workflow::{WorkflowCallback, WorkflowSignal};
+
+use error::WorkflowRunResult;
+
+pub mod error;
 
 /// Functionality for running a Workflow for a Cell.
 ///
