@@ -8,30 +8,25 @@ use sx_types::{
 };
 use tokio::sync::RwLock;
 
+// #[async_trait::async_trait]
+// pub trait ExternalConductorApi<Req, Res>: 'static + Send + Sync + Clone {
+//     async fn handle_request(&self, request: Req) -> Res;
+// }
+
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
-pub trait AdminConductorApi: 'static + Send + Sync + Clone {
+pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
     async fn admin(&self, method: AdminRequest) -> ConductorApiResult<AdminResponse>;
 
     // -- provided -- //
 
-    async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
-        let res: ConductorApiResult<ConductorResponse> = async move {
-            match request {
-                ConductorRequest::AdminRequest { request } => {
-                    Ok(ConductorResponse::AdminResponse {
-                        response: Box::new(self.admin(*request).await?),
-                    })
-                }
-                _ => unimplemented!(),
-            }
-        }
-        .await;
+    async fn handle_request(&self, request: AdminRequest) -> AdminResponse {
+        let res = self.admin(request).await;
 
         match res {
             Ok(response) => response,
-            Err(e) => ConductorResponse::Error {
+            Err(e) => AdminResponse::Error {
                 debug: format!("{:?}", e),
             },
         }
@@ -39,7 +34,7 @@ pub trait AdminConductorApi: 'static + Send + Sync + Clone {
 }
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
-pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
+pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     /// Invoke a zome function on any cell in this conductor.
     async fn invoke_zome(
         &self,
@@ -48,11 +43,11 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
 
     // -- provided -- //
 
-    async fn handle_request(&self, request: ConductorRequest) -> ConductorResponse {
-        let res: ConductorApiResult<ConductorResponse> = async move {
+    async fn handle_request(&self, request: AppRequest) -> AppResponse {
+        let res: ConductorApiResult<AppResponse> = async move {
             match request {
-                ConductorRequest::ZomeInvocationRequest { request } => {
-                    Ok(ConductorResponse::ZomeInvocationResponse {
+                AppRequest::ZomeInvocationRequest { request } => {
+                    Ok(AppResponse::ZomeInvocationResponse {
                         response: Box::new(self.invoke_zome(*request).await?),
                     })
                 }
@@ -63,21 +58,26 @@ pub trait ExternalConductorApi: 'static + Send + Sync + Clone {
 
         match res {
             Ok(response) => response,
-            Err(e) => ConductorResponse::Error {
+            Err(e) => AppResponse::Error {
                 debug: format!("{:?}", e),
             },
         }
     }
 }
 
+#[derive(Clone)]
+pub struct StdAdminInterfaceApi;
+
+impl AdminInterfaceApi for StdAdminInterfaceApi {}
+
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
 #[derive(Clone)]
-pub struct StdExternalConductorApi {
+pub struct StdAppInterfaceApi {
     conductor_mutex: Arc<RwLock<Conductor>>,
 }
 
-impl StdExternalConductorApi {
+impl StdAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
         Self { conductor_mutex }
@@ -85,7 +85,7 @@ impl StdExternalConductorApi {
 }
 
 #[async_trait::async_trait]
-impl ExternalConductorApi for StdExternalConductorApi {
+impl AppInterfaceApi for StdAppInterfaceApi {
     async fn invoke_zome(
         &self,
         _invocation: ZomeInvocation,
@@ -98,12 +98,9 @@ impl ExternalConductorApi for StdExternalConductorApi {
 /// The set of messages that a conductor understands how to respond
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
-pub enum ConductorResponse {
+pub enum AppResponse {
     Error {
         debug: String,
-    },
-    AdminResponse {
-        response: Box<AdminResponse>,
     },
     ZomeInvocationResponse {
         response: Box<ZomeInvocationResponse>,
@@ -115,13 +112,13 @@ pub enum ConductorResponse {
 pub enum AdminResponse {
     Stub,
     DnaAdded,
+    Error { debug: String },
 }
 
 /// The set of messages that a conductor understands how to handle
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
-pub enum ConductorRequest {
-    AdminRequest { request: Box<AdminRequest> },
+pub enum AppRequest {
     CryptoRequest { request: Box<CryptoRequest> },
     TestRequest { request: Box<TestRequest> },
     ZomeInvocationRequest { request: Box<ZomeInvocation> },

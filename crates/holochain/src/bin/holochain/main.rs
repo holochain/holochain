@@ -134,7 +134,7 @@ async fn async_main() {
 
     let lock = Arc::new(RwLock::new(conductor));
     // Create an external API to hand off to any Interfaces
-    let api = StdExternalConductorApi::new(lock);
+    let api = StdAppInterfaceApi::new(lock);
 
     if opt.run_interface_example {
         interface_example(api).await;
@@ -197,14 +197,14 @@ a valid default configuration. Details:
 /// Simple example of what an [Interface] looks like in its most basic form,
 /// and how to interact with it.
 /// TODO: remove once we have real Interfaces
-async fn interface_example(api: StdExternalConductorApi) {
+async fn interface_example(api: StdAppInterfaceApi) {
     let (mut sender, join_handle) = create_demo_channel_interface(api);
     let driver_fut = async move {
         for _ in 0..50 as u32 {
             use futures::{future::FutureExt, sink::SinkExt};
             sender
                 .send((
-                    ConductorRequest::AdminRequest {
+                    AppRequest::AdminRequest {
                         request: Box::new(AdminRequest::Start("cell-handle".into())),
                     }
                     .try_into()

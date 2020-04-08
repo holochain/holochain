@@ -1,7 +1,7 @@
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
-//! - externally, via a [ExternalConductorApi]
+//! - externally, via a [AppInterfaceApi]
 //! - from within a [Cell], via [CellConductorApi]
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.

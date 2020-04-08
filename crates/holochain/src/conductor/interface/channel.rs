@@ -15,15 +15,18 @@ use tokio::sync::broadcast;
 use tracing::*;
 use url2::url2;
 
-enum InterfaceKind {
-    App,
-    Admin,
+enum ApiKind<
+    App: AppInterfaceApi = StdAppInterfaceApi,
+    Admin: AdminInterfaceApi = StdAdminInterfaceApi,
+> {
+    App(App),
+    Admin(Admin),
 }
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
-/// interact with a ExternalConductorApi
-pub fn create_demo_channel_interface<A: ExternalConductorApi>(
+/// interact with a AppInterfaceApi
+pub fn create_demo_channel_interface<A: AppInterfaceApi>(
     api: A,
 ) -> (
     futures::channel::mpsc::Sender<(SerializedBytes, ExternalSideResponder)>,
@@ -38,7 +41,7 @@ pub fn create_demo_channel_interface<A: ExternalConductorApi>(
 
     let (_chan_sig_send, chan_req_recv): (
         ConductorSideSignalSender<Stub>, // stub impl signals
-        ConductorSideRequestReceiver<ConductorRequest, ConductorResponse>,
+        ConductorSideRequestReceiver<AppRequest, AppResponse>,
     ) = create_interface_channel(send_sig, recv_req);
 
     let join_handle = attach_external_conductor_api(api, chan_req_recv);
@@ -48,7 +51,10 @@ pub fn create_demo_channel_interface<A: ExternalConductorApi>(
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub async fn create_admin_interface(port: u16) -> InterfaceResult<()> {
+pub async fn create_admin_interface<A: AdminInterfaceApi>(
+    api: A,
+    port: u16,
+) -> InterfaceResult<()> {
     trace!("Initializing Admin interface");
     let mut listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
@@ -57,9 +63,14 @@ pub async fn create_admin_interface(port: u16) -> InterfaceResult<()> {
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
     let mut listener_handles = Vec::new();
+    // TODO there is no way to exit this listner
+    // If we remove the interface then we want to kill this lister
     while let Some(maybe_con) = listener.next().await {
         let (_, recv_socket) = maybe_con.await?;
-        listener_handles.push(tokio::task::spawn(recv_incoming_msgs(recv_socket)));
+        listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
+            api,
+            recv_socket,
+        )));
     }
     for h in listener_handles {
         h.await?;
@@ -69,7 +80,8 @@ pub async fn create_admin_interface(port: u16) -> InterfaceResult<()> {
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
-pub async fn create_app_interface(
+pub async fn create_app_interface<A: AppInterfaceApi>(
+    api: A,
     port: u16,
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<()> {
@@ -81,10 +93,13 @@ pub async fn create_app_interface(
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
     let mut listener_handles = Vec::new();
+    // TODO there is no way to exit this listner
+    // If we remove the interface then we want to kill this lister
     while let Some(maybe_con) = listener.next().await {
         let (send_socket, recv_socket) = maybe_con.await?;
         let signal_rx = signal_broadcaster.subscribe();
         listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
+            api,
             recv_socket,
             signal_rx,
             send_socket,
@@ -98,9 +113,12 @@ pub async fn create_app_interface(
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_msgs(mut recv_socket: WebsocketReceiver) -> () {
+async fn recv_incoming_admin_msgs<A: AdminInterfaceApi>(
+    api: A,
+    mut recv_socket: WebsocketReceiver,
+) -> () {
     while let Some(msg) = recv_socket.next().await {
-        if let Err(_todo) = handle_incoming_message(msg, InterfaceKind::Admin).await {
+        if let Err(_todo) = handle_incoming_message(msg, ApiKind::Admin(api)).await {
             break;
         }
     }
@@ -109,7 +127,8 @@ async fn recv_incoming_msgs(mut recv_socket: WebsocketReceiver) -> () {
 /// Polls for messages coming in from the external client while simultaneously
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
-async fn recv_incoming_msgs_and_outgoing_signals(
+async fn recv_incoming_msgs_and_outgoing_signals<A: AppInterfaceApi>(
+    api: A,
     mut recv_socket: WebsocketReceiver,
     mut signal_rx: broadcast::Receiver<Signal>,
     mut signal_tx: WebsocketSender,
@@ -135,7 +154,7 @@ async fn recv_incoming_msgs_and_outgoing_signals(
             // If we receive a message from outside, handle it
             msg = recv_socket.next() => {
                 if let Some(msg) = msg {
-                    handle_incoming_message(msg, InterfaceKind::App).await?
+                    handle_incoming_message(msg, ApiKind::<A, _>::App(api)).await.map_err(InterfaceError::RequestHandler)?
                 } else {
                     debug!("Closing interface: message stream empty");
                     break;
@@ -149,19 +168,20 @@ async fn recv_incoming_msgs_and_outgoing_signals(
 
 async fn handle_incoming_message(
     ws_msg: WebsocketMessage,
-    interface_kind: InterfaceKind,
+    api_kind: ApiKind,
 ) -> InterfaceResult<()> {
     match ws_msg {
-        WebsocketMessage::Request(bytes, respond) => match interface_kind {
-            InterfaceKind::Admin => {
+        WebsocketMessage::Request(bytes, respond) => match api_kind {
+            ApiKind::Admin(api) => {
                 let request = AdminRequest::try_from(bytes)?;
-                Ok(respond(handle_incoming_admin_request(request).await?.try_into()?).await?)
+                Ok(respond(api.handle_request(request).await.try_into()?).await?)
             }
-            InterfaceKind::App => {
-                let request = ConductorRequest::try_from(bytes)?;
-                Ok(respond(handle_incoming_app_request(request).await?.try_into()?).await?)
+            ApiKind::App(api) => {
+                let request = AppRequest::try_from(bytes)?;
+                Ok(respond(api.handle_request(request).await.try_into()?).await?)
             }
         },
+        // FIXME this will kill this interface, is that what we want?
         WebsocketMessage::Signal(_) => Err(InterfaceError::UnexpectedMessage(
             "Got an unexpected Signal while handing incoming message".to_string(),
         )),
@@ -175,12 +195,10 @@ async fn handle_incoming_admin_request(request: AdminRequest) -> InterfaceResult
     })
 }
 
-// TODO: rename ConductorRequest to AppRequest or something
-async fn handle_incoming_app_request(
-    request: ConductorRequest,
-) -> InterfaceResult<ConductorResponse> {
+// TODO: rename AppRequest to AppRequest or something
+async fn handle_incoming_app_request(request: AppRequest) -> InterfaceResult<AppResponse> {
     Ok(match request {
-        _ => ConductorResponse::Error {
+        _ => AppResponse::Error {
             debug: "TODO".into(),
         },
     })

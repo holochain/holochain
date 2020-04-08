@@ -1,5 +1,5 @@
 use crate::Port;
-use holochain_2020::conductor::api::{AdminResponse, ConductorResponse};
+use holochain_2020::conductor::api::{AdminResponse, AppResponse};
 use holochain_websocket::*;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -34,7 +34,7 @@ async fn recv_msgs(mut recv_socket: WebsocketReceiver) -> StdResult {
         match msg {
             WebsocketMessage::Request(msg, response) => {
                 response(
-                    ConductorResponse::AdminResponse {
+                    AppResponse::AdminResponse {
                         response: Box::new(AdminResponse::DnaAdded),
                     }
                     .try_into()?,

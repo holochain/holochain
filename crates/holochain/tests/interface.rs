@@ -1,6 +1,6 @@
 use assert_cmd::prelude::*;
 use holochain_2020::conductor::api::{
-    AdminRequest, AdminResponse, ConductorRequest, ConductorResponse,
+    AdminRequest, AdminResponse, AppRequest, AppResponse,
 };
 use holochain_websocket::*;
 use std::sync::Arc;
@@ -63,11 +63,11 @@ async fn run_websocket(port: u16) -> StdResult {
     }
     let (mut send_socket, _) = r?;
     let request = Box::new(AdminRequest::AddDna);
-    let response: ConductorResponse = send_socket
-        .request(ConductorRequest::AdminRequest { request })
+    let response: AppResponse = send_socket
+        .request(AppRequest::AdminRequest { request })
         .await?;
     let r = match response {
-        ConductorResponse::AdminResponse { response } => {
+        AppResponse::AdminResponse { response } => {
             if let AdminResponse::DnaAdded = *response {
                 true
             } else {
@@ -78,7 +78,7 @@ async fn run_websocket(port: u16) -> StdResult {
     };
     assert!(r);
 
-    //assert_eq!(response, ConductorResponse::AdminResponse{ response: Box::new(AdminResponse::DnaAdded) });
+    //assert_eq!(response, AppResponse::AdminResponse{ response: Box::new(AdminResponse::DnaAdded) });
 
     Ok(())
 }

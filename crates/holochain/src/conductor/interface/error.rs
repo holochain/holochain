@@ -1,3 +1,4 @@
+use crate::conductor::error::ConductorError;
 use holochain_serialized_bytes::SerializedBytesError;
 
 /// Interface Error Type
@@ -6,6 +7,7 @@ pub enum InterfaceError {
     SerializedBytes(#[from] SerializedBytesError),
     JoinError(#[from] tokio::task::JoinError),
     SignalReceive(tokio::sync::broadcast::RecvError),
+    RequestHandler(ConductorError),
     UnexpectedMessage(String),
     SendError,
     Other(String),

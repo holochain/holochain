@@ -40,7 +40,7 @@ impl PartialEq for Cell {
 ///
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
-/// [CellConductorApi] or an [ExternalConductorApi])
+/// [CellConductorApi] or an [AppInterfaceApi])
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorApi,
