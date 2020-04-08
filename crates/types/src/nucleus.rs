@@ -13,7 +13,8 @@ pub type ZomeName = String;
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[allow(missing_docs)] // members are self-explanitory
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+// DO NOT CLONE THIS because payload can be huge
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocation {
     /// the cell ID
     pub cell_id: CellId,
@@ -32,7 +33,7 @@ pub struct ZomeInvocation {
 }
 
 /// Response to a zome invocation
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum ZomeInvocationResponse {
     /// arbitrary functions exposed by zome devs to the outside world
     ZomeApiFn(ZomeExternGuestOutput),
