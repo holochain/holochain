@@ -29,6 +29,9 @@ use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
+use tracing::*;
+use url2::Url2;
+use std::error::Error;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -53,6 +56,7 @@ pub struct Conductor {
     state_db: ConductorStateDb,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
+    admin_interfaces: Vec<Url2>,
 }
 
 impl Conductor {
@@ -64,6 +68,7 @@ impl Conductor {
             cells: HashMap::new(),
             _handle_map: HashMap::new(),
             _agent_keys: HashMap::new(),
+            admin_interfaces: Vec::new(),
         })
     }
 
@@ -98,8 +103,6 @@ impl Conductor {
         Ok(new_state)
     }
 
-    // TODO: remove allow once we actually use this function
-    #[allow(dead_code)]
     async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
@@ -124,7 +127,21 @@ mod builder {
         pub async fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            let conductor = Conductor::new(environment).await?;
+            let mut conductor = Conductor::new(environment).await?;
+            conductor.admin_interfaces = config
+                .admin_interfaces
+                .unwrap_or_else(|| Vec::new())
+                .into_iter()
+                .map(Url2::try_parse)
+                // Log errors
+                .inspect(|url| {
+                    if let Err(ref e) = url {
+                        error!(error = e as &dyn Error, "Admin interface failed to parse");
+                    }
+                })
+                // Throw away errors
+                .filter_map(Result::ok)
+                .collect();
             Ok(conductor)
         }
 

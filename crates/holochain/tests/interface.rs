@@ -31,10 +31,7 @@ fn check_started(started: Result<Option<ExitStatus>, std::io::Error>, holochain:
 async fn call_admin() -> StdResult {
     let port = 9000;
     let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
-    cmd.arg("--admin");
     cmd.arg("--structured");
-    cmd.arg("--websocket-example");
-    cmd.arg(port.to_string());
     cmd.env("RUST_LOG", "debug");
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());

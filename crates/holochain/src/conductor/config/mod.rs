@@ -16,6 +16,8 @@ use passphrase_service_config::PassphraseServiceConfig;
 //use signal_config::SignalConfig;
 use std::path::Path;
 
+
+// TODO change types from "stringly typed" to Url2
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
     /// The path to the LMDB environment for this conductor.
@@ -52,6 +54,8 @@ pub struct ConductorConfig {
     /// PassphraseService. It just needs something to provide a passphrase when needed.
     /// This config setting selects one of the available services (i.e. CLI prompt, IPC, mock)
     pub passphrase_service: PassphraseServiceConfig,
+    /// Setup an admin interfaces to control this conductor through a websocket connection
+    pub admin_interfaces: Option<Vec<String>>,
     //
     //
     // /// Which signals to emit

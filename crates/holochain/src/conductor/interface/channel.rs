@@ -4,16 +4,46 @@ use crate::core::signal::Signal;
 //use tracing::*;
 use super::error::{InterfaceError, InterfaceResult};
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_wasmer_host::TryInto;
 use holochain_websocket::{
     websocket_bind, WebsocketConfig, WebsocketMessage, WebsocketReceiver, WebsocketSender,
 };
-use std::convert::{TryFrom};
+use std::convert::TryFrom;
+use std::error::Error;
 use std::sync::Arc;
 use tokio::stream::StreamExt;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc::Receiver};
 use tracing::*;
 use url2::url2;
-use holochain_wasmer_host::TryInto;
+
+#[derive(Debug, Clone)]
+pub enum InterfaceMsg {
+    CreateAdmin {
+        api: Box<dyn InterfaceApi<ApiRequest = AdminRequest, ApiResponse = AdminResponse>>,
+        port: u16,
+    },
+    Close,
+}
+
+pub async fn manage_interfaces(mut recv_ci: Receiver<InterfaceMsg>) {
+    use InterfaceMsg::*;
+    let mut handles = Vec::new();
+    while let Some(msg) = recv_ci.recv().await {
+        match msg {
+            CreateAdmin { api, port } => {
+                handles.push(tokio::spawn(create_admin_interface(api, port)))
+            }
+            Close => {
+                for h in handles {
+                    h.await.unwrap_or_else(|e| {
+                        error!(error = &e as &dyn Error, "Failed to join interface task");
+                    });
+                }
+                break;
+            }
+        }
+    }
+}
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
@@ -128,6 +158,8 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     trace!("CONNECTION: {}", recv_socket.remote_addr());
 
     loop {
+        // FIXME this will return on whoever is first and cancel
+        // all remaining tasks. Is that what we want?
         tokio::select! {
             // If we receive a Signal broadcasted from a Cell, push it out
             // across the interface

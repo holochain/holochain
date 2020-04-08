@@ -2,13 +2,15 @@ use holochain_2020::conductor::{
     api::*, config::ConductorConfig, error::ConductorError, interactive, interface::channel::*,
     paths::ConfigFilePath, Conductor,
 };
+use std::error::Error;
 use std::{convert::TryInto, path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use sx_types::observability::{self, Output};
-use tokio::sync::RwLock;
+use tokio::sync::{self, RwLock};
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
+const CHANNEL_SIZE: usize = 1000;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]
@@ -44,9 +46,6 @@ struct Opt {
         help = "Run a very basic interface example, just to have something to do"
     )]
     run_interface_example: bool,
-
-    #[structopt(long, help = "Runs holochain with the admin interface enabled")]
-    admin: bool,
 }
 
 fn main() {
@@ -127,12 +126,24 @@ async fn async_main() {
         .expect("Could not initialize Conductor from configuration");
 
     let lock = Arc::new(RwLock::new(conductor));
-    // Create an external API to hand off to any Interfaces
-    let api = StdAppInterfaceApi::new(lock);
 
     if opt.run_interface_example {
+        // Create an external API to hand off to any Interfaces
+        let api = StdAppInterfaceApi::new(lock);
         interface_example(api).await;
     } else {
+        let (mut send_create_interface, recv_ci) = sync::mpsc::channel(CHANNEL_SIZE);
+        let handle = tokio::spawn(manage_interfaces(recv_ci));
+        send_create_interface
+            .send(InterfaceMsg::CreateAdmin)
+            .await
+            .unwrap_or_else(|e| {
+                error!(error = &e as &dyn Error, "Failed to create interfaces")
+            });
+        let (create_result,) = tokio::join!(handle);
+        create_result.unwrap_or_else(|e| {
+            error!(error = &e as &dyn Error, "Failed to join create_interfaces")
+        });
         // TODO: kick off actual conductor task here when we're ready for that
         println!("Conductor successfully initialized. Nothing else to do. Bye bye!");
     }

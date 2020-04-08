@@ -70,6 +70,13 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct StdAdminInterfaceApi;
 
+impl StdAdminInterfaceApi {
+    pub(crate) fn new() -> Self {
+        StdAdminInterfaceApi{}
+    }
+
+}
+
 #[async_trait::async_trait]
 impl AdminInterfaceApi for StdAdminInterfaceApi {
     async fn admin(&self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> { unimplemented!() }
