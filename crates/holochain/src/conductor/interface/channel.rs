@@ -13,6 +13,7 @@ use tokio::stream::StreamExt;
 use tokio::sync::broadcast;
 use tracing::*;
 use url2::url2;
+use holochain_wasmer_host::TryInto;
 
 /// A trivial Interface, used for proof of concept only,
 /// which is driven externally by a channel in order to
@@ -164,7 +165,7 @@ where
 {
     match ws_msg {
         WebsocketMessage::Request(bytes, respond) => {
-            Ok(respond(api.handle_request(bytes).await?).await?)
+            Ok(respond(api.handle_request(bytes.try_into()?).await?.try_into()?).await?)
         }
         // FIXME this will kill this interface, is that what we want?
         WebsocketMessage::Signal(_) => Err(InterfaceError::UnexpectedMessage(

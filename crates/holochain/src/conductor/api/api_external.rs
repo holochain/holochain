@@ -8,14 +8,11 @@ use sx_types::{
 };
 use tokio::sync::RwLock;
 
-// #[async_trait::async_trait]
-// pub trait ExternalConductorApi<Req, Res>: 'static + Send + Sync + Clone {
-//     async fn handle_request(&self, request: Req) -> Res;
-// }
-
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
-    async fn handle_request(&self, bytes: SerializedBytes) -> InterfaceResult<SerializedBytes>;
+    type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    async fn handle_request(&self, request: Self::ApiRequest) -> InterfaceResult<Self::ApiResponse>;
 }
 
 /// The interface that a Conductor exposes to the outside world.
@@ -80,9 +77,10 @@ impl AdminInterfaceApi for StdAdminInterfaceApi {
 
 #[async_trait::async_trait]
 impl InterfaceApi for StdAdminInterfaceApi {
-    async fn handle_request(&self, bytes: SerializedBytes) -> InterfaceResult<SerializedBytes> {
-        let request = AdminRequest::try_from(bytes)?;
-        let r = AdminInterfaceApi::handle_request(self, request).await.try_into()?;
+    type ApiRequest = AdminRequest;
+    type ApiResponse = AdminResponse;
+    async fn handle_request(&self, request: Self::ApiRequest) -> InterfaceResult<Self::ApiResponse> {
+        let r = AdminInterfaceApi::handle_request(self, request).await;
         Ok(r)
     }
 }
@@ -114,9 +112,10 @@ impl AppInterfaceApi for StdAppInterfaceApi {
 
 #[async_trait::async_trait]
 impl InterfaceApi for StdAppInterfaceApi {
-    async fn handle_request(&self, bytes: SerializedBytes) -> InterfaceResult<SerializedBytes> {
-        let request = AppRequest::try_from(bytes)?;
-        let r = AppInterfaceApi::handle_request(self, request).await.try_into()?;
+    type ApiRequest = AppRequest;
+    type ApiResponse = AppResponse;
+    async fn handle_request(&self, request: Self::ApiRequest) -> InterfaceResult<Self::ApiResponse> {
+        let r = AppInterfaceApi::handle_request(self, request).await;
         Ok(r)
     }
 }
