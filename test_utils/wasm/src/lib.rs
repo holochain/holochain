@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use sx_types::dna::wasm::DnaWasm;
 use std::io::Read;
 
@@ -26,38 +26,11 @@ impl From<TestWasm> for PathBuf {
     }
 }
 
-pub fn test_wasm(relative_path_to_repo_root: PathBuf, wasm: TestWasm) -> DnaWasm {
-    let cargo_toml = match wasm {
-        TestWasm::Foo => {
-            relative_path_to_repo_root.join(Path::new("test_utils/wasm/foo/Cargo.toml"))
-        }
-    };
-
-    let cargo_command = std::env::var_os("CARGO");
-    let cargo_command = cargo_command
-        .as_ref()
-        .map(|s| &**s)
-        .unwrap_or("cargo".as_ref());
-
-    println!("building test wasm");
-    let status = std::process::Command::new(cargo_command)
-        .arg("build")
-        .arg("--manifest-path")
-        .arg(cargo_toml)
-        .arg("--release")
-        .arg("--target")
-        .arg("wasm32-unknown-unknown")
-        .status()
-        .unwrap();
-
-    println!("done building test wasm");
-
-    assert!(status.success());
-
-    create_wasm_from_file(
-        &std::env::current_dir()
-            .unwrap()
-            .join(relative_path_to_repo_root)
-            .join(PathBuf::from(wasm)),
-    )
+pub fn test_wasm(wasm: TestWasm) -> DnaWasm {
+    match wasm {
+        TestWasm::Foo => DnaWasm::from(
+            include_bytes!("../foo/target/wasm32-unknown-unknown/release/test_wasm_foo.wasm")
+                .to_vec(),
+        ),
+    }
 }
