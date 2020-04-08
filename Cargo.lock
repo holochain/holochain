@@ -885,6 +885,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "holo_hash_core"
+version = "0.0.1"
+dependencies = [
+ "holochain_serialized_bytes",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "holochain_2020"
 version = "0.0.1"
 dependencies = [

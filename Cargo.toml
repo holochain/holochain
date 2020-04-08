@@ -6,6 +6,7 @@ members = [
   # "crates/legacy",
   "crates/holochain",
   "crates/holo_hash",
+  "crates/holo_hash_core",
   "crates/state",
   "crates/types",
   "crates/crypto",
