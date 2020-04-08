@@ -1,9 +1,9 @@
-//! Errors occurring during a [CellConductorApi] or [AppInterfaceApi] call
+//! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use sx_types::cell::CellId;
 use thiserror::Error;
 
-/// Errors occurring during a [CellConductorApi] or [AppInterfaceApi] call
+/// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
     /// Cell was referenced, but is missing from the conductor.

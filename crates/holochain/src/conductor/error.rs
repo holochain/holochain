@@ -11,9 +11,6 @@ pub enum ConductorError {
     #[error("Internal Cell error: {0}")]
     InternalCellError(#[from] CellError),
 
-    #[error("Conductor API error: {0}")]
-    ApiError(#[from] ConductorApiError),
-
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
 
@@ -43,6 +40,9 @@ pub enum ConductorError {
 
     #[error("Config deserialization error: {0}")]
     SerializationError(#[from] toml::ser::Error),
+
+    #[error("Attempted to call into the conductor while it is shutting down")]
+    ShuttingDown,
 
     #[error("Miscellaneous error: {0}")]
     Todo(String),

@@ -81,8 +81,8 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
         admin_interfaces: Some(vec![AdminInterfaceConfig { driver: InterfaceDriver::Websocket { port: 0 }}]),
         ..Default::default()
     };
-    let conductor = Conductor::build().from_config(config).await?;
-    conductor.write().await.kill().await;
+    let conductor_handle = Conductor::build().from_config(config).await?;
+    conductor_handle.shutdown().await;
 
     Ok(())
 }

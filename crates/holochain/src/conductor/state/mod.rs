@@ -16,7 +16,6 @@ use sx_types::{
     error::SkunkError,
     prelude::*,
 };
-use toml;
 
 #[cfg(test)]
 mod tests;

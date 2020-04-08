@@ -1,5 +1,5 @@
 use super::error::ConductorApiResult;
-use crate::conductor::{conductor::Conductor, interface::error::InterfaceResult};
+use crate::conductor::{conductor::Conductor, interface::error::InterfaceResult, ConductorHandle};
 use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
 use sx_types::{
@@ -70,12 +70,12 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 
 #[derive(Clone)]
 pub struct StdAdminInterfaceApi {
-    conductor_mutex: Arc<RwLock<Conductor>>,
+    conductor_handle: ConductorHandle,
 }
 
 impl StdAdminInterfaceApi {
-    pub(crate) fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
-        StdAdminInterfaceApi { conductor_mutex }
+    pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
+        StdAdminInterfaceApi { conductor_handle }
     }
 }
 
@@ -103,13 +103,13 @@ impl InterfaceApi for StdAdminInterfaceApi {
 /// other Api references
 #[derive(Clone)]
 pub struct StdAppInterfaceApi {
-    conductor_mutex: Arc<RwLock<Conductor>>,
+    conductor_handle: ConductorHandle,
 }
 
 impl StdAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
-    pub fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
-        Self { conductor_mutex }
+    pub fn new(conductor_handle: ConductorHandle) -> Self {
+        Self { conductor_handle }
     }
 }
 
@@ -119,7 +119,7 @@ impl AppInterfaceApi for StdAppInterfaceApi {
         &self,
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        let _conductor = self.conductor_mutex.read().await;
+        let _conductor = self.conductor_handle.read().await;
         unimplemented!()
     }
 }

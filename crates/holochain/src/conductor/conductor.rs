@@ -8,7 +8,11 @@
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
 
-use super::{api::AdminInterfaceApi, state::ConductorState};
+use super::{
+    api::{AdminInterfaceApi, AppInterfaceApi},
+    error::ConductorError,
+    state::ConductorState,
+};
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
@@ -16,8 +20,10 @@ use crate::conductor::{
     error::ConductorResult,
 };
 pub use builder::*;
+use derive_more::{AsRef, Deref, From};
+use futures::future;
 use std::collections::HashMap;
-use std::error::Error;
+use std::{error::Error, sync::Arc};
 use sx_state::{
     db,
     env::{Environment, ReadManager},
@@ -30,6 +36,7 @@ use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::*;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
@@ -50,12 +57,30 @@ struct CellItem {
 // TODO: figure out what we need to track admin interfaces, if anything
 struct AdminInterfaceHandle(());
 
+impl AdminInterfaceHandle {
+    async fn stop(&mut self) {
+        unimplemented!()
+    }
+}
+
+#[derive(Clone, From, AsRef, Deref)]
+pub struct ConductorHandle(Arc<RwLock<Conductor>>);
+
+impl ConductorHandle {
+    /// End all tasks run by the Conductor.
+    pub async fn shutdown(self) {
+        let mut conductor = self.0.write().await;
+        conductor.shutdown().await;
+    }
+}
+
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     // tx_network: NetSender,
     cells: HashMap<CellId, CellItem>,
     env: Environment,
     state_db: ConductorStateDb,
+    closing: bool,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
     admin_interfaces: Vec<AdminInterfaceHandle>,
@@ -71,15 +96,12 @@ impl Conductor {
             _handle_map: HashMap::new(),
             _agent_keys: HashMap::new(),
             admin_interfaces: Vec::new(),
+            closing: false,
         })
     }
 
     pub fn build() -> ConductorBuilder {
         ConductorBuilder::new()
-    }
-
-    pub async fn kill() -> () {
-        unimplemented!()
     }
 
     pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
@@ -94,12 +116,25 @@ impl Conductor {
         unimplemented!()
     }
 
+    fn check_running(&self) -> ConductorResult<()> {
+        if self.closing {
+            Err(ConductorError::ShuttingDown)
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn shutdown(&mut self) -> () {
+        future::join_all(self.admin_interfaces.iter_mut().map(|i| i.stop())).await;
+    }
+
     // TODO: remove allow once we actually use this function
     #[allow(dead_code)]
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
     {
+        self.check_running()?;
         let guard = self.env.guard().await;
         let mut writer = guard.writer()?;
         let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
@@ -115,7 +150,19 @@ impl Conductor {
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
-    async fn spawn_admin_interface<Api: AdminInterfaceApi>(&mut self, api: Api) {
+    async fn spawn_admin_interface<Api: AdminInterfaceApi>(
+        &mut self,
+        _api: Api,
+    ) -> ConductorResult<()> {
+        self.check_running()?;
+        unimplemented!()
+    }
+
+    async fn spawn_app_interface<Api: AppInterfaceApi>(
+        &mut self,
+        _api: Api,
+    ) -> ConductorResult<()> {
+        self.check_running()?;
         unimplemented!()
     }
 }
@@ -130,7 +177,7 @@ mod builder {
         config::AdminInterfaceConfig,
         interface::{websocket::create_admin_interface, InterfaceDriver},
     };
-    use futures::{future, stream::FuturesUnordered};
+    use futures::future;
     use std::sync::Arc;
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
     use tokio::sync::RwLock;
@@ -145,11 +192,11 @@ mod builder {
         pub async fn from_config(
             self,
             config: ConductorConfig,
-        ) -> ConductorResult<Arc<RwLock<Conductor>>> {
+        ) -> ConductorResult<ConductorHandle> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            let conductor = Arc::new(RwLock::new(Conductor::new(environment).await?));
-            let admin_api = StdAdminInterfaceApi::new(conductor.clone());
+            let conductor_mutex = Arc::new(RwLock::new(Conductor::new(environment).await?));
+            let admin_api = StdAdminInterfaceApi::new(conductor_mutex.clone().into());
             let interface_futures: Vec<_> = config
                 .admin_interfaces
                 .unwrap_or_else(|| Vec::new())
@@ -174,10 +221,10 @@ mod builder {
                 .map(AdminInterfaceHandle)
                 .collect();
             {
-                let mut c = conductor.write().await;
-                c.admin_interfaces = interfaces;
+                let mut conductor = conductor_mutex.write().await;
+                conductor.admin_interfaces = interfaces;
             }
-            Ok(conductor)
+            Ok(conductor_mutex.into())
         }
 
         pub async fn test(self) -> ConductorResult<Conductor> {

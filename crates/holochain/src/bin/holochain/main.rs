@@ -1,11 +1,10 @@
 use holochain_2020::conductor::{
     api::*, config::ConductorConfig, error::ConductorError, interactive, interface::websocket::*,
-    paths::ConfigFilePath, Conductor,
+    paths::ConfigFilePath, Conductor, ConductorHandle,
 };
-use std::{convert::TryInto, path::PathBuf, sync::Arc};
+use std::{convert::TryInto, path::PathBuf};
 use structopt::StructOpt;
 use sx_types::observability::{self, Output};
-use tokio::sync::{self, RwLock};
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
@@ -119,14 +118,14 @@ async fn async_main() {
     }
 
     // Initialize the Conductor
-    let conductor: Arc<RwLock<Conductor>> = Conductor::build()
+    let conductor: ConductorHandle = Conductor::build()
         .from_config(config)
         .await
         .expect("Could not initialize Conductor from configuration");
 
     if opt.run_interface_example {
         // Create an external API to hand off to any Interfaces
-        let api = StdAppInterfaceApi::new(conductor);
+        let api = StdAppInterfaceApi::new(conductor.into());
         interface_example(api).await;
     } else {
         // let (mut send_create_interface, recv_ci) = sync::mpsc::channel(CHANNEL_SIZE);
@@ -142,6 +141,9 @@ async fn async_main() {
         // // TODO: kick off actual conductor task here when we're ready for that
         println!("Conductor successfully initialized.");
     }
+
+    // TODO: on SIGINT/SIGKILL, kill the conductor:
+    // conductor.kill().await
 }
 
 fn display_friendly_missing_config_message(config_path: ConfigFilePath, config_path_default: bool) {
