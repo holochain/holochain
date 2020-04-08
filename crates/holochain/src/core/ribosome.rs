@@ -150,7 +150,7 @@ pub mod tests {
             let mut v = std::collections::BTreeMap::new();
             v.insert(
                 String::from("foo"),
-                zome_from_code(test_wasm(&"../..".into(), TestWasm::Foo)),
+                zome_from_code(test_wasm("../..".into(), TestWasm::Foo)),
             );
             v
         }));
