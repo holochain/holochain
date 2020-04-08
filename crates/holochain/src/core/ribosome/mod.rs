@@ -7,7 +7,39 @@
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
+pub mod call;
+pub mod capability;
+pub mod commit_entry;
+pub mod debug;
+pub mod decrypt;
+pub mod emit_signal;
+pub mod encrypt;
+pub mod entry_address;
+pub mod entry_type_properties;
+pub mod get_entry;
+pub mod get_links;
+pub mod globals;
+pub mod keystore;
+pub mod link_entries;
+pub mod property;
+pub mod query;
+pub mod remove_entry;
+pub mod remove_link;
+pub mod send;
+pub mod show_env;
+pub mod sign;
+pub mod sleep;
+pub mod sys_time;
+pub mod update_entry;
 
+use crate::core::ribosome::{
+    call::call, capability::capability, commit_entry::commit_entry, debug::debug, decrypt::decrypt,
+    emit_signal::emit_signal, encrypt::encrypt, entry_address::entry_address,
+    entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
+    globals::globals, keystore::keystore, link_entries::link_entries, property::property,
+    query::query, remove_entry::remove_entry, remove_link::remove_link, send::send,
+    show_env::show_env, sign::sign, sleep::sleep, sys_time::sys_time, update_entry::update_entry,
+};
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use mockall::automock;
@@ -19,7 +51,6 @@ use sx_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use sx_zome_types::globals::ZomeGlobals;
 use sx_zome_types::*;
 
 /// Represents a type which has not been decided upon yet
@@ -71,213 +102,6 @@ impl From<&ZomeInvocation> for HostContext {
             zome_name: zome_invocation.zome_name.clone(),
         }
     }
-}
-
-fn debug(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    input: DebugInput,
-) -> DebugOutput {
-    println!("{}", input.inner());
-    DebugOutput::new(())
-}
-
-fn globals(
-    ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: GlobalsInput,
-) -> GlobalsOutput {
-    GlobalsOutput::new(ZomeGlobals {
-        agent_address: "".into(),      // @TODO
-        agent_id_str: "".into(),       // @TODO
-        agent_initial_hash: "".into(), // @TODO
-        agent_latest_hash: "".into(),  // @TODO
-        dna_address: "".into(),        // @TODO
-        dna_name: ribosome.dna.name.clone(),
-        properties: SerializedBytes::try_from(()).unwrap(), // @TODO
-        public_token: "".into(),                            // @TODO
-    })
-}
-
-fn call(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: CallInput,
-) -> CallOutput {
-    unimplemented!();
-}
-
-fn capability(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: CapabilityInput,
-) -> CapabilityOutput {
-    unimplemented!();
-}
-
-fn commit_entry(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: CommitEntryInput,
-) -> CommitEntryOutput {
-    unimplemented!();
-}
-
-fn decrypt(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: DecryptInput,
-) -> DecryptOutput {
-    unimplemented!();
-}
-
-fn encrypt(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: EncryptInput,
-) -> EncryptOutput {
-    unimplemented!();
-}
-
-fn entry_address(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: EntryAddressInput,
-) -> EntryAddressOutput {
-    unimplemented!();
-}
-
-fn entry_type_properties(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: EntryTypePropertiesInput,
-) -> EntryTypePropertiesOutput {
-    unimplemented!();
-}
-
-fn get_entry(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: GetEntryInput,
-) -> GetEntryOutput {
-    unimplemented!();
-}
-
-fn get_links(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: GetLinksInput,
-) -> GetLinksOutput {
-    unimplemented!();
-}
-
-fn keystore(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: KeystoreInput,
-) -> KeystoreOutput {
-    unimplemented!();
-}
-
-fn link_entries(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: LinkEntriesInput,
-) -> LinkEntriesOutput {
-    unimplemented!();
-}
-
-fn remove_entry(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: RemoveEntryInput,
-) -> RemoveEntryOutput {
-    unimplemented!();
-}
-
-fn update_entry(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: UpdateEntryInput,
-) -> UpdateEntryOutput {
-    unimplemented!();
-}
-
-fn show_env(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: ShowEnvInput,
-) -> ShowEnvOutput {
-    unimplemented!();
-}
-
-fn sleep(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    input: SleepInput,
-) -> SleepOutput {
-    std::thread::sleep(input.inner());
-    SleepOutput::new(())
-}
-
-fn sign(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: SignInput,
-) -> SignOutput {
-    unimplemented!();
-}
-
-fn send(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: SendInput,
-) -> SendOutput {
-    unimplemented!();
-}
-
-fn remove_link(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: RemoveLinkInput,
-) -> RemoveLinkOutput {
-    unimplemented!();
-}
-
-fn query(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: QueryInput,
-) -> QueryOutput {
-    unimplemented!();
-}
-
-fn property(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: PropertyInput,
-) -> PropertyOutput {
-    unimplemented!();
-}
-
-fn emit_signal(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: EmitSignalInput,
-) -> EmitSignalOutput {
-    unimplemented!();
-}
-
-fn sys_time(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: SysTimeInput,
-) -> SysTimeOutput {
-    let start = std::time::SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("Time went backwards");
-    SysTimeOutput::new(since_the_epoch)
 }
 
 impl WasmRibosome {
@@ -422,7 +246,7 @@ pub mod wasm_test {
         dna
     }
 
-    fn zome_invocation_from_names(
+    pub fn zome_invocation_from_names(
         zome_name: &str,
         fn_name: &str,
         payload: SerializedBytes,
@@ -438,7 +262,7 @@ pub mod wasm_test {
         }
     }
 
-    fn test_ribosome() -> WasmRibosome {
+    pub fn test_ribosome() -> WasmRibosome {
         WasmRibosome::new(dna_from_zomes({
             let mut v = std::collections::BTreeMap::new();
             v.insert(
@@ -453,7 +277,7 @@ pub mod wasm_test {
         }))
     }
 
-    fn now() -> Duration {
+    pub fn now() -> Duration {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
@@ -474,154 +298,5 @@ pub mod wasm_test {
                 .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
                 .unwrap()
         );
-    }
-
-    #[test]
-    fn invoke_import_debug_test() {
-        let ribosome = test_ribosome();
-
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "debug",
-            DebugInput::new(format!("debug {:?}", "works!"))
-                .try_into()
-                .unwrap(),
-        );
-
-        ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-            .unwrap();
-    }
-
-    #[test]
-    fn invoke_import_globals_test() {
-        let ribosome = test_ribosome();
-
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "globals",
-            GlobalsInput::new(()).try_into().unwrap(),
-        );
-
-        let output_sb: SerializedBytes = match ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-        {
-            Ok(ZomeInvocationResponse::ZomeApiFn(guest_output)) => guest_output.inner(),
-            _ => unreachable!(),
-        };
-        let output = GlobalsOutput::try_from(output_sb).unwrap().inner();
-
-        assert_eq!(output.dna_name, "test",);
-
-        let ribosome = test_ribosome();
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "globals",
-            GlobalsInput::new(()).try_into().unwrap(),
-        );
-        let t0 = now();
-        ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-            .unwrap();
-        let t1 = now();
-
-        println!(
-            "x: {} {} {}",
-            t0.as_nanos(),
-            t1.as_nanos(),
-            t1.as_nanos() - t0.as_nanos()
-        );
-    }
-
-    #[test]
-    fn invoke_import_sys_time_test() {
-        let ribosome = test_ribosome();
-
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "sys_time",
-            SysTimeInput::new(()).try_into().unwrap(),
-        );
-
-        let output: Duration = match ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-        {
-            Ok(ZomeInvocationResponse::ZomeApiFn(guest_output)) => {
-                SysTimeOutput::try_from(guest_output.inner())
-                    .unwrap()
-                    .inner()
-            }
-            _ => unreachable!(),
-        };
-
-        let test_now = now();
-
-        // if it takes more than 2 ms to read the system time something is horribly wrong
-        assert!(
-            (i128::try_from(test_now.as_millis()).unwrap()
-                - i128::try_from(output.as_millis()).unwrap())
-            .abs()
-                < 3
-        );
-    }
-
-    #[test]
-    fn invoke_import_sleep_test() {
-        test_ribosome()
-            .call_zome_function(
-                &mut SourceChainCommitBundle::default(),
-                zome_invocation_from_names(
-                    "imports",
-                    "sleep",
-                    SleepInput::new(Duration::from_millis(0))
-                        .try_into()
-                        .unwrap(),
-                ),
-            )
-            .unwrap();
-
-        let ribosome = test_ribosome();
-
-        let t0 = now().as_millis();
-
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "sleep",
-            SleepInput::new(Duration::from_millis(0))
-                .try_into()
-                .unwrap(),
-        );
-
-        ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-            .unwrap();
-        let t1 = now().as_millis();
-
-        let diff0 = i128::try_from(t1).unwrap() - i128::try_from(t0).unwrap();
-
-        assert!(diff0 < 2, format!("t0, t1, diff0: {} {} {}", t0, t1, diff0));
-
-        let ribosome = test_ribosome();
-
-        let t2 = now();
-
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "sleep",
-            SleepInput::new(Duration::from_millis(3))
-                .try_into()
-                .unwrap(),
-        );
-
-        ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-            .unwrap();
-        let t3 = now();
-
-        let diff1 =
-            i128::try_from(t3.as_millis()).unwrap() - i128::try_from(t2.as_millis()).unwrap();
-
-        assert!(2 < diff1);
-        assert!(diff1 < 5);
     }
 }
