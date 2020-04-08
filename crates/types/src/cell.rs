@@ -3,7 +3,7 @@
 
 use derive_more::{Display, From, Into};
 use std::fmt;
-use sx_address::prelude::*;
+use sx_zome_types::address::Address;
 use sx_zome_types::agent::AgentId;
 use sx_zome_types::dna::DnaAddress;
 

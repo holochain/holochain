@@ -79,12 +79,14 @@ pub enum LinkMatch<S: Into<String>> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{entry::tests::*, persistence::cas::content::Addressable};
+    use crate::address::Addressable;
+    use sx_fixture::Fixture;
+    use sx_fixture::FixtureType;
 
     pub fn example_link() -> Link {
         Link::new(
-            &test_entry_a().address(),
-            &test_entry_b().address(),
+            &Entry::fixture(FixtureType::A).address(),
+            &Entry::fixture(FixtureType::B).address(),
             &example_link_type(),
             &example_link_tag(),
         )

@@ -1,16 +1,24 @@
+use crate::address::Address;
 use holochain_serialized_bytes::prelude::*;
 use std::{collections::BTreeMap, str::FromStr};
-use sx_address_types::Address;
+use thiserror::Error;
 
 //--------------------------------------------------------------------------------------------------
 // CapabilityType
 //--------------------------------------------------------------------------------------------------
 
+#[derive(Error, Debug)]
 pub enum CapabilityError {
     /// there must be no assignees for public or transferable grants,
     PublicAssigned,
     /// Assigned grant must have 1 or more assignees
     Unassigned,
+}
+
+impl core::fmt::Display for CapabilityError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 /// Enum for CapabilityType.  Public capabilities require public grant token.  Transferable
@@ -197,8 +205,8 @@ pub mod tests {
 
     #[test]
     fn test_new_cap_token_claim_entry() {
-        let token = Address::from("fake");
-        let grantor = Address::from("fake grantor");
+        let token = Address::new("fake".as_bytes().into());
+        let grantor = Address::new("fake grantor".as_bytes().into());
         let claim = CapTokenClaim::new("foo".to_string(), grantor.clone(), token.clone());
         assert_eq!(claim.id(), "foo".to_string());
         assert_eq!(claim.grantor(), grantor);
@@ -213,7 +221,7 @@ pub mod tests {
         assert_eq!(grant.id(), "foo".to_string());
         let grant = CapTokenGrant::new("", Some(Vec::new()), empty_functions.clone());
         assert_eq!(grant.cap_type(), CapabilityType::Transferable);
-        let test_address = Address::new();
+        let test_address = Address::new(vec![]);
         let grant = CapTokenGrant::new(
             "",
             Some(vec![test_address.clone()]),
@@ -227,15 +235,15 @@ pub mod tests {
     fn test_cap_grant_valid() {
         assert!(CapTokenGrant::valid(CapabilityType::Public, None).is_ok());
         assert!(CapTokenGrant::valid(CapabilityType::Public, Some(Vec::new())).is_ok());
-        assert!(CapTokenGrant::valid(CapabilityType::Public, Some(vec![Address::new()])).is_err());
+        assert!(CapTokenGrant::valid(CapabilityType::Public, Some(vec![Address::new(vec![])])).is_err());
         assert!(CapTokenGrant::valid(CapabilityType::Transferable, None).is_ok());
         assert!(CapTokenGrant::valid(CapabilityType::Transferable, Some(Vec::new())).is_ok());
         assert!(
-            CapTokenGrant::valid(CapabilityType::Transferable, Some(vec![Address::new()])).is_err()
+            CapTokenGrant::valid(CapabilityType::Transferable, Some(vec![Address::new(vec![])])).is_err()
         );
         assert!(CapTokenGrant::valid(CapabilityType::Assigned, None).is_err());
         assert!(CapTokenGrant::valid(CapabilityType::Assigned, Some(Vec::new())).is_err());
-        assert!(CapTokenGrant::valid(CapabilityType::Assigned, Some(vec![Address::new()])).is_ok());
+        assert!(CapTokenGrant::valid(CapabilityType::Assigned, Some(vec![Address::new(vec![])])).is_ok());
     }
 
     #[test]
@@ -265,7 +273,7 @@ pub mod tests {
         let grant = maybe_grant.unwrap();
         assert_eq!(grant.cap_type(), CapabilityType::Transferable);
 
-        let test_address = Address::new();
+        let test_address = Address::new(vec![]);
 
         let maybe_grant = CapTokenGrant::create(
             "foo",

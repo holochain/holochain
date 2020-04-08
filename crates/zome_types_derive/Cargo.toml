@@ -1,8 +1,8 @@
 [package]
-name = "sx_address_derive"
+name = "sx_zome_types_derive"
 version = "0.0.1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
-description = "Provides derive macros for holochain addresses."
+description = "Provides derive macros for holochain zome types."
 edition="2018"
 keywords = ["holochain", "holo", "bytes", "serde", "derive"]
 categories = ["parsing"]

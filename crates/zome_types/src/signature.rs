@@ -1,8 +1,8 @@
 //! The Signature type is defined here. They are used in ChainHeaders as
 //! a way of providing cryptographically verifiable proof of a given agent
 //! as having been the author of a given data entry.
+use crate::address::Address;
 use holochain_serialized_bytes::prelude::*;
-use sx_address_types::Address;
 
 /// Provenance is a tuple of initiating agent public key and signature of some item being signed
 /// this type is used in headers and in capability requests where the item being signed

@@ -11,6 +11,8 @@ pub mod fn_declarations;
 pub mod traits;
 pub mod wasm;
 pub mod zome;
+#[cfg(test)]
+pub mod fixture;
 
 use crate::{
     dna::{
@@ -22,11 +24,11 @@ use crate::{
     entry::entry_type::{AppEntryType, EntryType},
     prelude::Address,
 };
-use holochain_serialized_bytes::prelude::*;
 use std::{
     collections::BTreeMap,
     hash::{Hash, Hasher},
 };
+use crate::prelude::*;
 
 /// serde helper, provides a default newly generated v4 uuid
 fn zero_uuid() -> String {
@@ -37,7 +39,7 @@ fn zero_uuid() -> String {
 pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes)]
+#[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
 pub struct Dna {
     /// The top-level "name" of a holochain application.
     #[serde(default)]
@@ -66,8 +68,6 @@ pub struct Dna {
     #[serde(default)]
     pub zomes: BTreeMap<String, zome::Zome>,
 }
-
-impl Eq for Dna {}
 
 impl Dna {
     /// Return a Zome
@@ -205,6 +205,8 @@ impl PartialEq for Dna {
     }
 }
 
+impl Eq for Dna {}
+
 #[cfg(test)]
 pub mod tests {
     use crate::{
@@ -217,15 +219,17 @@ pub mod tests {
             Dna,
         },
         entry::entry_type::{AppEntryType, EntryType},
-        persistence::cas::content::Address,
-        test_utils::{fake_dna, fake_zome},
     };
     use holochain_serialized_bytes::prelude::*;
     use std::collections::BTreeMap;
+    use crate::address::Address;
+    use sx_fixture::FixtureType;
+    use sx_fixture::Fixture;
+    use crate::dna::fixture::DnaFixtureInput;
 
     #[test]
     fn test_dna_get_zome() {
-        let dna = fake_dna("a");
+        let dna = Dna::fixture(FixtureType::A);
         let result = dna.get_zome("foo zome");
         assert_eq!(
             format!("{:?}", result),
@@ -237,7 +241,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_get_trait() {
-        let dna = fake_dna("a");
+        let dna = Dna::fixture(FixtureType::A);
         let zome = dna.get_zome("test").unwrap();
         let result = dna.get_trait(zome, "foo trait");
         assert!(result.is_none());
@@ -247,7 +251,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_get_trait_with_zome_name() {
-        let dna = fake_dna("a");
+        let dna = Dna::fixture(FixtureType::A);
         let result = dna.get_trait_fns_with_zome_name("foo zome", "foo trait");
         assert_eq!(
             format!("{:?}", result),
@@ -276,7 +280,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_get_function_with_zome_name() {
-        let dna = fake_dna("a");
+        let dna = Dna::fixture(FixtureType::A);
         let result = dna.get_function_with_zome_name("foo zome", "foo fun");
         assert_eq!(
             format!("{:?}", result),
@@ -293,7 +297,7 @@ pub mod tests {
 
     #[test]
     fn test_dna_verify() {
-        let dna = fake_dna("a");
+        let dna = Dna::fixture(FixtureType::A);
         assert!(dna.verify().is_ok())
     }
 
@@ -331,8 +335,8 @@ pub mod tests {
 
     #[test]
     fn get_entry_type_def_test() {
-        let mut dna = fake_dna("get_entry_type_def_test");
-        let mut zome = fake_zome();
+        let mut dna = Dna::fixture(FixtureType::FromInput(DnaFixtureInput{ uuid: "get_entry_type_def_test".into() }));
+        let mut zome = Zome::fixture(FixtureType::A);
         let entry_type = EntryType::App(AppEntryType::from("bar"));
         let entry_type_def = EntryTypeDef::new();
 
@@ -508,7 +512,7 @@ pub mod tests {
                                 handle: String::from("DPKI"),
                                 presence: BridgePresence::Required,
                                 reference: BridgeReference::Address {
-                                    dna_address: Address::from("Qmabcdef1234567890"),
+                                    dna_address: Address::new("Qmabcdef1234567890".as_bytes().into()),
                                 },
                             },
                         ],
@@ -545,7 +549,7 @@ pub mod tests {
                     presence: BridgePresence::Required,
                     handle: String::from("DPKI"),
                     reference: BridgeReference::Address {
-                        dna_address: Address::from("Qmabcdef1234567890"),
+                        dna_address: Address::new("Qmabcdef1234567890".as_bytes().into()),
                     }
                 },
             ]

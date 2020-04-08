@@ -139,15 +139,14 @@ impl Zome {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
-        dna::fn_declarations::{FnDeclaration, FnParameter},
-        test_utils::fake_zome,
-    };
+    use super::Zome;
+    use crate::dna::fn_declarations::{FnDeclaration, FnParameter};
+    use sx_fixture::*;
 
     #[test]
     fn test_zome_add_fn_declaration() {
         let base = {
-            let mut zome = fake_zome();
+            let mut zome = Zome::fixture(FixtureType::A);
             zome.fn_declarations = vec![];
             zome
         };
@@ -178,7 +177,7 @@ pub mod tests {
 
     #[test]
     fn test_zome_get_function() {
-        let mut zome = fake_zome();
+        let mut zome = Zome::fixture(FixtureType::A);
         zome.add_fn_declaration(String::from("test"), vec![], vec![]);
         let result = zome.get_function("foo func");
         assert!(result.is_none());

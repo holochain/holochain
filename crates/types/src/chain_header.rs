@@ -128,10 +128,6 @@ pub mod tests {
     use crate::{
         agent::test_agent_id,
         chain_header::ChainHeader,
-        entry::{
-            entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
-            tests::{test_entry, test_entry_a, test_entry_b},
-        },
         persistence::cas::content::{Address, Addressable},
         signature::Signature,
         time::test_iso_8601,

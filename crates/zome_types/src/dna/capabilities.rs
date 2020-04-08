@@ -1,9 +1,9 @@
 //! capabilities implements the capability request functionality used to check
 //! that a given capability has been granted for actions like zome calls
 
+use crate::address::Address;
 use crate::signature::{Provenance, Signature};
 use holochain_serialized_bytes::prelude::*;
-use sx_address_types::Address;
 
 //--------------------------------------------------------------------------------------------------
 // CapabilityRequest
@@ -34,19 +34,20 @@ impl CapabilityRequest {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::persistence::cas::content::Address;
+    use crate::address::Address;
+    use sx_fixture::*;
 
     #[test]
     fn test_capability_request_new() {
         let cap_call = CapabilityRequest::new(
-            Address::from("123"),
-            Address::from("requester"),
-            Signature::fake(),
+            Address::new("123".as_bytes().into()),
+            Address::new("requester".as_bytes().into()),
+            Signature::fixture(FixtureType::A),
         );
         assert_eq!(
             CapabilityRequest {
-                cap_token: Address::from("123"),
-                provenance: Provenance::new(Address::from("requester"), Signature::fake()),
+                cap_token: Address::new("123".as_bytes().into()),
+                provenance: Provenance::new(Address::new("requester".as_bytes().into()), Signature::fixture(FixtureType::A)),
             },
             cap_call
         );

@@ -3,6 +3,7 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
+use crate::address::Address;
 use crate::{
     agent::AgentId,
     dna::Dna,
@@ -14,7 +15,11 @@ use crate::{
     link::Link,
 };
 use holochain_serialized_bytes::prelude::*;
-use sx_address_types::Address;
+
+#[cfg(test)]
+use sx_fixture::Fixture;
+#[cfg(test)]
+use sx_fixture::FixtureType;
 
 pub enum EntryError {
     /// Attempted to convert any EntryType other than App to AppEntryType
@@ -85,120 +90,47 @@ impl PartialEq for Entry {
 pub struct EntryAddress(Address);
 
 #[cfg(test)]
+pub enum EntryFixtureType {
+    App,
+    Dna,
+}
+
+#[cfg(test)]
+impl Fixture for Entry {
+    type Input = EntryFixtureType;
+    fn fixture(fixture_type: FixtureType<Self::Input>) -> Self {
+        match fixture_type {
+            FixtureType::A => Entry::App(
+                AppEntryType::from("foo".to_string()),
+                SerializedBytes::try_from(()).unwrap(),
+            ),
+            FixtureType::FromInput(entry_fixture_type) => {
+                match entry_fixture_type {
+                    EntryFixtureType::App => unimplemented!(),
+                    EntryFixtureType::Dna => Entry::Dna(Box::new(Dna::fixture(FixtureType::A))),
+                }
+            },
+            _ => unimplemented!(),
+        }
+    }
+}
+
+#[cfg(test)]
 pub mod tests {
 
     use super::*;
-    use crate::{
-        agent::test_agent_id,
-        entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
-        persistence::cas::content::Addressable,
-        test_utils::fake_dna,
-    };
+    use crate::address::Addressable;
+    use sx_fixture::Fixture;
+    use sx_fixture::FixtureType;
 
     #[derive(Serialize, Deserialize, SerializedBytes)]
     struct SerializedString(String);
 
-    /// dummy entry value
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value() -> SerializedBytes {
-        SerializedBytes::try_from(()).unwrap()
-    }
-
-    pub fn test_entry_content() -> SerializedBytes {
-        SerializedBytes::try_from(Entry::App(test_app_entry_type(), test_entry_value())).unwrap()
-    }
-
-    /// dummy entry content, same as test_entry_value()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_a() -> SerializedBytes {
-        test_entry_value()
-    }
-
-    /// dummy entry content, differs from test_entry_value()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_b() -> SerializedBytes {
-        SerializedBytes::try_from(SerializedString(String::from("other test entry value"))).unwrap()
-    }
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_c() -> SerializedBytes {
-        SerializedBytes::try_from(SerializedString(String::from("value C"))).unwrap()
-    }
-
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_sys_entry_value() -> AgentId {
-        test_agent_id()
-    }
-
-    /// dummy entry
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry() -> Entry {
-        Entry::App(test_app_entry_type(), test_entry_value())
-    }
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_with_value<T: TryInto<SerializedBytes>>(value: T) -> Entry
-    where
-        <T as TryInto<SerializedBytes>>::Error: std::fmt::Debug,
-    {
-        Entry::App(test_app_entry_type(), value.try_into().unwrap())
-    }
-
-    pub fn expected_serialized_entry_content() -> SerializedBytes {
-        SerializedBytes::try_from(test_entry()).unwrap()
-    }
-
-    /// the correct address for test_entry()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn expected_entry_address() -> Address {
-        Address::from("QmWiGDegSfEUxw5qsco39QeGuZLqiunN928g3uPDdQw2QZ".to_string())
-    }
-
-    /// dummy entry, same as test_entry()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_a() -> Entry {
-        test_entry()
-    }
-
-    /// dummy entry, differs from test_entry()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_b() -> Entry {
-        Entry::App(test_app_entry_type_b(), test_entry_value_b())
-    }
-    pub fn test_entry_c() -> Entry {
-        Entry::App(test_app_entry_type_b(), test_entry_value_c())
-    }
-
-    /// dummy entry with unique string content
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_unique() -> Entry {
-        Entry::App(
-            test_app_entry_type(),
-            SerializedString(snowflake::ProcessUniqueId::new().to_string())
-                .try_into()
-                .unwrap(),
-        )
-    }
-
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_sys_entry() -> Entry {
-        Entry::AgentId(test_sys_entry_value())
-    }
-
-    pub fn test_sys_entry_address() -> Address {
-        Address::from(String::from(
-            "QmUZ3wsC4sVdJZK2AC8Ji4HZRfkFSH2cYE6FntmfWKF8GV",
-        ))
-    }
-
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_unpublishable_entry() -> Entry {
-        Entry::Dna(Box::new(fake_dna("uuid")))
-    }
-
     #[test]
     /// tests for PartialEq
     fn eq() {
-        let entry_a = test_entry_a();
-        let entry_b = test_entry_b();
+        let entry_a = Entry::fixture(FixtureType::A);
+        let entry_b = Entry::fixture(FixtureType::B);
 
         // same content is equal
         assert_eq!(entry_a, entry_a);
@@ -210,6 +142,6 @@ pub mod tests {
     #[test]
     /// test entry.address() against a known value
     fn known_address() {
-        assert_eq!(expected_entry_address(), test_entry().address());
+        assert_eq!(Address::new(vec![0]), Entry::fixture(FixtureType::A).address());
     }
 }

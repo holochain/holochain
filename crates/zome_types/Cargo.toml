@@ -14,4 +14,11 @@ edition = "2018"
 [dependencies]
 holochain_serialized_bytes = "=0.0.36"
 serde = { version = "1.0.104", features = ["derive", "rc"] }
-sx_address_types = { version = "0.0.1", path = "../address_types" }
+multihash = "=0.10.1"
+sx_zome_types_derive = { path = "../zome_types_derive" }
+# can we remove?
+thiserror = "1.0.10"
+
+[dev-dependencies]
+sx_fixture = { path = "../fixture" }
+maplit = "1.0.2"

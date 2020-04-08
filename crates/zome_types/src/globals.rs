@@ -1,5 +1,4 @@
-use holochain_serialized_bytes::prelude::*;
-use sx_address_types::Address;
+use crate::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct ZomeGlobals {
@@ -12,5 +11,5 @@ pub struct ZomeGlobals {
     pub public_token: Address,
     // @todo
     // pub cap_request: Option<CapabilityRequest>,
-    pub properties: crate::SerializedBytes,
+    pub properties: SerializedBytes,
 }

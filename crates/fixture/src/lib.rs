@@ -1,10 +1,12 @@
-pub enum FixtureType {
+pub enum FixtureType<I: Sized> {
     A,
     B,
     C,
     Random,
+    FromInput(I),
 }
 
 pub trait Fixture {
-    fn fixture(fixture_type: FixtureType) -> Self;
+    type Input: Sized;
+    fn fixture(fixture_type: FixtureType<Self::Input>) -> Self;
 }

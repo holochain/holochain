@@ -1,4 +1,4 @@
-use holochain_serialized_bytes::prelude::*;
+use crate::prelude::*;
 
 /// all wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way
@@ -112,6 +112,6 @@ wasm_io_types!(
     // IMPORTANT NOTE: zome externs work differently to everything else here because the _host_
     // is providing the input and the _guest_ is providing the output
     // hence, the non-standard naming, to try and make this clear
-    [ZomeExternHostInput, crate::SerializedBytes],
-    [ZomeExternGuestOutput, crate::SerializedBytes]
+    [ZomeExternHostInput, SerializedBytes],
+    [ZomeExternGuestOutput, SerializedBytes]
 );
