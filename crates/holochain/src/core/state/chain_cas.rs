@@ -1,7 +1,10 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use sx_state::{
     buffer::{BufferedStore, CasBuf},
-    db::{DbManager, CHAIN_ENTRIES, CHAIN_HEADERS},
+    db::{
+        DbManager, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
+        PRIMARY_CHAIN_HEADERS,
+    },
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
     prelude::{Readable, Reader, Writer},
@@ -34,13 +37,23 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     }
 
     pub fn primary(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
-        let entries = *dbs.get(&*CHAIN_ENTRIES)?;
-        let headers = *dbs.get(&*CHAIN_HEADERS)?;
+        let entries = *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?;
+        let headers = *dbs.get(&*PRIMARY_CHAIN_HEADERS)?;
+        Self::new(reader, entries, headers)
+    }
+
+    pub fn cache(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+        let entries = *dbs.get(&*CACHE_CHAIN_ENTRIES)?;
+        let headers = *dbs.get(&*CACHE_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 
     pub fn get_entry(&self, entry_address: &Address) -> DatabaseResult<Option<Entry>> {
         self.entries.get(entry_address)
+    }
+
+    pub fn contains(&self, entry_address: &Address) -> DatabaseResult<bool> {
+        self.entries.get(entry_address).map(|e| e.is_some())
     }
 
     pub fn get_header(&self, header_address: &Address) -> DatabaseResult<Option<ChainHeader>> {
@@ -72,18 +85,18 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn put(&mut self, v: (ChainHeader, Entry)) -> () {
+    pub fn put(&mut self, v: (ChainHeader, Entry)) {
         let (header, entry) = v;
         self.entries.put(entry);
         self.headers.put(header);
     }
 
-    /// TODO: consolidate into single delete which handles entry and header together
-    pub fn delete_entry(&mut self, k: Address) -> () {
+    // TODO: consolidate into single delete which handles entry and header together
+    pub fn delete_entry(&mut self, k: Address) {
         self.entries.delete(k)
     }
 
-    pub fn delete_header(&mut self, k: Address) -> () {
+    pub fn delete_header(&mut self, k: Address) {
         self.headers.delete(k)
     }
 

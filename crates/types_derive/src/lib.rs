@@ -1,8 +1,8 @@
 #![recursion_limit = "128"]
 #![cfg_attr(tarpaulin, skip)]
-#![warn(unused_extern_crates)]
 
 extern crate proc_macro;
+
 use quote::quote;
 use syn;
 
