@@ -1,6 +1,6 @@
 mod interface;
 
-pub mod channel;
 pub mod error;
+pub mod websocket;
 
 pub use interface::*;

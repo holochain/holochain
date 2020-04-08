@@ -8,7 +8,7 @@
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
 
-use super::state::ConductorState;
+use super::{api::AdminInterfaceApi, state::ConductorState};
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
@@ -17,6 +17,7 @@ use crate::conductor::{
 };
 pub use builder::*;
 use std::collections::HashMap;
+use std::error::Error;
 use sx_state::{
     db,
     env::{Environment, ReadManager},
@@ -30,8 +31,6 @@ use sx_types::{
     shims::Keystore,
 };
 use tracing::*;
-use url2::Url2;
-use std::error::Error;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -48,6 +47,9 @@ struct CellItem {
     _state: CellState,
 }
 
+// TODO: figure out what we need to track admin interfaces, if anything
+struct AdminInterfaceHandle(());
+
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     // tx_network: NetSender,
@@ -56,7 +58,7 @@ pub struct Conductor {
     state_db: ConductorStateDb,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
-    admin_interfaces: Vec<Url2>,
+    admin_interfaces: Vec<AdminInterfaceHandle>,
 }
 
 impl Conductor {
@@ -76,7 +78,11 @@ impl Conductor {
         ConductorBuilder::new()
     }
 
-    pub fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+    pub async fn kill() -> () {
+        unimplemented!()
+    }
+
+    pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
         let item = self
             .cells
             .get(cell_id)
@@ -84,7 +90,7 @@ impl Conductor {
         Ok(&item.cell)
     }
 
-    pub fn tx_network(&self) -> &NetSender {
+    pub(crate) fn tx_network(&self) -> &NetSender {
         unimplemented!()
     }
 
@@ -108,6 +114,10 @@ impl Conductor {
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
+
+    async fn spawn_admin_interface<Api: AdminInterfaceApi>(&mut self, api: Api) {
+        unimplemented!()
+    }
 }
 
 type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
@@ -115,7 +125,15 @@ type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
 mod builder {
 
     use super::*;
+    use crate::conductor::{
+        api::StdAdminInterfaceApi,
+        config::AdminInterfaceConfig,
+        interface::{websocket::create_admin_interface, InterfaceDriver},
+    };
+    use futures::{future, stream::FuturesUnordered};
+    use std::sync::Arc;
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
+    use tokio::sync::RwLock;
 
     pub struct ConductorBuilder {}
 
@@ -124,24 +142,41 @@ mod builder {
             Self {}
         }
 
-        pub async fn from_config(self, config: ConductorConfig) -> ConductorResult<Conductor> {
+        pub async fn from_config(
+            self,
+            config: ConductorConfig,
+        ) -> ConductorResult<Arc<RwLock<Conductor>>> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            let mut conductor = Conductor::new(environment).await?;
-            conductor.admin_interfaces = config
+            let conductor = Arc::new(RwLock::new(Conductor::new(environment).await?));
+            let admin_api = StdAdminInterfaceApi::new(conductor.clone());
+            let interface_futures: Vec<_> = config
                 .admin_interfaces
                 .unwrap_or_else(|| Vec::new())
                 .into_iter()
-                .map(Url2::try_parse)
+                .map(|AdminInterfaceConfig { driver, .. }| match driver {
+                    InterfaceDriver::Websocket { port } => {
+                        create_admin_interface(admin_api.clone(), port)
+                    }
+                })
+                .collect();
+            let interfaces: Vec<AdminInterfaceHandle> = future::join_all(interface_futures)
+                .await
+                .into_iter()
                 // Log errors
-                .inspect(|url| {
-                    if let Err(ref e) = url {
+                .inspect(|interface| {
+                    if let Err(ref e) = interface {
                         error!(error = e as &dyn Error, "Admin interface failed to parse");
                     }
                 })
                 // Throw away errors
                 .filter_map(Result::ok)
+                .map(AdminInterfaceHandle)
                 .collect();
+            {
+                let mut c = conductor.write().await;
+                c.admin_interfaces = interfaces;
+            }
             Ok(conductor)
         }
 

@@ -1,5 +1,5 @@
 use super::error::ConductorApiResult;
-use crate::conductor::{interface::error::InterfaceResult, conductor::Conductor};
+use crate::conductor::{conductor::Conductor, interface::error::InterfaceResult};
 use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
 use sx_types::{
@@ -12,7 +12,8 @@ use tokio::sync::RwLock;
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
     type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
     type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
-    async fn handle_request(&self, request: Self::ApiRequest) -> InterfaceResult<Self::ApiResponse>;
+    async fn handle_request(&self, request: Self::ApiRequest)
+        -> InterfaceResult<Self::ApiResponse>;
 }
 
 /// The interface that a Conductor exposes to the outside world.
@@ -68,25 +69,31 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 }
 
 #[derive(Clone)]
-pub struct StdAdminInterfaceApi;
+pub struct StdAdminInterfaceApi {
+    conductor_mutex: Arc<RwLock<Conductor>>,
+}
 
 impl StdAdminInterfaceApi {
-    pub(crate) fn new() -> Self {
-        StdAdminInterfaceApi{}
+    pub(crate) fn new(conductor_mutex: Arc<RwLock<Conductor>>) -> Self {
+        StdAdminInterfaceApi { conductor_mutex }
     }
-
 }
 
 #[async_trait::async_trait]
 impl AdminInterfaceApi for StdAdminInterfaceApi {
-    async fn admin(&self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> { unimplemented!() }
+    async fn admin(&self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> {
+        unimplemented!()
+    }
 }
 
 #[async_trait::async_trait]
 impl InterfaceApi for StdAdminInterfaceApi {
     type ApiRequest = AdminRequest;
     type ApiResponse = AdminResponse;
-    async fn handle_request(&self, request: Self::ApiRequest) -> InterfaceResult<Self::ApiResponse> {
+    async fn handle_request(
+        &self,
+        request: Self::ApiRequest,
+    ) -> InterfaceResult<Self::ApiResponse> {
         let r = AdminInterfaceApi::handle_request(self, request).await;
         Ok(r)
     }
@@ -121,7 +128,10 @@ impl AppInterfaceApi for StdAppInterfaceApi {
 impl InterfaceApi for StdAppInterfaceApi {
     type ApiRequest = AppRequest;
     type ApiResponse = AppResponse;
-    async fn handle_request(&self, request: Self::ApiRequest) -> InterfaceResult<Self::ApiResponse> {
+    async fn handle_request(
+        &self,
+        request: Self::ApiRequest,
+    ) -> InterfaceResult<Self::ApiResponse> {
         let r = AppInterfaceApi::handle_request(self, request).await;
         Ok(r)
     }

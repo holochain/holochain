@@ -7,6 +7,7 @@ use futures::{
     stream::{Stream, StreamExt},
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
+use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 
 /// Allows the conductor or cell to forward signals to connected clients
@@ -136,6 +137,28 @@ pub fn attach_external_conductor_api<A: AppInterfaceApi>(
             }
         }
     })
+}
+
+/// Configuration for interfaces, specifying the means by which an interface
+/// should be opened.
+///
+/// NB: This struct is used in both [ConductorConfig] and [ConductorState], so
+/// it is important that the serialization technique is not altered.
+//
+// TODO: write test that ensures the serialization is unaltered
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum InterfaceDriver {
+    Websocket { port: u16 },
+}
+
+/// Message sent to an interface task to effect some change
+// TODO: hook this up to admin and app interfaces via a channel
+pub enum InterfaceControlMsg {
+    /// Broadcasts a Signal out to all clients of this interface
+    Signal(crate::core::signal::Signal),
+    /// Close all connections and kill the task listening for new connections
+    Kill,
 }
 
 #[cfg(test)]

@@ -1,16 +1,17 @@
+use anyhow::Result;
 use assert_cmd::prelude::*;
-use holochain_2020::conductor::api::{AdminRequest, AdminResponse};
+use holochain_2020::conductor::{Conductor, api::{AdminRequest, AdminResponse}, config::*};
 use holochain_websocket::*;
 use std::sync::Arc;
 use std::{
     io::Read,
     process::{Child, Command, ExitStatus, Stdio},
 };
+use tempdir::TempDir;
 use url2::prelude::*;
 
-type StdResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-fn check_started(started: Result<Option<ExitStatus>, std::io::Error>, holochain: &mut Child) {
+fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
     if let Ok(Some(status)) = started {
         let mut stdout = String::new();
         let mut stderr = String::new();
@@ -28,7 +29,8 @@ fn check_started(started: Result<Option<ExitStatus>, std::io::Error>, holochain:
 }
 
 #[tokio::test]
-async fn call_admin() -> StdResult {
+#[ignore]
+async fn call_admin() -> Result<()> {
     let port = 9000;
     let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
     cmd.arg("--structured");
@@ -38,7 +40,7 @@ async fn call_admin() -> StdResult {
     let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
     std::thread::sleep(std::time::Duration::from_secs(1));
     let started = holochain.try_wait();
-    check_started(started, &mut holochain);
+    check_started(started.map_err(Into::into), &mut holochain);
 
     run_websocket(port).await?;
 
@@ -46,7 +48,7 @@ async fn call_admin() -> StdResult {
     Ok(())
 }
 
-async fn run_websocket(port: u16) -> StdResult {
+async fn run_websocket(port: u16) -> Result<()> {
     //let (mut send_socket, mut recv_socket) = websocket_connect(
     let r = websocket_connect(
         url2!("ws://127.0.0.1:{}", port),
@@ -67,6 +69,20 @@ async fn run_websocket(port: u16) -> StdResult {
     assert!(r);
 
     //assert_eq!(response, AppResponse::AdminResponse{ response: Box::new(AdminResponse::DnaAdded) });
+
+    Ok(())
+}
+
+
+#[tokio::test]
+#[ignore]
+async fn conductor_admin_interface_runs_from_config() -> Result<()> {
+    let config = ConductorConfig {
+        admin_interfaces: Some(vec![AdminInterfaceConfig { driver: InterfaceDriver::Websocket { port: 0 }}]),
+        ..Default::default()
+    };
+    let conductor = Conductor::build().from_config(config).await?;
+    conductor.write().await.kill().await;
 
     Ok(())
 }
