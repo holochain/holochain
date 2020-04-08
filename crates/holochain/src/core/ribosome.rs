@@ -8,6 +8,8 @@
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
 
+use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_host::prelude::*;
 use mockall::automock;
 use std::sync::Arc;
 use sx_types::{
@@ -19,8 +21,6 @@ use sx_types::{
 };
 use sx_zome_types::globals::ZomeGlobals;
 use sx_zome_types::*;
-use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_host::prelude::*;
 
 /// Represents a type which has not been decided upon yet
 pub enum Todo {}
