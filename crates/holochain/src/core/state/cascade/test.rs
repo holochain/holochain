@@ -11,7 +11,7 @@ use sx_state::{
     test_utils::test_cell_env,
 };
 use sx_types::persistence::cas::content::Addressable;
-use sx_types::{agent::AgentId, entry::Entry, observability, prelude::Address};
+use sx_types::{agent::AgentId, entry::Entry, observability};
 
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
