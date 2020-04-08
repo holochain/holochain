@@ -7,7 +7,6 @@ edition = "2018"
 [lib]
 name = "test_wasm_foo"
 crate-type = [ "cdylib", "rlib" ]
-path = "./foo.rs"
 
 [dependencies]
 wee_alloc = "=0.4.5"
