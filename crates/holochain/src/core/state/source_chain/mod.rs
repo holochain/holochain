@@ -1,4 +1,5 @@
 mod error;
+#[allow(clippy::module_inception)]
 mod source_chain;
 mod source_chain_buffer;
 

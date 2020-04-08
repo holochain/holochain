@@ -35,6 +35,7 @@ petgraph = "0.5.0"
 boolinator = "2.4.0"
 base64 = "0.10.1"
 tracing = "=0.1.13"
+tracing-futures = "=0.2.3"
 holochain_wasmer_host = "=0.0.24"
 holochain_serialized_bytes = "=0.0.36"
 url = "1.7.2"
@@ -49,6 +50,7 @@ anyhow = "1.0.26"
 assert_cli = "0.6.3"
 sx_wasm_test_utils = { path = "../../test_utils/wasm" }
 test_wasm_common = { path = "../../test_utils/wasm_common" }
+maplit = "1.0.2"
 
 [lib]
 name = "holochain_2020"
