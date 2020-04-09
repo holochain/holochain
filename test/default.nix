@@ -5,8 +5,6 @@ let
   ''
   set -euxo pipefail
   RUST_BACKTRACE=1 \
-  CARGO_TARGET_DIR=test_utils/wasm/target/foo \
-  cargo build --release --manifest-path test_utils/wasm/foo/Cargo.toml --target wasm32-unknown-unknown && \
   cargo test -- --nocapture
   '';
 
