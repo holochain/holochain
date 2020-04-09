@@ -71,11 +71,13 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct StdAdminInterfaceApi {
     conductor_handle: ConductorHandle,
+    app_api: StdAppInterfaceApi,
 }
 
 impl StdAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
-        StdAdminInterfaceApi { conductor_handle }
+        let app_api = StdAppInterfaceApi::new(conductor_handle.clone());
+        StdAdminInterfaceApi { conductor_handle, app_api }
     }
 }
 
