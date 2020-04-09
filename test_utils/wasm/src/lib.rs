@@ -29,8 +29,11 @@ impl From<TestWasm> for PathBuf {
 pub fn test_wasm(wasm: TestWasm) -> DnaWasm {
     match wasm {
         TestWasm::Foo => DnaWasm::from(
-            include_bytes!(concat!(env!("OUT_DIR"), "/wasm32-unknown-unknown/release/test_wasm_foo.wasm"))
-                .to_vec(),
+            include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
+            ))
+            .to_vec(),
         ),
     }
 }
