@@ -4,6 +4,7 @@ use holochain_2020::conductor::{Conductor, api::{AdminRequest, AdminResponse}, c
 use holochain_websocket::*;
 use std::sync::Arc;
 use std::{
+    path::PathBuf,
     io::Read,
     process::{Child, Command, ExitStatus, Stdio},
 };
@@ -28,12 +29,29 @@ fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
     }
 }
 
+fn create_config(mut path: PathBuf, port: u16) -> Result<PathBuf> {
+    let config = ConductorConfig {
+        admin_interfaces: Some(vec![AdminInterfaceConfig { driver: InterfaceDriver::Websocket { port }}]),
+        ..Default::default()
+    };
+    path.push("conductor_config.toml");
+    std::fs::write(path.clone(), toml::to_string(&config)?)?;
+    Ok(path)
+
+}
+
 #[tokio::test]
 #[ignore]
 async fn call_admin() -> Result<()> {
     let port = 9000;
+
+    let tmp_dir = TempDir::new("conductor_cfg")?;
+    let config_path = create_config(tmp_dir.into_path(), port)?;
+
     let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
     cmd.arg("--structured");
+    cmd.arg("--config-path");
+    cmd.arg(config_path);
     cmd.env("RUST_LOG", "debug");
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
