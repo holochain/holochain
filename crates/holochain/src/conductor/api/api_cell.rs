@@ -1,5 +1,5 @@
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::{cell::Cell, conductor::Conductor};
+use crate::conductor::{cell::Cell, Conductor};
 use async_trait::async_trait;
 use std::sync::Arc;
 use sx_types::{

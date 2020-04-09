@@ -17,6 +17,8 @@ use sx_types::{
     shims::*,
 };
 
+pub mod error;
+
 impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)
     where
