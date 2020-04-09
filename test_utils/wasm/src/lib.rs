@@ -15,17 +15,6 @@ pub enum TestWasm {
     Foo,
 }
 
-impl From<TestWasm> for PathBuf {
-    fn from(test_wasm: TestWasm) -> PathBuf {
-        match test_wasm {
-            TestWasm::Foo => {
-                "test_utils/wasm/foo/target/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
-            }
-        }
-        .into()
-    }
-}
-
 pub fn test_wasm(wasm: TestWasm) -> DnaWasm {
     match wasm {
         TestWasm::Foo => DnaWasm::from(
