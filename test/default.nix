@@ -1,17 +1,8 @@
 { pkgs }:
 let
-  t-wasm = pkgs.writeShellScriptBin "hc-rust-wasm-compile"
-  ''
-  set -euxo pipefail
-  RUST_BACKTRACE=1 \
-  CARGO_TARGET_DIR=test_utils/wasm/target/foo \
-  cargo build --release --manifest-path test_utils/wasm/foo/Cargo.toml --target wasm32-unknown-unknown
-  '';
-
   t-test = pkgs.writeShellScriptBin "hc-test"
   ''
   set -euxo pipefail
-  hc-rust-wasm-compile
   RUST_BACKTRACE=1 \
   cargo test -- --nocapture
   '';
@@ -28,7 +19,6 @@ let
   t-cover = pkgs.writeShellScriptBin "hc-coverage-test"
   ''
   set -euxo pipefail
-  hc-rust-wasm-compile
 
   # kcov does not work with the global /holochain-rust/target
   mkdir -p target
@@ -77,5 +67,5 @@ let
   maybe_linux = if pkgs.stdenv.isLinux then [ t-cover ] else [ ];
 in
 {
-  buildInputs = [ t-wasm t-test t-merge ] ++ maybe_linux;
+  buildInputs = [ t-test t-merge ] ++ maybe_linux;
 }

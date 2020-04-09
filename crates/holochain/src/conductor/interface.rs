@@ -9,6 +9,9 @@ use futures::{
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use std::convert::{TryFrom, TryInto};
 
+pub mod channel;
+mod handler;
+
 /// Interface Error Type
 #[derive(Debug, thiserror::Error)]
 pub enum InterfaceError {
