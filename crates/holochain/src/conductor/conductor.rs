@@ -77,7 +77,7 @@ impl ConductorHandle {
     }
 
     pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
-        // Make sure the write lock is not held for the await
+        // TODO: TEST: Make sure the write lock is not held for the await
         let task_manager_run_handle = {
             let mut conductor = self.0.write().await;
             conductor.wait()
@@ -97,7 +97,7 @@ pub struct Conductor {
     cells: HashMap<CellId, CellItem>,
     env: Environment,
     state_db: ConductorStateDb,
-    closing: bool,
+    shutting_down: bool,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
 
@@ -126,7 +126,7 @@ impl Conductor {
             cells: HashMap::new(),
             _handle_map: HashMap::new(),
             _agent_keys: HashMap::new(),
-            closing: false,
+            shutting_down: false,
             managed_task_add_sender: task_tx,
             managed_task_stop_sender: stop_tx,
             task_manager_run_handle,
@@ -157,8 +157,11 @@ impl Conductor {
             .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
     }
 
+    /// A gate to put at the top of public functions to ensure that work is not
+    /// attempted after a shutdown has been issued
+    // TEST: that this works
     fn check_running(&self) -> ConductorResult<()> {
-        if self.closing {
+        if self.shutting_down {
             Err(ConductorError::ShuttingDown)
         } else {
             Ok(())
@@ -166,6 +169,7 @@ impl Conductor {
     }
 
     async fn shutdown(&mut self) -> () {
+        self.shutting_down = true;
         self.managed_task_stop_sender
             .send(())
             .map_err(|e| {
@@ -225,7 +229,8 @@ mod builder {
     use crate::conductor::{
         api::StdAdminInterfaceApi,
         config::AdminInterfaceConfig,
-        interface::{websocket::create_admin_interface, InterfaceDriver}, manager::keep_alive,
+        interface::{websocket::create_admin_interface, InterfaceDriver},
+        manager::keep_alive,
     };
     use futures::future;
     use std::sync::Arc;
@@ -278,20 +283,19 @@ mod builder {
                         .manage_task(ManagedTaskAdd::new(
                             handle,
                             Box::new(|result| {
-                                result
-                                    .map_err(|e| {
-                                        error!(
-                                            error = &e as &dyn std::error::Error,
-                                            "Interface died"
-                                        )
-                                    })
-                                    .ok();
+                                result.unwrap_or_else(|e| {
+                                    error!(error = &e as &dyn std::error::Error, "Interface died")
+                                });
                                 None
                             }),
                         ))
                         .await?
                 }
-                conductor.manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive(stop_tx.subscribe())))).await?;
+                conductor
+                    .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive(
+                        stop_tx.subscribe(),
+                    ))))
+                    .await?;
             }
             Ok(conductor_mutex.into())
         }

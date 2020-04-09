@@ -17,7 +17,7 @@ use std::convert::TryFrom;
 
 use std::sync::Arc;
 use tokio::stream::StreamExt;
-use tokio::sync::{broadcast};
+use tokio::sync::broadcast;
 use tracing::*;
 use url2::url2;
 
@@ -92,7 +92,7 @@ pub async fn create_admin_interface<A: InterfaceApi>(
                 }
             }
         }
-        // TODO: drop listener, make sure all these tasks finish!
+        // TODO: TEST: drop listener, make sure all these tasks finish!
         drop(listener);
 
         // these SHOULD end soon after we get here, or by the time we get here,

@@ -1,16 +1,19 @@
 use anyhow::Result;
 use assert_cmd::prelude::*;
-use holochain_2020::conductor::{Conductor, api::{AdminRequest, AdminResponse}, config::*};
+use holochain_2020::conductor::{
+    api::{AdminRequest, AdminResponse},
+    config::*,
+    Conductor,
+};
 use holochain_websocket::*;
 use std::sync::Arc;
 use std::{
-    path::PathBuf,
     io::Read,
+    path::PathBuf,
     process::{Child, Command, ExitStatus, Stdio},
 };
 use tempdir::TempDir;
 use url2::prelude::*;
-
 
 fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
     if let Ok(Some(status)) = started {
@@ -31,13 +34,14 @@ fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
 
 fn create_config(mut path: PathBuf, port: u16) -> Result<PathBuf> {
     let config = ConductorConfig {
-        admin_interfaces: Some(vec![AdminInterfaceConfig { driver: InterfaceDriver::Websocket { port }}]),
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket { port },
+        }]),
         ..Default::default()
     };
     path.push("conductor_config.toml");
     std::fs::write(path.clone(), toml::to_string(&config)?)?;
     Ok(path)
-
 }
 
 #[tokio::test]
@@ -91,12 +95,12 @@ async fn run_websocket(port: u16) -> Result<()> {
     Ok(())
 }
 
-
 #[tokio::test]
-#[ignore]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let config = ConductorConfig {
-        admin_interfaces: Some(vec![AdminInterfaceConfig { driver: InterfaceDriver::Websocket { port: 0 }}]),
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket { port: 0 },
+        }]),
         ..Default::default()
     };
     let conductor_handle = Conductor::build().from_config(config).await?;

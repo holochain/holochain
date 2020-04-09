@@ -8,7 +8,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::stream::StreamExt;
-use tokio::sync::{mpsc, broadcast};
+use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -47,18 +47,6 @@ impl ManagedTaskAdd {
     }
 }
 
-// TODO: implement, move into task that loops and select!s
-struct TaskManager {
-    stream: FuturesUnordered<ManagedTaskAdd>,
-}
-
-impl TaskManager {
-    fn new() -> Self {
-        let stream = FuturesUnordered::new();
-        TaskManager { stream }
-    }
-}
-
 // FIXME I'm not sure if this is correct please review
 impl Future for ManagedTaskAdd {
     type Output = (Option<OnDeath>, ManagedTaskResult);
@@ -71,6 +59,18 @@ impl Future for ManagedTaskAdd {
             }
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+// TODO: implement, move into task that loops and select!s
+struct TaskManager {
+    stream: FuturesUnordered<ManagedTaskAdd>,
+}
+
+impl TaskManager {
+    fn new() -> Self {
+        let stream = FuturesUnordered::new();
+        TaskManager { stream }
     }
 }
 
@@ -103,7 +103,7 @@ async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) {
                 None
             }
             result = task_manager.stream.next() => match result {
-                Some((Some(on_death), result)) => handle_complete_task(on_death, result),
+                Some((Some(on_death), task_result)) => handle_completed_task(on_death, task_result),
                 None => break,
                 _ => None,
             }
@@ -114,11 +114,11 @@ async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) {
     }
 }
 
-fn handle_complete_task(
+fn handle_completed_task(
     on_death: OnDeath,
-    complete_task: ManagedTaskResult,
+    task_result: ManagedTaskResult,
 ) -> Option<ManagedTaskAdd> {
-    on_death(complete_task)
+    on_death(task_result)
 }
 
 #[cfg(test)]
@@ -145,7 +145,7 @@ mod test {
                 _ => None,
             }),
         );
-        // Check that the main task doesn't close staright away
+        // Check that the main task doesn't close straight away
         let main_handle = tokio::spawn(main_task);
         tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
