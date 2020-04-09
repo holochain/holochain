@@ -8,7 +8,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::stream::StreamExt;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, broadcast};
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -37,6 +37,13 @@ impl ManagedTaskAdd {
     pub(crate) fn new(handle: ManagedTaskHandle, on_death: OnDeath) -> Self {
         let on_death = Some(on_death);
         ManagedTaskAdd { handle, on_death }
+    }
+
+    /// You just want the task in the task manager but don't want
+    /// to react to an error
+    pub(crate) fn dont_handle(handle: ManagedTaskHandle) -> Self {
+        let on_death = Box::new(|_| None);
+        Self::new(handle, on_death)
     }
 }
 
@@ -70,6 +77,14 @@ impl Future for ManagedTaskAdd {
 pub(crate) fn spawn_task_manager() -> (mpsc::Sender<ManagedTaskAdd>, TaskManagerRunHandle) {
     let (send, recv) = mpsc::channel(CHANNEL_SIZE);
     (send, tokio::spawn(run(recv)))
+}
+
+/// A super pessimistic task that is just waitng to die
+/// but gets to live as long as the process
+/// so the task manager doesn't quite
+pub(crate) async fn keep_alive(mut die: broadcast::Receiver<()>) -> ManagedTaskResult {
+    die.recv().await?;
+    Ok(())
 }
 
 async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) {

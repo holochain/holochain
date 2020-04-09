@@ -225,7 +225,7 @@ mod builder {
     use crate::conductor::{
         api::StdAdminInterfaceApi,
         config::AdminInterfaceConfig,
-        interface::{websocket::create_admin_interface, InterfaceDriver},
+        interface::{websocket::create_admin_interface, InterfaceDriver}, manager::keep_alive,
     };
     use futures::future;
     use std::sync::Arc;
@@ -291,6 +291,7 @@ mod builder {
                         ))
                         .await?
                 }
+                conductor.manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive(stop_tx.subscribe())))).await?;
             }
             Ok(conductor_mutex.into())
         }
