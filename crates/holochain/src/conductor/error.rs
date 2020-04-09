@@ -1,4 +1,4 @@
-use crate::conductor::{api::error::ConductorApiError, cell::error::CellError};
+use crate::conductor::{cell::error::CellError};
 use std::path::PathBuf;
 use sx_state::error::DatabaseError;
 use sx_types::cell::{CellHandle, CellId};
@@ -49,6 +49,9 @@ pub enum ConductorError {
 
     #[error("Error while performing IO for the Conductor: {0}")]
     IoError(#[from] std::io::Error),
+    
+    #[error("Error while trying to send a task to the task manager: {0}")]
+    SubmitTaskError(String)
 }
 
 // TODO: can this be removed?

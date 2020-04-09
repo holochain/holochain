@@ -14,10 +14,10 @@ use holochain_websocket::{
     websocket_bind, WebsocketConfig, WebsocketMessage, WebsocketReceiver, WebsocketSender,
 };
 use std::convert::TryFrom;
-use std::error::Error;
+
 use std::sync::Arc;
 use tokio::stream::StreamExt;
-use tokio::sync::{broadcast, mpsc::Receiver};
+use tokio::sync::{broadcast};
 use tracing::*;
 use url2::url2;
 

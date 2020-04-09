@@ -2,6 +2,7 @@ use holochain_2020::conductor::{
     api::*, config::ConductorConfig, error::ConductorError, interactive, interface::websocket::*,
     paths::ConfigFilePath, Conductor, ConductorHandle,
 };
+use std::error::Error;
 use std::{convert::TryInto, path::PathBuf};
 use structopt::StructOpt;
 use sx_types::observability::{self, Output};
@@ -129,18 +130,15 @@ async fn async_main() {
         let api = StdAppInterfaceApi::new(conductor.into());
         interface_example(api).await;
     } else {
-        // let (mut send_create_interface, recv_ci) = sync::mpsc::channel(CHANNEL_SIZE);
-        // let handle = tokio::spawn(manage_interfaces(recv_ci));
-        // send_create_interface
-        //     .send(InterfaceMsg::CreateAdmin)
-        //     .await
-        //     .unwrap_or_else(|e| error!(error = &e as &dyn Error, "Failed to create interfaces"));
-        // let (create_result,) = tokio::join!(handle);
-        // create_result.unwrap_or_else(|e| {
-        //     error!(error = &e as &dyn Error, "Failed to join create_interfaces")
-        // });
-        // // TODO: kick off actual conductor task here when we're ready for that
         println!("Conductor successfully initialized.");
+        // kick off actual conductor task here 
+        conductor
+            .wait()
+            .await
+            .map_err(|e| {
+                error!(error = &e as &dyn Error, "Failed to join the main task");
+            })
+            .ok();
     }
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:

@@ -11,7 +11,7 @@
 use super::{
     api::{AdminInterfaceApi, AppInterfaceApi},
     error::ConductorError,
-    manager::{ManagedTaskHandle, ManagedTaskResult},
+    manager::{spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle, TaskManagerRunHandle},
     state::ConductorState,
 };
 use crate::conductor::{
@@ -22,7 +22,6 @@ use crate::conductor::{
 };
 pub use builder::*;
 use derive_more::{AsRef, Deref, From};
-use futures::{future, stream::FuturesUnordered};
 use std::collections::HashMap;
 use std::{error::Error, sync::Arc};
 use sx_state::{
@@ -37,7 +36,7 @@ use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
-use tokio::sync::{mpsc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
@@ -76,18 +75,21 @@ impl ConductorHandle {
         let mut conductor = self.0.write().await;
         conductor.shutdown().await;
     }
+
+    pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
+        // Make sure the write lock is not held for the await
+        let task_manager_run_handle = {
+            let mut conductor = self.0.write().await;
+            conductor.wait()
+        };
+        if let Some(handle) = task_manager_run_handle {
+            handle.await?;
+        } else {
+            warn!("Tried to await the task manager run handle but there was none");
+        }
+        Ok(())
+    }
 }
-
-// TODO: implement, move into task that loops and select!s
-struct TaskManager(FuturesUnordered<ManagedTaskHandle>);
-
-/// A message sent to the TaskManager, registering a closure to run upon
-/// completion of a task
-pub type ManagedTaskAdd = (
-    ManagedTaskHandle,
-    // TODO: reevaluate wether this should be a callback
-    Box<dyn FnOnce(ConductorHandle, ManagedTaskResult) -> () + Send + Sync>,
-);
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
@@ -106,13 +108,17 @@ pub struct Conductor {
 
     /// broadcast channel sender, used to end all managed tasks
     managed_task_stop_sender: StopBroadcaster,
+
+    /// The main task join handle to await on
+    task_manager_run_handle: Option<TaskManagerRunHandle>,
 }
 
 impl Conductor {
     async fn new(env: Environment) -> ConductorResult<Conductor> {
         let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
         // TODO: move task_rx into TaskManager
-        let (task_tx, task_rx) = mpsc::channel(1);
+        let (task_tx, task_manager_run_handle) = spawn_task_manager();
+        let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
         Ok(Conductor {
             env,
@@ -123,6 +129,7 @@ impl Conductor {
             closing: false,
             managed_task_add_sender: task_tx,
             managed_task_stop_sender: stop_tx,
+            task_manager_run_handle,
         })
     }
 
@@ -143,10 +150,11 @@ impl Conductor {
     }
 
     /// Sends a JoinHandle to the TaskManager task to be managed
-    fn manage_task(&mut self, handle: ManagedTaskHandle) {
-        // TODO: send handle to TaskManager task.
-        // Perhaps also need to send a closure detailing what to do on error.
-        unimplemented!()
+    pub(crate) async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
+        self.managed_task_add_sender
+            .send(handle)
+            .await
+            .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
     }
 
     fn check_running(&self) -> ConductorResult<()> {
@@ -158,12 +166,16 @@ impl Conductor {
     }
 
     async fn shutdown(&mut self) -> () {
-        self.managed_task_stop_sender.send(()).unwrap_or_else(|e| {
-            error!(
-                //error = &e as &dyn std::error::Error,
-                "Couldn't broadcast stop signal to managed tasks!"
-            );
-        });
+        self.managed_task_stop_sender
+            .send(())
+            .map_err(|e| {
+                error!(?e, "Couldn't broadcast stop signal to managed tasks!");
+            })
+            .ok();
+    }
+
+    pub fn wait(&mut self) -> Option<TaskManagerRunHandle> {
+        self.task_manager_run_handle.take()
     }
 
     // TODO: remove allow once we actually use this function
@@ -263,12 +275,21 @@ mod builder {
                 let mut conductor = conductor_mutex.write().await;
                 for handle in handles {
                     conductor
-                        .managed_task_add_sender
-                        // TODO: write closure for handling result of this task,
-                        // and feel free to pretty it up with a newtype or something
-                        .send((handle, Box::new(|_, _| {})))
-                        .await
-                        .unwrap_or_else(|_err| error!("Failed to send a task to the task manager"));
+                        .manage_task(ManagedTaskAdd::new(
+                            handle,
+                            Box::new(|result| {
+                                result
+                                    .map_err(|e| {
+                                        error!(
+                                            error = &e as &dyn std::error::Error,
+                                            "Interface died"
+                                        )
+                                    })
+                                    .ok();
+                                None
+                            }),
+                        ))
+                        .await?
                 }
             }
             Ok(conductor_mutex.into())
