@@ -11,7 +11,8 @@ use super::error::{InterfaceError, InterfaceResult};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_wasmer_host::TryInto;
 use holochain_websocket::{
-    websocket_bind, WebsocketConfig, WebsocketMessage, WebsocketReceiver, WebsocketSender,
+    websocket_bind, WebsocketConfig, WebsocketListener, WebsocketMessage, WebsocketReceiver,
+    WebsocketSender,
 };
 use std::convert::TryFrom;
 
@@ -42,7 +43,7 @@ use url2::url2;
 //     while let Some(msg) = recv_ci.recv().await {
 //         match msg {
 //             CreateAdmin { api, port } => {
-//                 handles.push(tokio::spawn(create_admin_interface(api, port)))
+//                 handles.push(tokio::spawn(spawn_admin_interface_task(api, port)))
 //             }
 //             Close => {
 //                 for h in handles {
@@ -58,19 +59,27 @@ use url2::url2;
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub async fn create_admin_interface<A: InterfaceApi>(
-    api: A,
+pub async fn spawn_admin_interface_task<A: InterfaceApi>(
     port: u16,
-    mut stop_rx: StopReceiver,
+    api: A,
+    stop_rx: StopReceiver,
 ) -> InterfaceResult<ManagedTaskHandle> {
     trace!("Initializing Admin interface");
-    let mut listener = websocket_bind(
+    let listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
 
+    build_admin_interface_listener_task(listener, api, stop_rx)
+}
+
+fn build_admin_interface_listener_task<A: InterfaceApi>(
+    mut listener: WebsocketListener,
+    api: A,
+    mut stop_rx: StopReceiver,
+) -> InterfaceResult<ManagedTaskHandle> {
     Ok(tokio::task::spawn(async move {
         let mut listener_handles = Vec::new();
         loop {
@@ -106,10 +115,10 @@ pub async fn create_admin_interface<A: InterfaceApi>(
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
-// TODO: hook up a kill channel similar to `create_admin_interface` above
-pub async fn create_app_interface<A: InterfaceApi>(
-    api: A,
+// TODO: hook up a kill channel similar to `spawn_admin_interface_task` above
+pub async fn spawn_app_interface_task<A: InterfaceApi>(
     port: u16,
+    api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<()> {
     trace!("Initializing App interface");

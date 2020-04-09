@@ -79,10 +79,10 @@ pub(crate) fn spawn_task_manager() -> (mpsc::Sender<ManagedTaskAdd>, TaskManager
     (send, tokio::spawn(run(recv)))
 }
 
-/// A super pessimistic task that is just waitng to die
+/// A super pessimistic task that is just waiting to die
 /// but gets to live as long as the process
-/// so the task manager doesn't quite
-pub(crate) async fn keep_alive(mut die: broadcast::Receiver<()>) -> ManagedTaskResult {
+/// so the task manager doesn't quit
+pub(crate) async fn keep_alive_task(mut die: broadcast::Receiver<()>) -> ManagedTaskResult {
     die.recv().await?;
     Ok(())
 }

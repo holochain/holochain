@@ -229,8 +229,8 @@ mod builder {
     use crate::conductor::{
         api::StdAdminInterfaceApi,
         config::AdminInterfaceConfig,
-        interface::{websocket::create_admin_interface, InterfaceDriver},
-        manager::keep_alive,
+        interface::{websocket::spawn_admin_interface_task, InterfaceDriver},
+        manager::keep_alive_task,
     };
     use futures::future;
     use std::sync::Arc;
@@ -253,50 +253,14 @@ mod builder {
             let conductor = Conductor::new(environment).await?;
             let stop_tx = conductor.managed_task_stop_sender.clone();
             let conductor_mutex = Arc::new(RwLock::new(conductor));
-            let admin_api = StdAdminInterfaceApi::new(conductor_mutex.clone().into());
-            let interface_futures: Vec<_> = config
-                .admin_interfaces
-                .unwrap_or_else(|| Vec::new())
-                .into_iter()
-                .map(|AdminInterfaceConfig { driver, .. }| match driver {
-                    InterfaceDriver::Websocket { port } => {
-                        create_admin_interface(admin_api.clone(), port, stop_tx.subscribe())
-                    }
-                })
-                .collect();
-            let handles: Vec<ManagedTaskHandle> = future::join_all(interface_futures)
-                .await
-                .into_iter()
-                // Log errors
-                .inspect(|interface| {
-                    if let Err(ref e) = interface {
-                        error!(error = e as &dyn Error, "Admin interface failed to parse");
-                    }
-                })
-                // Throw away errors
-                .filter_map(Result::ok)
-                .collect();
-            {
-                let mut conductor = conductor_mutex.write().await;
-                for handle in handles {
-                    conductor
-                        .manage_task(ManagedTaskAdd::new(
-                            handle,
-                            Box::new(|result| {
-                                result.unwrap_or_else(|e| {
-                                    error!(error = &e as &dyn std::error::Error, "Interface died")
-                                });
-                                None
-                            }),
-                        ))
-                        .await?
-                }
-                conductor
-                    .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive(
-                        stop_tx.subscribe(),
-                    ))))
-                    .await?;
-            }
+
+            setup_admin_interfaces_from_config(
+                conductor_mutex.clone(),
+                stop_tx,
+                config.admin_interfaces.unwrap_or_default(),
+            )
+            .await?;
+
             Ok(conductor_mutex.into())
         }
 
@@ -304,6 +268,66 @@ mod builder {
             let environment = test_conductor_env();
             Conductor::new(environment).await
         }
+    }
+
+    /// Spawn all admin interface tasks, register them with the TaskManager,
+    /// and modify the conductor accordingly, based on the config passed in
+    async fn setup_admin_interfaces_from_config(
+        conductor_mutex: Arc<RwLock<Conductor>>,
+        stop_tx: StopBroadcaster,
+        configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()> {
+        let admin_api = StdAdminInterfaceApi::new(conductor_mutex.clone().into());
+
+        // Closure to process each admin config item
+        let spawn_from_config = |AdminInterfaceConfig { driver, .. }| match driver {
+            InterfaceDriver::Websocket { port } => {
+                spawn_admin_interface_task(port, admin_api.clone(), stop_tx.subscribe())
+            }
+        };
+
+        // spawn interface tasks, collect their JoinHandles,
+        // and throw away the errors after logging them
+        let handles: Vec<_> = future::join_all(configs.into_iter().map(spawn_from_config))
+            .await
+            .into_iter()
+            // Log errors
+            .inspect(|interface| {
+                if let Err(ref e) = interface {
+                    error!(error = e as &dyn Error, "Admin interface failed to parse");
+                }
+            })
+            // Throw away errors
+            .filter_map(Result::ok)
+            .collect();
+
+        {
+            let mut conductor = conductor_mutex.write().await;
+
+            // First, register the keepalive task, to ensure the conductor doesn't shut down
+            // in the absence of other "real" tasks
+            conductor
+                .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
+                    stop_tx.subscribe(),
+                ))))
+                .await?;
+
+            // Now that tasks are spawned, register them with the TaskManager
+            for handle in handles {
+                conductor
+                    .manage_task(ManagedTaskAdd::new(
+                        handle,
+                        Box::new(|result| {
+                            result.unwrap_or_else(|e| {
+                                error!(error = &e as &dyn std::error::Error, "Interface died")
+                            });
+                            None
+                        }),
+                    ))
+                    .await?
+            }
+        }
+        Ok(())
     }
 }
 
