@@ -85,6 +85,7 @@ struct TaskManager(FuturesUnordered<ManagedTaskHandle>);
 /// completion of a task
 pub type ManagedTaskAdd = (
     ManagedTaskHandle,
+    // TODO: reevaluate wether this should be a callback
     Box<dyn FnOnce(ConductorHandle, ManagedTaskResult) -> () + Send + Sync>,
 );
 
@@ -97,7 +98,6 @@ pub struct Conductor {
     closing: bool,
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
-    admin_interfaces: Vec<AdminInterfaceHandle>,
 
     /// oneshot senders used to end various managed tasks
     // TODO: define message type, spawn task that takes receiver and select!s
@@ -120,7 +120,6 @@ impl Conductor {
             cells: HashMap::new(),
             _handle_map: HashMap::new(),
             _agent_keys: HashMap::new(),
-            admin_interfaces: Vec::new(),
             closing: false,
             managed_task_add_sender: task_tx,
             managed_task_stop_sender: stop_tx,
@@ -159,7 +158,12 @@ impl Conductor {
     }
 
     async fn shutdown(&mut self) -> () {
-        future::join_all(self.admin_interfaces.iter_mut().map(|i| i.stop())).await;
+        self.managed_task_stop_sender.send(()).unwrap_or_else(|e| {
+            error!(
+                //error = &e as &dyn std::error::Error,
+                "Couldn't broadcast stop signal to managed tasks!"
+            );
+        });
     }
 
     // TODO: remove allow once we actually use this function

@@ -92,7 +92,11 @@ pub async fn create_admin_interface<A: InterfaceApi>(
                 }
             }
         }
+        // TODO: drop listener, make sure all these tasks finish!
+        drop(listener);
 
+        // these SHOULD end soon after we get here, or by the time we get here,
+        // if not this will hang. Maybe that's OK, in which case we don't await
         for h in listener_handles {
             h.await?;
         }
