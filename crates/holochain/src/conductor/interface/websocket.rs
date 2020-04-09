@@ -61,7 +61,7 @@ use url2::url2;
 pub async fn create_admin_interface<A: InterfaceApi>(
     api: A,
     port: u16,
-    stop_rx: StopReceiver,
+    mut stop_rx: StopReceiver,
 ) -> InterfaceResult<ManagedTaskHandle> {
     trace!("Initializing Admin interface");
     let mut listener = websocket_bind(
@@ -76,13 +76,12 @@ pub async fn create_admin_interface<A: InterfaceApi>(
         loop {
             tokio::select! {
                 // break if we receive on the stop channel
-                _ = stop_rx => { break; },
+                _ = stop_rx.recv() => { break; },
 
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(conn) = maybe_con {
                     let (_, recv_socket) = conn.await?;
                     listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-                        // FIXME not sure if clone is correct here
                         api.clone(),
                         recv_socket,
                     )));
@@ -123,7 +122,6 @@ pub async fn create_app_interface<A: InterfaceApi>(
         let (send_socket, recv_socket) = maybe_con.await?;
         let signal_rx = signal_broadcaster.subscribe();
         listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
-            // FIXME not sure if clone is correct here
             api.clone(),
             recv_socket,
             signal_rx,
@@ -169,7 +167,6 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
     mut recv_socket: WebsocketReceiver,
 ) -> () {
     while let Some(msg) = recv_socket.next().await {
-        // FIXME I'm not sure if cloning is the right thing to do here
         if let Err(_todo) = handle_incoming_message(msg, api.clone()).await {
             break;
         }

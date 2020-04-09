@@ -11,6 +11,7 @@
 use super::{
     api::{AdminInterfaceApi, AppInterfaceApi},
     error::ConductorError,
+    manager::{ManagedTaskHandle, ManagedTaskResult},
     state::ConductorState,
 };
 use crate::conductor::{
@@ -21,7 +22,7 @@ use crate::conductor::{
 };
 pub use builder::*;
 use derive_more::{AsRef, Deref, From};
-use futures::future;
+use futures::{future, stream::FuturesUnordered};
 use std::collections::HashMap;
 use std::{error::Error, sync::Arc};
 use sx_state::{
@@ -36,7 +37,7 @@ use sx_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{mpsc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tracing::*;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
@@ -63,8 +64,8 @@ impl AdminInterfaceHandle {
     }
 }
 
-pub type StopSender = tokio::sync::oneshot::Sender<()>;
-pub type StopReceiver = tokio::sync::oneshot::Receiver<()>;
+pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
+pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 #[derive(Clone, From, AsRef, Deref)]
 pub struct ConductorHandle(Arc<RwLock<Conductor>>);
@@ -77,6 +78,16 @@ impl ConductorHandle {
     }
 }
 
+// TODO: implement, move into task that loops and select!s
+struct TaskManager(FuturesUnordered<ManagedTaskHandle>);
+
+/// A message sent to the TaskManager, registering a closure to run upon
+/// completion of a task
+pub type ManagedTaskAdd = (
+    ManagedTaskHandle,
+    Box<dyn FnOnce(ConductorHandle, ManagedTaskResult) -> () + Send + Sync>,
+);
+
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     // tx_network: NetSender,
@@ -87,11 +98,22 @@ pub struct Conductor {
     _handle_map: HashMap<CellHandle, CellId>,
     _agent_keys: HashMap<AgentId, Keystore>,
     admin_interfaces: Vec<AdminInterfaceHandle>,
+
+    /// oneshot senders used to end various managed tasks
+    // TODO: define message type, spawn task that takes receiver and select!s
+    // over FuturesUnordered and the receiver, etc.
+    managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
+
+    /// broadcast channel sender, used to end all managed tasks
+    managed_task_stop_sender: StopBroadcaster,
 }
 
 impl Conductor {
     async fn new(env: Environment) -> ConductorResult<Conductor> {
         let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
+        // TODO: move task_rx into TaskManager
+        let (task_tx, task_rx) = mpsc::channel(1);
+        let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
         Ok(Conductor {
             env,
             state_db: Kv::new(db)?,
@@ -100,6 +122,8 @@ impl Conductor {
             _agent_keys: HashMap::new(),
             admin_interfaces: Vec::new(),
             closing: false,
+            managed_task_add_sender: task_tx,
+            managed_task_stop_sender: stop_tx,
         })
     }
 
@@ -116,6 +140,13 @@ impl Conductor {
     }
 
     pub(crate) fn tx_network(&self) -> &NetSender {
+        unimplemented!()
+    }
+
+    /// Sends a JoinHandle to the TaskManager task to be managed
+    fn manage_task(&mut self, handle: ManagedTaskHandle) {
+        // TODO: send handle to TaskManager task.
+        // Perhaps also need to send a closure detailing what to do on error.
         unimplemented!()
     }
 
@@ -198,7 +229,9 @@ mod builder {
         ) -> ConductorResult<ConductorHandle> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            let conductor_mutex = Arc::new(RwLock::new(Conductor::new(environment).await?));
+            let conductor = Conductor::new(environment).await?;
+            let stop_tx = conductor.managed_task_stop_sender.clone();
+            let conductor_mutex = Arc::new(RwLock::new(conductor));
             let admin_api = StdAdminInterfaceApi::new(conductor_mutex.clone().into());
             let interface_futures: Vec<_> = config
                 .admin_interfaces
@@ -206,11 +239,11 @@ mod builder {
                 .into_iter()
                 .map(|AdminInterfaceConfig { driver, .. }| match driver {
                     InterfaceDriver::Websocket { port } => {
-                        create_admin_interface(admin_api.clone(), port)
+                        create_admin_interface(admin_api.clone(), port, stop_tx.subscribe())
                     }
                 })
                 .collect();
-            let interfaces: Vec<AdminInterfaceHandle> = future::join_all(interface_futures)
+            let handles: Vec<ManagedTaskHandle> = future::join_all(interface_futures)
                 .await
                 .into_iter()
                 // Log errors
@@ -221,11 +254,18 @@ mod builder {
                 })
                 // Throw away errors
                 .filter_map(Result::ok)
-                .map(AdminInterfaceHandle)
                 .collect();
             {
                 let mut conductor = conductor_mutex.write().await;
-                conductor.admin_interfaces = interfaces;
+                for handle in handles {
+                    conductor
+                        .managed_task_add_sender
+                        // TODO: write closure for handling result of this task,
+                        // and feel free to pretty it up with a newtype or something
+                        .send((handle, Box::new(|_, _| {})))
+                        .await
+                        .unwrap_or_else(|_err| error!("Failed to send a task to the task manager"));
+                }
             }
             Ok(conductor_mutex.into())
         }
