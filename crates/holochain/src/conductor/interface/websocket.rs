@@ -1,4 +1,9 @@
-use crate::conductor::{api::*, interface::interface::*};
+use crate::conductor::{
+    api::*,
+    conductor::StopReceiver,
+    interface::interface::*,
+    manager::{ManagedTaskHandle, ManagedTaskResult},
+};
 use crate::core::signal::Signal;
 //use async_trait::async_trait;
 //use tracing::*;
@@ -53,7 +58,11 @@ use url2::url2;
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub async fn create_admin_interface<A: InterfaceApi>(api: A, port: u16) -> InterfaceResult<()> {
+pub async fn create_admin_interface<A: InterfaceApi>(
+    api: A,
+    port: u16,
+    stop_rx: StopReceiver,
+) -> InterfaceResult<ManagedTaskHandle> {
     trace!("Initializing Admin interface");
     let mut listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
@@ -61,25 +70,40 @@ pub async fn create_admin_interface<A: InterfaceApi>(api: A, port: u16) -> Inter
     )
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
-    let mut listener_handles = Vec::new();
-    // TODO there is no way to exit this listner
-    // If we remove the interface then we want to kill this lister
-    while let Some(maybe_con) = listener.next().await {
-        let (_, recv_socket) = maybe_con.await?;
-        listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-            // FIXME not sure if clone is correct here
-            api.clone(),
-            recv_socket,
-        )));
-    }
-    for h in listener_handles {
-        h.await?;
-    }
-    Ok(())
+
+    Ok(tokio::task::spawn(async move {
+        let mut listener_handles = Vec::new();
+        loop {
+            tokio::select! {
+                // break if we receive on the stop channel
+                _ = stop_rx => { break; },
+
+                // establish a new connection to a client
+                maybe_con = listener.next() => if let Some(conn) = maybe_con {
+                    let (_, recv_socket) = conn.await?;
+                    listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                        // FIXME not sure if clone is correct here
+                        api.clone(),
+                        recv_socket,
+                    )));
+                } else {
+                    // This shouldn't actually ever happen, but if it did,
+                    // we would just stop the listener task
+                    break;
+                }
+            }
+        }
+
+        for h in listener_handles {
+            h.await?;
+        }
+        ManagedTaskResult::Ok(())
+    }))
 }
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
+// TODO: hook up a kill channel similar to `create_admin_interface` above
 pub async fn create_app_interface<A: InterfaceApi>(
     api: A,
     port: u16,

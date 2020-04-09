@@ -5,6 +5,7 @@ pub mod config;
 pub mod error;
 pub mod interactive;
 pub mod interface;
+pub mod manager;
 pub mod paths;
 pub mod state;
 

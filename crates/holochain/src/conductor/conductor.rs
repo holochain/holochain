@@ -63,6 +63,9 @@ impl AdminInterfaceHandle {
     }
 }
 
+pub type StopSender = tokio::sync::oneshot::Sender<()>;
+pub type StopReceiver = tokio::sync::oneshot::Receiver<()>;
+
 #[derive(Clone, From, AsRef, Deref)]
 pub struct ConductorHandle(Arc<RwLock<Conductor>>);
 
