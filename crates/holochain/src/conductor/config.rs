@@ -76,7 +76,7 @@ fn config_from_toml<'a, T>(toml: &'a str) -> ConductorResult<T>
 where
     T: Deserialize<'a>,
 {
-    toml::from_str::<T>(toml).map_err(|e| ConductorError::DeserializationError(e))
+    toml::from_str::<T>(toml).map_err(ConductorError::DeserializationError)
 }
 
 impl ConductorConfig {

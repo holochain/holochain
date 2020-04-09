@@ -15,17 +15,14 @@ pub enum TestWasm {
     Foo,
 }
 
-impl From<TestWasm> for PathBuf {
-    fn from(test_wasm: TestWasm) -> PathBuf {
-        match test_wasm {
-            TestWasm::Foo => {
-                "test_utils/wasm/target/foo/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
-            }
-        }
-        .into()
+pub fn test_wasm(wasm: TestWasm) -> DnaWasm {
+    match wasm {
+        TestWasm::Foo => DnaWasm::from(
+            include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
+            ))
+            .to_vec(),
+        ),
     }
-}
-
-pub fn test_wasm(relative_path_to_repo_root: &PathBuf, wasm: TestWasm) -> DnaWasm {
-    create_wasm_from_file(&std::env::current_dir().unwrap().join(relative_path_to_repo_root).join(PathBuf::from(wasm)))
 }

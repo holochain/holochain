@@ -1,7 +1,6 @@
 use crate::conductor::{
-    api::*,
     conductor::StopReceiver,
-    interface::interface::*,
+    interface::*,
     manager::{ManagedTaskHandle, ManagedTaskResult},
 };
 use crate::core::signal::Signal;
@@ -83,7 +82,6 @@ fn build_admin_interface_listener_task<A: InterfaceApi>(
     Ok(tokio::task::spawn(async move {
         let mut listener_handles = Vec::new();
         let mut send_sockets = Vec::new();
-        let mut result = ManagedTaskResult::Ok(());
         loop {
             tokio::select! {
                 // break if we receive on the stop channel
@@ -91,20 +89,14 @@ fn build_admin_interface_listener_task<A: InterfaceApi>(
 
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(conn) = maybe_con {
-                    match conn.await {
-                        Ok((send_socket, recv_socket)) => {
-                            send_sockets.push(send_socket);
-                            listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-                                api.clone(),
-                                recv_socket,
-                            )));
-                        }
-                        Err(e) => {
-                            result = Err(e.into());
-                            // Listener might be in a bad state
-                            // Attempt clean up and exit
-                            break;
-                        }
+                    // TODO this could take some time and should be spawned
+                    // This will be fixed by TK-01260
+                    if let Ok((send_socket, recv_socket)) = conn.await {
+                        send_sockets.push(send_socket);
+                        listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                            api.clone(),
+                            recv_socket,
+                        )));
                     }
                 } else {
                     // This shouldn't actually ever happen, but if it did,
@@ -116,8 +108,7 @@ fn build_admin_interface_listener_task<A: InterfaceApi>(
         // TODO: TEST: drop listener, make sure all these tasks finish!
         drop(listener);
 
-        // TODO does this kill the recv_socket or does it
-        // Need to wait for the other end to respond?
+        // TODO Make send_socket close tell the recv socket to close locally in the websocket code
         for mut send_socket in send_sockets {
             // TODO change from u16 code to enum
             send_socket.close(1000, "Shutting down".into()).await?;
@@ -128,7 +119,7 @@ fn build_admin_interface_listener_task<A: InterfaceApi>(
         for h in listener_handles {
             h.await?;
         }
-        result
+        ManagedTaskResult::Ok(())
     }))
 }
 

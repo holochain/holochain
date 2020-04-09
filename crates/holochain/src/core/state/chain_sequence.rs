@@ -195,7 +195,7 @@ pub mod tests {
             let env = arc1.guard().await;
             let dbs = arc1.clone().dbs().await?;
             let reader = env.reader()?;
-            let mut buf = { ChainSequenceBuf::new(&reader, &dbs)? };
+            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(Address::from("0"));
             buf.put_header(Address::from("1"));
             buf.put_header(Address::from("2"));

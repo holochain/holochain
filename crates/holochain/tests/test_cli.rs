@@ -2,6 +2,7 @@ use assert_cli::Assert;
 use tempdir::TempDir;
 
 #[test]
+#[ignore] // (david.b) [D-01034] these take minutes to run in nix/CI - disable until fixed
 fn first_experience_with_holochain_is_a_friendly_one() {
     let tmp = TempDir::new("").unwrap();
     let path = tmp.path().join("missing-config.toml");
@@ -18,6 +19,7 @@ fn first_experience_with_holochain_is_a_friendly_one() {
 }
 
 #[test]
+#[ignore] // (david.b) [D-01034] these take minutes to run in nix/CI - disable until fixed
 fn malformed_toml_error_is_friendly() {
     let tmp = TempDir::new("").unwrap();
     let path = tmp.path().join("malformed-config.toml");
@@ -38,6 +40,7 @@ fn malformed_toml_error_is_friendly() {
 }
 
 #[test]
+#[ignore] // (david.b) [D-01034] these take minutes to run in nix/CI - disable until fixed
 fn invalid_config_error_is_friendly() {
     let tmp = TempDir::new("").unwrap();
     let path = tmp.path().join("malformed-config.toml");

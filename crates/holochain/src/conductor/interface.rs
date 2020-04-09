@@ -1,4 +1,4 @@
-use super::error::InterfaceResult;
+use error::InterfaceResult;
 use crate::conductor::api::*;
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
@@ -9,6 +9,9 @@ use futures::{
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
+
+pub mod error;
+pub mod websocket;
 
 /// Allows the conductor or cell to forward signals to connected clients
 pub struct ConductorSideSignalSender<Sig>

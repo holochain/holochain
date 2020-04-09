@@ -11,7 +11,7 @@
 use super::{
     api::{AdminInterfaceApi, AppInterfaceApi},
     error::ConductorError,
-    manager::{spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle, TaskManagerRunHandle},
+    manager::{spawn_task_manager, ManagedTaskAdd, TaskManagerRunHandle},
     state::ConductorState,
 };
 use crate::conductor::{
@@ -22,7 +22,6 @@ use crate::conductor::{
 };
 pub use builder::*;
 use derive_more::{AsRef, Deref, From};
-use futures::Future;
 use std::collections::HashMap;
 use std::{error::Error, sync::Arc};
 use sx_state::{
@@ -242,6 +241,7 @@ mod builder {
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
     use tokio::sync::RwLock;
 
+    #[derive(Default)]
     pub struct ConductorBuilder {}
 
     impl ConductorBuilder {
@@ -249,10 +249,7 @@ mod builder {
             Self {}
         }
 
-        pub async fn from_config(
-            self,
-            config: ConductorConfig,
-        ) -> ConductorResult<ConductorHandle> {
+        pub async fn with_config(self, config: ConductorConfig) -> ConductorResult<ConductorHandle> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment).await?;
