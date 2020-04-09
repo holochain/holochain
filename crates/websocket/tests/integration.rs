@@ -20,7 +20,7 @@ async fn integration_test() {
 
     sx_types::observability::test_run().unwrap();
 
-    let mut server = websocket_bind(
+    let server = websocket_bind(
         url2!("ws://127.0.0.1:0"),
         std::sync::Arc::new(WebsocketConfig::default()),
     )
@@ -33,6 +33,48 @@ async fn integration_test() {
         %binding,
     );
 
+    spawn_listener_loop(server);
+
+    let (mut send, mut recv) =
+        websocket_connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+            .await
+            .unwrap();
+
+    tracing::info!(
+        test = "connection success",
+        remote_addr = %recv.remote_addr(),
+    );
+
+    let msg = TestMessage("test-signal".to_string());
+    send.signal(msg).await.unwrap();
+
+    let msg = TestMessage("test-request".to_string());
+    let rsp: TestMessage = send.request(msg).await.unwrap();
+
+    tracing::info!(
+        test = "got response",
+        data = %rsp.0,
+    );
+
+    assert_eq!("echo: test-request", &rsp.0,);
+
+    send.close(1000, "test".to_string()).await.unwrap();
+
+    assert_eq!(
+        "WebsocketMessage::Close { close: WebsocketClosed { code: 0, reason: \"Internal Error: Protocol(\\\"Connection reset without closing handshake\\\")\" } }",
+        &format!("{:?}", recv.next().await.unwrap()),
+    );
+
+    assert_eq!("None", &format!("{:?}", recv.next().await),);
+}
+
+#[tokio::test]
+#[ignore]
+async fn channels_properly_close() {
+    // TODO
+}
+
+fn spawn_listener_loop(mut server: WebsocketListener) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn(async move {
         while let Some(maybe_con) = server.next().await {
             tokio::task::spawn(async move {
@@ -77,37 +119,5 @@ async fn integration_test() {
             });
         }
         tracing::info!(test = "exit srv listen loop");
-    });
-
-    let (mut send, mut recv) =
-        websocket_connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
-            .await
-            .unwrap();
-
-    tracing::info!(
-        test = "connection success",
-        remote_addr = %recv.remote_addr(),
-    );
-
-    let msg = TestMessage("test-signal".to_string());
-    send.signal(msg).await.unwrap();
-
-    let msg = TestMessage("test-request".to_string());
-    let rsp: TestMessage = send.request(msg).await.unwrap();
-
-    tracing::info!(
-        test = "got response",
-        data = %rsp.0,
-    );
-
-    assert_eq!("echo: test-request", &rsp.0,);
-
-    send.close(1000, "test".to_string()).await.unwrap();
-
-    assert_eq!(
-        "WebsocketMessage::Close { close: WebsocketClosed { code: 0, reason: \"Internal Error: Protocol(\\\"Connection reset without closing handshake\\\")\" } }",
-        &format!("{:?}", recv.next().await.unwrap()),
-    );
-
-    assert_eq!("None", &format!("{:?}", recv.next().await),);
+    })
 }

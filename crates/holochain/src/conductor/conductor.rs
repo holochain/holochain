@@ -22,6 +22,7 @@ use crate::conductor::{
 };
 pub use builder::*;
 use derive_more::{AsRef, Deref, From};
+use futures::Future;
 use std::collections::HashMap;
 use std::{error::Error, sync::Arc};
 use sx_state::{
@@ -73,7 +74,7 @@ impl ConductorHandle {
     /// End all tasks run by the Conductor.
     pub async fn shutdown(self) {
         let mut conductor = self.0.write().await;
-        conductor.shutdown().await;
+        conductor.shutdown();
     }
 
     pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
@@ -88,6 +89,10 @@ impl ConductorHandle {
             warn!("Tried to await the task manager run handle but there was none");
         }
         Ok(())
+    }
+
+    pub async fn check_running(&self) -> ConductorResult<()> {
+        self.0.read().await.check_running()
     }
 }
 
@@ -107,7 +112,7 @@ pub struct Conductor {
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
 
     /// broadcast channel sender, used to end all managed tasks
-    managed_task_stop_sender: StopBroadcaster,
+    managed_task_stop_broadcaster: StopBroadcaster,
 
     /// The main task join handle to await on
     task_manager_run_handle: Option<TaskManagerRunHandle>,
@@ -128,7 +133,7 @@ impl Conductor {
             _agent_keys: HashMap::new(),
             shutting_down: false,
             managed_task_add_sender: task_tx,
-            managed_task_stop_sender: stop_tx,
+            managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,
         })
     }
@@ -160,7 +165,7 @@ impl Conductor {
     /// A gate to put at the top of public functions to ensure that work is not
     /// attempted after a shutdown has been issued
     // TEST: that this works
-    fn check_running(&self) -> ConductorResult<()> {
+    pub(crate) fn check_running(&self) -> ConductorResult<()> {
         if self.shutting_down {
             Err(ConductorError::ShuttingDown)
         } else {
@@ -168,14 +173,14 @@ impl Conductor {
         }
     }
 
-    async fn shutdown(&mut self) -> () {
+    fn shutdown(&mut self) -> () {
         self.shutting_down = true;
-        self.managed_task_stop_sender
+        self.managed_task_stop_broadcaster
             .send(())
-            .map_err(|e| {
+            .map(|_| ())
+            .unwrap_or_else(|e| {
                 error!(?e, "Couldn't broadcast stop signal to managed tasks!");
             })
-            .ok();
     }
 
     pub fn wait(&mut self) -> Option<TaskManagerRunHandle> {
@@ -251,7 +256,7 @@ mod builder {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment).await?;
-            let stop_tx = conductor.managed_task_stop_sender.clone();
+            let stop_tx = conductor.managed_task_stop_broadcaster.clone();
             let conductor_mutex = Arc::new(RwLock::new(conductor));
 
             setup_admin_interfaces_from_config(

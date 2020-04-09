@@ -1,11 +1,13 @@
 use super::error::ConductorApiResult;
-use crate::conductor::{interface::error::InterfaceResult, ConductorHandle};
+use crate::conductor::{
+    interface::error::{InterfaceError, InterfaceResult},
+    ConductorHandle,
+};
 use holochain_serialized_bytes::prelude::*;
 use sx_types::{
     cell::CellHandle,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
-
 
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
@@ -76,14 +78,23 @@ pub struct StdAdminInterfaceApi {
 impl StdAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
         let app_api = StdAppInterfaceApi::new(conductor_handle.clone());
-        StdAdminInterfaceApi { conductor_handle, app_api }
+        StdAdminInterfaceApi {
+            conductor_handle,
+            app_api,
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl AdminInterfaceApi for StdAdminInterfaceApi {
-    async fn admin(&self, _method: AdminRequest) -> ConductorApiResult<AdminResponse> {
-        unimplemented!()
+    async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
+        Ok(AdminResponse::Unimplemented(request))
+        // use AdminRequest::*;
+        // match request {
+        //     Start(cell_handle) => unimplemented!(),
+        //     Stop(cell_handle) => unimplemented!(),
+        //     AddDna => unimplemented!(),
+        // }
     }
 }
 
@@ -95,6 +106,11 @@ impl InterfaceApi for StdAdminInterfaceApi {
         &self,
         request: Self::ApiRequest,
     ) -> InterfaceResult<Self::ApiResponse> {
+        self.conductor_handle
+            .read()
+            .await
+            .check_running()
+            .map_err(InterfaceError::RequestHandler)?;
         let r = AdminInterfaceApi::handle_request(self, request).await;
         Ok(r)
     }
@@ -133,6 +149,11 @@ impl InterfaceApi for StdAppInterfaceApi {
         &self,
         request: Self::ApiRequest,
     ) -> InterfaceResult<Self::ApiResponse> {
+        self.conductor_handle
+            .read()
+            .await
+            .check_running()
+            .map_err(InterfaceError::RequestHandler)?;
         let r = AppInterfaceApi::handle_request(self, request).await;
         Ok(r)
     }
@@ -152,7 +173,7 @@ pub enum AppResponse {
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum AdminResponse {
-    Stub,
+    Unimplemented(AdminRequest),
     DnaAdded,
     Error { debug: String },
 }
