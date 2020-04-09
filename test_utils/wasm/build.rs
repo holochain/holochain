@@ -9,7 +9,7 @@ fn main() {
     let cargo_command = cargo_command
         .as_ref()
         .map(|s| &**s)
-        .unwrap_or("cargo".as_ref());
+        .unwrap_or_else(|| "cargo".as_ref());
 
     let status = std::process::Command::new(cargo_command)
         .arg("build")
