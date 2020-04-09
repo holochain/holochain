@@ -27,6 +27,7 @@ struct Opt {
 
     #[structopt(
         short = "c",
+        long,
         help = "Path to a TOML file containing conductor configuration"
     )]
     config_path: Option<PathBuf>,
