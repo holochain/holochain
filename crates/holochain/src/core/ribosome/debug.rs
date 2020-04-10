@@ -32,16 +32,18 @@ pub mod wasm_test {
     fn ribosome_debug_test() {
         // this shows that debug is called but our line numbers will be messed up
         // the line numbers will show as coming from this test because we made the input here
-        let _: DebugOutput = crate::call_test_ribosome!(
+        let output: DebugOutput = crate::call_test_ribosome!(
             "imports",
             "debug",
             DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
         );
+        assert_eq!((), output.inner(),);
     }
 
     #[test]
     fn wasm_line_numbers_test() {
         // this shows that we can get line numbers out of wasm
-        let _: DebugOutput = crate::call_test_ribosome!("debug", "debug", ());
+        let output: DebugOutput = crate::call_test_ribosome!("debug", "debug", ());
+        assert_eq!((), output.inner(),);
     }
 }

@@ -25,10 +25,10 @@ pub mod property;
 pub mod query;
 pub mod remove_entry;
 pub mod remove_link;
+pub mod schedule;
 pub mod send;
 pub mod show_env;
 pub mod sign;
-pub mod schedule;
 pub mod sys_time;
 pub mod update_entry;
 
@@ -37,8 +37,8 @@ use crate::core::ribosome::{
     emit_signal::emit_signal, encrypt::encrypt, entry_address::entry_address,
     entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
     globals::globals, keystore::keystore, link_entries::link_entries, property::property,
-    query::query, remove_entry::remove_entry, remove_link::remove_link, send::send,
-    show_env::show_env, sign::sign, schedule::schedule, sys_time::sys_time, update_entry::update_entry,
+    query::query, remove_entry::remove_entry, remove_link::remove_link, schedule::schedule,
+    send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
