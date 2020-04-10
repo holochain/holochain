@@ -14,29 +14,12 @@ pub fn debug(
 }
 
 #[cfg(all(test, feature = "wasmtest"))]
-pub mod test {
-
-    use crate::core::ribosome::wasm_test::test_ribosome;
-    use crate::core::ribosome::wasm_test::zome_invocation_from_names;
-    use crate::core::ribosome::RibosomeT;
-    use std::convert::TryInto;
-    use sx_types::shims::SourceChainCommitBundle;
+pub mod wasm_test {
     use sx_zome_types::DebugInput;
+    use sx_zome_types::DebugOutput;
 
     #[test]
-    fn invoke_import_debug_test() {
-        let ribosome = test_ribosome();
-
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "debug",
-            DebugInput::new(format!("debug {:?}", "works!"))
-                .try_into()
-                .unwrap(),
-        );
-
-        ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-            .unwrap();
+    fn ribosome_debug_test() {
+        let _: DebugOutput = crate::call_test_ribosome!("imports", "debug", DebugInput::new(format!("ribosome debug {}", "works!")));
     }
 }
