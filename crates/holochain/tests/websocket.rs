@@ -6,7 +6,9 @@ use holochain_2020::conductor::{
     error::ConductorError,
     Conductor,
 };
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_websocket::*;
+use std::convert::TryFrom;
 use std::sync::Arc;
 use std::{
     io::Read,
@@ -19,8 +21,6 @@ use tempdir::TempDir;
 use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
-use holochain_serialized_bytes::SerializedBytes;
-use std::convert::TryFrom;
 
 fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
     if let Ok(Some(status)) = started {
@@ -117,7 +117,9 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     // TODO: update to proper response once implemented
     assert!(matches!(
         response,
-        Ok(AdminResponse::Unimplemented(AdminRequest::InstallDna(request)))
+        Ok(AdminResponse::Unimplemented(AdminRequest::InstallDna(
+            request
+        )))
     ));
     conductor_handle.shutdown().await;
 
@@ -167,7 +169,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     assert!(matches!(incoming[0], WebsocketMessage::Close(_)));
 
     info!("About to make failing request");
-    
+
     let tmp_dir = TempDir::new("fake_dna")?;
     let fake_dna = fake_dna(tmp_dir.into_path())?;
     let request = AdminRequest::InstallDna(fake_dna);

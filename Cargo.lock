@@ -959,6 +959,7 @@ dependencies = [
  "url 1.7.2",
  "url2",
  "url_serde",
+ "uuid 0.7.4",
  "wasmer-runtime",
 ]
 
@@ -1076,7 +1077,7 @@ dependencies = [
  "serde_derive",
  "termcolor",
  "toml",
- "uuid",
+ "uuid 0.8.1",
 ]
 
 [[package]]
@@ -2201,7 +2202,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "url 2.1.1",
- "uuid",
+ "uuid 0.8.1",
 ]
 
 [[package]]
@@ -3109,6 +3110,16 @@ name = "utf-8"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05e42f7c18b8f902290b009cde6d651262f956c98bc51bca4cd1d511c9cd85c7"
+
+[[package]]
+name = "uuid"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90dbc611eb48397705a6b0f6e917da23ae517e4d127123d2cf7674206627d32a"
+dependencies = [
+ "rand 0.6.5",
+ "serde",
+]
 
 [[package]]
 name = "uuid"

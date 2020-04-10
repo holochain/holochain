@@ -1,16 +1,17 @@
-use super::error::ConductorApiResult;
+use super::error::{ConductorApiError, ConductorApiResult, SerializationError};
 use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
-use std::{sync::Arc, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use sx_types::{
     cell::CellHandle,
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
@@ -76,13 +77,13 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 pub struct StdAdminInterfaceApi {
     conductor_handle: ConductorHandle,
     app_api: StdAppInterfaceApi,
-    fake_dna_cache: Arc<RwLock<Vec<Dna>>>,
+    fake_dna_cache: Arc<RwLock<HashMap<Uuid, Dna>>>,
 }
 
 impl StdAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
         let app_api = StdAppInterfaceApi::new(conductor_handle.clone());
-        let fake_dna_cache = Arc::new(RwLock::new(Vec::new()));
+        let fake_dna_cache = Arc::new(RwLock::new(HashMap::new()));
         StdAdminInterfaceApi {
             conductor_handle,
             app_api,
@@ -93,12 +94,21 @@ impl StdAdminInterfaceApi {
     async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
         let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
         let dna = SerializedBytes::from(dna);
-        let dna: Dna = dna.try_into()?;
+        let dna: Dna = dna.try_into().map_err(SerializationError::from)?;
         {
             let mut fake_dna_cache = self.fake_dna_cache.write().await;
-            fake_dna_cache.push(dna);
+            fake_dna_cache.insert(
+                Uuid::parse_str(&dna.uuid).map_err(SerializationError::from)?,
+                dna,
+            );
         }
         Ok(AdminResponse::DnaInstalled)
+    }
+
+    async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
+        let fake_dna_cache = self.fake_dna_cache.read().await;
+        let dna_list = fake_dna_cache.keys().cloned().collect::<Vec<_>>();
+        Ok(AdminResponse::ListDnas(dna_list))
     }
 }
 
@@ -107,9 +117,10 @@ impl AdminInterfaceApi for StdAdminInterfaceApi {
     async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
         use AdminRequest::*;
         match request {
-            Start(cell_handle) => unimplemented!(),
-            Stop(cell_handle) => unimplemented!(),
+            Start(_cell_handle) => unimplemented!(),
+            Stop(_cell_handle) => unimplemented!(),
             InstallDna(dna_path) => self.install_dna(dna_path).await,
+            ListDnas => self.list_dnas().await,
         }
     }
 }
@@ -191,6 +202,7 @@ pub enum AppResponse {
 pub enum AdminResponse {
     Unimplemented(AdminRequest),
     DnaInstalled,
+    ListDnas(Vec<Uuid>),
     Error { debug: String },
 }
 
@@ -209,6 +221,7 @@ pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
     InstallDna(PathBuf),
+    ListDnas,
 }
 
 #[allow(missing_docs)]
