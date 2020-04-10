@@ -228,7 +228,7 @@ pub mod wasm_test {
         shims::SourceChainCommitBundle,
         test_utils::{fake_agent_id, fake_capability_request, fake_cell_id},
     };
-    use sx_wasm_test_utils::{test_wasm, TestWasm};
+    use sx_wasm_test_utils::TestWasm;
     use sx_zome_types::*;
     use test_wasm_common::TestString;
 
@@ -279,13 +279,10 @@ pub mod wasm_test {
         }
         WasmRibosome::new(dna_from_zomes({
             let mut v = std::collections::BTreeMap::new();
-            v.insert(
-                String::from("foo"),
-                zome_from_code(test_wasm(&"../..".into(), TestWasm::Foo)),
-            );
+            v.insert(String::from("foo"), zome_from_code(TestWasm::Foo.into()));
             v.insert(
                 String::from("imports"),
-                zome_from_code(test_wasm(&"../..".into(), TestWasm::Imports)),
+                zome_from_code(TestWasm::Imports.into()),
             );
             v
         }))

@@ -109,7 +109,7 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
     }
 }
 
-#[cfg(all(test, not(feature = "wasmtest")))]
+#[cfg(test)]
 pub mod tests {
 
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};

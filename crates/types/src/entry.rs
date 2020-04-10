@@ -11,11 +11,11 @@ use crate::{
     link::Link,
     persistence::cas::content::{Address, Addressable},
 };
-use holochain_serialized_bytes::prelude::*;
-
 use cap_entries::{CapTokenClaim, CapTokenGrant};
 use deletion_entry::DeletionEntry;
 use entry_type::{AppEntryType, EntryType};
+use holochain_serialized_bytes::prelude::*;
+use multihash::Hash;
 
 pub(crate) mod cap_entries;
 pub(crate) mod deletion_entry;
@@ -78,6 +78,20 @@ impl Entry {
 impl PartialEq for Entry {
     fn eq(&self, other: &Entry) -> bool {
         self.address() == other.address()
+    }
+}
+
+impl Addressable for Entry {
+    fn address(&self) -> Address {
+        match &self {
+            Entry::AgentId(agent_id) => agent_id.address(),
+            _ => Address::encode_from_bytes(
+                SerializedBytes::try_from(self)
+                    .expect("tried to address an entry that is not serializable")
+                    .bytes(),
+                Hash::SHA2256,
+            ),
+        }
     }
 }
 

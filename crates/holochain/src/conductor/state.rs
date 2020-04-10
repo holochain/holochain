@@ -17,7 +17,7 @@ use sx_types::{
     prelude::*,
 };
 
-#[cfg(all(test, not(feature = "wasmtest")))]
+#[cfg(test)]
 mod tests;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.

@@ -24,7 +24,7 @@ pub trait Workspace: Send {
     fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
 }
 
-#[cfg(all(test, not(feature = "wasmtest")))]
+#[cfg(test)]
 pub mod tests {
 
     use super::Workspace;

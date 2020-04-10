@@ -8,7 +8,6 @@ use crate::{
     conductor::api::error::ConductorApiError,
     core::state::workspace::{Workspace, WorkspaceError},
 };
-// use std::sync::Arc;
 use std::time::Duration;
 use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;

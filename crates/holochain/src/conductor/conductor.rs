@@ -136,7 +136,7 @@ mod builder {
     }
 }
 
-#[cfg(all(test, not(feature = "wasmtest")))]
+#[cfg(test)]
 pub mod tests {
 
     use super::{Conductor, ConductorState};
