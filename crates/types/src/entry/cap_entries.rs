@@ -213,11 +213,7 @@ pub mod tests {
         let grant = CapTokenGrant::new("", Some(Vec::new()), empty_functions.clone());
         assert_eq!(grant.cap_type(), CapabilityType::Transferable);
         let test_address = Address::new();
-        let grant = CapTokenGrant::new(
-            "",
-            Some(vec![test_address.clone()]),
-            empty_functions,
-        );
+        let grant = CapTokenGrant::new("", Some(vec![test_address.clone()]), empty_functions);
         assert_eq!(grant.cap_type(), CapabilityType::Assigned);
         assert_eq!(grant.assignees().unwrap()[0], test_address)
     }

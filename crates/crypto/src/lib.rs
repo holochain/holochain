@@ -148,9 +148,7 @@ mod tests {
 
     #[test]
     fn double_check_same_blake2b_loc() {
-        let hash = blake2b_simd::Params::new()
-            .hash_length(16)
-            .hash(&[0; 8]);
+        let hash = blake2b_simd::Params::new().hash_length(16).hash(&[0; 8]);
         let hash = hash.as_bytes();
         let mut out: [u8; 4] = [hash[0], hash[1], hash[2], hash[3]];
         for i in (4..16).step_by(4) {

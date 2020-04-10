@@ -728,7 +728,10 @@ pub mod tests {
     fn test_period_basic() {
         assert_eq!(format!("{}", Period(Duration::from_millis(0))), "0s");
         assert_eq!(format!("{}", Period(Duration::from_millis(123))), "123ms");
-        assert_eq!(format!("{}", Period(Duration::from_nanos(120_000))), "120us");
+        assert_eq!(
+            format!("{}", Period(Duration::from_nanos(120_000))),
+            "120us"
+        );
         assert_eq!(format!("{}", Period(Duration::from_nanos(100))), "100ns");
         assert_eq!(
             format!("{}", Period(Duration::from_millis(1000 * 604_800 + 1123))),
@@ -1133,10 +1136,7 @@ pub mod tests {
         .map(|ts| {
             let iso_8601 = Iso8601::try_from(*ts)?;
             let dt = DateTime::<FixedOffset>::from(&iso_8601); // from &Iso8601
-            assert_eq!(
-                dt.to_rfc3339(),
-                "2015-02-18T23:59:60.234567-05:00"
-            );
+            assert_eq!(dt.to_rfc3339(), "2015-02-18T23:59:60.234567-05:00");
             Ok(())
         })
         .collect::<Result<(), SkunkError>>()
@@ -1228,7 +1228,6 @@ pub mod tests {
             "2018-10-11 03:23:40".try_into().unwrap(),
         ];
         v.sort_by(|a, b| {
-            
             //println!( "{} {:?} {}", a, cmp, b );
             a.cmp(b)
         });
