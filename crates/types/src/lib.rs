@@ -1,4 +1,6 @@
 //! Common holochain types crate.
+
+#![allow(clippy::cognitive_complexity)]
 #![deny(missing_docs)]
 
 /// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)

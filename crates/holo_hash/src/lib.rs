@@ -483,7 +483,7 @@ mod tests {
         let h: HoloHash = "uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.get_loc());
+        assert_eq!(3_860_645_936, h.get_loc());
         assert_eq!(
             "DnaHash(uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -492,7 +492,7 @@ mod tests {
         let h: HoloHash = "uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.get_loc());
+        assert_eq!(3_860_645_936, h.get_loc());
         assert_eq!(
             "NetIdHash(uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -501,7 +501,7 @@ mod tests {
         let h: HoloHash = "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.get_loc());
+        assert_eq!(3_860_645_936, h.get_loc());
         assert_eq!(
             "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -510,7 +510,7 @@ mod tests {
         let h: HoloHash = "uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.get_loc());
+        assert_eq!(3_860_645_936, h.get_loc());
         assert_eq!(
             "EntryHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -519,7 +519,7 @@ mod tests {
         let h: HoloHash = "uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, h.get_loc());
+        assert_eq!(3_860_645_936, h.get_loc());
         assert_eq!(
             "DhtOpHash(uhCQkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
@@ -575,12 +575,12 @@ mod tests {
         let agent_id: AgentHash = "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
-        assert_eq!(3860645936, agent_id.get_loc());
+        assert_eq!(3_860_645_936, agent_id.get_loc());
     }
 
     #[test]
     fn agent_id_sync_debug() {
-        let agent_id = AgentHash::with_data_sync(&vec![0xdb; 32]);
+        let agent_id = AgentHash::with_data_sync(&[0xdb; 32]);
         assert_eq!(
             "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", agent_id),
@@ -591,7 +591,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_debug() {
         tokio::task::spawn(async move {
-            let agent_id = AgentHash::with_data(&vec![0xdb; 32]).await;
+            let agent_id = AgentHash::with_data(&[0xdb; 32]).await;
             assert_eq!(
                 "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
                 &format!("{:?}", agent_id),
@@ -603,7 +603,7 @@ mod tests {
 
     #[test]
     fn agent_id_sync_display() {
-        let agent_id = AgentHash::with_data_sync(&vec![0xdb; 32]);
+        let agent_id = AgentHash::with_data_sync(&[0xdb; 32]);
         assert_eq!(
             "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm",
             &format!("{}", agent_id),
@@ -614,7 +614,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_display() {
         tokio::task::spawn(async move {
-            let agent_id = AgentHash::with_data(&vec![0xdb; 32]).await;
+            let agent_id = AgentHash::with_data(&[0xdb; 32]).await;
             assert_eq!(
                 "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm",
                 &format!("{}", agent_id),
@@ -626,16 +626,16 @@ mod tests {
 
     #[test]
     fn agent_id_sync_loc() {
-        let agent_id = AgentHash::with_data_sync(&vec![0xdb; 32]);
-        assert_eq!(3860645936, agent_id.get_loc());
+        let agent_id = AgentHash::with_data_sync(&[0xdb; 32]);
+        assert_eq!(3_860_645_936, agent_id.get_loc());
     }
 
     #[cfg(feature = "async")]
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_loc() {
         tokio::task::spawn(async move {
-            let agent_id = AgentHash::with_data(&vec![0xdb; 32]).await;
-            assert_eq!(3860645936, agent_id.get_loc());
+            let agent_id = AgentHash::with_data(&[0xdb; 32]).await;
+            assert_eq!(3_860_645_936, agent_id.get_loc());
         })
         .await
         .unwrap();

@@ -337,7 +337,7 @@ pub mod tests {
         let entry_type_def = EntryTypeDef::new();
 
         zome.entry_types
-            .insert(entry_type.into(), entry_type_def.clone());
+            .insert(entry_type, entry_type_def.clone());
         dna.zomes.insert("zome".to_string(), zome);
 
         assert_eq!(None, dna.get_entry_type_def("foo"));
