@@ -26,7 +26,6 @@ pub fn globals(
 
 #[cfg(all(test, feature = "wasmtest"))]
 pub mod wasm_test {
-    use crate::core::ribosome::wasm_test::now;
     use crate::core::ribosome::wasm_test::test_ribosome;
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use crate::core::ribosome::RibosomeT;
@@ -57,17 +56,5 @@ pub mod wasm_test {
         let output = GlobalsOutput::try_from(output_sb).unwrap().inner();
 
         assert_eq!(output.dna_name, "test",);
-
-        let ribosome = test_ribosome();
-        let invocation = zome_invocation_from_names(
-            "imports",
-            "globals",
-            GlobalsInput::new(()).try_into().unwrap(),
-        );
-        let t0 = now();
-        ribosome
-            .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
-            .unwrap();
-        let t1 = now();
     }
 }
