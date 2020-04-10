@@ -13,7 +13,7 @@ pub fn debug(
     DebugOutput::new(())
 }
 
-#[cfg(all(test, feature = "wasmtest"))]
+#[cfg(test)]
 pub mod wasm_test {
     use sx_zome_types::DebugInput;
     use sx_zome_types::DebugOutput;

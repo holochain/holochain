@@ -24,8 +24,8 @@ pub fn globals(
     })
 }
 
-#[cfg(all(test, feature = "wasmtest"))]
-pub mod wasm_test {
+#[cfg(test)]
+pub mod test {
     use sx_zome_types::GlobalsInput;
     use sx_zome_types::GlobalsOutput;
 

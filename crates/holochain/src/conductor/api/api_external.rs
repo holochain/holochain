@@ -1,5 +1,5 @@
 use super::error::ConductorApiResult;
-use crate::conductor::conductor::Conductor;
+use crate::conductor::Conductor;
 use std::sync::Arc;
 use sx_types::{
     cell::CellHandle,

@@ -13,7 +13,7 @@ pub fn sleep(
     SleepOutput::new(())
 }
 
-#[cfg(all(test, feature = "wasmtest"))]
+#[cfg(test)]
 pub mod wasm_test {
     use sx_zome_types::SleepInput;
     use sx_zome_types::SleepOutput;

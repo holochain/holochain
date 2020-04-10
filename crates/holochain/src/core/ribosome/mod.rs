@@ -216,7 +216,7 @@ impl RibosomeT for WasmRibosome {
     }
 }
 
-#[cfg(all(test, feature = "wasmtest"))]
+#[cfg(test)]
 pub mod wasm_test {
     use super::WasmRibosome;
     use crate::core::ribosome::RibosomeT;
@@ -318,6 +318,9 @@ pub mod wasm_test {
                 .unwrap();
             let t1 = $crate::core::ribosome::wasm_test::now();
 
+            // display the function call timings
+            // all imported host functions are critical path performance as they are all exposed
+            // directly to happ developers
             let ribosome_call_duration_nanos =
                 i128::try_from(t1.as_nanos()).unwrap() - i128::try_from(t0.as_nanos()).unwrap();
             dbg!(ribosome_call_duration_nanos);

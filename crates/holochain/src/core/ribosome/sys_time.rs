@@ -16,7 +16,7 @@ pub fn sys_time(
     SysTimeOutput::new(since_the_epoch)
 }
 
-#[cfg(all(test, feature = "wasmtest"))]
+#[cfg(test)]
 pub mod wasm_test {
     use sx_zome_types::zome_io::SysTimeOutput;
     use sx_zome_types::SysTimeInput;

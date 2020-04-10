@@ -41,39 +41,33 @@ async fn integration_test() {
                     test = "incoming connection",
                     remote_addr = %recv.remote_addr(),
                 );
+                while let Some(msg) = recv.next().await {
+                    match msg {
+                        WebsocketMessage::Close(close) => {
+                            tracing::error!(error = ?close);
+                            break;
+                        }
+                        WebsocketMessage::Signal(data) => {
+                            let msg: TestMessage = data.try_into().unwrap();
+                            tracing::info!(
+                                test = "incoming signal",
+                                data = %msg.0,
+                            );
 
-                tokio::task::spawn(async move {
-                    loop {
-                        match recv.next().await {
-                            Some(msg) => match msg {
-                                WebsocketMessage::Close(close) => {
-                                    tracing::error!(error = ?close);
-                                    break;
-                                }
-                                WebsocketMessage::Signal(data) => {
-                                    let msg: TestMessage = data.try_into().unwrap();
-                                    tracing::info!(
-                                        test = "incoming signal",
-                                        data = %msg.0,
-                                    );
-
-                                    assert_eq!("test-signal", msg.0,);
-                                }
-                                WebsocketMessage::Request(data, respond) => {
-                                    let msg: TestMessage = data.try_into().unwrap();
-                                    tracing::info!(
-                                        test = "incoming message",
-                                        data = %msg.0,
-                                    );
-                                    let msg = TestMessage(format!("echo: {}", msg.0));
-                                    respond(msg.try_into().unwrap()).await.unwrap();
-                                }
-                            },
-                            None => break,
+                            assert_eq!("test-signal", msg.0,);
+                        }
+                        WebsocketMessage::Request(data, respond) => {
+                            let msg: TestMessage = data.try_into().unwrap();
+                            tracing::info!(
+                                test = "incoming message",
+                                data = %msg.0,
+                            );
+                            let msg = TestMessage(format!("echo: {}", msg.0));
+                            respond(msg.try_into().unwrap()).await.unwrap();
                         }
                     }
-                    tracing::info!(test = "exit srv con loop");
-                });
+                }
+                tracing::info!(test = "exit srv con loop");
             });
         }
         tracing::info!(test = "exit srv listen loop");
