@@ -58,6 +58,7 @@ sx_wasm_test_utils = { path = "../../test_utils/wasm" }
 test_wasm_common = { path = "../../test_utils/wasm_common" }
 maplit = "1.0.2"
 matches = "0.1.8"
+sx_types = { path = "../types", features = ["test_utils"] }
 
 [lib]
 name = "holochain_2020"

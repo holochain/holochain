@@ -38,3 +38,8 @@ thiserror = "1.0.10"
 derive_more = "0.99.3"
 rust-base58 = "0.0.4"
 shrinkwraprs = "0.3.0"
+
+
+[features]
+default = []
+test_utils = []

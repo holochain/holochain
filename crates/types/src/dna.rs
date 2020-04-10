@@ -37,7 +37,7 @@ fn zero_uuid() -> String {
 pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Default, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
+#[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
 pub struct Dna {
     /// The top-level "name" of a holochain application.
     #[serde(default)]
@@ -65,6 +65,23 @@ pub struct Dna {
     /// An array of zomes associated with your holochain application.
     #[serde(default)]
     pub zomes: BTreeMap<String, zome::Zome>,
+}
+
+/// Default implementation for Dna, which only makes sense for generating
+/// arbitrary values used for testing
+#[cfg(feature = "test_utils")]
+impl Default for Dna {
+    fn default() -> Self {
+        Dna {
+            name: Default::default(),
+            description: Default::default(),
+            version: Default::default(),
+            uuid: Default::default(),
+            dna_spec_version: Default::default(),
+            properties: Default::default(),
+            zomes: Default::default(),
+        }
+    }
 }
 
 impl Eq for Dna {}
