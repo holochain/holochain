@@ -4,6 +4,7 @@ use std::sync::Arc;
 use sx_zome_types::debug::DebugMsg;
 use sx_zome_types::DebugInput;
 use sx_zome_types::DebugOutput;
+use tracing::*;
 
 pub fn debug(
     _ribosome: Arc<WasmRibosome>,
@@ -11,7 +12,7 @@ pub fn debug(
     input: DebugInput,
 ) -> DebugOutput {
     let msg: DebugMsg = input.inner();
-    println!(
+    trace!(
         "{}:{}:{} {}",
         msg.module_path(),
         msg.file(),
