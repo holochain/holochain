@@ -67,23 +67,6 @@ pub struct Dna {
     pub zomes: BTreeMap<String, zome::Zome>,
 }
 
-/// Default implementation for Dna, which only makes sense for generating
-/// arbitrary values used for testing
-#[cfg(feature = "test_utils")]
-impl Default for Dna {
-    fn default() -> Self {
-        Dna {
-            name: Default::default(),
-            description: Default::default(),
-            version: Default::default(),
-            uuid: Default::default(),
-            dna_spec_version: Default::default(),
-            properties: Default::default(),
-            zomes: Default::default(),
-        }
-    }
-}
-
 impl Eq for Dna {}
 
 impl Dna {

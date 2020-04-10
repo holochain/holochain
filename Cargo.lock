@@ -2599,6 +2599,7 @@ dependencies = [
 name = "sx_types"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "backtrace",
  "base64 0.10.1",
  "chrono",
@@ -2618,6 +2619,7 @@ dependencies = [
  "snowflake",
  "sx_types_derive",
  "sx_wasm_types",
+ "tempdir",
  "thiserror",
  "tracing",
  "tracing-core",

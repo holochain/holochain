@@ -32,14 +32,13 @@ holochain_wasmer_common = "=0.0.22"
 sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
 sx_wasm_types = { path = "../wasm_types" }
 
+# for test_utils
+anyhow = "1.0.26"
+tempdir = "0.3.7"
+
 # possibly dispensable
 maplit = "1.0.2"
 thiserror = "1.0.10"
 derive_more = "0.99.3"
 rust-base58 = "0.0.4"
 shrinkwraprs = "0.3.0"
-
-
-[features]
-default = []
-test_utils = []

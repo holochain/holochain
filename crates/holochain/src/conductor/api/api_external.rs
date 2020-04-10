@@ -269,27 +269,19 @@ mod test {
     use crate::conductor::Conductor;
     use anyhow::Result;
     use matches::assert_matches;
-    use sx_types::dna::Dna;
+    use sx_types::{
+        dna::Dna,
+        test_utils::{fake_dna, fake_dna_file},
+    };
     use tempdir::TempDir;
     use uuid::Uuid;
-
-    fn fake_dna(fake_dna: Dna) -> Result<PathBuf> {
-        let tmp_dir = TempDir::new("fake_dna")?;
-        let mut path = tmp_dir.into_path();
-        path.push("dna");
-        std::fs::write(path.clone(), SerializedBytes::try_from(fake_dna)?.bytes())?;
-        Ok(path)
-    }
 
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
         let conductor = Conductor::build().test().await?;
         let admin_api = StdAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
-        let dna = Dna {
-            uuid: uuid.to_string(),
-            ..Default::default()
-        };
+        let dna = fake_dna(&uuid.to_string());
         let dna_address = dna.address();
         admin_api.add_dna(dna).await?;
         let dna_list = admin_api.list_dnas().await?;
@@ -301,11 +293,8 @@ mod test {
     #[tokio::test]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
-        let dna = Dna {
-            uuid: uuid.to_string(),
-            ..Default::default()
-        };
-        let dna_path = fake_dna(dna.clone())?;
+        let dna = fake_dna(&uuid.to_string());
+        let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
         let result = StdAdminInterfaceApi::read_parse_dna(dna_path).await?;
         assert_eq!(dna, result);
         Ok(())
