@@ -18,7 +18,7 @@ use std::{
     process::{Child, Command, ExitStatus, Stdio},
     time::Duration,
 };
-use sx_types::{dna::Dna, observability};
+use sx_types::{dna::Dna, observability, prelude::*};
 use tempdir::TempDir;
 use tokio::stream::StreamExt;
 use tracing::*;
@@ -136,6 +136,7 @@ async fn call_admin() {
         uuid: uuid.to_string(),
         ..Default::default()
     };
+    let dna_address = dna.address();
 
     // Install Dna
     let fake_dna = fake_dna(dna);
@@ -148,7 +149,7 @@ async fn call_admin() {
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
-    let expects = vec![uuid];
+    let expects = vec![dna_address];
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
     holochain.kill().expect("Failed to kill holochain");

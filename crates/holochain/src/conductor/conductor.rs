@@ -34,6 +34,8 @@ use sx_state::{
 use sx_types::{
     agent::AgentId,
     cell::{CellHandle, CellId},
+    dna::Dna,
+    prelude::Address,
     shims::Keystore,
 };
 use tokio::sync::{mpsc, RwLock};
@@ -52,15 +54,6 @@ pub struct CellState {
 struct CellItem {
     cell: Cell,
     _state: CellState,
-}
-
-// TODO: figure out what we need to track admin interfaces, if anything
-struct AdminInterfaceHandle(());
-
-impl AdminInterfaceHandle {
-    async fn stop(&mut self) {
-        unimplemented!()
-    }
 }
 
 pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
@@ -94,6 +87,8 @@ impl ConductorHandle {
         self.0.read().await.check_running()
     }
 }
+
+pub type FakeDnaCache = HashMap<Address, Dna>;
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
@@ -130,6 +125,9 @@ pub struct Conductor {
     /// The main task join handle to await on.
     /// The conductor is intended to live as long as this task does.
     task_manager_run_handle: Option<TaskManagerRunHandle>,
+
+    /// Placeholder for what will be the real DNA/Wasm cache
+    pub(super) fake_dna_cache: FakeDnaCache,
 }
 
 impl Conductor {
@@ -149,6 +147,7 @@ impl Conductor {
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,
             admin_websocket_ports: Vec::new(),
+            fake_dna_cache: HashMap::new(),
         })
     }
 

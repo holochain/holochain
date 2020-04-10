@@ -9,6 +9,7 @@ use sx_types::{
     cell::CellHandle,
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    prelude::*,
 };
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -73,21 +74,22 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     }
 }
 
+/// The concrete (non-mock) implementation of the AdminInterfaceApi
 #[derive(Clone)]
 pub struct StdAdminInterfaceApi {
+    /// Mutable access to the Conductor
     conductor_handle: ConductorHandle,
+
+    // TODO: I already forget why we needed to put this in here! ~MD
     app_api: StdAppInterfaceApi,
-    fake_dna_cache: Arc<RwLock<HashMap<Uuid, Dna>>>,
 }
 
 impl StdAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
         let app_api = StdAppInterfaceApi::new(conductor_handle.clone());
-        let fake_dna_cache = Arc::new(RwLock::new(HashMap::new()));
         StdAdminInterfaceApi {
             conductor_handle,
             app_api,
-            fake_dna_cache,
         }
     }
 
@@ -98,11 +100,11 @@ impl StdAdminInterfaceApi {
     }
 
     async fn add_dna(&self, dna: Dna) -> ConductorApiResult<()> {
-        let mut fake_dna_cache = self.fake_dna_cache.write().await;
-        fake_dna_cache.insert(
-            Uuid::parse_str(&dna.uuid).map_err(SerializationError::from)?,
-            dna,
-        );
+        self.conductor_handle
+            .write()
+            .await
+            .fake_dna_cache
+            .insert(dna.address(), dna);
         Ok(())
     }
 
@@ -114,8 +116,14 @@ impl StdAdminInterfaceApi {
     }
 
     async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
-        let fake_dna_cache = self.fake_dna_cache.read().await;
-        let dna_list = fake_dna_cache.keys().cloned().collect::<Vec<_>>();
+        let dna_list = self
+            .conductor_handle
+            .read()
+            .await
+            .fake_dna_cache
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         Ok(AdminResponse::ListDnas(dna_list))
     }
 }
@@ -211,7 +219,7 @@ pub enum AppResponse {
 pub enum AdminResponse {
     Unimplemented(AdminRequest),
     DnaInstalled,
-    ListDnas(Vec<Uuid>),
+    ListDnas(Vec<Address>),
     Error { debug: String },
 }
 
@@ -282,9 +290,10 @@ mod test {
             uuid: uuid.to_string(),
             ..Default::default()
         };
+        let dna_address = dna.address();
         admin_api.add_dna(dna).await?;
         let dna_list = admin_api.list_dnas().await?;
-        let expects = vec![uuid];
+        let expects = vec![dna_address];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
         Ok(())
     }
