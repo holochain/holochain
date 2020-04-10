@@ -1,6 +1,4 @@
-// use std::path::PathBuf;
 use sx_types::dna::wasm::DnaWasm;
-// use std::io::Read;
 
 pub enum TestWasm {
     Foo,
