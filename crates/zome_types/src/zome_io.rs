@@ -102,7 +102,7 @@ wasm_io_types!(
     // it is intended that the zome dev or the HDK provides a little sugar to support arbitrary
     // implementations of Debug, e.g. something like a debug! macro that wraps format! and the
     // host interface
-    [DebugInput, String],
+    [DebugInput, crate::debug::DebugMsg],
     [DebugOutput, ()],
     // every externed function that the zome develoepr exposes to holochain returns ZomeExternOutput
     // as the zome developer can expose arbitrary functions and the client will expect arbitrary data

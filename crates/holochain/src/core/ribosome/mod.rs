@@ -284,6 +284,10 @@ pub mod wasm_test {
                 String::from("imports"),
                 zome_from_code(TestWasm::Imports.into()),
             );
+            v.insert(
+                String::from("debug"),
+                zome_from_code(TestWasm::Debug.into()),
+            );
             v
         }))
     }

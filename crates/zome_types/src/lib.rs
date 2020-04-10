@@ -1,3 +1,4 @@
+pub mod debug;
 pub mod globals;
 pub mod hash;
 pub mod zome_io;

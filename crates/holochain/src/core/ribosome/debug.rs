@@ -1,6 +1,7 @@
 use super::HostContext;
 use super::WasmRibosome;
 use std::sync::Arc;
+use sx_zome_types::debug::DebugMsg;
 use sx_zome_types::DebugInput;
 use sx_zome_types::DebugOutput;
 
@@ -9,21 +10,37 @@ pub fn debug(
     _host_context: Arc<HostContext>,
     input: DebugInput,
 ) -> DebugOutput {
-    println!("{}", input.inner());
+    let msg: DebugMsg = input.inner();
+    println!(
+        "{}:{}:{} {}",
+        msg.module_path(),
+        msg.file(),
+        msg.line(),
+        msg.msg()
+    );
     DebugOutput::new(())
 }
 
 #[cfg(test)]
 pub mod wasm_test {
+    use sx_zome_types::debug_msg;
     use sx_zome_types::DebugInput;
     use sx_zome_types::DebugOutput;
 
     #[test]
     fn ribosome_debug_test() {
+        // this shows that debug is called but our line numbers will be messed up
+        // the line numbers will show as coming from this test because we made the input here
         let _: DebugOutput = crate::call_test_ribosome!(
             "imports",
             "debug",
-            DebugInput::new(format!("ribosome debug {}", "works!"))
+            DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
         );
+    }
+
+    #[test]
+    fn wasm_line_numbers_test() {
+        // this shows that we can get line numbers out of wasm
+        let _: DebugOutput = crate::call_test_ribosome!("debug", "debug", ());
     }
 }
