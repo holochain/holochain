@@ -1,4 +1,4 @@
-use super::error::{ConductorApiError, ConductorApiResult, SerializationError};
+use super::error::{ConductorApiResult, SerializationError};
 use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
     ConductorHandle,
@@ -91,18 +91,26 @@ impl StdAdminInterfaceApi {
         }
     }
 
-    async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
+    pub(crate) async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
+        let dna = Self::read_parse_dna(dna_path).await?;
+        self.add_dna(dna).await?;
+        Ok(AdminResponse::DnaInstalled)
+    }
+
+    async fn add_dna(&self, dna: Dna) -> ConductorApiResult<()> {
+        let mut fake_dna_cache = self.fake_dna_cache.write().await;
+        fake_dna_cache.insert(
+            Uuid::parse_str(&dna.uuid).map_err(SerializationError::from)?,
+            dna,
+        );
+        Ok(())
+    }
+
+    async fn read_parse_dna(dna_path: PathBuf) -> ConductorApiResult<Dna> {
         let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
         let dna = SerializedBytes::from(dna);
-        let dna: Dna = dna.try_into().map_err(SerializationError::from)?;
-        {
-            let mut fake_dna_cache = self.fake_dna_cache.write().await;
-            fake_dna_cache.insert(
-                Uuid::parse_str(&dna.uuid).map_err(SerializationError::from)?,
-                dna,
-            );
-        }
-        Ok(AdminResponse::DnaInstalled)
+        dna.try_into()
+            .map_err(|e| SerializationError::from(e).into())
     }
 
     async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
@@ -187,7 +195,7 @@ impl InterfaceApi for StdAppInterfaceApi {
 }
 /// The set of messages that a conductor understands how to respond
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type")]
+//#[serde(rename = "snake-case", tag = "type")]
 pub enum AppResponse {
     Error {
         debug: String,
@@ -199,7 +207,7 @@ pub enum AppResponse {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type")]
+//#[serde(rename = "snake-case")]
 pub enum AdminResponse {
     Unimplemented(AdminRequest),
     DnaInstalled,
@@ -209,7 +217,7 @@ pub enum AdminResponse {
 
 /// The set of messages that a conductor understands how to handle
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type")]
+//#[serde(rename = "snake-case", tag = "type")]
 pub enum AppRequest {
     CryptoRequest { request: Box<CryptoRequest> },
     TestRequest { request: Box<TestRequest> },
@@ -218,7 +226,7 @@ pub enum AppRequest {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type")]
+//#[serde(rename = "snake-case", tag = "type")]
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
@@ -245,4 +253,52 @@ pub enum TestRequest {
 pub struct AddAgentArgs {
     id: String,
     name: String,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::conductor::Conductor;
+    use anyhow::Result;
+    use matches::assert_matches;
+    use sx_types::dna::Dna;
+    use tempdir::TempDir;
+    use uuid::Uuid;
+
+    fn fake_dna(fake_dna: Dna) -> Result<PathBuf> {
+        let tmp_dir = TempDir::new("fake_dna")?;
+        let mut path = tmp_dir.into_path();
+        path.push("dna");
+        std::fs::write(path.clone(), SerializedBytes::try_from(fake_dna)?.bytes())?;
+        Ok(path)
+    }
+
+    #[tokio::test]
+    async fn install_list_dna() -> Result<()> {
+        let conductor = Conductor::build().test().await?;
+        let admin_api = StdAdminInterfaceApi::new(conductor);
+        let uuid = Uuid::new_v4();
+        let dna = Dna {
+            uuid: uuid.to_string(),
+            ..Default::default()
+        };
+        admin_api.add_dna(dna).await?;
+        let dna_list = admin_api.list_dnas().await?;
+        let expects = vec![uuid];
+        assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn dna_read_parses() -> Result<()> {
+        let uuid = Uuid::new_v4();
+        let dna = Dna {
+            uuid: uuid.to_string(),
+            ..Default::default()
+        };
+        let dna_path = fake_dna(dna.clone())?;
+        let result = StdAdminInterfaceApi::read_parse_dna(dna_path).await?;
+        assert_eq!(dna, result);
+        Ok(())
+    }
 }

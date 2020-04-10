@@ -269,9 +269,11 @@ mod builder {
             Ok(conductor_mutex.into())
         }
 
-        pub async fn test(self) -> ConductorResult<Conductor> {
+        pub async fn test(self) -> ConductorResult<ConductorHandle> {
             let environment = test_conductor_env();
-            Conductor::new(environment).await
+            let conductor = Conductor::new(environment).await?;
+            Ok(Arc::new(RwLock::new(conductor)).into())
+
         }
     }
 
@@ -345,6 +347,7 @@ pub mod tests {
     #[tokio::test]
     async fn can_update_state() {
         let conductor = Conductor::build().test().await.unwrap();
+        let conductor = conductor.read().await;
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state, ConductorState::default());
 

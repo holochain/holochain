@@ -937,6 +937,7 @@ dependencies = [
  "human-panic",
  "lazy_static",
  "maplit",
+ "matches",
  "mockall",
  "num_cpus",
  "owning_ref",

@@ -1,13 +1,15 @@
 use anyhow::Result;
 use assert_cmd::prelude::*;
+use futures::Future;
 use holochain_2020::conductor::{
-    api::{AdminRequest, AdminResponse},
+    api::{error::ConductorApiError, AdminRequest, AdminResponse},
     config::*,
     error::ConductorError,
     Conductor,
 };
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_websocket::*;
+use matches::assert_matches;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use std::{
@@ -21,32 +23,43 @@ use tempdir::TempDir;
 use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
+use uuid::Uuid;
+
+fn read_output(holochain: &mut Child) -> String {
+    let mut stdout = String::new();
+    let mut stderr = String::new();
+    if let Some(ref mut so) = holochain.stdout {
+        so.read_to_string(&mut stdout).ok();
+    }
+    if let Some(ref mut se) = holochain.stderr {
+        se.read_to_string(&mut stderr).ok();
+    }
+    format!("stdout: {}, stderr: {}", stdout, stderr)
+}
 
 fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
     if let Ok(Some(status)) = started {
-        let mut stdout = String::new();
-        let mut stderr = String::new();
-        if let Some(ref mut so) = holochain.stdout {
-            so.read_to_string(&mut stdout).ok();
-        }
-        if let Some(ref mut se) = holochain.stderr {
-            se.read_to_string(&mut stderr).ok();
-        }
+        let output = read_output(holochain);
         panic!(
-            "Holochain failed to start. status: {:?}, stdout: {}, stderr: {}",
-            status, stdout, stderr
+            "Holochain failed to start. status: {:?}, {}",
+            status, output
         );
     }
 }
 
-fn fake_dna(mut path: PathBuf) -> Result<PathBuf> {
-    let fake_dna: Dna = Default::default();
+fn fake_dna(fake_dna: Dna) -> PathBuf {
+    let tmp_dir = TempDir::new("fake_dna").unwrap();
+    let mut path = tmp_dir.into_path();
     path.push("dna");
-    std::fs::write(path.clone(), SerializedBytes::try_from(fake_dna)?.bytes())?;
-    Ok(path)
+    std::fs::write(
+        path.clone(),
+        SerializedBytes::try_from(fake_dna).unwrap().bytes(),
+    )
+    .unwrap();
+    path
 }
 
-fn create_config(mut path: PathBuf, port: u16) -> Result<PathBuf> {
+fn create_config(mut path: PathBuf, port: u16) -> PathBuf {
     let config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
@@ -54,8 +67,23 @@ fn create_config(mut path: PathBuf, port: u16) -> Result<PathBuf> {
         ..Default::default()
     };
     path.push("conductor_config.toml");
-    std::fs::write(path.clone(), toml::to_string(&config)?)?;
-    Ok(path)
+    std::fs::write(path.clone(), toml::to_string(&config).unwrap()).unwrap();
+    path
+}
+
+async fn check_timeout(
+    holochain: &mut Child,
+    response: impl Future<Output = Result<AdminResponse, std::io::Error>>,
+    timeout_millis: u64,
+) -> AdminResponse {
+    match tokio::time::timeout(std::time::Duration::from_millis(timeout_millis), response).await {
+        Ok(response) => response.unwrap(),
+        Err(_) => {
+            holochain.kill().unwrap();
+            let output = read_output(holochain);
+            panic!("Timed out on request: {}", output)
+        }
+    }
 }
 
 async fn websocket_client(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
@@ -67,12 +95,12 @@ async fn websocket_client(port: u16) -> Result<(WebsocketSender, WebsocketReceiv
 }
 
 #[tokio::test]
-async fn call_admin() -> Result<()> {
+async fn call_admin() {
     // FIXME: make it possible to bind to port 0
     let port = 9000;
 
-    let tmp_dir = TempDir::new("conductor_cfg")?;
-    let config_path = create_config(tmp_dir.into_path(), port)?;
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let config_path = create_config(tmp_dir.into_path(), port);
 
     let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
     cmd.arg("--structured");
@@ -86,16 +114,29 @@ async fn call_admin() -> Result<()> {
     let started = holochain.try_wait();
     check_started(started.map_err(Into::into), &mut holochain);
 
-    let (mut client, _) = websocket_client(port).await?;
+    let (mut client, _) = websocket_client(port).await.unwrap();
 
-    let tmp_dir = TempDir::new("fake_dna")?;
-    let fake_dna = fake_dna(tmp_dir.into_path())?;
+    let uuid = Uuid::new_v4();
+    let dna = Dna {
+        uuid: uuid.to_string(),
+        ..Default::default()
+    };
+
+    // Install Dna
+    let fake_dna = fake_dna(dna);
     let request = AdminRequest::InstallDna(fake_dna);
-    let response = client.request(request).await?;
-    assert!(matches!(response, AdminResponse::DnaInstalled));
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+    assert_matches!(response, AdminResponse::DnaInstalled);
+    
+    // List Dnas
+    let request = AdminRequest::ListDnas;
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+    let expects = vec![uuid];
+    assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
     holochain.kill().expect("Failed to kill holochain");
-    Ok(())
 }
 
 #[tokio::test]
@@ -110,8 +151,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let conductor_handle = Conductor::build().with_config(config).await?;
     let (mut client, _) = websocket_client(9001).await?;
 
-    let tmp_dir = TempDir::new("fake_dna")?;
-    let fake_dna = fake_dna(tmp_dir.into_path())?;
+    let fake_dna = fake_dna(Default::default());
     let request = AdminRequest::InstallDna(fake_dna);
     let response = client.request(request).await;
     // TODO: update to proper response once implemented
@@ -170,8 +210,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     info!("About to make failing request");
 
-    let tmp_dir = TempDir::new("fake_dna")?;
-    let fake_dna = fake_dna(tmp_dir.into_path())?;
+    let fake_dna = fake_dna(Default::default());
     let request = AdminRequest::InstallDna(fake_dna);
 
     // send a request after the conductor has shutdown
