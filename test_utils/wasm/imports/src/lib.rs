@@ -54,7 +54,7 @@ guest_functions!(
     [ __remove_link, remove_link, RemoveLinkInput, RemoveLinkOutput ],
     [ __send, send, SendInput, SendOutput ],
     [ __sign, sign, SignInput, SignOutput ],
-    [ __sleep, sleep, SleepInput, SleepOutput ],
+    [ __schedule, schedule, ScheduleInput, ScheduleOutput ],
     [ __update_entry, update_entry, UpdateEntryInput, UpdateEntryOutput ],
     [ __emit_signal, emit_signal, EmitSignalInput, EmitSignalOutput ],
     [ __remove_entry, remove_entry, RemoveEntryInput, RemoveEntryOutput ],

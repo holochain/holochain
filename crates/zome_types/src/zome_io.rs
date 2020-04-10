@@ -66,8 +66,8 @@ wasm_io_types!(
     [SignInput, ()],
     [SignOutput, ()],
     // @TODO
-    [SleepInput, core::time::Duration],
-    [SleepOutput, ()],
+    [ScheduleInput, core::time::Duration],
+    [ScheduleOutput, ()],
     // @TODO
     [UpdateEntryInput, ()],
     [UpdateEntryOutput, ()],
