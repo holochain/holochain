@@ -187,7 +187,7 @@ impl InterfaceApi for StdAppInterfaceApi {
 }
 /// The set of messages that a conductor understands how to respond
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type")]
+#[serde(rename = "snake-case", tag = "type")]
 pub enum AppResponse {
     Error {
         debug: String,
@@ -199,6 +199,7 @@ pub enum AppResponse {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename = "snake-case", tag = "type")]
 pub enum AdminResponse {
     Unimplemented(AdminRequest),
     DnaInstalled,
@@ -208,7 +209,7 @@ pub enum AdminResponse {
 
 /// The set of messages that a conductor understands how to handle
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type")]
+#[serde(rename = "snake-case", tag = "type")]
 pub enum AppRequest {
     CryptoRequest { request: Box<CryptoRequest> },
     TestRequest { request: Box<TestRequest> },
@@ -217,6 +218,7 @@ pub enum AppRequest {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename = "snake-case", tag = "type")]
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
