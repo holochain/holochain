@@ -95,7 +95,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
         }]),
         ..Default::default()
     };
-    let conductor_handle = Conductor::build().from_config(config).await?;
+    let conductor_handle = Conductor::build().with_config(config).await?;
     let (mut client, _) = websocket_client(9001).await?;
     let response = client.request(AdminRequest::AddDna).await;
     // TODO: update to proper response once implemented
@@ -111,7 +111,6 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 // TODO: this test hangs because of client websocket connections not being
 // closed on shutdown
 #[tokio::test]
-#[ignore]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     observability::test_run().ok();
 
@@ -123,8 +122,9 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
         }]),
         ..Default::default()
     };
-    let conductor_handle = Conductor::build().from_config(config).await?;
-    info!("creating config");
+    let conductor_handle = Conductor::build().with_config(config).await?;
+
+    info!("building conductor");
     let (mut client, rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(
         url2!("ws://127.0.0.1:{}", 9010),
         Arc::new(WebsocketConfig {
@@ -134,8 +134,12 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     )
     .await?;
 
+    info!("client connect");
+
     // clone handle here so we can still illicitly use it later
     conductor_handle.clone().shutdown().await;
+
+    info!("shutdown");
 
     assert!(matches!(
         conductor_handle.check_running().await,
@@ -143,16 +147,17 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     ));
 
     let incoming: Vec<_> = rx.collect().await;
-    assert_eq!(incoming.len(), 0);
+    assert_eq!(incoming.len(), 1);
+    assert!(matches!(incoming[0], WebsocketMessage::Close(_)));
 
-    println!("About to make failing request");
     info!("About to make failing request");
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
         tokio::time::timeout(Duration::from_secs(1), client.request(AdminRequest::AddDna)).await;
 
-    // request should have errored since the conductor shut down
+    // request should have errored since the conductor shut down,
+    // but should not have timed out (which would be an `Err(Err(_))`)
     assert!(matches!(response, Ok(Err(_))));
 
     Ok(())
