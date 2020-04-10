@@ -1,5 +1,5 @@
-use error::InterfaceResult;
 use crate::conductor::api::*;
+use error::InterfaceResult;
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
     future::{BoxFuture, FutureExt},
