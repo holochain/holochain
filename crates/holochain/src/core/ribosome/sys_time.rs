@@ -23,6 +23,7 @@ pub mod wasm_test {
 
     #[test]
     fn invoke_import_sys_time_test() {
-        let _: SysTimeOutput = crate::call_test_ribosome!("imports", "sys_time", SysTimeInput::new(()));
+        let _: SysTimeOutput =
+            crate::call_test_ribosome!("imports", "sys_time", SysTimeInput::new(()));
     }
 }

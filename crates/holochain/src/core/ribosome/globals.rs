@@ -31,7 +31,8 @@ pub mod wasm_test {
 
     #[test]
     fn invoke_import_globals_test() {
-        let globals: GlobalsOutput = crate::call_test_ribosome!("imports", "globals", GlobalsInput::new(()));
+        let globals: GlobalsOutput =
+            crate::call_test_ribosome!("imports", "globals", GlobalsInput::new(()));
         assert_eq!(globals.inner_ref().dna_name, "test",);
     }
 }

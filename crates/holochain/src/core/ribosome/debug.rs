@@ -20,6 +20,10 @@ pub mod wasm_test {
 
     #[test]
     fn ribosome_debug_test() {
-        let _: DebugOutput = crate::call_test_ribosome!("imports", "debug", DebugInput::new(format!("ribosome debug {}", "works!")));
+        let _: DebugOutput = crate::call_test_ribosome!(
+            "imports",
+            "debug",
+            DebugInput::new(format!("ribosome debug {}", "works!"))
+        );
     }
 }

@@ -271,9 +271,11 @@ pub mod wasm_test {
         // warm the zome module in the module cache
         if let Some(zome_name) = warm {
             let ribosome = test_ribosome(None);
-            let _ = ribosome.instance(HostContext {
-                zome_name: zome_name.to_string(),
-            }).unwrap();
+            let _ = ribosome
+                .instance(HostContext {
+                    zome_name: zome_name.to_string(),
+                })
+                .unwrap();
         }
         WasmRibosome::new(dna_from_zomes({
             let mut v = std::collections::BTreeMap::new();
@@ -299,27 +301,37 @@ pub mod wasm_test {
     macro_rules! call_test_ribosome {
         ( $zome:literal, $fn_name:literal, $input:expr ) => {{
             use crate::core::ribosome::RibosomeT;
-            use std::convert::TryInto;
             use std::convert::TryFrom;
+            use std::convert::TryInto;
             let ribosome = $crate::core::ribosome::wasm_test::test_ribosome(Some($zome));
             let t0 = $crate::core::ribosome::wasm_test::now();
-            let invocation = $crate::core::ribosome::wasm_test::zome_invocation_from_names($zome, $fn_name, $input.try_into().unwrap());
-            let zome_invocation_response = ribosome.call_zome_function(&mut sx_types::shims::SourceChainCommitBundle::default(), invocation).unwrap();
+            let invocation = $crate::core::ribosome::wasm_test::zome_invocation_from_names(
+                $zome,
+                $fn_name,
+                $input.try_into().unwrap(),
+            );
+            let zome_invocation_response = ribosome
+                .call_zome_function(
+                    &mut sx_types::shims::SourceChainCommitBundle::default(),
+                    invocation,
+                )
+                .unwrap();
             let t1 = $crate::core::ribosome::wasm_test::now();
 
-            let ribosome_call_duration_nanos = i128::try_from(t1.as_nanos()).unwrap() - i128::try_from(t0.as_nanos()).unwrap();
+            let ribosome_call_duration_nanos =
+                i128::try_from(t1.as_nanos()).unwrap() - i128::try_from(t0.as_nanos()).unwrap();
             dbg!(ribosome_call_duration_nanos);
 
             let output = match zome_invocation_response {
                 sx_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
                     guest_output.inner().try_into().unwrap()
-                },
+                }
             };
             // this is convenient for now as we flesh out the zome i/o behaviour
             // maybe in the future this will be too noisy and we might want to remove it...
             dbg!(&output);
             output
-        }}
+        }};
     }
 
     #[test]
