@@ -2,10 +2,10 @@ use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
 use holochain_2020::conductor::{
-    api::{error::ConductorApiError, AdminRequest, AdminResponse},
+    api::{AdminRequest, AdminResponse},
     config::*,
     error::ConductorError,
-    Conductor,
+    Conductor, ConductorHandle,
 };
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_websocket::*;
@@ -86,7 +86,22 @@ async fn check_timeout(
     }
 }
 
-async fn websocket_client(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
+async fn admin_port(conductor: &ConductorHandle) -> u16 {
+    conductor
+        .read()
+        .await
+        .get_arbitrary_admin_websocket_port()
+        .expect("No admin port open on conductor")
+}
+
+async fn websocket_client(
+    conductor: &ConductorHandle,
+) -> Result<(WebsocketSender, WebsocketReceiver)> {
+    let port = admin_port(conductor).await;
+    websocket_client_by_port(port).await
+}
+
+async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(websocket_connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
@@ -96,8 +111,8 @@ async fn websocket_client(port: u16) -> Result<(WebsocketSender, WebsocketReceiv
 
 #[tokio::test]
 async fn call_admin() {
-    // FIXME: make it possible to bind to port 0
-    let port = 9000;
+    // TODO: can we make this port 0 and find out the dynamic port later?
+    let port = 9909;
 
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
     let config_path = create_config(tmp_dir.into_path(), port);
@@ -114,7 +129,7 @@ async fn call_admin() {
     let started = holochain.try_wait();
     check_started(started.map_err(Into::into), &mut holochain);
 
-    let (mut client, _) = websocket_client(port).await.unwrap();
+    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
     let uuid = Uuid::new_v4();
     let dna = Dna {
@@ -128,7 +143,7 @@ async fn call_admin() {
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
     assert_matches!(response, AdminResponse::DnaInstalled);
-    
+
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
@@ -141,15 +156,14 @@ async fn call_admin() {
 
 #[tokio::test]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    // FIXME: make it possible to bind to port 0
     let config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 9001 },
+            driver: InterfaceDriver::Websocket { port: 0 },
         }]),
         ..Default::default()
     };
     let conductor_handle = Conductor::build().with_config(config).await?;
-    let (mut client, _) = websocket_client(9001).await?;
+    let (mut client, _) = websocket_client(&conductor_handle).await?;
 
     let fake_dna = fake_dna(Default::default());
     let request = AdminRequest::InstallDna(fake_dna);
@@ -166,25 +180,22 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     Ok(())
 }
 
-// TODO: this test hangs because of client websocket connections not being
-// closed on shutdown
 #[tokio::test]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     observability::test_run().ok();
 
     info!("creating config");
-    // FIXME: make it possible to bind to port 0
     let config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 9010 },
+            driver: InterfaceDriver::Websocket { port: 0 },
         }]),
         ..Default::default()
     };
     let conductor_handle = Conductor::build().with_config(config).await?;
-
+    let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let (mut client, rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(
-        url2!("ws://127.0.0.1:{}", 9010),
+        url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig {
             default_request_timeout_s: 1,
             ..Default::default()

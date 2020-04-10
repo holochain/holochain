@@ -21,48 +21,9 @@ use tokio::sync::broadcast;
 use tracing::*;
 use url2::url2;
 
-// #[derive(Debug, Clone)]
-// pub enum InterfaceMsg {
-//     CreateAdmin {
-//         api: Box<dyn InterfaceApi<ApiRequest = AdminRequest, ApiResponse = AdminResponse>>,
-//         port: u16,
-//     },
-//     Close,
-// }
-
-// MD: I'm not sure we need to treat the Conductor as an Actor in this way.
-// Seems this was introduced to have a main task that the Conductor runs,
-// but I think there are plenty of tasks that the conductor runs in its normal
-// course of execution, including the interfaces, which will keep it alive and
-// busy.
-//
-// pub async fn manage_interfaces(mut recv_ci: Receiver<InterfaceMsg>) {
-//     use InterfaceMsg::*;
-//     let mut handles = Vec::new();
-//     while let Some(msg) = recv_ci.recv().await {
-//         match msg {
-//             CreateAdmin { api, port } => {
-//                 handles.push(tokio::spawn(spawn_admin_interface_task(api, port)))
-//             }
-//             Close => {
-//                 for h in handles {
-//                     h.await.unwrap_or_else(|e| {
-//                         error!(error = &e as &dyn Error, "Failed to join interface task");
-//                     });
-//                 }
-//                 break;
-//             }
-//         }
-//     }
-// }
-
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub async fn spawn_admin_interface_task<A: InterfaceApi>(
-    port: u16,
-    api: A,
-    stop_rx: StopReceiver,
-) -> InterfaceResult<ManagedTaskHandle> {
+pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
     let listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
@@ -70,11 +31,10 @@ pub async fn spawn_admin_interface_task<A: InterfaceApi>(
     )
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
-
-    build_admin_interface_listener_task(listener, api, stop_rx)
+    Ok(listener)
 }
 
-fn build_admin_interface_listener_task<A: InterfaceApi>(
+pub fn spawn_admin_interface_task<A: InterfaceApi>(
     mut listener: WebsocketListener,
     api: A,
     mut stop_rx: StopReceiver,

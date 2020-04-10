@@ -97,30 +97,44 @@ impl ConductorHandle {
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
-    // tx_network: NetSender,
+    /// The collection of cells associated with this Conductor
     cells: HashMap<CellId, CellItem>,
+
+    /// The LMDB environment for persisting state related to this Conductor
     env: Environment,
+
+    /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
+
+    /// Set to true when `conductor.shutdown()` has been called, so that other
+    /// tasks can check on the shutdown status
     shutting_down: bool,
+
+    /// The admin websocket ports this conductor has open.
+    /// This exists so that we can run tests and bind to port 0, and find out
+    /// the dynamically allocated port later.
+    admin_websocket_ports: Vec<u16>,
+
+    /// Placeholder. A way to look up a Cell from its app-specific handle.
     _handle_map: HashMap<CellHandle, CellId>,
+
+    /// Placeholder. A way to get a Keystore from an AgentId.
     _agent_keys: HashMap<AgentId, Keystore>,
 
-    /// oneshot senders used to end various managed tasks
-    // TODO: define message type, spawn task that takes receiver and select!s
-    // over FuturesUnordered and the receiver, etc.
+    /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
 
     /// broadcast channel sender, used to end all managed tasks
     managed_task_stop_broadcaster: StopBroadcaster,
 
-    /// The main task join handle to await on
+    /// The main task join handle to await on.
+    /// The conductor is intended to live as long as this task does.
     task_manager_run_handle: Option<TaskManagerRunHandle>,
 }
 
 impl Conductor {
     async fn new(env: Environment) -> ConductorResult<Conductor> {
         let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
-        // TODO: move task_rx into TaskManager
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
@@ -134,6 +148,7 @@ impl Conductor {
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,
+            admin_websocket_ports: Vec::new(),
         })
     }
 
@@ -163,13 +178,16 @@ impl Conductor {
 
     /// A gate to put at the top of public functions to ensure that work is not
     /// attempted after a shutdown has been issued
-    // TEST: that this works
     pub(crate) fn check_running(&self) -> ConductorResult<()> {
         if self.shutting_down {
             Err(ConductorError::ShuttingDown)
         } else {
             Ok(())
         }
+    }
+
+    pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+        self.admin_websocket_ports.get(0).map(|p| *p)
     }
 
     fn shutdown(&mut self) -> () {
@@ -208,6 +226,12 @@ impl Conductor {
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
+    // TODO: it would be nice to use this as the common way to spawn an admin
+    // interface, especially if we allow spawning additional admin interfaces
+    // on-the-fly, but it is a little weird, since we need to lock the Conductor
+    // in order to do so, and pass in an AdminInterfaceApi, which contains
+    // an Arc<RwLock<Conductor>> around the very Conductor which is calling this
+    // method...leading to potential deadlock if not careful.
     async fn spawn_admin_interface<Api: AdminInterfaceApi>(
         &mut self,
         _api: Api,
@@ -216,6 +240,8 @@ impl Conductor {
         unimplemented!()
     }
 
+    /// The common way to spawn a new app interface, whether read from
+    /// ConductorState on startup, or generated on-the-fly by an admin method
     async fn spawn_app_interface<Api: AppInterfaceApi>(
         &mut self,
         _api: Api,
@@ -233,8 +259,12 @@ mod builder {
     use crate::conductor::{
         api::StdAdminInterfaceApi,
         config::AdminInterfaceConfig,
-        interface::{websocket::spawn_admin_interface_task, InterfaceDriver},
-        manager::keep_alive_task,
+        interface::{
+            error::InterfaceResult,
+            websocket::{spawn_admin_interface_task, spawn_websocket_listener},
+            InterfaceDriver,
+        },
+        manager::{keep_alive_task, ManagedTaskHandle},
     };
     use futures::future;
     use std::sync::Arc;
@@ -273,7 +303,6 @@ mod builder {
             let environment = test_conductor_env();
             let conductor = Conductor::new(environment).await?;
             Ok(Arc::new(RwLock::new(conductor)).into())
-
         }
     }
 
@@ -287,9 +316,22 @@ mod builder {
         let admin_api = StdAdminInterfaceApi::new(conductor_mutex.clone().into());
 
         // Closure to process each admin config item
-        let spawn_from_config = |AdminInterfaceConfig { driver, .. }| match driver {
-            InterfaceDriver::Websocket { port } => {
-                spawn_admin_interface_task(port, admin_api.clone(), stop_tx.subscribe())
+        let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
+            let admin_api = admin_api.clone();
+            let stop_tx = stop_tx.clone();
+            async move {
+                match driver {
+                    InterfaceDriver::Websocket { port } => {
+                        let listener = spawn_websocket_listener(port).await?;
+                        let port = listener.local_addr().port().unwrap_or(port);
+                        let handle: ManagedTaskHandle = spawn_admin_interface_task(
+                            listener,
+                            admin_api.clone(),
+                            stop_tx.subscribe(),
+                        )?;
+                        InterfaceResult::Ok((port, handle))
+                    }
+                }
             }
         };
 
@@ -299,8 +341,8 @@ mod builder {
             .await
             .into_iter()
             // Log errors
-            .inspect(|interface| {
-                if let Err(ref e) = interface {
+            .inspect(|result| {
+                if let Err(ref e) = result {
                     error!(error = e as &dyn Error, "Admin interface failed to parse");
                 }
             })
@@ -310,6 +352,7 @@ mod builder {
 
         {
             let mut conductor = conductor_mutex.write().await;
+            let mut ports = Vec::new();
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
@@ -320,7 +363,8 @@ mod builder {
                 .await?;
 
             // Now that tasks are spawned, register them with the TaskManager
-            for handle in handles {
+            for (port, handle) in handles {
+                ports.push(port);
                 conductor
                     .manage_task(ManagedTaskAdd::new(
                         handle,
@@ -333,6 +377,7 @@ mod builder {
                     ))
                     .await?
             }
+            conductor.admin_websocket_ports = ports;
         }
         Ok(())
     }
