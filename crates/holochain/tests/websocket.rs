@@ -95,7 +95,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
         }]),
         ..Default::default()
     };
-    let conductor_handle = Conductor::build().from_config(config).await?;
+    let conductor_handle = Conductor::build().with_config(config).await?;
     let (mut client, _) = websocket_client(9001).await?;
     let response = client.request(AdminRequest::AddDna).await;
     // TODO: update to proper response once implemented
@@ -123,7 +123,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
         }]),
         ..Default::default()
     };
-    let conductor_handle = Conductor::build().from_config(config).await?;
+    let conductor_handle = Conductor::build().with_config(config).await?;
     info!("creating config");
     let (mut client, rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(
         url2!("ws://127.0.0.1:{}", 9010),
