@@ -96,8 +96,8 @@ wasm_io_types!(
     [EntryAddressInput, ()],
     [EntryAddressOutput, ()],
     // the current system time, in the opinion of the host, as a Duration
-    [SysTimeInput, ()],
-    [SysTimeOutput, core::time::Duration],
+    [RoughtimeInput, Option<[u8; 64]>],
+    [RoughtimeOutput, crate::roughtime::ClockChain],
     // the debug host import takes a DebugMsg to output wherever the host wants to display it
     // it is intended that the zome dev or the HDK provides a little sugar to support arbitrary
     // implementations of Debug, e.g. something like a debug! macro that wraps debug_msg! and the

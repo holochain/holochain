@@ -29,7 +29,7 @@ pub mod send;
 pub mod show_env;
 pub mod sign;
 pub mod sleep;
-pub mod sys_time;
+pub mod roughtime;
 pub mod update_entry;
 
 use crate::core::ribosome::{
@@ -38,7 +38,7 @@ use crate::core::ribosome::{
     entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
     globals::globals, keystore::keystore, link_entries::link_entries, property::property,
     query::query, remove_entry::remove_entry, remove_link::remove_link, send::send,
-    show_env::show_env, sign::sign, sleep::sleep, sys_time::sys_time, update_entry::update_entry,
+    show_env::show_env, sign::sign, sleep::sleep, roughtime::roughtime, update_entry::update_entry,
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -186,7 +186,7 @@ impl WasmRibosome {
                 "__update_entry" => func!(invoke_host_function!(update_entry)),
                 "__remove_entry" => func!(invoke_host_function!(remove_entry)),
                 "__show_env" => func!(invoke_host_function!(show_env)),
-                "__sys_time" => func!(invoke_host_function!(sys_time)),
+                "__roughtime" => func!(invoke_host_function!(roughtime)),
             },
         }
     }

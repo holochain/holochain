@@ -1,8 +1,6 @@
-use super::HostContext;
-use super::WasmRibosome;
-use std::sync::Arc;
-use sx_zome_types::SysTimeInput;
-use sx_zome_types::SysTimeOutput;
+// everything here adapted from roughtime client upstrea
+// @see https://github.com/int08h/roughenough/blob/master/src/bin/roughenough-client.rs
+
 use std::net::{ToSocketAddrs, UdpSocket};
 use roughenough::merkle::root_from_paths;
 use roughenough::sign::Verifier;
@@ -11,13 +9,6 @@ use roughenough::{
 };
 use std::collections::HashMap;
 use byteorder::{LittleEndian, ReadBytesExt};
-use chrono::offset::Utc;
-use chrono::offset::TimeZone;
-
-fn create_nonce() -> [u8; 64] {
-    let nonce = [0u8; 64];
-    nonce
-}
 
 fn make_request(nonce: &[u8]) -> Vec<u8> {
     let mut msg = RtMessage::new(1);
@@ -167,72 +158,5 @@ impl ResponseHandler {
         let mut verifier = Verifier::new(public_key);
         verifier.update(data);
         verifier.verify(sig)
-    }
-}
-
-pub fn sys_time(
-    _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
-    _input: SysTimeInput,
-) -> SysTimeOutput {
-
-    let addr_str = "roughtime.cloudflare.com:2002";
-    let num_requests = 3;
-    let pub_key: &[u8; 32] = &[0x80, 0x3e, 0xb7, 0x85, 0x28, 0xf7, 0x49, 0xc4, 0xbe, 0xc2, 0xe3, 0x9e, 0x1a, 0xbb, 0x9b, 0x5e, 0x5a, 0xb7, 0xe4, 0xdd, 0x5c, 0xe4, 0xb6, 0xf2, 0xfd, 0x2f, 0x93, 0xec, 0xc3, 0x53, 0x8f, 0x1a];
-
-    let addr = addr_str.to_socket_addrs().unwrap().next().unwrap();
-
-    let mut requests = Vec::with_capacity(num_requests);
-    for _ in 0..num_requests {
-        let nonce = create_nonce();
-        let socket = UdpSocket::bind("0.0.0.0:0").expect("Couldn't open UDP socket");
-        let request = make_request(&nonce);
-        requests.push((nonce, request, socket));
-    }
-
-    for &mut (_, ref request, ref mut socket) in &mut requests {
-        socket.send_to(request, addr).unwrap();
-    }
-
-    for (nonce, _, mut socket) in requests {
-        let resp = receive_response(&mut socket);
-
-        let ParsedResponse {
-            verified,
-            midpoint,
-            radius,
-        } = ResponseHandler::new(Some(pub_key.to_vec()), resp.clone(), nonce).extract_time();
-
-        dbg!("x: {} {} {}", verified, midpoint, radius);
-
-        let map = resp.into_hash_map();
-        let _index = map[&Tag::INDX]
-        .as_slice()
-        .read_u32::<LittleEndian>()
-        .unwrap();
-
-        let seconds = midpoint / 10_u64.pow(6);
-        let nsecs = (midpoint - (seconds * 10_u64.pow(6))) * 10_u64.pow(3);
-
-        let ts = Utc.timestamp(seconds as i64, nsecs as u32);
-        dbg!("y: {:?}", ts);
-    }
-
-    let start = std::time::SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("Time went backwards");
-    SysTimeOutput::new(since_the_epoch)
-}
-
-#[cfg(test)]
-pub mod wasm_test {
-    use sx_zome_types::zome_io::SysTimeOutput;
-    use sx_zome_types::SysTimeInput;
-
-    #[test]
-    fn invoke_import_sys_time_test() {
-        let _: SysTimeOutput =
-            crate::call_test_ribosome!("imports", "sys_time", SysTimeInput::new(()));
     }
 }
