@@ -59,6 +59,3 @@ path = "src/lib.rs"
 [[bin]]
 name = "holochain-2020"
 path = "src/bin/holochain/main.rs"
-
-[features]
-wasmtest = []
