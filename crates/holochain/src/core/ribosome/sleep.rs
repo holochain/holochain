@@ -81,6 +81,7 @@ pub mod wasm_test {
         let diff1 =
             i128::try_from(t3.as_millis()).unwrap() - i128::try_from(t2.as_millis()).unwrap();
 
+        println!("{}", diff1);
         assert!(2 < diff1);
         assert!(diff1 < 5);
     }

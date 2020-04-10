@@ -138,15 +138,18 @@ impl WasmRibosome {
                 move |ctx: &mut Ctx,
                       guest_allocation_ptr: RemotePtr|
                       -> Result<RemotePtr, WasmError> {
+                    let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
+                        ctx,
+                        guest_allocation_ptr,
+                    )?;
+                    // this could take a long time but it's fine because this all has its own
+                    // thread that has nothing to do with tokio, right?
+                    // note that wasmer doesn't seem to like async stuff
                     let output_sb: SerializedBytes = $host_function(
-                        std::sync::Arc::clone(&closure_self_arc),
-                        std::sync::Arc::clone(&closure_host_context_arc),
-                        $crate::holochain_wasmer_host::guest::from_guest_ptr(
-                            ctx,
-                            guest_allocation_ptr,
-                        )?,
-                    )
-                    .try_into()?;
+                            std::sync::Arc::clone(&closure_self_arc),
+                            std::sync::Arc::clone(&closure_host_context_arc),
+                            input,
+                        ).try_into()?;
                     let output_allocation_ptr: AllocationPtr = output_sb.into();
                     Ok(output_allocation_ptr.as_remote_ptr())
                 }
