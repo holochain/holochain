@@ -37,7 +37,7 @@ fn zero_uuid() -> String {
 pub type DnaAddress = Address;
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
 pub struct Dna {
     /// The top-level "name" of a holochain application.
     #[serde(default)]

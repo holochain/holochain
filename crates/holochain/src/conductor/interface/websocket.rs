@@ -261,11 +261,13 @@ where
     }
 }
 
+/* I don't think we need this?
 async fn handle_incoming_admin_request(request: AdminRequest) -> InterfaceResult<AdminResponse> {
     Ok(match request {
         _ => AdminResponse::DnaAdded,
     })
 }
+*/
 
 // TODO: rename AppRequest to AppRequest or something
 async fn handle_incoming_app_request(request: AppRequest) -> InterfaceResult<AppResponse> {

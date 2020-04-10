@@ -4,10 +4,13 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
+use std::{sync::Arc, path::PathBuf};
 use sx_types::{
     cell::CellHandle,
+    dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
+use tokio::sync::RwLock;
 
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
@@ -73,28 +76,41 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 pub struct StdAdminInterfaceApi {
     conductor_handle: ConductorHandle,
     app_api: StdAppInterfaceApi,
+    fake_dna_cache: Arc<RwLock<Vec<Dna>>>,
 }
 
 impl StdAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
         let app_api = StdAppInterfaceApi::new(conductor_handle.clone());
+        let fake_dna_cache = Arc::new(RwLock::new(Vec::new()));
         StdAdminInterfaceApi {
             conductor_handle,
             app_api,
+            fake_dna_cache,
         }
+    }
+
+    async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
+        let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
+        let dna = SerializedBytes::from(dna);
+        let dna: Dna = dna.try_into()?;
+        {
+            let mut fake_dna_cache = self.fake_dna_cache.write().await;
+            fake_dna_cache.push(dna);
+        }
+        Ok(AdminResponse::DnaInstalled)
     }
 }
 
 #[async_trait::async_trait]
 impl AdminInterfaceApi for StdAdminInterfaceApi {
     async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
-        Ok(AdminResponse::Unimplemented(request))
-        // use AdminRequest::*;
-        // match request {
-        //     Start(cell_handle) => unimplemented!(),
-        //     Stop(cell_handle) => unimplemented!(),
-        //     AddDna => unimplemented!(),
-        // }
+        use AdminRequest::*;
+        match request {
+            Start(cell_handle) => unimplemented!(),
+            Stop(cell_handle) => unimplemented!(),
+            InstallDna(dna_path) => self.install_dna(dna_path).await,
+        }
     }
 }
 
@@ -174,7 +190,7 @@ pub enum AppResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum AdminResponse {
     Unimplemented(AdminRequest),
-    DnaAdded,
+    DnaInstalled,
     Error { debug: String },
 }
 
@@ -192,7 +208,7 @@ pub enum AppRequest {
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
-    AddDna,
+    InstallDna(PathBuf),
 }
 
 #[allow(missing_docs)]

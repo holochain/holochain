@@ -14,11 +14,13 @@ use std::{
     process::{Child, Command, ExitStatus, Stdio},
     time::Duration,
 };
-use sx_types::observability;
+use sx_types::{dna::Dna, observability};
 use tempdir::TempDir;
 use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
+use holochain_serialized_bytes::SerializedBytes;
+use std::convert::TryFrom;
 
 fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
     if let Ok(Some(status)) = started {
@@ -35,6 +37,13 @@ fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
             status, stdout, stderr
         );
     }
+}
+
+fn fake_dna(mut path: PathBuf) -> Result<PathBuf> {
+    let fake_dna: Dna = Default::default();
+    path.push("dna");
+    std::fs::write(path.clone(), SerializedBytes::try_from(fake_dna)?.bytes())?;
+    Ok(path)
 }
 
 fn create_config(mut path: PathBuf, port: u16) -> Result<PathBuf> {
@@ -78,9 +87,12 @@ async fn call_admin() -> Result<()> {
     check_started(started.map_err(Into::into), &mut holochain);
 
     let (mut client, _) = websocket_client(port).await?;
-    let request = AdminRequest::AddDna;
+
+    let tmp_dir = TempDir::new("fake_dna")?;
+    let fake_dna = fake_dna(tmp_dir.into_path())?;
+    let request = AdminRequest::InstallDna(fake_dna);
     let response = client.request(request).await?;
-    assert!(matches!(response, AdminResponse::DnaAdded));
+    assert!(matches!(response, AdminResponse::DnaInstalled));
 
     holochain.kill().expect("Failed to kill holochain");
     Ok(())
@@ -97,11 +109,15 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     };
     let conductor_handle = Conductor::build().with_config(config).await?;
     let (mut client, _) = websocket_client(9001).await?;
-    let response = client.request(AdminRequest::AddDna).await;
+
+    let tmp_dir = TempDir::new("fake_dna")?;
+    let fake_dna = fake_dna(tmp_dir.into_path())?;
+    let request = AdminRequest::InstallDna(fake_dna);
+    let response = client.request(request).await;
     // TODO: update to proper response once implemented
     assert!(matches!(
         response,
-        Ok(AdminResponse::Unimplemented(AdminRequest::AddDna))
+        Ok(AdminResponse::Unimplemented(AdminRequest::InstallDna(request)))
     ));
     conductor_handle.shutdown().await;
 
@@ -151,10 +167,14 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     assert!(matches!(incoming[0], WebsocketMessage::Close(_)));
 
     info!("About to make failing request");
+    
+    let tmp_dir = TempDir::new("fake_dna")?;
+    let fake_dna = fake_dna(tmp_dir.into_path())?;
+    let request = AdminRequest::InstallDna(fake_dna);
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
-        tokio::time::timeout(Duration::from_secs(1), client.request(AdminRequest::AddDna)).await;
+        tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
     // request should have errored since the conductor shut down,
     // but should not have timed out (which would be an `Err(Err(_))`)

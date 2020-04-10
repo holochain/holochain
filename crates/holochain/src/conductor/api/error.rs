@@ -18,6 +18,14 @@ pub enum ConductorApiError {
     /// Miscellaneous error
     #[error("Miscellaneous error: {0}")]
     Todo(String),
+    
+    /// Io error.
+    #[error("Io error while using a Interface Api: {0:?}")]
+    Io(#[from] std::io::Error),
+
+    /// Serialization error
+    #[error("Io error while using a InterfaceApi: {0:?}")]
+    SerializationError(#[from] holochain_serialized_bytes::SerializedBytesError),
 }
 
 /// Type alias
