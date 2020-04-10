@@ -249,7 +249,10 @@ mod builder {
             Self {}
         }
 
-        pub async fn with_config(self, config: ConductorConfig) -> ConductorResult<ConductorHandle> {
+        pub async fn with_config(
+            self,
+            config: ConductorConfig,
+        ) -> ConductorResult<ConductorHandle> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment).await?;
