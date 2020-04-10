@@ -13,8 +13,7 @@ let
   RUST_BACKTRACE=1 \
   hn-rust-fmt-check \
   && hn-rust-clippy \
-  && hc-test \
-  && hc-test-wasm
+  && hc-test
   '';
 
   t-cover = pkgs.writeShellScriptBin "hc-coverage-test"
