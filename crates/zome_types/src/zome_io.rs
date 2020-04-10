@@ -98,13 +98,14 @@ wasm_io_types!(
     // the current system time, in the opinion of the host, as a Duration
     [SysTimeInput, ()],
     [SysTimeOutput, core::time::Duration],
-    // the debug host import takes a string to output wherever the host wants to display it
+    // the debug host import takes a DebugMsg to output wherever the host wants to display it
     // it is intended that the zome dev or the HDK provides a little sugar to support arbitrary
-    // implementations of Debug, e.g. something like a debug! macro that wraps format! and the
+    // implementations of Debug, e.g. something like a debug! macro that wraps debug_msg! and the
     // host interface
+    // DebugMsg includes line numbers etc. so the wasm can tell the host about it's own code
     [DebugInput, crate::debug::DebugMsg],
     [DebugOutput, ()],
-    // every externed function that the zome develoepr exposes to holochain returns ZomeExternOutput
+    // every externed function that the zome developer exposes to holochain returns ZomeExternOutput
     // as the zome developer can expose arbitrary functions and the client will expect arbitrary data
     // all we can say is that some SerializedBytes are being returned
     // same deal for the input, the HDK or the dev will need to BYO context for deserialization of the
