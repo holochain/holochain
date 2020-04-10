@@ -69,12 +69,5 @@ pub mod wasm_test {
             .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
             .unwrap();
         let t1 = now();
-
-        println!(
-            "x: {} {} {}",
-            t0.as_nanos(),
-            t1.as_nanos(),
-            t1.as_nanos() - t0.as_nanos()
-        );
     }
 }
