@@ -158,7 +158,7 @@ impl WasmRibosome {
         }
         imports! {
             "env" => {
-                // standard memory handling
+                // standard memory handling used by the holochain_wasmer guest and host macros
                 "__import_allocation" => func!(holochain_wasmer_host::import::__import_allocation),
                 "__import_bytes" => func!(holochain_wasmer_host::import::__import_bytes),
 
