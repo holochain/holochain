@@ -41,8 +41,6 @@ macro_rules! debug_msg {
         debug_msg!("{}", $msg);
     };
     ( $msg:expr, $($tail:expr),* ) => {{
-        let ret = $crate::debug::DebugMsg::new(module_path!(), file!(), line!(), &format!($msg, $($tail),*));
-        dbg!(&ret);
-        ret
+        $crate::debug::DebugMsg::new(module_path!(), file!(), line!(), &format!($msg, $($tail),*))
     }};
 }
