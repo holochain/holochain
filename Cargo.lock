@@ -77,9 +77,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.29"
+version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bab5c215748dc1ad11a145359b1067107ae0f8ca5e99844fa64067ed5bf198e3"
+checksum = "da71fef07bc806586090247e971229289f64c210a278ee5ae419314eb386b31d"
 dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
@@ -376,7 +376,7 @@ dependencies = [
  "cranelift-codegen-shared",
  "cranelift-entity",
  "log",
- "smallvec 1.2.0",
+ "smallvec 1.3.0",
  "target-lexicon",
  "thiserror",
 ]
@@ -975,8 +975,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a05a1ab3ce45baaeb3ea2d5c7a09b4902e698c76cad85005089cc8a05353c5d8"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned#695e4a9ffead59fba1f9ecbd1eb0ef9cb17dc5d5"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -988,8 +987,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ca00b5ce8e8228b4a7eb097bbad4dd013d6fc85973760713ff36c396db26b20"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned#695e4a9ffead59fba1f9ecbd1eb0ef9cb17dc5d5"
 dependencies = [
  "quote 0.6.11",
  "syn 0.15.31",
@@ -1592,9 +1590,9 @@ checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 
 [[package]]
 name = "openssl"
-version = "0.10.28"
+version = "0.10.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "973293749822d7dd6370d6da1e523b0d1db19f06c459134c658b2a4261378b52"
+checksum = "cee6d85f4cb4c4f59a6a85d5b68a233d280c82e29e822913b9c8b129fbf20bdd"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -1612,9 +1610,9 @@ checksum = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.54"
+version = "0.9.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1024c0a59774200a555087a6da3f253a9095a5f344e353b212ac4c8b8e450986"
+checksum = "7717097d810a0f2e2323f9e5d11e71608355e24828410b55b9d4f18aa5f9a5d8"
 dependencies = [
  "autocfg 1.0.0",
  "cc",
@@ -1706,7 +1704,7 @@ dependencies = [
  "cloudabi",
  "libc",
  "redox_syscall",
- "smallvec 1.2.0",
+ "smallvec 1.3.0",
  "winapi 0.3.8",
 ]
 
@@ -2392,9 +2390,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.48"
+version = "1.0.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9371ade75d4c2d6cb154141b9752cf3781ec9c05e0e5cf35060e1e70ee7b9c25"
+checksum = "da07b57ee2623368351e9a0488bb0b261322a15a6e0ae53e243cbdc0f4208da9"
 dependencies = [
  "indexmap",
  "itoa",
@@ -2496,9 +2494,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
+checksum = "05720e22615919e4734f6a99ceae50d00226c3c5aca406e102ebc33298214e0a"
 
 [[package]]
 name = "snowflake"
@@ -2837,9 +2835,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee5a0dd887e37d37390c13ff8ac830f992307fe30a1fff0ab8427af67211ba28"
+checksum = "39fb9142eb6e9cc37f4f29144e62618440b149a138eee01a7bbe9b9226aaf17c"
 dependencies = [
  "bytes",
  "fnv",
@@ -2979,7 +2977,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sharded-slab",
- "smallvec 1.2.0",
+ "smallvec 1.3.0",
  "tracing-core",
  "tracing-log",
  "tracing-serde",
@@ -3032,7 +3030,7 @@ version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5479532badd04e128284890390c1e876ef7a993d0570b3597ae43dfa1d59afa4"
 dependencies = [
- "smallvec 1.2.0",
+ "smallvec 1.3.0",
 ]
 
 [[package]]
@@ -3200,7 +3198,7 @@ checksum = "6d2e13201ef9ef527ad30a6bf1b08e3e024a40cf2731f393d80375dc88506207"
 dependencies = [
  "cranelift-codegen",
  "log",
- "smallvec 1.2.0",
+ "smallvec 1.3.0",
  "target-lexicon",
 ]
 
