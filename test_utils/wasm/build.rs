@@ -12,8 +12,7 @@ fn main() {
     for m in vec!["debug", "foo", "imports"] {
 
         let out_dir = std::env::var_os("OUT_DIR").unwrap();
-        let toml_str = format!("{}/Cargo.toml", &m);
-        let cargo_toml = Path::new(&toml_str);
+        let cargo_toml = Path::new(m).join("Cargo.toml");
 
         let cargo_command = std::env::var_os("CARGO");
         let cargo_command = cargo_command
