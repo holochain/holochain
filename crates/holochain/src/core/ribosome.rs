@@ -32,7 +32,7 @@ pub mod sign;
 pub mod sys_time;
 pub mod update_entry;
 
-use crate::core::ribosome::{
+use self::{
     call::call, capability::capability, commit_entry::commit_entry, debug::debug, decrypt::decrypt,
     emit_signal::emit_signal, encrypt::encrypt, entry_address::entry_address,
     entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
@@ -40,6 +40,7 @@ use crate::core::ribosome::{
     query::query, remove_entry::remove_entry, remove_link::remove_link, schedule::schedule,
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
+
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use mockall::automock;
