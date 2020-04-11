@@ -13,5 +13,7 @@ edition = "2018"
 [dependencies]
 holochain_serialized_bytes = "=0.0.36"
 serde = { version = "1.0.104", features = ["derive"] }
+
+# TODO: remove these two dependencies and replace with HoloHash
 multihash = "0.8.0"
 rust-base58 = "0.0.4"

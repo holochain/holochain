@@ -2,7 +2,11 @@ use holochain_serialized_bytes::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 pub struct DebugMsg {
+    // TODO: Consider either replacing with `Cow<'static, str>` or with
+    // `&'a str` and using `#[serde(borrow)]`
     module_path: String,
+    // TODO: Consider either replacing with `Cow<'static, str>` or with
+    // `&'a str` and using `#[serde(borrow)]`
     file: String,
     line: u32,
     msg: String,
