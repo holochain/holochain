@@ -9,12 +9,12 @@ pub struct DebugMsg {
 }
 
 impl DebugMsg {
-    pub fn new(module_path: &str, file: &str, line: u32, msg: &str) -> Self {
+    pub fn new(module_path: String, file: String, line: u32, msg: String) -> Self {
         Self {
-            module_path: module_path.to_owned(),
-            file: file.to_owned(),
+            module_path,
+            file,
             line,
-            msg: msg.to_owned(),
+            msg,
         }
     }
 
@@ -41,6 +41,6 @@ macro_rules! debug_msg {
         debug_msg!("{}", $msg);
     };
     ( $msg:expr, $($tail:expr),* ) => {{
-        $crate::debug::DebugMsg::new(module_path!(), file!(), line!(), &format!($msg, $($tail),*))
+        $crate::debug::DebugMsg::new(module_path!().to_string(), file!().to_string(), line!(), format!($msg, $($tail),*))
     }};
 }
