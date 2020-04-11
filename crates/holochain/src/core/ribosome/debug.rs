@@ -11,7 +11,7 @@ pub fn debug(
     _host_context: Arc<HostContext>,
     input: DebugInput,
 ) -> DebugOutput {
-    let msg: DebugMsg = input.inner();
+    let msg: DebugMsg = input.into_inner();
     trace!(
         "{}:{}:{} {}",
         msg.module_path(),
@@ -37,13 +37,13 @@ pub mod wasm_test {
             "debug",
             DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
         );
-        assert_eq!((), output.inner(),);
+        assert_eq!((), output.into_inner());
     }
 
     #[test]
     fn wasm_line_numbers_test() {
         // this shows that we can get line numbers out of wasm
         let output: DebugOutput = crate::call_test_ribosome!("debug", "debug", ());
-        assert_eq!((), output.inner(),);
+        assert_eq!((), output.into_inner());
     }
 }

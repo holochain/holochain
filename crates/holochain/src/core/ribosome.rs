@@ -328,7 +328,7 @@ pub mod wasm_test {
 
             let output = match zome_invocation_response {
                 sx_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
-                    guest_output.inner().try_into().unwrap()
+                    guest_output.into_inner().try_into().unwrap()
                 }
             };
             // this is convenient for now as we flesh out the zome i/o behaviour
