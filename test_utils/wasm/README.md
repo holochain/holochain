@@ -15,5 +15,6 @@ be included.
 it should be reasonably easy to interact with holochain even without the HDK
 using the `holochain_wasmer_*` crates.
 
-the tests themselves generally sit in the ribosome module in core.
-this is necessary so that core can inject the host import functions.
+The tests that run this Wasm generally sit in the [`ribosome.rs` module in core][ribosome]. This is necessary because the Wasm crates depend on certain global functions that core defines and needs to inject.
+
+[ribosome]: https://github.com/Holo-Host/holochain-2020/blob/2b83a9340fba999e8c32adb9c342bd268f0ef480/crates/holochain/src/core/ribosome.rs
