@@ -13,7 +13,7 @@ macro_rules! wasm_io_types {
                     Self(i)
                 }
 
-                pub fn inner(self) -> $t_inner {
+                pub fn into_inner(self) -> $t_inner {
                     self.0
                 }
 
