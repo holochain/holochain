@@ -18,8 +18,7 @@ pub fn sys_time(
 
 #[cfg(test)]
 pub mod wasm_test {
-    use sx_zome_types::zome_io::SysTimeOutput;
-    use sx_zome_types::SysTimeInput;
+    use sx_zome_types::{SysTimeInput, SysTimeOutput};
 
     #[test]
     fn invoke_import_sys_time_test() {
