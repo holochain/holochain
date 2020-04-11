@@ -1,10 +1,11 @@
-# test utils: wasm
+# Wasm test utilities
 
-here we have:
+This crate contains:
 
-- several rust crates that compile to wasms that are useful for testing
-- a `TestWasm` enum that maps variants to populated `DnaWasm` structs (bytes)
-- a `build.rs` file that builds all the wasms for testing
+- several small crates that compile to Wasm and are used as test values.
+- `enum TestWasm` which enumerates all of those crates.
+-  `impl From<TestWasm> for DnaWasm` to obtain the compiled Wasm artifacts for those crates.
+- a `build.rs` file that builds all those crates for compile-time inclusion in the library.
 
 these wasms _directly_ test the host/guest implementation of holochain
 
