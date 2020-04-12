@@ -48,6 +48,7 @@ num_cpus = "1.8"
 roughenough = "1.1.8"
 ring = "0.13"
 byteorder = "1"
+rand = "0.7.3"
 
 [dev-dependencies]
 anyhow = "1.0.26"

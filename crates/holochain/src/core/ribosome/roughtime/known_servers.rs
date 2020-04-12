@@ -1,3 +1,5 @@
+use rand::seq::SliceRandom;
+
 // @TODO
 // https://roughtime.googlesource.com/roughtime/+/HEAD/ECOSYSTEM.md#curating-server-lists
 // So, instead, Roughtime is only available for products that can be updated. The server lists have
@@ -41,7 +43,7 @@ impl Server {
 }
 
 pub fn servers() -> Vec<Server> {
-    vec![
+    let mut server_list = vec![
         Server {
             addr: CLOUDFLARE_ADDR.into(),
             pub_key: *CLOUDFLARE_PUB_KEY,
@@ -54,5 +56,9 @@ pub fn servers() -> Vec<Server> {
             addr: TICKTOCK_ADDR.into(),
             pub_key: *TICKTOCK_PUB_KEY,
         },
-    ]
+    ];
+
+    server_list.shuffle(&mut rand::thread_rng());
+
+    server_list
 }

@@ -948,6 +948,7 @@ dependencies = [
  "owning_ref",
  "parking_lot 0.10.0",
  "petgraph",
+ "rand 0.7.3",
  "ring",
  "roughenough",
  "serde",
