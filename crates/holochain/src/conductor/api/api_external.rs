@@ -4,16 +4,13 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{path::PathBuf};
 use sx_types::{
     cell::CellHandle,
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,
 };
-use tokio::sync::RwLock;
-use uuid::Uuid;
-
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
     type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
@@ -81,6 +78,7 @@ pub struct StdAdminInterfaceApi {
     conductor_handle: ConductorHandle,
 
     // TODO: I already forget why we needed to put this in here! ~MD
+    // To spawn new app APIs you need a copy of the App Api :)
     app_api: StdAppInterfaceApi,
 }
 
@@ -270,10 +268,8 @@ mod test {
     use anyhow::Result;
     use matches::assert_matches;
     use sx_types::{
-        dna::Dna,
         test_utils::{fake_dna, fake_dna_file},
     };
-    use tempdir::TempDir;
     use uuid::Uuid;
 
     #[tokio::test]

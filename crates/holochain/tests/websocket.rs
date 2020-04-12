@@ -7,10 +7,8 @@ use holochain_2020::conductor::{
     error::ConductorError,
     Conductor, ConductorHandle,
 };
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_websocket::*;
 use matches::assert_matches;
-use std::convert::TryFrom;
 use std::sync::Arc;
 use std::{
     io::Read,
@@ -19,7 +17,6 @@ use std::{
     time::Duration,
 };
 use sx_types::{
-    dna::Dna,
     observability,
     prelude::*,
     test_utils::{fake_dna, fake_dna_file},
@@ -163,7 +160,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     assert!(matches!(
         response,
         Ok(AdminResponse::Unimplemented(AdminRequest::InstallDna(
-            request
+            _request
         )))
     ));
     conductor_handle.shutdown().await;

@@ -24,7 +24,7 @@ pub enum ConductorApiError {
     Io(#[from] std::io::Error),
 
     /// Serialization error
-    #[error("Io error while using a InterfaceApi: {0:?}")]
+    #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
 }
 
