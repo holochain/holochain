@@ -23,13 +23,14 @@ pub mod keystore;
 pub mod link_entries;
 pub mod property;
 pub mod query;
+pub mod random_bytes;
 pub mod remove_entry;
 pub mod remove_link;
+pub mod roughtime;
 pub mod send;
 pub mod show_env;
 pub mod sign;
 pub mod sleep;
-pub mod roughtime;
 pub mod update_entry;
 
 use crate::core::ribosome::{
@@ -37,8 +38,9 @@ use crate::core::ribosome::{
     emit_signal::emit_signal, encrypt::encrypt, entry_address::entry_address,
     entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
     globals::globals, keystore::keystore, link_entries::link_entries, property::property,
-    query::query, remove_entry::remove_entry, remove_link::remove_link, send::send,
-    show_env::show_env, sign::sign, sleep::sleep, roughtime::roughtime, update_entry::update_entry,
+    query::query, random_bytes::random_bytes, remove_entry::remove_entry, remove_link::remove_link,
+    roughtime::roughtime, send::send, show_env::show_env, sign::sign, sleep::sleep,
+    update_entry::update_entry,
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -186,6 +188,7 @@ impl WasmRibosome {
                 "__update_entry" => func!(invoke_host_function!(update_entry)),
                 "__remove_entry" => func!(invoke_host_function!(remove_entry)),
                 "__show_env" => func!(invoke_host_function!(show_env)),
+                "__random_bytes" => func!(invoke_host_function!(random_bytes)),
                 "__roughtime" => func!(invoke_host_function!(roughtime)),
             },
         }

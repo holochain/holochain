@@ -1,16 +1,14 @@
 // everything here adapted from roughtime client upstrea
 // @see https://github.com/int08h/roughenough/blob/master/src/bin/roughenough-client.rs
 
-use std::net::{ToSocketAddrs, UdpSocket};
+use byteorder::{LittleEndian, ReadBytesExt};
 use roughenough::merkle::root_from_paths;
 use roughenough::sign::Verifier;
-use roughenough::{
-    RtMessage, Tag, CERTIFICATE_CONTEXT, SIGNED_RESPONSE_CONTEXT,
-};
+use roughenough::{RtMessage, Tag, CERTIFICATE_CONTEXT, SIGNED_RESPONSE_CONTEXT};
 use std::collections::HashMap;
-use byteorder::{LittleEndian, ReadBytesExt};
+use std::net::UdpSocket;
 
-fn make_request(nonce: &[u8]) -> Vec<u8> {
+pub fn make_request(nonce: &[u8]) -> Vec<u8> {
     let mut msg = RtMessage::new(1);
     msg.add_field(Tag::NONC, nonce).unwrap();
     msg.pad_to_kilobyte();
@@ -18,14 +16,14 @@ fn make_request(nonce: &[u8]) -> Vec<u8> {
     msg.encode().unwrap()
 }
 
-fn receive_response(sock: &mut UdpSocket) -> RtMessage {
+pub fn receive_response(sock: &mut UdpSocket) -> RtMessage {
     let mut buf = [0; 744];
     let resp_len = sock.recv_from(&mut buf).unwrap().0;
 
     RtMessage::from_bytes(&buf[0..resp_len]).unwrap()
 }
 
-struct ResponseHandler {
+pub struct ResponseHandler {
     pub_key: Option<Vec<u8>>,
     msg: HashMap<Tag, Vec<u8>>,
     srep: HashMap<Tag, Vec<u8>>,
@@ -38,6 +36,18 @@ pub struct ParsedResponse {
     verified: bool,
     midpoint: u64,
     radius: u32,
+}
+
+impl ParsedResponse {
+    pub fn verified(&self) -> bool {
+        self.verified
+    }
+    pub fn midpoint(&self) -> u64 {
+        self.midpoint
+    }
+    pub fn radius(&self) -> u32 {
+        self.radius
+    }
 }
 
 impl ResponseHandler {
@@ -127,7 +137,8 @@ impl ResponseHandler {
         let hash = root_from_paths(index as usize, &self.nonce, paths);
 
         assert_eq!(
-            hash, srep[&Tag::ROOT],
+            hash,
+            srep[&Tag::ROOT],
             "Nonce is not present in the response's merkle tree"
         );
     }
@@ -145,12 +156,16 @@ impl ResponseHandler {
         assert!(
             midpoint >= mint,
             "Response midpoint {} lies *before* delegation span ({}, {})",
-            midpoint, mint, maxt
+            midpoint,
+            mint,
+            maxt
         );
         assert!(
             midpoint <= maxt,
             "Response midpoint {} lies *after* delegation span ({}, {})",
-            midpoint, mint, maxt
+            midpoint,
+            mint,
+            maxt
         );
     }
 

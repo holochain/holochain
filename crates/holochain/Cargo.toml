@@ -45,7 +45,8 @@ directories = "2.0.2"
 human-panic = "1.0.3"
 num_cpus = "1.8"
 
-roughenough = { path = "../../../roughenough" }
+roughenough = "1.1.8"
+ring = "0.13"
 byteorder = "1"
 
 [dev-dependencies]

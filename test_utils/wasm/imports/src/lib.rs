@@ -64,7 +64,8 @@ guest_functions!(
     [ __get_entry, get_entry, GetEntryInput, GetEntryOutput ],
     [ __entry_type_properties, entry_type_properties, EntryTypePropertiesInput, EntryTypePropertiesOutput ],
     [ __entry_address, entry_address, EntryAddressInput, EntryAddressOutput ],
-    [ __sys_time, sys_time, SysTimeInput, SysTimeOutput ],
+    [ __roughtime, roughtime, RoughtimeInput, RoughtimeOutput ],
+    [ __random_bytes, random_bytes, RandomBytesInput, RandomBytesOutput ],
     [ __debug, debug, DebugInput, DebugOutput ]
 );
 
