@@ -6,12 +6,8 @@ use super::WasmRibosome;
 use crate::core::ribosome::random_bytes::csprng_bytes;
 use crate::core::ribosome::roughtime::client::*;
 use crate::core::ribosome::roughtime::known_servers::servers;
-use byteorder::LittleEndian;
-use byteorder::ReadBytesExt;
-use chrono::offset::TimeZone;
-use chrono::Utc;
+use crate::core::ribosome::roughtime::known_servers::Server;
 use roughenough::RtMessage;
-use roughenough::Tag;
 use std::net::ToSocketAddrs;
 use std::net::UdpSocket;
 use std::sync::Arc;
@@ -19,11 +15,40 @@ use sx_zome_types::RoughtimeInput;
 use sx_zome_types::RoughtimeOutput;
 
 const MIN_BLIND_LEN: usize = 64;
+const DESIRED_CHAIN_LEN: usize = 3;
+const MAX_ATTEMPTS: u8 = 3;
 
 pub struct Nonce {
     bytes: [u8; 64],
     blind: Vec<u8>,
     encoded_message: Vec<u8>,
+}
+
+impl std::fmt::Debug for Nonce {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Nonce").field("bytes", &self.bytes.to_vec()).field("blind", &self.blind).field("encoded_message", &self.encoded_message).finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct ChainItem {
+    nonce: Nonce,
+    server: Server,
+    server_response: RtMessage,
+}
+
+impl ChainItem {
+    pub fn nonce(&self) -> &Nonce {
+        &self.nonce
+    }
+
+    pub fn server_response(&self) -> &RtMessage {
+        &self.server_response
+    }
+
+    pub fn server(&self) -> &Server {
+        &self.server
+    }
 }
 
 /// https://roughtime.googlesource.com/roughtime/+/HEAD/ECOSYSTEM.md#chaining-requests
@@ -33,7 +58,7 @@ impl Nonce {
     }
 
     pub fn generate(
-        blind: Vec<u8>,
+        blind: &[u8],
         last_message: Option<RtMessage>,
     ) -> Result<Nonce, roughenough::Error> {
         let mut nonce = Nonce {
@@ -45,10 +70,10 @@ impl Nonce {
         // pad the blind out if it's too short with some random bytes
         nonce.blind = if blind.len() < MIN_BLIND_LEN {
             let mut bytes: Vec<u8> = csprng_bytes(MIN_BLIND_LEN - blind.len());
-            bytes.extend(&blind);
+            bytes.extend(blind);
             bytes
         } else {
-            blind
+            blind.to_vec()
         };
         assert!(nonce.blind.len() >= MIN_BLIND_LEN);
 
@@ -75,49 +100,89 @@ impl Nonce {
     }
 }
 
+fn try_chain(
+    mut servers: Vec<Server>,
+    nonce: Nonce,
+    mut chain: Vec<ChainItem>,
+) -> Result<Vec<ChainItem>, ()> {
+    if chain.len() == DESIRED_CHAIN_LEN {
+        Ok(chain)
+    } else {
+        match servers.pop() {
+            // not enough servers!
+            None => Err(()),
+            Some(server) => {
+                let addr = server
+                    .addr()
+                    .to_socket_addrs()
+                    .unwrap()
+                    .next()
+                    .unwrap();
+
+                let mut socket = UdpSocket::bind("0.0.0.0:0").expect("Couldn't open UDP socket");
+                let request = make_request(nonce.bytes());
+
+                socket.send_to(&request, addr).unwrap();
+
+                let resp: RtMessage = receive_response(&mut socket);
+                let next_nonce = match Nonce::generate(nonce.bytes(), Some(resp.clone())) {
+                    Ok(v) => v,
+                    // failed to generate a nonce!
+                    Err(_) => return Err(()),
+                };
+
+                let response: ParsedResponse = ResponseHandler::new(
+                    Some(server.pub_key().to_vec()),
+                    resp.clone(),
+                    *nonce.bytes(),
+                )
+                .extract_time();
+
+                // the response does not verify according to roughtime protocol
+                if !response.verified() {
+                    return Err(());
+                }
+
+                chain.push(ChainItem {
+                    nonce: nonce,
+                    server,
+                    server_response: resp,
+                });
+
+                // recurse
+                try_chain(servers, next_nonce, chain)
+            }
+        }
+    }
+}
+
 pub fn roughtime(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     input: RoughtimeInput,
 ) -> RoughtimeOutput {
-    // TODO deal with unwrap
-    let nonce = Nonce::generate(input.inner(), None).unwrap();
-    dbg!(&nonce.bytes().to_vec());
+    let mut attempt = 0;
 
-    for server in servers()[0..3].iter() {
-        let addr = server.addr().to_socket_addrs().unwrap().next().unwrap();
+    let chain: Vec<ChainItem> = loop {
+        if attempt == MAX_ATTEMPTS {
+            break vec![];
+        } else {
+            // TODO deal with unwrap
+            match try_chain(
+                servers(),
+                Nonce::generate(input.inner_ref(), None).unwrap(),
+                vec![],
+            ) {
+                Ok(chain) => break chain,
+                Err(_) => {
+                    attempt += 1;
+                    continue;
+                }
+            }
+        }
+    };
 
-
-        let mut socket = UdpSocket::bind("0.0.0.0:0").expect("Couldn't open UDP socket");
-        let request = make_request(nonce.bytes());
-
-        socket.send_to(&request, addr).unwrap();
-
-        let resp = receive_response(&mut socket);
-
-        let response =
-            ResponseHandler::new(Some(server.pub_key().to_vec()), resp.clone(), *nonce.bytes())
-                .extract_time();
-
-        dbg!(
-            "x: {} {} {}",
-            response.verified(),
-            response.midpoint(),
-            response.radius()
-        );
-
-        let map = resp.into_hash_map();
-        let _index = map[&Tag::INDX]
-            .as_slice()
-            .read_u32::<LittleEndian>()
-            .unwrap();
-
-        let seconds = response.midpoint() / 10_u64.pow(6);
-        let nsecs = (response.midpoint() - (seconds * 10_u64.pow(6))) * 10_u64.pow(3);
-
-        let ts = Utc.timestamp(seconds as i64, nsecs as u32);
-        dbg!("y: {:?}", ts);
-    }
+    dbg!(chain);
 
     RoughtimeOutput::new(())
 }
