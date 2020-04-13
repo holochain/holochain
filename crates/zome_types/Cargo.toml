@@ -1,7 +1,7 @@
 [package]
-name = "sx_wasm_types"
+name = "sx_zome_types"
 version = "0.0.1"
-description = "Holochain wasm types"
+description = "Holochain zome types"
 license = "GPL-3.0-only"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
@@ -13,3 +13,7 @@ edition = "2018"
 [dependencies]
 holochain_serialized_bytes = "=0.0.36"
 serde = { version = "1.0.104", features = ["derive"] }
+
+# TODO: remove these two dependencies and replace with HoloHash
+multihash = "0.8.0"
+rust-base58 = "0.0.4"

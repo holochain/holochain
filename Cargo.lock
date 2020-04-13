@@ -948,7 +948,7 @@ dependencies = [
  "sx_state",
  "sx_types",
  "sx_wasm_test_utils",
- "sx_wasm_types",
+ "sx_zome_types",
  "tempdir",
  "test_wasm_common",
  "thiserror",
@@ -959,7 +959,6 @@ dependencies = [
  "url 1.7.2",
  "url2",
  "url_serde",
- "wasmer-runtime",
 ]
 
 [[package]]
@@ -995,9 +994,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.22"
+version = "0.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d8727c16b3fadcdfee09043b8577438a91d4cffc5ecc006274b54ce9ff80241"
+checksum = "dc9561fb0cf8eecae7c161087b1f34b43b8d7abb5f2e111272ddd0f12f5e3c6b"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -1007,9 +1006,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.22"
+version = "0.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55d862293b55322c324a980677bc8d0abaa5c007629deb83f73e4674b492bde8"
+checksum = "2106a54eb7117cb98d519e272a3208b7aa530fe81e5f5950ad30610812128948"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -2615,7 +2614,7 @@ dependencies = [
  "shrinkwraprs",
  "snowflake",
  "sx_types_derive",
- "sx_wasm_types",
+ "sx_zome_types",
  "thiserror",
  "tracing",
  "tracing-core",
@@ -2639,10 +2638,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "sx_wasm_types"
+name = "sx_zome_types"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
+ "multihash",
+ "rust-base58",
  "serde",
 ]
 

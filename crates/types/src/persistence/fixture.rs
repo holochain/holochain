@@ -1,9 +1,7 @@
 //! helper functions and data for persistence testing
 
-use crate::{
-    persistence::{cas::content::Addressable, hash::HashString},
-    prelude::*,
-};
+use crate::{persistence::cas::content::Addressable, prelude::*};
+use sx_zome_types::hash::HashString;
 
 /// dummy hash based on the key of test_entry_a()
 pub fn test_hash_a() -> HashString {
