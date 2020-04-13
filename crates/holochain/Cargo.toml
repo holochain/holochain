@@ -15,7 +15,7 @@ hcid = "0.0.6"
 futures = "0.3.1"
 sx_state = { path = "../state" }
 sx_types = { path = "../types" }
-sx_wasm_types = { path = "../wasm_types" }
+sx_zome_types = { path = "../zome_types" }
 serde = { version = "1.0.104", features = ["derive"] }
 shrinkwraprs = "0.3.0"
 structopt = "=0.3.11"
@@ -36,8 +36,7 @@ boolinator = "2.4.0"
 base64 = "0.10.1"
 tracing = "=0.1.13"
 tracing-futures = "=0.2.3"
-wasmer-runtime = "=0.13.1"
-holochain_wasmer_host = "=0.0.22"
+holochain_wasmer_host = "=0.0.24"
 holochain_serialized_bytes = "=0.0.36"
 url = "1.7.2"
 url_serde = "0.2.0"

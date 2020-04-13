@@ -121,6 +121,11 @@ version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "libc"
 version = "0.2.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -367,11 +372,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_foo"
+name = "test_wasm_debug"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes 0.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_wasmer_guest 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "sx_zome_types 0.0.1",
  "test_wasm_common 0.0.1",
@@ -467,6 +473,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum holochain_wasmer_guest 0.0.24 (registry+https://github.com/rust-lang/crates.io-index)" = "3ea5a568ab4e1f63ec3b31116731e349fd288a03c30d6b4960e00aa65fc3267d"
 "checksum indexmap 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "076f042c5b7b98f31d205f1249267e12a6518c1481e9dae9764af19b707d2292"
 "checksum itoa 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "b8b7a7c0c47db5545ed3fef7468ee7bb5b74691498139e4b3f6a20685dc6dd8e"
+"checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 "checksum libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)" = "dea0c0405123bba743ee3f91f49b1c7cfb684eef0da0a50110f758ccf24cdff0"
 "checksum memory_units 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 "checksum multihash 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c62469025f45dee2464ef9fc845f4683c543993792c1993e7d903c17a4546b74"

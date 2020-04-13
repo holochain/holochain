@@ -3,3 +3,5 @@
 
 pub mod conductor;
 pub mod core;
+
+use holochain_wasmer_host;

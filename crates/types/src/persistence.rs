@@ -4,5 +4,3 @@ pub mod cas;
 
 #[allow(missing_docs)] // don't worry about documenting fixture data
 pub mod fixture;
-
-pub mod hash;
