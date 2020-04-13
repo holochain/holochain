@@ -17,6 +17,7 @@ sx_state = { path = "../state" }
 sx_types = { path = "../types" }
 sx_zome_types = { path = "../zome_types" }
 serde = { version = "1.0.104", features = ["derive"] }
+serde_json = { version = "=1.0.48", features = ["preserve_order"] }
 shrinkwraprs = "0.3.0"
 structopt = "=0.3.11"
 holochain_common = "0.0.43-alpha3"
