@@ -11,11 +11,12 @@ members = [
   "crates/types",
   "crates/crypto",
   "crates/websocket",
+  "crates/test_utils/wasm",
+  "crates/test_utils/wasm_common",
 ]
 
 exclude = [
   "pseudocode",
-  "test_utils/wasm"
 ]
 
 [patch.crates-io]

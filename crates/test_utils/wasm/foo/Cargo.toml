@@ -4,6 +4,11 @@ version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
 
+# Ensure that this is not inside of any other workspace.
+# This crate should be an implementation detail of test_utils_wasm and
+# therefore shouldn't be mentioned in the top-level Cargo.toml
+[workspace]
+
 [lib]
 name = "test_wasm_foo"
 crate-type = [ "cdylib", "rlib" ]
@@ -14,4 +19,4 @@ holochain_wasmer_guest = "=0.0.24"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 holochain_serialized_bytes = "=0.0.36"
 serde = "=1.0.104"
-sx_zome_types = { version = "=0.0.1", path = "../../../crates/zome_types" }
+sx_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
