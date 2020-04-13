@@ -1,6 +1,8 @@
 //! The Iso8601 type is defined here. It is used in particular within ChainHeader to enforce that
 //! their timestamps are defined in a useful and consistent way.
 
+#![allow(clippy::identity_op)] // see https://github.com/rust-lang/rust-clippy/issues/3866
+
 use crate::{error::SkunkError, prelude::*};
 use chrono::{offset::FixedOffset, DateTime, TimeZone};
 use lazy_static::lazy_static;
@@ -720,14 +722,16 @@ pub fn test_iso_8601() -> Iso8601 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use serde_json;
     use std::convert::TryInto;
 
     #[test]
     fn test_period_basic() {
         assert_eq!(format!("{}", Period(Duration::from_millis(0))), "0s");
         assert_eq!(format!("{}", Period(Duration::from_millis(123))), "123ms");
-        assert_eq!(format!("{}", Period(Duration::from_nanos(120000))), "120us");
+        assert_eq!(
+            format!("{}", Period(Duration::from_nanos(120_000))),
+            "120us"
+        );
         assert_eq!(format!("{}", Period(Duration::from_nanos(100))), "100ns");
         assert_eq!(
             format!("{}", Period(Duration::from_millis(1000 * 604_800 + 1123))),
@@ -742,7 +746,7 @@ pub mod tests {
                 "{}",
                 Period(Duration::from_nanos(
                     (2 * YR + 3 * WK + 4 * DY + 5 * HR + 6 * MN + 7) * 1_000_000_000_u64
-                        + 123456789
+                        + 123_456_789
                 ))
             ),
             "2y3w4d5h6m7.123456789s"
@@ -802,7 +806,7 @@ pub mod tests {
             // sub-second ranging into appropriate ms/us/ns.
             (
                 "600millisecond25usecs100nanos",
-                Duration::new(0, 600025100_u32),
+                Duration::new(0, 600_025_100_u32),
                 "0.6000251s",
             ),
             ("25us100ns", Duration::new(0, 25100_u32), "25100ns"),
@@ -810,27 +814,27 @@ pub mod tests {
             (".000025s", Duration::new(0, 25000_u32), "25us"),
             (
                 "1y2w3d4h5m6s7ms8us9ns",
-                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7008009),
+                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7_008_009),
                 "1y2w3d4h5m6.007008009s",
             ),
             (
                 "1yr2wk3dy4hr5min6sec7msec8μsec9nsec",
-                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7008009),
+                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7_008_009),
                 "1y2w3d4h5m6.007008009s",
             ),
             (
                 "1year2week3day4hour5minute6second7msecond8usecond9nsecond",
-                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7008009),
+                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7_008_009),
                 "1y2w3d4h5m6.007008009s",
             ),
             (
                 "1years2weeks3days4hours5minutes6seconds7milliseconds8microseconds9nanoseconds",
-                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7008009),
+                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7_008_009),
                 "1y2w3d4h5m6.007008009s",
             ),
             (
                 "1 yrs 2 wks 3 dys 4 hrs 5 mins 6 secs 7 millis 8 micros 9 nanos ",
-                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7008009),
+                Duration::new(YR + 2 * WK + 3 * DY + 4 * HR + 5 * MN + 6, 7_008_009),
                 "1y2w3d4h5m6.007008009s",
             ),
         ]
@@ -853,8 +857,8 @@ pub mod tests {
 
             // JSON serialization via serde_json
             let serialized = serde_json::to_string(&period)?;
-            assert_eq!(serialized.to_string(), format!("\"{}\"", ps_out));
-            let deserialized: Period = serde_json::from_str(&serialized.to_string())?;
+            assert_eq!(serialized, format!("\"{}\"", ps_out));
+            let deserialized: Period = serde_json::from_str(&serialized)?;
             assert_eq!(&deserialized.to_string(), ps_out);
 
             // JSON serialization via JsonSring
@@ -1019,7 +1023,7 @@ pub mod tests {
     fn test_iso_8601_basic() {
         // A public Iso8601::new API is available, for nanosecond-precision times
         assert_eq!(
-            Iso8601::new(1234567890, 123456789),
+            Iso8601::new(1_234_567_890, 123_456_789),
             Iso8601::try_from("2009-02-13T23:31:30.123456789+00:00").unwrap()
         );
 
@@ -1043,10 +1047,7 @@ pub mod tests {
                 })
                 .and_then(|iso| {
                     assert_eq!(
-                        format!(
-                            "{}",
-                            DateTime::<FixedOffset>::from(iso.clone()).to_rfc3339()
-                        ),
+                        DateTime::<FixedOffset>::from(iso.clone()).to_rfc3339(),
                         "2018-10-11T03:23:38+00:00"
                     );
                     Ok(iso)
@@ -1058,8 +1059,8 @@ pub mod tests {
                 .and_then(|iso| {
                     // JSON serialization via serde_json
                     let serialized = serde_json::to_string(&iso)?;
-                    assert_eq!(serialized.to_string(), "\"2018-10-11T03:23:38+00:00\"");
-                    let deserialized: Iso8601 = serde_json::from_str(&serialized.to_string())?;
+                    assert_eq!(serialized, "\"2018-10-11T03:23:38+00:00\"");
+                    let deserialized: Iso8601 = serde_json::from_str(&serialized)?;
                     assert_eq!(deserialized.to_string(), "2018-10-11T03:23:38+00:00");
 
                     // JSON serialization via JsonString
@@ -1109,7 +1110,7 @@ pub mod tests {
         .iter()
         .map(|ts| {
             Iso8601::try_from(*ts)
-                .and_then(|iso| Ok(assert_eq!(iso.to_string(), "2018-01-01T03:23:00+00:00")))
+                .map(|iso| assert_eq!(iso.to_string(), "2018-01-01T03:23:00+00:00"))
         })
         .collect::<Result<(), SkunkError>>()
         .map_err(|e| {
@@ -1135,10 +1136,8 @@ pub mod tests {
         .map(|ts| {
             let iso_8601 = Iso8601::try_from(*ts)?;
             let dt = DateTime::<FixedOffset>::from(&iso_8601); // from &Iso8601
-            Ok(assert_eq!(
-                dt.to_rfc3339().to_string(),
-                "2015-02-18T23:59:60.234567-05:00"
-            ))
+            assert_eq!(dt.to_rfc3339(), "2015-02-18T23:59:60.234567-05:00");
+            Ok(())
         })
         .collect::<Result<(), SkunkError>>()
         .map_err(|e| {
@@ -1229,13 +1228,12 @@ pub mod tests {
             "2018-10-11 03:23:40".try_into().unwrap(),
         ];
         v.sort_by(|a, b| {
-            let cmp = a.cmp(b);
             //println!( "{} {:?} {}", a, cmp, b );
-            cmp
+            a.cmp(b)
         });
         assert_eq!(
             v.iter()
-                .map(|ts| format!("{:?}", &ts).to_string())
+                .map(|ts| format!("{:?}", &ts))
                 .collect::<Vec<String>>()
                 .join(", "),
             concat!(
@@ -1254,7 +1252,7 @@ pub mod tests {
         v.sort_by(|a, b| b.cmp(a)); // reverse
         assert_eq!(
             v.iter()
-                .map(|ts| format!("{:?}", &ts).to_string())
+                .map(|ts| format!("{:?}", &ts))
                 .collect::<Vec<String>>()
                 .join(", "),
             concat!(
