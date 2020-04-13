@@ -922,6 +922,7 @@ dependencies = [
  "parking_lot 0.10.0",
  "petgraph",
  "serde",
+ "serde_json",
  "shrinkwraprs",
  "structopt",
  "sx_state",

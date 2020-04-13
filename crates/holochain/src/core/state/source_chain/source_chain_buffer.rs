@@ -88,6 +88,27 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env, R> {
         SourceChainBackwardIterator::new(self)
     }
+
+    /// dump the entire source chain as a pretty-printed json string
+    pub fn dump_as_json(&self) -> Result<String, SourceChainError> {
+        #[derive(Serialize, Deserialize)]
+        struct JsonChainDump {
+            pub header: ChainHeader,
+            pub entry: Option<Entry>,
+        }
+
+        Ok(serde_json::to_string_pretty(
+            &self
+                .iter_back()
+                .map(|h| {
+                    Ok(JsonChainDump {
+                        entry: self.get_entry(h.entry_address())?,
+                        header: h,
+                    })
+                })
+                .collect::<Vec<_>>()?,
+        )?)
+    }
 }
 
 impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
@@ -204,6 +225,52 @@ pub mod tests {
                     .unwrap(),
                 vec![Some(agent_entry), Some(dna_entry)]
             );
+            Ok(())
+        })
+    }
+
+    #[tokio::test]
+    async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
+
+        let dna = fake_dna("a");
+        let agent_id = fake_agent_id("a");
+
+        let dna_entry = Entry::Dna(Box::new(dna));
+        let agent_entry = Entry::AgentId(agent_id.clone());
+
+        env.with_reader(|reader| {
+            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            store.put_entry(dna_entry.clone(), &agent_id);
+            store.put_entry(agent_entry.clone(), &agent_id);
+            env.with_commit(|writer| store.flush_to_txn(writer))
+        })?;
+
+        env.with_reader(|reader| {
+            let store = SourceChainBuf::new(&reader, &dbs)?;
+            let json = store.dump_as_json()?;
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            let parsed = parsed.as_array().unwrap().iter().map(|item| {
+                let item = item.as_object().unwrap();
+                let header = item.get("header").unwrap();
+                let entry = item.get("entry").unwrap();
+                let entry_type = header.get("entry_type").unwrap().as_str().unwrap();
+                let entry_address = header.get("entry_address").unwrap().as_str().unwrap();
+                let entry_data: serde_json::Value = match entry_type {
+                    "AgentId" => entry.get("entry").unwrap().as_object().unwrap().get("pub_sign_key").unwrap().clone(),
+                    "Dna" => entry.get("entry").unwrap().as_object().unwrap().get("uuid").unwrap().clone(),
+                    _ => serde_json::Value::Null,
+                };
+                serde_json::json!([entry_type, entry_address, entry_data])
+            }).collect::<Vec<_>>();
+
+            assert_eq!(
+                "[[\"AgentId\",\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\",\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\"],[\"Dna\",\"QmQGir9h5SzZnY8wZb5Cbj29Fzjv3srf5xwC1TUzsoCHxH\",\"a\"]]",
+                &serde_json::to_string(&parsed).unwrap(),
+            );
+
             Ok(())
         })
     }

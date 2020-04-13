@@ -27,6 +27,16 @@ pub enum SourceChainError {
 
     #[error("Workspace error: {0}")]
     DatabaseError(#[from] DatabaseError),
+
+    #[error("SerdeJson Error: {0}")]
+    SerdeJsonError(String),
+}
+
+// serde_json::Error does not implement PartialEq - why is that a requirement??
+impl From<serde_json::Error> for SourceChainError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::SerdeJsonError(format!("{:?}", e))
+    }
 }
 
 #[derive(Error, Debug, PartialEq)]
