@@ -167,7 +167,7 @@ impl Conductor {
         }
     }
 
-    fn shutdown(&mut self) -> () {
+    fn shutdown(&mut self) {
         self.shutting_down = true;
         self.managed_task_stop_broadcaster
             .send(())

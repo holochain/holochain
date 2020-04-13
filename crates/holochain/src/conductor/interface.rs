@@ -87,7 +87,7 @@ where
 
     // we can ignore this JoinHandle, because if conductor is dropped,
     // both sides of this forward will be dropped and the task will end.
-    let _ = tokio::task::spawn(sig_recv.map(|x: SerializedBytes| Ok(x)).forward(extern_sig));
+    let _ = tokio::task::spawn(sig_recv.map(Ok).forward(extern_sig));
 
     // we need to do some translations on the request/response flow
     let (req_send, req_recv) = channel(10);
