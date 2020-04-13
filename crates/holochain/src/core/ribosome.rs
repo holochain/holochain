@@ -38,10 +38,11 @@ use self::{
     emit_signal::emit_signal, encrypt::encrypt, entry_address::entry_address,
     entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
     globals::globals, keystore::keystore, link_entries::link_entries, property::property,
-    query::query, remove_entry::remove_entry, remove_link::remove_link, schedule::schedule, random_bytes::random_bytes,
-    send::send, show_env::show_env, sign::sign, roughtime::roughtime, update_entry::update_entry,
+    query::query, random_bytes::random_bytes, remove_entry::remove_entry, remove_link::remove_link,
+    roughtime::roughtime, schedule::schedule, send::send, show_env::show_env, sign::sign,
+    update_entry::update_entry,
 };
-
+use crate::core::ribosome::roughtime::RoughTimeError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use mockall::automock;
@@ -57,6 +58,37 @@ use sx_zome_types::*;
 
 /// Represents a type which has not been decided upon yet
 pub enum Todo {}
+
+pub enum RibosomeError {
+    Wasm(WasmError),
+    RoughTime(RoughTimeError),
+    SerializedBytes(SerializedBytesError),
+    RingUnspecified(ring::error::Unspecified),
+}
+
+impl From<RoughTimeError> for RibosomeError {
+    fn from(error: RoughTimeError) -> RibosomeError {
+        RibosomeError::RoughTime(error)
+    }
+}
+
+impl From<WasmError> for RibosomeError {
+    fn from(error: WasmError) -> RibosomeError {
+        RibosomeError::Wasm(error)
+    }
+}
+
+impl From<SerializedBytesError> for RibosomeError {
+    fn from(error: SerializedBytesError) -> RibosomeError {
+        RibosomeError::SerializedBytes(error)
+    }
+}
+
+impl From<ring::error::Unspecified> for RibosomeError {
+    fn from(error: ring::error::Unspecified) -> RibosomeError {
+        RibosomeError::RingUnspecified(error)
+    }
+}
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
@@ -139,7 +171,7 @@ impl WasmRibosome {
                 let closure_host_context_arc = std::sync::Arc::clone(&host_context_arc);
                 move |ctx: &mut Ctx,
                       guest_allocation_ptr: RemotePtr|
-                      -> Result<RemotePtr, WasmError> {
+                      -> Result<RemotePtr, RibosomeError> {
                     let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
@@ -151,7 +183,7 @@ impl WasmRibosome {
                         std::sync::Arc::clone(&closure_self_arc),
                         std::sync::Arc::clone(&closure_host_context_arc),
                         input,
-                    )
+                    )?
                     .try_into()?;
                     let output_allocation_ptr: AllocationPtr = output_sb.into();
                     Ok(output_allocation_ptr.as_remote_ptr())

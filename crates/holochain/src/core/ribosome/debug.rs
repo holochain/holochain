@@ -1,5 +1,6 @@
 use super::HostContext;
 use super::WasmRibosome;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 use sx_zome_types::debug::DebugMsg;
 use sx_zome_types::DebugInput;
@@ -10,7 +11,7 @@ pub fn debug(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     input: DebugInput,
-) -> DebugOutput {
+) -> Result<DebugOutput, RibosomeError> {
     let msg: DebugMsg = input.into_inner();
     trace!(
         "{}:{}:{} {}",
@@ -19,7 +20,7 @@ pub fn debug(
         msg.line(),
         msg.msg()
     );
-    DebugOutput::new(())
+    Ok(DebugOutput::new(()))
 }
 
 #[cfg(test)]
