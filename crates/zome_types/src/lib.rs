@@ -6,3 +6,6 @@ mod zome_io;
 
 use holochain_serialized_bytes::prelude::*;
 pub use zome_io::*;
+
+#[macro_use]
+extern crate serde_big_array;

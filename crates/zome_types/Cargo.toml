@@ -17,3 +17,7 @@ serde = { version = "1.0.104", features = ["derive"] }
 # TODO: remove these two dependencies and replace with HoloHash
 multihash = "0.8.0"
 rust-base58 = "0.0.4"
+
+# TODO: is there a way to avoid this nicely and keep fixed size arrays?
+# https://github.com/serde-rs/serde/issues/631#issuecomment-445566498
+serde-big-array = "0.2.0"

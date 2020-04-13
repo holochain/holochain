@@ -6,55 +6,20 @@ use super::WasmRibosome;
 use crate::core::ribosome::random_bytes::csprng_bytes;
 use crate::core::ribosome::roughtime::client::*;
 use crate::core::ribosome::roughtime::known_servers::servers;
-use crate::core::ribosome::roughtime::known_servers::Server;
 use crate::core::ribosome::RibosomeError;
 use roughenough::RtMessage;
 use std::net::ToSocketAddrs;
 use std::net::UdpSocket;
 use std::sync::Arc;
+use sx_zome_types::roughtime::ChainItem;
+use sx_zome_types::roughtime::Nonce;
+use sx_zome_types::roughtime::Server;
 use sx_zome_types::RoughtimeInput;
 use sx_zome_types::RoughtimeOutput;
 
 const MIN_BLIND_LEN: usize = 64;
 const DESIRED_CHAIN_LEN: usize = 3;
 const MAX_ATTEMPTS: u8 = 3;
-
-pub struct Nonce {
-    bytes: [u8; 64],
-    blind: Vec<u8>,
-    encoded_message: Vec<u8>,
-}
-
-impl std::fmt::Debug for Nonce {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Nonce")
-            .field("bytes", &self.bytes.to_vec())
-            .field("blind", &self.blind)
-            .field("encoded_message", &self.encoded_message)
-            .finish()
-    }
-}
-
-#[derive(Debug)]
-pub struct ChainItem {
-    nonce: Nonce,
-    server: Server,
-    server_response: RtMessage,
-}
-
-impl ChainItem {
-    pub fn nonce(&self) -> &Nonce {
-        &self.nonce
-    }
-
-    pub fn server_response(&self) -> &RtMessage {
-        &self.server_response
-    }
-
-    pub fn server(&self) -> &Server {
-        &self.server
-    }
-}
 
 pub enum RoughTimeError {
     NotEnoughServers,
@@ -84,52 +49,46 @@ impl From<roughenough::Error> for RoughTimeError {
 }
 
 /// https://roughtime.googlesource.com/roughtime/+/HEAD/ECOSYSTEM.md#chaining-requests
-impl Nonce {
-    pub fn bytes(&self) -> &[u8; 64] {
-        &self.bytes
-    }
+pub fn generate_nonce(
+    blind: &[u8],
+    last_message: Option<RtMessage>,
+) -> Result<Nonce, RoughTimeError> {
+    let mut nonce = Nonce {
+        bytes: [0_u8; 64],
+        blind: Vec::with_capacity(MIN_BLIND_LEN),
+        encoded_message: Vec::new(),
+    };
 
-    pub fn generate(
-        blind: &[u8],
-        last_message: Option<RtMessage>,
-    ) -> Result<Nonce, RoughTimeError> {
-        let mut nonce = Nonce {
-            bytes: [0_u8; 64],
-            blind: Vec::with_capacity(MIN_BLIND_LEN),
-            encoded_message: Vec::new(),
-        };
+    // pad the blind out if it's too short with some random bytes
+    nonce.blind = if blind.len() < MIN_BLIND_LEN {
+        let mut bytes: Vec<u8> = csprng_bytes(MIN_BLIND_LEN - blind.len())?;
+        bytes.extend(blind);
+        bytes
+    } else {
+        blind.to_vec()
+    };
+    assert!(nonce.blind.len() >= MIN_BLIND_LEN);
 
-        // pad the blind out if it's too short with some random bytes
-        nonce.blind = if blind.len() < MIN_BLIND_LEN {
-            let mut bytes: Vec<u8> = csprng_bytes(MIN_BLIND_LEN - blind.len())?;
-            bytes.extend(blind);
-            bytes
-        } else {
-            blind.to_vec()
-        };
-        assert!(nonce.blind.len() >= MIN_BLIND_LEN);
-
-        nonce.bytes.copy_from_slice(&match last_message {
-            // in the case that there is no previous message we can just SHA-512 the blind to enforce
-            // blinding and bytes length
-            None => ring::digest::digest(&ring::digest::SHA512, &nonce.blind)
-                .as_ref()
-                .to_owned(),
-            // normal algorithm is SHA-512(SHA-512(previous-reply) + blind)
-            Some(message) => {
-                nonce.encoded_message = message.encode()?;
-                let mut hashed_last_message: Vec<u8> =
-                    ring::digest::digest(&ring::digest::SHA512, &nonce.encoded_message)
-                        .as_ref()
-                        .to_vec();
-                hashed_last_message.extend(&nonce.blind);
-                ring::digest::digest(&ring::digest::SHA512, &hashed_last_message)
+    nonce.bytes.copy_from_slice(&match last_message {
+        // in the case that there is no previous message we can just SHA-512 the blind to enforce
+        // blinding and bytes length
+        None => ring::digest::digest(&ring::digest::SHA512, &nonce.blind)
+            .as_ref()
+            .to_owned(),
+        // normal algorithm is SHA-512(SHA-512(previous-reply) + blind)
+        Some(message) => {
+            nonce.encoded_message = message.encode()?;
+            let mut hashed_last_message: Vec<u8> =
+                ring::digest::digest(&ring::digest::SHA512, &nonce.encoded_message)
                     .as_ref()
-                    .to_owned()
-            }
-        });
-        Ok(nonce)
-    }
+                    .to_vec();
+            hashed_last_message.extend(&nonce.blind);
+            ring::digest::digest(&ring::digest::SHA512, &hashed_last_message)
+                .as_ref()
+                .to_owned()
+        }
+    });
+    Ok(nonce)
 }
 
 fn try_chain(
@@ -155,7 +114,7 @@ fn try_chain(
 
                 let resp: RtMessage = receive_response(&mut socket)?;
                 // an empty blind will be filled with crypto random bytes
-                let next_nonce = Nonce::generate(&[], Some(resp.clone()))?;
+                let next_nonce = generate_nonce(&[], Some(resp.clone()))?;
 
                 match ResponseHandler::new(server.pub_key().to_vec(), resp.clone(), *nonce.bytes())?
                     .validate()
@@ -167,7 +126,7 @@ fn try_chain(
                 chain.push(ChainItem {
                     nonce: nonce,
                     server,
-                    server_response: resp,
+                    server_response: resp.encode()?,
                 });
 
                 // recurse
@@ -184,11 +143,11 @@ pub fn roughtime(
 ) -> Result<RoughtimeOutput, RibosomeError> {
     let mut attempt = 0;
 
-    let _chain: Vec<ChainItem> = loop {
+    let chain: Vec<ChainItem> = loop {
         if attempt == MAX_ATTEMPTS {
             break vec![];
         } else {
-            match try_chain(servers(), Nonce::generate(input.inner_ref(), None)?, vec![]) {
+            match try_chain(servers(), generate_nonce(input.inner_ref(), None)?, vec![]) {
                 Ok(chain) => break chain,
                 Err(_) => {
                     attempt += 1;
@@ -198,7 +157,7 @@ pub fn roughtime(
         }
     };
 
-    Ok(RoughtimeOutput::new(()))
+    Ok(RoughtimeOutput::new(chain))
 }
 
 #[cfg(test)]

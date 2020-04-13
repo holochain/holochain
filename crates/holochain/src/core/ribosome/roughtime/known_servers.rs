@@ -1,4 +1,5 @@
 use rand::seq::SliceRandom;
+use sx_zome_types::roughtime::Server;
 
 // @TODO
 // https://roughtime.googlesource.com/roughtime/+/HEAD/ECOSYSTEM.md#curating-server-lists
@@ -26,22 +27,6 @@ const TICKTOCK_PUB_KEY: &[u8; 32] = &[
     0x72, 0x3f, 0x06, 0xb2, 0x23, 0x65, 0x46, 0x4a, 0xa2, 0x0c, 0x49, 0x40, 0x78, 0xd3, 0x12, 0x04,
     0x13, 0x30, 0xac, 0x09, 0x75, 0xe6, 0x16, 0x0f, 0x81, 0x7e, 0x74, 0xf8, 0x65, 0x97, 0xfe, 0x50,
 ];
-
-#[derive(Debug)]
-pub struct Server {
-    addr: String,
-    pub_key: [u8; 32],
-}
-
-impl Server {
-    pub fn addr(&self) -> &str {
-        &self.addr
-    }
-
-    pub fn pub_key(&self) -> &[u8; 32] {
-        &self.pub_key
-    }
-}
 
 pub fn servers() -> Vec<Server> {
     let mut server_list = vec![

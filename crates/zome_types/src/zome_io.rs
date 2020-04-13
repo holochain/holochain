@@ -97,7 +97,7 @@ wasm_io_types!(
     pub struct EntryAddressOutput(());
     // the current system time, in the opinion of the host, as a Duration
     pub struct RoughtimeInput(Vec<u8>);
-    pub struct RoughtimeOutput(crate::roughtime::ClockChain);
+    pub struct RoughtimeOutput(Vec<crate::roughtime::ChainItem>);
     pub struct RandomBytesInput(usize);
     pub struct RandomBytesOutput(Vec<u8>);
     // the debug host import takes a DebugMsg to output wherever the host wants to display it
