@@ -1,5 +1,5 @@
 [package]
-name = "test_wasm_debug"
+name = "test_wasm_foo"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
@@ -10,15 +10,13 @@ edition = "2018"
 [workspace]
 
 [lib]
-name = "test_wasm_debug"
+name = "test_wasm_foo"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-# TODO: Investigate replacing "=x.x.x" version specifications with `--frozen` or `--locked`
 wee_alloc = "=0.4.5"
 holochain_wasmer_guest = "=0.0.24"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 holochain_serialized_bytes = "=0.0.36"
 serde = "=1.0.104"
-sx_zome_types = { version = "=0.0.1", path = "../../../crates/zome_types" }
-lazy_static = "1.4.0"
+sx_zome_types = { version = "=0.0.1", path = "../../../zome_types" }

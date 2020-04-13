@@ -11,8 +11,8 @@ members = [
   "crates/types",
   "crates/crypto",
   "crates/websocket",
-  "test_utils/wasm",
-  "test_utils/wasm_common",
+  "crates/test_utils/wasm",
+  "crates/test_utils/wasm_common",
 ]
 
 exclude = [

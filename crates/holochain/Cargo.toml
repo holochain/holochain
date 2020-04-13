@@ -48,8 +48,8 @@ num_cpus = "1.8"
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cli = "0.6.3"
-sx_wasm_test_utils = { path = "../../test_utils/wasm" }
-test_wasm_common = { path = "../../test_utils/wasm_common" }
+sx_wasm_test_utils = { path = "../test_utils/wasm" }
+test_wasm_common = { path = "../test_utils/wasm_common" }
 maplit = "1.0.2"
 
 [lib]
