@@ -1,10 +1,13 @@
 #![deny(missing_docs)]
 //! holo_hash::HoloHash is a hashing framework for Holochain.
 //!
-//! Note that not all HoloHashes are true hashes -
+//! Note that not all HoloHashes are simple hashes of the full content as you
+//! might expect in a "content-addressable" application.
 //!
-//! For example AgentHash actually stores the PublicKey of the agent's
-//! libsodium signature keypair.
+//! For example, the content of an AgentHash is simply the key itself to
+//! enable self-proving signatures. DhtOps sometimes hash either entry content
+//! or header content to produce their hashes, depending on which type
+//! of operation it is.
 //!
 //! HoloHash implements `Display` providing a `to_string()` function accessing
 //! the hash as a user friendly string. It also provides TryFrom for string
