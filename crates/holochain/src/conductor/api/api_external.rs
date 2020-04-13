@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 use super::error::ConductorApiResult;
 use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
@@ -9,10 +11,14 @@ use sx_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
 
+/// A trait that unifies both the admin and app interfaces
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
+    /// Which request is being made
     type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    /// Which response is sent to the above request
     type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    /// Handle a request on this API
     async fn handle_request(&self, request: Self::ApiRequest)
         -> InterfaceResult<Self::ApiResponse>;
 }
@@ -25,6 +31,7 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
     // -- provided -- //
 
+    /// Route the request to be handled
     async fn handle_request(&self, request: AdminRequest) -> AdminResponse {
         let res = self.admin(request).await;
 
@@ -47,6 +54,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 
     // -- provided -- //
 
+    /// Routes the [AppRequest] to the [AppResponse]
     async fn handle_request(&self, request: AppRequest) -> AppResponse {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
@@ -69,6 +77,8 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     }
 }
 
+/// The admin interface that external conections
+/// can use to make requests to the conductor
 #[derive(Clone)]
 pub struct StdAdminInterfaceApi {
     conductor_handle: ConductorHandle,
@@ -102,6 +112,7 @@ impl AdminInterfaceApi for StdAdminInterfaceApi {
 impl InterfaceApi for StdAdminInterfaceApi {
     type ApiRequest = AdminRequest;
     type ApiResponse = AdminResponse;
+
     async fn handle_request(
         &self,
         request: Self::ApiRequest,
@@ -109,6 +120,7 @@ impl InterfaceApi for StdAdminInterfaceApi {
         self.conductor_handle
             .read()
             .await
+            // Make sure the conductor is not in the process of shutting down
             .check_running()
             .map_err(InterfaceError::RequestHandler)?;
         let r = AdminInterfaceApi::handle_request(self, request).await;
@@ -162,10 +174,15 @@ impl InterfaceApi for StdAppInterfaceApi {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum AppResponse {
+    /// There has been an error in the request
     Error {
+        // TODO maybe this could be serialized instead of stringified?
+        /// Stringified version of the error
         debug: String,
     },
+    /// The response to a zome call
     ZomeInvocationResponse {
+        /// The data that was returned by this call
         response: Box<ZomeInvocationResponse>,
     },
 }
@@ -182,9 +199,21 @@ pub enum AdminResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum AppRequest {
-    CryptoRequest { request: Box<CryptoRequest> },
-    TestRequest { request: Box<TestRequest> },
-    ZomeInvocationRequest { request: Box<ZomeInvocation> },
+    /// TODO: DOCS: what is this?
+    CryptoRequest {
+        /// TODO: DOCS: ?
+        request: Box<CryptoRequest>,
+    },
+    /// Request used for testing
+    TestRequest {
+        /// Tets request data
+        request: Box<TestRequest>,
+    },
+    /// Call a zome function
+    ZomeInvocationRequest {
+        /// Information about which zome call you want to make
+        request: Box<ZomeInvocation>,
+    },
 }
 
 #[allow(missing_docs)]

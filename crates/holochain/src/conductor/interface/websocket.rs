@@ -8,7 +8,6 @@ use crate::core::signal::Signal;
 //use tracing::*;
 use super::error::{InterfaceError, InterfaceResult};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_wasmer_host::TryInto;
 use holochain_websocket::{
     websocket_bind, WebsocketConfig, WebsocketListener, WebsocketMessage, WebsocketReceiver,
     WebsocketSender,
@@ -242,6 +241,7 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     Ok(())
 }
 
+/// Handles messages on all interfaces
 async fn handle_incoming_message<A>(ws_msg: WebsocketMessage, api: A) -> InterfaceResult<()>
 where
     A: InterfaceApi,

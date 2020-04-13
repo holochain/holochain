@@ -4,6 +4,8 @@ use serde::{self, Deserialize, Serialize};
 /// as well as what parameters to pass it on its initialization
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
+    /// TODO: DOCS: ?
     pub instance_id: String,
+    /// TODO: DOCS: ?
     pub init_params: String,
 }

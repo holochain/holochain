@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
@@ -61,6 +62,8 @@ struct AdminInterfaceHandle(());
 pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
+/// A handle to the conductor that can easily be passed
+/// around and cheaply cloned
 #[derive(Clone, From, AsRef, Deref)]
 pub struct ConductorHandle(Arc<RwLock<Conductor>>);
 
@@ -71,8 +74,11 @@ impl ConductorHandle {
         conductor.shutdown();
     }
 
+    // TODO Maybe this should be private and called from within the shutdown function?
+    /// After a shutdown call await on the task manager
     pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
         // TODO: TEST: Make sure the write lock is not held for the await
+        // Doesn't the {} block make that true?
         let task_manager_run_handle = {
             let mut conductor = self.0.write().await;
             conductor.wait()
@@ -85,6 +91,7 @@ impl ConductorHandle {
         Ok(())
     }
 
+    /// Check that shutdown has not been called
     pub async fn check_running(&self) -> ConductorResult<()> {
         self.0.read().await.check_running()
     }
@@ -132,6 +139,7 @@ impl Conductor {
         })
     }
 
+    /// Create a conductor builder
     pub fn build() -> ConductorBuilder {
         ConductorBuilder::new()
     }
@@ -177,7 +185,7 @@ impl Conductor {
             })
     }
 
-    pub fn wait(&mut self) -> Option<TaskManagerRunHandle> {
+    fn wait(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
 

@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::conductor::error::ConductorError;
 use thiserror::Error;
 
