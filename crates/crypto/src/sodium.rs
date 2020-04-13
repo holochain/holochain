@@ -230,8 +230,14 @@ impl plugin::CryptoPlugin for SodiumCryptoPlugin {
 
 /// initialize the crypto system plugin with our internal libsodium implementation
 pub fn crypto_init_sodium() -> CryptoResult<()> {
+    // be sure to init first, otherwise another thread could sneak
+    // in an invalid call between when we've set the plugin, but
+    // before we run init.
+    let init_result = safe_sodium::sodium_init();
+
+    // now initialize the plugin
     match plugin::set_global_crypto_plugin(Arc::new(SodiumCryptoPlugin)) {
-        Ok(_) => safe_sodium::sodium_init(),
+        Ok(_) => init_result,
         Err(e) => Err(e),
     }
 }
