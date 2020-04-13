@@ -1,28 +1,19 @@
-use std::path::PathBuf;
 use sx_types::dna::wasm::DnaWasm;
-use std::io::Read;
-
-/// Load WASM from filesystem
-pub fn create_wasm_from_file(path: &PathBuf) -> DnaWasm {
-    let mut file = std::fs::File::open(path)
-        .unwrap_or_else(|err| panic!("Couldn't create WASM from file: {:?}; {}", std::env::current_dir().unwrap().join(path), err));
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).unwrap();
-    DnaWasm::from(buf)
-}
 
 pub enum TestWasm {
+    Debug,
     Foo,
+    Imports,
 }
 
-pub fn test_wasm(wasm: TestWasm) -> DnaWasm {
-    match wasm {
-        TestWasm::Foo => DnaWasm::from(
-            include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
-            ))
-            .to_vec(),
-        ),
+impl From<TestWasm> for DnaWasm {
+    fn from(test_wasm: TestWasm) -> DnaWasm {
+        DnaWasm::from(
+        match test_wasm {
+            TestWasm::Debug => include_bytes!(concat!(env!("OUT_DIR"), "/wasm32-unknown-unknown/release/test_wasm_debug.wasm")).to_vec(),
+            TestWasm::Foo => include_bytes!(concat!(env!("OUT_DIR"), "/wasm32-unknown-unknown/release/test_wasm_foo.wasm")).to_vec(),
+            TestWasm::Imports => include_bytes!(concat!(env!("OUT_DIR"), "/wasm32-unknown-unknown/release/test_wasm_imports.wasm")).to_vec(),
+        }
+    )
     }
 }

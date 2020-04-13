@@ -11,12 +11,11 @@ use crate::{
     link::Link,
     persistence::cas::content::{Address, Addressable},
 };
-use holochain_serialized_bytes::prelude::*;
-use multihash::Hash;
-
 use cap_entries::{CapTokenClaim, CapTokenGrant};
 use deletion_entry::DeletionEntry;
 use entry_type::{AppEntryType, EntryType};
+use holochain_serialized_bytes::prelude::*;
+use multihash::Hash;
 
 pub(crate) mod cap_entries;
 pub(crate) mod deletion_entry;

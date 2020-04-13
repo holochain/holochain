@@ -3,10 +3,8 @@
 //! meaning that it can be implemented for other structs.
 //! A test suite for AddressableContent is also implemented here.
 
-use crate::persistence::hash::HashString;
 use holochain_serialized_bytes::prelude::*;
-
-use multihash::Hash;
+use sx_zome_types::hash::HashString;
 
 /// an Address for some Content
 /// ideally would be the Content but pragmatically must be Address
@@ -28,7 +26,7 @@ pub trait Addressable {
 
 impl Addressable for SerializedBytes {
     fn address(&self) -> Address {
-        Address::encode_from_bytes(self.bytes(), Hash::SHA2256)
+        Address::encode_from_bytes(self.bytes(), crate::sx_zome_types::hash::DEFAULT_HASH)
     }
 }
 
@@ -41,7 +39,7 @@ macro_rules! addressable_serializable {
                 let serialized_bytes = $crate::prelude::SerializedBytes::try_from(self).unwrap();
                 $crate::persistence::cas::content::Address::encode_from_bytes(
                     serialized_bytes.bytes(),
-                    $crate::persistence::hash::DEFAULT_HASH,
+                    $crate::sx_zome_types::hash::DEFAULT_HASH,
                 )
             }
         }
