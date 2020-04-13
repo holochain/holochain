@@ -55,13 +55,8 @@ struct CellItem {
 }
 
 // TODO: figure out what we need to track admin interfaces, if anything
+#[allow(dead_code)]
 struct AdminInterfaceHandle(());
-
-impl AdminInterfaceHandle {
-    async fn stop(&mut self) {
-        unimplemented!()
-    }
-}
 
 pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
@@ -186,7 +181,7 @@ impl Conductor {
         self.task_manager_run_handle.take()
     }
 
-    // TODO: remove allow once we actually use this function
+    // FIXME: remove allow once we actually use this function
     #[allow(dead_code)]
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
@@ -202,12 +197,16 @@ impl Conductor {
         Ok(new_state)
     }
 
+    // FIXME: remove allow once we actually use this function
+    #[allow(dead_code)]
     async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
+    // FIXME: remove allow once we actually use this function
+    #[allow(dead_code)]
     async fn spawn_admin_interface<Api: AdminInterfaceApi>(
         &mut self,
         _api: Api,
@@ -216,6 +215,8 @@ impl Conductor {
         unimplemented!()
     }
 
+    // FIXME: remove allow once we actually use this function
+    #[allow(dead_code)]
     async fn spawn_app_interface<Api: AppInterfaceApi>(
         &mut self,
         _api: Api,
