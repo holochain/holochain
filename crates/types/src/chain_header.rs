@@ -80,13 +80,13 @@ impl ChainHeader {
         timestamp: Iso8601,
     ) -> Self {
         ChainHeader {
-            entry_type: entry_type,
-            entry_address: entry_address,
+            entry_type,
+            entry_address,
             provenances: provenances.to_owned(),
-            link: link,
-            link_same_type: link_same_type,
-            link_crud: link_crud,
-            timestamp: timestamp,
+            link,
+            link_same_type,
+            link_crud,
+            timestamp,
         }
     }
 
