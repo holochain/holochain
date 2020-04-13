@@ -186,10 +186,10 @@ impl Conductor {
     }
 
     pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
-        self.admin_websocket_ports.get(0).map(|p| *p)
+        self.admin_websocket_ports.get(0).copied()
     }
 
-    fn shutdown(&mut self) -> () {
+    fn shutdown(&mut self) {
         self.shutting_down = true;
         self.managed_task_stop_broadcaster
             .send(())

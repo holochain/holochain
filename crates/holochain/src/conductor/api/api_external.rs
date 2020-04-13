@@ -4,7 +4,7 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
-use std::{path::PathBuf};
+use std::path::PathBuf;
 use sx_types::{
     cell::CellHandle,
     dna::Dna,
@@ -267,9 +267,7 @@ mod test {
     use crate::conductor::Conductor;
     use anyhow::Result;
     use matches::assert_matches;
-    use sx_types::{
-        test_utils::{fake_dna, fake_dna_file},
-    };
+    use sx_types::test_utils::{fake_dna, fake_dna_file};
     use uuid::Uuid;
 
     #[tokio::test]

@@ -145,10 +145,7 @@ pub fn create_demo_channel_interface<A: AppInterfaceApi>(
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs<A: InterfaceApi>(
-    api: A,
-    mut recv_socket: WebsocketReceiver,
-) -> () {
+async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut recv_socket: WebsocketReceiver) {
     while let Some(msg) = recv_socket.next().await {
         if let Err(_todo) = handle_incoming_message(msg, api.clone()).await {
             break;

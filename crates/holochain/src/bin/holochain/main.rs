@@ -127,7 +127,7 @@ async fn async_main() {
 
     if opt.run_interface_example {
         // Create an external API to hand off to any Interfaces
-        let api = StdAppInterfaceApi::new(conductor.into());
+        let api = StdAppInterfaceApi::new(conductor);
         interface_example(api).await;
     } else {
         println!("Conductor successfully initialized.");
