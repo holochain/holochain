@@ -21,7 +21,7 @@ macro_rules! guest_functions {
             pub extern "C" fn $guest_fn(host_allocation_ptr: RemotePtr) -> RemotePtr {
                 let input = {
                     let v: ZomeExternHostInput = host_args!(host_allocation_ptr);
-                    let deserialized = <$input_type>::try_from(v.inner());
+                    let deserialized = <$input_type>::try_from(v.into_inner());
                     try_result!(deserialized, "failed to deserialize host inputs")
                 };
                 let output: $output_type = try_result!(
@@ -54,7 +54,7 @@ guest_functions!(
     [ __remove_link, remove_link, RemoveLinkInput, RemoveLinkOutput ],
     [ __send, send, SendInput, SendOutput ],
     [ __sign, sign, SignInput, SignOutput ],
-    [ __sleep, sleep, SleepInput, SleepOutput ],
+    [ __schedule, schedule, ScheduleInput, ScheduleOutput ],
     [ __update_entry, update_entry, UpdateEntryInput, UpdateEntryOutput ],
     [ __emit_signal, emit_signal, EmitSignalInput, EmitSignalOutput ],
     [ __remove_entry, remove_entry, RemoveEntryInput, RemoveEntryOutput ],
@@ -73,6 +73,6 @@ guest_functions!(
 lazy_static! {
     pub(crate) static ref GLOBALS: ZomeGlobals = {
         let output: GlobalsOutput = host_call!(__globals, GlobalsInput::new(())).unwrap();
-        output.inner()
+        output.into_inner()
     };
 }

@@ -9,16 +9,11 @@ pub enum TestWasm {
 impl From<TestWasm> for DnaWasm {
     fn from(test_wasm: TestWasm) -> DnaWasm {
         DnaWasm::from(
-            std::fs::read(
-                format!("{}/wasm32-unknown-unknown/release/test_wasm_{}.wasm",
-                env!("OUT_DIR"),
-                match test_wasm {
-                    TestWasm::Debug => "debug",
-                    TestWasm::Foo => "foo",
-                    TestWasm::Imports => "imports",
-                })
-            )
-            .unwrap()
-        )
+        match test_wasm {
+            TestWasm::Debug => include_bytes!(concat!(env!("OUT_DIR"), "/wasm32-unknown-unknown/release/test_wasm_debug.wasm")).to_vec(),
+            TestWasm::Foo => include_bytes!(concat!(env!("OUT_DIR"), "/wasm32-unknown-unknown/release/test_wasm_foo.wasm")).to_vec(),
+            TestWasm::Imports => include_bytes!(concat!(env!("OUT_DIR"), "/wasm32-unknown-unknown/release/test_wasm_imports.wasm")).to_vec(),
+        }
+    )
     }
 }

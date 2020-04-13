@@ -9,6 +9,7 @@ name = "test_wasm_debug"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
+# TODO: Investigate replacing "=x.x.x" version specifications with `--frozen` or `--locked`
 wee_alloc = "=0.4.5"
 holochain_wasmer_guest = "=0.0.24"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }

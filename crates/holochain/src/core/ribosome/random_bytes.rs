@@ -20,7 +20,7 @@ pub fn random_bytes(
     _host_context: Arc<HostContext>,
     input: RandomBytesInput,
 ) -> RandomBytesOutput {
-    RandomBytesOutput::new(csprng_bytes(input.inner()))
+    RandomBytesOutput::new(csprng_bytes(input.into_inner()))
 }
 
 #[cfg(test)]

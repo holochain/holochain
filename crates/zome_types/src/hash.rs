@@ -2,6 +2,8 @@
 //! to keep track of places where a string is the product of a hash function,
 //! and as a base type for Address to use.
 
+// TODO: remove this module and replace with HoloHash
+
 use multihash::{encode, Hash};
 use rust_base58::{FromBase58, ToBase58};
 use std::{convert::TryInto, fmt};
@@ -26,7 +28,7 @@ pub struct HashString(String);
 
 impl fmt::Display for HashString {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        self.0.fmt(f)
     }
 }
 

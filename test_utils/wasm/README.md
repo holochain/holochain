@@ -1,10 +1,11 @@
-# test utils: wasm
+# Wasm test utilities
 
-here we have:
+This crate contains:
 
-- several rust crates that compile to wasms that are useful for testing
-- a `TestWasm` enum that maps variants to populated `DnaWasm` structs (bytes)
-- a `build.rs` file that builds all the wasms for testing
+- several small crates that compile to Wasm and are used as test values.
+- `enum TestWasm` which enumerates all of those crates.
+-  `impl From<TestWasm> for DnaWasm` to obtain the compiled Wasm artifacts for those crates.
+- a `build.rs` file that builds all those crates for compile-time inclusion in the library.
 
 these wasms _directly_ test the host/guest implementation of holochain
 
@@ -14,5 +15,6 @@ be included.
 it should be reasonably easy to interact with holochain even without the HDK
 using the `holochain_wasmer_*` crates.
 
-the tests themselves generally sit in the ribosome module in core.
-this is necessary so that core can inject the host import functions.
+The tests that run this Wasm generally sit in the [`ribosome.rs` module in core][ribosome]. This is necessary because the Wasm crates depend on certain global functions that core defines and needs to inject.
+
+[ribosome]: https://github.com/Holo-Host/holochain-2020/blob/2b83a9340fba999e8c32adb9c342bd268f0ef480/crates/holochain/src/core/ribosome.rs

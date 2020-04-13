@@ -27,21 +27,21 @@ pub mod random_bytes;
 pub mod remove_entry;
 pub mod remove_link;
 pub mod roughtime;
+pub mod schedule;
 pub mod send;
 pub mod show_env;
 pub mod sign;
-pub mod sleep;
 pub mod update_entry;
 
-use crate::core::ribosome::{
+use self::{
     call::call, capability::capability, commit_entry::commit_entry, debug::debug, decrypt::decrypt,
     emit_signal::emit_signal, encrypt::encrypt, entry_address::entry_address,
     entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
     globals::globals, keystore::keystore, link_entries::link_entries, property::property,
-    query::query, random_bytes::random_bytes, remove_entry::remove_entry, remove_link::remove_link,
-    roughtime::roughtime, send::send, show_env::show_env, sign::sign, sleep::sleep,
-    update_entry::update_entry,
+    query::query, remove_entry::remove_entry, remove_link::remove_link, schedule::schedule, random_bytes::random_bytes,
+    send::send, show_env::show_env, sign::sign, roughtime::roughtime, update_entry::update_entry,
 };
+
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use mockall::automock;
@@ -160,7 +160,7 @@ impl WasmRibosome {
         }
         imports! {
             "env" => {
-                // standard memory handling
+                // standard memory handling used by the holochain_wasmer guest and host macros
                 "__import_allocation" => func!(holochain_wasmer_host::import::__import_allocation),
                 "__import_bytes" => func!(holochain_wasmer_host::import::__import_bytes),
 
@@ -184,7 +184,7 @@ impl WasmRibosome {
                 "__remove_link" => func!(invoke_host_function!(remove_link)),
                 "__send" => func!(invoke_host_function!(send)),
                 "__sign" => func!(invoke_host_function!(sign)),
-                "__sleep" => func!(invoke_host_function!(sleep)),
+                "__schedule" => func!(invoke_host_function!(schedule)),
                 "__update_entry" => func!(invoke_host_function!(update_entry)),
                 "__remove_entry" => func!(invoke_host_function!(remove_entry)),
                 "__show_env" => func!(invoke_host_function!(show_env)),
@@ -331,7 +331,7 @@ pub mod wasm_test {
 
             let output = match zome_invocation_response {
                 sx_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
-                    guest_output.inner().try_into().unwrap()
+                    guest_output.into_inner().try_into().unwrap()
                 }
             };
             // this is convenient for now as we flesh out the zome i/o behaviour

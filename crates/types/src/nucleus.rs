@@ -16,15 +16,15 @@ pub type ZomeName = String;
 // DO NOT CLONE THIS because payload can be huge
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocation {
-    /// the cell ID
+    /// The ID of the [Cell] in which this Zome-call would be invoked
     pub cell_id: CellId,
-    /// the zome name
+    /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
-    /// a capability request
+    /// The capability request authorization this [ZomeInvocation]
     pub cap: CapabilityRequest,
-    /// the zome fn to call
+    /// The name of the Zome function to call
     pub fn_name: String,
-    /// the serialized data to make available to the zome call
+    /// The serialized data to pass an an argument to the Zome call
     pub payload: ZomeExternHostInput,
     /// the provenance of the call
     pub provenance: AgentId,
