@@ -208,7 +208,7 @@ where
 {
     match ws_msg {
         WebsocketMessage::Request(bytes, respond) => {
-            Ok(respond(api.handle_request(bytes.try_into()?).await?.try_into()?).await?)
+            Ok(respond(api.handle_request(bytes.try_into()).await?.try_into()?).await?)
         }
         // FIXME this will kill this interface, is that what we want?
         WebsocketMessage::Signal(_) => Err(InterfaceError::UnexpectedMessage(
@@ -233,4 +233,77 @@ async fn handle_incoming_app_request(request: AppRequest) -> InterfaceResult<App
             debug: "TODO".into(),
         },
     })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::conductor::{
+        api::{AdminRequest, AdminResponse, StdAdminInterfaceApi},
+        Conductor,
+    };
+    use futures::future::FutureExt;
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_websocket::WebsocketMessage;
+    use matches::assert_matches;
+    use std::convert::TryInto;
+    use sx_types::observability;
+    use crate::conductor::interface::error::AdminInterfaceError;
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+    #[serde(rename = "snake-case", tag = "type", content = "data")]
+    enum AdmonRequest {
+        InstallsDna(String),
+    }
+
+    async fn setup() -> StdAdminInterfaceApi {
+        let conductor = Conductor::build().test().await.unwrap();
+        StdAdminInterfaceApi::new(conductor)
+    }
+
+    #[tokio::test]
+    async fn serialization_failure() {
+        let admin_api = setup().await;
+        let msg = AdmonRequest::InstallsDna("".into());
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceError::Serialization, ..});
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn invalid_request() {
+        observability::test_run().ok();
+        let admin_api = setup().await;
+        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into());
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceError::Io, ..});
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap()
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn cache_failure() {
+        // TODO this can't be done easily yet
+        // because we can't cause the cache to fail from an input
+    }
+    
+    #[ignore]
+    #[tokio::test]
+    async fn deserialization_failure() {
+        // TODO this can't be done easily yet
+        // because we can't serialize something that
+        // doesn't deserialize
+    }
 }

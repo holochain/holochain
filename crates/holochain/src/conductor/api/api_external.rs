@@ -1,22 +1,26 @@
 use super::error::{ConductorApiResult, SerializationError};
 use crate::conductor::{
-    interface::error::{InterfaceError, InterfaceResult},
+    interface::error::{AdminInterfaceError, InterfaceError, InterfaceResult},
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 use sx_types::{
     cell::CellHandle,
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,
 };
+use tracing::*;
+
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
     type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
     type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
-    async fn handle_request(&self, request: Self::ApiRequest)
-        -> InterfaceResult<Self::ApiResponse>;
+    async fn handle_request(
+        &self,
+        request: Result<Self::ApiRequest, SerializedBytesError>,
+    ) -> InterfaceResult<Self::ApiResponse>;
 }
 
 /// The interface that a Conductor exposes to the outside world.
@@ -33,7 +37,8 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
         match res {
             Ok(response) => response,
             Err(e) => AdminResponse::Error {
-                debug: format!("{:?}", e),
+                debug: e.to_string(),
+                error_type: e.into(),
             },
         }
     }
@@ -92,7 +97,9 @@ impl StdAdminInterfaceApi {
     }
 
     pub(crate) async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
+        trace!(?dna_path);
         let dna = Self::read_parse_dna(dna_path).await?;
+        trace!(line = line!());
         self.add_dna(dna).await?;
         Ok(AdminResponse::DnaInstalled)
     }
@@ -145,15 +152,20 @@ impl InterfaceApi for StdAdminInterfaceApi {
     type ApiResponse = AdminResponse;
     async fn handle_request(
         &self,
-        request: Self::ApiRequest,
+        request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse> {
         self.conductor_handle
             .read()
             .await
             .check_running()
             .map_err(InterfaceError::RequestHandler)?;
-        let r = AdminInterfaceApi::handle_request(self, request).await;
-        Ok(r)
+        match request {
+            Ok(request) => Ok(AdminInterfaceApi::handle_request(self, request).await),
+            Err(e) => Ok(AdminResponse::Error {
+                debug: e.to_string(),
+                error_type: InterfaceError::SerializedBytes(e.into()).into(),
+            }),
+        }
     }
 }
 
@@ -188,20 +200,24 @@ impl InterfaceApi for StdAppInterfaceApi {
     type ApiResponse = AppResponse;
     async fn handle_request(
         &self,
-        request: Self::ApiRequest,
+        request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse> {
         self.conductor_handle
             .read()
             .await
             .check_running()
             .map_err(InterfaceError::RequestHandler)?;
-        let r = AppInterfaceApi::handle_request(self, request).await;
-        Ok(r)
+        match request {
+            Ok(request) => Ok(AppInterfaceApi::handle_request(self, request).await),
+            Err(e) => Ok(AppResponse::Error {
+                debug: e.to_string(),
+            }),
+        }
     }
 }
 /// The set of messages that a conductor understands how to respond
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-//#[serde(rename = "snake-case", tag = "type")]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppResponse {
     Error {
         debug: String,
@@ -213,17 +229,20 @@ pub enum AppResponse {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-//#[serde(rename = "snake-case")]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminResponse {
     Unimplemented(AdminRequest),
     DnaInstalled,
     ListDnas(Vec<Address>),
-    Error { debug: String },
+    Error {
+        debug: String,
+        error_type: AdminInterfaceError,
+    },
 }
 
 /// The set of messages that a conductor understands how to handle
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-//#[serde(rename = "snake-case", tag = "type")]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppRequest {
     CryptoRequest { request: Box<CryptoRequest> },
     TestRequest { request: Box<TestRequest> },
@@ -232,7 +251,7 @@ pub enum AppRequest {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-//#[serde(rename = "snake-case", tag = "type")]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
@@ -242,6 +261,7 @@ pub enum AdminRequest {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum CryptoRequest {
     Sign(String),
     Decrypt(String),
@@ -250,6 +270,7 @@ pub enum CryptoRequest {
 
 #[allow(missing_docs)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum TestRequest {
     AddAgent(AddAgentArgs),
 }
