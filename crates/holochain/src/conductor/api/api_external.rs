@@ -4,7 +4,7 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 use sx_types::{
     cell::CellHandle,
     dna::Dna,
