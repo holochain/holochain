@@ -13,7 +13,7 @@ use std::path::PathBuf;
 pub enum PassphraseServiceConfig {
     /// Passphrase is requested from the command line
     Cmd,
-    /// TODO: DOCS: ?
+    /// Passphrase is requested over a Unix domain socket at the given path.
     UnixSocket {
         /// TODO: DOCS: ?
         path: PathBuf,
