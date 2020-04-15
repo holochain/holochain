@@ -11,7 +11,7 @@ use std::path::PathBuf;
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum PassphraseServiceConfig {
-    /// TODO: DOCS: ?
+    /// Passphrase is requested from the command line
     Cmd,
     /// TODO: DOCS: ?
     UnixSocket {
