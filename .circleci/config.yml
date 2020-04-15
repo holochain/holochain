@@ -35,3 +35,7 @@ jobs:
    steps:
     - build-docker:
        box: circle.build
+
+workflows:
+ - build
+ - docker-build-circle-build
