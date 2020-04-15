@@ -1,0 +1,12 @@
+FROM holochain/holonix:latest
+
+WORKDIR /holochain-2020/build
+ENV NIX_ENV_PREFIX /holochain-2020/build
+
+ARG DOCKER_BRANCH=develop
+
+ADD https://github.com/holochain/holochain-2020/archive/$DOCKER_BRANCH.tar.gz /holochain-2020/build/$DOCKER_BRANCH.tar.gz
+RUN tar --strip-components=1 -zxvf $DOCKER_BRANCH.tar.gz
+
+# warm things
+RUN nix-shell --run echo

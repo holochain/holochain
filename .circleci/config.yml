@@ -29,6 +29,13 @@ jobs:
       - run:
           command: nix-shell --run hc-merge-test
 
+  docker-build-latest:
+   resource_class: large
+   machine: true
+   steps:
+    - build-docker:
+       box: latest
+
   docker-build-circle-build:
    resource_class: large
    machine: true
@@ -41,4 +48,5 @@ workflows:
  tests:
   jobs:
    - build
+   - docker-build-latest
    - docker-build-circle-build
