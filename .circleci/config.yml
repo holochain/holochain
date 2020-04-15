@@ -13,9 +13,9 @@ commands:
    - run:
       no_output_timeout: 45m
       command: ./docker/build.sh << parameters.box >> $CIRCLE_BRANCH
-   # - run:
-   #    no_output_timeout: 30m
-   #    command: ./docker/push << parameters.box >> $CIRCLE_BRANCH
+   - run:
+      no_output_timeout: 30m
+      command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
   # must be called build
