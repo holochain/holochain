@@ -171,7 +171,7 @@ impl InterfaceApi for StdAppInterfaceApi {
         Ok(r)
     }
 }
-/// The set of messages that a conductor understands how to respond
+/// Responses to requests received on an App interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum AppResponse {
