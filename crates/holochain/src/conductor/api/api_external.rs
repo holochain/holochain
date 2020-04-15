@@ -216,7 +216,7 @@ pub enum AppRequest {
     },
 }
 
-#[allow(missing_docs)]
+/// The set of messages that a conductor understands how to handle over an Admin interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum AdminRequest {
     Start(CellHandle),
