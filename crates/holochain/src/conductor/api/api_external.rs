@@ -188,7 +188,7 @@ pub enum AppResponse {
     },
 }
 
-#[allow(missing_docs)]
+/// Responses to messages received on an Admin interface 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum AdminResponse {
     Unimplemented(AdminRequest),
