@@ -9,7 +9,6 @@ use sx_types::observability::{self, Output};
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
-// const CHANNEL_SIZE: usize = 1000;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]
