@@ -18,7 +18,7 @@ pub enum PassphraseServiceConfig {
         /// TODO: DOCS: ?
         path: PathBuf,
     },
-    /// TODO: DOCS: ?
+    /// Passphrase is requested from a mock service for testing purposes
     Mock {
         /// The actual pasphrase in the mock case so we can test fail cases
         passphrase: String,
