@@ -261,13 +261,6 @@ mod test {
         InstallsDna(String),
     }
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-    #[serde(rename = "snake-case")]
-    struct CustomProperties {
-        the_answer: u32,
-        secret: String,
-    }
-
     async fn setup() -> StdAdminInterfaceApi {
         let conductor = Conductor::build().test().await.unwrap();
         StdAdminInterfaceApi::new(conductor)
@@ -321,6 +314,15 @@ mod test {
 
     #[tokio::test]
     async fn with_unique_parameters() {
+        use rmpv::Value;
+        observability::test_run().ok();
+        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+        #[serde(rename = "snake-case")]
+        struct CustomProperties {
+            the_answer: u32,
+            secret: String,
+        }
+
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
         let properties = CustomProperties {
@@ -332,11 +334,11 @@ mod test {
         let admin_api = setup().await;
 
         // Expecting
-        let mut expecting = vec![dna.clone(), dna.clone()];
-        expecting[0].properties = properties.clone().try_into().unwrap();
+        let expecting = vec![dna.clone(), dna.clone()];
 
         // Install Dna 1
-        let msg = AdminRequest::InstallDna(fake_dna_path.clone(), Some(properties.try_into().unwrap()));
+        let msg =
+            AdminRequest::InstallDna(fake_dna_path.clone(), Some(properties.try_into().unwrap()));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -345,14 +347,15 @@ mod test {
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api.clone()).await.unwrap();
+        handle_incoming_message(msg, admin_api.clone())
+            .await
+            .unwrap();
 
         // Install Dna 2
         let properties = CustomProperties {
             the_answer: 4242,
             secret: "Sometimes they have you're back".to_string(),
         };
-        expecting[1].properties = properties.clone().try_into().unwrap();
         let msg = AdminRequest::InstallDna(fake_dna_path, Some(properties.try_into().unwrap()));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -362,7 +365,9 @@ mod test {
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api.clone()).await.unwrap();
+        handle_incoming_message(msg, admin_api.clone())
+            .await
+            .unwrap();
 
         // List Dna
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -380,7 +385,46 @@ mod test {
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
 
-        let expecting: HashSet<Address> = expecting.into_iter().map(|dna| dna.address()).collect();
+        let expected_props: Vec<Vec<(Value, Value)>> = vec![
+            vec![
+                (
+                    Value::String("the_answer".into()),
+                    Value::Integer(42.into()),
+                ),
+                (
+                    Value::String("secrect".into()),
+                    Value::String("types can sometimes hurt".into()),
+                ),
+                (Value::String("test".into()), Value::String("test".into())),
+            ]
+            .try_into()
+            .unwrap(),
+            vec![
+                (
+                    Value::String("the_answer".into()),
+                    Value::Integer(4242.into()),
+                ),
+                (
+                    Value::String("secrect".into()),
+                    Value::String("Sometimes they have you're back".into()),
+                ),
+                (Value::String("test".into()), Value::String("test".into())),
+            ]
+            .try_into()
+            .unwrap(),
+        ];
+
+        let expecting: HashSet<Address> = expecting
+            .into_iter()
+            .zip(expected_props.into_iter())
+            .map(|(mut dna, properties)| {
+                let mut bytes = Vec::new();
+                rmpv::encode::write_value(&mut bytes, &properties.try_into().unwrap()).unwrap();
+                dna.properties = UnsafeBytes::from(bytes).into();
+                dna
+            })
+            .map(|dna| dna.address())
+            .collect();
         let result: HashSet<Address> = rx.await.unwrap().into_iter().collect();
         assert_eq!(expecting, result);
     }

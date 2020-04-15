@@ -5,7 +5,7 @@ use crate::conductor::{
 };
 use holochain_serialized_bytes::prelude::*;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap},
     path::PathBuf,
 };
 use sx_types::{
@@ -108,8 +108,11 @@ impl StdAdminInterfaceApi {
         let mut dna = Self::read_parse_dna(dna_path).await?;
         if let Some(properties) = properties {
             let admin_properties = Self::parse_properties(properties)?;
+            trace!(?admin_properties);
             let dna_properties = Self::parse_properties(dna.properties)?;
+            trace!(?dna_properties);
             let dna_properties = Self::merge_properties(dna_properties, admin_properties);
+            trace!(?dna_properties);
             dna.properties = Self::encode_properties(dna_properties)?;
         }
         self.add_dna(dna).await?;
@@ -143,7 +146,7 @@ impl StdAdminInterfaceApi {
     fn parse_properties(
         properties: SerializedBytes,
     ) -> ConductorApiResult<HashMap<String, rmpv::Value>> {
-        let mut bytes: Vec<u8> = UnsafeBytes::from(properties).into();
+        let bytes: Vec<u8> = UnsafeBytes::from(properties).into();
         let properties: Vec<(rmpv::Value, rmpv::Value)> =
             // FIXME This is not async friendly
             rmpv::decode::read_value(&mut bytes.as_slice())
