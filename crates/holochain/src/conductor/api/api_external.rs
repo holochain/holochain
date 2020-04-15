@@ -108,7 +108,7 @@ impl StdAdminInterfaceApi {
         self.conductor_handle
             .write()
             .await
-            .fake_dna_cache
+            .dna_cache()
             .insert(dna.address(), dna);
         Ok(())
     }
@@ -125,7 +125,7 @@ impl StdAdminInterfaceApi {
             .conductor_handle
             .read()
             .await
-            .fake_dna_cache
+            .dna_cache()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
@@ -154,11 +154,13 @@ impl InterfaceApi for StdAdminInterfaceApi {
         &self,
         request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse> {
-        self.conductor_handle
-            .read()
-            .await
-            .check_running()
-            .map_err(InterfaceError::RequestHandler)?;
+        {
+            self.conductor_handle
+                .read()
+                .await
+                .check_running()
+                .map_err(InterfaceError::RequestHandler)?;
+        }
         match request {
             Ok(request) => Ok(AdminInterfaceApi::handle_request(self, request).await),
             Err(e) => Ok(AdminResponse::Error {
@@ -285,7 +287,7 @@ pub struct AddAgentArgs {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::Conductor;
+    use crate::conductor::conductor::Runtime;
     use anyhow::Result;
     use matches::assert_matches;
     use sx_types::test_utils::{fake_dna, fake_dna_file};
@@ -293,7 +295,7 @@ mod test {
 
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
-        let conductor = Conductor::build().test().await?;
+        let conductor = Runtime::build().test().await?;
         let admin_api = StdAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());

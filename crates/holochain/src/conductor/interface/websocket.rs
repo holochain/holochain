@@ -240,7 +240,7 @@ mod test {
     use super::*;
     use crate::conductor::{
         api::{AdminRequest, AdminResponse, StdAdminInterfaceApi},
-        Conductor,
+        Conductor, conductor::Runtime, 
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
@@ -257,7 +257,7 @@ mod test {
     }
 
     async fn setup() -> StdAdminInterfaceApi {
-        let conductor = Conductor::build().test().await.unwrap();
+        let conductor = Runtime::build().test().await.unwrap();
         StdAdminInterfaceApi::new(conductor)
     }
 
