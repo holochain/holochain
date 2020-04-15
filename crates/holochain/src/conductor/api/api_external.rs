@@ -1,10 +1,13 @@
-use super::error::{ConductorApiResult, SerializationError};
+use super::error::{ConductorApiError, ConductorApiResult, SerializationError};
 use crate::conductor::{
     interface::error::{AdminInterfaceError, InterfaceError, InterfaceResult},
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
-use std::path::PathBuf;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 use sx_types::{
     cell::CellHandle,
     dna::Dna,
@@ -96,10 +99,19 @@ impl StdAdminInterfaceApi {
         }
     }
 
-    pub(crate) async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
+    pub(crate) async fn install_dna(
+        &self,
+        dna_path: PathBuf,
+        properties: Option<SerializedBytes>,
+    ) -> ConductorApiResult<AdminResponse> {
         trace!(?dna_path);
-        let dna = Self::read_parse_dna(dna_path).await?;
-        trace!(line = line!());
+        let mut dna = Self::read_parse_dna(dna_path).await?;
+        if let Some(properties) = properties {
+            let admin_properties = Self::parse_properties(properties)?;
+            let dna_properties = Self::parse_properties(dna.properties)?;
+            let dna_properties = Self::merge_properties(dna_properties, admin_properties);
+            dna.properties = Self::encode_properties(dna_properties)?;
+        }
         self.add_dna(dna).await?;
         Ok(AdminResponse::DnaInstalled)
     }
@@ -118,6 +130,64 @@ impl StdAdminInterfaceApi {
         let dna = SerializedBytes::from(dna);
         dna.try_into()
             .map_err(|e| SerializationError::from(e).into())
+    }
+
+    fn merge_properties(
+        mut dna_properties: HashMap<String, rmpv::Value>,
+        admin_properties: HashMap<String, rmpv::Value>,
+    ) -> HashMap<String, rmpv::Value> {
+        dna_properties.extend(admin_properties);
+        dna_properties
+    }
+
+    fn parse_properties(
+        properties: SerializedBytes,
+    ) -> ConductorApiResult<HashMap<String, rmpv::Value>> {
+        let mut bytes: Vec<u8> = UnsafeBytes::from(properties).into();
+        let properties: Vec<(rmpv::Value, rmpv::Value)> =
+            // FIXME This is not async friendly
+            rmpv::decode::read_value(&mut bytes.as_slice())
+                .map_err(|e| SerializationError::from(e))?
+                .try_into()
+                .map_err(|e| {
+                    SerializationError::Properties(format!(
+                        "Properties are in the wrong format, found {:?}",
+                        e
+                    ))
+                })?;
+        properties
+            .into_iter()
+            .map(|(name, val)| {
+                let name: Result<String, ConductorApiError> = name.try_into().map_err(|e| {
+                    SerializationError::Properties(format!(
+                        "Properties should start with a String, found {:?}",
+                        e
+                    ))
+                    .into()
+                });
+                name.map(|name| (name, val))
+            })
+            .collect()
+    }
+
+    fn encode_properties(
+        properties: HashMap<String, rmpv::Value>,
+    ) -> ConductorApiResult<SerializedBytes> {
+        // FIXME with_capacity or reuse
+        let mut bytes = Vec::new();
+        // FIXME Avoid this allocation
+        let properties: Vec<(rmpv::Value, rmpv::Value)> = properties
+            .into_iter()
+            .map(|(name, val)| (name.into(), val))
+            .collect();
+        rmpv::encode::write_value(
+            &mut bytes,
+            &properties.try_into().map_err(|_| {
+                SerializationError::Properties("Failed to encode properties".to_string())
+            })?,
+        )
+        .unwrap();
+        Ok(UnsafeBytes::from(bytes).into())
     }
 
     async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
@@ -140,7 +210,7 @@ impl AdminInterfaceApi for StdAdminInterfaceApi {
         match request {
             Start(_cell_handle) => unimplemented!(),
             Stop(_cell_handle) => unimplemented!(),
-            InstallDna(dna_path) => self.install_dna(dna_path).await,
+            InstallDna(dna_path, properties) => self.install_dna(dna_path, properties).await,
             ListDnas => self.list_dnas().await,
         }
     }
@@ -255,7 +325,7 @@ pub enum AppRequest {
 pub enum AdminRequest {
     Start(CellHandle),
     Stop(CellHandle),
-    InstallDna(PathBuf),
+    InstallDna(PathBuf, Option<SerializedBytes>),
     ListDnas,
 }
 
@@ -287,9 +357,16 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
+    use maplit::hashmap;
     use matches::assert_matches;
     use sx_types::test_utils::{fake_dna, fake_dna_file};
     use uuid::Uuid;
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone)]
+    struct TestProp {
+        a: u32,
+        b: String,
+        c: i32,
+    }
 
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
@@ -313,5 +390,65 @@ mod test {
         let result = StdAdminInterfaceApi::read_parse_dna(dna_path).await?;
         assert_eq!(dna, result);
         Ok(())
+    }
+
+    #[test]
+    fn properties_value() {
+        use rmpv::Value;
+        let test_prop = TestProp {
+            a: std::u32::MAX - 1,
+            b: "hello Á".to_string(),
+            c: std::i32::MIN + 1,
+        };
+        let expected_val = hashmap! {
+            "a".to_string() => Value::Integer((std::u32::MAX - 1).into()),
+            "b".to_string() => Value::String("hello Á".into()),
+            "c".to_string() => Value::Integer((std::i32::MIN + 1).into()),
+        };
+        let bytes: SerializedBytes = test_prop.clone().try_into().unwrap();
+        let val = StdAdminInterfaceApi::parse_properties(bytes).unwrap();
+        assert_eq!(val, expected_val);
+        let bytes = StdAdminInterfaceApi::encode_properties(val).unwrap();
+        let result: TestProp = SerializedBytes::from(UnsafeBytes::from(bytes))
+            .try_into()
+            .unwrap();
+        assert_eq!(result, test_prop);
+    }
+
+    #[test]
+    fn update_properties_test() {
+        use rmpv::Value;
+        let test_prop = TestProp {
+            a: std::u32::MAX - 1,
+            b: "hello Á".to_string(),
+            c: std::i32::MIN + 1,
+        };
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone)]
+        struct OtherTestProp {
+            b: i32,
+            d: String,
+        }
+
+        let test_prop_2 = OtherTestProp {
+            b: 55,
+            d: "Oh yeh".to_string(),
+        };
+
+        let bytes: SerializedBytes = test_prop.try_into().unwrap();
+        let val = StdAdminInterfaceApi::parse_properties(bytes).unwrap();
+        let bytes: SerializedBytes = test_prop_2.try_into().unwrap();
+        let val_2 = StdAdminInterfaceApi::parse_properties(bytes).unwrap();
+
+        let result = StdAdminInterfaceApi::merge_properties(val, val_2);
+
+        let expected = hashmap! {
+            "a".to_string() => Value::Integer((std::u32::MAX - 1).into()),
+            "b".to_string() => Value::Integer(55.into()),
+            "c".to_string() => Value::Integer((std::i32::MIN + 1).into()),
+            "d".to_string() => Value::String("Oh yeh".into()),
+        };
+
+        assert_eq!(result, expected);
     }
 }

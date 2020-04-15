@@ -34,6 +34,10 @@ pub enum SerializationError {
     Bytes(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]
     Uuid(#[from] uuid::parser::ParseError),
+    #[error(transparent)]
+    Decode(#[from] rmpv::decode::Error),
+    #[error("Properties failed to serialize: {0:?}")]
+    Properties(String),
 }
 
 /// Type alias

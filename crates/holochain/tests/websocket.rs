@@ -127,7 +127,7 @@ async fn call_admin() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = fake_dna_file(dna).unwrap();
-    let request = AdminRequest::InstallDna(fake_dna_path);
+    let request = AdminRequest::InstallDna(fake_dna_path, None);
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
     assert_matches!(response, AdminResponse::DnaInstalled);
@@ -154,13 +154,14 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
     let (fake_dna_path, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
-    let request = AdminRequest::InstallDna(fake_dna_path);
+    let request = AdminRequest::InstallDna(fake_dna_path, None);
     let response = client.request(request).await;
     // TODO: update to proper response once implemented
     assert!(matches!(
         response,
         Ok(AdminResponse::Unimplemented(AdminRequest::InstallDna(
-            _request
+            _request,
+            _
         )))
     ));
     conductor_handle.shutdown().await;
@@ -210,7 +211,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     info!("About to make failing request");
 
     let (fake_dna, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
-    let request = AdminRequest::InstallDna(fake_dna);
+    let request = AdminRequest::InstallDna(fake_dna, None);
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =

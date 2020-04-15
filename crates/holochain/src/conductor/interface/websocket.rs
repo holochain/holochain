@@ -238,6 +238,7 @@ async fn handle_incoming_app_request(request: AppRequest) -> InterfaceResult<App
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::conductor::interface::error::AdminInterfaceError;
     use crate::conductor::{
         api::{AdminRequest, AdminResponse, StdAdminInterfaceApi},
         Conductor,
@@ -246,14 +247,25 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
-    use std::convert::TryInto;
-    use sx_types::observability;
-    use crate::conductor::interface::error::AdminInterfaceError;
+    use std::{collections::HashSet, convert::TryInto};
+    use sx_types::{
+        observability,
+        prelude::*,
+        test_utils::{fake_dna, fake_dna_file},
+    };
+    use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     #[serde(rename = "snake-case", tag = "type", content = "data")]
     enum AdmonRequest {
         InstallsDna(String),
+    }
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+    #[serde(rename = "snake-case")]
+    struct CustomProperties {
+        the_answer: u32,
+        secret: String,
     }
 
     async fn setup() -> StdAdminInterfaceApi {
@@ -280,7 +292,7 @@ mod test {
     async fn invalid_request() {
         observability::test_run().ok();
         let admin_api = setup().await;
-        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into());
+        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -298,12 +310,78 @@ mod test {
         // TODO this can't be done easily yet
         // because we can't cause the cache to fail from an input
     }
-    
+
     #[ignore]
     #[tokio::test]
     async fn deserialization_failure() {
         // TODO this can't be done easily yet
         // because we can't serialize something that
         // doesn't deserialize
+    }
+
+    #[tokio::test]
+    async fn with_unique_parameters() {
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna(&uuid.to_string());
+        let properties = CustomProperties {
+            the_answer: 42,
+            secret: "types can sometimes hurt".to_string(),
+        };
+
+        let (fake_dna_path, _t) = fake_dna_file(dna.clone()).unwrap();
+        let admin_api = setup().await;
+
+        // Expecting
+        let mut expecting = vec![dna.clone(), dna.clone()];
+        expecting[0].properties = properties.clone().try_into().unwrap();
+
+        // Install Dna 1
+        let msg = AdminRequest::InstallDna(fake_dna_path.clone(), Some(properties.try_into().unwrap()));
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::DnaInstalled);
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api.clone()).await.unwrap();
+
+        // Install Dna 2
+        let properties = CustomProperties {
+            the_answer: 4242,
+            secret: "Sometimes they have you're back".to_string(),
+        };
+        expecting[1].properties = properties.clone().try_into().unwrap();
+        let msg = AdminRequest::InstallDna(fake_dna_path, Some(properties.try_into().unwrap()));
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::DnaInstalled);
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api.clone()).await.unwrap();
+
+        // List Dna
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let msg = AdminRequest::ListDnas;
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            match response {
+                AdminResponse::ListDnas(dnas) => tx.send(dnas).unwrap(),
+                _ => panic!("Bad response {:?}", response),
+            }
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
+
+        let expecting: HashSet<Address> = expecting.into_iter().map(|dna| dna.address()).collect();
+        let result: HashSet<Address> = rx.await.unwrap().into_iter().collect();
+        assert_eq!(expecting, result);
     }
 }
