@@ -20,7 +20,7 @@ pub enum PassphraseServiceConfig {
     },
     /// TODO: DOCS: ?
     Mock {
-        /// TODO: DOCS: ?
+        /// The actual pasphrase in the mock case so we can test fail cases
         passphrase: String,
     },
 }
