@@ -1,5 +1,22 @@
 version: 2.1
 
+commands:
+ build-docker:
+  description: "Build and deploy a docker box"
+  parameters:
+   box:
+    type: string
+    default: "minimal"
+  steps:
+   - checkout
+   - run: ./docker/login.sh
+   # - run:
+   #    no_output_timeout: 45m
+   #    command: ./docker/build << parameters.box >> $CIRCLE_BRANCH
+   # - run:
+   #    no_output_timeout: 30m
+   #    command: ./docker/push << parameters.box >> $CIRCLE_BRANCH
+
 jobs:
   # must be called build
   build:
@@ -11,3 +28,10 @@ jobs:
       - checkout
       - run:
           command: nix-shell --run hc-merge-test
+
+  docker-build-circle-build:
+   resource_class: large
+   machine: true
+   steps:
+    - build-docker:
+       box: circle.build
