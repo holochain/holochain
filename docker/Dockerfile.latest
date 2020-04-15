@@ -5,7 +5,7 @@ ENV NIX_ENV_PREFIX /holochain-2020/build
 
 ARG DOCKER_BRANCH=develop
 
-ADD https://github.com/holochain/holochain-2020/archive/$DOCKER_BRANCH.tar.gz /holochain-2020/build/$DOCKER_BRANCH.tar.gz
+ADD https://github.com/Holo-Host/holochain-2020/archive/$DOCKER_BRANCH.tar.gz /holochain-2020/build/$DOCKER_BRANCH.tar.gz
 RUN tar --strip-components=1 -zxvf $DOCKER_BRANCH.tar.gz
 
 # warm things
