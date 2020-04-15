@@ -21,13 +21,13 @@ jobs:
   # must be called build
   build:
     docker:
-#    - image: holochain/holochain-rust:circle.build.develop
-     - image: holochain/holonix:latest.develop
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run:
-          command: nix-shell --run hc-merge-test
+     image: holochain/holochain-2020:circle.build.2020-04-15-dockerz
+      # - image: holochain/holonix:latest.develop
+     resource_class: xlarge
+     steps:
+       - checkout
+       - run:
+           command: nix-shell --run hc-merge-test
 
   docker-build-latest:
    resource_class: large
