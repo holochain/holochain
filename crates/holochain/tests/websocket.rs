@@ -49,13 +49,24 @@ fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
     }
 }
 
-fn create_config(mut path: PathBuf, port: u16) -> PathBuf {
-    let config = ConductorConfig {
+fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
+    ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
         }]),
-        ..Default::default()
-    };
+        environment_path: environment_path.into(),
+        network: None,
+        signing_service_uri: None,
+        encryption_service_uri: None,
+        decryption_service_uri: None,
+        dpki: None,
+        passphrase_service: PassphraseServiceConfig::Mock {
+            passphrase: "password".into(),
+        },
+    }
+}
+
+fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
     path.push("conductor_config.toml");
     std::fs::write(path.clone(), toml::to_string(&config).unwrap()).unwrap();
     path
@@ -105,7 +116,10 @@ async fn call_admin() {
     let port = 9909;
 
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
-    let config_path = create_config(tmp_dir.into_path(), port);
+    let path = tmp_dir.path().to_path_buf();
+    let environment_path = path.clone();
+    let config = create_config(port, environment_path);
+    let config_path = write_config(path, &config);
 
     let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
     cmd.arg("--structured");
@@ -144,25 +158,16 @@ async fn call_admin() {
 
 #[tokio::test]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    let config = ConductorConfig {
-        admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 0 },
-        }]),
-        ..Default::default()
-    };
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let environment_path = tmp_dir.path().to_path_buf();
+    let config = create_config(0, environment_path);
     let conductor_handle = Conductor::build().with_config(config).await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
     let (fake_dna_path, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
     let request = AdminRequest::InstallDna(fake_dna_path);
     let response = client.request(request).await;
-    // TODO: update to proper response once implemented
-    assert!(matches!(
-        response,
-        Ok(AdminResponse::Unimplemented(AdminRequest::InstallDna(
-            _request
-        )))
-    ));
+    assert_matches!(response, Ok(AdminResponse::DnaInstalled));
     conductor_handle.shutdown().await;
 
     Ok(())
@@ -198,14 +203,14 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     info!("shutdown");
 
-    assert!(matches!(
+    assert_matches!(
         conductor_handle.check_running().await,
         Err(ConductorError::ShuttingDown)
-    ));
+    );
 
     let incoming: Vec<_> = rx.collect().await;
     assert_eq!(incoming.len(), 1);
-    assert!(matches!(incoming[0], WebsocketMessage::Close(_)));
+    assert_matches!(incoming[0], WebsocketMessage::Close(_));
 
     info!("About to make failing request");
 
@@ -218,7 +223,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     // request should have errored since the conductor shut down,
     // but should not have timed out (which would be an `Err(Err(_))`)
-    assert!(matches!(response, Ok(Err(_))));
+    assert_matches!(response, Ok(Err(_)));
 
     Ok(())
 }

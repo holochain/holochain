@@ -96,14 +96,15 @@ impl StdAdminInterfaceApi {
         }
     }
 
+    /// Installs a [Dna] from a file path
     pub(crate) async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
         trace!(?dna_path);
         let dna = Self::read_parse_dna(dna_path).await?;
-        trace!(line = line!());
         self.add_dna(dna).await?;
         Ok(AdminResponse::DnaInstalled)
     }
 
+    /// Adds the [Dna] to the dna store
     async fn add_dna(&self, dna: Dna) -> ConductorApiResult<()> {
         self.conductor_handle
             .write()
@@ -113,6 +114,7 @@ impl StdAdminInterfaceApi {
         Ok(())
     }
 
+    /// Reads the [Dna] from disk and parses to [SerializedBytes]
     async fn read_parse_dna(dna_path: PathBuf) -> ConductorApiResult<Dna> {
         let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
         let dna = SerializedBytes::from(dna);
@@ -120,7 +122,8 @@ impl StdAdminInterfaceApi {
             .map_err(|e| SerializationError::from(e).into())
     }
 
-    async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
+    /// Lists all the [Dna]'s in the dna store
+    pub(crate) async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
         let dna_list = self
             .conductor_handle
             .read()
@@ -154,11 +157,14 @@ impl InterfaceApi for StdAdminInterfaceApi {
         &self,
         request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse> {
-        self.conductor_handle
-            .read()
-            .await
-            .check_running()
-            .map_err(InterfaceError::RequestHandler)?;
+        // Don't hold the read across both awaits
+        {
+            self.conductor_handle
+                .read()
+                .await
+                .check_running()
+                .map_err(InterfaceError::RequestHandler)?;
+        }
         match request {
             Ok(request) => Ok(AdminInterfaceApi::handle_request(self, request).await),
             Err(e) => Ok(AdminResponse::Error {
