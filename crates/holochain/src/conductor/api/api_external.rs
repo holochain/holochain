@@ -195,7 +195,7 @@ pub enum AdminResponse {
     Error { debug: String },
 }
 
-/// The set of messages that a conductor understands how to handle
+/// The set of messages that a conductor understands how to handle over an App interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum AppRequest {
