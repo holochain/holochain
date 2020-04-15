@@ -23,7 +23,8 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
         -> InterfaceResult<Self::ApiResponse>;
 }
 
-/// The interface that a Conductor exposes to the outside world.
+/// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.  
+/// This trait has a one mock implementation and one "Std" implementation
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
