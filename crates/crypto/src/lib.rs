@@ -47,12 +47,10 @@
 
 use rust_sodium_holochain_fork_sys as rust_sodium_sys;
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use futures::future::{BoxFuture, FutureExt};
+use once_cell::sync::OnceCell;
 
 #[macro_use]
 mod macros;
