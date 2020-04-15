@@ -188,7 +188,7 @@ pub enum AppResponse {
     },
 }
 
-/// Responses to messages received on an Admin interface 
+/// Responses to messages received on an Admin interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum AdminResponse {
     Unimplemented(AdminRequest),

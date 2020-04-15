@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 //! We want to have control over certain long running
-//! tasks that we care about. 
+//! tasks that we care about.
 //! If a task that is added to the task manager ends
 //! then a reaction can be set.
 //! An example would be a websocket closes with an error
