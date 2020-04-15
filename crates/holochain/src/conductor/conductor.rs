@@ -97,7 +97,7 @@ impl ConductorHandle {
     }
 }
 
-/// A Conductor is a group of [Cell]s
+/// A Conductor manages communication to and between a collection of [Cell]s and system services
 pub struct Conductor {
     // tx_network: NetSender,
     cells: HashMap<CellId, CellItem>,
