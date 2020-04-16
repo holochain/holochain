@@ -1,7 +1,7 @@
+use error::DnaStoreResult;
 use mockall::automock;
 use std::collections::HashMap;
 use sx_types::{dna::Dna, prelude::*};
-use error::DnaStoreResult;
 
 /// Placeholder for real cache
 pub struct RealDnaStore(HashMap<Address, Dna>);

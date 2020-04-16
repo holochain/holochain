@@ -1,7 +1,6 @@
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::{cell::Cell, Conductor, ConductorHandle};
+use crate::conductor::{cell::Cell, ConductorHandle};
 use async_trait::async_trait;
-use std::sync::Arc;
 use sx_types::{
     autonomic::AutonomicCue,
     cell::CellId,
@@ -9,13 +8,12 @@ use sx_types::{
     shims::*,
     signature::Signature,
 };
-use tokio::sync::RwLock;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].
 #[derive(Clone)]
 pub struct CellConductorApi {
-    lock: ConductorHandle, 
+    lock: ConductorHandle,
     cell_id: CellId,
 }
 
