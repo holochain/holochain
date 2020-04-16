@@ -1,6 +1,6 @@
 use super::error::{ConductorApiResult, SerializationError};
 use crate::conductor::{
-    interface::error::{AdminInterfaceError, InterfaceError, InterfaceResult},
+    interface::error::{AdminInterfaceErrorKind, InterfaceError, InterfaceResult},
     ConductorHandle,
 };
 use holochain_serialized_bytes::prelude::*;
@@ -82,8 +82,7 @@ pub struct StdAdminInterfaceApi {
     /// Mutable access to the Conductor
     conductor_handle: ConductorHandle,
 
-    // TODO: I already forget why we needed to put this in here! ~MD
-    // To spawn new app APIs you need a copy of the App Api :)
+    /// Needed to spawn an App interface
     app_api: StdAppInterfaceApi,
 }
 
@@ -169,7 +168,7 @@ impl InterfaceApi for StdAdminInterfaceApi {
             Ok(request) => Ok(AdminInterfaceApi::handle_request(self, request).await),
             Err(e) => Ok(AdminResponse::Error {
                 debug: e.to_string(),
-                error_type: InterfaceError::SerializedBytes(e.into()).into(),
+                error_type: InterfaceError::SerializedBytes(e).into(),
             }),
         }
     }
@@ -242,7 +241,7 @@ pub enum AdminResponse {
     ListDnas(Vec<Address>),
     Error {
         debug: String,
-        error_type: AdminInterfaceError,
+        error_type: AdminInterfaceErrorKind,
     },
 }
 

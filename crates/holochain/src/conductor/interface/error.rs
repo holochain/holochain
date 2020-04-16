@@ -12,6 +12,7 @@ pub enum InterfaceError {
     UnexpectedMessage(String),
     SendError,
     Other(String),
+    Closed,
     // FIXME: update error types in holochain_websocket to use a more specific
     // type than io::Error
     IoTodo(#[from] std::io::Error),
@@ -40,7 +41,7 @@ pub type InterfaceResult<T> = Result<T, InterfaceError>;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
-pub enum AdminInterfaceError {
+pub enum AdminInterfaceErrorKind {
     Serialization,
     Cell,
     Conductor,
@@ -50,9 +51,9 @@ pub enum AdminInterfaceError {
     Other,
 }
 
-impl From<InterfaceError> for AdminInterfaceError {
+impl From<InterfaceError> for AdminInterfaceErrorKind {
     fn from(error: InterfaceError) -> Self {
-        use AdminInterfaceError::*;
+        use AdminInterfaceErrorKind::*;
         match error {
             InterfaceError::SerializedBytes(_) => Serialization,
             InterfaceError::JoinError(_) => Runtime,
@@ -62,13 +63,14 @@ impl From<InterfaceError> for AdminInterfaceError {
             InterfaceError::SendError => Io,
             InterfaceError::Other(_) => Other,
             InterfaceError::IoTodo(_) => Other,
+            InterfaceError::Closed => unreachable!(),
         }
     }
 }
 
-impl From<ConductorApiError> for AdminInterfaceError {
+impl From<ConductorApiError> for AdminInterfaceErrorKind {
     fn from(e: ConductorApiError) -> Self {
-        use AdminInterfaceError::*;
+        use AdminInterfaceErrorKind::*;
         match e {
             ConductorApiError::CellMissing(_) => Cell,
             ConductorApiError::ConductorError(_) => Conductor,

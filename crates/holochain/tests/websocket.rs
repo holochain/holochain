@@ -112,7 +112,10 @@ async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Websock
 
 #[tokio::test]
 async fn call_admin() {
-    // TODO: can we make this port 0 and find out the dynamic port later?
+    // NOTE: This is a full integration test that
+    // actually runs the holochain binary
+
+    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
     let port = 9909;
 
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
@@ -178,12 +181,9 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     observability::test_run().ok();
 
     info!("creating config");
-    let config = ConductorConfig {
-        admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port: 0 },
-        }]),
-        ..Default::default()
-    };
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let environment_path = tmp_dir.path().to_path_buf();
+    let config = create_config(0, environment_path);
     let conductor_handle = Conductor::build().with_config(config).await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");

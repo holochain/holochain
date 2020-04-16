@@ -95,9 +95,9 @@ impl ConductorConfig {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use matches::assert_matches;
     use std::path::{Path, PathBuf};
     use url::Url;
-    use matches::assert_matches;
 
     #[test]
     fn test_config_load_toml() {
@@ -114,10 +114,7 @@ pub mod tests {
     #[test]
     fn test_config_bad_toml() {
         let result: ConductorResult<ConductorConfig> = config_from_toml("this isn't toml");
-        assert_matches!(
-            result,
-            Err(ConductorError::DeserializationError(_))
-        );
+        assert_matches!(result, Err(ConductorError::DeserializationError(_)));
     }
 
     #[test]

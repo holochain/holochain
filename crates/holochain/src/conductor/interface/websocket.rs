@@ -147,8 +147,10 @@ pub fn create_demo_channel_interface<A: AppInterfaceApi>(
 /// Used by Admin interface.
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut recv_socket: WebsocketReceiver) {
     while let Some(msg) = recv_socket.next().await {
-        if let Err(_todo) = handle_incoming_message(msg, api.clone()).await {
-            break;
+        match handle_incoming_message(msg, api.clone()).await {
+            Err(InterfaceError::Closed) => break,
+            Err(e) => error!(error = &e as &dyn std::error::Error),
+            Ok(()) => (),
         }
     }
 }
@@ -210,34 +212,18 @@ where
         WebsocketMessage::Request(bytes, respond) => {
             Ok(respond(api.handle_request(bytes.try_into()).await?.try_into()?).await?)
         }
-        // FIXME this will kill this interface, is that what we want?
-        WebsocketMessage::Signal(_) => Err(InterfaceError::UnexpectedMessage(
-            "Got an unexpected Signal while handing incoming message".to_string(),
-        )),
-        WebsocketMessage::Close(_) => unimplemented!(),
+        WebsocketMessage::Signal(msg) => {
+            error!(msg = ?msg, "Got an unexpected Signal while handing incoming message");
+            Ok(())
+        }
+        WebsocketMessage::Close(_) => Err(InterfaceError::Closed),
     }
-}
-
-/* I don't think we need this?
-async fn handle_incoming_admin_request(request: AdminRequest) -> InterfaceResult<AdminResponse> {
-    Ok(match request {
-        _ => AdminResponse::DnaAdded,
-    })
-}
-*/
-
-// TODO: rename AppRequest to AppRequest or something
-async fn handle_incoming_app_request(request: AppRequest) -> InterfaceResult<AppResponse> {
-    Ok(match request {
-        _ => AppResponse::Error {
-            debug: "TODO".into(),
-        },
-    })
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::conductor::interface::error::AdminInterfaceErrorKind;
     use crate::conductor::{
         api::{AdminRequest, AdminResponse, StdAdminInterfaceApi},
         Conductor,
@@ -248,7 +234,6 @@ mod test {
     use matches::assert_matches;
     use std::convert::TryInto;
     use sx_types::observability;
-    use crate::conductor::interface::error::AdminInterfaceError;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     #[serde(rename = "snake-case", tag = "type", content = "data")]
@@ -268,7 +253,7 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceError::Serialization, ..});
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Serialization, ..});
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -284,7 +269,7 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceError::Io, ..});
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Io, ..});
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -295,14 +280,14 @@ mod test {
     #[ignore]
     #[tokio::test]
     async fn cache_failure() {
-        // TODO this can't be done easily yet
+        // TODO: B-01440: this can't be done easily yet
         // because we can't cause the cache to fail from an input
     }
-    
+
     #[ignore]
     #[tokio::test]
     async fn deserialization_failure() {
-        // TODO this can't be done easily yet
+        // TODO: B-01440: this can't be done easily yet
         // because we can't serialize something that
         // doesn't deserialize
     }

@@ -219,18 +219,16 @@ impl Conductor {
         Ok(new_state)
     }
 
+    #[allow(dead_code)]
     async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
-    // TODO: it would be nice to use this as the common way to spawn an admin
-    // interface, especially if we allow spawning additional admin interfaces
-    // on-the-fly, but it is a little weird, since we need to lock the Conductor
-    // in order to do so, and pass in an AdminInterfaceApi, which contains
-    // an Arc<RwLock<Conductor>> around the very Conductor which is calling this
-    // method...leading to potential deadlock if not careful.
+    // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
+    // the Conductor handle (from where this could be called)
+    #[allow(dead_code)]
     async fn spawn_admin_interface<Api: AdminInterfaceApi>(
         &mut self,
         _api: Api,
@@ -239,8 +237,11 @@ impl Conductor {
         unimplemented!()
     }
 
+    // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
+    // the Conductor handle (from where this could be called)
     /// The common way to spawn a new app interface, whether read from
     /// ConductorState on startup, or generated on-the-fly by an admin method
+    #[allow(dead_code)]
     async fn spawn_app_interface<Api: AppInterfaceApi>(
         &mut self,
         _api: Api,
