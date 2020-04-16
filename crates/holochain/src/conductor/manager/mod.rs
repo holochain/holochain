@@ -32,12 +32,7 @@ pub(crate) type OnDeath =
 /// completion of a task
 pub(crate) struct ManagedTaskAdd {
     handle: ManagedTaskHandle,
-    // TODO: reevaluate wether this should be a callback
-    // This is probably not a great way to do this.
-    // The task needs to check the error but then it probably needs to be able to restart itself.
-    // If we use a callback then we need to be able to restart the task without duplicating all the start code.
-    // We also might need some state because say a task dies 5 times, maybe you restart it 4 times but 5 you hard error or something.
-    // The TaskManager could store some context like number of times killed but then we need to have unique managed tasks.
+    // TODO: B-01455: reevaluate wether this should be a callback
     on_death: Option<OnDeath>,
 }
 
@@ -55,7 +50,6 @@ impl ManagedTaskAdd {
     }
 }
 
-// FIXME I'm not sure if this is correct please review
 impl Future for ManagedTaskAdd {
     type Output = (Option<OnDeath>, ManagedTaskResult);
 
@@ -70,7 +64,6 @@ impl Future for ManagedTaskAdd {
     }
 }
 
-// TODO: implement, move into task that loops and select!s
 struct TaskManager {
     stream: FuturesUnordered<ManagedTaskAdd>,
 }
@@ -97,7 +90,7 @@ pub(crate) async fn keep_alive_task(mut die: broadcast::Receiver<()>) -> Managed
 
 async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) {
     let mut task_manager = TaskManager::new();
-    // Need to have atleast on item in the stream or it will exit early
+    // Need to have at least on item in the stream or it will exit early
     if let Some(new_task) = new_task_channel.recv().await {
         task_manager.stream.push(new_task);
     } else {
