@@ -471,7 +471,9 @@ new_holo_hash! {
 impl TryFrom<sx_types::entry::Entry> for crate::EntryHash {
     type Error = SerializedBytesError;
     fn try_from(entry: Entry) -> Result<Self, Self::Error> {
-        Ok(EntryHash::with_data_sync(SerializedBytes::try_from(entry)?.bytes()))
+        Ok(EntryHash::with_data_sync(
+            SerializedBytes::try_from(entry)?.bytes(),
+        ))
     }
 }
 

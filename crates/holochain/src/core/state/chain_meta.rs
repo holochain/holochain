@@ -1,4 +1,5 @@
 #![allow(clippy::ptr_arg)]
+use holo_hash::EntryHash;
 use mockall::mock;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -8,7 +9,6 @@ use sx_state::{
     error::DatabaseResult,
     prelude::*,
 };
-use holo_hash::EntryHash;
 
 type Tag = String;
 

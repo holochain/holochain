@@ -5,6 +5,8 @@ use crate::core::state::{
 };
 
 use fallible_iterator::FallibleIterator;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 use sx_state::{
     buffer::BufferedStore,
     db::DbManager,
@@ -18,8 +20,6 @@ use sx_types::{
     prelude::*,
     signature::{Provenance, Signature},
 };
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {

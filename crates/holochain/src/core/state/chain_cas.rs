@@ -1,4 +1,6 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 use sx_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -13,8 +15,6 @@ use sx_types::{
     chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,
 };
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
 pub type HeaderCas<'env, R> = CasBuf<'env, ChainHeader, R>;

@@ -42,11 +42,11 @@ use super::{
     chain_cas::ChainCasBuf,
     chain_meta::{ChainMetaBufT, EntryDhtStatus},
 };
+use holo_hash::EntryHash;
 use std::collections::HashSet;
 use sx_state::{error::DatabaseResult, prelude::Reader};
-use sx_types::{entry::Entry};
+use sx_types::entry::Entry;
 use tracing::*;
-use holo_hash::EntryHash;
 
 #[cfg(test)]
 mod test;
@@ -108,13 +108,16 @@ where
             .primary
             .get_entry(entry_hash.clone())?
             .and_then(|entry| {
-                self.primary_meta.get_crud(entry_hash.clone()).ok().map(|crud| {
-                    if let EntryDhtStatus::Live = crud {
-                        Search::Found(entry)
-                    } else {
-                        Search::NotInCascade
-                    }
-                })
+                self.primary_meta
+                    .get_crud(entry_hash.clone())
+                    .ok()
+                    .map(|crud| {
+                        if let EntryDhtStatus::Live = crud {
+                            Search::Found(entry)
+                        } else {
+                            Search::NotInCascade
+                        }
+                    })
             })
             .unwrap_or_else(|| Search::Continue);
 

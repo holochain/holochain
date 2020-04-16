@@ -8,8 +8,8 @@ use crate::{
     signature::Provenance,
     time::Iso8601,
 };
-use holo_hash_core::HeaderHash;
 use holo_hash_core::EntryHash;
+use holo_hash_core::HeaderHash;
 
 /// ChainHeader + Entry.
 pub struct HeaderWithEntry(ChainHeader, Entry);
@@ -178,7 +178,12 @@ pub mod tests {
     pub fn test_chain_header_b() -> ChainHeader {
         ChainHeader::new(
             test_entry_type_b(),
-            EntryHash::new(SerializedBytes::try_from(test_entry_b()).unwrap().bytes().to_vec()),
+            EntryHash::new(
+                SerializedBytes::try_from(test_entry_b())
+                    .unwrap()
+                    .bytes()
+                    .to_vec(),
+            ),
             &test_provenances("sig"),
             None,
             None,
