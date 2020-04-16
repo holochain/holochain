@@ -47,12 +47,10 @@
 
 use rust_sodium_holochain_fork_sys as rust_sodium_sys;
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use futures::future::{BoxFuture, FutureExt};
+use once_cell::sync::OnceCell;
 
 #[macro_use]
 mod macros;
@@ -123,7 +121,7 @@ mod tests {
                 "{:?}",
                 blake2b_simd::Params::new()
                     .hash_length(16)
-                    .hash(&vec![0; 8])
+                    .hash(&[0; 8])
                     .as_bytes(),
             ),
         );
@@ -140,7 +138,7 @@ mod tests {
             );
 
             let loc = crypto_dht_location(&mut buf).await.unwrap();
-            assert_eq!(3917265024, loc);
+            assert_eq!(3_917_265_024, loc);
         })
         .await
         .unwrap();
@@ -148,9 +146,7 @@ mod tests {
 
     #[test]
     fn double_check_same_blake2b_loc() {
-        let hash = blake2b_simd::Params::new()
-            .hash_length(16)
-            .hash(&vec![0; 8]);
+        let hash = blake2b_simd::Params::new().hash_length(16).hash(&[0; 8]);
         let hash = hash.as_bytes();
         let mut out: [u8; 4] = [hash[0], hash[1], hash[2], hash[3]];
         for i in (4..16).step_by(4) {
@@ -163,7 +159,7 @@ mod tests {
             + ((out[1] as u32) << 8)
             + ((out[2] as u32) << 16)
             + ((out[3] as u32) << 24);
-        assert_eq!(3917265024, loc);
+        assert_eq!(3_917_265_024, loc);
     }
 
     #[tokio::test(threaded_scheduler)]

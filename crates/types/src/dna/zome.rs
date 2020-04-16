@@ -164,7 +164,7 @@ pub mod tests {
         );
         assert_eq!(actual.fn_declarations.len(), 1);
 
-        let mut expected = base.clone();
+        let mut expected = base;
         expected.fn_declarations.push(FnDeclaration {
             name: String::from("hello"),
             inputs: vec![],

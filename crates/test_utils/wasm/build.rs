@@ -43,6 +43,5 @@ fn main() {
             .unwrap();
 
         assert!(status.success());
-
     }
 }

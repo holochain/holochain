@@ -338,10 +338,7 @@ pub mod tests {
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
             debug!(?forward);
-            assert_eq!(
-                forward,
-                vec![("a".as_bytes(), V(1)), ("c".as_bytes(), V(3))]
-            );
+            assert_eq!(forward, vec![(&b"a"[..], V(1)), (&b"c"[..], V(3))],);
             Ok(())
         })
     }
@@ -379,10 +376,7 @@ pub mod tests {
             let buf: KvBuf<&str, _> = KvBuf::new(&reader, db).unwrap();
 
             let forward: Vec<_> = buf.iter_raw().unwrap().collect();
-            assert_eq!(
-                forward,
-                vec![("a".as_bytes(), V(5)), ("c".as_bytes(), V(9))]
-            );
+            assert_eq!(forward, vec![(&b"a"[..], V(5)), (&b"c"[..], V(9))]);
             Ok(())
         })
     }
