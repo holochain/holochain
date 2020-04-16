@@ -129,7 +129,7 @@ async fn async_main() {
         let api = RealAppInterfaceApi::new(conductor);
         interface_example(api).await;
     } else {
-        println!("Conductor successfully initialized.");
+        info!("Conductor successfully initialized.");
         // kick off actual conductor task here
         conductor
             .wait()
