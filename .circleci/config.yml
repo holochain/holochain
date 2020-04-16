@@ -52,14 +52,14 @@ workflows:
  docker-builds:
   triggers:
    - schedule:
-    cron: "0 0 * * *"
-    filters:
-     branches:
-      only:
-       - develop
-       - master
+      cron: "0 0 * * *"
+      filters:
+       branches:
+        only:
+         - develop
+         - master
   jobs:
    - docker-build-latest
    - docker-build-circle-build:
-    requires:
-     - docker-build-latest
+      requires:
+       - docker-build-latest
