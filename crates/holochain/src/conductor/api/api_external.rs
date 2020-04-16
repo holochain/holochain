@@ -173,7 +173,7 @@ impl InterfaceApi for RealAdminInterfaceApi {
             self.conductor_handle
                 .read()
                 .await
-            // Make sure the conductor is not in the process of shutting down
+                // Make sure the conductor is not in the process of shutting down
                 .check_running()
                 .map_err(InterfaceError::RequestHandler)?;
         }
@@ -297,7 +297,7 @@ pub enum AppRequest {
 pub enum AdminRequest {
     /// Start a cell running
     Start(CellHandle),
-    /// Stop a cell running 
+    /// Stop a cell running
     Stop(CellHandle),
     /// Install a [Dna] from a path
     InstallDna(PathBuf),

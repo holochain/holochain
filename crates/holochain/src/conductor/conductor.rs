@@ -73,7 +73,7 @@ impl ConductorHandle {
     }
 
     /// Wait on the main running tasks
-    /// This will not be `Ready` until everything is done 
+    /// This will not be `Ready` until everything is done
     /// Useful as a main point to keep the program alive.
     pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
         let task_manager_run_handle = {

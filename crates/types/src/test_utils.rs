@@ -15,8 +15,8 @@ use crate::{
     prelude::*,
     signature::{Provenance, Signature},
 };
-use sx_zome_types::ZomeExternHostInput;
 use std::{collections::BTreeMap, path::PathBuf};
+use sx_zome_types::ZomeExternHostInput;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {
