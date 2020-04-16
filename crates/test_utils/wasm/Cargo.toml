@@ -11,7 +11,3 @@ path = "./src/lib.rs"
 
 [dependencies]
 sx_types = { path = "../../types" }
-
-[patch.crates-io]
-holochain_serialized_bytes = { version = "=0.0.36", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
-holochain_serialized_bytes_derive = { version = "=0.0.36", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }

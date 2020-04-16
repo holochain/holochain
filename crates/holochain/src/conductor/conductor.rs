@@ -194,6 +194,7 @@ impl Conductor {
         }
     }
 
+    /// Returns a port that was chosen by the OS
     pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
         self.admin_websocket_ports.get(0).copied()
     }

@@ -22,6 +22,7 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
     type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
     /// Which response is sent to the above request
     type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    /// Handle a request on this API
     async fn handle_request(
         &self,
         request: Result<Self::ApiRequest, SerializedBytesError>,
@@ -84,7 +85,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     }
 }
 
-/// The admin interface that external conections
+/// The admin interface that external connections
 /// can use to make requests to the conductor
 /// The concrete (non-mock) implementation of the AdminInterfaceApi
 #[derive(Clone)]
@@ -253,11 +254,18 @@ pub enum AppResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminResponse {
+    /// This response is unimplemented
     Unimplemented(AdminRequest),
+    /// [Dna] has successfully been installed
     DnaInstalled,
+    /// A list of all installed [Dna]s
     ListDnas(Vec<Address>),
+    /// An error has ocurred in this request
     Error {
+        /// The error as a string
         debug: String,
+        /// A simplified version of the error
+        /// Useful for reacting to an error
         error_type: AdminInterfaceErrorKind,
     },
 }
@@ -287,9 +295,13 @@ pub enum AppRequest {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminRequest {
+    /// Start a cell running
     Start(CellHandle),
+    /// Stop a cell running 
     Stop(CellHandle),
+    /// Install a [Dna] from a path
     InstallDna(PathBuf),
+    /// List all installed [Dna]s
     ListDnas,
 }
 
