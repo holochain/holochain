@@ -18,10 +18,8 @@ commands:
       command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
-  # must be called build
-  build:
+  merge-test:
     docker:
-   # - image: holochain/holochain-2020:circle.build.2020-04-15-dockerz
      - image: holochain/holochain-2020:circle.build.2020-04-15-dockerz
        auth:
         username: $DOCKER_USER
@@ -50,6 +48,18 @@ workflows:
  version: 2.1
  tests:
   jobs:
-   - build
+   - merge-test
+ docker-builds:
+  triggers:
+   - schedule:
+    chron: "0 0 * * *"
+    filters:
+     branches:
+      only:
+       - develop
+       - master
+  jobs:
    - docker-build-latest
-   - docker-build-circle-build
+   - docker-build-circle-build:
+    requires:
+     - docker-build-latest
