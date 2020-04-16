@@ -126,7 +126,7 @@ async fn async_main() {
 
     if opt.run_interface_example {
         // Create an external API to hand off to any Interfaces
-        let api = StdAppInterfaceApi::new(conductor);
+        let api = RealAppInterfaceApi::new(conductor);
         interface_example(api).await;
     } else {
         println!("Conductor successfully initialized.");
@@ -193,7 +193,7 @@ a valid default configuration. Details:
 /// Simple example of what an [Interface] looks like in its most basic form,
 /// and how to interact with it.
 /// TODO: remove once we have real Interfaces
-async fn interface_example(api: StdAppInterfaceApi) {
+async fn interface_example(api: RealAppInterfaceApi) {
     let (mut sender, join_handle) = create_demo_channel_interface(api);
     let driver_fut = async move {
         for _ in 0..50 as u32 {

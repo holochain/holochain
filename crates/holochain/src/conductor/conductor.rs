@@ -72,11 +72,10 @@ impl ConductorHandle {
         conductor.shutdown();
     }
 
-    // TODO Maybe this should be private and called from within the shutdown function?
-    /// After a shutdown call await on the task manager
+    /// Wait on the main running tasks
+    /// This will not be `Ready` until everything is done 
+    /// Useful as a main point to keep the program alive.
     pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
-        // TODO: TEST: Make sure the write lock is not held for the await
-        // Doesn't the {} block make that true?
         let task_manager_run_handle = {
             let mut conductor = self.0.write().await;
             conductor.wait()
@@ -267,7 +266,7 @@ mod builder {
 
     use super::*;
     use crate::conductor::{
-        api::StdAdminInterfaceApi,
+        api::RealAdminInterfaceApi,
         config::AdminInterfaceConfig,
         interface::{
             error::InterfaceResult,
@@ -323,7 +322,7 @@ mod builder {
         stop_tx: StopBroadcaster,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
-        let admin_api = StdAdminInterfaceApi::new(conductor_mutex.clone().into());
+        let admin_api = RealAdminInterfaceApi::new(conductor_mutex.clone().into());
 
         // Closure to process each admin config item
         let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {

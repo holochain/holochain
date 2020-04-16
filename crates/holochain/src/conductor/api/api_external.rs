@@ -30,7 +30,7 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
 }
 
 /// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.  
-/// This trait has a one mock implementation and one "Std" implementation
+/// This trait has a one mock implementation and one "Real" implementation
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
@@ -89,18 +89,18 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 /// can use to make requests to the conductor
 /// The concrete (non-mock) implementation of the AdminInterfaceApi
 #[derive(Clone)]
-pub struct StdAdminInterfaceApi {
+pub struct RealAdminInterfaceApi {
     /// Mutable access to the Conductor
     conductor_handle: ConductorHandle,
 
     /// Needed to spawn an App interface
-    app_api: StdAppInterfaceApi,
+    app_api: RealAppInterfaceApi,
 }
 
-impl StdAdminInterfaceApi {
+impl RealAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
-        let app_api = StdAppInterfaceApi::new(conductor_handle.clone());
-        StdAdminInterfaceApi {
+        let app_api = RealAppInterfaceApi::new(conductor_handle.clone());
+        RealAdminInterfaceApi {
             conductor_handle,
             app_api,
         }
@@ -147,7 +147,7 @@ impl StdAdminInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl AdminInterfaceApi for StdAdminInterfaceApi {
+impl AdminInterfaceApi for RealAdminInterfaceApi {
     async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
         use AdminRequest::*;
         match request {
@@ -160,7 +160,7 @@ impl AdminInterfaceApi for StdAdminInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl InterfaceApi for StdAdminInterfaceApi {
+impl InterfaceApi for RealAdminInterfaceApi {
     type ApiRequest = AdminRequest;
     type ApiResponse = AdminResponse;
 
@@ -190,11 +190,11 @@ impl InterfaceApi for StdAdminInterfaceApi {
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
 #[derive(Clone)]
-pub struct StdAppInterfaceApi {
+pub struct RealAppInterfaceApi {
     conductor_handle: ConductorHandle,
 }
 
-impl StdAppInterfaceApi {
+impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_handle: ConductorHandle) -> Self {
         Self { conductor_handle }
@@ -202,7 +202,7 @@ impl StdAppInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl AppInterfaceApi for StdAppInterfaceApi {
+impl AppInterfaceApi for RealAppInterfaceApi {
     async fn invoke_zome(
         &self,
         _invocation: ZomeInvocation,
@@ -213,7 +213,7 @@ impl AppInterfaceApi for StdAppInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl InterfaceApi for StdAppInterfaceApi {
+impl InterfaceApi for RealAppInterfaceApi {
     type ApiRequest = AppRequest;
     type ApiResponse = AppResponse;
     async fn handle_request(
@@ -340,7 +340,7 @@ mod test {
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
         let conductor = Conductor::build().test().await?;
-        let admin_api = StdAdminInterfaceApi::new(conductor);
+        let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
         let dna_address = dna.address();
@@ -356,7 +356,7 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
         let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
-        let result = StdAdminInterfaceApi::read_parse_dna(dna_path).await?;
+        let result = RealAdminInterfaceApi::read_parse_dna(dna_path).await?;
         assert_eq!(dna, result);
         Ok(())
     }

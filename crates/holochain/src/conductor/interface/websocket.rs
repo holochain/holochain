@@ -235,7 +235,7 @@ mod test {
     use super::*;
     use crate::conductor::interface::error::AdminInterfaceErrorKind;
     use crate::conductor::{
-        api::{AdminRequest, AdminResponse, StdAdminInterfaceApi},
+        api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
         Conductor,
     };
     use futures::future::FutureExt;
@@ -251,9 +251,9 @@ mod test {
         InstallsDna(String),
     }
 
-    async fn setup() -> StdAdminInterfaceApi {
+    async fn setup() -> RealAdminInterfaceApi {
         let conductor = Conductor::build().test().await.unwrap();
-        StdAdminInterfaceApi::new(conductor)
+        RealAdminInterfaceApi::new(conductor)
     }
 
     #[tokio::test]
