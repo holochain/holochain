@@ -131,6 +131,8 @@ pub enum EnvironmentKind {
     Cell(CellId),
     /// Specifies the environment used by a Conductor
     Conductor,
+    /// Specifies the environment used to save wasm
+    Wasm,
 }
 
 impl EnvironmentKind {
@@ -139,6 +141,7 @@ impl EnvironmentKind {
         match self {
             EnvironmentKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
             EnvironmentKind::Conductor => PathBuf::from("conductor"),
+            EnvironmentKind::Wasm => PathBuf::from("wasm"),
         }
     }
 }
