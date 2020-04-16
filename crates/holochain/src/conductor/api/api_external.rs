@@ -119,7 +119,7 @@ impl RealAdminInterfaceApi {
         self.conductor_handle
             .write()
             .await
-            .fake_dna_cache
+            .dna_cache()
             .insert(dna.address(), dna);
         Ok(())
     }
@@ -138,7 +138,7 @@ impl RealAdminInterfaceApi {
             .conductor_handle
             .read()
             .await
-            .fake_dna_cache
+            .dna_cache()
             .keys()
             .cloned()
             .collect::<Vec<_>>();
@@ -331,7 +331,7 @@ pub struct AddAgentArgs {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::Conductor;
+    use crate::conductor::conductor::Runtime;
     use anyhow::Result;
     use matches::assert_matches;
     use sx_types::test_utils::{fake_dna, fake_dna_file};
@@ -339,7 +339,7 @@ mod test {
 
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
-        let conductor = Conductor::build().test().await?;
+        let conductor = Runtime::build().test().await?;
         let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());

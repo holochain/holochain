@@ -236,7 +236,7 @@ mod test {
     use crate::conductor::interface::error::AdminInterfaceErrorKind;
     use crate::conductor::{
         api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
-        Conductor,
+        Conductor, Runtime,
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
@@ -252,7 +252,7 @@ mod test {
     }
 
     async fn setup() -> RealAdminInterfaceApi {
-        let conductor = Conductor::build().test().await.unwrap();
+        let conductor = Runtime::build().test().await.unwrap();
         RealAdminInterfaceApi::new(conductor)
     }
 
