@@ -1,0 +1,13 @@
+FROM holochain/holonix:latest
+
+WORKDIR /holochain-2020/build
+ENV NIX_ENV_PREFIX /holochain-2020/build
+
+ARG DOCKER_BRANCH=develop
+ARG GITHUB_ACCESS_TOKEN=xxxx
+
+ADD https://api.github.com/repos/Holo-Host/holochain-2020/tarball/$DOCKER_BRANCH?access_token=$GITHUB_ACCESS_TOKEN /holochain-2020/build/$DOCKER_BRANCH.tar.gz
+RUN tar --strip-components=1 -zxvf $DOCKER_BRANCH.tar.gz
+
+# warm things
+RUN nix-shell --run echo
