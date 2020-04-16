@@ -1,6 +1,12 @@
 use crate::*;
 
-mod safe_mem_copy;
+pub(crate) fn mem_copy(dst: &mut [u8], dst_offset: usize, src: &[u8]) -> CryptoResult<()> {
+    let dst_subslice = dst
+        .get_mut(dst_offset..dst_offset + src.len())
+        .ok_or(CryptoError::WriteOverflow)?;
+    dst_subslice.copy_from_slice(src);
+    Ok(())
+}
 
 /// read guard for crypto bytes
 pub trait CryptoBytesRead<'lt>: 'lt + std::ops::Deref<Target = [u8]> {}
@@ -33,7 +39,7 @@ pub trait CryptoBytes: 'static + Send + std::fmt::Debug {
 
     /// copy data from another byte array into this buffer
     fn copy_from(&mut self, offset: usize, data: &[u8]) -> CryptoResult<()> {
-        safe_mem_copy::safe_mem_copy(&mut self.write(), offset, data)
+        mem_copy(&mut self.write(), offset, data)
     }
 }
 
