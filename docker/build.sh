@@ -4,7 +4,7 @@ set -euxo pipefail
 
 owner=holochain
 repo=holochain-2020
-box=${1:-sim2h_server}
+box=${1:-latest}
 branch=${2:-$( git rev-parse --abbrev-ref HEAD )}
 tag="$owner/$repo:$box.$branch"
 
