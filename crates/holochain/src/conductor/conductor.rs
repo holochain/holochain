@@ -11,6 +11,7 @@
 
 use super::{
     api::{AdminInterfaceApi, AppInterfaceApi},
+    dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
     manager::{spawn_task_manager, ManagedTaskAdd, TaskManagerRunHandle},
     state::ConductorState,
@@ -19,6 +20,7 @@ use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
     cell::{Cell, NetSender},
     config::ConductorConfig,
+    dna_store::MockDnaStore,
     error::ConductorResult,
 };
 pub use builder::*;
@@ -66,6 +68,12 @@ pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 pub struct ConductorHandle(Arc<RwLock<Box<dyn Conductor + Send + Sync>>>);
 
 impl ConductorHandle {
+    /// Creates new handle
+    pub fn new<DS: DnaStore + 'static>(conductor: Runtime<DS>) -> Self {
+        let conductor_handle: Arc<RwLock<Box<dyn Conductor + Send + Sync>>> =
+            Arc::new(RwLock::new(Box::new(conductor)));
+        ConductorHandle(conductor_handle)
+    }
     /// End all tasks run by the Conductor.
     pub async fn shutdown(self) {
         let mut conductor = self.0.write().await;
@@ -94,17 +102,11 @@ impl ConductorHandle {
     }
 }
 
-impl From<Arc<RwLock<Box<Runtime>>>> for ConductorHandle {
-    fn from(runtime: Arc<RwLock<Box<Runtime>>>) -> Self {
-        ConductorHandle(runtime)
-    }
-}
-
-/// Placeholder for real cache
-pub type FakeDnaCache = HashMap<Address, Dna>;
-
 /// A Conductor is a group of [Cell]s
-pub struct Runtime {
+pub struct Runtime<DS = RealDnaStore>
+where
+    DS: DnaStore,
+{
     /// The collection of cells associated with this Conductor
     cells: HashMap<CellId, CellItem>,
 
@@ -140,11 +142,24 @@ pub struct Runtime {
     task_manager_run_handle: Option<TaskManagerRunHandle>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
-    pub(super) fake_dna_cache: FakeDnaCache,
+    dna_store: DS,
 }
 
 impl Runtime {
-    async fn new(env: Environment) -> ConductorResult<Runtime> {
+    /// Create a conductor builder
+    pub fn builder() -> ConductorBuilder {
+        ConductorBuilder::new()
+    }
+}
+
+impl Runtime<MockDnaStore> {
+}
+
+impl<DS> Runtime<DS>
+where
+    DS: DnaStore,
+{
+    async fn new(env: Environment, dna_store: DS) -> ConductorResult<Self> {
         let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
@@ -160,15 +175,9 @@ impl Runtime {
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,
             admin_websocket_ports: Vec::new(),
-            fake_dna_cache: HashMap::new(),
+            dna_store,
         })
     }
-
-    /// Create a conductor builder
-    pub fn build() -> ConductorBuilder {
-        ConductorBuilder::new()
-    }
-    
     // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
     // the Conductor handle (from where this could be called)
     #[allow(dead_code)]
@@ -210,6 +219,7 @@ impl Runtime {
     }
 }
 
+#[allow(missing_docs)]
 #[async_trait::async_trait]
 pub trait Conductor {
     fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell>;
@@ -220,11 +230,16 @@ pub trait Conductor {
     fn shutdown(&mut self);
     fn wait(&mut self) -> Option<TaskManagerRunHandle>;
     async fn get_state(&self) -> ConductorResult<ConductorState>;
-    fn dna_cache(&mut self) -> &mut FakeDnaCache;
+    fn dna_cache(&self) -> &dyn DnaStore;
+    fn dna_cache_mut(&mut self) -> &mut dyn DnaStore;
+    fn add_admin_port(&mut self, port: u16);
 }
 
 #[async_trait::async_trait]
-impl Conductor for Runtime {
+impl<DS> Conductor for Runtime<DS>
+where
+    DS: DnaStore,
+{
     fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
         let item = self
             .cells
@@ -274,18 +289,24 @@ impl Conductor for Runtime {
         self.task_manager_run_handle.take()
     }
 
-
     #[allow(dead_code)]
     async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
-    
-    fn dna_cache(&mut self) -> &mut FakeDnaCache {
-        &mut self.fake_dna_cache
+
+    fn dna_cache(&self) -> &dyn DnaStore {
+        &self.dna_store
     }
 
+    fn dna_cache_mut(&mut self) -> &mut dyn DnaStore {
+        &mut self.dna_store
+    }
+
+    fn add_admin_port(&mut self, port: u16) {
+        self.admin_websocket_ports.push(port);
+    }
 }
 
 type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
@@ -296,6 +317,7 @@ mod builder {
     use crate::conductor::{
         api::RealAdminInterfaceApi,
         config::AdminInterfaceConfig,
+        dna_store::RealDnaStore,
         interface::{
             error::InterfaceResult,
             websocket::{spawn_admin_interface_task, spawn_websocket_listener},
@@ -304,49 +326,65 @@ mod builder {
         manager::{keep_alive_task, ManagedTaskHandle},
     };
     use futures::future;
-    use std::sync::Arc;
+    use std::{marker::PhantomData, sync::Arc};
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
     use tokio::sync::RwLock;
 
     #[derive(Default)]
-    pub struct ConductorBuilder {}
+    pub struct ConductorBuilder<DS = RealDnaStore> {
+        dna_store: DS,
+    }
 
     impl ConductorBuilder {
         pub fn new() -> Self {
-            Self {}
+            ConductorBuilder{ dna_store: RealDnaStore::new() }
         }
+        
+    }
+    
+    impl ConductorBuilder<MockDnaStore> {
+        pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
+            ConductorBuilder{ dna_store }
+        }
+    }
 
+    impl<DS> ConductorBuilder<DS>
+    where
+        DS: DnaStore + 'static,
+    {
         pub async fn with_config(
             self,
             config: ConductorConfig,
         ) -> ConductorResult<ConductorHandle> {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            let conductor = Runtime::new(environment).await?;
+            let conductor = Runtime::new(environment, self.dna_store).await?;
             let stop_tx = conductor.managed_task_stop_broadcaster.clone();
-            let conductor_mutex = Arc::new(RwLock::new(Box::new(conductor)));
+            let conductor_handle = ConductorHandle::new(conductor);
 
             setup_admin_interfaces_from_config(
-                conductor_mutex.clone(),
+                conductor_handle.clone(),
                 stop_tx,
                 config.admin_interfaces.unwrap_or_default(),
             )
             .await?;
 
-            Ok(conductor_mutex.into())
+            Ok(conductor_handle)
         }
+
 
         pub async fn test(self) -> ConductorResult<ConductorHandle> {
             let environment = test_conductor_env();
-            let conductor = Runtime::new(environment).await?;
-            Ok(Arc::new(RwLock::new(Box::new(conductor))).into())
+            let conductor = Runtime::new(environment, self.dna_store).await?;
+            let conductor_handle = ConductorHandle::new(conductor);
+            Ok(conductor_handle)
         }
     }
 
     /// Spawn all admin interface tasks, register them with the TaskManager,
     /// and modify the conductor accordingly, based on the config passed in
     async fn setup_admin_interfaces_from_config(
-        conductor_mutex: Arc<RwLock<Box<Runtime>>>,
+        conductor_mutex: ConductorHandle,
         stop_tx: StopBroadcaster,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
@@ -414,7 +452,9 @@ mod builder {
                     ))
                     .await?
             }
-            conductor.admin_websocket_ports = ports;
+            for p in ports {
+                conductor.add_admin_port(p);
+            }
         }
         Ok(())
     }
@@ -423,7 +463,7 @@ mod builder {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{Runtime, ConductorState};
+    use super::{ConductorState, Runtime};
     use crate::conductor::state::CellConfig;
 
     /*

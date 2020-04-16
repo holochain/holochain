@@ -5,7 +5,7 @@ use holochain_2020::conductor::{
     api::{AdminRequest, AdminResponse},
     config::*,
     error::ConductorError,
-    Conductor, ConductorHandle,
+    Conductor, ConductorHandle, Runtime,
 };
 use holochain_websocket::*;
 use matches::assert_matches;
@@ -164,7 +164,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
-    let conductor_handle = Conductor::build().with_config(config).await?;
+    let conductor_handle = Runtime::builder().with_config(config).await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
     let (fake_dna_path, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
@@ -184,7 +184,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
-    let conductor_handle = Conductor::build().with_config(config).await?;
+    let conductor_handle = Runtime::builder().with_config(config).await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let (mut client, rx): (WebsocketSender, WebsocketReceiver) = websocket_connect(

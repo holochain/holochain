@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::conductor::error::ConductorError;
+use crate::conductor::{dna_store::error::DnaStoreError, error::ConductorError};
 use sx_types::cell::CellId;
 use thiserror::Error;
 
@@ -27,6 +27,10 @@ pub enum ConductorApiError {
     /// Serialization error
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
+
+    /// Database Error
+    #[error("Database error: {0:?}")]
+    Db(#[from] DnaStoreError),
 }
 
 /// All the serialization errors that can occur

@@ -1,4 +1,4 @@
-use crate::conductor::{api::error::ConductorApiError, error::ConductorError};
+use crate::conductor::{api::error::ConductorApiError, error::ConductorError, dna_store::error::DnaStoreError};
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytesError;
 
@@ -49,6 +49,7 @@ pub enum AdminInterfaceErrorKind {
     Runtime,
     BadRequest,
     Other,
+    Cache,
 }
 
 impl From<InterfaceError> for AdminInterfaceErrorKind {
@@ -77,6 +78,7 @@ impl From<ConductorApiError> for AdminInterfaceErrorKind {
             ConductorApiError::Todo(_) => Other,
             ConductorApiError::Io(_) => Io,
             ConductorApiError::SerializationError(_) => Serialization,
+            ConductorApiError::Db(_) => Cache
         }
     }
 }

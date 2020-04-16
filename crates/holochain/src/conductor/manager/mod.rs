@@ -30,7 +30,7 @@ pub(crate) type OnDeath =
 
 /// A message sent to the TaskManager, registering a closure to run upon
 /// completion of a task
-pub(crate) struct ManagedTaskAdd {
+pub struct ManagedTaskAdd {
     handle: ManagedTaskHandle,
     // TODO: B-01455: reevaluate wether this should be a callback
     on_death: Option<OnDeath>,
