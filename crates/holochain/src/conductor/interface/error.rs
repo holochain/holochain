@@ -1,4 +1,5 @@
-use crate::conductor::error::ConductorError;
+use crate::conductor::{api::error::ConductorApiError, error::ConductorError};
+use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytesError;
 
 /// Interface Error Type
@@ -11,6 +12,7 @@ pub enum InterfaceError {
     UnexpectedMessage(String),
     SendError,
     Other(String),
+    Closed,
     // FIXME: update error types in holochain_websocket to use a more specific
     // type than io::Error
     IoTodo(#[from] std::io::Error),
@@ -36,3 +38,45 @@ impl From<futures::channel::mpsc::SendError> for InterfaceError {
 
 /// Interface Result Type
 pub type InterfaceResult<T> = Result<T, InterfaceError>;
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
+pub enum AdminInterfaceErrorKind {
+    Serialization,
+    Cell,
+    Conductor,
+    Io,
+    Runtime,
+    BadRequest,
+    Other,
+}
+
+impl From<InterfaceError> for AdminInterfaceErrorKind {
+    fn from(error: InterfaceError) -> Self {
+        use AdminInterfaceErrorKind::*;
+        match error {
+            InterfaceError::SerializedBytes(_) => Serialization,
+            InterfaceError::JoinError(_) => Runtime,
+            InterfaceError::SignalReceive(_) => Runtime,
+            InterfaceError::RequestHandler(_) => Conductor,
+            InterfaceError::UnexpectedMessage(_) => BadRequest,
+            InterfaceError::SendError => Io,
+            InterfaceError::Other(_) => Other,
+            InterfaceError::IoTodo(_) => Other,
+            InterfaceError::Closed => unreachable!(),
+        }
+    }
+}
+
+impl From<ConductorApiError> for AdminInterfaceErrorKind {
+    fn from(e: ConductorApiError) -> Self {
+        use AdminInterfaceErrorKind::*;
+        match e {
+            ConductorApiError::CellMissing(_) => Cell,
+            ConductorApiError::ConductorError(_) => Conductor,
+            ConductorApiError::Todo(_) => Other,
+            ConductorApiError::Io(_) => Io,
+            ConductorApiError::SerializationError(_) => Serialization,
+        }
+    }
+}

@@ -15,8 +15,8 @@ use crate::{
     prelude::*,
     signature::{Provenance, Signature},
 };
-use std::collections::BTreeMap;
 use sx_zome_types::ZomeExternHostInput;
+use std::{collections::BTreeMap, path::PathBuf};
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {
@@ -96,6 +96,15 @@ pub fn fake_dna(uuid: &str) -> Dna {
         },
         dna_spec_version: Default::default(),
     }
+}
+
+/// Save a Dna to a file and return the path and tempdir that contains it
+pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+    let tmp_dir = tempdir::TempDir::new("fake_dna")?;
+    let mut path: PathBuf = tmp_dir.path().into();
+    path.push("dna");
+    std::fs::write(path.clone(), SerializedBytes::try_from(dna)?.bytes())?;
+    Ok((path, tmp_dir))
 }
 
 /// A fixture example CellId for unit testing.

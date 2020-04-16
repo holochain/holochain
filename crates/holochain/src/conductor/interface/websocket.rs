@@ -20,48 +20,9 @@ use tokio::sync::broadcast;
 use tracing::*;
 use url2::url2;
 
-// #[derive(Debug, Clone)]
-// pub enum InterfaceMsg {
-//     CreateAdmin {
-//         api: Box<dyn InterfaceApi<ApiRequest = AdminRequest, ApiResponse = AdminResponse>>,
-//         port: u16,
-//     },
-//     Close,
-// }
-
-// MD: I'm not sure we need to treat the Conductor as an Actor in this way.
-// Seems this was introduced to have a main task that the Conductor runs,
-// but I think there are plenty of tasks that the conductor runs in its normal
-// course of execution, including the interfaces, which will keep it alive and
-// busy.
-//
-// pub async fn manage_interfaces(mut recv_ci: Receiver<InterfaceMsg>) {
-//     use InterfaceMsg::*;
-//     let mut handles = Vec::new();
-//     while let Some(msg) = recv_ci.recv().await {
-//         match msg {
-//             CreateAdmin { api, port } => {
-//                 handles.push(tokio::spawn(spawn_admin_interface_task(api, port)))
-//             }
-//             Close => {
-//                 for h in handles {
-//                     h.await.unwrap_or_else(|e| {
-//                         error!(error = &e as &dyn Error, "Failed to join interface task");
-//                     });
-//                 }
-//                 break;
-//             }
-//         }
-//     }
-// }
-
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub async fn spawn_admin_interface_task<A: InterfaceApi>(
-    port: u16,
-    api: A,
-    stop_rx: StopReceiver,
-) -> InterfaceResult<ManagedTaskHandle> {
+pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
     let listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
@@ -69,11 +30,10 @@ pub async fn spawn_admin_interface_task<A: InterfaceApi>(
     )
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
-
-    build_admin_interface_listener_task(listener, api, stop_rx)
+    Ok(listener)
 }
 
-fn build_admin_interface_listener_task<A: InterfaceApi>(
+pub fn spawn_admin_interface_task<A: InterfaceApi>(
     mut listener: WebsocketListener,
     api: A,
     mut stop_rx: StopReceiver,
@@ -186,8 +146,10 @@ pub fn create_demo_channel_interface<A: AppInterfaceApi>(
 /// Used by Admin interface.
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut recv_socket: WebsocketReceiver) {
     while let Some(msg) = recv_socket.next().await {
-        if let Err(_todo) = handle_incoming_message(msg, api.clone()).await {
-            break;
+        match handle_incoming_message(msg, api.clone()).await {
+            Err(InterfaceError::Closed) => break,
+            Err(e) => error!(error = &e as &dyn std::error::Error),
+            Ok(()) => (),
         }
     }
 }
@@ -248,12 +210,85 @@ where
 {
     match ws_msg {
         WebsocketMessage::Request(bytes, respond) => {
-            Ok(respond(api.handle_request(bytes.try_into()?).await?.try_into()?).await?)
+            Ok(respond(api.handle_request(bytes.try_into()).await?.try_into()?).await?)
         }
-        // FIXME this will kill this interface, is that what we want?
-        WebsocketMessage::Signal(_) => Err(InterfaceError::UnexpectedMessage(
-            "Got an unexpected Signal while handing incoming message".to_string(),
-        )),
-        WebsocketMessage::Close(_) => unimplemented!(),
+        WebsocketMessage::Signal(msg) => {
+            error!(msg = ?msg, "Got an unexpected Signal while handing incoming message");
+            Ok(())
+        }
+        WebsocketMessage::Close(_) => Err(InterfaceError::Closed),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::conductor::interface::error::AdminInterfaceErrorKind;
+    use crate::conductor::{
+        api::{AdminRequest, AdminResponse, StdAdminInterfaceApi},
+        Conductor,
+    };
+    use futures::future::FutureExt;
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_websocket::WebsocketMessage;
+    use matches::assert_matches;
+    use std::convert::TryInto;
+    use sx_types::observability;
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+    #[serde(rename = "snake-case", tag = "type", content = "data")]
+    enum AdmonRequest {
+        InstallsDna(String),
+    }
+
+    async fn setup() -> StdAdminInterfaceApi {
+        let conductor = Conductor::build().test().await.unwrap();
+        StdAdminInterfaceApi::new(conductor)
+    }
+
+    #[tokio::test]
+    async fn serialization_failure() {
+        let admin_api = setup().await;
+        let msg = AdmonRequest::InstallsDna("".into());
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Serialization, ..});
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn invalid_request() {
+        observability::test_run().ok();
+        let admin_api = setup().await;
+        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into());
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Io, ..});
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap()
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn cache_failure() {
+        // TODO: B-01440: this can't be done easily yet
+        // because we can't cause the cache to fail from an input
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn deserialization_failure() {
+        // TODO: B-01440: this can't be done easily yet
+        // because we can't serialize something that
+        // doesn't deserialize
     }
 }

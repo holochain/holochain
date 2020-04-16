@@ -46,6 +46,7 @@ derive_more = "0.99.3"
 directories = "2.0.2"
 human-panic = "1.0.3"
 num_cpus = "1.8"
+uuid = { version = "0.7", features = ["serde", "v4"] }
 
 [dev-dependencies]
 anyhow = "1.0.26"
@@ -55,6 +56,7 @@ assert_cmd = "1.0.1"
 sx_wasm_test_utils = { path = "../../test_utils/wasm" }
 test_wasm_common = { path = "../../test_utils/wasm_common" }
 maplit = "1.0.2"
+matches = "0.1.8"
 
 [lib]
 name = "holochain_2020"

@@ -31,6 +31,10 @@ holochain_wasmer_common = "=0.0.24"
 sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
 sx_zome_types = { path = "../zome_types" }
 
+# for test_utils
+anyhow = "1.0.26"
+tempdir = "0.3.7"
+
 # possibly dispensable
 multihash = "0.8.0"
 maplit = "1.0.2"
