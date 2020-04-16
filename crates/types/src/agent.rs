@@ -15,7 +15,7 @@ pub enum AgentError {
 /// Agent Result Type
 pub type AgentResult<T> = Result<T, AgentError>;
 
-/// A signature produces by an Agent private key
+/// A signature produced by an Agent private key
 #[derive(Serialize, Deserialize, SerializedBytes)]
 pub struct AgentSignature(#[serde(with = "serde_bytes")] Vec<u8>);
 
