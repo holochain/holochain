@@ -164,6 +164,9 @@ core_holo_hash! {
     "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
     EntryHash,
 
+    "Represents a Holo/Holochain HeaderHash - A direct hash of an entry header.",
+    HeaderHash,
+
     "Represents a Holo/Holochain DhtOpHash - The hash used is tuned by dht ops. (uhCQk...)",
     DhtOpHash,
 }

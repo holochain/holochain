@@ -85,6 +85,8 @@
 //! ```
 
 pub use holo_hash_core::HoloHashCoreHash;
+use holochain_serialized_bytes::prelude::*;
+use sx_types::entry::Entry;
 
 /// Holo Hash Error Type.
 #[derive(Debug, thiserror::Error)]
@@ -140,20 +142,20 @@ for (let i = 0x00; i <= 0xff; ++i) {
 }
 ```
 
-hCAk 4100 <Buffer 84 20 24>
-hCEk 4228 <Buffer 84 21 24>
-hCIk 4356 <Buffer 84 22 24>
+hCAk 4100 <Buffer 84 20 24> // agent
+hCEk 4228 <Buffer 84 21 24> // entry
+hCIk 4356 <Buffer 84 22 24> // net id
 hCMk 4484 <Buffer 84 23 24>
-hCQk 4612 <Buffer 84 24 24>
+hCQk 4612 <Buffer 84 24 24> // dht op
 hCUk 4740 <Buffer 84 25 24>
 hCYk 4868 <Buffer 84 26 24>
 hCck 4996 <Buffer 84 27 24>
 hCgk 5124 <Buffer 84 28 24>
-hCkk 5252 <Buffer 84 29 24>
+hCkk 5252 <Buffer 84 29 24> // entry header
 hCok 5380 <Buffer 84 2a 24>
 hCsk 5508 <Buffer 84 2b 24>
 hCwk 5636 <Buffer 84 2c 24>
-hC0k 5764 <Buffer 84 2d 24>
+hC0k 5764 <Buffer 84 2d 24> // dna
 hC4k 5892 <Buffer 84 2e 24>
 hC8k 6020 <Buffer 84 2f 24>
 */
@@ -162,6 +164,7 @@ const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k
 const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
 const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
 const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
+const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk
 const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk
 
 /// internal compute a 32 byte blake2b hash
@@ -224,7 +227,6 @@ fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError> {
 
 /// internal parse helper for HoloHash enum.
 fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
-    use std::convert::TryFrom;
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
@@ -234,6 +236,7 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
         "hCAk" => Ok(HoloHash::AgentHash(AgentHash::try_from(s)?)),
         "hCEk" => Ok(HoloHash::EntryHash(EntryHash::try_from(s)?)),
         "hCQk" => Ok(HoloHash::DhtOpHash(DhtOpHash::try_from(s)?)),
+        "uhCkk" => Ok(HoloHash::HeaderHash(HeaderHash::try_from(s)?)),
         _ => Err(HoloHashError::BadPrefix),
     }
 }
@@ -430,6 +433,12 @@ macro_rules! new_holo_hash {
                 HoloHash::try_from(&s)
             }
         }
+
+        impl ::std::convert::AsRef<[u8]> for HoloHash {
+            fn as_ref(&self) -> &[u8] {
+                self.get_bytes()
+            }
+        }
     };
 }
 
@@ -450,9 +459,20 @@ new_holo_hash! {
     EntryHash,
     ENTRY_PREFIX,
 
+    "Represents a Holo/Holochain HeaderHash - A direct hash of the entry header. (uhCkk...)",
+    HeaderHash,
+    HEADER_PREFIX,
+
     "Represents a Holo/Holochain DhtOpHash - The hash used is tuned by dht ops. (uhCQk...)",
     DhtOpHash,
     DHTOP_PREFIX,
+}
+
+impl TryFrom<sx_types::entry::Entry> for crate::EntryHash {
+    type Error = SerializedBytesError;
+    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
+        Ok(EntryHash::with_data_sync(SerializedBytes::try_from(entry)?.bytes()))
+    }
 }
 
 #[cfg(test)]

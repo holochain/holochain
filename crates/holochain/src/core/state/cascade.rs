@@ -44,8 +44,9 @@ use super::{
 };
 use std::collections::HashSet;
 use sx_state::{error::DatabaseResult, prelude::Reader};
-use sx_types::{entry::Entry, persistence::cas::content::Address};
+use sx_types::{entry::Entry};
 use tracing::*;
+use holo_hash::EntryHash;
 
 #[cfg(test)]
 mod test;
@@ -101,13 +102,13 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get(&self, address: &Address) -> DatabaseResult<Option<Entry>> {
+    pub async fn dht_get(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
             .primary
-            .get_entry(address)?
+            .get_entry(entry_hash.clone())?
             .and_then(|entry| {
-                self.primary_meta.get_crud(&address).ok().map(|crud| {
+                self.primary_meta.get_crud(entry_hash.clone()).ok().map(|crud| {
                     if let EntryDhtStatus::Live = crud {
                         Search::Found(entry)
                     } else {
@@ -119,9 +120,9 @@ where
 
         // Cache
         match search {
-            Search::Continue => Ok(self.cache.get_entry(address)?.and_then(|entry| {
+            Search::Continue => Ok(self.cache.get_entry(entry_hash)?.and_then(|entry| {
                 self.cache_meta
-                    .get_crud(address)
+                    .get_crud(entry_hash)
                     .ok()
                     .and_then(|crud| match crud {
                         EntryDhtStatus::Live => Some(entry),
@@ -139,25 +140,25 @@ where
     // TODO: Implement customization of this behavior with an options/builder struct
     pub async fn dht_get_links<S: Into<String>>(
         &self,
-        base: Address,
+        base: EntryHash,
         tag: S,
-    ) -> DatabaseResult<HashSet<Address>> {
+    ) -> DatabaseResult<HashSet<EntryHash>> {
         // Am I an authority?
-        let authority = self.primary.contains(&base)?;
+        let authority = self.primary.contains(base)?;
         let tag = tag.into();
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(&base, tag.clone())?;
+            let links = self.primary_meta.get_links(base, tag.clone())?;
 
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(&base, tag)
+                self.cache_meta.get_links(base, tag)
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            self.cache_meta.get_links(&base, tag)
+            self.cache_meta.get_links(base, tag)
         }
     }
 }

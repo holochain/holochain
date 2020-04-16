@@ -12,8 +12,9 @@ use sx_state::{
 use sx_types::{
     chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,
-    prelude::Address,
 };
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
 pub type HeaderCas<'env, R> = CasBuf<'env, ChainHeader, R>;
@@ -48,16 +49,16 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         Self::new(reader, entries, headers)
     }
 
-    pub fn get_entry(&self, entry_address: &Address) -> DatabaseResult<Option<Entry>> {
-        self.entries.get(entry_address)
+    pub fn get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+        self.entries.get(&entry_hash.into())
     }
 
-    pub fn contains(&self, entry_address: &Address) -> DatabaseResult<bool> {
-        self.entries.get(entry_address).map(|e| e.is_some())
+    pub fn contains(&self, entry_hash: EntryHash) -> DatabaseResult<bool> {
+        self.entries.get(&entry_hash.into()).map(|e| e.is_some())
     }
 
-    pub fn get_header(&self, header_address: &Address) -> DatabaseResult<Option<ChainHeader>> {
-        self.headers.get(header_address)
+    pub fn get_header(&self, header_hash: HeaderHash) -> DatabaseResult<Option<ChainHeader>> {
+        self.headers.get(&header_hash.into())
     }
 
     /// Given a ChainHeader, return the corresponding HeaderWithEntry
@@ -65,20 +66,20 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header: ChainHeader,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(entry) = self.get_entry(header.entry_address())? {
+        if let Some(entry) = self.get_entry(header.entry_hash())? {
             Ok(Some(HeaderWithEntry::new(header, entry)))
         } else {
             Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(header.entry_address().clone()),
+                ChainInvalidReason::MissingData(header.entry_hash().clone()),
             ))
         }
     }
 
     pub fn get_header_with_entry(
         &self,
-        header_address: &Address,
+        header_hash: &HeaderHash,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(header) = self.get_header(header_address)? {
+        if let Some(header) = self.get_header(header_hash)? {
             self.header_with_entry(header)
         } else {
             Ok(None)
@@ -92,12 +93,12 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     }
 
     // TODO: consolidate into single delete which handles entry and header together
-    pub fn delete_entry(&mut self, k: Address) {
-        self.entries.delete(k)
+    pub fn delete_entry(&mut self, k: EntryHash) {
+        self.entries.delete(k.into())
     }
 
-    pub fn delete_header(&mut self, k: Address) {
-        self.headers.delete(k)
+    pub fn delete_header(&mut self, k: HeaderHash) {
+        self.headers.delete(k.into())
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {

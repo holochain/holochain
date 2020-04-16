@@ -18,6 +18,8 @@ use sx_types::{
     prelude::*,
     signature::{Provenance, Signature},
 };
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -47,12 +49,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.chain_head()
     }
 
-    pub fn get_entry(&self, k: &Address) -> DatabaseResult<Option<Entry>> {
-        self.cas.get_entry(k)
+    pub fn get_entry(&self, k: EntryHash) -> DatabaseResult<Option<Entry>> {
+        self.cas.get_entry(k.into())
     }
 
-    pub fn get_header(&self, k: &Address) -> DatabaseResult<Option<ChainHeader>> {
-        self.cas.get_header(k)
+    pub fn get_header(&self, k: HeaderHash) -> DatabaseResult<Option<ChainHeader>> {
+        self.cas.get_header(k.into())
     }
 
     pub fn cas(&self) -> &ChainCasBuf<R> {

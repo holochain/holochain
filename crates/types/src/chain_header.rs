@@ -8,6 +8,8 @@ use crate::{
     signature::Provenance,
     time::Iso8601,
 };
+use holo_hash_core::HeaderHash;
+use holo_hash_core::EntryHash;
 
 /// ChainHeader + Entry.
 pub struct HeaderWithEntry(ChainHeader, Entry);
@@ -41,16 +43,16 @@ pub struct ChainHeader {
     /// system types may have associated "subconscious" behavior
     entry_type: EntryType,
     /// Key to the entry of this header
-    entry_address: Address,
+    entry_hash: EntryHash,
     /// Address(es) of the agent(s) that authored and signed this entry,
     /// along with their cryptographic signatures
     provenances: Vec<Provenance>,
     /// Key to the immediately preceding header. Only the init Pair can have None as valid
-    link: Option<Address>,
+    prev_header: Option<HeaderHash>,
     /// Key to the most recent header of the same type, None is valid only for the first of that type
-    link_same_type: Option<Address>,
+    prev_same_type: Option<HeaderHash>,
     /// Key to the header of the previous version of this chain header's entry
-    link_crud: Option<Address>,
+    replaced_entry: Option<HeaderHash>,
     /// ISO8601 time stamp
     timestamp: Iso8601,
 }
@@ -72,20 +74,20 @@ impl ChainHeader {
     /// @see chain::entry::Entry
     pub fn new(
         entry_type: EntryType,
-        entry_address: Address,
+        entry_hash: EntryHash,
         provenances: &[Provenance],
-        link: Option<Address>,
-        link_same_type: Option<Address>,
-        link_crud: Option<Address>,
+        prev_header: Option<HeaderHash>,
+        prev_same_type: Option<HeaderHash>,
+        replaced_entry: Option<HeaderHash>,
         timestamp: Iso8601,
     ) -> Self {
         ChainHeader {
             entry_type,
-            entry_address,
+            entry_hash,
             provenances: provenances.to_owned(),
-            link,
-            link_same_type,
-            link_crud,
+            prev_header,
+            prev_same_type,
+            replaced_entry,
             timestamp,
         }
     }
@@ -100,24 +102,24 @@ impl ChainHeader {
         &self.timestamp
     }
 
-    /// link getter
-    pub fn link(&self) -> Option<Address> {
-        self.link.clone()
+    /// prev_header getter
+    pub fn prev_header(&self) -> Option<HeaderHash> {
+        self.prev_header.clone()
     }
 
     /// entry_address getter
-    pub fn entry_address(&self) -> &Address {
-        &self.entry_address
+    pub fn entry_hash(&self) -> &EntryHash {
+        &self.entry_hash
     }
 
-    /// link_same_type getter
-    pub fn link_same_type(&self) -> Option<Address> {
-        self.link_same_type.clone()
+    /// prev_same_type getter
+    pub fn prev_same_type(&self) -> Option<HeaderHash> {
+        self.prev_same_type.clone()
     }
 
-    /// link_crud getter
-    pub fn link_crud(&self) -> Option<Address> {
-        self.link_crud.clone()
+    /// replaced_entry getter
+    pub fn replaced_entry(&self) -> Option<HeaderHash> {
+        self.replaced_entry.clone()
     }
 
     /// entry_signature getter
@@ -140,6 +142,7 @@ pub mod tests {
         signature::Signature,
         time::test_iso_8601,
     };
+    use holo_hash::EntryHash;
 
     /// returns a dummy header for use in tests
     pub fn test_chain_header() -> ChainHeader {
@@ -150,7 +153,7 @@ pub mod tests {
     pub fn test_chain_header_with_sig(sig: &'static str) -> ChainHeader {
         ChainHeader::new(
             test_entry_type(),
-            test_entry().address(),
+            EntryHash::try_from(test_entry()).unwrap(),
             &test_provenances(sig),
             None,
             None,
@@ -175,7 +178,7 @@ pub mod tests {
     pub fn test_chain_header_b() -> ChainHeader {
         ChainHeader::new(
             test_entry_type_b(),
-            test_entry_b().address(),
+            EntryHash::new(SerializedBytes::try_from(test_entry_b()).unwrap().bytes().to_vec()),
             &test_provenances("sig"),
             None,
             None,
@@ -203,7 +206,7 @@ pub mod tests {
         assert_ne!(
             ChainHeader::new(
                 entry_a.entry_type(),
-                entry_a.address(),
+                holo_hash::EntryHash::try_from(entry_a).unwrap(),
                 &test_provenances("sig"),
                 None,
                 None,

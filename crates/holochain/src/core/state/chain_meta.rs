@@ -8,7 +8,7 @@ use sx_state::{
     error::DatabaseResult,
     prelude::*,
 };
-use sx_types::persistence::cas::content::Address;
+use holo_hash::EntryHash;
 
 type Tag = String;
 
@@ -32,7 +32,7 @@ enum Op {
 
 #[allow(dead_code)]
 struct LinkKey<'a> {
-    base: &'a Address,
+    base: &'a EntryHash,
     op: Op,
     tag: Tag,
 }
@@ -70,8 +70,8 @@ pub trait ChainMetaBufT<'env, R = Reader<'env>>
 where
     R: Readable,
 {
-    fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>>;
-    fn get_crud(&self, address: &Address) -> DatabaseResult<EntryDhtStatus>;
+    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
+    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
 }
 pub struct ChainMetaBuf<'env, V, R = Reader<'env>>
 where
@@ -115,7 +115,7 @@ where
     R: Readable,
 {
     // TODO find out whether we need link_type.
-    fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>> {
+    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
         // TODO get removes
         // TODO get adds
         let key = LinkKey {
@@ -126,7 +126,7 @@ where
         let _values = self.links_meta.get(&key.to_key());
         Ok(HashSet::new())
     }
-    fn get_crud(&self, _address: &Address) -> DatabaseResult<EntryDhtStatus> {
+    fn get_crud(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
         unimplemented!()
     }
 }
@@ -134,8 +134,8 @@ where
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>>;
-        fn get_crud(&self, address: &Address) -> DatabaseResult<EntryDhtStatus>;
+        fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
+        fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
     }
 }
 
@@ -143,10 +143,10 @@ impl<'env, R> ChainMetaBufT<'env, R> for MockChainMetaBuf
 where
     R: Readable,
 {
-    fn get_links(&self, base: &Address, tag: Tag) -> DatabaseResult<HashSet<Address>> {
+    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
         self.get_links(base, tag)
     }
-    fn get_crud(&self, address: &Address) -> DatabaseResult<EntryDhtStatus> {
-        self.get_crud(address)
+    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        self.get_crud(entry_hash)
     }
 }

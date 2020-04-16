@@ -30,6 +30,7 @@ holochain_serialized_bytes = "=0.0.36"
 holochain_wasmer_common = "=0.0.24"
 sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
 sx_zome_types = { path = "../zome_types" }
+holo_hash_core = { path = "../holo_hash_core" }
 
 # possibly dispensable
 multihash = "0.8.0"
@@ -38,3 +39,6 @@ thiserror = "1.0.10"
 derive_more = "0.99.3"
 rust-base58 = "0.0.4"
 shrinkwraprs = "0.3.0"
+
+[dev-dependencies]
+holo_hash = { path = "../holo_hash" }
