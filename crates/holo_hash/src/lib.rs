@@ -86,7 +86,6 @@
 
 pub use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
-use sx_types::entry::Entry;
 
 /// Holo Hash Error Type.
 #[derive(Debug, thiserror::Error)]
@@ -290,6 +289,10 @@ macro_rules! new_holo_hash {
                 fn get_loc(&self) -> u32 {
                     self.0.get_loc()
                 }
+
+                fn into_inner(self) -> Vec<u8> {
+                    self.0.into_inner()
+                }
             }
 
             impl std::fmt::Debug for $name {
@@ -340,6 +343,24 @@ macro_rules! new_holo_hash {
                     $name::try_from(&s)
                 }
             }
+
+            impl From<::holo_hash_core::$name> for $crate::$name {
+                fn from(core_hash: ::holo_hash_core::$name) -> Self {
+                    crate::$name(core_hash)
+                }
+            }
+
+            impl From<$crate::$name> for ::holo_hash_core::$name {
+                fn from(hash: $crate::$name) -> ::holo_hash_core::$name {
+                    ::holo_hash_core::$name::new(hash.into_inner())
+                }
+            }
+
+            impl AsRef<[u8]> for $crate::$name {
+                fn as_ref(&self) -> &[u8] {
+                    self.get_bytes()
+                }
+            }
         )*
 
         /// An unified enum representing the holo hash types.
@@ -374,6 +395,14 @@ macro_rules! new_holo_hash {
                 match self {
                     $(
                         HoloHash::$name(i) => i.get_loc(),
+                    )*
+                }
+            }
+
+            fn into_inner(self) -> Vec<u8> {
+                match self {
+                    $(
+                        HoloHash::$name(i) => i.into_inner(),
                     )*
                 }
             }
@@ -468,14 +497,49 @@ new_holo_hash! {
     DHTOP_PREFIX,
 }
 
-impl TryFrom<sx_types::entry::Entry> for crate::EntryHash {
-    type Error = SerializedBytesError;
-    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
-        Ok(EntryHash::with_data_sync(
-            SerializedBytes::try_from(entry)?.bytes(),
-        ))
-    }
+macro_rules! serial_hash {
+    ( $( $input:ty, $output:ident )* ) => {
+        $(
+            impl TryFrom<$input> for crate::$output {
+                type Error = SerializedBytesError;
+                fn try_from(i: $input) -> Result<Self, Self::Error> {
+                    crate::$output::try_from(&i)
+                }
+            }
+            impl TryFrom<&$input> for crate::$output {
+                type Error = SerializedBytesError;
+                fn try_from(i: &$input) -> Result<Self, Self::Error> {
+                    Ok($output::with_data_sync(
+                        SerializedBytes::try_from(i)?.bytes(),
+                    ))
+                }
+            }
+
+            impl TryFrom<&$input> for crate::HoloHash {
+                type Error = SerializedBytesError;
+                fn try_from(i: &$input) -> Result<Self, Self::Error> {
+                    Ok(crate::HoloHash::$output(crate::$output::try_from(
+                        i
+                    )?))
+                }
+            }
+            impl TryFrom<$input> for crate::HoloHash {
+                type Error = SerializedBytesError;
+                fn try_from(i: $input) -> Result<Self, Self::Error> {
+                    crate::HoloHash::try_from(&i)
+                }
+            }
+        )*
+    };
 }
+
+serial_hash!(
+    sx_types::entry::Entry,
+    EntryHash
+
+    sx_types::chain_header::ChainHeader,
+    HeaderHash
+);
 
 #[cfg(test)]
 mod tests {

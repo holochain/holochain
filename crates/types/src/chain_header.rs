@@ -153,7 +153,7 @@ pub mod tests {
     pub fn test_chain_header_with_sig(sig: &'static str) -> ChainHeader {
         ChainHeader::new(
             test_entry_type(),
-            EntryHash::try_from(test_entry()).unwrap(),
+            holo_hash::EntryHash::try_from(test_entry()).unwrap(),
             &test_provenances(sig),
             None,
             None,

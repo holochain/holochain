@@ -39,7 +39,7 @@ struct LinkKey<'a> {
 
 impl<'a> LinkKey<'a> {
     fn to_key(&self) -> Vec<u8> {
-        let mut vec: Vec<u8> = self.base.as_ref().into();
+        let mut vec: Vec<u8> = self.base.as_ref().to_vec();
         vec.extend_from_slice(self.tag.as_ref());
         vec
     }
@@ -120,7 +120,7 @@ where
         // TODO get adds
         let key = LinkKey {
             op: Op::Add,
-            base,
+            base: &base,
             tag,
         };
         let _values = self.links_meta.get(&key.to_key());

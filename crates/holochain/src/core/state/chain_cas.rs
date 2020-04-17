@@ -1,6 +1,7 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
+use std::convert::TryInto;
 use sx_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -66,11 +67,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header: ChainHeader,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(entry) = self.get_entry(header.entry_hash())? {
+        if let Some(entry) = self.get_entry(header.entry_hash().to_owned().into())? {
             Ok(Some(HeaderWithEntry::new(header, entry)))
         } else {
             Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(header.entry_hash().clone()),
+                ChainInvalidReason::MissingData(header.entry_hash().to_owned().into()),
             ))
         }
     }
@@ -79,17 +80,18 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header_hash: &HeaderHash,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(header) = self.get_header(header_hash)? {
+        if let Some(header) = self.get_header(header_hash.to_owned())? {
             self.header_with_entry(header)
         } else {
             Ok(None)
         }
     }
 
-    pub fn put(&mut self, v: (ChainHeader, Entry)) {
+    pub fn put(&mut self, v: (ChainHeader, Entry)) -> DatabaseResult<()> {
         let (header, entry) = v;
-        self.entries.put(entry);
-        self.headers.put(header);
+        self.entries.put((&entry).try_into()?, entry);
+        self.headers.put((&header).try_into()?, header);
+        Ok(())
     }
 
     // TODO: consolidate into single delete which handles entry and header together

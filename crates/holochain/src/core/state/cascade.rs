@@ -123,7 +123,7 @@ where
 
         // Cache
         match search {
-            Search::Continue => Ok(self.cache.get_entry(entry_hash)?.and_then(|entry| {
+            Search::Continue => Ok(self.cache.get_entry(entry_hash.clone())?.and_then(|entry| {
                 self.cache_meta
                     .get_crud(entry_hash)
                     .ok()
@@ -147,11 +147,11 @@ where
         tag: S,
     ) -> DatabaseResult<HashSet<EntryHash>> {
         // Am I an authority?
-        let authority = self.primary.contains(base)?;
+        let authority = self.primary.contains(base.clone())?;
         let tag = tag.into();
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(base, tag.clone())?;
+            let links = self.primary_meta.get_links(base.clone(), tag.clone())?;
 
             // Cache
             if links.is_empty() {

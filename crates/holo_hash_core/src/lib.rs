@@ -50,6 +50,9 @@ pub trait HoloHashCoreHash:
 
     /// Fetch the holo dht location for this hash
     fn get_loc(&self) -> u32;
+
+    /// consume into the inner byte vector
+    fn into_inner(self) -> Vec<u8>;
 }
 
 macro_rules! core_holo_hash {
@@ -81,6 +84,10 @@ macro_rules! core_holo_hash {
 
                 fn get_loc(&self) -> u32 {
                     bytes_to_loc(&self.0[self.0.len() - 4..])
+                }
+
+                fn into_inner(self) -> Vec<u8> {
+                    self.0
                 }
             }
 
@@ -134,6 +141,14 @@ macro_rules! core_holo_hash {
                 match self {
                     $(
                         HoloHashCore::$name(i) => i.get_loc(),
+                    )*
+                }
+            }
+
+            fn into_inner(self) -> Vec<u8> {
+                match self {
+                    $(
+                        HoloHashCore::$name(i) => i.into_inner(),
                     )*
                 }
             }

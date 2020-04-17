@@ -3,9 +3,10 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentId,
 //! cannot fail, so the function return types reflect that.
 
+use holo_hash::HeaderHash;
 use shrinkwraprs::Shrinkwrap;
 use sx_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
-use sx_types::{agent::AgentId, prelude::Address};
+use sx_types::agent::AgentId;
 
 pub use error::*;
 pub use source_chain_buffer::*;
@@ -25,7 +26,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         ))
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<&Address> {
+    pub fn chain_head(&self) -> SourceChainResult<&HeaderHash> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
     pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {

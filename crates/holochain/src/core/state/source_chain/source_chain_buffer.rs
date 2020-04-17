@@ -45,16 +45,16 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         })
     }
 
-    pub fn chain_head(&self) -> Option<&Address> {
+    pub fn chain_head(&self) -> Option<&HeaderHash> {
         self.sequence.chain_head()
     }
 
     pub fn get_entry(&self, k: EntryHash) -> DatabaseResult<Option<Entry>> {
-        self.cas.get_entry(k.into())
+        self.cas.get_entry(k)
     }
 
     pub fn get_header(&self, k: HeaderHash) -> DatabaseResult<Option<ChainHeader>> {
-        self.cas.get_header(k.into())
+        self.cas.get_header(k)
     }
 
     pub fn cas(&self) -> &ChainCasBuf<R> {
@@ -63,10 +63,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
-    pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) {
-        let header = header_for_entry(&entry, agent_id, self.chain_head().cloned());
-        self.sequence.put_header(header.address());
-        self.cas.put((header, entry));
+    pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) -> DatabaseResult<()> {
+        let header = header_for_entry(&entry, agent_id, self.chain_head().cloned())?;
+        self.sequence.put_header((&header).try_into()?);
+        self.cas.put((header, entry))?;
+        Ok(())
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
@@ -104,7 +105,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 .iter_back()
                 .map(|h| {
                     Ok(JsonChainDump {
-                        entry: self.get_entry(h.entry_address())?,
+                        entry: self.get_entry(h.entry_hash().to_owned().into())?,
                         header: h,
                     })
                 })
@@ -123,24 +124,28 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
     }
 }
 
-fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Option<Address>) -> ChainHeader {
+fn header_for_entry(
+    entry: &Entry,
+    agent_id: &AgentId,
+    prev_head: Option<HeaderHash>,
+) -> Result<ChainHeader, SerializedBytesError> {
     let provenances = &[Provenance::new(agent_id.address(), Signature::fake())];
     let timestamp = chrono::Utc::now().timestamp().into();
     trace!("PUT {} {:?}", entry.address(), entry);
-    ChainHeader::new(
+    Ok(ChainHeader::new(
         entry.entry_type(),
-        entry.address(),
+        holo_hash::EntryHash::try_from(entry)?.into(),
         provenances,
-        prev_head,
+        prev_head.map(|h| h.into()),
         None,
         None,
         timestamp,
-    )
+    ))
 }
 
 pub struct SourceChainBackwardIterator<'env, R: Readable> {
     store: &'env SourceChainBuf<'env, R>,
-    current: Option<Address>,
+    current: Option<HeaderHash>,
 }
 
 impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
@@ -162,8 +167,8 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
         match &self.current {
             None => Ok(None),
             Some(top) => {
-                if let Some(header) = self.store.get_header(top)? {
-                    self.current = header.link();
+                if let Some(header) = self.store.get_header(top.to_owned())? {
+                    self.current = header.prev_header().map(|h| h.into());
                     Ok(Some(header))
                 } else {
                     Ok(None)
