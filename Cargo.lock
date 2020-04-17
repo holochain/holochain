@@ -1418,6 +1418,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "must_future"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9abee73a92c055233afa557c1209436a515f14a7c1b84a0825d08b48241fb3eb"
+dependencies = [
+ "futures",
+ "pin-utils",
+]
+
+[[package]]
 name = "nanoid"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2611,23 +2621,29 @@ dependencies = [
  "base64 0.10.1",
  "chrono",
  "derive_more",
+ "futures",
  "hcid",
+ "holo_hash",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "lazy_static",
  "lib3h_crypto_api",
  "maplit",
  "multihash",
+ "must_future",
  "regex",
  "rust-base58",
  "serde",
+ "serde_bytes",
  "serde_json",
  "shrinkwraprs",
  "snowflake",
+ "sx_crypto",
  "sx_types_derive",
  "sx_zome_types",
  "tempdir",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-core",
  "tracing-serde",
