@@ -90,6 +90,132 @@ impl ConductorHandle {
 
 pub type FakeDnaCache = HashMap<Address, Dna>;
 
+use crate::conductor::api::api_external::{AdminRequest, AdminResponse};
+use futures::{future::FutureExt, stream::StreamExt};
+use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use std::convert::TryInto;
+use sx_types::persistence::cas::content::Addressable;
+
+ghost_actor::ghost_chan! {
+    name: ConductorInternal,
+    error: ConductorError,
+    api: {
+        FinishInstallDna::finish_install_dna (
+            "complete the dna installation process", Dna, ()
+        ),
+    }
+}
+
+pub type WaitFuture = must_future::MustBoxFuture<'static, ()>;
+pub type AdminResponseFuture = must_future::MustBoxFuture<'static, AdminResponse>;
+
+ghost_actor::ghost_actor! {
+    name: pub ConductorApi,
+    error: ConductorError,
+    api: {
+        Wait::wait (
+            "wait for the conductor to be dropped", (), WaitFuture
+        ),
+        AdminRequest::admin_request (
+            "service an external api admin request", AdminRequest, AdminResponseFuture
+        ),
+    }
+}
+
+/// TODO - Don't ACTUALLY call this GhostConductor
+///        replace the other Conductor below
+pub struct GhostConductor {
+    internal_sender: ConductorApiInternalSender<(), ConductorInternal>,
+    fake_dna_cache: FakeDnaCache,
+    drop_broadcast: tokio::sync::broadcast::Sender<()>,
+}
+
+impl Drop for GhostConductor {
+    fn drop(&mut self) {
+        let _ = self.drop_broadcast.send(());
+    }
+}
+
+impl GhostConductor {
+    async fn new(
+        internal_sender: ConductorApiInternalSender<(), ConductorInternal>,
+    ) -> ConductorResult<Self> {
+        let (drop_broadcast, _) = tokio::sync::broadcast::channel(1);
+        Ok(Self {
+            internal_sender,
+            fake_dna_cache: FakeDnaCache::new(),
+            drop_broadcast,
+        })
+    }
+}
+
+async fn install_dna_task(
+    mut sender: ConductorApiInternalSender<(), ConductorInternal>,
+    dna_path: std::path::PathBuf,
+) -> ConductorResult<AdminResponse> {
+    tracing::warn!(message = "(install_dna_task) INSTALL DNA", file = ?dna_path);
+    let dna: UnsafeBytes = tokio::fs::read(dna_path.clone()).await?.into();
+    let dna = SerializedBytes::from(dna);
+    let dna: Dna = dna.try_into()?;
+    sender
+        .ghost_actor_internal()
+        .finish_install_dna(dna)
+        .await?;
+    tracing::warn!(message = "(install_dna_task) INSTALL DNA DONE", file = ?dna_path);
+    Ok(AdminResponse::DnaInstalled)
+}
+
+impl ConductorApiHandler<(), ConductorInternal> for GhostConductor {
+    fn handle_wait(&mut self, _: ()) -> ConductorResult<WaitFuture> {
+        let mut recv = self.drop_broadcast.subscribe();
+        Ok(async move {
+            let _ = recv.next().await;
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_admin_request(
+        &mut self,
+        request: AdminRequest,
+    ) -> ConductorResult<AdminResponseFuture> {
+        match request {
+            AdminRequest::InstallDna(dna_path) => {
+                let sender = self.internal_sender.clone();
+                Ok(install_dna_task(sender, dna_path).map(|result| {
+                    match result {
+                        Ok(r) => r,
+                        Err(e) => AdminResponse::Error {
+                            debug: format!("{:?}", e),
+                            // ?!? not sure this is useful...
+                            error_type: crate::conductor::interface::error::AdminInterfaceErrorKind::Other,
+                        },
+                    }
+                }).boxed().into())
+            }
+            AdminRequest::ListDnas => {
+                let dnas = self.fake_dna_cache.keys().cloned().collect::<Vec<_>>();
+                Ok(async move { AdminResponse::ListDnas(dnas) }.boxed().into())
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    fn handle_ghost_actor_internal(&mut self, msg: ConductorInternal) {
+        match msg {
+            ConductorInternal::FinishInstallDna(item) => {
+                let ghost_actor::GhostChanItem {
+                    input: dna,
+                    respond,
+                    ..
+                } = item;
+                self.fake_dna_cache.insert(dna.address(), dna);
+                let _ = respond(Ok(()));
+            }
+        }
+    }
+}
+
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     /// The collection of cells associated with this Conductor
@@ -279,6 +405,25 @@ mod builder {
             Self {}
         }
 
+        pub async fn spawn_ghost_conductor_with_config(
+            self,
+            config: ConductorConfig,
+        ) -> ConductorResult<ConductorApiSender<()>> {
+            // TODO - do all the same db init stuff as below
+            let (sender, driver) = ConductorApiSender::ghost_actor_spawn(Box::new(|is| {
+                async move { GhostConductor::new(is).await }.boxed().into()
+            }))
+            .await?;
+            tokio::task::spawn(driver);
+            setup_ghost_admin_interfaces_from_config(
+                sender.clone(),
+                config.admin_interfaces.unwrap_or_default(),
+            )
+            .await
+            .unwrap(); // TODO circular InterfaceError
+            Ok(sender)
+        }
+
         pub async fn with_config(
             self,
             config: ConductorConfig,
@@ -304,6 +449,53 @@ mod builder {
             let conductor = Conductor::new(environment).await?;
             Ok(Arc::new(RwLock::new(conductor)).into())
         }
+    }
+
+    async fn setup_ghost_admin_interfaces_from_config(
+        conductor: ConductorApiSender<()>,
+        configs: Vec<AdminInterfaceConfig>,
+    ) -> InterfaceResult<()> {
+        for iface in configs {
+            match iface {
+                AdminInterfaceConfig {
+                    driver: InterfaceDriver::Websocket { port },
+                    ..
+                } => {
+                    let mut listener = spawn_websocket_listener(port).await?;
+                    let _port = listener.local_addr().port().unwrap_or(port);
+                    let c1 = conductor.clone();
+                    tokio::task::spawn(async move {
+                        while let Some(maybe_con) = listener.next().await {
+                            let c2 = c1.clone();
+                            tokio::task::spawn(async move {
+                                if let Ok((_, mut recv)) = maybe_con.await {
+                                    while let Some(
+                                        holochain_websocket::WebsocketMessage::Request(req, res),
+                                    ) = recv.next().await
+                                    {
+                                        let req: AdminRequest = req.try_into().unwrap();
+                                        tracing::warn!(message = "admin request", request = ?req);
+                                        let mut c3 = c2.clone();
+                                        tokio::task::spawn(async move {
+                                            let response = c3
+                                                .admin_request(req)
+                                                .await
+                                                .unwrap()
+                                                .await
+                                                .try_into()
+                                                .unwrap();
+                                            tracing::warn!(message = "admin request-response", response = ?response);
+                                            res(response).await.unwrap();
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Spawn all admin interface tasks, register them with the TaskManager,

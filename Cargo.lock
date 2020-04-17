@@ -858,6 +858,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ghost_actor"
+version = "0.1.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aad6c976c8e35f4680e0806540245e97b34a4722caf30d236d1ffe8625dfed9a"
+dependencies = [
+ "futures",
+ "must_future",
+ "paste",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "hcid"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -929,6 +942,7 @@ dependencies = [
  "directories 2.0.2",
  "fallible-iterator",
  "futures",
+ "ghost_actor",
  "hcid",
  "holochain_common",
  "holochain_serialized_bytes",
@@ -939,6 +953,7 @@ dependencies = [
  "maplit",
  "matches",
  "mockall",
+ "must_future",
  "num_cpus",
  "owning_ref",
  "parking_lot 0.10.0",
@@ -1418,6 +1433,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "must_future"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9abee73a92c055233afa557c1209436a515f14a7c1b84a0825d08b48241fb3eb"
+dependencies = [
+ "futures",
+ "pin-utils",
+]
+
+[[package]]
 name = "nanoid"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1708,6 +1733,28 @@ dependencies = [
  "redox_syscall",
  "smallvec 1.3.0",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "paste"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab4fb1930692d1b6a9cfabdde3d06ea0a7d186518e2f4d67660d8970e2fa647a"
+dependencies = [
+ "paste-impl",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "paste-impl"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a62486e111e571b1e93b710b61e8f493c0013be39629b714cb166bdb06aa5a8a"
+dependencies = [
+ "proc-macro-hack",
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.17",
 ]
 
 [[package]]

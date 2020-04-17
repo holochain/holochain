@@ -9,6 +9,8 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
+ghost_actor = "0.1.0-alpha.2"
+must_future = "0.1.1"
 async-trait = "0.1.24"
 crossbeam-channel = "0.4.0"
 hcid = "0.0.6"

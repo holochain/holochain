@@ -52,6 +52,12 @@ pub enum ConductorError {
 
     #[error("Error while trying to send a task to the task manager: {0}")]
     SubmitTaskError(String),
+
+    #[error("GhostError: {0}")]
+    GhostError(#[from] ghost_actor::GhostError),
+
+    #[error("SerializedBytesError: {0}")]
+    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 }
 
 // TODO: can this be removed?

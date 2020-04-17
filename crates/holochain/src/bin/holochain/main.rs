@@ -46,6 +46,9 @@ struct Opt {
         help = "Run a very basic interface example, just to have something to do"
     )]
     run_interface_example: bool,
+
+    #[structopt(long = "ghost", help = "run with the test ghost conductor")]
+    ghost: bool,
 }
 
 fn main() {
@@ -117,6 +120,25 @@ async fn async_main() {
                 result.expect("Couldn't auto-create environment dir");
             }
         }
+    }
+
+    if opt.ghost {
+        println!("RUNNING WITH GHOST CONDUCTOR");
+
+        let mut conductor = Conductor::build()
+            .spawn_ghost_conductor_with_config(config)
+            .await
+            .expect("Could not initialize Conductor from configuration");
+
+        conductor
+            .wait(())
+            .await
+            .expect("conductor should exit gracefully")
+            .await;
+
+        println!("GHOST CONDUCTOR EXITED");
+
+        return;
     }
 
     // Initialize the Conductor

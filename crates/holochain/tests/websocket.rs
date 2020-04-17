@@ -160,6 +160,56 @@ async fn call_admin() {
 }
 
 #[tokio::test]
+async fn call_admin_ghost() {
+    // NOTE: This is a full integration test that
+    // actually runs the holochain binary
+
+    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    let port = 19909;
+
+    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let path = tmp_dir.path().to_path_buf();
+    let environment_path = path.clone();
+    let config = create_config(port, environment_path);
+    let config_path = write_config(path, &config);
+
+    let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
+    cmd.arg("--ghost");
+    cmd.arg("--structured");
+    cmd.arg("--config-path");
+    cmd.arg(config_path);
+    cmd.env("RUST_LOG", "debug");
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    let started = holochain.try_wait();
+    check_started(started.map_err(Into::into), &mut holochain);
+
+    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
+
+    let uuid = Uuid::new_v4();
+    let dna = fake_dna(&uuid.to_string());
+    let dna_address = dna.address();
+
+    // Install Dna
+    let (fake_dna_path, _tmpdir) = fake_dna_file(dna).unwrap();
+    let request = AdminRequest::InstallDna(fake_dna_path);
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+    assert_matches!(response, AdminResponse::DnaInstalled);
+
+    // List Dnas
+    let request = AdminRequest::ListDnas;
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+    let expects = vec![dna_address];
+    assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
+
+    holochain.kill().expect("Failed to kill holochain");
+}
+
+#[tokio::test]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
     let environment_path = tmp_dir.path().to_path_buf();

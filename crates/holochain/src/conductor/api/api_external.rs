@@ -1,3 +1,5 @@
+//! external conductor api
+
 use super::error::{ConductorApiResult, SerializationError};
 use crate::conductor::{
     interface::error::{AdminInterfaceErrorKind, InterfaceError, InterfaceResult},
