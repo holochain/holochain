@@ -94,8 +94,8 @@ impl ConductorHandle {
     }
 }
 
-/// Placeholder for real cache
-pub type FakeDnaCache = HashMap<Address, Dna>;
+/// Placeholder for real store
+pub type FakeDnaStore = HashMap<Address, Dna>;
 
 /// A Conductor manages communication to and between a collection of [Cell]s and system services
 pub struct Conductor {
@@ -133,8 +133,8 @@ pub struct Conductor {
     /// The conductor is intended to live as long as this task does.
     task_manager_run_handle: Option<TaskManagerRunHandle>,
 
-    /// Placeholder for what will be the real DNA/Wasm cache
-    pub(super) fake_dna_cache: FakeDnaCache,
+    /// Placeholder for what will be the real DNA/Wasm store
+    pub(super) fake_dna_cache: FakeDnaStore,
 }
 
 impl Conductor {
