@@ -14,7 +14,7 @@ edition = "2018"
 base64 = "0.12.0"
 blake2b_simd = "0.5.10"
 holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
-holochain_serialized_bytes = "=0.0.37"
+holochain_serialized_bytes = "=0.0.38"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_bytes = "0.11"
 thiserror = "1"

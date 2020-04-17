@@ -11,7 +11,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.37"
+holochain_serialized_bytes = "=0.0.38"
 serde = { version = "1.0.104", features = ["derive"] }
 
 # TODO: remove these two dependencies and replace with HoloHash

@@ -78,20 +78,23 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.36"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned#695e4a9ffead59fba1f9ecbd1eb0ef9cb17dc5d5"
+version = "0.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6be38f6ee21d935ce62a55ca27d2708e2dcce0ac4fda46c792bbdc76b2be83b4"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.36"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned#695e4a9ffead59fba1f9ecbd1eb0ef9cb17dc5d5"
+version = "0.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f9dcb58ed79199b69ab54407901b9d681a498bc48c9d145b8ec1d2255440eb5"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -100,8 +103,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc9561fb0cf8eecae7c161087b1f34b43b8d7abb5f2e111272ddd0f12f5e3c6b"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -112,8 +114,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ea5a568ab4e1f63ec3b31116731e349fd288a03c30d6b4960e00aa65fc3267d"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -499,3 +500,13 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[patch.unused]]
+name = "holochain_serialized_bytes"
+version = "0.0.37"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned-next#c747d9e42a33d9e7aa77710b05c835b76c0c8ba8"
+
+[[patch.unused]]
+name = "holochain_wasmer_host"
+version = "0.0.24"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"

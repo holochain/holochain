@@ -976,8 +976,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.37"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned-next#c747d9e42a33d9e7aa77710b05c835b76c0c8ba8"
+version = "0.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6be38f6ee21d935ce62a55ca27d2708e2dcce0ac4fda46c792bbdc76b2be83b4"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -989,8 +990,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.37"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned-next#c747d9e42a33d9e7aa77710b05c835b76c0c8ba8"
+version = "0.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f9dcb58ed79199b69ab54407901b9d681a498bc48c9d145b8ec1d2255440eb5"
 dependencies = [
  "quote 0.6.11",
  "syn 0.15.31",
@@ -999,7 +1001,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.24"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#3d0c25db5202c7f9e3ff0d0e373905c25e927adc"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -1010,7 +1012,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.24"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#3d0c25db5202c7f9e3ff0d0e373905c25e927adc"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -3397,4 +3399,4 @@ dependencies = [
 [[patch.unused]]
 name = "holochain_wasmer_guest"
 version = "0.0.24"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#3d0c25db5202c7f9e3ff0d0e373905c25e927adc"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
