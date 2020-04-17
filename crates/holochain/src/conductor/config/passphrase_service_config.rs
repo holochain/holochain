@@ -15,7 +15,7 @@ pub enum PassphraseServiceConfig {
     Cmd,
     /// Passphrase is requested over a Unix domain socket at the given path.
     UnixSocket {
-        /// TODO: DOCS: ?
+        /// Path of the socket
         path: PathBuf,
     },
     /// Passphrase is requested from a mock service for testing purposes
