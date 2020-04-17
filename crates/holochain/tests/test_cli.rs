@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use assert_cli::Assert;
 use tempdir::TempDir;
 

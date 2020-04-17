@@ -1,9 +1,7 @@
 //! Common holochain types crate.
-#![deny(missing_docs)]
 
-/// TODO: remove these 2015 edition artifacts (they're going to require a lot of changes)
-#[macro_use]
-extern crate serde;
+#![allow(clippy::cognitive_complexity)]
+#![deny(missing_docs)]
 
 pub mod agent;
 pub mod autonomic;
@@ -29,3 +27,5 @@ pub mod universal_map;
 
 // #[cfg(test)]
 pub mod test_utils;
+
+use sx_zome_types;

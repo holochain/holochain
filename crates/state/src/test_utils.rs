@@ -17,6 +17,7 @@ pub fn test_conductor_env() -> TestEnvironment {
 
 fn test_env(kind: EnvironmentKind) -> TestEnvironment {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
+    // TODO: Wrap Environment along with the TempDir so that it lives longer
     Environment::new(tmpdir.path(), kind).expect("Couldn't create test LMDB environment")
 }
 

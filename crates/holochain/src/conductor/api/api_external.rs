@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! external conductor api
 
 use super::error::{ConductorApiResult, SerializationError};
@@ -15,17 +16,22 @@ use sx_types::{
 };
 use tracing::*;
 
+/// A trait that unifies both the admin and app interfaces
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
+    /// Which request is being made
     type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    /// Which response is sent to the above request
     type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    /// Handle a request on this API
     async fn handle_request(
         &self,
         request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse>;
 }
 
-/// The interface that a Conductor exposes to the outside world.
+/// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
+/// This trait has a one mock implementation and one "Real" implementation
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
@@ -33,6 +39,7 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
     // -- provided -- //
 
+    /// Route the request to be handled
     async fn handle_request(&self, request: AdminRequest) -> AdminResponse {
         let res = self.admin(request).await;
 
@@ -56,6 +63,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 
     // -- provided -- //
 
+    /// Routes the [AppRequest] to the [AppResponse]
     async fn handle_request(&self, request: AppRequest) -> AppResponse {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
@@ -78,20 +86,22 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     }
 }
 
+/// The admin interface that external connections
+/// can use to make requests to the conductor
 /// The concrete (non-mock) implementation of the AdminInterfaceApi
 #[derive(Clone)]
-pub struct StdAdminInterfaceApi {
+pub struct RealAdminInterfaceApi {
     /// Mutable access to the Conductor
     conductor_handle: ConductorHandle,
 
     /// Needed to spawn an App interface
-    app_api: StdAppInterfaceApi,
+    app_api: RealAppInterfaceApi,
 }
 
-impl StdAdminInterfaceApi {
+impl RealAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
-        let app_api = StdAppInterfaceApi::new(conductor_handle.clone());
-        StdAdminInterfaceApi {
+        let app_api = RealAppInterfaceApi::new(conductor_handle.clone());
+        RealAdminInterfaceApi {
             conductor_handle,
             app_api,
         }
@@ -138,7 +148,7 @@ impl StdAdminInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl AdminInterfaceApi for StdAdminInterfaceApi {
+impl AdminInterfaceApi for RealAdminInterfaceApi {
     async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
         use AdminRequest::*;
         match request {
@@ -151,9 +161,10 @@ impl AdminInterfaceApi for StdAdminInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl InterfaceApi for StdAdminInterfaceApi {
+impl InterfaceApi for RealAdminInterfaceApi {
     type ApiRequest = AdminRequest;
     type ApiResponse = AdminResponse;
+
     async fn handle_request(
         &self,
         request: Result<Self::ApiRequest, SerializedBytesError>,
@@ -163,6 +174,7 @@ impl InterfaceApi for StdAdminInterfaceApi {
             self.conductor_handle
                 .read()
                 .await
+                // Make sure the conductor is not in the process of shutting down
                 .check_running()
                 .map_err(InterfaceError::RequestHandler)?;
         }
@@ -179,11 +191,11 @@ impl InterfaceApi for StdAdminInterfaceApi {
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
 #[derive(Clone)]
-pub struct StdAppInterfaceApi {
+pub struct RealAppInterfaceApi {
     conductor_handle: ConductorHandle,
 }
 
-impl StdAppInterfaceApi {
+impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_handle: ConductorHandle) -> Self {
         Self { conductor_handle }
@@ -191,7 +203,7 @@ impl StdAppInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl AppInterfaceApi for StdAppInterfaceApi {
+impl AppInterfaceApi for RealAppInterfaceApi {
     async fn invoke_zome(
         &self,
         _invocation: ZomeInvocation,
@@ -202,7 +214,7 @@ impl AppInterfaceApi for StdAppInterfaceApi {
 }
 
 #[async_trait::async_trait]
-impl InterfaceApi for StdAppInterfaceApi {
+impl InterfaceApi for RealAppInterfaceApi {
     type ApiRequest = AppRequest;
     type ApiResponse = AppResponse;
     async fn handle_request(
@@ -222,47 +234,70 @@ impl InterfaceApi for StdAppInterfaceApi {
         }
     }
 }
-/// The set of messages that a conductor understands how to respond
+/// Responses to requests received on an App interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppResponse {
+    /// There has been an error in the request
     Error {
+        // TODO maybe this could be serialized instead of stringified?
+        /// Stringified version of the error
         debug: String,
     },
+    /// The response to a zome call
     ZomeInvocationResponse {
+        /// The data that was returned by this call
         response: Box<ZomeInvocationResponse>,
     },
 }
 
-#[allow(missing_docs)]
+/// Responses to messages received on an Admin interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminResponse {
+    /// This response is unimplemented
     Unimplemented(AdminRequest),
+    /// [Dna] has successfully been installed
     DnaInstalled,
+    /// A list of all installed [Dna]s
     ListDnas(Vec<Address>),
+    /// An error has ocurred in this request
     Error {
+        /// The error as a string
         debug: String,
+        /// A simplified version of the error
+        /// Useful for reacting to an error
         error_type: AdminInterfaceErrorKind,
     },
 }
 
-/// The set of messages that a conductor understands how to handle
+/// The set of messages that a conductor understands how to handle over an App interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppRequest {
-    CryptoRequest { request: Box<CryptoRequest> },
-    TestRequest { request: Box<TestRequest> },
-    ZomeInvocationRequest { request: Box<ZomeInvocation> },
+    /// Asks the conductor to do some crypto
+    CryptoRequest {
+        /// The request payload
+        request: Box<CryptoRequest>,
+    },
+    /// Call a zome function
+    ZomeInvocationRequest {
+        /// Information about which zome call you want to make
+        request: Box<ZomeInvocation>,
+    },
 }
 
-#[allow(missing_docs)]
+/// The set of messages that a conductor understands how to handle over an Admin interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminRequest {
+    /// Start a cell running
     Start(CellHandle),
+    /// Stop a cell running
     Stop(CellHandle),
+    /// Install a [Dna] from a path
     InstallDna(PathBuf),
+    /// List all installed [Dna]s
     ListDnas,
 }
 
@@ -301,7 +336,7 @@ mod test {
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
         let conductor = Conductor::build().test().await?;
-        let admin_api = StdAdminInterfaceApi::new(conductor);
+        let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
         let dna_address = dna.address();
@@ -317,7 +352,7 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
         let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
-        let result = StdAdminInterfaceApi::read_parse_dna(dna_path).await?;
+        let result = RealAdminInterfaceApi::read_parse_dna(dna_path).await?;
         assert_eq!(dna, result);
         Ok(())
     }

@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::conductor::error::ConductorError;
@@ -11,7 +12,7 @@ pub enum ConductorApiError {
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 
-    /// Conductor errored during API call.
+    /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
     ConductorError(#[from] ConductorError),
 
@@ -28,6 +29,8 @@ pub enum ConductorApiError {
     SerializationError(#[from] SerializationError),
 }
 
+/// All the serialization errors that can occur
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum SerializationError {
     #[error(transparent)]

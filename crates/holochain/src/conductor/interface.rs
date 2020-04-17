@@ -155,15 +155,6 @@ pub enum InterfaceDriver {
     Websocket { port: u16 },
 }
 
-/// Message sent to an interface task to effect some change
-// TODO: hook this up to admin and app interfaces via a channel
-pub enum InterfaceControlMsg {
-    /// Broadcasts a Signal out to all clients of this interface
-    Signal(crate::core::signal::Signal),
-    /// Close all connections and kill the task listening for new connections
-    Kill,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

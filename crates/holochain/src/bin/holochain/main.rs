@@ -1,15 +1,14 @@
 use holochain_2020::conductor::{
-    api::*, config::ConductorConfig, error::ConductorError, interactive, interface::websocket::*,
-    paths::ConfigFilePath, Conductor, ConductorHandle,
+    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
+    ConductorHandle,
 };
 use std::error::Error;
-use std::{convert::TryInto, path::PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 use sx_types::observability::{self, Output};
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
-// const CHANNEL_SIZE: usize = 1000;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]
@@ -40,12 +39,6 @@ struct Opt {
     useful when running a conductor for the first time"
     )]
     interactive: bool,
-
-    #[structopt(
-        long = "example",
-        help = "Run a very basic interface example, just to have something to do"
-    )]
-    run_interface_example: bool,
 
     #[structopt(long = "ghost", help = "run with the test ghost conductor")]
     ghost: bool,
@@ -147,21 +140,15 @@ async fn async_main() {
         .await
         .expect("Could not initialize Conductor from configuration");
 
-    if opt.run_interface_example {
-        // Create an external API to hand off to any Interfaces
-        let api = StdAppInterfaceApi::new(conductor);
-        interface_example(api).await;
-    } else {
-        println!("Conductor successfully initialized.");
-        // kick off actual conductor task here
-        conductor
-            .wait()
-            .await
-            .map_err(|e| {
-                error!(error = &e as &dyn Error, "Failed to join the main task");
-            })
-            .ok();
-    }
+    info!("Conductor successfully initialized.");
+    // kick off actual conductor task here
+    conductor
+        .wait()
+        .await
+        .map_err(|e| {
+            error!(error = &e as &dyn Error, "Failed to join the main task");
+        })
+        .ok();
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await
@@ -211,27 +198,4 @@ a valid default configuration. Details:
     ",
         config_path, error
     )
-}
-
-/// Simple example of what an [Interface] looks like in its most basic form,
-/// and how to interact with it.
-/// TODO: remove once we have real Interfaces
-async fn interface_example(api: StdAppInterfaceApi) {
-    let (mut sender, join_handle) = create_demo_channel_interface(api);
-    let driver_fut = async move {
-        for _ in 0..50 as u32 {
-            use futures::{future::FutureExt, sink::SinkExt};
-            sender
-                .send((
-                    AdminRequest::Start("cell-handle".into())
-                        .try_into()
-                        .unwrap(),
-                    Box::new(|_| async move { Ok(()) }.boxed()),
-                ))
-                .await
-                .unwrap();
-        }
-    };
-    driver_fut.await;
-    join_handle.await.unwrap();
 }

@@ -1,3 +1,6 @@
+#![deny(missing_docs)]
+//! This module is used to configure the conductor
+
 use serde::{Deserialize, Serialize};
 
 mod admin_interface_config;
@@ -21,6 +24,7 @@ pub use passphrase_service_config::PassphraseServiceConfig;
 use std::path::Path;
 
 // TODO change types from "stringly typed" to Url2
+/// All the config information for the conductor
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
     /// The path to the LMDB environment for this conductor.

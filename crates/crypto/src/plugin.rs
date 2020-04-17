@@ -75,14 +75,20 @@ pub trait CryptoPlugin: 'static + Send + Sync {
 /// dyn reference to a crypto plugin
 pub type DynCryptoPlugin = Arc<dyn CryptoPlugin + 'static>;
 
-mod safe_global_plugin;
+static CRYPTO_PLUGIN: OnceCell<DynCryptoPlugin> = OnceCell::new();
 
 /// internal get the crypto plugin reference
 pub(crate) fn get_global_crypto_plugin() -> CryptoResult<DynCryptoPlugin> {
-    safe_global_plugin::get()
+    let plugin = CRYPTO_PLUGIN
+        .get()
+        .ok_or(CryptoError::PluginNotInitialized)?;
+
+    Ok(plugin.clone())
 }
 
 /// set the global system crypto plugin
 pub fn set_global_crypto_plugin(crypto_plugin: DynCryptoPlugin) -> CryptoResult<()> {
-    safe_global_plugin::set(crypto_plugin)
+    CRYPTO_PLUGIN
+        .set(crypto_plugin)
+        .map_err(|_| CryptoError::PluginAlreadyInitialized)
 }

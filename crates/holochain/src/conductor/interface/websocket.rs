@@ -1,14 +1,11 @@
+use super::error::{InterfaceError, InterfaceResult};
 use crate::conductor::{
     conductor::StopReceiver,
     interface::*,
     manager::{ManagedTaskHandle, ManagedTaskResult},
 };
 use crate::core::signal::Signal;
-//use async_trait::async_trait;
-//use tracing::*;
-use super::error::{InterfaceError, InterfaceResult};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_wasmer_host::TryInto;
 use holochain_websocket::{
     websocket_bind, WebsocketConfig, WebsocketListener, WebsocketMessage, WebsocketReceiver,
     WebsocketSender,
@@ -49,8 +46,7 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
 
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(conn) = maybe_con {
-                    // TODO this could take some time and should be spawned
-                    // This will be fixed by TK-01260
+                    // TODO: TK-01260: this could take some time and should be spawned
                     if let Ok((send_socket, recv_socket)) = conn.await {
                         send_sockets.push(send_socket);
                         listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
@@ -59,25 +55,29 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                         )));
                     }
                 } else {
+                    warn!(line = line!(), "Listener has returned none");
                     // This shouldn't actually ever happen, but if it did,
                     // we would just stop the listener task
                     break;
                 }
             }
         }
-        // TODO: TEST: drop listener, make sure all these tasks finish!
+        // TODO: TK-01261: drop listener, make sure all these tasks finish!
         drop(listener);
 
-        // TODO Make send_socket close tell the recv socket to close locally in the websocket code
+        // TODO: TK-01261: Make send_socket close tell the recv socket to close locally in the websocket code
         for mut send_socket in send_sockets {
-            // TODO change from u16 code to enum
+            // TODO: TK-01261: change from u16 code to enum
             send_socket.close(1000, "Shutting down".into()).await?;
         }
 
-        // these SHOULD end soon after we get here, or by the time we get here,
-        // if not this will hang. Maybe that's OK, in which case we don't await
+        // These SHOULD end soon after we get here, or by the time we get here.
         for h in listener_handles {
-            h.await?;
+            // Show if these are actually finishing
+            match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
+                Ok(r) => r?,
+                Err(_) => warn!("Websocket listener failed to join child tasks"),
+            }
         }
         ManagedTaskResult::Ok(())
     }))
@@ -85,11 +85,11 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
-// TODO: hook up a kill channel similar to `spawn_admin_interface_task` above
 pub async fn spawn_app_interface_task<A: InterfaceApi>(
     port: u16,
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
+    mut stop_rx: StopReceiver,
 ) -> InterfaceResult<()> {
     trace!("Initializing App interface");
     let mut listener = websocket_bind(
@@ -99,10 +99,8 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
     let mut listener_handles = Vec::new();
-    // TODO there is no way to exit this listner
-    // If we remove the interface then we want to kill this lister
-    while let Some(maybe_con) = listener.next().await {
-        let (send_socket, recv_socket) = maybe_con.await?;
+
+    let mut handle_connection = |send_socket: WebsocketSender, recv_socket: WebsocketReceiver| {
         let signal_rx = signal_broadcaster.subscribe();
         listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
             api.clone(),
@@ -110,37 +108,29 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
             signal_rx,
             send_socket,
         )));
+    };
+
+    loop {
+        tokio::select! {
+            // break if we receive on the stop channel
+            _ = stop_rx.recv() => { break; },
+            maybe_con = listener.next() => if let Some(connection) = maybe_con {
+                let (send_socket, recv_socket) = connection.await?;
+                handle_connection(send_socket, recv_socket);
+            } else {
+                break;
+            }
+        }
     }
+
     for h in listener_handles {
-        h.await??;
+        // Show if these are actually finishing
+        match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
+            Ok(r) => r??,
+            Err(_) => warn!("Websocket listener failed to join child tasks"),
+        }
     }
     Ok(())
-}
-
-/// A trivial Interface, used for proof of concept only,
-/// which is driven externally by a channel in order to
-/// interact with a AppInterfaceApi
-pub fn create_demo_channel_interface<A: AppInterfaceApi>(
-    api: A,
-) -> (
-    futures::channel::mpsc::Sender<(SerializedBytes, ExternalSideResponder)>,
-    tokio::task::JoinHandle<()>,
-) {
-    let (send_sig, _recv_sig) = futures::channel::mpsc::channel(1);
-    let (send_req, recv_req) = futures::channel::mpsc::channel(1);
-
-    #[derive(serde::Serialize, serde::Deserialize)]
-    struct Stub;
-    holochain_serialized_bytes::holochain_serial!(Stub);
-
-    let (_chan_sig_send, chan_req_recv): (
-        ConductorSideSignalSender<Stub>, // stub impl signals
-        ConductorSideRequestReceiver<AppRequest, AppResponse>,
-    ) = create_interface_channel(send_sig, recv_req);
-
-    let join_handle = attach_external_conductor_api(api, chan_req_recv);
-
-    (send_req, join_handle)
 }
 
 /// Polls for messages coming in from the external client.
@@ -167,12 +157,6 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     trace!("CONNECTION: {}", recv_socket.remote_addr());
 
     loop {
-        // T: FIXME this will return on whoever is first and cancel
-        // all remaining tasks. Is that what we want?
-        // M: This is straight from a tokio example for listening on two
-        // streams simultaneously. The task that's canceled is the other
-        // `next()`, which allows us to go back to the top of the loop to
-        // listen on both channels yet again.
         tokio::select! {
             // If we receive a Signal broadcasted from a Cell, push it out
             // across the interface
@@ -191,7 +175,6 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
             // If we receive a message from outside, handle it
             msg = recv_socket.next() => {
                 if let Some(msg) = msg {
-                    // FIXME I'm not sure if cloning is the right thing to do here
                     handle_incoming_message(msg, api.clone()).await?
                 } else {
                     debug!("Closing interface: message stream empty");
@@ -204,6 +187,7 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     Ok(())
 }
 
+/// Handles messages on all interfaces
 async fn handle_incoming_message<A>(ws_msg: WebsocketMessage, api: A) -> InterfaceResult<()>
 where
     A: InterfaceApi,
@@ -225,7 +209,7 @@ mod test {
     use super::*;
     use crate::conductor::interface::error::AdminInterfaceErrorKind;
     use crate::conductor::{
-        api::{AdminRequest, AdminResponse, StdAdminInterfaceApi},
+        api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
         Conductor,
     };
     use futures::future::FutureExt;
@@ -241,9 +225,9 @@ mod test {
         InstallsDna(String),
     }
 
-    async fn setup() -> StdAdminInterfaceApi {
+    async fn setup() -> RealAdminInterfaceApi {
         let conductor = Conductor::build().test().await.unwrap();
-        StdAdminInterfaceApi::new(conductor)
+        RealAdminInterfaceApi::new(conductor)
     }
 
     #[tokio::test]

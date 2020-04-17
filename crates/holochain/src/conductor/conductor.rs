@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
@@ -59,6 +60,8 @@ struct CellItem {
 pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
+/// A handle to the conductor that can easily be passed
+/// around and cheaply cloned
 #[derive(Clone, From, AsRef, Deref)]
 pub struct ConductorHandle(Arc<RwLock<Conductor>>);
 
@@ -69,8 +72,10 @@ impl ConductorHandle {
         conductor.shutdown();
     }
 
+    /// Wait on the main running tasks
+    /// This will not be `Ready` until everything is done
+    /// Useful as a main point to keep the program alive.
     pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
-        // TODO: TEST: Make sure the write lock is not held for the await
         let task_manager_run_handle = {
             let mut conductor = self.0.write().await;
             conductor.wait()
@@ -83,12 +88,14 @@ impl ConductorHandle {
         Ok(())
     }
 
+    /// Check that shutdown has not been called
     pub async fn check_running(&self) -> ConductorResult<()> {
         self.0.read().await.check_running()
     }
 }
 
-pub type FakeDnaCache = HashMap<Address, Dna>;
+/// Placeholder for real store
+pub type FakeDnaStore = HashMap<Address, Dna>;
 
 use crate::conductor::api::api_external::{AdminRequest, AdminResponse};
 use futures::{future::FutureExt, stream::StreamExt};
@@ -126,7 +133,7 @@ ghost_actor::ghost_actor! {
 ///        replace the other Conductor below
 pub struct GhostConductor {
     internal_sender: ConductorApiInternalSender<(), ConductorInternal>,
-    fake_dna_cache: FakeDnaCache,
+    fake_dna_cache: FakeDnaStore,
     drop_broadcast: tokio::sync::broadcast::Sender<()>,
 }
 
@@ -143,7 +150,7 @@ impl GhostConductor {
         let (drop_broadcast, _) = tokio::sync::broadcast::channel(1);
         Ok(Self {
             internal_sender,
-            fake_dna_cache: FakeDnaCache::new(),
+            fake_dna_cache: FakeDnaStore::new(),
             drop_broadcast,
         })
     }
@@ -216,7 +223,7 @@ impl ConductorApiHandler<(), ConductorInternal> for GhostConductor {
     }
 }
 
-/// A Conductor is a group of [Cell]s
+/// A Conductor manages communication to and between a collection of [Cell]s and system services
 pub struct Conductor {
     /// The collection of cells associated with this Conductor
     cells: HashMap<CellId, CellItem>,
@@ -252,8 +259,8 @@ pub struct Conductor {
     /// The conductor is intended to live as long as this task does.
     task_manager_run_handle: Option<TaskManagerRunHandle>,
 
-    /// Placeholder for what will be the real DNA/Wasm cache
-    pub(super) fake_dna_cache: FakeDnaCache,
+    /// Placeholder for what will be the real DNA/Wasm store
+    pub(super) fake_dna_cache: FakeDnaStore,
 }
 
 impl Conductor {
@@ -277,6 +284,7 @@ impl Conductor {
         })
     }
 
+    /// Create a conductor builder
     pub fn build() -> ConductorBuilder {
         ConductorBuilder::new()
     }
@@ -311,6 +319,7 @@ impl Conductor {
         }
     }
 
+    /// Returns a port that was chosen by the OS
     pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
         self.admin_websocket_ports.get(0).copied()
     }
@@ -325,11 +334,11 @@ impl Conductor {
             })
     }
 
-    pub fn wait(&mut self) -> Option<TaskManagerRunHandle> {
+    fn wait(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
 
-    // TODO: remove allow once we actually use this function
+    // FIXME: remove allow once we actually use this function
     #[allow(dead_code)]
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
@@ -383,7 +392,7 @@ mod builder {
 
     use super::*;
     use crate::conductor::{
-        api::StdAdminInterfaceApi,
+        api::RealAdminInterfaceApi,
         config::AdminInterfaceConfig,
         interface::{
             error::InterfaceResult,
@@ -505,7 +514,7 @@ mod builder {
         stop_tx: StopBroadcaster,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
-        let admin_api = StdAdminInterfaceApi::new(conductor_mutex.clone().into());
+        let admin_api = RealAdminInterfaceApi::new(conductor_mutex.clone().into());
 
         // Closure to process each admin config item
         let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {

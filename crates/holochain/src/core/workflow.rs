@@ -19,7 +19,7 @@ use sx_state::error::DatabaseError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
     Genesis(Box<Dna>, AgentId),
@@ -44,7 +44,7 @@ pub struct WorkflowEffects<W: Workspace> {
 pub type WorkflowCallback = ();
 pub type WorkflowSignal = ();
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct WorkflowTrigger {
     pub(crate) call: WorkflowCall,
     pub(crate) interval: Option<Duration>,
