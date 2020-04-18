@@ -23,7 +23,7 @@ sx_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 lazy_static = "1.4.0"
 
 [patch.crates-io]
-holochain_serialized_bytes = { version = "=0.0.37", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned-next" }
+# holochain_serialized_bytes = { version = "=0.0.38", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 holochain_wasmer_common = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 holochain_wasmer_guest = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 holochain_wasmer_host = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
