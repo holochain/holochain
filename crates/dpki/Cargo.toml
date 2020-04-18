@@ -15,7 +15,7 @@ sx_types = { path = "../types" }
 newrelic = "0.2"
 lib3h_sodium = "0.0.38"
 serde = { version = "1.0.104", features = ["derive"] }
-serde_json = { version = "1.0.48", features = ["preserve_order"] }
+serde_json = { version = "1.0.51", features = ["preserve_order"] }
 hcid = "0.0.6"
 bip39 = "0.6.0-beta.1"
 holochain_common = { version = "0.0.46-alpha1" }

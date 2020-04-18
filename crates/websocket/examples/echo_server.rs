@@ -34,6 +34,8 @@ async fn main() {
 
             eprintln!("CONNECTION: {}", recv_socket.remote_addr());
 
+            // FIXME this doesn't need to be spawned as it's spawn above already
+            // and there's no loop
             tokio::task::spawn(async move {
                 while let Some(msg) = recv_socket.next().await {
                     match msg {

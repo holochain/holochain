@@ -1,3 +1,6 @@
+// Legacy config that will probably change
+#![allow(missing_docs)]
+
 use serde::{self, Deserialize, Serialize};
 
 /// Configure which app instance id to treat as the DPKI application handler

@@ -25,6 +25,7 @@ impl WebsocketSender {
         }
     }
 
+    // FIXME use the code enum not the u16
     /// Close the websocket
     #[must_use]
     pub fn close(&mut self, code: u16, reason: String) -> BoxFuture<'static, Result<()>> {
