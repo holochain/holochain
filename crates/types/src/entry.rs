@@ -123,15 +123,24 @@ pub fn test_entry() -> Entry {
 
 /// dummy core entry hash
 pub fn test_entry_hash() -> EntryHash {
-    EntryHash::new(vec![1, 2, 3, 4])
+    EntryHash::new(vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 1, 2, 3, 4,
+    ])
 }
 /// dummy core entry hash
 pub fn test_entry_hash_b() -> EntryHash {
-    EntryHash::new(vec![5, 6, 7, 8])
+    EntryHash::new(vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 5, 6, 7, 8,
+    ])
 }
 /// dummy core entry hash
 pub fn test_entry_hash_c() -> EntryHash {
-    EntryHash::new(vec![9, 10, 11, 12])
+    EntryHash::new(vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 9, 10, 11, 12,
+    ])
 }
 
 /// dummy entry, same as test_entry()

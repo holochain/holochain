@@ -262,19 +262,20 @@ pub mod tests {
             let parsed = parsed.as_array().unwrap().iter().map(|item| {
                 let item = item.as_object().unwrap();
                 let header = item.get("header").unwrap();
+                // println!("{:?}", &header.get("entry_hash").unwrap().to_vec());
                 let entry = item.get("entry").unwrap();
                 let entry_type = header.get("entry_type").unwrap().as_str().unwrap();
-                let entry_address = header.get("entry_address").unwrap().as_str().unwrap();
+                let entry_hash = header.get("entry_hash").unwrap().as_array().unwrap();
                 let entry_data: serde_json::Value = match entry_type {
                     "AgentId" => entry.get("entry").unwrap().as_object().unwrap().get("pub_sign_key").unwrap().clone(),
                     "Dna" => entry.get("entry").unwrap().as_object().unwrap().get("uuid").unwrap().clone(),
                     _ => serde_json::Value::Null,
                 };
-                serde_json::json!([entry_type, entry_address, entry_data])
+                serde_json::json!([entry_type, entry_hash, entry_data])
             }).collect::<Vec<_>>();
 
             assert_eq!(
-                "[[\"AgentId\",\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\",\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\"],[\"Dna\",\"QmQGir9h5SzZnY8wZb5Cbj29Fzjv3srf5xwC1TUzsoCHxH\",\"a\"]]",
+                "[[\"AgentId\",[80,175,172,157,19,188,197,203,244,17,222,5,124,231,9,136,103,95,220,176,53,29,50,213,177,162,170,128,201,34,105,174,246,127,146,111],\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\"],[\"Dna\",[141,156,107,10,121,153,183,44,252,235,130,18,15,60,195,140,245,216,114,34,159,25,20,192,110,168,173,156,245,222,28,181,205,228,163,32],\"a\"]]",
                 &serde_json::to_string(&parsed).unwrap(),
             );
 

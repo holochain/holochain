@@ -67,7 +67,7 @@ macro_rules! core_holo_hash {
                 /// Construct a new hash instance providing 36 bytes.
                 pub fn new(bytes: Vec<u8>) -> Self {
                     if bytes.len() != 36 {
-                        panic!("invalid holo_hash byte count, expected: 36, found: {}.", bytes.len());
+                        panic!("invalid holo_hash byte count, expected: 36, found: {}. {:?}", bytes.len(), &bytes);
                     }
                     Self(bytes)
                 }

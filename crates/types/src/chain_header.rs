@@ -146,7 +146,6 @@ pub mod tests {
         signature::Signature,
         time::test_iso_8601,
     };
-    use holo_hash_core::EntryHash;
 
     /// returns a dummy header for use in tests
     pub fn test_chain_header() -> ChainHeader {
@@ -182,12 +181,7 @@ pub mod tests {
     pub fn test_chain_header_b() -> ChainHeader {
         ChainHeader::new(
             test_entry_type_b(),
-            EntryHash::new(
-                SerializedBytes::try_from(test_entry_b())
-                    .unwrap()
-                    .bytes()
-                    .to_vec(),
-            ),
+            test_entry_hash_b(),
             &test_provenances("sig"),
             None,
             None,
@@ -201,10 +195,16 @@ pub mod tests {
     }
 
     pub fn test_header_hash() -> HeaderHash {
-        HeaderHash::new(vec![10, 20, 30])
+        HeaderHash::new(vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 10, 20, 30,
+        ])
     }
     pub fn test_header_hash_b() -> HeaderHash {
-        HeaderHash::new(vec![40, 50, 60])
+        HeaderHash::new(vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 40, 50, 60,
+        ])
     }
 
     #[test]
