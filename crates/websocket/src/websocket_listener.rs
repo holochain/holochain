@@ -1,6 +1,10 @@
 //! defines the websocket listener struct
 
 use crate::*;
+use futures::stream::FuturesUnordered;
+
+type PendingConnection = BoxFuture<'static, Result<(WebsocketSender, WebsocketReceiver)>>;
+const PENDING_BOUND: usize = 1000;
 
 /// Websocket listening / server socket. This struct is an async Stream -
 /// calling `.next().await` will give you a Future that will in turn resolve
@@ -12,6 +16,7 @@ pub struct WebsocketListener {
     config: Arc<WebsocketConfig>,
     local_addr: Url2,
     socket: tokio::net::TcpListener,
+    connections_queue: FuturesUnordered<PendingConnection>,
 }
 
 impl WebsocketListener {
@@ -27,44 +32,57 @@ impl WebsocketListener {
 }
 
 impl tokio::stream::Stream for WebsocketListener {
-    type Item = BoxFuture<'static, Result<(WebsocketSender, WebsocketReceiver)>>;
+    //type Item = BoxFuture<'static, Result<(WebsocketSender, WebsocketReceiver)>>;
+    type Item = Result<(WebsocketSender, WebsocketReceiver)>;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> std::task::Poll<Option<Self::Item>> {
+        let con_pin = std::pin::Pin::new(&mut self.connections_queue);
+        tracing::trace!("polling");
+        if let std::task::Poll::Ready(Some(result)) = tokio::stream::Stream::poll_next(con_pin, cx)
+        {
+            tracing::trace!("task ready");
+            return std::task::Poll::Ready(Some(result));
+        }
+        if self.connections_queue.len() > PENDING_BOUND {
+            tracing::trace!("queue full");
+            return std::task::Poll::Pending;
+        }
         let p = std::pin::Pin::new(&mut self.socket);
         match tokio::stream::Stream::poll_next(p, cx) {
             std::task::Poll::Ready(Some(socket_result)) => {
                 let config = self.config.clone();
-                std::task::Poll::Ready(Some(
-                    async move {
-                        match socket_result {
-                            Ok(socket) => {
-                                socket.set_keepalive(Some(std::time::Duration::from_secs(
-                                    config.tcp_keepalive_s as u64,
-                                )))?;
-                                tracing::debug!(
-                                    message = "accepted incoming raw socket",
-                                    remote_addr = %socket.peer_addr()?,
-                                );
-                                let socket = tokio_tungstenite::accept_async_with_config(
-                                    socket,
-                                    Some(tungstenite::protocol::WebSocketConfig {
-                                        max_send_queue: Some(config.max_send_queue),
-                                        max_message_size: Some(config.max_message_size),
-                                        max_frame_size: Some(config.max_frame_size),
-                                    }),
-                                )
-                                .await
-                                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-                                build_websocket_pair(config, socket)
-                            }
-                            Err(e) => Err(Error::new(ErrorKind::Other, e)),
+                let pending_connection = async move {
+                    match socket_result {
+                        Ok(socket) => {
+                            socket.set_keepalive(Some(std::time::Duration::from_secs(
+                                config.tcp_keepalive_s as u64,
+                            )))?;
+                            tracing::debug!(
+                                message = "accepted incoming raw socket",
+                                remote_addr = %socket.peer_addr()?,
+                            );
+                            let socket = tokio_tungstenite::accept_async_with_config(
+                                socket,
+                                Some(tungstenite::protocol::WebSocketConfig {
+                                    max_send_queue: Some(config.max_send_queue),
+                                    max_message_size: Some(config.max_message_size),
+                                    max_frame_size: Some(config.max_frame_size),
+                                }),
+                            )
+                            .await
+                            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+                            build_websocket_pair(config, socket)
                         }
+                        Err(e) => Err(Error::new(ErrorKind::Other, e)),
                     }
-                    .boxed(),
-                ))
+                }
+                .boxed();
+                self.connections_queue.push(pending_connection);
+                tracing::trace!("new connections");
+                std::task::Poll::Pending
             }
             std::task::Poll::Ready(None) => std::task::Poll::Ready(None),
             std::task::Poll::Pending => std::task::Poll::Pending,
@@ -86,6 +104,7 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
     socket.set_nonblocking(true)?;
     let socket = tokio::net::TcpListener::from_std(socket)?;
     let local_addr = addr_to_url(socket.local_addr()?, config.scheme);
+    let connections_queue = FuturesUnordered::new();
     tracing::info!(
         message = "bind",
         local_addr = %local_addr,
@@ -94,5 +113,6 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
         config,
         local_addr,
         socket,
+        connections_queue,
     })
 }

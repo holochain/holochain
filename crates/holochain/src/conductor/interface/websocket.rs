@@ -39,7 +39,9 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
     Ok(tokio::task::spawn(async move {
         let mut listener_handles = Vec::new();
         let mut send_sockets = Vec::new();
+            /*
         loop {
+            trace!("Looking for connections");
             tokio::select! {
                 // break if we receive on the stop channel
                 _ = stop_rx.recv() => { break; },
@@ -47,7 +49,7 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(conn) = maybe_con {
                     // TODO: TK-01260: this could take some time and should be spawned
-                    if let Ok((send_socket, recv_socket)) = conn.await {
+                    if let Ok((send_socket, recv_socket)) = conn {
                         send_sockets.push(send_socket);
                         listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
                             api.clone(),
@@ -62,6 +64,18 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 }
             }
         }
+        */
+        while let Some(conn) = listener.next().await {
+            trace!("round");
+            if let Ok((send_socket, recv_socket)) = conn {
+                send_sockets.push(send_socket);
+                listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                    api.clone(),
+                    recv_socket,
+                )));
+            }
+        }
+        trace!("done");
         // TODO: TK-01261: drop listener, make sure all these tasks finish!
         drop(listener);
 
@@ -115,7 +129,8 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
             // break if we receive on the stop channel
             _ = stop_rx.recv() => { break; },
             maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                let (send_socket, recv_socket) = connection.await?;
+                // FIXME: Handle this connection error without breaking the loop
+                let (send_socket, recv_socket) = connection?;
                 handle_connection(send_socket, recv_socket);
             } else {
                 break;
