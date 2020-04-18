@@ -3413,8 +3413,3 @@ dependencies = [
  "podio",
  "time",
 ]
-
-[[patch.unused]]
-name = "holochain_wasmer_guest"
-version = "0.0.24"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
