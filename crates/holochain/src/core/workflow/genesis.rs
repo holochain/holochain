@@ -86,19 +86,23 @@ mod tests {
             let source_chain = SourceChain::new(&reader, &dbs)?;
             assert_eq!(source_chain.agent_id()?, agent_id);
             source_chain.chain_head().expect("chain head should be set");
-            let addresses: Vec<_> = source_chain
+            let hashes: Vec<_> = source_chain
                 .iter_back()
                 .map(|h| {
                     debug!("header: {:?}", h);
-                    Ok(h.entry_address().clone())
+                    Ok(h.entry_hash().clone())
                 })
                 .collect()
                 .unwrap();
             assert_eq!(
-                addresses,
+                hashes,
                 vec![
-                    Entry::AgentId(agent_id).address(),
-                    Entry::Dna(Box::new(dna)).address()
+                    holo_hash::EntryHash::try_from(Entry::AgentId(agent_id))
+                        .unwrap()
+                        .into(),
+                    holo_hash::EntryHash::try_from(Entry::Dna(Box::new(dna)))
+                        .unwrap()
+                        .into(),
                 ]
             );
             Result::<_, WorkflowError>::Ok(())

@@ -206,8 +206,8 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put_entry(dna_entry.clone(), &agent_id);
-            store.put_entry(agent_entry.clone(), &agent_id);
+            store.put_entry(dna_entry.clone(), &agent_id)?;
+            store.put_entry(agent_entry.clone(), &agent_id)?;
             env.with_commit(|writer| store.flush_to_txn(writer))
         })?;
 
@@ -215,11 +215,11 @@ pub mod tests {
             let store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_some());
             let dna_entry_fetched = store
-                .get_entry(&dna_entry.address())
+                .get_entry((&dna_entry).try_into()?)
                 .expect("error retrieving")
                 .expect("entry not found");
             let agent_entry_fetched = store
-                .get_entry(&agent_entry.address())
+                .get_entry((&agent_entry).try_into()?)
                 .expect("error retrieving")
                 .expect("entry not found");
             assert_eq!(dna_entry, dna_entry_fetched);
@@ -227,7 +227,7 @@ pub mod tests {
             assert_eq!(
                 store
                     .iter_back()
-                    .map(|h| Ok(store.get_entry(h.entry_address())?))
+                    .map(|h| Ok(store.get_entry(h.entry_hash().to_owned().into())?))
                     .collect::<Vec<_>>()
                     .unwrap(),
                 vec![Some(agent_entry), Some(dna_entry)]
@@ -250,8 +250,8 @@ pub mod tests {
 
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put_entry(dna_entry.clone(), &agent_id);
-            store.put_entry(agent_entry.clone(), &agent_id);
+            store.put_entry(dna_entry.clone(), &agent_id)?;
+            store.put_entry(agent_entry.clone(), &agent_id)?;
             env.with_commit(|writer| store.flush_to_txn(writer))
         })?;
 

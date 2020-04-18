@@ -131,18 +131,22 @@ impl ChainHeader {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::entry::test_entry_hash;
+    use crate::entry::test_entry_hash_b;
+    use crate::entry::test_entry_hash_c;
     use crate::{
         agent::test_agent_id,
         chain_header::ChainHeader,
         entry::{
-            entry_type::tests::{test_entry_type, test_entry_type_a, test_entry_type_b},
-            tests::{test_entry, test_entry_a, test_entry_b},
+            entry_type::test_entry_type,
+            entry_type::tests::{test_entry_type_a, test_entry_type_b},
+            test_entry, test_entry_a, test_entry_b,
         },
         persistence::cas::content::{Address, Addressable},
         signature::Signature,
         time::test_iso_8601,
     };
-    use holo_hash::EntryHash;
+    use holo_hash_core::EntryHash;
 
     /// returns a dummy header for use in tests
     pub fn test_chain_header() -> ChainHeader {
@@ -153,7 +157,7 @@ pub mod tests {
     pub fn test_chain_header_with_sig(sig: &'static str) -> ChainHeader {
         ChainHeader::new(
             test_entry_type(),
-            holo_hash::EntryHash::try_from(test_entry()).unwrap(),
+            test_entry_hash(),
             &test_provenances(sig),
             None,
             None,
@@ -196,6 +200,13 @@ pub mod tests {
         Address::from("Qmc1n5gbUU2QKW6is9ENTqmaTcEjYMBwNkcACCxe3bBDnd".to_string())
     }
 
+    pub fn test_header_hash() -> HeaderHash {
+        HeaderHash::new(vec![10, 20, 30])
+    }
+    pub fn test_header_hash_b() -> HeaderHash {
+        HeaderHash::new(vec![40, 50, 60])
+    }
+
     #[test]
     /// tests for PartialEq
     fn eq() {
@@ -211,7 +222,7 @@ pub mod tests {
         assert_ne!(
             ChainHeader::new(
                 entry_a.entry_type(),
-                holo_hash::EntryHash::try_from(entry_a).unwrap(),
+                test_entry_hash(),
                 &test_provenances("sig"),
                 None,
                 None,
@@ -220,7 +231,7 @@ pub mod tests {
             ),
             ChainHeader::new(
                 entry_b.entry_type(),
-                entry_a.address(),
+                test_entry_hash(),
                 &test_provenances("sig"),
                 None,
                 None,
@@ -234,7 +245,7 @@ pub mod tests {
         assert_ne!(
             ChainHeader::new(
                 entry.entry_type(),
-                entry.address(),
+                test_entry_hash(),
                 &test_provenances("sig"),
                 None,
                 None,
@@ -243,9 +254,9 @@ pub mod tests {
             ),
             ChainHeader::new(
                 entry.entry_type(),
-                entry.address(),
+                test_entry_hash(),
                 &test_provenances("sig"),
-                Some(test_chain_header().address()),
+                Some(test_header_hash()),
                 None,
                 None,
                 test_iso_8601(),
@@ -258,9 +269,8 @@ pub mod tests {
     fn new() {
         let chain_header = test_chain_header();
 
-        assert_eq!(chain_header.entry_address(), &test_entry().address());
-        assert_eq!(chain_header.link(), None);
-        assert_ne!(chain_header.address(), Address::new());
+        assert_eq!(chain_header.entry_hash(), &test_entry_hash());
+        assert_eq!(chain_header.prev_header(), None);
     }
 
     #[test]
@@ -276,25 +286,25 @@ pub mod tests {
     }
 
     #[test]
-    fn link_test() {
+    fn prev_header_test() {
         let chain_header_a = test_chain_header();
         let entry_b = test_entry();
         let chain_header_b = ChainHeader::new(
             entry_b.entry_type(),
-            entry_b.address(),
+            test_entry_hash_b(),
             &test_provenances("sig"),
-            Some(chain_header_a.address()),
+            Some(test_header_hash()),
             None,
             None,
             test_iso_8601(),
         );
-        assert_eq!(None, chain_header_a.link());
-        assert_eq!(Some(chain_header_a.address()), chain_header_b.link());
+        assert_eq!(None, chain_header_a.prev_header());
+        assert_eq!(Some(test_header_hash()), chain_header_b.prev_header());
     }
 
     #[test]
     fn entry_test() {
-        assert_eq!(test_chain_header().entry_address(), &test_entry().address());
+        assert_eq!(test_chain_header().entry_hash(), &test_entry_hash());
     }
 
     #[test]
@@ -303,9 +313,9 @@ pub mod tests {
         let entry_b = test_entry_b();
         let chain_header_b = ChainHeader::new(
             entry_b.entry_type(),
-            entry_b.address(),
+            test_entry_hash_b(),
             &test_provenances("sig"),
-            Some(chain_header_a.address()),
+            Some(test_header_hash()),
             None,
             None,
             test_iso_8601(),
@@ -313,20 +323,17 @@ pub mod tests {
         let entry_c = test_entry_a();
         let chain_header_c = ChainHeader::new(
             entry_c.entry_type(),
-            entry_c.address(),
+            test_entry_hash_c(),
             &test_provenances("sig"),
-            Some(chain_header_b.address()),
-            Some(chain_header_a.address()),
+            Some(test_header_hash_b()),
+            Some(test_header_hash()),
             None,
             test_iso_8601(),
         );
 
-        assert_eq!(None, chain_header_a.link_same_type());
-        assert_eq!(None, chain_header_b.link_same_type());
-        assert_eq!(
-            Some(chain_header_a.address()),
-            chain_header_c.link_same_type()
-        );
+        assert_eq!(None, chain_header_a.prev_same_type());
+        assert_eq!(None, chain_header_b.prev_same_type());
+        assert_eq!(Some(test_header_hash()), chain_header_c.prev_same_type());
     }
 
     #[test]
@@ -353,7 +360,7 @@ pub mod tests {
         assert_ne!(
             ChainHeader::new(
                 test_entry_type_a(),
-                test_entry().address(),
+                test_entry_hash(),
                 &test_provenances("sig"),
                 None,
                 None,
@@ -363,7 +370,7 @@ pub mod tests {
             .address(),
             ChainHeader::new(
                 test_entry_type_b(),
-                test_entry().address(),
+                test_entry_hash(),
                 &test_provenances("sig"),
                 None,
                 None,
@@ -382,9 +389,9 @@ pub mod tests {
             test_chain_header().address(),
             ChainHeader::new(
                 entry.entry_type(),
-                entry.address(),
+                test_entry_hash(),
                 &test_provenances("sig"),
-                Some(test_chain_header().address()),
+                Some(test_header_hash()),
                 None,
                 None,
                 test_iso_8601(),
@@ -401,10 +408,10 @@ pub mod tests {
             test_chain_header().address(),
             ChainHeader::new(
                 entry.entry_type(),
-                entry.address(),
+                test_entry_hash(),
                 &test_provenances("sig"),
                 None,
-                Some(test_chain_header().address()),
+                Some(test_header_hash()),
                 None,
                 test_iso_8601(),
             )

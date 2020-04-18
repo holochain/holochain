@@ -84,6 +84,7 @@
 //!
 //! ```
 
+pub use holo_hash_core;
 pub use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
 
@@ -540,6 +541,12 @@ serial_hash!(
     sx_types::chain_header::ChainHeader,
     HeaderHash
 );
+
+/// hacky way to make an entry hash
+#[cfg(test)]
+pub fn test_entry_hash() -> EntryHash {
+    EntryHash::try_from(sx_types::entry::test_entry()).unwrap()
+}
 
 #[cfg(test)]
 mod tests {
