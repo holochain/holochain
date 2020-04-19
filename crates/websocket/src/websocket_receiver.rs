@@ -29,6 +29,15 @@ pub enum WebsocketMessage {
     Close(WebsocketClosed),
 }
 
+impl PartialEq for WebsocketMessage {
+    fn eq(&self, other: &WebsocketMessage) -> bool {
+        match (self, other) {
+            (WebsocketMessage::Request(sb1, _), WebsocketMessage::Request(sb2, _)) => sb1 == sb2,
+            (s, o) => s == o,
+        }
+    }
+}
+
 impl std::fmt::Debug for WebsocketMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

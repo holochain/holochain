@@ -1,21 +1,30 @@
+#![deny(missing_docs)]
+//! This module is used to configure the conductor
+
 use serde::{Deserialize, Serialize};
 
+mod admin_interface_config;
 mod dpki_config;
-//mod logger_config;
 mod network_config;
 mod passphrase_service_config;
+//mod logger_config;
 //mod signal_config;
 use super::{
     error::{ConductorError, ConductorResult},
     paths::EnvironmentRootPath,
 };
-use dpki_config::DpkiConfig;
-//use logger_config::LoggerConfig;
-use network_config::NetworkConfig;
-use passphrase_service_config::PassphraseServiceConfig;
-//use signal_config::SignalConfig;
+
+pub use crate::conductor::interface::InterfaceDriver;
+pub use admin_interface_config::AdminInterfaceConfig;
+pub use dpki_config::DpkiConfig;
+//pub use logger_config::LoggerConfig;
+pub use network_config::NetworkConfig;
+pub use passphrase_service_config::PassphraseServiceConfig;
+//pub use signal_config::SignalConfig;
 use std::path::Path;
 
+// TODO change types from "stringly typed" to Url2
+/// All the config information for the conductor
 #[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
     /// The path to the LMDB environment for this conductor.
@@ -52,6 +61,9 @@ pub struct ConductorConfig {
     /// PassphraseService. It just needs something to provide a passphrase when needed.
     /// This config setting selects one of the available services (i.e. CLI prompt, IPC, mock)
     pub passphrase_service: PassphraseServiceConfig,
+
+    /// Setup admin interfaces to control this conductor through a websocket connection
+    pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
     //
     //
     // /// Which signals to emit
@@ -64,7 +76,7 @@ pub struct ConductorConfig {
 }
 
 /// helper fnction function to load a `Config` from a toml string.
-pub fn config_from_toml<'a, T>(toml: &'a str) -> ConductorResult<T>
+fn config_from_toml<'a, T>(toml: &'a str) -> ConductorResult<T>
 where
     T: Deserialize<'a>,
 {
@@ -87,7 +99,9 @@ impl ConductorConfig {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::path::Path;
+    use matches::assert_matches;
+    use std::path::{Path, PathBuf};
+    use url::Url;
 
     #[test]
     fn test_config_load_toml() {
@@ -104,7 +118,7 @@ pub mod tests {
     #[test]
     fn test_config_bad_toml() {
         let result: ConductorResult<ConductorConfig> = config_from_toml("this isn't toml");
-        assert_eq!("Err(DeserializationError(Error { inner: ErrorInner { kind: Wanted { expected: \"an equals\", found: \"an identifier\" }, line: Some(0), col: 5, at: Some(5), message: \"\", key: [] } }))".to_string(), format!("{:?}", result));
+        assert_matches!(result, Err(ConductorError::DeserializationError(_)));
     }
 
     #[test]
@@ -115,8 +129,20 @@ pub mod tests {
     [passphrase_service]
     type = "cmd"
     "#;
-        let result: ConductorResult<ConductorConfig> = config_from_toml(toml);
-        assert_eq!("Ok(ConductorConfig { environment_path: EnvironmentRootPath(\"/path/to/env\"), network: None, signing_service_uri: None, encryption_service_uri: None, decryption_service_uri: None, dpki: None, passphrase_service: Cmd })", format!("{:?}", result));
+        let result: ConductorConfig = config_from_toml(toml).unwrap();
+        assert_eq!(
+            result,
+            ConductorConfig {
+                environment_path: PathBuf::from("/path/to/env").into(),
+                network: None,
+                signing_service_uri: None,
+                encryption_service_uri: None,
+                decryption_service_uri: None,
+                dpki: None,
+                passphrase_service: PassphraseServiceConfig::Cmd,
+                admin_interfaces: None,
+            }
+        );
     }
 
     #[test]
@@ -139,8 +165,31 @@ pub mod tests {
     instance_id = "some_id"
     init_params = "some_params"
 
+    [[admin_interfaces]]
+    driver.type = "websocket"
+    driver.port = 1234
+
     "#;
         let result: ConductorResult<ConductorConfig> = config_from_toml(toml);
-        assert_eq!("Ok(ConductorConfig { environment_path: EnvironmentRootPath(\"/path/to/env\"), network: Some(Sim2h { url: \"ws://localhost:9000/\" }), signing_service_uri: None, encryption_service_uri: None, decryption_service_uri: None, dpki: Some(DpkiConfig { instance_id: \"some_id\", init_params: \"some_params\" }), passphrase_service: Cmd })", format!("{:?}", result));
+        assert_eq!(
+            result.unwrap(),
+            ConductorConfig {
+                environment_path: PathBuf::from("/path/to/env").into(),
+                network: Some(NetworkConfig::Sim2h {
+                    url: Url::parse("ws://localhost:9000/").unwrap()
+                }),
+                signing_service_uri: None,
+                encryption_service_uri: None,
+                decryption_service_uri: None,
+                dpki: Some(DpkiConfig {
+                    instance_id: "some_id".into(),
+                    init_params: "some_params".into()
+                }),
+                passphrase_service: PassphraseServiceConfig::Cmd,
+                admin_interfaces: Some(vec![AdminInterfaceConfig {
+                    driver: InterfaceDriver::Websocket { port: 1234 }
+                }]),
+            }
+        );
     }
 }

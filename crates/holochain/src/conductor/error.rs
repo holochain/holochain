@@ -1,4 +1,4 @@
-use crate::conductor::{api::error::ConductorApiError, cell::error::CellError};
+use crate::conductor::cell::error::CellError;
 use std::path::PathBuf;
 use sx_state::error::DatabaseError;
 use sx_types::cell::{CellHandle, CellId};
@@ -10,9 +10,6 @@ pub type ConductorResult<T> = Result<T, ConductorError>;
 pub enum ConductorError {
     #[error("Internal Cell error: {0}")]
     InternalCellError(#[from] CellError),
-
-    #[error("Conductor API error: {0}")]
-    ApiError(#[from] ConductorApiError),
 
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
@@ -44,11 +41,17 @@ pub enum ConductorError {
     #[error("Config deserialization error: {0}")]
     SerializationError(#[from] toml::ser::Error),
 
+    #[error("Attempted to call into the conductor while it is shutting down")]
+    ShuttingDown,
+
     #[error("Miscellaneous error: {0}")]
     Todo(String),
 
     #[error("Error while performing IO for the Conductor: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("Error while trying to send a task to the task manager: {0}")]
+    SubmitTaskError(String),
 }
 
 // TODO: can this be removed?

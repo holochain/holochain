@@ -18,7 +18,8 @@ hcid = "0.0.6"
 lib3h_crypto_api = "0.0.38"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = ["derive", "rc"] }
-serde_json = "1.0.47"
+serde_json = "1.0.51"
+serde_bytes = "0.11"
 lazy_static = "1.4.0"
 snowflake = "1.3.0"
 backtrace = "0.3.27"
@@ -26,11 +27,18 @@ tracing = "=0.1.13"
 tracing-core = "=0.1.10"
 tracing-subscriber = "=0.2.3"
 tracing-serde = "=0.1.1"
-holochain_serialized_bytes = "=0.0.36"
+holochain_serialized_bytes = "=0.0.38"
 holochain_wasmer_common = "=0.0.24"
 sx_types_derive = { version = "=0.0.1", path = "../types_derive" }
 sx_zome_types = { path = "../zome_types" }
-holo_hash_core = { path = "../holo_hash_core" }
+sx_crypto = { version = "=0.0.1", path = "../crypto" }
+holo_hash = { version = "=0.0.1", path = "../holo_hash" }
+futures = "0.3"
+must_future = "0.1.1"
+
+# for test_utils
+anyhow = "1.0.26"
+tempdir = "0.3.7"
 
 # possibly dispensable
 multihash = "0.8.0"
@@ -41,4 +49,4 @@ rust-base58 = "0.0.4"
 shrinkwraprs = "0.3.0"
 
 [dev-dependencies]
-holo_hash = { path = "../holo_hash" }
+tokio = { version = "0.2", features = ["full"] }

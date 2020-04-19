@@ -6,11 +6,12 @@ pub mod config;
 pub mod error;
 pub mod interactive;
 pub mod interface;
+pub mod manager;
 pub mod paths;
 pub mod state;
 
 pub use cell::Cell;
-pub use conductor::Conductor;
+pub use conductor::{Conductor, ConductorHandle};
 
 //FIXME should this be here?
 // #[cfg(test)]
