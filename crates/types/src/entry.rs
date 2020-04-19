@@ -15,7 +15,6 @@ use crate::{
 use cap_entries::{CapTokenClaim, CapTokenGrant};
 use deletion_entry::DeletionEntry;
 use entry_type::{AppEntryType, EntryType};
-use holo_hash_core::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use multihash::Hash;
 
@@ -121,28 +120,6 @@ pub fn test_entry() -> Entry {
     )
 }
 
-/// dummy core entry hash
-pub fn test_entry_hash() -> EntryHash {
-    EntryHash::new(vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 1, 2, 3, 4,
-    ])
-}
-/// dummy core entry hash
-pub fn test_entry_hash_b() -> EntryHash {
-    EntryHash::new(vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 5, 6, 7, 8,
-    ])
-}
-/// dummy core entry hash
-pub fn test_entry_hash_c() -> EntryHash {
-    EntryHash::new(vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 9, 10, 11, 12,
-    ])
-}
-
 /// dummy entry, same as test_entry()
 #[cfg_attr(tarpaulin, skip)]
 pub fn test_entry_a() -> Entry {
@@ -160,6 +137,28 @@ pub fn test_entry_b() -> Entry {
 pub fn test_entry_value_b() -> SerializedBytes {
     SerializedBytes::try_from(SerializedString(String::from("other test entry value"))).unwrap()
 }
+#[cfg_attr(tarpaulin, skip)]
+/// dummy entry content c
+pub fn test_entry_value_c() -> SerializedBytes {
+    SerializedBytes::try_from(SerializedString(String::from("value C"))).unwrap()
+}
+/// dummy entry c
+pub fn test_entry_c() -> Entry {
+    Entry::App(test_app_entry_type_b(), test_entry_value_c())
+}
+
+#[cfg(test)]
+pub fn test_entry_hash() -> holo_hash::EntryHash {
+    holo_hash::EntryHash::try_from(crate::entry::test_entry()).unwrap()
+}
+#[cfg(test)]
+pub fn test_entry_hash_b() -> holo_hash::EntryHash {
+    holo_hash::EntryHash::try_from(crate::entry::test_entry_b()).unwrap()
+}
+#[cfg(test)]
+pub fn test_entry_hash_c() -> holo_hash::EntryHash {
+    holo_hash::EntryHash::try_from(crate::entry::test_entry_c()).unwrap()
+}
 
 #[cfg(test)]
 pub mod tests {
@@ -172,10 +171,8 @@ pub mod tests {
     use crate::entry::Entry;
     use crate::entry::SerializedString;
     use crate::{
-        agent::test_agent_id,
-        entry::entry_type::{test_app_entry_type, test_app_entry_type_b},
-        persistence::cas::content::Address,
-        persistence::cas::content::Addressable,
+        agent::test_agent_id, entry::entry_type::test_app_entry_type,
+        persistence::cas::content::Address, persistence::cas::content::Addressable,
         test_utils::fake_dna,
     };
     use holochain_serialized_bytes::prelude::*;
@@ -188,11 +185,6 @@ pub mod tests {
     #[cfg_attr(tarpaulin, skip)]
     pub fn test_entry_value_a() -> SerializedBytes {
         test_entry_value()
-    }
-
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_c() -> SerializedBytes {
-        SerializedBytes::try_from(SerializedString(String::from("value C"))).unwrap()
     }
 
     #[cfg_attr(tarpaulin, skip)]
@@ -216,10 +208,6 @@ pub mod tests {
     #[cfg_attr(tarpaulin, skip)]
     pub fn expected_entry_address() -> Address {
         Address::from("QmYd5fc7jzVZAQRuYGKU5PAiXeWoUEEaH4ogJyHR1RbQGw".to_string())
-    }
-
-    pub fn test_entry_c() -> Entry {
-        Entry::App(test_app_entry_type_b(), test_entry_value_c())
     }
 
     /// dummy entry with unique string content

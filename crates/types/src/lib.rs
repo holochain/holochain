@@ -29,3 +29,53 @@ pub mod universal_map;
 pub mod test_utils;
 
 use sx_zome_types;
+
+macro_rules! serial_hash {
+    ( $( $input:ty, $output:ident )* ) => {
+        $(
+            impl std::convert::TryFrom<$input> for holo_hash::$output {
+                type Error = holochain_serialized_bytes::SerializedBytesError;
+                fn try_from(i: $input) -> Result<Self, Self::Error> {
+                    holo_hash::$output::try_from(&i)
+                }
+            }
+            impl std::convert::TryFrom<&$input> for holo_hash::$output {
+                type Error = holochain_serialized_bytes::SerializedBytesError;
+                fn try_from(i: &$input) -> Result<Self, Self::Error> {
+                    Ok(holo_hash::$output::with_data_sync(
+                        holochain_serialized_bytes::SerializedBytes::try_from(i)?.bytes(),
+                    ))
+                }
+            }
+
+            impl std::convert::TryFrom<&$input> for holo_hash::HoloHash {
+                type Error = holochain_serialized_bytes::SerializedBytesError;
+                fn try_from(i: &$input) -> Result<Self, Self::Error> {
+                    Ok(holo_hash::HoloHash::$output(holo_hash::$output::try_from(
+                        i
+                    )?))
+                }
+            }
+            impl std::convert::TryFrom<$input> for holo_hash::HoloHash {
+                type Error = holochain_serialized_bytes::SerializedBytesError;
+                fn try_from(i: $input) -> Result<Self, Self::Error> {
+                    holo_hash::HoloHash::try_from(&i)
+                }
+            }
+        )*
+    };
+}
+
+/// hack to make serial_hash macro work
+#[allow(dead_code)]
+enum EntryHash {}
+#[allow(dead_code)]
+enum HeaderHash {}
+
+serial_hash!(
+    crate::entry::Entry,
+    EntryHash
+
+    crate::chain_header::ChainHeader,
+    HeaderHash
+);

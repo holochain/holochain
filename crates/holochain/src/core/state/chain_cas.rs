@@ -67,11 +67,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header: ChainHeader,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(entry) = self.get_entry(header.entry_hash().to_owned().into())? {
+        if let Some(entry) = self.get_entry(header.entry_hash().to_owned())? {
             Ok(Some(HeaderWithEntry::new(header, entry)))
         } else {
             Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(header.entry_hash().to_owned().into()),
+                ChainInvalidReason::MissingData(header.entry_hash().to_owned()),
             ))
         }
     }

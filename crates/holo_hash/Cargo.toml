@@ -19,7 +19,6 @@ serde = { version = "1.0.104", features = ["derive"] }
 serde_bytes = "0.11"
 thiserror = "1"
 tokio = { version = "0.2", optional = true }
-sx_types = { version = "0.0.1", path = "../types" }
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }

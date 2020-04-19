@@ -105,7 +105,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 .iter_back()
                 .map(|h| {
                     Ok(JsonChainDump {
-                        entry: self.get_entry(h.entry_hash().to_owned().into())?,
+                        entry: self.get_entry(h.entry_hash().to_owned())?,
                         header: h,
                     })
                 })
@@ -134,9 +134,9 @@ fn header_for_entry(
     trace!("PUT {} {:?}", entry.address(), entry);
     Ok(ChainHeader::new(
         entry.entry_type(),
-        holo_hash::EntryHash::try_from(entry)?.into(),
+        holo_hash::EntryHash::try_from(entry)?,
         provenances,
-        prev_head.map(|h| h.into()),
+        prev_head,
         None,
         None,
         timestamp,
@@ -168,7 +168,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 if let Some(header) = self.store.get_header(top.to_owned())? {
-                    self.current = header.prev_header().map(|h| h.into());
+                    self.current = header.prev_header();
                     Ok(Some(header))
                 } else {
                     Ok(None)
