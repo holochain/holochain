@@ -5,9 +5,7 @@
 //! As we decide which previous code to use, we should port those error types
 //! over to the appropriate error type in this crate.
 
-use crate::dna::error::DnaError;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_wasmer_common::WasmError;
 use lib3h_crypto_api::CryptoError;
 use serde_json::Error as SerdeError;
 use std::fmt;
@@ -27,8 +25,6 @@ pub enum SkunkError {
     CryptoError(#[from] CryptoError),
     Base64DecodeError(#[from] base64::DecodeError),
     Utf8Error(#[from] std::str::Utf8Error),
-    DnaError(#[from] DnaError),
-    WasmError(#[from] WasmError),
     // LocksmithError(#[from] holochain_locksmith::LocksmithError),
 }
 
