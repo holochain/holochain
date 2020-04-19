@@ -49,20 +49,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
-name = "assert_cli"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a29ab7c0ed62970beb0534d637a8688842506d0ff9157de83286dacd065c8149"
-dependencies = [
- "colored",
- "difference",
- "environment",
- "failure",
- "failure_derive",
- "serde_json",
-]
-
-[[package]]
 name = "assert_cmd"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -323,17 +309,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "colored"
-version = "1.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4ffc801dacf156c5854b9df4f425a626539c3a6ef7893cc0c5084a23f0b6c59"
-dependencies = [
- "atty",
- "lazy_static",
- "winapi 0.3.8",
-]
-
-[[package]]
 name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -581,12 +556,6 @@ name = "either"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
-
-[[package]]
-name = "environment"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f4b14e20978669064c33b4c1e0fb4083412e40fe56cbea2eae80fd7591503ee"
 
 [[package]]
 name = "errno"
@@ -918,7 +887,6 @@ name = "holochain_2020"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "assert_cli",
  "assert_cmd",
  "async-trait",
  "base64 0.10.1",
@@ -944,6 +912,7 @@ dependencies = [
  "owning_ref",
  "parking_lot 0.10.2",
  "petgraph",
+ "predicates",
  "serde",
  "serde_json",
  "shrinkwraprs",
