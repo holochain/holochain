@@ -11,7 +11,6 @@ use sx_state::env::Environment;
 use sx_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
-    error::SkunkResult,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
@@ -108,8 +107,10 @@ impl Cell {
 // so instead of explicitly building resources, we can downcast a Cell to exactly
 // the right set of resource getter traits
 trait NetSend {
-    fn network_send(&self, msg: Lib3hClientProtocol) -> SkunkResult<()>;
+    fn network_send(&self, msg: Lib3hClientProtocol) -> Result<(), NetError>;
 }
+
+enum NetError {}
 
 /// Simplification of holochain_net::connection::NetSend
 /// Could use the trait instead, but we will want an impl of it
