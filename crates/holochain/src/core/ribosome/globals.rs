@@ -8,17 +8,17 @@ use sx_zome_types::GlobalsInput;
 use sx_zome_types::GlobalsOutput;
 
 pub fn globals(
-    ribosome: Arc<WasmRibosome>,
+    _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: GlobalsInput,
 ) -> GlobalsOutput {
     GlobalsOutput::new(ZomeGlobals {
-        agent_address: "".into(),      // @TODO
-        agent_id_str: "".into(),       // @TODO
-        agent_initial_hash: "".into(), // @TODO
-        agent_latest_hash: "".into(),  // @TODO
-        dna_address: "".into(),        // @TODO
-        dna_name: ribosome.dna.name.clone(),
+        agent_address: "".into(),                           // @TODO
+        agent_id_str: "".into(),                            // @TODO
+        agent_initial_hash: "".into(),                      // @TODO
+        agent_latest_hash: "".into(),                       // @TODO
+        dna_address: "".into(),                             // @TODO
+        dna_name: "".into(),                                // @TODO
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
         public_token: "".into(),                            // @TODO
     })

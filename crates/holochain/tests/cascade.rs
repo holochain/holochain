@@ -4,7 +4,7 @@ use holochain_2020::core::state::{
 };
 use std::convert::TryInto;
 use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
-use sx_types::{agent::AgentId, entry::Entry};
+use sx_types::{entry::Entry, prelude::*, test_utils::fake_agent_hash};
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {
@@ -20,10 +20,10 @@ async fn get_links() -> DatabaseResult<()> {
     let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
     let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
 
-    let jimbo_id = AgentId::generate_fake("Jimbo");
-    let jimbo = Entry::AgentId(jimbo_id.clone());
-    let jessy_id = AgentId::generate_fake("Jessy");
-    let jessy = Entry::AgentId(jessy_id.clone());
+    let jimbo_id = fake_agent_hash("Jimbo");
+    let jimbo = Entry::AgentKey(jimbo_id.clone());
+    let jessy_id = fake_agent_hash("Jessy");
+    let jessy = Entry::AgentKey(jessy_id.clone());
     let base: EntryHash = (&jimbo).try_into()?;
     source_chain.put_entry(jimbo, &jimbo_id)?;
     source_chain.put_entry(jessy, &jessy_id)?;

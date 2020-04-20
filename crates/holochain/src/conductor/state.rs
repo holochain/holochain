@@ -7,15 +7,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use sx_types::{
-    agent::{AgentId, Base32},
-    dna::{
-        bridges::{BridgePresence, BridgeReference},
-        Dna,
-    },
-    error::SkunkError,
-    prelude::*,
-};
+use sx_types::{dna::Dna, error::SkunkError, prelude::*};
 
 #[cfg(test)]
 mod tests;
@@ -98,27 +90,28 @@ impl ConductorState {
                 )
             })?;
             let dna_config = dna_config.unwrap();
-            let dna =
+            let _dna =
                 Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(dna_config.file.clone()))
                     .map_err(|_| format!("Could not load DNA file \"{}\"", dna_config.file))?;
 
-            for zome in dna.zomes.values() {
-                for bridge in zome.bridges.iter() {
-                    if bridge.presence == BridgePresence::Required {
-                        let handle = bridge.handle.clone();
-                        let _ = self
-                            .bridges
-                            .iter()
-                            .find(|b| b.handle == handle)
-                            .ok_or_else(|| {
-                                format!(
-                                    "Required bridge '{}' for cell '{}' missing",
-                                    handle, cell.id
-                                )
-                            })?;
-                    }
-                }
-            }
+            // TODO: LEGACY
+            // for zome in dna.zomes.values() {
+            //     for bridge in zome.bridges.iter() {
+            //         if bridge.presence == BridgePresence::Required {
+            //             let handle = bridge.handle.clone();
+            //             let _ = self
+            //                 .bridges
+            //                 .iter()
+            //                 .find(|b| b.handle == handle)
+            //                 .ok_or_else(|| {
+            //                     format!(
+            //                         "Required bridge '{}' for cell '{}' missing",
+            //                         handle, cell.id
+            //                     )
+            //                 })?;
+            //         }
+            //     }
+            // }
         }
 
         for interface in self.interfaces.iter() {
@@ -132,149 +125,151 @@ impl ConductorState {
             }
         }
 
-        for bridge in self.bridges.iter() {
-            self.check_bridge_requirements(bridge, dna_loader)?;
-        }
+        // TODO: LEGACY
+        // for bridge in self.bridges.iter() {
+        //     self.check_bridge_requirements(bridge, dna_loader)?;
+        // }
 
         let _ = self.cell_ids_sorted_by_bridge_dependencies()?;
 
         Ok(())
     }
 
-    fn check_bridge_requirements(
-        &self,
-        bridge_config: &Bridge,
-        mut dna_loader: &mut DnaLoader,
-    ) -> Result<(), String> {
-        //
-        // Get caller's config. DNA config, and DNA:
-        //
-        let caller_config = self.cell_by_id(&bridge_config.caller_id).ok_or_else(|| {
-            format!(
-                "cell configuration \"{}\" not found, mentioned in bridge",
-                bridge_config.caller_id
-            )
-        })?;
+    // TODO: LEGACY
+    // fn check_bridge_requirements(
+    //     &self,
+    //     bridge_config: &Bridge,
+    //     mut dna_loader: &mut DnaLoader,
+    // ) -> Result<(), String> {
+    //     //
+    //     // Get caller's config. DNA config, and DNA:
+    //     //
+    //     let caller_config = self.cell_by_id(&bridge_config.caller_id).ok_or_else(|| {
+    //         format!(
+    //             "cell configuration \"{}\" not found, mentioned in bridge",
+    //             bridge_config.caller_id
+    //         )
+    //     })?;
 
-        let caller_dna_config = self.dna_by_id(&caller_config.dna).ok_or_else(|| {
-            format!(
-                "DNA configuration \"{}\" not found, mentioned in cell \"{}\"",
-                caller_config.dna, caller_config.id
-            )
-        })?;
+    //     let caller_dna_config = self.dna_by_id(&caller_config.dna).ok_or_else(|| {
+    //         format!(
+    //             "DNA configuration \"{}\" not found, mentioned in cell \"{}\"",
+    //             caller_config.dna, caller_config.id
+    //         )
+    //     })?;
 
-        let caller_dna_file = caller_dna_config.file;
-        let caller_dna =
-            Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(caller_dna_file.clone()))
-                .map_err(|err| {
-                    format!(
-                        "Could not load DNA file \"{}\"; error was: {}",
-                        caller_dna_file, err
-                    )
-                })?;
+    //     let caller_dna_file = caller_dna_config.file;
+    //     let caller_dna =
+    //         Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(caller_dna_file.clone()))
+    //             .map_err(|err| {
+    //                 format!(
+    //                     "Could not load DNA file \"{}\"; error was: {}",
+    //                     caller_dna_file, err
+    //                 )
+    //             })?;
 
-        //
-        // Get callee's config. DNA config, and DNA:
-        //
-        let callee_config = self.cell_by_id(&bridge_config.callee_id).ok_or_else(|| {
-            format!(
-                "cell configuration \"{}\" not found, mentioned in bridge",
-                bridge_config.callee_id
-            )
-        })?;
+    //     //
+    //     // Get callee's config. DNA config, and DNA:
+    //     //
+    //     let callee_config = self.cell_by_id(&bridge_config.callee_id).ok_or_else(|| {
+    //         format!(
+    //             "cell configuration \"{}\" not found, mentioned in bridge",
+    //             bridge_config.callee_id
+    //         )
+    //     })?;
 
-        let callee_dna_config = self.dna_by_id(&callee_config.dna).ok_or_else(|| {
-            format!(
-                "DNA configuration \"{}\" not found, mentioned in cell \"{}\"",
-                callee_config.dna, callee_config.id
-            )
-        })?;
+    //     let callee_dna_config = self.dna_by_id(&callee_config.dna).ok_or_else(|| {
+    //         format!(
+    //             "DNA configuration \"{}\" not found, mentioned in cell \"{}\"",
+    //             callee_config.dna, callee_config.id
+    //         )
+    //     })?;
 
-        let callee_dna_file = callee_dna_config.file;
-        let callee_dna =
-            Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(callee_dna_file.clone()))
-                .map_err(|err| {
-                    format!(
-                        "Could not load DNA file \"{}\"; error was: {}",
-                        callee_dna_file, err
-                    )
-                })?;
+    //     let callee_dna_file = callee_dna_config.file;
+    //     let callee_dna =
+    //         Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(callee_dna_file.clone()))
+    //             .map_err(|err| {
+    //                 format!(
+    //                     "Could not load DNA file \"{}\"; error was: {}",
+    //                     callee_dna_file, err
+    //                 )
+    //             })?;
 
-        //
-        // Get matching bridge definition from caller's DNA:
-        //
-        let mut maybe_bridge = None;
-        for zome in caller_dna.zomes.values() {
-            for bridge_def in zome.bridges.iter() {
-                if bridge_def.handle == bridge_config.handle {
-                    maybe_bridge = Some(bridge_def.clone());
-                }
-            }
-        }
+    //     //
+    //     // Get matching bridge definition from caller's DNA:
+    //     //
+    //     let mut maybe_bridge = None;
+    //     for zome in caller_dna.zomes.values() {
+    //         for bridge_def in zome.bridges.iter() {
+    //             if bridge_def.handle == bridge_config.handle {
+    //                 maybe_bridge = Some(bridge_def.clone());
+    //             }
+    //         }
+    //     }
 
-        let bridge = maybe_bridge.ok_or_else(|| {
-            format!(
-                "No bridge definition with handle '{}' found in {}'s DNA",
-                bridge_config.handle, bridge_config.caller_id,
-            )
-        })?;
+    //     let bridge = maybe_bridge.ok_or_else(|| {
+    //         format!(
+    //             "No bridge definition with handle '{}' found in {}'s DNA",
+    //             bridge_config.handle, bridge_config.caller_id,
+    //         )
+    //     })?;
 
-        match bridge.reference {
-            BridgeReference::Address { ref dna_address } => {
-                if *dna_address != callee_dna.address() {
-                    return Err(format!(
-                        "Bridge '{}' of caller cell '{}' requires callee to be DNA with hash '{}', but the configured cell '{}' runs DNA with hash '{}'.",
-                        bridge.handle,
-                        bridge_config.caller_id,
-                        dna_address,
-                        callee_config.id,
-                        callee_dna.address(),
-                    ));
-                }
-            }
-            BridgeReference::Trait { ref traits } => {
-                for (expected_trait_name, expected_trait) in traits {
-                    let mut found = false;
-                    for (_zome_name, zome) in callee_dna.zomes.iter() {
-                        for (zome_trait_name, zome_trait_functions) in zome.traits.iter() {
-                            if zome_trait_name == expected_trait_name {
-                                let mut has_all_fns_exported = true;
-                                for fn_def in expected_trait.functions.iter() {
-                                    if !zome_trait_functions.functions.contains(&fn_def.name) {
-                                        has_all_fns_exported = false;
-                                    }
-                                }
+    //     match bridge.reference {
+    //         BridgeReference::Address { ref dna_address } => {
+    //             if *dna_address != callee_dna.address() {
+    //                 return Err(format!(
+    //                     "Bridge '{}' of caller cell '{}' requires callee to be DNA with hash '{}', but the configured cell '{}' runs DNA with hash '{}'.",
+    //                     bridge.handle,
+    //                     bridge_config.caller_id,
+    //                     dna_address,
+    //                     callee_config.id,
+    //                     callee_dna.address(),
+    //                 ));
+    //             }
+    //         }
+    //         BridgeReference::Trait { ref traits } => {
+    //             for (expected_trait_name, expected_trait) in traits {
+    //                 let mut found = false;
+    //                 for (_zome_name, zome) in callee_dna.zomes.iter() {
+    //                     for (zome_trait_name, zome_trait_functions) in zome.traits.iter() {
+    //                         if zome_trait_name == expected_trait_name {
+    //                             let mut has_all_fns_exported = true;
+    //                             for fn_def in expected_trait.functions.iter() {
+    //                                 if !zome_trait_functions.functions.contains(&fn_def.name) {
+    //                                     has_all_fns_exported = false;
+    //                                 }
+    //                             }
 
-                                let mut has_matching_signatures = true;
-                                if has_all_fns_exported {
-                                    for fn_def in expected_trait.functions.iter() {
-                                        if !zome.fn_declarations.contains(&fn_def) {
-                                            has_matching_signatures = false;
-                                        }
-                                    }
-                                }
+    //                             let mut has_matching_signatures = true;
+    //                             if has_all_fns_exported {
+    //                                 for fn_def in expected_trait.functions.iter() {
+    //                                     if !zome.fn_declarations.contains(&fn_def) {
+    //                                         has_matching_signatures = false;
+    //                                     }
+    //                                 }
+    //                             }
 
-                                if has_all_fns_exported && has_matching_signatures {
-                                    found = true;
-                                }
-                            }
-                        }
-                    }
+    //                             if has_all_fns_exported && has_matching_signatures {
+    //                                 found = true;
+    //                             }
+    //                         }
+    //                     }
+    //                 }
 
-                    if !found {
-                        return Err(format!(
-                            "Bridge '{}' of cell '{}' requires callee to to implement trait '{}' with functions: {:?}",
-                            bridge.handle,
-                            bridge_config.caller_id,
-                            expected_trait_name,
-                            expected_trait.functions,
-                        ));
-                    }
-                }
-            }
-        };
-        Ok(())
-    }
+    //                 if !found {
+    //                     return Err(format!(
+    //                         "Bridge '{}' of cell '{}' requires callee to to implement trait '{}' with functions: {:?}",
+    //                         bridge.handle,
+    //                         bridge_config.caller_id,
+    //                         expected_trait_name,
+    //                         expected_trait.functions,
+    //                     ));
+    //                 }
+    //             }
+    //         }
+    //     };
+    //     Ok(())
+    // }
 
     /// Returns the agent configuration with the given ID if present
     pub fn agent_by_id(&self, id: &str) -> Option<AgentConfig> {
@@ -282,10 +277,10 @@ impl ConductorState {
     }
 
     /// Returns the agent configuration with the given ID if present
-    pub fn update_agent_address_by_id(&mut self, id: &str, agent_id: &AgentId) {
+    pub fn update_agent_address_by_id(&mut self, id: &str, agent_hash: &AgentHash) {
         self.agents.iter_mut().for_each(|ac| {
             if ac.id == *id {
-                ac.public_address = agent_id.pub_sign_key().clone()
+                ac.hash = agent_hash.clone()
             }
         })
     }
@@ -424,7 +419,7 @@ impl ConductorState {
 pub struct AgentConfig {
     pub id: String,
     pub name: String,
-    pub public_address: Base32,
+    pub hash: AgentHash,
     pub keystore_file: String,
     /// If set to true conductor will ignore keystore_file and instead use the remote signer
     /// accessible through signing_service_uri to request signatures.

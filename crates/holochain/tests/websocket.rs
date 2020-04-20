@@ -140,7 +140,7 @@ async fn call_admin() {
 
     let uuid = Uuid::new_v4();
     let dna = fake_dna(&uuid.to_string());
-    let dna_address = dna.address();
+    let dna_hash = dna.dna_hash();
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = fake_dna_file(dna).unwrap();
@@ -153,7 +153,7 @@ async fn call_admin() {
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
-    let expects = vec![dna_address];
+    let expects = vec![dna_hash];
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
     holochain.kill().expect("Failed to kill holochain");

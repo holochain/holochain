@@ -24,7 +24,7 @@ pub fn test_eav_value() -> ExampleEntry {
     test_entry_b()
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, SerializedBytesAddress)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct ExampleEntry {
     pub data: String,
 }

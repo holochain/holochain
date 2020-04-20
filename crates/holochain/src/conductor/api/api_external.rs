@@ -5,13 +5,13 @@ use crate::conductor::{
     interface::error::{AdminInterfaceErrorKind, InterfaceError, InterfaceResult},
     ConductorHandle,
 };
+use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use std::path::PathBuf;
 use sx_types::{
     cell::CellHandle,
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*,
 };
 use tracing::*;
 
@@ -120,7 +120,7 @@ impl RealAdminInterfaceApi {
             .write()
             .await
             .fake_dna_cache
-            .insert(dna.address(), dna);
+            .insert(dna.dna_hash(), dna);
         Ok(())
     }
 
@@ -259,7 +259,7 @@ pub enum AdminResponse {
     /// [Dna] has successfully been installed
     DnaInstalled,
     /// A list of all installed [Dna]s
-    ListDnas(Vec<Address>),
+    ListDnas(Vec<DnaHash>),
     /// An error has ocurred in this request
     Error {
         /// The error as a string
@@ -338,10 +338,10 @@ mod test {
         let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
-        let dna_address = dna.address();
+        let dna_hash = dna.dna_hash();
         admin_api.add_dna(dna).await?;
         let dna_list = admin_api.list_dnas().await?;
-        let expects = vec![dna_address];
+        let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
         Ok(())
     }

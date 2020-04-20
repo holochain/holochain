@@ -48,7 +48,7 @@ use holochain_wasmer_host::prelude::*;
 use mockall::automock;
 use std::sync::Arc;
 use sx_types::{
-    dna::Dna,
+    dna::{zome::Zome, Dna},
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
@@ -113,13 +113,18 @@ impl WasmRibosome {
     }
 
     pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
-        format!("{}{}", &self.dna.name, zome_name).into_bytes()
+        // TODO: @thedavidmeister is it OK to use dna_hash instead of name here? ~maackle
+        // format!("{}{}", &self.dna.name, zome_name).into_bytes()
+        format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
     }
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
         let zome_name = host_context.zome_name.clone();
-        let zome = self.dna.get_zome(&zome_name)?;
-        let wasm: Arc<Vec<u8>> = zome.code.code();
+        // TODO: cannot get zome because the notion of zomes is currently "legacy"
+        // let zome = self.dna.get_zome(&zome_name)?;
+        // let wasm: Arc<Vec<u8>> = zome.code.code();
+        let zome: Zome = todo!("Implement zomes");
+        let wasm: Arc<Vec<u8>> = todo!("Zome code");
         let imports: ImportObject = WasmRibosome::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             &self.wasm_cache_key(&zome_name),
@@ -226,9 +231,8 @@ pub mod wasm_test {
     use holochain_serialized_bytes::prelude::*;
     use sx_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
-        prelude::Address,
         shims::SourceChainCommitBundle,
-        test_utils::{fake_agent_id, fake_capability_request, fake_cell_id},
+        test_utils::{fake_agent_hash, fake_cap_token, fake_cell_id},
     };
     use sx_wasm_test_utils::TestWasm;
     use sx_zome_types::*;
@@ -238,18 +242,20 @@ pub mod wasm_test {
     use std::collections::BTreeMap;
     use sx_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
-        test_utils::{fake_dna, fake_zome},
+        test_utils::{fake_dna, fake_header_hash, fake_zome},
     };
 
     fn zome_from_code(code: DnaWasm) -> Zome {
         let mut zome = fake_zome();
-        zome.code = code;
+        // TODO: @thedavidmeister sorry to make your tests fail!
+        // zome.code = code;
         zome
     }
 
     fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
         let mut dna = fake_dna("uuid");
-        dna.zomes = zomes;
+        // TODO: @thedavidmeister sorry to make your tests fail!
+        // dna.zomes = zomes;
         dna
     }
 
@@ -262,10 +268,10 @@ pub mod wasm_test {
             zome_name: zome_name.into(),
             fn_name: fn_name.into(),
             cell_id: fake_cell_id("bob"),
-            cap: fake_capability_request(),
+            cap: fake_cap_token(),
             payload: ZomeExternHostInput::new(payload),
-            provenance: fake_agent_id("bob"),
-            as_at: Address::from("fake"),
+            provenance: fake_agent_hash("bob"),
+            as_at: fake_header_hash("fake"),
         }
     }
 

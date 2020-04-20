@@ -1,7 +1,7 @@
 //! Types related to making calls into Zomes.
 
-use crate::{agent::AgentId, cell::CellId, dna::capabilities::CapabilityRequest, prelude::*};
-// use std::sync::Arc;
+use crate::{cell::CellId, prelude::*, shims::CapToken};
+use holo_hash::AgentHash;
 use sx_zome_types::*;
 
 /// The ZomeId is a pair of CellId and ZomeName.
@@ -21,15 +21,15 @@ pub struct ZomeInvocation {
     /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
     /// The capability request authorization this [ZomeInvocation]
-    pub cap: CapabilityRequest,
+    pub cap: CapToken,
     /// The name of the Zome function to call
     pub fn_name: String,
     /// The serialized data to pass an an argument to the Zome call
     pub payload: ZomeExternHostInput,
     /// the provenance of the call
-    pub provenance: AgentId,
+    pub provenance: AgentHash,
     /// the hash of the top header at the time of call
-    pub as_at: Address,
+    pub as_at: HeaderHash,
 }
 
 /// Response to a zome invocation

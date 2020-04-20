@@ -23,6 +23,7 @@ use crate::conductor::{
 };
 pub use builder::*;
 use derive_more::{AsRef, Deref, From};
+use holo_hash::*;
 use std::collections::HashMap;
 use std::{error::Error, sync::Arc};
 use sx_state::{
@@ -33,10 +34,8 @@ use sx_state::{
     typed::{Kv, UnitDbKey},
 };
 use sx_types::{
-    agent::AgentId,
     cell::{CellHandle, CellId},
     dna::Dna,
-    prelude::Address,
     shims::Keystore,
 };
 use tokio::sync::{mpsc, RwLock};
@@ -95,7 +94,7 @@ impl ConductorHandle {
 }
 
 /// Placeholder for real store
-pub type FakeDnaStore = HashMap<Address, Dna>;
+pub type FakeDnaStore = HashMap<DnaHash, Dna>;
 
 /// A Conductor manages communication to and between a collection of [Cell]s and system services
 pub struct Conductor {
@@ -120,8 +119,8 @@ pub struct Conductor {
     /// Placeholder. A way to look up a Cell from its app-specific handle.
     _handle_map: HashMap<CellHandle, CellId>,
 
-    /// Placeholder. A way to get a Keystore from an AgentId.
-    _agent_keys: HashMap<AgentId, Keystore>,
+    /// Placeholder. A way to get a Keystore from an AgentHash.
+    _agent_keys: HashMap<AgentHash, Keystore>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
