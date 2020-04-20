@@ -40,7 +40,7 @@
 //!
 //! tokio::task::spawn(async move {
 //!     while let Some(maybe_con) = server.next().await {
-//!         let (_send, mut recv) = maybe_con.await.unwrap();
+//!         let (_send, mut recv) = maybe_con.unwrap();
 //!
 //!         tokio::task::spawn(async move {
 //!             if let Some(msg) = recv.next().await {
@@ -145,19 +145,21 @@ mod tests {
 
         let binding = server.local_addr().clone();
 
-        while let Some(maybe_con) = server.next().await {
-            let (_send, mut recv) = maybe_con.unwrap();
+        tokio::task::spawn(async move {
+            while let Some(maybe_con) = server.next().await {
+                let (_send, mut recv) = maybe_con.unwrap();
 
-            tokio::task::spawn(async move {
-                if let Some(msg) = recv.next().await {
-                    if let WebsocketMessage::Request(data, respond) = msg {
-                        let msg: TestMessage = data.try_into().unwrap();
-                        let msg = TestMessage(format!("echo: {}", msg.0));
-                        respond(msg.try_into().unwrap()).await.unwrap();
+                tokio::task::spawn(async move {
+                    if let Some(msg) = recv.next().await {
+                        if let WebsocketMessage::Request(data, respond) = msg {
+                            let msg: TestMessage = data.try_into().unwrap();
+                            let msg = TestMessage(format!("echo: {}", msg.0));
+                            respond(msg.try_into().unwrap()).await.unwrap();
+                        }
                     }
-                }
-            });
-        }
+                });
+            }
+        });
 
         let (mut send, _recv) = websocket_connect(binding, Arc::new(WebsocketConfig::default()))
             .await
