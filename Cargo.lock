@@ -2601,6 +2601,7 @@ dependencies = [
  "lazy_static",
  "lib3h_crypto_api",
  "maplit",
+ "matches",
  "multihash",
  "must_future",
  "regex",
