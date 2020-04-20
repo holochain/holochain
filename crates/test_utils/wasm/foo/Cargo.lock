@@ -502,11 +502,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[patch.unused]]
-name = "holochain_serialized_bytes"
-version = "0.0.37"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned-next#c747d9e42a33d9e7aa77710b05c835b76c0c8ba8"
-
-[[patch.unused]]
 name = "holochain_wasmer_host"
 version = "0.0.24"
 source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"

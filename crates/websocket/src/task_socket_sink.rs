@@ -28,12 +28,24 @@ where
         use tokio::stream::StreamExt;
         while let Some((msg, send_complete)) = recv_sink.next().await {
             use futures::sink::SinkExt;
+            // Avoid cloning every message by checking
+            // for close first
+            let mut should_exit = false;
+            if let tungstenite::Message::Close(_) = msg {
+                should_exit = true;
+            }
+
             if let Err(e) = sink.send(msg).await {
                 tracing::error!(error = ?e);
                 // end task
                 break;
             }
             let _ = send_complete.send(());
+
+            if should_exit {
+                tracing::info!("Close message sent now exiting sending task");
+                break;
+            }
         }
         tracing::info!(
             message = "socket sink task ended",

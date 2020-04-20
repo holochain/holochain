@@ -69,9 +69,60 @@ async fn integration_test() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn channels_properly_close() {
-    // TODO
+    sx_types::observability::test_run().unwrap();
+
+    let mut server = websocket_bind(
+        url2!("ws://127.0.0.1:0"),
+        std::sync::Arc::new(WebsocketConfig::default()),
+    )
+    .await
+    .unwrap();
+    let binding = server.local_addr().clone();
+
+    tracing::info!(
+        test = "got bound addr",
+        %binding,
+    );
+
+    let server_handle = tokio::task::spawn(async move {
+        let conn = server.next().await.unwrap();
+        let (_send, mut recv) = conn.await.unwrap();
+        if let WebsocketMessage::Close(_) = recv.next().await.unwrap() {
+            // Simulate slow client close
+            tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+        } else {
+            panic!("Got wrong message");
+        }
+    });
+
+    let (mut send, mut recv) =
+        websocket_connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+            .await
+            .unwrap();
+
+    tracing::info!(
+        test = "connection success",
+        remote_addr = %recv.remote_addr(),
+    );
+
+    let recv_handle = tokio::task::spawn(async move {
+        while let Some(msg) = recv.next().await {
+            tracing::info!(?msg, "Receiver");
+        }
+    });
+
+    send.close(1000, "test".to_string()).await.unwrap();
+
+    std::mem::drop(send);
+    dbg!();
+    tokio::time::delay_for(std::time::Duration::from_millis(1)).await;
+
+    tokio::time::timeout(std::time::Duration::from_secs(2), recv_handle)
+        .await
+        .expect("Receiver didn't close after close sent from receiver")
+        .unwrap();
+    server_handle.await.unwrap();
 }
 
 fn spawn_listener_loop(mut server: WebsocketListener) -> tokio::task::JoinHandle<()> {

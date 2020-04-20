@@ -13,6 +13,10 @@ pub struct WebsocketSender {
     send_dispatch: ToDispatchIncomingSender,
 }
 
+impl Drop for WebsocketSender {
+    fn drop(&mut self) { dbg!("Dropping websocket sender"); }
+}
+
 impl WebsocketSender {
     /// internal constructor
     pub(crate) fn priv_new(
