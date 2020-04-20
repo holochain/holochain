@@ -10,4 +10,4 @@ crate-type = [ "cdylib", "rlib" ]
 path = "./src/lib.rs"
 
 [dependencies]
-sx_types = { path = "../../crates/types" }
+sx_types = { path = "../../types" }

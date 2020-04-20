@@ -1,5 +1,5 @@
 use crate::conductor::api::*;
-
+use error::InterfaceResult;
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
     future::{BoxFuture, FutureExt},
@@ -7,39 +7,11 @@ use futures::{
     stream::{Stream, StreamExt},
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
+use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 
-pub mod channel;
-mod handler;
-
-/// Interface Error Type
-#[derive(Debug, thiserror::Error)]
-pub enum InterfaceError {
-    SerializedBytes(#[from] SerializedBytesError),
-    SendError,
-    Other(String),
-}
-
-impl std::fmt::Display for InterfaceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl From<String> for InterfaceError {
-    fn from(o: String) -> Self {
-        InterfaceError::Other(o)
-    }
-}
-
-impl From<futures::channel::mpsc::SendError> for InterfaceError {
-    fn from(_: futures::channel::mpsc::SendError) -> Self {
-        InterfaceError::SendError
-    }
-}
-
-/// Interface Result Type
-pub type InterfaceResult<T> = Result<T, InterfaceError>;
+pub mod error;
+pub mod websocket;
 
 /// Allows the conductor or cell to forward signals to connected clients
 pub struct ConductorSideSignalSender<Sig>
@@ -115,7 +87,7 @@ where
 
     // we can ignore this JoinHandle, because if conductor is dropped,
     // both sides of this forward will be dropped and the task will end.
-    let _ = tokio::task::spawn(sig_recv.map(|x: SerializedBytes| Ok(x)).forward(extern_sig));
+    let _ = tokio::task::spawn(sig_recv.map(Ok).forward(extern_sig));
 
     // we need to do some translations on the request/response flow
     let (req_send, req_recv) = channel(10);
@@ -150,9 +122,9 @@ where
 }
 
 /// bind a conductor-side request receiver to a particular conductor api
-pub fn attach_external_conductor_api<A: ExternalConductorApi>(
+pub fn attach_external_conductor_api<A: AppInterfaceApi>(
     api: A,
-    mut recv: ConductorSideRequestReceiver<ConductorRequest, ConductorResponse>,
+    mut recv: ConductorSideRequestReceiver<AppRequest, AppResponse>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn(async move {
         while let Some(msg) = recv.next().await {
@@ -168,6 +140,19 @@ pub fn attach_external_conductor_api<A: ExternalConductorApi>(
             }
         }
     })
+}
+
+/// Configuration for interfaces, specifying the means by which an interface
+/// should be opened.
+///
+/// NB: This struct is used in both [ConductorConfig] and [ConductorState], so
+/// it is important that the serialization technique is not altered.
+//
+// TODO: write test that ensures the serialization is unaltered
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum InterfaceDriver {
+    Websocket { port: u16 },
 }
 
 #[cfg(test)]

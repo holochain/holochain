@@ -3,12 +3,17 @@ use std::path::Path;
 fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
 
-    // force a rebuild every time because:
-    // - the wasm .rs files changing doesn't trigger a rebuild here
-    // - any shared dependency with core can be changed and that won't trigger a rebuild
-    // the alternative is to recurse over all the files in the dependencies and wasm
-    // crates and rerun-if-changed on each of those
-    // if you want to implement that, go for it :)
+    // HACK(thedavidmeister): We force a rebuild of our included Wasm packages
+    // every time this crate is built.
+    //
+    // Without this hack, changes made to the Wasm's dependencies that live in
+    // this repo wouldn't always trigger a rebuild of the Wasm and we could end
+    // up in inconsistent and confusing states.
+    //
+    // TODO: Investigate options like only rebuilding if a file in `crates/`
+    // has changed.
+    //
+    // See also: https://github.com/rust-lang/cargo/issues/8091
     let hacky_file_name = "__wasm_test_utils_non-existent_file";
     let hacky_file_not_found = match std::fs::metadata(hacky_file_name) {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
@@ -43,6 +48,5 @@ fn main() {
             .unwrap();
 
         assert!(status.success());
-
     }
 }

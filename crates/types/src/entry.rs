@@ -28,6 +28,7 @@ pub type AppEntryValue = SerializedBytes;
 /// data is stored as a JsonString
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, SerializedBytes)]
 #[allow(clippy::large_enum_variant)]
+#[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// An App (user defined) Entry
     App(AppEntryType, AppEntryValue),
@@ -163,7 +164,7 @@ pub mod tests {
     /// the correct address for test_entry()
     #[cfg_attr(tarpaulin, skip)]
     pub fn expected_entry_address() -> Address {
-        Address::from("QmWiGDegSfEUxw5qsco39QeGuZLqiunN928g3uPDdQw2QZ".to_string())
+        Address::from("QmYd5fc7jzVZAQRuYGKU5PAiXeWoUEEaH4ogJyHR1RbQGw".to_string())
     }
 
     /// dummy entry, same as test_entry()
