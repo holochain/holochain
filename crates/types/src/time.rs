@@ -60,6 +60,10 @@ pub enum Iso8601Error {
     #[error("Error when serializing/deserializing Iso8601 time: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
 
+    /// An error when parsing a string
+    #[error("Error when parsing a string: {0}")]
+    ParseError(String),
+
     /// A generic, string-based error
     #[error("Generic Iso8601 time Error: {0}")]
     Generic(String),
@@ -695,7 +699,7 @@ impl FromStr for Iso8601 {
                 .or_else(
                     |_| ISO8601_RE.captures(s)
                         .map_or_else(
-                            || Err(Iso8601Error::generic(
+                            || Err(Iso8601Error::ParseError(
                                 format!("Failed to find ISO 3339 or RFC 8601 timestamp in {:?}", s))),
                             |cap| {
                                 let timestamp = &format!(
@@ -741,6 +745,7 @@ pub fn test_iso_8601() -> Iso8601 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use matches::assert_matches;
     use std::convert::TryInto;
 
     #[test]
@@ -1226,10 +1231,7 @@ pub mod tests {
                 "Unexpected success of checked DateTime<FixedOffset> try_from: {:?}",
                 iso
             ),
-            Err(e) => assert_eq!(
-                e.to_string(),
-                "Failed to find ISO 3339 or RFC 8601 timestamp in \"boo\""
-            ),
+            Err(e) => assert_matches!(e, Iso8601Error::ParseError(_)),
         }
     }
 
