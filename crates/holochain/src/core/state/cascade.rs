@@ -42,7 +42,9 @@ use super::{
     chain_cas::ChainCasBuf,
     chain_meta::{ChainMetaBufT, EntryDhtStatus},
 };
+use holo_hash::AgentHash;
 use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 use std::collections::HashSet;
 use sx_state::{error::DatabaseResult, prelude::Reader};
 use sx_types::entry::Entry;
@@ -76,6 +78,13 @@ enum Search {
     NotInCascade,
 }
 
+#[derive(Debug, Clone, derive_more::From)]
+enum Key {
+    Header(HeaderHash),
+    Entry(EntryHash),
+    Agent(AgentHash),
+}
+
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
 impl<'env, C> Cascade<'env, C>
@@ -102,30 +111,27 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub async fn dht_get(&self, key: Key) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
             .primary
-            .get_entry(entry_hash.clone())?
+            .get_entry(key.clone())?
             .and_then(|entry| {
-                self.primary_meta
-                    .get_crud(entry_hash.clone())
-                    .ok()
-                    .map(|crud| {
-                        if let EntryDhtStatus::Live = crud {
-                            Search::Found(entry)
-                        } else {
-                            Search::NotInCascade
-                        }
-                    })
+                self.primary_meta.get_crud(key.clone()).ok().map(|crud| {
+                    if let EntryDhtStatus::Live = crud {
+                        Search::Found(entry)
+                    } else {
+                        Search::NotInCascade
+                    }
+                })
             })
             .unwrap_or_else(|| Search::Continue);
 
         // Cache
         match search {
-            Search::Continue => Ok(self.cache.get_entry(entry_hash.clone())?.and_then(|entry| {
+            Search::Continue => Ok(self.cache.get_entry(key.clone())?.and_then(|entry| {
                 self.cache_meta
-                    .get_crud(entry_hash)
+                    .get_crud(key)
                     .ok()
                     .and_then(|crud| match crud {
                         EntryDhtStatus::Live => Some(entry),
