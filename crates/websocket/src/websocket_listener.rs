@@ -32,26 +32,15 @@ impl WebsocketListener {
 }
 
 impl tokio::stream::Stream for WebsocketListener {
-    //type Item = BoxFuture<'static, Result<(WebsocketSender, WebsocketReceiver)>>;
     type Item = Result<(WebsocketSender, WebsocketReceiver)>;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let con_pin = std::pin::Pin::new(&mut self.connections_queue);
         tracing::trace!("polling");
-        if let std::task::Poll::Ready(Some(result)) = tokio::stream::Stream::poll_next(con_pin, cx)
-        {
-            tracing::trace!("task ready");
-            return std::task::Poll::Ready(Some(result));
-        }
-        if self.connections_queue.len() > PENDING_BOUND {
-            tracing::trace!("queue full");
-            return std::task::Poll::Pending;
-        }
         let p = std::pin::Pin::new(&mut self.socket);
-        match tokio::stream::Stream::poll_next(p, cx) {
+        let result = match tokio::stream::Stream::poll_next(p, cx) {
             std::task::Poll::Ready(Some(socket_result)) => {
                 let config = self.config.clone();
                 let pending_connection = async move {
@@ -80,13 +69,27 @@ impl tokio::stream::Stream for WebsocketListener {
                     }
                 }
                 .boxed();
+                tracing::trace!("Incoming");
                 self.connections_queue.push(pending_connection);
-                tracing::trace!("new connections");
                 std::task::Poll::Pending
             }
             std::task::Poll::Ready(None) => std::task::Poll::Ready(None),
             std::task::Poll::Pending => std::task::Poll::Pending,
+        };
+        let con_pin = std::pin::Pin::new(&mut self.connections_queue);
+        // It's important that the context is set by this stream after
+        // the previous or this future won't be polled until the
+        // next incoming connection
+        if let std::task::Poll::Ready(Some(result)) = tokio::stream::Stream::poll_next(con_pin, cx)
+        {
+            tracing::trace!("Connected");
+            return std::task::Poll::Ready(Some(result));
         }
+        if self.connections_queue.len() > PENDING_BOUND {
+            tracing::trace!("Full");
+            return std::task::Poll::Pending;
+        }
+        result
     }
 }
 
