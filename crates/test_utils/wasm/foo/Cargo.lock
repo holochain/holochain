@@ -318,6 +318,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-big-array"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "883eee5198ea51720eab8be52a36cf6c0164ac90eea0ed95b649d5e35382404e"
+dependencies = [
+ "serde",
+ "serde_derive",
+]
+
+[[package]]
 name = "serde-transcode"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -375,6 +385,7 @@ dependencies = [
  "multihash",
  "rust-base58",
  "serde",
+ "serde-big-array",
 ]
 
 [[package]]
@@ -500,11 +511,6 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[patch.unused]]
-name = "holochain_serialized_bytes"
-version = "0.0.37"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned-next#c747d9e42a33d9e7aa77710b05c835b76c0c8ba8"
 
 [[patch.unused]]
 name = "holochain_wasmer_host"

@@ -9,7 +9,7 @@ use sx_zome_types::RandomBytesOutput;
 
 pub fn csprng_bytes(n: usize) -> Result<Vec<u8>, ring::error::Unspecified> {
     let rng = rand::SystemRandom::new();
-    let mut bytes = Vec::with_capacity(n);
+    let mut bytes = vec![0; n];
     bytes.resize(n, 0);
     rng.fill(&mut bytes)?;
 
