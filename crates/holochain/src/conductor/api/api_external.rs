@@ -29,7 +29,7 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
     ) -> InterfaceResult<Self::ApiResponse>;
 }
 
-/// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.  
+/// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
 /// This trait has a one mock implementation and one "Real" implementation
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
@@ -267,15 +267,10 @@ pub enum AdminResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppRequest {
-    /// TODO: DOCS: what is this?
+    /// Asks the conductor to do some crypto
     CryptoRequest {
-        /// TODO: DOCS: ?
+        /// The request payload
         request: Box<CryptoRequest>,
-    },
-    /// Request used for testing
-    TestRequest {
-        /// Tets request data
-        request: Box<TestRequest>,
     },
     /// Call a zome function
     ZomeInvocationRequest {

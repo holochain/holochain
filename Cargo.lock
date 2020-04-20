@@ -976,20 +976,23 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.36"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned#695e4a9ffead59fba1f9ecbd1eb0ef9cb17dc5d5"
+version = "0.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6be38f6ee21d935ce62a55ca27d2708e2dcce0ac4fda46c792bbdc76b2be83b4"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.36"
-source = "git+https://github.com/holochain/holochain-serialization.git?branch=unpinned#695e4a9ffead59fba1f9ecbd1eb0ef9cb17dc5d5"
+version = "0.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f9dcb58ed79199b69ab54407901b9d681a498bc48c9d145b8ec1d2255440eb5"
 dependencies = [
  "quote 0.6.11",
  "syn 0.15.31",
@@ -998,8 +1001,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc9561fb0cf8eecae7c161087b1f34b43b8d7abb5f2e111272ddd0f12f5e3c6b"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -1010,8 +1012,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2106a54eb7117cb98d519e272a3208b7aa530fe81e5f5950ad30610812128948"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -1415,6 +1416,16 @@ dependencies = [
  "sha1",
  "sha2",
  "tiny-keccak",
+]
+
+[[package]]
+name = "must_future"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9abee73a92c055233afa557c1209436a515f14a7c1b84a0825d08b48241fb3eb"
+dependencies = [
+ "futures",
+ "pin-utils",
 ]
 
 [[package]]
@@ -1857,9 +1868,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-error"
-version = "0.4.12"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18f33027081eba0a6d8aba6d1b1c3a3be58cbb12106341c2d5759fcd9b5277e7"
+checksum = "98e9e4b82e0ef281812565ea4751049f1bdcdfccda7d3f459f2e138a40c08678"
 dependencies = [
  "proc-macro-error-attr",
  "proc-macro2 1.0.10",
@@ -1870,9 +1881,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-error-attr"
-version = "0.4.12"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a5b4b77fdb63c1eca72173d68d24501c54ab1269409f6b672c85deb18af69de"
+checksum = "4f5444ead4e9935abd7f27dc51f7e852a0569ac888096d5ec2499470794e2e53"
 dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
@@ -2538,9 +2549,9 @@ checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
 name = "structopt"
-version = "0.3.11"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fe43617218c0805c6eb37160119dc3c548110a67786da7218d1c6555212f073"
+checksum = "ff6da2e8d107dfd7b74df5ef4d205c6aebee0706c647f6bc6a2d5789905c00fb"
 dependencies = [
  "clap",
  "lazy_static",
@@ -2549,9 +2560,9 @@ dependencies = [
 
 [[package]]
 name = "structopt-derive"
-version = "0.4.4"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6e79c80e0f4efd86ca960218d4e056249be189ff1c42824dcd9a7f51a56f0bd"
+checksum = "a489c87c08fbaf12e386665109dd13470dcc9c4583ea3e10dd2b4523e5ebd9ac"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -2611,23 +2622,29 @@ dependencies = [
  "base64 0.10.1",
  "chrono",
  "derive_more",
+ "futures",
  "hcid",
+ "holo_hash",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "lazy_static",
  "lib3h_crypto_api",
  "maplit",
  "multihash",
+ "must_future",
  "regex",
  "rust-base58",
  "serde",
+ "serde_bytes",
  "serde_json",
  "shrinkwraprs",
  "snowflake",
+ "sx_crypto",
  "sx_types_derive",
  "sx_zome_types",
  "tempdir",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-core",
  "tracing-serde",
@@ -3394,3 +3411,8 @@ dependencies = [
  "podio",
  "time",
 ]
+
+[[patch.unused]]
+name = "holochain_wasmer_guest"
+version = "0.0.24"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"

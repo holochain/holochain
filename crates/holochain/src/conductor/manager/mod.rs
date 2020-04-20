@@ -25,20 +25,18 @@ const CHANNEL_SIZE: usize = 1000;
 pub(crate) type ManagedTaskHandle = JoinHandle<ManagedTaskResult>;
 pub(crate) type TaskManagerRunHandle = JoinHandle<()>;
 
-pub(crate) type OnDeath =
-    Box<dyn FnOnce(ManagedTaskResult) -> Option<ManagedTaskAdd> + Send + Sync>;
+pub(crate) type OnDeath = Box<dyn Fn(ManagedTaskResult) -> Option<ManagedTaskAdd> + Send + Sync>;
 
 /// A message sent to the TaskManager, registering a closure to run upon
 /// completion of a task
 pub struct ManagedTaskAdd {
     handle: ManagedTaskHandle,
     // TODO: B-01455: reevaluate wether this should be a callback
-    on_death: Option<OnDeath>,
+    on_death: OnDeath,
 }
 
 impl ManagedTaskAdd {
     pub(crate) fn new(handle: ManagedTaskHandle, on_death: OnDeath) -> Self {
-        let on_death = Some(on_death);
         ManagedTaskAdd { handle, on_death }
     }
 
@@ -51,14 +49,15 @@ impl ManagedTaskAdd {
 }
 
 impl Future for ManagedTaskAdd {
-    type Output = (Option<OnDeath>, ManagedTaskResult);
+    type Output = Option<ManagedTaskAdd>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let p = std::pin::Pin::new(&mut self.handle);
         match JoinHandle::poll(p, cx) {
-            Poll::Ready(r) => {
-                Poll::Ready((self.on_death.take(), r.unwrap_or_else(|e| Err(e.into()))))
-            }
+            Poll::Ready(r) => Poll::Ready(handle_completed_task(
+                &self.on_death,
+                r.unwrap_or_else(|e| Err(e.into())),
+            )),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -98,25 +97,21 @@ async fn run(mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>) {
         return;
     }
     loop {
-        let new_task_to_spawn = tokio::select! {
+        tokio::select! {
             Some(new_task) = new_task_channel.recv() => {
                 task_manager.stream.push(new_task);
-                None
             }
             result = task_manager.stream.next() => match result {
-                Some((Some(on_death), task_result)) => handle_completed_task(on_death, task_result),
+                Some(Some(new_task)) => task_manager.stream.push(new_task),
+                Some(None) => (),
                 None => break,
-                _ => None,
             }
         };
-        if let Some(new_task) = new_task_to_spawn {
-            task_manager.stream.push(new_task)
-        }
     }
 }
 
 fn handle_completed_task(
-    on_death: OnDeath,
+    on_death: &OnDeath,
     task_result: ManagedTaskResult,
 ) -> Option<ManagedTaskAdd> {
     on_death(task_result)
@@ -127,9 +122,11 @@ mod test {
     use super::*;
     use crate::conductor::error::ConductorError;
     use anyhow::Result;
+    use sx_types::observability;
 
     #[tokio::test]
     async fn spawn_and_handle_dying_task() -> Result<()> {
+        observability::test_run().ok();
         let (mut send_task_handle, main_task) = spawn_task_manager();
         let handle = tokio::spawn(async {
             Err(ConductorError::Todo("This task gotta die".to_string()).into())
