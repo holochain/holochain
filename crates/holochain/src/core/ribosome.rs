@@ -59,6 +59,8 @@ use sx_zome_types::*;
 /// Represents a type which has not been decided upon yet
 pub enum Todo {}
 
+/// all the things that can go wrong on the host side when a guest dials out to call some host
+/// imported function
 pub enum RibosomeError {
     Wasm(WasmError),
     RoughTime(RoughTimeError),
