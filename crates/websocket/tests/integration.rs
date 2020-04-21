@@ -116,7 +116,7 @@ async fn channels_properly_close() {
 
     std::mem::drop(send);
     dbg!();
-    tokio::time::delay_for(std::time::Duration::from_millis(1)).await;
+    tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
 
     tokio::time::timeout(std::time::Duration::from_secs(2), recv_handle)
         .await
