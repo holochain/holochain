@@ -152,6 +152,10 @@ impl WasmRibosome {
                             std::sync::Arc::clone(&closure_host_context_arc),
                             input,
                         ),
+                        // TODO - Identify calls that are essentially synchronous vs those that
+                        // may be async, such as get, send, etc.
+                        // async calls should require timeouts specified by hApp devs
+                        // pluck those timeouts out, and apply them here:
                         std::time::Duration::from_secs(60),
                     )
                     .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
