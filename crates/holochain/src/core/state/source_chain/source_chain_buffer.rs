@@ -11,6 +11,8 @@ use sx_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
+use sx_types::chain_header::HeaderAddress;
+use sx_types::entry::EntryAddress;
 use sx_types::{
     agent::AgentId,
     chain_header::ChainHeader,
@@ -43,15 +45,15 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         })
     }
 
-    pub fn chain_head(&self) -> Option<&Address> {
+    pub fn chain_head(&self) -> Option<&HeaderAddress> {
         self.sequence.chain_head()
     }
 
-    pub fn get_entry(&self, k: &Address) -> DatabaseResult<Option<Entry>> {
+    pub fn get_entry(&self, k: EntryAddress) -> DatabaseResult<Option<Entry>> {
         self.cas.get_entry(k)
     }
 
-    pub fn get_header(&self, k: &Address) -> DatabaseResult<Option<ChainHeader>> {
+    pub fn get_header(&self, k: HeaderAddress) -> DatabaseResult<Option<ChainHeader>> {
         self.cas.get_header(k)
     }
 
@@ -61,10 +63,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
-    pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) {
-        let header = header_for_entry(&entry, agent_id, self.chain_head().cloned());
-        self.sequence.put_header(header.address());
-        self.cas.put((header, entry));
+    pub fn put_entry(&mut self, entry: Entry, agent_id: &AgentId) -> DatabaseResult<()> {
+        let header = header_for_entry(&entry, agent_id, self.chain_head().cloned())?;
+        self.sequence.put_header((&header).try_into()?);
+        self.cas.put((header, entry))?;
+        Ok(())
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
@@ -102,7 +105,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 .iter_back()
                 .map(|h| {
                     Ok(JsonChainDump {
-                        entry: self.get_entry(h.entry_address())?,
+                        entry: self.get_entry(h.entry_address().to_owned())?,
                         header: h,
                     })
                 })
@@ -121,24 +124,28 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
     }
 }
 
-fn header_for_entry(entry: &Entry, agent_id: &AgentId, prev_head: Option<Address>) -> ChainHeader {
+fn header_for_entry(
+    entry: &Entry,
+    agent_id: &AgentId,
+    prev_head: Option<HeaderAddress>,
+) -> Result<ChainHeader, SerializedBytesError> {
     let provenances = &[Provenance::new(agent_id.address(), Signature::fake())];
     let timestamp = chrono::Utc::now().timestamp().into();
     trace!("PUT {} {:?}", entry.address(), entry);
-    ChainHeader::new(
+    Ok(ChainHeader::new(
         entry.entry_type(),
-        entry.address(),
+        EntryAddress::try_from(entry)?,
         provenances,
         prev_head,
         None,
         None,
         timestamp,
-    )
+    ))
 }
 
 pub struct SourceChainBackwardIterator<'env, R: Readable> {
     store: &'env SourceChainBuf<'env, R>,
-    current: Option<Address>,
+    current: Option<HeaderAddress>,
 }
 
 impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
@@ -160,8 +167,8 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
         match &self.current {
             None => Ok(None),
             Some(top) => {
-                if let Some(header) = self.store.get_header(top)? {
-                    self.current = header.link();
+                if let Some(header) = self.store.get_header(top.to_owned())? {
+                    self.current = header.prev_header();
                     Ok(Some(header))
                 } else {
                     Ok(None)
@@ -199,8 +206,8 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put_entry(dna_entry.clone(), &agent_id);
-            store.put_entry(agent_entry.clone(), &agent_id);
+            store.put_entry(dna_entry.clone(), &agent_id)?;
+            store.put_entry(agent_entry.clone(), &agent_id)?;
             env.with_commit(|writer| store.flush_to_txn(writer))
         })?;
 
@@ -208,11 +215,11 @@ pub mod tests {
             let store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_some());
             let dna_entry_fetched = store
-                .get_entry(&dna_entry.address())
+                .get_entry((&dna_entry).try_into()?)
                 .expect("error retrieving")
                 .expect("entry not found");
             let agent_entry_fetched = store
-                .get_entry(&agent_entry.address())
+                .get_entry((&agent_entry).try_into()?)
                 .expect("error retrieving")
                 .expect("entry not found");
             assert_eq!(dna_entry, dna_entry_fetched);
@@ -220,7 +227,7 @@ pub mod tests {
             assert_eq!(
                 store
                     .iter_back()
-                    .map(|h| Ok(store.get_entry(h.entry_address())?))
+                    .map(|h| Ok(store.get_entry(h.entry_address().to_owned())?))
                     .collect::<Vec<_>>()
                     .unwrap(),
                 vec![Some(agent_entry), Some(dna_entry)]
@@ -243,8 +250,8 @@ pub mod tests {
 
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put_entry(dna_entry.clone(), &agent_id);
-            store.put_entry(agent_entry.clone(), &agent_id);
+            store.put_entry(dna_entry.clone(), &agent_id)?;
+            store.put_entry(agent_entry.clone(), &agent_id)?;
             env.with_commit(|writer| store.flush_to_txn(writer))
         })?;
 
@@ -255,9 +262,10 @@ pub mod tests {
             let parsed = parsed.as_array().unwrap().iter().map(|item| {
                 let item = item.as_object().unwrap();
                 let header = item.get("header").unwrap();
+                // println!("{:?}", &header.get("entry_hash").unwrap().to_vec());
                 let entry = item.get("entry").unwrap();
                 let entry_type = header.get("entry_type").unwrap().as_str().unwrap();
-                let entry_address = header.get("entry_address").unwrap().as_str().unwrap();
+                let entry_address = header.get("entry_address").unwrap().get("Entry").unwrap().as_array().unwrap();
                 let entry_data: serde_json::Value = match entry_type {
                     "AgentId" => entry.get("entry").unwrap().as_object().unwrap().get("pub_sign_key").unwrap().clone(),
                     "Dna" => entry.get("entry").unwrap().as_object().unwrap().get("uuid").unwrap().clone(),
@@ -267,7 +275,7 @@ pub mod tests {
             }).collect::<Vec<_>>();
 
             assert_eq!(
-                "[[\"AgentId\",\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\",\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\"],[\"Dna\",\"QmQGir9h5SzZnY8wZb5Cbj29Fzjv3srf5xwC1TUzsoCHxH\",\"a\"]]",
+                "[[\"AgentId\",[80,175,172,157,19,188,197,203,244,17,222,5,124,231,9,136,103,95,220,176,53,29,50,213,177,162,170,128,201,34,105,174,246,127,146,111],\"HcScIkRaAaaaaaaaaaAaaaAAAAaaaaaaaaAaaaaAaaaaaaaaAaaAAAAatzu4aqa\"],[\"Dna\",[141,156,107,10,121,153,183,44,252,235,130,18,15,60,195,140,245,216,114,34,159,25,20,192,110,168,173,156,245,222,28,181,205,228,163,32],\"a\"]]",
                 &serde_json::to_string(&parsed).unwrap(),
             );
 

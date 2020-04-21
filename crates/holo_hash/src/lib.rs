@@ -84,7 +84,9 @@
 //!
 //! ```
 
+pub use holo_hash_core;
 pub use holo_hash_core::HoloHashCoreHash;
+use holochain_serialized_bytes::prelude::*;
 
 /// Holo Hash Error Type.
 #[derive(Debug, thiserror::Error)]
@@ -140,20 +142,20 @@ for (let i = 0x00; i <= 0xff; ++i) {
 }
 ```
 
-hCAk 4100 <Buffer 84 20 24>
-hCEk 4228 <Buffer 84 21 24>
-hCIk 4356 <Buffer 84 22 24>
+hCAk 4100 <Buffer 84 20 24> // agent
+hCEk 4228 <Buffer 84 21 24> // entry
+hCIk 4356 <Buffer 84 22 24> // net id
 hCMk 4484 <Buffer 84 23 24>
-hCQk 4612 <Buffer 84 24 24>
+hCQk 4612 <Buffer 84 24 24> // dht op
 hCUk 4740 <Buffer 84 25 24>
 hCYk 4868 <Buffer 84 26 24>
 hCck 4996 <Buffer 84 27 24>
 hCgk 5124 <Buffer 84 28 24>
-hCkk 5252 <Buffer 84 29 24>
+hCkk 5252 <Buffer 84 29 24> // entry header
 hCok 5380 <Buffer 84 2a 24>
 hCsk 5508 <Buffer 84 2b 24>
 hCwk 5636 <Buffer 84 2c 24>
-hC0k 5764 <Buffer 84 2d 24>
+hC0k 5764 <Buffer 84 2d 24> // dna
 hC4k 5892 <Buffer 84 2e 24>
 hC8k 6020 <Buffer 84 2f 24>
 */
@@ -162,6 +164,7 @@ const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k
 const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
 const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
 const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
+const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk
 const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk
 
 /// internal compute a 32 byte blake2b hash
@@ -224,7 +227,6 @@ fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError> {
 
 /// internal parse helper for HoloHash enum.
 fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
-    use std::convert::TryFrom;
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
@@ -234,6 +236,7 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
         "hCAk" => Ok(HoloHash::AgentHash(AgentHash::try_from(s)?)),
         "hCEk" => Ok(HoloHash::EntryHash(EntryHash::try_from(s)?)),
         "hCQk" => Ok(HoloHash::DhtOpHash(DhtOpHash::try_from(s)?)),
+        "hCkk" => Ok(HoloHash::HeaderHash(HeaderHash::try_from(s)?)),
         _ => Err(HoloHashError::BadPrefix),
     }
 }
@@ -287,6 +290,10 @@ macro_rules! new_holo_hash {
                 fn get_loc(&self) -> u32 {
                     self.0.get_loc()
                 }
+
+                fn into_inner(self) -> Vec<u8> {
+                    self.0.into_inner()
+                }
             }
 
             impl std::fmt::Debug for $name {
@@ -337,6 +344,24 @@ macro_rules! new_holo_hash {
                     $name::try_from(&s)
                 }
             }
+
+            impl From<::holo_hash_core::$name> for $crate::$name {
+                fn from(core_hash: ::holo_hash_core::$name) -> Self {
+                    crate::$name(core_hash)
+                }
+            }
+
+            impl From<$crate::$name> for ::holo_hash_core::$name {
+                fn from(hash: $crate::$name) -> ::holo_hash_core::$name {
+                    ::holo_hash_core::$name::new(hash.into_inner())
+                }
+            }
+
+            impl AsRef<[u8]> for $crate::$name {
+                fn as_ref(&self) -> &[u8] {
+                    self.get_bytes()
+                }
+            }
         )*
 
         /// An unified enum representing the holo hash types.
@@ -371,6 +396,14 @@ macro_rules! new_holo_hash {
                 match self {
                     $(
                         HoloHash::$name(i) => i.get_loc(),
+                    )*
+                }
+            }
+
+            fn into_inner(self) -> Vec<u8> {
+                match self {
+                    $(
+                        HoloHash::$name(i) => i.into_inner(),
                     )*
                 }
             }
@@ -430,6 +463,12 @@ macro_rules! new_holo_hash {
                 HoloHash::try_from(&s)
             }
         }
+
+        impl ::std::convert::AsRef<[u8]> for HoloHash {
+            fn as_ref(&self) -> &[u8] {
+                self.get_bytes()
+            }
+        }
     };
 }
 
@@ -449,6 +488,10 @@ new_holo_hash! {
     "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
     EntryHash,
     ENTRY_PREFIX,
+
+    "Represents a Holo/Holochain HeaderHash - A direct hash of the entry header. (uhCkk...)",
+    HeaderHash,
+    HEADER_PREFIX,
 
     "Represents a Holo/Holochain DhtOpHash - The hash used is tuned by dht ops. (uhCQk...)",
     DhtOpHash,
