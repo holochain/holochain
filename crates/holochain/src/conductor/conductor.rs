@@ -204,8 +204,6 @@ pub trait Conductor {
     async fn get_state(&self) -> ConductorResult<ConductorState>;
     fn dna_store(&self) -> &dyn DnaStore;
     fn dna_store_mut(&mut self) -> &mut dyn DnaStore;
-    //fn dna_store(&self) -> &RealDnaStore;
-    //fn dna_store_mut(&mut self) -> &mut RealDnaStore;
     fn add_admin_port(&mut self, port: u16);
     fn shutdown(&mut self);
     fn get_wait_handle(&mut self) -> Option<TaskManagerRunHandle>;
@@ -265,16 +263,6 @@ where
     fn dna_store_mut(&mut self) -> &mut dyn DnaStore {
         &mut self.dna_store
     }
-
-    /*
-    fn dna_store(&self) -> &RealDnaStore {
-        &self.dna_store
-    }
-
-    fn dna_store_mut(&mut self) -> &mut RealDnaStore {
-        &mut self.dna_store
-    }
-    */
 
     fn add_admin_port(&mut self, port: u16) {
         self.admin_websocket_ports.push(port);
@@ -372,7 +360,7 @@ mod builder {
         stop_tx: StopBroadcaster,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
-        let admin_api = RealAdminInterfaceApi::new(conductor_mutex.clone().into());
+        let admin_api = RealAdminInterfaceApi::new(conductor_mutex.clone());
 
         // Closure to process each admin config item
         let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
