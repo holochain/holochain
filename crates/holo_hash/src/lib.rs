@@ -236,7 +236,7 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
         "hCAk" => Ok(HoloHash::AgentHash(AgentHash::try_from(s)?)),
         "hCEk" => Ok(HoloHash::EntryHash(EntryHash::try_from(s)?)),
         "hCQk" => Ok(HoloHash::DhtOpHash(DhtOpHash::try_from(s)?)),
-        "uhCkk" => Ok(HoloHash::HeaderHash(HeaderHash::try_from(s)?)),
+        "hCkk" => Ok(HoloHash::HeaderHash(HeaderHash::try_from(s)?)),
         _ => Err(HoloHashError::BadPrefix),
     }
 }
