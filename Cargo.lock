@@ -2929,7 +2929,8 @@ dependencies = [
 [[package]]
 name = "tokio_safe_block_on"
 version = "0.1.0"
-source = "git+https://github.com/neonphog/tokio_safe_block_on.git#b6ee97035f0feebb32dfbcd96850810cd453bd26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccfbc0758aa72e316d673bcdc8013ebed0b42cf0efc38bbef54010323c77feef"
 dependencies = [
  "futures",
  "tokio",
