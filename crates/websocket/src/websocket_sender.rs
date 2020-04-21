@@ -14,7 +14,9 @@ pub struct WebsocketSender {
 }
 
 impl Drop for WebsocketSender {
-    fn drop(&mut self) { dbg!("Dropping websocket sender"); }
+    fn drop(&mut self) {
+        dbg!("Dropping websocket sender");
+    }
 }
 
 impl WebsocketSender {
