@@ -5,11 +5,6 @@
 //! As we decide which previous code to use, we should port those error types
 //! over to the appropriate error type in this crate.
 
-use crate::dna::error::DnaError;
-use holochain_serialized_bytes::SerializedBytesError;
-use holochain_wasmer_common::WasmError;
-use lib3h_crypto_api::CryptoError;
-use serde_json::Error as SerdeError;
 use std::fmt;
 use thiserror::Error;
 
@@ -19,39 +14,19 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum SkunkError {
     Todo(String),
-    NoneError,
-    IoError(#[from] std::io::Error),
-    HcidError(#[from] hcid::HcidError),
-    SerdeError(#[from] SerdeError),
-    SerializedBytesError(#[from] SerializedBytesError),
-    CryptoError(#[from] CryptoError),
-    Base64DecodeError(#[from] base64::DecodeError),
-    Utf8Error(#[from] std::str::Utf8Error),
-    DnaError(#[from] DnaError),
-    WasmError(#[from] WasmError),
-    // LocksmithError(#[from] holochain_locksmith::LocksmithError),
 }
 
 impl fmt::Display for SkunkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SkunkError::Todo(reason) => write!(f, "{}", reason),
-            _ => write!(f, "{:?}", self),
         }
     }
 }
 
 impl PartialEq for SkunkError {
     fn eq(&self, other: &Self) -> bool {
-        use SkunkError::*;
         match (self, other) {
-            (Todo(a), Todo(b)) => a == b,
-            (IoError(a), IoError(b)) => a.to_string() == b.to_string(),
-            (HcidError(a), HcidError(b)) => a.to_string() == b.to_string(),
-            (SerdeError(a), SerdeError(b)) => a.to_string() == b.to_string(),
-            (SerializedBytesError(a), SerializedBytesError(b)) => a == b,
-            (CryptoError(a), CryptoError(b)) => a == b,
-            (Base64DecodeError(a), Base64DecodeError(b)) => a == b,
             _ => false,
         }
     }
