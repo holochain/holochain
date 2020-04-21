@@ -2,7 +2,7 @@
 
 use crate::*;
 use futures::{
-    stream::{StreamExt, BoxStream},
+    stream::{BoxStream, StreamExt},
     Future,
 };
 
