@@ -265,7 +265,7 @@ where
     fn dna_store_mut(&mut self) -> &mut dyn DnaStore {
         &mut self.dna_store
     }
-    
+
     /*
     fn dna_store(&self) -> &RealDnaStore {
         &self.dna_store
