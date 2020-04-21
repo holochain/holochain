@@ -28,7 +28,9 @@ pub fn fake_zome() -> Zome {
 
 /// A fixture example dna for unit testing.
 pub fn fake_dna(uuid: &str) -> Dna {
-    Dna {}
+    Dna {
+        uuid: uuid.to_string(),
+    }
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it

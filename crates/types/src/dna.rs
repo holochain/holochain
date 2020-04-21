@@ -17,7 +17,10 @@ use std::hash::{Hash, Hasher};
 
 /// Represents the top-level holochain dna object.
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, SerializedBytes)]
-pub struct Dna {}
+pub struct Dna {
+    /// A UUID for uniquifying this Dna
+    pub uuid: String,
+}
 
 impl Dna {
     /// Gets DnaHash from Dna
