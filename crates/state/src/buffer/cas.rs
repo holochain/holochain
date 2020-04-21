@@ -7,18 +7,18 @@ use crate::{
     prelude::Writer,
     transaction::Readable,
 };
-use sx_types::prelude::{Address, Addressable};
+use holo_hash::HoloHash;
 
 /// A wrapper around a KvBuf where keys are always Addresses,
 /// and values are always AddressableContent.
-pub struct CasBuf<'env, V, R>(KvBuf<'env, Address, V, R>)
+pub struct CasBuf<'env, V, R>(KvBuf<'env, HoloHash, V, R>)
 where
-    V: BufVal + Addressable,
+    V: BufVal,
     R: Readable;
 
 impl<'env, V, R> CasBuf<'env, V, R>
 where
-    V: BufVal + Addressable,
+    V: BufVal,
     R: Readable,
 {
     /// Create a new CasBuf from a read-only transaction and a database reference
@@ -27,17 +27,17 @@ where
     }
 
     /// Get a value from the underlying [KvBuf]
-    pub fn get(&self, k: &Address) -> DatabaseResult<Option<V>> {
+    pub fn get(&self, k: &HoloHash) -> DatabaseResult<Option<V>> {
         self.0.get(k)
     }
 
     /// Put a value into the underlying [KvBuf]
-    pub fn put(&mut self, v: V) {
-        self.0.put(v.address(), v)
+    pub fn put(&mut self, k: HoloHash, v: V) {
+        self.0.put(k, v)
     }
 
     /// Delete a value from the underlying [KvBuf]
-    pub fn delete(&mut self, k: Address) {
+    pub fn delete(&mut self, k: HoloHash) {
         self.0.delete(k)
     }
 
@@ -49,7 +49,7 @@ where
 
 impl<'env, V, R> BufferedStore<'env> for CasBuf<'env, V, R>
 where
-    V: BufVal + Addressable,
+    V: BufVal,
     R: Readable,
 {
     type Error = DatabaseError;

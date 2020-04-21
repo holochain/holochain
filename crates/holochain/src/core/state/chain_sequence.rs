@@ -15,13 +15,13 @@ use sx_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use sx_types::prelude::Address;
+use sx_types::chain_header::HeaderAddress;
 use tracing::*;
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
-    header_address: Address,
+    header_address: HeaderAddress,
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
@@ -33,8 +33,8 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
     db: Store<'e, R>,
     next_index: u32,
     tx_seq: u32,
-    current_head: Option<Address>,
-    persisted_head: Option<Address>,
+    current_head: Option<HeaderAddress>,
+    persisted_head: Option<HeaderAddress>,
 }
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
@@ -71,14 +71,14 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     }
 
     /// Get the chain head, AKA top chain header. None if the chain is empty.
-    pub fn chain_head(&self) -> Option<&Address> {
+    pub fn chain_head(&self) -> Option<&HeaderAddress> {
         self.current_head.as_ref()
     }
 
     /// Add a header to the chain, setting all other values automatically.
     /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
-    pub fn put_header(&mut self, header_address: Address) {
+    pub fn put_header(&mut self, header_address: HeaderAddress) {
         self.db.put(
             self.next_index,
             ChainSequenceItem {
@@ -114,12 +114,13 @@ pub mod tests {
 
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
     use crate::core::state::source_chain::SourceChainResult;
+    use holo_hash::holo_hash_core::HeaderHash;
     use sx_state::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,
         test_utils::test_cell_env,
     };
-    use sx_types::{observability, prelude::Address};
+    use sx_types::observability;
 
     #[tokio::test]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
@@ -130,12 +131,57 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
-            buf.put_header(Address::from("0"));
-            assert_eq!(buf.chain_head(), Some(&Address::from("0")));
-            buf.put_header(Address::from("1"));
-            assert_eq!(buf.chain_head(), Some(&Address::from("1")));
-            buf.put_header(Address::from("2"));
-            assert_eq!(buf.chain_head(), Some(&Address::from("2")));
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ])
+                .into(),
+            );
+            assert_eq!(
+                buf.chain_head(),
+                Some(
+                    &HeaderHash::new(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                    ])
+                    .into()
+                )
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                ])
+                .into(),
+            );
+            assert_eq!(
+                buf.chain_head(),
+                Some(
+                    &HeaderHash::new(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+                    ])
+                    .into()
+                )
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                ])
+                .into(),
+            );
+            assert_eq!(
+                buf.chain_head(),
+                Some(
+                    &HeaderHash::new(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2
+                    ])
+                    .into()
+                )
+            );
             Ok(())
         })
     }
@@ -148,17 +194,53 @@ pub mod tests {
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
-            buf.put_header(Address::from("0"));
-            buf.put_header(Address::from("1"));
-            assert_eq!(buf.chain_head(), Some(&Address::from("1")));
-            buf.put_header(Address::from("2"));
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ])
+                .into(),
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                ])
+                .into(),
+            );
+            assert_eq!(
+                buf.chain_head(),
+                Some(
+                    &HeaderHash::new(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+                    ])
+                    .into()
+                )
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                ])
+                .into(),
+            );
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             Ok(())
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuf::new(&reader, &dbs)?;
-            assert_eq!(buf.chain_head(), Some(&Address::from("2")));
+            assert_eq!(
+                buf.chain_head(),
+                Some(
+                    &HeaderHash::new(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2
+                    ])
+                    .into()
+                )
+            );
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(key, _)| key).collect();
             assert_eq!(items, vec![0, 1, 2]);
             Ok(())
@@ -166,16 +248,43 @@ pub mod tests {
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
-            buf.put_header(Address::from("3"));
-            buf.put_header(Address::from("4"));
-            buf.put_header(Address::from("5"));
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+                ])
+                .into(),
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
+                ])
+                .into(),
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
+                ])
+                .into(),
+            );
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             Ok(())
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let buf = ChainSequenceBuf::new(&reader, &dbs)?;
-            assert_eq!(buf.chain_head(), Some(&Address::from("5")));
+            assert_eq!(
+                buf.chain_head(),
+                Some(
+                    &HeaderHash::new(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5
+                    ])
+                    .into()
+                )
+            );
             let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
             Ok(())
@@ -196,9 +305,27 @@ pub mod tests {
             let dbs = arc1.clone().dbs().await?;
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
-            buf.put_header(Address::from("0"));
-            buf.put_header(Address::from("1"));
-            buf.put_header(Address::from("2"));
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ])
+                .into(),
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                ])
+                .into(),
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                ])
+                .into(),
+            );
 
             // let the other task run and make a commit to the chain head,
             // which will cause this one to error out when it re-enters and tries to commit
@@ -214,9 +341,27 @@ pub mod tests {
             let dbs = arc2.clone().dbs().await?;
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
-            buf.put_header(Address::from("3"));
-            buf.put_header(Address::from("4"));
-            buf.put_header(Address::from("5"));
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+                ])
+                .into(),
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
+                ])
+                .into(),
+            );
+            buf.put_header(
+                HeaderHash::new(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
+                ])
+                .into(),
+            );
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
@@ -227,7 +372,16 @@ pub mod tests {
 
         assert_eq!(
             result1.unwrap(),
-            Err(SourceChainError::HeadMoved(None, Some(Address::from("5"))))
+            Err(SourceChainError::HeadMoved(
+                None,
+                Some(
+                    HeaderHash::new(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5
+                    ])
+                    .into()
+                )
+            ))
         );
         assert!(result2.unwrap().is_ok());
 
