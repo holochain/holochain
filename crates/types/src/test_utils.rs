@@ -42,17 +42,22 @@ pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
 
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (name.to_string().try_into().unwrap(), fake_agent_hash(name)).into()
+    (fake_dna_hash(name), fake_agent_hash(name)).into()
+}
+
+/// A fixture example DnaHash for unit testing.
+pub fn fake_dna_hash(name: &str) -> DnaHash {
+    DnaHash::with_data_sync(name.as_bytes())
 }
 
 /// A fixture example AgentHash for unit testing.
-pub fn fake_agent_hash(_name: &str) -> AgentHash {
-    todo!("Implement fake Agent fixture and get its hash")
+pub fn fake_agent_hash(name: &str) -> AgentHash {
+    AgentHash::with_data_sync(name.as_bytes())
 }
 
-/// A fixture example AgentHash for unit testing.
-pub fn fake_header_hash(_name: &str) -> HeaderHash {
-    todo!("Implement fake Header fixture and get its hash")
+/// A fixture example HeaderHash for unit testing.
+pub fn fake_header_hash(name: &str) -> HeaderHash {
+    HeaderHash::with_data_sync(name.as_bytes())
 }
 
 /// A fixture example CapabilityRequest for unit testing.
