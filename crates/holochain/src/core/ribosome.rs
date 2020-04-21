@@ -157,6 +157,36 @@ impl WasmRibosome {
                 }
             }};
         }
+        macro_rules! invoke_async_host_function {
+            ( $host_function:ident ) => {{
+                let closure_self_arc = std::sync::Arc::clone(&self_arc);
+                let closure_host_context_arc = std::sync::Arc::clone(&host_context_arc);
+                move |ctx: &mut Ctx,
+                      guest_allocation_ptr: RemotePtr|
+                      -> Result<RemotePtr, WasmError> {
+                    let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
+                        ctx,
+                        guest_allocation_ptr,
+                    )?;
+                    // this could take a long time but it's fine because this all has its own
+                    // thread that has nothing to do with tokio, right?
+                    // note that wasmer doesn't seem to like async stuff
+                    let output_sb: SerializedBytes =
+                        tokio_safe_block_on::tokio_safe_block_on(
+                            $host_function(
+                                std::sync::Arc::clone(&closure_self_arc),
+                                std::sync::Arc::clone(&closure_host_context_arc),
+                                input,
+                            ),
+                            std::time::Duration::from_secs(60),
+                        )
+                        .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
+                        .try_into()?;
+                    let output_allocation_ptr: AllocationPtr = output_sb.into();
+                    Ok(output_allocation_ptr.as_remote_ptr())
+                }
+            }};
+        }
         imports! {
             "env" => {
                 // standard memory handling used by the holochain_wasmer guest and host macros
@@ -164,7 +194,7 @@ impl WasmRibosome {
                 "__import_bytes" => func!(holochain_wasmer_host::import::__import_bytes),
 
                 // imported host functions for core
-                "__globals" => func!(invoke_host_function!(globals)),
+                "__globals" => func!(invoke_async_host_function!(globals)),
                 "__call" => func!(invoke_host_function!(call)),
                 "__capability" => func!(invoke_host_function!(capability)),
                 "__commit_entry" => func!(invoke_host_function!(commit_entry)),

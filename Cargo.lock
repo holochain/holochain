@@ -955,6 +955,7 @@ dependencies = [
  "test_wasm_common",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
  "toml",
  "tracing",
  "tracing-futures",
@@ -2921,6 +2922,15 @@ dependencies = [
  "tokio",
  "tokio-tls",
  "tungstenite",
+]
+
+[[package]]
+name = "tokio_safe_block_on"
+version = "0.1.0"
+source = "git+https://github.com/neonphog/tokio_safe_block_on.git#b6ee97035f0feebb32dfbcd96850810cd453bd26"
+dependencies = [
+ "futures",
+ "tokio",
 ]
 
 [[package]]

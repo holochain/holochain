@@ -7,7 +7,7 @@ use sx_zome_types::globals::ZomeGlobals;
 use sx_zome_types::GlobalsInput;
 use sx_zome_types::GlobalsOutput;
 
-pub fn globals(
+pub async fn globals(
     ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: GlobalsInput,
@@ -29,10 +29,14 @@ pub mod test {
     use sx_zome_types::GlobalsInput;
     use sx_zome_types::GlobalsOutput;
 
-    #[test]
-    fn invoke_import_globals_test() {
-        let globals: GlobalsOutput =
-            crate::call_test_ribosome!("imports", "globals", GlobalsInput::new(()));
-        assert_eq!(globals.inner_ref().dna_name, "test",);
+    #[tokio::test(threaded_scheduler)]
+    async fn invoke_import_globals_test() {
+        tokio::task::spawn(async move {
+            let globals: GlobalsOutput =
+                crate::call_test_ribosome!("imports", "globals", GlobalsInput::new(()));
+            assert_eq!(globals.inner_ref().dna_name, "test",);
+        })
+        .await
+        .unwrap();
     }
 }
