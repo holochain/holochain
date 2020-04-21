@@ -3,7 +3,7 @@ use mockall::automock;
 use std::collections::HashMap;
 use sx_types::{dna::Dna, prelude::*};
 
-/// Placeholder for real cache
+/// Placeholder for real dna store
 pub struct RealDnaStore(HashMap<Address, Dna>);
 
 #[automock]
