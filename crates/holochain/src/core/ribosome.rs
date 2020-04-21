@@ -113,8 +113,7 @@ impl WasmRibosome {
     }
 
     pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
-        // TODO: @thedavidmeister is it OK to use dna_hash instead of name here? ~maackle
-        // format!("{}{}", &self.dna.name, zome_name).into_bytes()
+        // TODO: make this actually the hash of the wasm once we can do that
         format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
     }
 
