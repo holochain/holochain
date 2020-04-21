@@ -16,6 +16,7 @@ pub mod emit_signal;
 pub mod encrypt;
 pub mod entry_address;
 pub mod entry_type_properties;
+pub mod error;
 pub mod get_entry;
 pub mod get_links;
 pub mod globals;
@@ -41,6 +42,7 @@ use self::{
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 
+use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use mockall::automock;
@@ -48,7 +50,6 @@ use std::sync::Arc;
 use sx_types::{
     dna::Dna,
     entry::Entry,
-    error::SkunkResult,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
@@ -81,7 +82,7 @@ pub trait RibosomeT: Sized {
         // FIXME: Use [SourceChain] instead
         _bundle: &mut SourceChainCommitBundle<'env>,
         invocation: ZomeInvocation,
-    ) -> SkunkResult<ZomeInvocationResponse>;
+    ) -> RibosomeResult<ZomeInvocationResponse>;
 }
 
 /// Total hack just to have something to look at
@@ -115,7 +116,7 @@ impl WasmRibosome {
         format!("{}{}", &self.dna.name, zome_name).into_bytes()
     }
 
-    pub fn instance(&self, host_context: HostContext) -> SkunkResult<Instance> {
+    pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
         let zome_name = host_context.zome_name.clone();
         let zome = self.dna.get_zome(&zome_name)?;
         let wasm: Arc<Vec<u8>> = zome.code.code();
@@ -207,7 +208,7 @@ impl RibosomeT for WasmRibosome {
         invocation: ZomeInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
-    ) -> SkunkResult<ZomeInvocationResponse> {
+    ) -> RibosomeResult<ZomeInvocationResponse> {
         let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
             &mut self.instance(HostContext::from(&invocation))?,
             &invocation.fn_name,
