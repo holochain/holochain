@@ -61,35 +61,23 @@ impl HeaderWithEntry {
     }
 }
 
-/// ChainHeader of a source chain "Item"
-/// The address of the ChainHeader is used as the Item's key in the source chain hash table
-/// ChainHeaders are linked to next header in chain and next header of same type in chain
-// @TODO - serialize properties as defined in ChainHeadersEntrySchema from golang alpha 1
-// @see https://github.com/holochain/holochain-proto/blob/4d1b8c8a926e79dfe8deaa7d759f930b66a5314f/entry_headers.go#L7
-// @see https://github.com/holochain/holochain-rust/issues/75
+/// Temporary minimal structure of a ChainHeader
+// TODO: this becomes an enum
+#[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct ChainHeader {}
+pub struct ChainHeader {
+    pub prev_header_address: Option<HeaderAddress>,
+    pub entry_address: EntryAddress,
+}
 
 impl ChainHeader {
-    /// build a new ChainHeader from a chain, entry type and entry.
-    /// a ChainHeader is immutable, but the chain is mutable if chain.push() is used.
-    /// this means that a header becomes invalid and useless as soon as the chain is mutated
-    /// the only valid usage of a header is to immediately push it onto a chain in a Pair.
-    /// normally (outside unit tests) the generation of valid headers is internal to the
-    /// chain::SourceChain trait and should not need to be handled manually
-    ///
-    /// @see chain::entry::Entry
-    pub fn new() -> Self {
-        ChainHeader {}
-    }
-
     /// Return the EntryHash this header points to
-    pub fn entry_address(&self) -> EntryAddress {
-        todo!("return entry address")
+    pub fn entry_address(&self) -> &EntryAddress {
+        &self.entry_address
     }
 
     /// Return the previous ChainHeader in the chain
-    pub fn prev_header_address(&self) -> Option<HeaderAddress> {
-        todo!("return previous header hash")
+    pub fn prev_header_address(&self) -> Option<&HeaderAddress> {
+        self.prev_header_address.as_ref()
     }
 }

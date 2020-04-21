@@ -132,15 +132,10 @@ fn header_for_entry(
     let provenances = &[Provenance::new(agent_hash.clone(), Signature::fake())];
     let timestamp: Iso8601 = chrono::Utc::now().timestamp().into();
     trace!("PUT {} {:?}", entry.entry_hash(), entry);
-    Ok(ChainHeader::new(
-        // entry.entry_type(),
-        // EntryAddress::try_from(entry)?,
-        // provenances,
-        // prev_head,
-        // None,
-        // None,
-        // timestamp,
-    ))
+    Ok(ChainHeader {
+        entry_address: EntryAddress::try_from(entry)?,
+        prev_header_address: prev_head,
+    })
 }
 
 pub struct SourceChainBackwardIterator<'env, R: Readable> {
@@ -168,7 +163,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 if let Some(header) = self.store.get_header(top.to_owned())? {
-                    self.current = header.prev_header_address();
+                    self.current = header.prev_header_address().cloned();
                     Ok(Some(header))
                 } else {
                     Ok(None)
