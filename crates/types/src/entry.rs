@@ -15,6 +15,9 @@ use crate::{
 use cap_entries::{CapTokenClaim, CapTokenGrant};
 use deletion_entry::DeletionEntry;
 use entry_type::{AppEntryType, EntryType};
+use holo_hash::AgentHash;
+use holo_hash::EntryHash;
+use holo_hash::HoloHash;
 use holochain_serialized_bytes::prelude::*;
 use multihash::Hash;
 
@@ -97,10 +100,51 @@ impl Addressable for Entry {
     }
 }
 
-/// The address of an entry.
-pub struct EntryAddress(Address);
+/// wraps hashes that can be used as addresses for entries e.g. in a CAS
+#[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EntryAddress {
+    /// standard entry hash
+    Entry(EntryHash),
+    /// agents are entries too
+    Agent(AgentHash),
+}
+
+impl From<EntryAddress> for HoloHash {
+    fn from(entry_address: EntryAddress) -> HoloHash {
+        match entry_address {
+            EntryAddress::Entry(entry_hash) => entry_hash.into(),
+            EntryAddress::Agent(agent_hash) => agent_hash.into(),
+        }
+    }
+}
+
+impl TryFrom<&Entry> for EntryAddress {
+    type Error = SerializedBytesError;
+    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
+        Ok(EntryAddress::Entry(EntryHash::try_from(entry)?))
+    }
+}
+
+impl AsRef<[u8]> for &EntryAddress {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
+            EntryAddress::Agent(agent_hash) => agent_hash.as_ref(),
+        }
+    }
+}
+
+impl std::fmt::Display for EntryAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
+            EntryAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
+        }
+    }
+}
 
 // TEST UTILS START
+// @TODO - move all of this into some kind of nice fixtures setup
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct SerializedString(String);
@@ -152,12 +196,24 @@ pub fn test_entry_hash() -> holo_hash::EntryHash {
     holo_hash::EntryHash::try_from(crate::entry::test_entry()).unwrap()
 }
 #[cfg(test)]
+pub fn test_entry_address() -> EntryAddress {
+    EntryAddress::Entry(test_entry_hash())
+}
+#[cfg(test)]
 pub fn test_entry_hash_b() -> holo_hash::EntryHash {
     holo_hash::EntryHash::try_from(crate::entry::test_entry_b()).unwrap()
 }
 #[cfg(test)]
+pub fn test_entry_address_b() -> EntryAddress {
+    EntryAddress::Entry(test_entry_hash_b())
+}
+#[cfg(test)]
 pub fn test_entry_hash_c() -> holo_hash::EntryHash {
     holo_hash::EntryHash::try_from(crate::entry::test_entry_c()).unwrap()
+}
+#[cfg(test)]
+pub fn test_entry_address_c() -> EntryAddress {
+    EntryAddress::Entry(test_entry_hash_c())
 }
 
 #[cfg(test)]

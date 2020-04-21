@@ -8,7 +8,6 @@
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-use holo_hash::HeaderHash;
 use serde::{Deserialize, Serialize};
 use sx_state::{
     buffer::{BufferedStore, IntKvBuf},
@@ -16,12 +15,13 @@ use sx_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
+use sx_types::chain_header::HeaderAddress;
 use tracing::*;
 
 /// A Value in the ChainSequence database.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
-    header_hash: HeaderHash,
+    header_address: HeaderAddress,
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
@@ -33,8 +33,8 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
     db: Store<'e, R>,
     next_index: u32,
     tx_seq: u32,
-    current_head: Option<HeaderHash>,
-    persisted_head: Option<HeaderHash>,
+    current_head: Option<HeaderAddress>,
+    persisted_head: Option<HeaderAddress>,
 }
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
@@ -57,7 +57,7 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
         let latest = db.iter_raw_reverse()?.next();
         debug!("{:?}", latest);
         let (next_index, tx_seq, current_head) = latest
-            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_hash)))
+            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
             .unwrap_or((0, 0, None));
         let persisted_head = current_head.clone();
 
@@ -71,25 +71,25 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     }
 
     /// Get the chain head, AKA top chain header. None if the chain is empty.
-    pub fn chain_head(&self) -> Option<&HeaderHash> {
+    pub fn chain_head(&self) -> Option<&HeaderAddress> {
         self.current_head.as_ref()
     }
 
     /// Add a header to the chain, setting all other values automatically.
     /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
-    pub fn put_header(&mut self, header_hash: HeaderHash) {
+    pub fn put_header(&mut self, header_address: HeaderAddress) {
         self.db.put(
             self.next_index,
             ChainSequenceItem {
-                header_hash: header_hash.clone(),
+                header_address: header_address.clone(),
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
         );
         trace!(self.next_index);
         self.next_index += 1;
-        self.current_head = Some(header_hash);
+        self.current_head = Some(header_address);
     }
 }
 

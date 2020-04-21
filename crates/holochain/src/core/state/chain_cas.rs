@@ -1,7 +1,7 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use std::convert::TryInto;
+use holochain_serialized_bytes::prelude::*;
 use sx_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -13,8 +13,10 @@ use sx_state::{
     prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
+    chain_header::HeaderAddress,
     chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,
+    entry::EntryAddress,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -50,16 +52,16 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         Self::new(reader, entries, headers)
     }
 
-    pub fn get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
-        self.entries.get(&entry_hash.into())
+    pub fn get_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
+        self.entries.get(&entry_address.into())
     }
 
-    pub fn contains(&self, entry_hash: EntryHash) -> DatabaseResult<bool> {
-        self.entries.get(&entry_hash.into()).map(|e| e.is_some())
+    pub fn contains(&self, entry_address: EntryAddress) -> DatabaseResult<bool> {
+        self.entries.get(&entry_address.into()).map(|e| e.is_some())
     }
 
-    pub fn get_header(&self, header_hash: HeaderHash) -> DatabaseResult<Option<ChainHeader>> {
-        self.headers.get(&header_hash.into())
+    pub fn get_header(&self, header_address: HeaderAddress) -> DatabaseResult<Option<ChainHeader>> {
+        self.headers.get(&header_address.into())
     }
 
     /// Given a ChainHeader, return the corresponding HeaderWithEntry
@@ -67,20 +69,20 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header: ChainHeader,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(entry) = self.get_entry(header.entry_hash().to_owned())? {
+        if let Some(entry) = self.get_entry(header.entry_address().to_owned())? {
             Ok(Some(HeaderWithEntry::new(header, entry)))
         } else {
             Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(header.entry_hash().to_owned()),
+                ChainInvalidReason::MissingData(header.entry_address().to_owned()),
             ))
         }
     }
 
     pub fn get_header_with_entry(
         &self,
-        header_hash: &HeaderHash,
+        header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(header) = self.get_header(header_hash.to_owned())? {
+        if let Some(header) = self.get_header(header_address.to_owned())? {
             self.header_with_entry(header)
         } else {
             Ok(None)

@@ -90,7 +90,7 @@ mod tests {
                 .iter_back()
                 .map(|h| {
                     debug!("header: {:?}", h);
-                    Ok(h.entry_hash().clone())
+                    Ok(h.entry_address().clone())
                 })
                 .collect()
                 .unwrap();

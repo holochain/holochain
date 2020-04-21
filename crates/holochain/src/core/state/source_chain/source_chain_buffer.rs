@@ -5,14 +5,14 @@ use crate::core::state::{
 };
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use sx_state::{
     buffer::BufferedStore,
     db::DbManager,
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
+use sx_types::chain_header::HeaderAddress;
+use sx_types::entry::EntryAddress;
 use sx_types::{
     agent::AgentId,
     chain_header::ChainHeader,
@@ -45,15 +45,15 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         })
     }
 
-    pub fn chain_head(&self) -> Option<&HeaderHash> {
+    pub fn chain_head(&self) -> Option<&HeaderAddress> {
         self.sequence.chain_head()
     }
 
-    pub fn get_entry(&self, k: EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub fn get_entry(&self, k: EntryAddress) -> DatabaseResult<Option<Entry>> {
         self.cas.get_entry(k)
     }
 
-    pub fn get_header(&self, k: HeaderHash) -> DatabaseResult<Option<ChainHeader>> {
+    pub fn get_header(&self, k: HeaderAddress) -> DatabaseResult<Option<ChainHeader>> {
         self.cas.get_header(k)
     }
 
@@ -105,7 +105,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 .iter_back()
                 .map(|h| {
                     Ok(JsonChainDump {
-                        entry: self.get_entry(h.entry_hash().to_owned())?,
+                        entry: self.get_entry(h.entry_address().to_owned())?,
                         header: h,
                     })
                 })
@@ -127,14 +127,14 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
 fn header_for_entry(
     entry: &Entry,
     agent_id: &AgentId,
-    prev_head: Option<HeaderHash>,
+    prev_head: Option<HeaderAddress>,
 ) -> Result<ChainHeader, SerializedBytesError> {
     let provenances = &[Provenance::new(agent_id.address(), Signature::fake())];
     let timestamp = chrono::Utc::now().timestamp().into();
     trace!("PUT {} {:?}", entry.address(), entry);
     Ok(ChainHeader::new(
         entry.entry_type(),
-        holo_hash::EntryHash::try_from(entry)?,
+        EntryAddress::try_from(entry)?,
         provenances,
         prev_head,
         None,
@@ -145,7 +145,7 @@ fn header_for_entry(
 
 pub struct SourceChainBackwardIterator<'env, R: Readable> {
     store: &'env SourceChainBuf<'env, R>,
-    current: Option<HeaderHash>,
+    current: Option<HeaderAddress>,
 }
 
 impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
@@ -227,7 +227,7 @@ pub mod tests {
             assert_eq!(
                 store
                     .iter_back()
-                    .map(|h| Ok(store.get_entry(h.entry_hash().to_owned().into())?))
+                    .map(|h| Ok(store.get_entry(h.entry_address().to_owned())?))
                     .collect::<Vec<_>>()
                     .unwrap(),
                 vec![Some(agent_entry), Some(dna_entry)]
@@ -265,13 +265,13 @@ pub mod tests {
                 // println!("{:?}", &header.get("entry_hash").unwrap().to_vec());
                 let entry = item.get("entry").unwrap();
                 let entry_type = header.get("entry_type").unwrap().as_str().unwrap();
-                let entry_hash = header.get("entry_hash").unwrap().as_array().unwrap();
+                let entry_address = header.get("entry_address").unwrap().get("Entry").unwrap().as_array().unwrap();
                 let entry_data: serde_json::Value = match entry_type {
                     "AgentId" => entry.get("entry").unwrap().as_object().unwrap().get("pub_sign_key").unwrap().clone(),
                     "Dna" => entry.get("entry").unwrap().as_object().unwrap().get("uuid").unwrap().clone(),
                     _ => serde_json::Value::Null,
                 };
-                serde_json::json!([entry_type, entry_hash, entry_data])
+                serde_json::json!([entry_type, entry_address, entry_data])
             }).collect::<Vec<_>>();
 
             assert_eq!(

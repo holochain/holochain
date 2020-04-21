@@ -35,7 +35,7 @@ async fn get_links() -> DatabaseResult<()> {
         &cache.cas(),
         &cache_meta,
     );
-    let links = cascade.dht_get_links(base, "").await?;
+    let links = cascade.dht_get_links(base.into(), "").await?;
     let link = links.into_iter().next();
     assert_eq!(link, None);
     Ok(())
