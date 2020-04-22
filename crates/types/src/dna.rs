@@ -54,6 +54,12 @@ impl std::fmt::Display for DnaAddress {
     }
 }
 
+/// A type to allow json values to be used as [SerializedBtyes]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct Properties {
+    properties: serde_json::Value,
+}
+
 /// Represents the top-level holochain dna object.
 #[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
 pub struct Dna {
@@ -206,6 +212,13 @@ impl Dna {
         } else {
             Err(DnaError::Invalid(format!("invalid DNA: {:?}", errors)))
         }
+    }
+}
+
+impl Properties {
+    /// Create new properties from json value
+    pub fn new(properties: serde_json::Value) -> Self {
+        Properties { properties }
     }
 }
 

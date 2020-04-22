@@ -17,6 +17,7 @@ use std::{
     time::Duration,
 };
 use sx_types::{
+    dna::Properties,
     observability,
     prelude::*,
     test_utils::{fake_dna, fake_dna_file},
@@ -112,6 +113,7 @@ async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Websock
 
 #[tokio::test]
 async fn call_admin() {
+    observability::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -139,12 +141,18 @@ async fn call_admin() {
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
     let uuid = Uuid::new_v4();
-    let dna = fake_dna(&uuid.to_string());
-    let dna_address = dna.address();
+    let mut dna = fake_dna(&uuid.to_string());
+
+    // Make properties
+    let json = serde_json::json!({
+        "test": "example",
+        "how_many": 42,
+    });
+    let properties = Some(json.clone());
 
     // Install Dna
-    let (fake_dna_path, _tmpdir) = fake_dna_file(dna).unwrap();
-    let request = AdminRequest::InstallDna(fake_dna_path);
+    let (fake_dna_path, _tmpdir) = fake_dna_file(dna.clone()).unwrap();
+    let request = AdminRequest::InstallDna(fake_dna_path, properties.clone());
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
     assert_matches!(response, AdminResponse::DnaInstalled);
@@ -153,6 +161,9 @@ async fn call_admin() {
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
+
+    dna.properties = Properties::new(properties.unwrap()).try_into().unwrap();
+    let dna_address = dna.address();
     let expects = vec![dna_address];
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
@@ -168,7 +179,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
     let (fake_dna_path, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
-    let request = AdminRequest::InstallDna(fake_dna_path);
+    let request = AdminRequest::InstallDna(fake_dna_path, None);
     let response = client.request(request).await;
     assert_matches!(response, Ok(AdminResponse::DnaInstalled));
     conductor_handle.shutdown().await;
@@ -215,7 +226,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     info!("About to make failing request");
 
     let (fake_dna, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
-    let request = AdminRequest::InstallDna(fake_dna);
+    let request = AdminRequest::InstallDna(fake_dna, None);
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
