@@ -15,6 +15,11 @@ pub fn test_conductor_env() -> TestEnvironment {
     test_env(EnvironmentKind::Conductor)
 }
 
+/// Create an [TestEnvironment] of [EnvironmentKind::Wasm], backed by a temp directory
+pub fn test_wasm_env() -> TestEnvironment {
+    test_env(EnvironmentKind::Wasm)
+}
+
 fn test_env(kind: EnvironmentKind) -> TestEnvironment {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     // TODO: Wrap Environment along with the TempDir so that it lives longer
