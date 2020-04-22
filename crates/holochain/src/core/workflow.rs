@@ -14,7 +14,6 @@ use thiserror::Error;
 
 #[cfg(test)]
 use super::state::source_chain::SourceChainError;
-#[cfg(test)]
 use sx_state::error::DatabaseError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
@@ -78,7 +77,6 @@ pub enum WorkflowError {
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
 
-    #[cfg(test)]
     #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),
 

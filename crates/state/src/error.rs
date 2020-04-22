@@ -6,6 +6,7 @@
 use crate::db::DbName;
 use failure::Fail;
 use std::path::PathBuf;
+use sx_types::prelude::SerializedBytesError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -51,6 +52,9 @@ pub enum DatabaseError {
 
     #[error("Error decoding to MsgPack: {0}")]
     MsgPackDecodeError(#[from] rmp_serde::decode::Error),
+
+    #[error("SerializedBytes error when attempting to interact with LMDB: {0}")]
+    SerializedBytes(#[from] SerializedBytesError),
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),

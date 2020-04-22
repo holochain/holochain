@@ -1,4 +1,4 @@
-use crate::conductor::error::ConductorError;
+use crate::conductor::{error::ConductorError, interface::InterfaceDriver};
 use boolinator::Boolinator;
 use petgraph::{algo::toposort, graph::DiGraph, prelude::NodeIndex};
 use serde::{Deserialize, Serialize};
@@ -480,15 +480,6 @@ pub struct InterfaceConfig {
     /// is not aware of this logic and is not tracking the new port (which gets printed on stdout).
     /// Use at your own risk...
     pub choose_free_port: Option<bool>,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum InterfaceDriver {
-    Websocket { port: u16 },
-    Http { port: u16 },
-    DomainSocket { file: String },
-    Custom(toml::value::Value),
 }
 
 /// An cell reference makes an cell available in the scope

@@ -5,6 +5,7 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
+use crate::entry::entry_type::test_app_entry_type_b;
 use crate::{
     agent::AgentId,
     dna::Dna,
@@ -14,6 +15,9 @@ use crate::{
 use cap_entries::{CapTokenClaim, CapTokenGrant};
 use deletion_entry::DeletionEntry;
 use entry_type::{AppEntryType, EntryType};
+use holo_hash::AgentHash;
+use holo_hash::EntryHash;
+use holo_hash::HoloHash;
 use holochain_serialized_bytes::prelude::*;
 use multihash::Hash;
 
@@ -96,28 +100,138 @@ impl Addressable for Entry {
     }
 }
 
-/// The address of an entry.
-pub struct EntryAddress(Address);
+/// wraps hashes that can be used as addresses for entries e.g. in a CAS
+#[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EntryAddress {
+    /// standard entry hash
+    Entry(EntryHash),
+    /// agents are entries too
+    Agent(AgentHash),
+}
+
+impl From<EntryAddress> for HoloHash {
+    fn from(entry_address: EntryAddress) -> HoloHash {
+        match entry_address {
+            EntryAddress::Entry(entry_hash) => entry_hash.into(),
+            EntryAddress::Agent(agent_hash) => agent_hash.into(),
+        }
+    }
+}
+
+impl TryFrom<&Entry> for EntryAddress {
+    type Error = SerializedBytesError;
+    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
+        Ok(EntryAddress::Entry(EntryHash::try_from(entry)?))
+    }
+}
+
+impl AsRef<[u8]> for &EntryAddress {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
+            EntryAddress::Agent(agent_hash) => agent_hash.as_ref(),
+        }
+    }
+}
+
+impl std::fmt::Display for EntryAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
+            EntryAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
+        }
+    }
+}
+
+// TEST UTILS START
+// @TODO - move all of this into some kind of nice fixtures setup
+
+#[derive(Serialize, Deserialize, SerializedBytes)]
+struct SerializedString(String);
+
+/// dummy entry value
+#[cfg_attr(tarpaulin, skip)]
+pub fn test_entry_value() -> SerializedBytes {
+    SerializedBytes::try_from(()).unwrap()
+}
+
+/// dummy entry
+#[cfg_attr(tarpaulin, skip)]
+pub fn test_entry() -> Entry {
+    Entry::App(
+        crate::entry::entry_type::test_app_entry_type(),
+        test_entry_value(),
+    )
+}
+
+/// dummy entry, same as test_entry()
+#[cfg_attr(tarpaulin, skip)]
+pub fn test_entry_a() -> Entry {
+    test_entry()
+}
+
+/// dummy entry, differs from test_entry()
+#[cfg_attr(tarpaulin, skip)]
+pub fn test_entry_b() -> Entry {
+    Entry::App(test_app_entry_type_b(), test_entry_value_b())
+}
+
+/// dummy entry content, differs from test_entry_value()
+#[cfg_attr(tarpaulin, skip)]
+pub fn test_entry_value_b() -> SerializedBytes {
+    SerializedBytes::try_from(SerializedString(String::from("other test entry value"))).unwrap()
+}
+#[cfg_attr(tarpaulin, skip)]
+/// dummy entry content c
+pub fn test_entry_value_c() -> SerializedBytes {
+    SerializedBytes::try_from(SerializedString(String::from("value C"))).unwrap()
+}
+/// dummy entry c
+pub fn test_entry_c() -> Entry {
+    Entry::App(test_app_entry_type_b(), test_entry_value_c())
+}
+
+#[cfg(test)]
+pub fn test_entry_hash() -> holo_hash::EntryHash {
+    holo_hash::EntryHash::try_from(crate::entry::test_entry()).unwrap()
+}
+#[cfg(test)]
+pub fn test_entry_address() -> EntryAddress {
+    EntryAddress::Entry(test_entry_hash())
+}
+#[cfg(test)]
+pub fn test_entry_hash_b() -> holo_hash::EntryHash {
+    holo_hash::EntryHash::try_from(crate::entry::test_entry_b()).unwrap()
+}
+#[cfg(test)]
+pub fn test_entry_address_b() -> EntryAddress {
+    EntryAddress::Entry(test_entry_hash_b())
+}
+#[cfg(test)]
+pub fn test_entry_hash_c() -> holo_hash::EntryHash {
+    holo_hash::EntryHash::try_from(crate::entry::test_entry_c()).unwrap()
+}
+#[cfg(test)]
+pub fn test_entry_address_c() -> EntryAddress {
+    EntryAddress::Entry(test_entry_hash_c())
+}
 
 #[cfg(test)]
 pub mod tests {
 
-    use super::*;
+    use crate::agent::AgentId;
+    use crate::entry::test_entry;
+    use crate::entry::test_entry_a;
+    use crate::entry::test_entry_b;
+    use crate::entry::test_entry_value;
+    use crate::entry::Entry;
+    use crate::entry::SerializedString;
     use crate::{
-        agent::test_agent_id,
-        entry::entry_type::tests::{test_app_entry_type, test_app_entry_type_b},
-        persistence::cas::content::Addressable,
+        agent::test_agent_id, entry::entry_type::test_app_entry_type,
+        persistence::cas::content::Address, persistence::cas::content::Addressable,
         test_utils::fake_dna,
     };
-
-    #[derive(Serialize, Deserialize, SerializedBytes)]
-    struct SerializedString(String);
-
-    /// dummy entry value
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value() -> SerializedBytes {
-        SerializedBytes::try_from(()).unwrap()
-    }
+    use holochain_serialized_bytes::prelude::*;
 
     pub fn test_entry_content() -> SerializedBytes {
         SerializedBytes::try_from(Entry::App(test_app_entry_type(), test_entry_value())).unwrap()
@@ -129,26 +243,11 @@ pub mod tests {
         test_entry_value()
     }
 
-    /// dummy entry content, differs from test_entry_value()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_b() -> SerializedBytes {
-        SerializedBytes::try_from(SerializedString(String::from("other test entry value"))).unwrap()
-    }
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_value_c() -> SerializedBytes {
-        SerializedBytes::try_from(SerializedString(String::from("value C"))).unwrap()
-    }
-
     #[cfg_attr(tarpaulin, skip)]
     pub fn test_sys_entry_value() -> AgentId {
         test_agent_id()
     }
 
-    /// dummy entry
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry() -> Entry {
-        Entry::App(test_app_entry_type(), test_entry_value())
-    }
     #[cfg_attr(tarpaulin, skip)]
     pub fn test_entry_with_value<T: TryInto<SerializedBytes>>(value: T) -> Entry
     where
@@ -165,21 +264,6 @@ pub mod tests {
     #[cfg_attr(tarpaulin, skip)]
     pub fn expected_entry_address() -> Address {
         Address::from("QmYd5fc7jzVZAQRuYGKU5PAiXeWoUEEaH4ogJyHR1RbQGw".to_string())
-    }
-
-    /// dummy entry, same as test_entry()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_a() -> Entry {
-        test_entry()
-    }
-
-    /// dummy entry, differs from test_entry()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_entry_b() -> Entry {
-        Entry::App(test_app_entry_type_b(), test_entry_value_b())
-    }
-    pub fn test_entry_c() -> Entry {
-        Entry::App(test_app_entry_type_b(), test_entry_value_c())
     }
 
     /// dummy entry with unique string content

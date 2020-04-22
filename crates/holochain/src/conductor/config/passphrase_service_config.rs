@@ -11,9 +11,18 @@ use std::path::PathBuf;
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum PassphraseServiceConfig {
+    /// Passphrase is requested from the command line
     Cmd,
-    UnixSocket { path: PathBuf },
-    Mock { passphrase: String },
+    /// Passphrase is requested over a Unix domain socket at the given path.
+    UnixSocket {
+        /// Path of the socket
+        path: PathBuf,
+    },
+    /// Passphrase is requested from a mock service for testing purposes
+    Mock {
+        /// The actual pasphrase in the mock case so we can test fail cases
+        passphrase: String,
+    },
 }
 
 impl Default for PassphraseServiceConfig {

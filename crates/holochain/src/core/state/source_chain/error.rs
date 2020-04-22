@@ -1,6 +1,7 @@
 use holochain_serialized_bytes::prelude::*;
 use sx_state::error::DatabaseError;
-use sx_types::prelude::*;
+use sx_types::chain_header::HeaderAddress;
+use sx_types::entry::EntryAddress;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -9,7 +10,7 @@ pub enum SourceChainError {
     ChainEmpty,
 
     #[error("Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}")]
-    HeadMoved(Option<Address>, Option<Address>),
+    HeadMoved(Option<HeaderAddress>, Option<HeaderAddress>),
 
     #[error(
         "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
@@ -20,7 +21,7 @@ pub enum SourceChainError {
     MissingHead,
 
     #[error("The content at address {0} is malformed and can't be deserialized.")]
-    MalformedEntry(Address),
+    MalformedEntry(EntryAddress),
 
     #[error("Serialization error: {0}")]
     SerializationError(#[from] SerializedBytesError),
@@ -45,10 +46,10 @@ pub enum ChainInvalidReason {
     GenesisDataMissing,
 
     #[error("A chain header and its corresponding entry have a discrepancy. Entry address: {0}")]
-    HeaderAndEntryMismatch(Address),
+    HeaderAndEntryMismatch(EntryAddress),
 
     #[error("Content was expected to definitely exist at this address, but didn't: {0}")]
-    MissingData(Address),
+    MissingData(EntryAddress),
 }
 
 pub type SourceChainResult<T> = Result<T, SourceChainError>;
