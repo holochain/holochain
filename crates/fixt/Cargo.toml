@@ -1,0 +1,19 @@
+[package]
+name = "fixt"
+version = "0.0.1"
+description = "minimum viable fixtures"
+license = "Apache-2.0"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "test", "fixture"]
+categories = ["fixtures"]
+edition = "2018"
+
+[dependencies]
+rand = "0.7"
+rstest = "0.6.3"
+hamcrest2 = "0.3.0"
+
+[features]
+fixt = []
