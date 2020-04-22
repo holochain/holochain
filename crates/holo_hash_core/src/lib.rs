@@ -170,6 +170,9 @@ core_holo_hash! {
     "Represents a Holo/Holochain DnaHash - The hash of a specific hApp DNA. (uhC0k...)",
     DnaHash,
 
+    "Represents a Holo/Holochain WasmHash - The hash of the wasm bytes. (uhCok...)",
+    WasmHash,
+
     "Represents a Holo/Holochain NetIdHash - Network Ids let you create hard dht network divisions. (uhCIk...)",
     NetIdHash,
 
