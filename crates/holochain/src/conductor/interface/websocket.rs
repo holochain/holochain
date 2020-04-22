@@ -229,14 +229,21 @@ mod test {
     use crate::conductor::interface::error::AdminInterfaceErrorKind;
     use crate::conductor::{
         api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
-        Conductor,
+        conductor::ConductorBuilder,
+        dna_store::{error::DnaStoreError, MockDnaStore},
+        RealConductor,
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
+    use mockall::predicate;
     use std::convert::TryInto;
-    use sx_types::observability;
+    use sx_types::{
+        observability,
+        test_utils::{fake_dna, fake_dna_file},
+    };
+    use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     #[serde(rename = "snake-case", tag = "type", content = "data")]
@@ -245,7 +252,7 @@ mod test {
     }
 
     async fn setup() -> RealAdminInterfaceApi {
-        let conductor = Conductor::build().test().await.unwrap();
+        let conductor = RealConductor::builder().test().await.unwrap();
         RealAdminInterfaceApi::new(conductor)
     }
 
@@ -280,9 +287,33 @@ mod test {
         handle_incoming_message(msg, admin_api).await.unwrap()
     }
 
-    #[ignore]
     #[tokio::test]
     async fn cache_failure() {
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna(&uuid.to_string());
+
+        let (fake_dna_path, _tmpdir) = fake_dna_file(dna.clone()).unwrap();
+        let mut dna_cache = MockDnaStore::new();
+        dna_cache
+            .expect_add()
+            .with(predicate::eq(dna))
+            .returning(|_| Err(DnaStoreError::WriteFail));
+
+        let conductor = ConductorBuilder::with_mock_dna_store(dna_cache)
+            .test()
+            .await
+            .unwrap();
+        let admin_api = RealAdminInterfaceApi::new(conductor);
+        let msg = AdminRequest::InstallDna(fake_dna_path, None);
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Cache, ..});
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap()
         // TODO: B-01440: this can't be done easily yet
         // because we can't cause the cache to fail from an input
     }
