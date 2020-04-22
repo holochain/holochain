@@ -13,12 +13,12 @@ pub fn globals(
     _input: GlobalsInput,
 ) -> GlobalsOutput {
     GlobalsOutput::new(ZomeGlobals {
+        dna_name: ribosome.dna.name.clone(),
         agent_address: "".into(),                           // @TODO
         agent_id_str: "".into(),                            // @TODO
         agent_initial_hash: "".into(),                      // @TODO
         agent_latest_hash: "".into(),                       // @TODO
         dna_address: "".into(),                             // @TODO
-        dna_name: ribosome.dna.name.clone(),                // @TODO
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
         public_token: "".into(),                            // @TODO
     })
