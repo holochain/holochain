@@ -22,11 +22,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_sys_time_test() {
-        tokio::task::spawn(async move {
-            let _: SysTimeOutput =
-                crate::call_test_ribosome!("imports", "sys_time", SysTimeInput::new(()));
-        })
-        .await
-        .unwrap()
+        let _: SysTimeOutput =
+            crate::call_test_ribosome!("imports", "sys_time", SysTimeInput::new(()));
     }
 }
