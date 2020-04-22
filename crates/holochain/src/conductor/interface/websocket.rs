@@ -46,15 +46,18 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 _ = stop_rx.recv() => { break; },
 
                 // establish a new connection to a client
-                maybe_con = listener.next() => if let Some(conn) = maybe_con {
-                    if let Ok((send_socket, recv_socket)) = conn {
-                        send_sockets.push(send_socket);
-                        listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-                            api.clone(),
-                            recv_socket,
-                        )));
-                    } else {
-                        warn!("Admin socket connection failed");
+                maybe_con = listener.next() => if let Some(connection) = maybe_con {
+                    match connection {
+                        Ok((send_socket, recv_socket)) => {
+                            send_sockets.push(send_socket);
+                            listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                                api.clone(),
+                                recv_socket,
+                            )));
+                        }
+                        Err(err) => {
+                            warn!("Admin socket connection failed: {}", err);
+                        }
                     }
                 } else {
                     warn!(line = line!(), "Listener has returned none");
@@ -116,11 +119,16 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         tokio::select! {
             // break if we receive on the stop channel
             _ = stop_rx.recv() => { break; },
+
+            // establish a new connection to a client
             maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                if let Ok((send_socket, recv_socket)) = connection {
-                    handle_connection(send_socket, recv_socket);
-                } else {
-                    warn!("Admin socket connection failed");
+                match connection {
+                    Ok((send_socket, recv_socket)) => {
+                        handle_connection(send_socket, recv_socket);
+                    }
+                    Err(err) => {
+                        warn!("Admin socket connection failed: {}", err);
+                    }
                 }
             } else {
                 break;
