@@ -1,0 +1,23 @@
+[package]
+name = "holochain_keystore"
+version = "0.0.1"
+description = "keystore for libsodium keypairs"
+license = "Apache-2.0"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "nacl", "libsodium", "cryptography"]
+categories = ["cryptography"]
+edition = "2018"
+
+[dependencies]
+holochain_serialized_bytes = "0.0.38"
+holo_hash = { version = "0.0.1", path = "../holo_hash" }
+ghost_actor = "0.1.0-alpha.2"
+serde = { version = "1.0.104", features = ["derive"] }
+serde_bytes = "0.11"
+sx_crypto = { version = "0.0.1", path = "../crypto" }
+thiserror = "1"
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["full"] }

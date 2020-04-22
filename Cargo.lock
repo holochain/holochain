@@ -827,6 +827,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ghost_actor"
+version = "0.1.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aad6c976c8e35f4680e0806540245e97b34a4722caf30d236d1ffe8625dfed9a"
+dependencies = [
+ "futures",
+ "must_future",
+ "paste",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "hcid"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -942,6 +955,20 @@ checksum = "b1ea372338cb6550b0fa7f62b35c6d986e541181d9167083965adf6e15940b2d"
 dependencies = [
  "directories 1.0.2",
  "lazy_static",
+]
+
+[[package]]
+name = "holochain_keystore"
+version = "0.0.1"
+dependencies = [
+ "ghost_actor",
+ "holo_hash",
+ "holochain_serialized_bytes",
+ "serde",
+ "serde_bytes",
+ "sx_crypto",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -1695,6 +1722,28 @@ dependencies = [
  "redox_syscall",
  "smallvec 1.3.0",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "paste"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab4fb1930692d1b6a9cfabdde3d06ea0a7d186518e2f4d67660d8970e2fa647a"
+dependencies = [
+ "paste-impl",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "paste-impl"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a62486e111e571b1e93b710b61e8f493c0013be39629b714cb166bdb06aa5a8a"
+dependencies = [
+ "proc-macro-hack",
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.17",
 ]
 
 [[package]]
