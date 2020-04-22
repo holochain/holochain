@@ -110,6 +110,7 @@ trait NetSend {
     fn network_send(&self, msg: Lib3hClientProtocol) -> Result<(), NetError>;
 }
 
+#[allow(dead_code)]
 enum NetError {}
 
 /// Simplification of holochain_net::connection::NetSend

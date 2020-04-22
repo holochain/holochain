@@ -11,7 +11,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// Structure holding actual data in a source chain "Item"
 /// data is stored as a JsonString
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[allow(clippy::large_enum_variant)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
@@ -24,6 +24,8 @@ pub enum Entry {
 
 impl Entry {
     /// Get the EntryHash of this entry
+    // FIXME: use async with_data, or consider wrapper type
+    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
     pub fn entry_hash(&self) -> EntryHash {
         let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
         EntryHash::with_data_sync(&sb.bytes())

@@ -10,8 +10,6 @@ use crate::prelude::*;
 use error::DnaError;
 pub use holo_hash::*;
 use std::collections::BTreeMap;
-use std::hash::{Hash, Hasher};
-
 /// A type to allow json values to be used as [SerializedBtyes]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct Properties {
@@ -19,7 +17,7 @@ pub struct Properties {
 }
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, SerializedBytes)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
@@ -37,6 +35,8 @@ pub struct Dna {
 
 impl Dna {
     /// Gets DnaHash from Dna
+    // FIXME: use async with_data, or consider wrapper type
+    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413222920
     pub fn dna_hash(&self) -> DnaHash {
         let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
         DnaHash::with_data_sync(&sb.bytes())
@@ -54,25 +54,5 @@ impl Properties {
     /// Create new properties from json value
     pub fn new(properties: serde_json::Value) -> Self {
         Properties { properties }
-    }
-}
-
-impl Hash for Dna {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let s: Vec<u8> =
-            UnsafeBytes::from(SerializedBytes::try_from(self).expect("TODO: can this fail?"))
-                .into();
-        s.hash(state);
-    }
-}
-
-impl PartialEq for Dna {
-    fn eq(&self, other: &Dna) -> bool {
-        // need to guarantee that PartialEq and Hash always agree
-        let (this, that) = (
-            SerializedBytes::try_from(self),
-            SerializedBytes::try_from(other),
-        );
-        this.is_ok() && that.is_ok() && this == that
     }
 }
