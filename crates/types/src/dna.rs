@@ -3,12 +3,7 @@
 //! It includes utilities for representing dna structures in memory,
 //! as well as serializing and deserializing dna, mainly to json format.
 
-// pub mod bridges;
-// pub mod capabilities;
-// pub mod entry_types;
 pub mod error;
-// pub mod fn_declarations;
-// pub mod traits;
 pub mod wasm;
 pub mod zome;
 use crate::prelude::*;
@@ -30,6 +25,7 @@ pub struct Dna {
     pub name: String,
 
     /// A UUID for uniquifying this Dna.
+    // TODO: consider Vec<u8> instead (https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r412689085)
     pub uuid: String,
 
     /// Any arbitrary application properties can be included in this object.
