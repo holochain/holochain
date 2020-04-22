@@ -29,7 +29,7 @@ chrono = "0.4.6"
 tempdir = "0.3.7"
 mockall = "0.6.0"
 tokio = { version = "0.2.11", features = ["full"] }
-tokio_safe_block_on = "0.1"
+tokio_safe_block_on = "0.1.1"
 owning_ref = "0.4.1"
 anyhow = "1.0.26"
 parking_lot = "0.10.0"

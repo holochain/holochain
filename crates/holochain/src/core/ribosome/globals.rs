@@ -31,12 +31,8 @@ pub mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_globals_test() {
-        tokio::task::spawn(async move {
-            let globals: GlobalsOutput =
-                crate::call_test_ribosome!("imports", "globals", GlobalsInput::new(()));
-            assert_eq!(globals.inner_ref().dna_name, "test",);
-        })
-        .await
-        .unwrap();
+        let globals: GlobalsOutput =
+            crate::call_test_ribosome!("imports", "globals", GlobalsInput::new(()));
+        assert_eq!(globals.inner_ref().dna_name, "test",);
     }
 }
