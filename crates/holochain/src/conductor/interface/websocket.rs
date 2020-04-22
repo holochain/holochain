@@ -15,6 +15,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use tokio::stream::StreamExt;
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tracing::*;
 use url2::url2;
 
@@ -52,6 +53,8 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                             api.clone(),
                             recv_socket,
                         )));
+                    } else {
+                        warn!("Admin socket connection failed");
                     }
                 } else {
                     warn!(line = line!(), "Listener has returned none");
@@ -114,15 +117,23 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
             // break if we receive on the stop channel
             _ = stop_rx.recv() => { break; },
             maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                // FIXME: Handle this connection error without breaking the loop
-                let (send_socket, recv_socket) = connection?;
-                handle_connection(send_socket, recv_socket);
+                if let Ok((send_socket, recv_socket)) = connection {
+                    handle_connection(send_socket, recv_socket);
+                } else {
+                    warn!("Admin socket connection failed");
+                }
             } else {
                 break;
             }
         }
     }
 
+    handle_shutdown(listener_handles).await
+}
+
+async fn handle_shutdown(
+    listener_handles: Vec<JoinHandle<InterfaceResult<()>>>,
+) -> InterfaceResult<()> {
     for h in listener_handles {
         // Show if these are actually finishing
         match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {

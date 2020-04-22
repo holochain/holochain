@@ -6,8 +6,6 @@ use futures::{
     Future,
 };
 
-const PENDING_BOUND: usize = 1000;
-
 /// Websocket listening / server socket. This struct is an async Stream -
 /// calling `.next().await` will give you a Future that will in turn resolve
 /// to a split websocket pair (
@@ -55,7 +53,7 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
     }
     .reuse_address(true)?
     .bind(addr)?
-    .listen(255)?; // TODO - config?
+    .listen(config.max_pending_connections as i32)?;
     socket.set_nonblocking(true)?;
     let socket = tokio::net::TcpListener::from_std(socket)?;
 
@@ -65,7 +63,7 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
             let config = config.clone();
             move |socket_result| connect(config.clone(), socket_result)
         })
-        .buffer_unordered(PENDING_BOUND)
+        .buffer_unordered(config.max_pending_connections)
         .boxed();
 
     tracing::info!(
