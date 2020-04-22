@@ -1,6 +1,5 @@
 //! Some common testing helpers.
 
-use crate::dna::DnaAddress;
 use crate::{
     agent::AgentId,
     cell::CellId,
@@ -16,8 +15,7 @@ use crate::{
     prelude::*,
     signature::{Provenance, Signature},
 };
-use holo_hash::DnaHash;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
 use sx_zome_types::ZomeExternHostInput;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
@@ -100,28 +98,9 @@ pub fn fake_dna(uuid: &str) -> Dna {
     }
 }
 
-/// Save a Dna to a file and return the path and tempdir that contains it
-pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
-    let tmp_dir = tempdir::TempDir::new("fake_dna")?;
-    let mut path: PathBuf = tmp_dir.path().into();
-    path.push("dna");
-    std::fs::write(path.clone(), SerializedBytes::try_from(dna)?.bytes())?;
-    Ok((path, tmp_dir))
-}
-
-/// generate a fake DnaHash
-pub fn fake_dna_hash() -> DnaHash {
-    holo_hash::DnaHash::try_from(fake_dna("hash")).unwrap()
-}
-
-/// generate a fake DnaAddress
-pub fn fake_dna_address() -> DnaAddress {
-    fake_dna_hash().into()
-}
-
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (fake_dna_address(), fake_agent_id(name)).into()
+    (name.to_string().into(), fake_agent_id(name)).into()
 }
 
 /// A fixture example AgentId for unit testing.
