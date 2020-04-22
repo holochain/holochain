@@ -152,7 +152,7 @@ hCYk 4868 <Buffer 84 26 24>
 hCck 4996 <Buffer 84 27 24>
 hCgk 5124 <Buffer 84 28 24>
 hCkk 5252 <Buffer 84 29 24> // entry header
-hCok 5380 <Buffer 84 2a 24>
+hCok 5380 <Buffer 84 2a 24> // wasm
 hCsk 5508 <Buffer 84 2b 24>
 hCwk 5636 <Buffer 84 2c 24>
 hC0k 5764 <Buffer 84 2d 24> // dna
@@ -161,6 +161,7 @@ hC8k 6020 <Buffer 84 2f 24>
 */
 
 const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k
+const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok
 const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
 const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
 const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
@@ -232,6 +233,7 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
     }
     match &s[1..5] {
         "hC0k" => Ok(HoloHash::DnaHash(DnaHash::try_from(s)?)),
+        "hCok" => Ok(HoloHash::WasmHash(WasmHash::try_from(s)?)),
         "hCIk" => Ok(HoloHash::NetIdHash(NetIdHash::try_from(s)?)),
         "hCAk" => Ok(HoloHash::AgentHash(AgentHash::try_from(s)?)),
         "hCEk" => Ok(HoloHash::EntryHash(EntryHash::try_from(s)?)),
@@ -476,6 +478,10 @@ new_holo_hash! {
     "Represents a Holo/Holochain DnaHash - The hash of a specific hApp DNA. (uhC0k...)",
     DnaHash,
     DNA_PREFIX,
+
+    "Represents a Holo/Holochain WasmHash - The hash of the wasm bytes. (uhCok...)",
+    WasmHash,
+    WASM_PREFIX,
 
     "Represents a Holo/Holochain NetIdHash - Network Ids let you create hard dht network divisions. (uhCIk...)",
     NetIdHash,
