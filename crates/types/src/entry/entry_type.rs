@@ -164,19 +164,26 @@ impl Display for EntryType {
     }
 }
 
+/// dummy AppEntryType
+#[cfg_attr(tarpaulin, skip)]
+pub fn test_app_entry_type() -> AppEntryType {
+    AppEntryType::from("testEntryType")
+}
+
+/// dummy EntryType
+pub fn test_entry_type() -> EntryType {
+    EntryType::App(test_app_entry_type())
+}
+
+/// dummy entry type, differs from test_type()
+#[cfg_attr(tarpaulin, skip)]
+pub fn test_app_entry_type_b() -> AppEntryType {
+    AppEntryType::from("testEntryTypeB")
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
-
-    /// dummy entry type
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_app_entry_type() -> AppEntryType {
-        AppEntryType::from("testEntryType")
-    }
-
-    pub fn test_entry_type() -> EntryType {
-        EntryType::App(test_app_entry_type())
-    }
 
     /// dummy entry type, same as test_type()
     #[cfg_attr(tarpaulin, skip)]
@@ -186,12 +193,6 @@ pub mod tests {
 
     pub fn test_entry_type_a() -> EntryType {
         EntryType::App(test_app_entry_type_a())
-    }
-
-    /// dummy entry type, differs from test_type()
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn test_app_entry_type_b() -> AppEntryType {
-        AppEntryType::from("testEntryTypeB")
     }
 
     pub fn test_entry_type_b() -> EntryType {

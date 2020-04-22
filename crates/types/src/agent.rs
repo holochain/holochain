@@ -137,10 +137,7 @@ mod tests {
 // TODO XXX | Everything below here is OLD stuff from holochain-rust - DELETE! |
 // TODO XXX |------------------------------------------------------------------|
 
-use crate::{
-    error::SkunkResult,
-    persistence::cas::content::{Address, Addressable},
-};
+use crate::persistence::cas::content::{Address, Addressable};
 use hcid::*;
 use holochain_serialized_bytes::prelude::*;
 use std::str;
@@ -175,7 +172,7 @@ impl AgentId {
     }
 
     /// initialize an Agent struct with `nick` and `key` that will be encoded with HCID.
-    pub fn new_with_raw_key(nick: &str, key: &str) -> SkunkResult<Self> {
+    pub fn new_with_raw_key(nick: &str, key: &str) -> Result<Self, HcidError> {
         let codec = HcidEncoding::with_kind("hcs0")?;
         let key_b32 = codec.encode(key.as_bytes())?;
         Ok(AgentId::new(nick, key_b32))
@@ -190,7 +187,7 @@ impl AgentId {
     }
 
     /// Get the key decoded with HCID
-    pub fn decoded_key(&self) -> SkunkResult<String> {
+    pub fn decoded_key(&self) -> Result<String, HcidError> {
         let codec = HcidEncoding::with_kind("hcs0")?;
         let key_b32 = codec.decode(&self.pub_sign_key)?;
         Ok(str::from_utf8(&key_b32).unwrap().to_owned())

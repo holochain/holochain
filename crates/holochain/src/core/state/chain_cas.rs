@@ -1,4 +1,7 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_serialized_bytes::prelude::*;
 use sx_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -10,9 +13,10 @@ use sx_state::{
     prelude::{Readable, Reader, Writer},
 };
 use sx_types::{
+    chain_header::HeaderAddress,
     chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,
-    prelude::Address,
+    entry::EntryAddress,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -48,16 +52,16 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         Self::new(reader, entries, headers)
     }
 
-    pub fn get_entry(&self, entry_address: &Address) -> DatabaseResult<Option<Entry>> {
-        self.entries.get(entry_address)
+    pub fn get_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
+        self.entries.get(&entry_address.into())
     }
 
-    pub fn contains(&self, entry_address: &Address) -> DatabaseResult<bool> {
-        self.entries.get(entry_address).map(|e| e.is_some())
+    pub fn contains(&self, entry_address: EntryAddress) -> DatabaseResult<bool> {
+        self.entries.get(&entry_address.into()).map(|e| e.is_some())
     }
 
-    pub fn get_header(&self, header_address: &Address) -> DatabaseResult<Option<ChainHeader>> {
-        self.headers.get(header_address)
+    pub fn get_header(&self, header_address: HeaderAddress) -> DatabaseResult<Option<ChainHeader>> {
+        self.headers.get(&header_address.into())
     }
 
     /// Given a ChainHeader, return the corresponding HeaderWithEntry
@@ -65,39 +69,40 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header: ChainHeader,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(entry) = self.get_entry(header.entry_address())? {
+        if let Some(entry) = self.get_entry(header.entry_address().to_owned())? {
             Ok(Some(HeaderWithEntry::new(header, entry)))
         } else {
             Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(header.entry_address().clone()),
+                ChainInvalidReason::MissingData(header.entry_address().to_owned()),
             ))
         }
     }
 
     pub fn get_header_with_entry(
         &self,
-        header_address: &Address,
+        header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(header) = self.get_header(header_address)? {
+        if let Some(header) = self.get_header(header_address.to_owned())? {
             self.header_with_entry(header)
         } else {
             Ok(None)
         }
     }
 
-    pub fn put(&mut self, v: (ChainHeader, Entry)) {
+    pub fn put(&mut self, v: (ChainHeader, Entry)) -> DatabaseResult<()> {
         let (header, entry) = v;
-        self.entries.put(entry);
-        self.headers.put(header);
+        self.entries.put((&entry).try_into()?, entry);
+        self.headers.put((&header).try_into()?, header);
+        Ok(())
     }
 
     // TODO: consolidate into single delete which handles entry and header together
-    pub fn delete_entry(&mut self, k: Address) {
-        self.entries.delete(k)
+    pub fn delete_entry(&mut self, k: EntryHash) {
+        self.entries.delete(k.into())
     }
 
-    pub fn delete_header(&mut self, k: Address) {
-        self.headers.delete(k)
+    pub fn delete_header(&mut self, k: HeaderHash) {
+        self.headers.delete(k.into())
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {

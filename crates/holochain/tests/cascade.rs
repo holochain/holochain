@@ -1,10 +1,10 @@
+use holo_hash::EntryHash;
 use holochain_2020::core::state::{
     cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
 };
+use std::convert::TryInto;
 use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
 use sx_types::{agent::AgentId, entry::Entry};
-
-use sx_types::persistence::cas::content::Addressable;
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {
@@ -24,9 +24,9 @@ async fn get_links() -> DatabaseResult<()> {
     let jimbo = Entry::AgentId(jimbo_id.clone());
     let jessy_id = AgentId::generate_fake("Jessy");
     let jessy = Entry::AgentId(jessy_id.clone());
-    let base = jimbo.address();
-    source_chain.put_entry(jimbo, &jimbo_id);
-    source_chain.put_entry(jessy, &jessy_id);
+    let base: EntryHash = (&jimbo).try_into()?;
+    source_chain.put_entry(jimbo, &jimbo_id)?;
+    source_chain.put_entry(jessy, &jessy_id)?;
 
     // Pass in stores as references
     let cascade = Cascade::new(
@@ -35,7 +35,7 @@ async fn get_links() -> DatabaseResult<()> {
         &cache.cas(),
         &cache_meta,
     );
-    let links = cascade.dht_get_links(base, "").await?;
+    let links = cascade.dht_get_links(base.into(), "").await?;
     let link = links.into_iter().next();
     assert_eq!(link, None);
     Ok(())

@@ -50,6 +50,9 @@ pub trait HoloHashCoreHash:
 
     /// Fetch the holo dht location for this hash
     fn get_loc(&self) -> u32;
+
+    /// consume into the inner byte vector
+    fn into_inner(self) -> Vec<u8>;
 }
 
 macro_rules! core_holo_hash {
@@ -64,7 +67,7 @@ macro_rules! core_holo_hash {
                 /// Construct a new hash instance providing 36 bytes.
                 pub fn new(bytes: Vec<u8>) -> Self {
                     if bytes.len() != 36 {
-                        panic!("invalid holo_hash byte count, expected: 36, found: {}.", bytes.len());
+                        panic!("invalid holo_hash byte count, expected: 36, found: {}. {:?}", bytes.len(), &bytes);
                     }
                     Self(bytes)
                 }
@@ -81,6 +84,10 @@ macro_rules! core_holo_hash {
 
                 fn get_loc(&self) -> u32 {
                     bytes_to_loc(&self.0[self.0.len() - 4..])
+                }
+
+                fn into_inner(self) -> Vec<u8> {
+                    self.0
                 }
             }
 
@@ -137,6 +144,14 @@ macro_rules! core_holo_hash {
                     )*
                 }
             }
+
+            fn into_inner(self) -> Vec<u8> {
+                match self {
+                    $(
+                        HoloHashCore::$name(i) => i.into_inner(),
+                    )*
+                }
+            }
         }
 
         impl std::fmt::Debug for HoloHashCore {
@@ -163,6 +178,9 @@ core_holo_hash! {
 
     "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
     EntryHash,
+
+    "Represents a Holo/Holochain HeaderHash - A direct hash of an entry header.",
+    HeaderHash,
 
     "Represents a Holo/Holochain DhtOpHash - The hash used is tuned by dht ops. (uhCQk...)",
     DhtOpHash,

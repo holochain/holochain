@@ -5,7 +5,8 @@
 
 use shrinkwraprs::Shrinkwrap;
 use sx_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
-use sx_types::{agent::AgentId, prelude::Address};
+use sx_types::agent::AgentId;
+use sx_types::chain_header::HeaderAddress;
 
 pub use error::*;
 pub use source_chain_buffer::*;
@@ -25,7 +26,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         ))
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<&Address> {
+    pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
     pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
