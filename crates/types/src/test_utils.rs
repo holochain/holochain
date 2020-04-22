@@ -32,6 +32,7 @@ pub fn fake_zome() -> Zome {
 pub fn fake_dna(uuid: &str) -> Dna {
     Dna {
         name: "test".to_string(),
+        properties: ().try_into().unwrap(),
         uuid: uuid.to_string(),
         zomes: {
             let mut v = BTreeMap::new();

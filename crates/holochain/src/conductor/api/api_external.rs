@@ -10,7 +10,7 @@ use holochain_serialized_bytes::prelude::*;
 use std::path::PathBuf;
 use sx_types::{
     cell::CellHandle,
-    dna::Dna,
+    dna::{Dna, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
 use tracing::*;
@@ -107,9 +107,13 @@ impl RealAdminInterfaceApi {
     }
 
     /// Installs a [Dna] from a file path
-    pub(crate) async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
+    pub(crate) async fn install_dna(
+        &self,
+        dna_path: PathBuf,
+        properties: Option<serde_json::Value>,
+    ) -> ConductorApiResult<AdminResponse> {
         trace!(?dna_path);
-        let dna = Self::read_parse_dna(dna_path).await?;
+        let dna = Self::read_parse_dna(dna_path, properties).await?;
         self.add_dna(dna).await?;
         Ok(AdminResponse::DnaInstalled)
     }
@@ -119,29 +123,31 @@ impl RealAdminInterfaceApi {
         self.conductor_handle
             .write()
             .await
-            .fake_dna_cache
-            .insert(dna.dna_hash(), dna);
-        Ok(())
+            .dna_store_mut()
+            .add(dna)
+            .map_err(|e| e.into())
     }
 
     /// Reads the [Dna] from disk and parses to [SerializedBytes]
-    async fn read_parse_dna(dna_path: PathBuf) -> ConductorApiResult<Dna> {
+    async fn read_parse_dna(
+        dna_path: PathBuf,
+        properties: Option<serde_json::Value>,
+    ) -> ConductorApiResult<Dna> {
         let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
         let dna = SerializedBytes::from(dna);
-        dna.try_into()
-            .map_err(|e| SerializationError::from(e).into())
+        let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
+        if let Some(properties) = properties {
+            let properties = Properties::new(properties);
+            dna.properties = (properties)
+                .try_into()
+                .map_err(|e| SerializationError::from(e))?;
+        }
+        Ok(dna)
     }
 
     /// Lists all the [Dna]'s in the dna store
     pub(crate) async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
-        let dna_list = self
-            .conductor_handle
-            .read()
-            .await
-            .fake_dna_cache
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>();
+        let dna_list = self.conductor_handle.read().await.dna_store().list();
         Ok(AdminResponse::ListDnas(dna_list))
     }
 }
@@ -153,7 +159,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
         match request {
             Start(_cell_handle) => unimplemented!(),
             Stop(_cell_handle) => unimplemented!(),
-            InstallDna(dna_path) => self.install_dna(dna_path).await,
+            InstallDna(dna_path, properties) => self.install_dna(dna_path, properties).await,
             ListDnas => self.list_dnas().await,
         }
     }
@@ -234,7 +240,7 @@ impl InterfaceApi for RealAppInterfaceApi {
     }
 }
 /// Responses to requests received on an App interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppResponse {
     /// There has been an error in the request
@@ -251,7 +257,7 @@ pub enum AppResponse {
 }
 
 /// Responses to messages received on an Admin interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminResponse {
     /// This response is unimplemented
@@ -271,7 +277,7 @@ pub enum AdminResponse {
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppRequest {
     /// Asks the conductor to do some crypto
@@ -287,21 +293,21 @@ pub enum AppRequest {
 }
 
 /// The set of messages that a conductor understands how to handle over an Admin interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminRequest {
     /// Start a cell running
     Start(CellHandle),
     /// Stop a cell running
     Stop(CellHandle),
-    /// Install a [Dna] from a path
-    InstallDna(PathBuf),
+    /// Install a [Dna] from a path with optional properties
+    InstallDna(PathBuf, Option<serde_json::Value>),
     /// List all installed [Dna]s
     ListDnas,
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum CryptoRequest {
     Sign(String),
@@ -310,14 +316,14 @@ pub enum CryptoRequest {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum TestRequest {
     AddAgent(AddAgentArgs),
 }
 
 #[allow(dead_code, missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AddAgentArgs {
     id: String,
     name: String,
@@ -326,7 +332,7 @@ pub struct AddAgentArgs {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::Conductor;
+    use crate::conductor::conductor::RealConductor;
     use anyhow::Result;
     use matches::assert_matches;
     use sx_types::test_utils::{fake_dna, fake_dna_file};
@@ -334,7 +340,7 @@ mod test {
 
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
-        let conductor = Conductor::build().test().await?;
+        let conductor = RealConductor::builder().test().await?;
         let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
@@ -349,9 +355,16 @@ mod test {
     #[tokio::test]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
+        let mut dna = fake_dna(&uuid.to_string());
         let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
-        let result = RealAdminInterfaceApi::read_parse_dna(dna_path).await?;
+        let json = serde_json::json!({
+            "test": "example",
+            "how_many": 42,
+        });
+        let properties = Some(json.clone());
+        let result = RealAdminInterfaceApi::read_parse_dna(dna_path, properties).await?;
+        let properties = Properties::new(json);
+        dna.properties = properties.try_into().unwrap();
         assert_eq!(dna, result);
         Ok(())
     }
