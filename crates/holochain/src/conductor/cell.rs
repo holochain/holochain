@@ -111,6 +111,7 @@ trait NetSend {
 }
 
 #[allow(dead_code)]
+/// TODO - this is a shim until we need a real NetError
 enum NetError {}
 
 /// Simplification of holochain_net::connection::NetSend
