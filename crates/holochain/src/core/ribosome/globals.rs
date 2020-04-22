@@ -18,7 +18,7 @@ pub fn globals(
         agent_initial_hash: "".into(),                      // @TODO
         agent_latest_hash: "".into(),                       // @TODO
         dna_address: "".into(),                             // @TODO
-        dna_name: ribosome.dna.name.clone().into(),         // @TODO
+        dna_name: ribosome.dna.name.clone(),         // @TODO
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
         public_token: "".into(),                            // @TODO
     })
