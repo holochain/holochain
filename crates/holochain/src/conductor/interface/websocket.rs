@@ -249,7 +249,7 @@ mod test {
     async fn invalid_request() {
         observability::test_run().ok();
         let admin_api = setup().await;
-        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into());
+        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
