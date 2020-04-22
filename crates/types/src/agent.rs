@@ -1,6 +1,6 @@
 //! agent module
 
-use hcid::*;
+
 use holochain_serialized_bytes::prelude::*;
 
 /// Agent Error Type

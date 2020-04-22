@@ -2,7 +2,7 @@
 
 use super::wasm::DnaWasm;
 use holochain_serialized_bytes::prelude::*;
-use std::collections::BTreeMap;
+
 
 /// Represents an individual "zome".
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SerializedBytes)]

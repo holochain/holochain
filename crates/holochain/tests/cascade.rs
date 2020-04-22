@@ -4,7 +4,7 @@ use holochain_2020::core::state::{
 };
 use std::convert::TryInto;
 use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
-use sx_types::{entry::Entry, prelude::*, test_utils::fake_agent_hash};
+use sx_types::{entry::Entry, test_utils::fake_agent_hash};
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {

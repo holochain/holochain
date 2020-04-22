@@ -129,8 +129,8 @@ fn header_for_entry(
     agent_hash: &AgentHash,
     prev_head: Option<HeaderAddress>,
 ) -> Result<ChainHeader, SerializedBytesError> {
-    let provenances = &[Provenance::new(agent_hash.clone(), Signature::fake())];
-    let timestamp: Iso8601 = chrono::Utc::now().timestamp().into();
+    let _provenances = &[Provenance::new(agent_hash.clone(), Signature::fake())];
+    let _timestamp: Iso8601 = chrono::Utc::now().timestamp().into();
     trace!("PUT {} {:?}", entry.entry_hash(), entry);
     Ok(ChainHeader {
         entry_address: EntryAddress::try_from(entry)?,
