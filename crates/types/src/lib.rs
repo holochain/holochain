@@ -79,9 +79,6 @@ serial_hash!(
     crate::chain_header::ChainHeader,
     HeaderHash
 
-    crate::dna::Dna,
-    DnaHash
-
     crate::dna::wasm::DnaWasm,
     WasmHash
 );

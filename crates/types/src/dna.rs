@@ -20,7 +20,6 @@ use crate::{
         fn_declarations::{FnDeclaration, TraitFns},
     },
     entry::entry_type::{AppEntryType, EntryType},
-    error::{SkunkError, SkunkResult},
     prelude::{Address, *},
 };
 use std::{
@@ -175,8 +174,8 @@ impl Dna {
 
     /// Check that all the zomes in the DNA have code with the required callbacks
     /// TODO: Add more advanced checks that actually try and call required functions
-    pub fn verify(&self) -> SkunkResult<()> {
-        let errors: Vec<SkunkError> = self
+    pub fn verify(&self) -> Result<(), DnaError> {
+        let errors: Vec<DnaError> = self
             .zomes
             .iter()
             .map(|(zome_name, zome)| {
@@ -184,7 +183,7 @@ impl Dna {
                 if zome.code.code().len() > 0 {
                     Ok(())
                 } else {
-                    Err(SkunkError::new(format!("Zome {} has no code!", zome_name)))
+                    Err(DnaError::EmptyZome(zome_name.clone()))
                 }
             })
             .filter_map(|r| r.err())
@@ -192,7 +191,7 @@ impl Dna {
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(SkunkError::new(format!("invalid DNA: {:?}", errors)))
+            Err(DnaError::Invalid(format!("invalid DNA: {:?}", errors)))
         }
     }
 }
