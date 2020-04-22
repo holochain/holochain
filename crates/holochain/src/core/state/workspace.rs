@@ -36,10 +36,10 @@ pub mod tests {
         prelude::{Reader, Writer},
         test_utils::test_cell_env,
     };
-    
+    use sx_types::prelude::*;
 
     pub struct TestWorkspace<'env> {
-        one: KvBuf<'env, String, u32>,
+        one: KvBuf<'env, EntryHash, u32>,
         two: KvBuf<'env, String, bool>,
     }
 
@@ -66,7 +66,7 @@ pub mod tests {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
-        let addr1 = "hi".to_string();
+        let addr1 = EntryHash::with_data_sync("hello".as_bytes());
         let addr2 = "hi".to_string();
         {
             let reader = env.reader()?;
