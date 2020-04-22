@@ -285,7 +285,7 @@ mod test {
             .await
             .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor);
-        let msg = AdminRequest::InstallDna(fake_dna_path);
+        let msg = AdminRequest::InstallDna(fake_dna_path, None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
