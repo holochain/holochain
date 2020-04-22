@@ -9,7 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 use std::path::PathBuf;
 use sx_types::{
     cell::CellHandle,
-    dna::Dna,
+    dna::{Dna, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,
 };
@@ -107,9 +107,13 @@ impl RealAdminInterfaceApi {
     }
 
     /// Installs a [Dna] from a file path
-    pub(crate) async fn install_dna(&self, dna_path: PathBuf) -> ConductorApiResult<AdminResponse> {
+    pub(crate) async fn install_dna(
+        &self,
+        dna_path: PathBuf,
+        properties: Option<serde_json::Value>,
+    ) -> ConductorApiResult<AdminResponse> {
         trace!(?dna_path);
-        let dna = Self::read_parse_dna(dna_path).await?;
+        let dna = Self::read_parse_dna(dna_path, properties).await?;
         self.add_dna(dna).await?;
         Ok(AdminResponse::DnaInstalled)
     }
@@ -125,11 +129,20 @@ impl RealAdminInterfaceApi {
     }
 
     /// Reads the [Dna] from disk and parses to [SerializedBytes]
-    async fn read_parse_dna(dna_path: PathBuf) -> ConductorApiResult<Dna> {
+    async fn read_parse_dna(
+        dna_path: PathBuf,
+        properties: Option<serde_json::Value>,
+    ) -> ConductorApiResult<Dna> {
         let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
         let dna = SerializedBytes::from(dna);
-        dna.try_into()
-            .map_err(|e| SerializationError::from(e).into())
+        let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
+        if let Some(properties) = properties {
+            let properties = Properties::new(properties);
+            dna.properties = (properties)
+                .try_into()
+                .map_err(|e| SerializationError::from(e))?;
+        }
+        Ok(dna)
     }
 
     /// Lists all the [Dna]'s in the dna store
@@ -153,7 +166,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
         match request {
             Start(_cell_handle) => unimplemented!(),
             Stop(_cell_handle) => unimplemented!(),
-            InstallDna(dna_path) => self.install_dna(dna_path).await,
+            InstallDna(dna_path, properties) => self.install_dna(dna_path, properties).await,
             ListDnas => self.list_dnas().await,
         }
     }
@@ -294,8 +307,8 @@ pub enum AdminRequest {
     Start(CellHandle),
     /// Stop a cell running
     Stop(CellHandle),
-    /// Install a [Dna] from a path
-    InstallDna(PathBuf),
+    /// Install a [Dna] from a path with optional properties
+    InstallDna(PathBuf, Option<serde_json::Value>),
     /// List all installed [Dna]s
     ListDnas,
 }
@@ -349,9 +362,16 @@ mod test {
     #[tokio::test]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
+        let mut dna = fake_dna(&uuid.to_string());
         let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
-        let result = RealAdminInterfaceApi::read_parse_dna(dna_path).await?;
+        let json = serde_json::json!({
+            "test": "example",
+            "how_many": 42,
+        });
+        let properties = Some(json.clone());
+        let result = RealAdminInterfaceApi::read_parse_dna(dna_path, properties).await?;
+        let properties = Properties::new(json);
+        dna.properties = properties.try_into().unwrap();
         assert_eq!(dna, result);
         Ok(())
     }
