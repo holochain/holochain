@@ -3,7 +3,6 @@
 use super::wasm::DnaWasm;
 use holochain_serialized_bytes::prelude::*;
 
-
 /// Represents an individual "zome".
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SerializedBytes)]
 pub struct Zome {

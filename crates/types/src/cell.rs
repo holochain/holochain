@@ -1,7 +1,6 @@
 //! A "Cell" represents a DNA/AgentId pair - a space where one dna/agent
 //! can track its source chain and service network requests / responses.
 
-
 use derive_more::{Display, From, Into};
 use holo_hash::{AgentHash, DnaHash};
 use std::fmt;

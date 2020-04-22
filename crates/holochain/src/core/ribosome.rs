@@ -48,7 +48,7 @@ use holochain_wasmer_host::prelude::*;
 use mockall::automock;
 use std::sync::Arc;
 use sx_types::{
-    dna::{Dna},
+    dna::Dna,
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
