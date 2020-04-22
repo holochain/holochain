@@ -204,10 +204,10 @@ impl DbManager {
             }
             EnvironmentKind::Conductor => {
                 self.create(&*CONDUCTOR_STATE).await?;
-            },
+            }
             EnvironmentKind::Wasm => {
                 self.create(&*WASM).await?;
-            },
+            }
         }
         Ok(())
     }

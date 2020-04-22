@@ -1,5 +1,6 @@
 //! Some common testing helpers.
 
+use crate::dna::DnaAddress;
 use crate::{
     agent::AgentId,
     cell::CellId,
@@ -15,6 +16,7 @@ use crate::{
     prelude::*,
     signature::{Provenance, Signature},
 };
+use holo_hash::DnaHash;
 use std::{collections::BTreeMap, path::PathBuf};
 use sx_zome_types::ZomeExternHostInput;
 
@@ -107,9 +109,19 @@ pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
     Ok((path, tmp_dir))
 }
 
+/// generate a fake DnaHash
+pub fn fake_dna_hash() -> DnaHash {
+    holo_hash::DnaHash::try_from(fake_dna("hash")).unwrap()
+}
+
+/// generate a fake DnaAddress
+pub fn fake_dna_address() -> DnaAddress {
+    fake_dna_hash().into()
+}
+
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (name.to_string().into(), fake_agent_id(name)).into()
+    (fake_dna_address(), fake_agent_id(name)).into()
 }
 
 /// A fixture example AgentId for unit testing.

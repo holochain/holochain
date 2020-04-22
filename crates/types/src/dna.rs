@@ -20,8 +20,9 @@ use crate::{
         fn_declarations::{FnDeclaration, TraitFns},
     },
     entry::entry_type::{AppEntryType, EntryType},
-    prelude::{Address, *},
+    prelude::*,
 };
+use holo_hash::DnaHash;
 use std::{
     collections::BTreeMap,
     hash::{Hash, Hasher},
@@ -32,8 +33,26 @@ fn zero_uuid() -> String {
     String::from("00000000-0000-0000-0000-000000000000")
 }
 
-/// TODO: consider a newtype for this
-pub type DnaAddress = Address;
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+/// CAS wrapper around DNA hashes
+pub enum DnaAddress {
+    /// the only option, Dna
+    Dna(DnaHash),
+}
+
+impl From<DnaHash> for DnaAddress {
+    fn from(dna_hash: DnaHash) -> Self {
+        Self::Dna(dna_hash)
+    }
+}
+
+impl std::fmt::Display for DnaAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DnaAddress::Dna(dna_hash) => write!(f, "{}", dna_hash),
+        }
+    }
+}
 
 /// Represents the top-level holochain dna object.
 #[derive(Serialize, Deserialize, Clone, Debug, SerializedBytes, SerializedBytesAddress)]
