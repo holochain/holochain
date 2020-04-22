@@ -119,11 +119,8 @@ impl WasmRibosome {
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
         let zome_name = host_context.zome_name.clone();
-        // TODO: cannot get zome because the notion of zomes is currently "legacy"
-        // let zome = self.dna.get_zome(&zome_name)?;
-        // let wasm: Arc<Vec<u8>> = zome.code.code();
-        let zome: Zome = todo!("Implement zomes");
-        let wasm: Arc<Vec<u8>> = todo!("Zome code");
+        let zome = self.dna.get_zome(&zome_name)?;
+        let wasm: Arc<Vec<u8>> = zome.code.code();
         let imports: ImportObject = WasmRibosome::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             &self.wasm_cache_key(&zome_name),
@@ -246,15 +243,13 @@ pub mod wasm_test {
 
     fn zome_from_code(code: DnaWasm) -> Zome {
         let mut zome = fake_zome();
-        // TODO: @thedavidmeister sorry to make your tests fail!
-        // zome.code = code;
+        zome.code = code;
         zome
     }
 
     fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
         let mut dna = fake_dna("uuid");
-        // TODO: @thedavidmeister sorry to make your tests fail!
-        // dna.zomes = zomes;
+        dna.zomes = zomes;
         dna
     }
 

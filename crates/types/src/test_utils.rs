@@ -8,7 +8,7 @@ use crate::{
     signature::{Provenance, Signature},
 };
 use holo_hash::AgentHash;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 use sx_zome_types::ZomeExternHostInput;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
@@ -23,13 +23,21 @@ pub fn fake_dna_wasm() -> DnaWasm {
 
 /// simple Zome fixture
 pub fn fake_zome() -> Zome {
-    Zome {}
+    Zome {
+        code: fake_dna_wasm(),
+    }
 }
 
 /// A fixture example dna for unit testing.
 pub fn fake_dna(uuid: &str) -> Dna {
     Dna {
+        name: "test".to_string(),
         uuid: uuid.to_string(),
+        zomes: {
+            let mut v = BTreeMap::new();
+            v.insert("test".into(), fake_zome());
+            v
+        },
     }
 }
 
