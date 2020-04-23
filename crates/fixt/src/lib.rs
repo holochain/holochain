@@ -95,7 +95,7 @@ impl FixT for bool {
     }
 }
 
-macro_rules! fixt_uint {
+macro_rules! fixt_unsigned {
     ( $t:ty, $tt:ident ) => {
         pub enum $tt {
             Range($t, $t),
@@ -109,7 +109,7 @@ macro_rules! fixt_uint {
                     FixTT::B => 1,
                     FixTT::C => <$t>::max_value(),
                     FixTT::Random => rand::random(),
-                    FixTT::Input(fixt_uint) => match fixt_uint {
+                    FixTT::Input(fixt_unsigned) => match fixt_unsigned {
                         $tt::Range(min, max) => {
                             let mut rng = rand::thread_rng();
                             rng.gen_range(min, max)
@@ -121,14 +121,14 @@ macro_rules! fixt_uint {
     };
 }
 
-fixt_uint!(u8, FixTU8);
-fixt_uint!(u16, FixTU16);
-fixt_uint!(u32, FixTU32);
-fixt_uint!(u64, FixTU64);
-fixt_uint!(u128, FixTU128);
-fixt_uint!(usize, FixTUSize);
+fixt_unsigned!(u8, FixTU8);
+fixt_unsigned!(u16, FixTU16);
+fixt_unsigned!(u32, FixTU32);
+fixt_unsigned!(u64, FixTU64);
+fixt_unsigned!(u128, FixTU128);
+fixt_unsigned!(usize, FixTUSize);
 
-macro_rules! fixt_iint {
+macro_rules! fixt_signed {
     ( $t:ty, $tt:ident ) => {
         pub enum $tt {
             Range($t, $t),
@@ -142,7 +142,7 @@ macro_rules! fixt_iint {
                     FixTT::B => 0,
                     FixTT::C => <$t>::max_value(),
                     FixTT::Random => rand::random(),
-                    FixTT::Input(fixt_uint) => match fixt_uint {
+                    FixTT::Input(fixt_unsigned) => match fixt_unsigned {
                         $tt::Range(min, max) => {
                             let mut rng = rand::thread_rng();
                             rng.gen_range(min, max)
@@ -154,28 +154,47 @@ macro_rules! fixt_iint {
     };
 }
 
-fixt_iint!(i8, FixTI8);
-fixt_iint!(i16, FixTI16);
-fixt_iint!(i32, FixTI32);
-fixt_iint!(i64, FixTI64);
-fixt_iint!(i128, FixTI128);
-fixt_iint!(isize, FixTISize);
+fixt_signed!(i8, FixTI8);
+fixt_signed!(i16, FixTI16);
+fixt_signed!(i32, FixTI32);
+fixt_signed!(i64, FixTI64);
+fixt_signed!(i128, FixTI128);
+fixt_signed!(isize, FixTISize);
+
+macro_rules! fixt_float {
+    ( $t:ident, $tt:ident ) => {
+        pub enum $tt {
+            Range($t, $t),
+        }
+        impl FixT for $t {
+            type Input = $tt;
+            fn fixt(fixtt: FixTT<Self::Input>) -> Self {
+                match fixtt {
+                    FixTT::Empty => 0.0,
+                    // NAN is the most common source of bugs in float handling, so it's the first
+                    // thing we should be testing
+                    FixTT::A => std::$t::NAN,
+                    FixTT::B => std::$t::NEG_INFINITY,
+                    FixTT::C => std::$t::INFINITY,
+                    FixTT::Random => rand::random(),
+                    FixTT::Input(fixt_float) => match fixt_float {
+                        $tt::Range(min, max) => {
+                            let mut rng = rand::thread_rng();
+                            rng.gen_range(min, max)
+                        }
+                    },
+                }
+            }
+        }
+    };
+}
+
+fixt_float!(f32, FixTF32);
+fixt_float!(f64, FixTF64);
 
 #[cfg(test)]
 mod tests {
-    use crate::FixTU128;
-    use crate::FixTU16;
-    use crate::FixTU32;
-    use crate::FixTU64;
-    use crate::FixTU8;
-    use crate::FixTUSize;
-    use crate::FixTI128;
-    use crate::FixTI16;
-    use crate::FixTI32;
-    use crate::FixTI64;
-    use crate::FixTI8;
-    use crate::FixTISize;
-    use crate::{FixT, FixTT};
+    use super::*;
     use hamcrest2::prelude::*;
     use rstest::rstest;
 
@@ -206,42 +225,62 @@ mod tests {
     // function name, type to test, input type, empty, a, b, c
     basic_test!(unit_test, (), (), (), (), (), (), ());
 
-    macro_rules! uint_test {
+    macro_rules! unsigned_test {
         ( $f:ident, $t:ty, $tt:ty ) => {
             basic_test!( $f, $t, $tt, 0, 0, <$t>::min_value(), 1, <$t>::max_value() );
         };
     }
 
-    uint_test!(u8_test, u8, FixTU8);
-    uint_test!(u16_test, u16, FixTU16);
-    uint_test!(u32_test, u32, FixTU32);
-    uint_test!(u64_test, u64, FixTU64);
-    uint_test!(u128_test, u128, FixTU128);
-    uint_test!(usize_test, usize, FixTUSize);
+    unsigned_test!(u8_test, u8, FixTU8);
+    unsigned_test!(u16_test, u16, FixTU16);
+    unsigned_test!(u32_test, u32, FixTU32);
+    unsigned_test!(u64_test, u64, FixTU64);
+    unsigned_test!(u128_test, u128, FixTU128);
+    unsigned_test!(usize_test, usize, FixTUSize);
 
-    macro_rules! iint_test {
+    macro_rules! signed_test {
         ( $f:ident, $t:ty, $tt:ty ) => {
             basic_test!( $f, $t, $tt, 0, 0, <$t>::min_value(), 0, <$t>::max_value() );
         };
     }
 
-    iint_test!(i8_test, i8, FixTI8);
-    iint_test!(i16_test, i16, FixTI16);
-    iint_test!(i32_test, i32, FixTI32);
-    iint_test!(i64_test, i64, FixTI64);
-    iint_test!(i128_test, i128, FixTI128);
-    iint_test!(isize_test, isize, FixTISize);
+    signed_test!(i8_test, i8, FixTI8);
+    signed_test!(i16_test, i16, FixTI16);
+    signed_test!(i32_test, i32, FixTI32);
+    signed_test!(i64_test, i64, FixTI64);
+    signed_test!(i128_test, i128, FixTI128);
+    signed_test!(isize_test, isize, FixTISize);
 
-    basic_test!(
-        new_type_test,
-        MyNewType,
-        FixTU32,
-        MyNewType(0),
-        MyNewType(0),
-        MyNewType(<u32>::min_value()),
-        MyNewType(1),
-        MyNewType(<u32>::max_value())
-    );
+    macro_rules! float_test {
+        ( $f:ident, $t:ident, $tt:ty ) => {
+            #[rstest(
+                i,
+                o,
+                case(FixTT::default(), 0.0),
+                case(FixTT::Empty, 0.0),
+                // hit NAN directly
+                // case(FixTT::A, $a),
+                case(FixTT::B, std::$t::NEG_INFINITY),
+                case(FixTT::C, std::$t::INFINITY)
+            )]
+            fn $f(i: FixTT<$tt>, o: $t) {
+                match i {
+                    FixTT::Empty => assert_that!(&<$t>::fixt_empty(), eq(&o)),
+                    // FixTT::A => assert_that!(&<$t>::fixt_a(), eq(&o)),
+                    FixTT::B => assert_that!(&<$t>::fixt_b(), eq(&o)),
+                    FixTT::C => assert_that!(&<$t>::fixt_c(), eq(&o)),
+                    _ => {}
+                }
+                assert_that!(&<$t>::fixt(i), eq(&o));
+
+                // this is redundantly called every case but it doesn't matter, we get NAN coverage
+                assert_that!(<$t>::fixt(FixTT::A).is_nan(), is(true));
+                assert_that!(<$t>::fixt_a().is_nan(), is(true));
+            }
+        };
+    }
+    float_test!(f32_test, f32, FixTF32);
+    float_test!(f64_test, f64, FixTF64);
 
     /// show an example of a newtype delegating to inner fixtures
     #[derive(Debug, PartialEq)]
@@ -252,4 +291,14 @@ mod tests {
             Self(u32::fixt(fixtt))
         }
     }
+    basic_test!(
+        new_type_test,
+        MyNewType,
+        FixTU32,
+        MyNewType(0),
+        MyNewType(0),
+        MyNewType(<u32>::min_value()),
+        MyNewType(1),
+        MyNewType(<u32>::max_value())
+    );
 }
