@@ -18,6 +18,9 @@ pub enum FixTT<I: Sized> {
     /// there is no intent to hit any particular statistical distribution or range of values
     /// typically the expectation is that it falls back to whatever `rand::random()` does
     Random,
+    /// random data of a fixed size, where that is meaningful
+    /// could be something like the length/size of a collection or range of a sampled number
+    RandomSize(usize),
     /// opens fixture implementations up for extension
     /// a fixture sub-type
     Input(I),
@@ -75,8 +78,32 @@ pub trait FixT {
 
 impl FixT for () {
     type Input = ();
-    fn fixt(_: FixTT<Self::Input>) -> Self {
-        ()
+    fn fixt(fixtt: FixTT<Self::Input>) -> Self {
+        match fixtt {
+            FixTT::A => (),
+            FixTT::Empty => (),
+            // there's no more options for ()!
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl FixT for Vec<()> {
+    type Input = ();
+    fn fixt(fixtt: FixTT<Self::Input>) -> Self {
+        match fixtt {
+            FixTT::A => vec![()],
+            FixTT::B => vec![(), ()],
+            FixTT::C => vec![(), (), ()],
+            FixTT::Empty => vec![],
+            FixTT::Random => {
+                let random_len = <usize>::fixt(FixTT::Input(FixTUSize::Range(0, 10)));
+                vec![(); random_len]
+            }
+            // can't randomise () over a fixed length
+            FixTT::RandomSize(_) => unimplemented!(),
+            FixTT::Input(_) => unimplemented!(),
+        }
     }
 }
 
@@ -90,6 +117,7 @@ impl FixT for bool {
             FixTT::C => unimplemented!(),
             FixTT::Empty => false,
             FixTT::Random => rand::random(),
+            FixTT::RandomSize(_) => unimplemented!(),
             FixTT::Input(_) => unimplemented!(),
         }
     }
@@ -108,30 +136,28 @@ impl FixT for char {
             // null
             FixTT::Empty => '\u{0000}',
             FixTT::Random => rand::random(),
+            // chars have no length
+            FixTT::RandomSize(_) => unimplemented!(),
             FixTT::Input(_) => unimplemented!(),
         }
     }
 }
 
-pub enum FixTString {
-    RandomLength(usize),
-}
 impl FixT for String {
-    type Input = FixTString;
+    type Input = ();
     fn fixt(fixtt: FixTT<Self::Input>) -> Self {
         match fixtt {
             FixTT::A => "❤💩a".to_string(),
             FixTT::B => "foo".to_string(),
             FixTT::C => "bar".to_string(),
             FixTT::Empty => "".to_string(),
-            FixTT::Random => Self::fixt(FixTT::Input(FixTString::RandomLength(10))),
-            FixTT::Input(fixt_string) => match fixt_string {
-                FixTString::RandomLength(len) => {
-                    let mut rng = rand::thread_rng();
-                    let vec: Vec<char> = (0..len).map(|_| rng.gen()).collect();
-                    vec.into_iter().collect()
-                }
-            },
+            FixTT::Random => Self::fixt(FixTT::RandomSize(10)),
+            FixTT::RandomSize(len) => {
+                let mut rng = rand::thread_rng();
+                let vec: Vec<char> = (0..len).map(|_| rng.gen()).collect();
+                vec.into_iter().collect()
+            }
+            FixTT::Input(_) => unimplemented!(),
         }
     }
 }
@@ -150,6 +176,7 @@ macro_rules! fixt_unsigned {
                     FixTT::B => 1,
                     FixTT::C => <$t>::max_value(),
                     FixTT::Random => rand::random(),
+                    FixTT::RandomSize(max) => <$t>::fixt(FixTT::Input($tt::Range(0, max as _))),
                     FixTT::Input(fixt_unsigned) => match fixt_unsigned {
                         $tt::Range(min, max) => {
                             let mut rng = rand::thread_rng();
@@ -183,6 +210,7 @@ macro_rules! fixt_signed {
                     FixTT::B => 0,
                     FixTT::C => <$t>::max_value(),
                     FixTT::Random => rand::random(),
+                    FixTT::RandomSize(max) => <$t>::fixt(FixTT::Input($tt::Range(0, max as _))),
                     FixTT::Input(fixt_unsigned) => match fixt_unsigned {
                         $tt::Range(min, max) => {
                             let mut rng = rand::thread_rng();
@@ -218,6 +246,9 @@ macro_rules! fixt_float {
                     FixTT::B => std::$t::NEG_INFINITY,
                     FixTT::C => std::$t::INFINITY,
                     FixTT::Random => rand::random(),
+                    FixTT::RandomSize(max) => {
+                        <$t>::fixt(FixTT::Input($tt::Range(0 as _, max as _)))
+                    }
                     FixTT::Input(fixt_float) => match fixt_float {
                         $tt::Range(min, max) => {
                             let mut rng = rand::thread_rng();
@@ -252,6 +283,40 @@ mod tests {
     use hamcrest2::prelude::*;
     use rstest::rstest;
 
+    #[rstest(i, o,
+        case(FixTT::default(), ()),
+        case(FixTT::Empty, ()),
+        case(FixTT::A, ()),
+    )]
+    /// tests the values for unit type (which is more limited than even basic_test can handle)
+    fn unit_test(i: FixTT<()>, o: ()) {
+        match i {
+            FixTT::Empty => assert_that!(&<()>::fixt_empty(), eq(&o)),
+            FixTT::A => assert_that!(&<()>::fixt_a(), eq(&o)),
+            _ => {}
+        }
+        assert_that!(&<()>::fixt(i), eq(&o));
+    }
+
+    #[rstest(
+        i,
+        o,
+        case(FixTT::default(), false),
+        case(FixTT::Empty, false),
+        case(FixTT::A, false),
+        case(FixTT::B, true)
+    )]
+    /// tests the values for unit type (which is more limited than even basic_test can handle)
+    fn bool_test(i: FixTT<()>, o: bool) {
+        match i {
+            FixTT::Empty => assert_that!(&<bool>::fixt_empty(), eq(&o)),
+            FixTT::A => assert_that!(&<bool>::fixt_a(), eq(&o)),
+            FixTT::B => assert_that!(&<bool>::fixt_b(), eq(&o)),
+            _ => {}
+        }
+        assert_that!(&<bool>::fixt(i), eq(&o));
+    }
+
     macro_rules! basic_test {
         ( $f:ident, $t:ty, $tt:ty, $d:expr, $e:expr, $a:expr, $b:expr, $c:expr ) => {
             #[rstest(
@@ -277,7 +342,6 @@ mod tests {
     }
 
     // function name, type to test, input type, default, empty, a, b, c
-    basic_test!(unit_test, (), (), (), (), (), (), ());
     basic_test!(
         char_test,
         char,
@@ -291,7 +355,7 @@ mod tests {
     basic_test!(
         string_test,
         String,
-        FixTString,
+        (),
         String::from(""),
         String::from(""),
         String::from("❤💩a"),
