@@ -5,15 +5,15 @@ use crate::core::state::{
 };
 
 use fallible_iterator::FallibleIterator;
-use sx_state::{
+use holochain_state::{
     buffer::BufferedStore,
     db::DbManager,
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use sx_types::chain_header::HeaderAddress;
-use sx_types::entry::EntryAddress;
-use sx_types::{
+use holochain_types::chain_header::HeaderAddress;
+use holochain_types::entry::EntryAddress;
+use holochain_types::{
     chain_header::ChainHeader,
     entry::Entry,
     prelude::*,
@@ -179,8 +179,8 @@ pub mod tests {
     use super::SourceChainBuf;
     use crate::core::state::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use sx_state::{prelude::*, test_utils::test_cell_env};
-    use sx_types::{
+    use holochain_state::{prelude::*, test_utils::test_cell_env};
+    use holochain_types::{
         entry::Entry,
         prelude::*,
         test_utils::{fake_agent_hash, fake_dna},

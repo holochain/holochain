@@ -57,7 +57,7 @@ try_from_serialized_bytes!(WireMessage);
 
 #[cfg(test)]
 pub(crate) fn init_tracing() {
-    sx_types::observability::test_run().unwrap();
+    holochain_types::observability::test_run().unwrap();
 }
 
 /// internal socket type

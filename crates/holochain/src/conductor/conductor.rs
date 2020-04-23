@@ -26,19 +26,19 @@ use crate::conductor::{
 pub use builder::*;
 use derive_more::{AsRef, Deref, From};
 use holo_hash::*;
-use std::collections::HashMap;
-use std::{error::Error, sync::Arc};
-use sx_state::{
+use holochain_state::{
     db,
     env::{Environment, ReadManager},
     exports::SingleStore,
     prelude::WriteManager,
     typed::{Kv, UnitDbKey},
 };
-use sx_types::{
+use holochain_types::{
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
+use std::collections::HashMap;
+use std::{error::Error, sync::Arc};
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
@@ -300,7 +300,7 @@ mod builder {
         manager::{keep_alive_task, ManagedTaskHandle},
     };
     use futures::future;
-    use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
+    use holochain_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
@@ -437,7 +437,7 @@ pub mod tests {
 
     use super::{Conductor, ConductorState, RealConductor};
     use crate::conductor::{dna_store::MockDnaStore, state::CellConfig};
-    use sx_state::test_utils::test_conductor_env;
+    use holochain_state::test_utils::test_conductor_env;
 
     #[tokio::test]
     async fn can_update_state() {

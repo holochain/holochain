@@ -23,4 +23,4 @@ url2 = "0.0.5"
 
 [dev-dependencies]
 linefeed = "0.6"
-sx_types = { version = "=0.0.1", path = "../types" }
+holochain_types = { version = "=0.0.1", path = "../types" }

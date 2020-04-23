@@ -1,8 +1,8 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::GetEntryInput;
+use holochain_zome_types::GetEntryOutput;
 use std::sync::Arc;
-use sx_zome_types::GetEntryInput;
-use sx_zome_types::GetEntryOutput;
 
 pub async fn get_entry(
     _ribosome: Arc<WasmRibosome>,

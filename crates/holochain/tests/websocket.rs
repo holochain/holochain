@@ -7,16 +7,16 @@ use holochain_2020::conductor::{
     error::ConductorError,
     ConductorHandle, RealConductor,
 };
-use holochain_websocket::*;
-use matches::assert_matches;
-use std::sync::Arc;
-use std::{path::PathBuf, process::Stdio, time::Duration};
-use sx_types::{
+use holochain_types::{
     dna::Properties,
     observability,
     prelude::*,
     test_utils::{fake_dna, fake_dna_file},
 };
+use holochain_websocket::*;
+use matches::assert_matches;
+use std::sync::Arc;
+use std::{path::PathBuf, process::Stdio, time::Duration};
 use tempdir::TempDir;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};

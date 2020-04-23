@@ -1,4 +1,4 @@
-//! sx_types::dna::zome is a set of structs for working with holochain dna.
+//! holochain_types::dna::zome is a set of structs for working with holochain dna.
 
 use super::wasm::DnaWasm;
 use holochain_serialized_bytes::prelude::*;

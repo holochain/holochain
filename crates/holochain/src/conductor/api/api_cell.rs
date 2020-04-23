@@ -1,7 +1,7 @@
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::{cell::Cell, ConductorHandle};
 use async_trait::async_trait;
-use sx_types::{
+use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
