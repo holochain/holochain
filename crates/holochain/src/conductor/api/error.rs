@@ -2,6 +2,7 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::conductor::{dna_store::error::DnaStoreError, error::ConductorError};
+use holochain_serialized_bytes::prelude::*;
 use sx_types::cell::CellId;
 use thiserror::Error;
 
@@ -45,3 +46,42 @@ pub enum SerializationError {
 
 /// Type alias
 pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
+
+/// Error type that goes over the websocket wire.
+/// This intends to be application developer facing
+/// so it should be readable and relevant
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename = "snake-case", tag = "type", content = "data")]
+pub enum WireError {
+    // TODO: B-01506 Constrain these errors so they are relevant to
+    // application developers and what they would need
+    // to react to using code (i.e. not just print)
+    /// Any internal error
+    InternalError(String),
+    /// The input to the api failed to Deseralize
+    Deserialization(String),
+    /// The dna path provided was invalid
+    InvalidDnaPath(String),
+}
+
+impl WireError {
+    /// Convert the error from the display.
+    /// Display is chosen as the only thing
+    /// the end user can do is print this and therefor
+    /// should use the version intended for users.
+    pub fn from_display<T: std::fmt::Display>(e: T) -> Self {
+        WireError::InternalError(e.to_string())
+    }
+}
+
+impl From<ConductorApiError> for WireError {
+    fn from(e: ConductorApiError) -> Self {
+        WireError::from_display(e)
+    }
+}
+
+impl From<SerializationError> for WireError {
+    fn from(e: SerializationError) -> Self {
+        WireError::Deserialization(format!("{:?}", e))
+    }
+}

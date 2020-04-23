@@ -207,9 +207,8 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::interface::error::AdminInterfaceErrorKind;
     use crate::conductor::{
-        api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
+        api::{error::WireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
         RealConductor,
@@ -244,7 +243,10 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Serialization, ..});
+            assert_matches!(
+                response,
+                AdminResponse::Error(WireError::Deserialization(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -260,7 +262,7 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Io, ..});
+            assert_matches!(response, AdminResponse::Error(WireError::InvalidDnaPath(_)));
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -289,14 +291,12 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Cache, ..});
+            assert_matches!(response, AdminResponse::Error(WireError::InternalError(_)));
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap()
-        // TODO: B-01440: this can't be done easily yet
-        // because we can't cause the cache to fail from an input
     }
 
     #[ignore]
