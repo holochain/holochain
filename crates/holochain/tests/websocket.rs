@@ -90,9 +90,7 @@ async fn check_timeout(
 
 async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
-        .read()
-        .await
-        .get_arbitrary_admin_websocket_port()
+        .get_arbitrary_admin_websocket_port().await
         .expect("No admin port open on conductor")
 }
 
@@ -183,7 +181,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let request = AdminRequest::InstallDna(fake_dna_path, None);
     let response = client.request(request).await;
     assert_matches!(response, Ok(AdminResponse::DnaInstalled));
-    conductor_handle.write().await.shutdown();
+    conductor_handle.shutdown();
 
     Ok(())
 }
@@ -210,7 +208,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     info!("client connect");
 
-    conductor_handle.write().await.shutdown();
+    conductor_handle.shutdown().await;
 
     info!("shutdown");
 

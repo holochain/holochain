@@ -121,9 +121,7 @@ async fn async_main() {
     info!("Conductor successfully initialized.");
     // kick off actual conductor task here
     let waiting_handle = conductor
-        .write()
-        .await
-        .get_wait_handle()
+        .get_wait_handle().await
         .expect("No wait handle in conductor");
 
     waiting_handle

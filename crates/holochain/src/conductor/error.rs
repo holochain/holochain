@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use sx_state::error::DatabaseError;
 use sx_types::cell::{CellHandle, CellId};
 use thiserror::Error;
+use super::dna_store::error::DnaStoreError;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -52,6 +53,10 @@ pub enum ConductorError {
 
     #[error("Error while trying to send a task to the task manager: {0}")]
     SubmitTaskError(String),
+
+    #[error("DNA store error: {0:?}")]
+    DnaStoreError(#[from] DnaStoreError),
+
 }
 
 // TODO: can this be removed?

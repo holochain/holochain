@@ -79,7 +79,6 @@ impl From<ConductorApiError> for AdminInterfaceErrorKind {
             ConductorApiError::Todo(_) => Other,
             ConductorApiError::Io(_) => Io,
             ConductorApiError::SerializationError(_) => Serialization,
-            ConductorApiError::Db(_) => Cache,
         }
     }
 }

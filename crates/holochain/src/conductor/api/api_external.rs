@@ -2,6 +2,7 @@
 
 use super::error::{ConductorApiResult, SerializationError};
 use crate::conductor::{
+    config::AdminInterfaceConfig,
     interface::error::{AdminInterfaceErrorKind, InterfaceError, InterfaceResult},
     ConductorHandle,
 };
@@ -120,6 +121,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
         match request {
             Start(_cell_handle) => unimplemented!(),
             Stop(_cell_handle) => unimplemented!(),
+            AddAdminInterfaces(configs) => Ok(AdminResponse::AdminInterfacesAdded(
+                self.conductor_handle
+                    .add_admin_interfaces_via_handle(self.conductor_handle.clone(), configs)
+                    .await?,
+            )),
             InstallDna(dna_path, properties) => {
                 trace!(?dna_path);
                 let dna = read_parse_dna(dna_path, properties).await?;
@@ -246,6 +252,8 @@ pub enum AdminResponse {
     Unimplemented(AdminRequest),
     /// [Dna] has successfully been installed
     DnaInstalled,
+    /// AdminInterfaces have successfully been added
+    AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
     ListDnas(Vec<DnaHash>),
     /// An error has ocurred in this request
@@ -282,6 +290,8 @@ pub enum AdminRequest {
     Start(CellHandle),
     /// Stop a cell running
     Stop(CellHandle),
+    /// Set up and register an Admin interface task
+    AddAdminInterfaces(Vec<AdminInterfaceConfig>),
     /// Install a [Dna] from a path with optional properties
     InstallDna(PathBuf, Option<serde_json::Value>),
     /// List all installed [Dna]s

@@ -289,7 +289,7 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Cache, ..});
+            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Conductor, ..});
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);

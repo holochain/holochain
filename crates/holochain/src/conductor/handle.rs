@@ -1,8 +1,8 @@
 use super::{
-    api::{error::ConductorApiResult, CellConductorApi},
+    api::{error::ConductorApiResult, CellConductorApi, RealAdminInterfaceApi},
     dna_store::DnaStore,
     error::ConductorResult,
-    Cell, Conductor,
+    Cell, Conductor, config::AdminInterfaceConfig, manager::TaskManagerRunHandle,
 };
 use std::sync::Arc;
 use sx_types::{
@@ -20,6 +20,7 @@ pub type ConductorHandleInner<DS> = RwLock<Conductor<DS>>;
 #[async_trait::async_trait]
 pub trait ConductorHandleT: Send + Sync {
     async fn check_running(&self) -> ConductorResult<()>;
+    async fn add_admin_interfaces_via_handle(&self, handle: ConductorHandle, configs: Vec<AdminInterfaceConfig>) -> ConductorResult<()>;
     async fn install_dna(&self, dna: Dna) -> ConductorResult<()>;
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
     async fn invoke_zome(
@@ -27,7 +28,12 @@ pub trait ConductorHandleT: Send + Sync {
         api: CellConductorApi,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
+
+    async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle>;
+    async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
+    async fn shutdown(&self);
 }
+
 
 /// A handle to the conductor that can easily be passed
 /// around and cheaply cloned
@@ -41,12 +47,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.0.read().await.check_running()
     }
 
-    async fn install_dna(&self, dna: Dna) -> ConductorResult<()> {
-        unimplemented!()
+    async fn add_admin_interfaces_via_handle(&self, handle: ConductorHandle, configs: Vec<AdminInterfaceConfig>) -> ConductorResult<()> {
+        let mut lock = self.0.write().await;
+        lock.add_admin_interfaces_via_handle(handle, configs).await
     }
 
+    async fn install_dna(&self, dna: Dna) -> ConductorResult<()> {
+        Ok(self.0.write().await.dna_store_mut().add(dna)?)
+    }
+    
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
-        unimplemented!()
+        Ok(self.0.read().await.dna_store().list())
     }
 
     async fn invoke_zome(
@@ -58,4 +69,19 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let cell: &Cell = conductor.cell_by_id(&invocation.cell_id)?;
         cell.invoke_zome(api, invocation).await.map_err(Into::into)
     }
+
+    async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle> {
+        self.0.write().await.get_wait_handle()
+    }
+
+    async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+        self.0.read().await.get_arbitrary_admin_websocket_port()
+    }
+
+    async fn shutdown(&self) {
+        self.0.write().await.shutdown()
+    }
+
 }
+
+

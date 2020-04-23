@@ -10,12 +10,12 @@
 //! users in a testing environment.
 
 use super::{
-    api::{AdminInterfaceApi, AppInterfaceApi},
+    api::{AdminInterfaceApi, AppInterfaceApi, RealAdminInterfaceApi},
     dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
     handle::ConductorHandleImpl,
-    manager::{spawn_task_manager, ManagedTaskAdd, TaskManagerRunHandle},
-    state::ConductorState,
+    manager::{spawn_task_manager, ManagedTaskAdd, TaskManagerRunHandle, ManagedTaskHandle, keep_alive_task},
+    state::ConductorState, config::{InterfaceDriver, AdminInterfaceConfig}, interface::{error::InterfaceResult, websocket::{spawn_admin_interface_task, spawn_websocket_listener}},
 };
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
@@ -44,6 +44,7 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 pub use builder::*;
+use futures::future;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -214,7 +215,7 @@ where
     }
 
     /// Returns a port that was chosen by the OS
-    fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+    pub(super) fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
         self.admin_websocket_ports.get(0).copied()
     }
 
@@ -225,11 +226,11 @@ where
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
-    fn dna_store(&self) -> &DS {
+    pub(super) fn dna_store(&self) -> &DS {
         &self.dna_store
     }
 
-    fn dna_store_mut(&mut self) -> &mut DS {
+    pub(super) fn dna_store_mut(&mut self) -> &mut DS {
         &mut self.dna_store
     }
 
@@ -237,7 +238,7 @@ where
         self.admin_websocket_ports.push(port);
     }
 
-    fn shutdown(&mut self) {
+    pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
         self.managed_task_stop_broadcaster
             .send(())
@@ -247,12 +248,102 @@ where
             })
     }
 
-    fn get_wait_handle(&mut self) -> Option<TaskManagerRunHandle> {
+    pub(super) fn get_wait_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
 
+    /// Move this [Conductor] into a shared [ConductorHandle].
+    /// 
+    /// After this happens, direct mutable access to the Conductor becomes impossible,
+    /// and you must interact with it through the ConductorHandle, a limited cloneable interface 
+    /// for which all mutation is synchronized across all shared copies by a RwLock.
+    /// 
+    /// This signals the completion of Conductor initialization and the beginning of its lifecycle
+    /// as the driver of its various interface handling loops
     pub fn into_handle(self) -> ConductorHandle {
         Arc::new(ConductorHandleImpl::from(RwLock::new(self)))
+    }
+
+
+    /// Spawn all admin interface tasks, register them with the TaskManager,
+    /// and modify the conductor accordingly, based on the config passed in
+    pub(crate) async fn add_admin_interfaces_via_handle(
+        &mut self,
+        handle: ConductorHandle,
+        configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()>
+    where
+        DS: DnaStore + 'static,
+    {
+        let admin_api = RealAdminInterfaceApi::new(handle);
+        let stop_tx = self.managed_task_stop_broadcaster.clone();
+
+        // Closure to process each admin config item
+        let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
+            let admin_api = admin_api.clone();
+            let stop_tx = stop_tx.clone();
+            async move {
+                match driver {
+                    InterfaceDriver::Websocket { port } => {
+                        let listener = spawn_websocket_listener(port).await?;
+                        let port = listener.local_addr().port().unwrap_or(port);
+                        let handle: ManagedTaskHandle = spawn_admin_interface_task(
+                            listener,
+                            admin_api.clone(),
+                            stop_tx.subscribe(),
+                        )?;
+                        InterfaceResult::Ok((port, handle))
+                    }
+                }
+            }
+        };
+
+        // spawn interface tasks, collect their JoinHandles,
+        // and throw away the errors after logging them
+        let handles: Vec<_> = future::join_all(configs.into_iter().map(spawn_from_config))
+            .await
+            .into_iter()
+            // Log errors
+            .inspect(|result| {
+                if let Err(ref e) = result {
+                    error!(error = e as &dyn Error, "Admin interface failed to parse");
+                }
+            })
+            // Throw away errors
+            .filter_map(Result::ok)
+            .collect();
+
+        {
+            let mut ports = Vec::new();
+
+            // First, register the keepalive task, to ensure the conductor doesn't shut down
+            // in the absence of other "real" tasks
+            self
+                .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
+                    stop_tx.subscribe(),
+                ))))
+                .await?;
+
+            // Now that tasks are spawned, register them with the TaskManager
+            for (port, handle) in handles {
+                ports.push(port);
+                self
+                    .manage_task(ManagedTaskAdd::new(
+                        handle,
+                        Box::new(|result| {
+                            result.unwrap_or_else(|e| {
+                                error!(error = &e as &dyn std::error::Error, "Interface died")
+                            });
+                            None
+                        }),
+                    ))
+                    .await?
+            }
+            for p in ports {
+                self.add_admin_port(p);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -307,20 +398,21 @@ mod builder {
             let env_path = config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment, self.dna_store).await?;
-            let stop_tx = conductor.managed_task_stop_broadcaster.clone();
-            let conductor_mutex = RwLock::new(conductor);
-            let mut conductor_lock = conductor_mutex.write().await;
-            let conductor_handle: ConductorHandle =
-                Arc::new(ConductorHandleImpl::from(conductor_mutex));
-            let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+            let conductor_handle: ConductorHandle = conductor.into_handle();
 
-            setup_admin_interfaces_from_config(
-                &mut conductor_lock,
-                admin_api,
-                stop_tx,
-                config.admin_interfaces.unwrap_or_default(),
-            )
-            .await?;
+            if let Some(configs) = config.admin_interfaces {
+                conductor_handle.add_admin_interfaces_via_handle(conductor_handle.clone(), configs).await?;
+            }
+            // let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+
+            // TODO: initialzie admin interfafaces 
+            // setup_admin_interfaces_from_config(
+            //     &mut conductor_lock,
+            //     admin_api,
+            //     stop_tx,
+            //     config.admin_interfaces.unwrap_or_default(),
+            // )
+            // .await?;
 
             Ok(conductor_handle)
         }
@@ -333,84 +425,6 @@ mod builder {
         }
     }
 
-    /// Spawn all admin interface tasks, register them with the TaskManager,
-    /// and modify the conductor accordingly, based on the config passed in
-    async fn setup_admin_interfaces_from_config<DS>(
-        conductor_lock: &mut RwLockWriteGuard<'_, Conductor<DS>>,
-        admin_api: RealAdminInterfaceApi,
-        stop_tx: StopBroadcaster,
-        configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()>
-    where
-        DS: DnaStore + 'static,
-    {
-        // Closure to process each admin config item
-        let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
-            let admin_api = admin_api.clone();
-            let stop_tx = stop_tx.clone();
-            async move {
-                match driver {
-                    InterfaceDriver::Websocket { port } => {
-                        let listener = spawn_websocket_listener(port).await?;
-                        let port = listener.local_addr().port().unwrap_or(port);
-                        let handle: ManagedTaskHandle = spawn_admin_interface_task(
-                            listener,
-                            admin_api.clone(),
-                            stop_tx.subscribe(),
-                        )?;
-                        InterfaceResult::Ok((port, handle))
-                    }
-                }
-            }
-        };
-
-        // spawn interface tasks, collect their JoinHandles,
-        // and throw away the errors after logging them
-        let handles: Vec<_> = future::join_all(configs.into_iter().map(spawn_from_config))
-            .await
-            .into_iter()
-            // Log errors
-            .inspect(|result| {
-                if let Err(ref e) = result {
-                    error!(error = e as &dyn Error, "Admin interface failed to parse");
-                }
-            })
-            // Throw away errors
-            .filter_map(Result::ok)
-            .collect();
-
-        {
-            let mut ports = Vec::new();
-
-            // First, register the keepalive task, to ensure the conductor doesn't shut down
-            // in the absence of other "real" tasks
-            conductor_lock
-                .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
-                    stop_tx.subscribe(),
-                ))))
-                .await?;
-
-            // Now that tasks are spawned, register them with the TaskManager
-            for (port, handle) in handles {
-                ports.push(port);
-                conductor_lock
-                    .manage_task(ManagedTaskAdd::new(
-                        handle,
-                        Box::new(|result| {
-                            result.unwrap_or_else(|e| {
-                                error!(error = &e as &dyn std::error::Error, "Interface died")
-                            });
-                            None
-                        }),
-                    ))
-                    .await?
-            }
-            for p in ports {
-                conductor_lock.add_admin_port(p);
-            }
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]

@@ -15,7 +15,9 @@ pub enum ConductorApiError {
     /// Cell was referenced, but is missing from the conductor.
     #[error("A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {invocation_cell_id:?}")]
     ZomeInvocationCellMismatch {
+        /// The CellId which is referenced by the CellConductorApi
         api_cell_id: CellId,
+        /// The CellId which is referenced by the ZomeInvocation
         invocation_cell_id: CellId,
     },
 
@@ -34,10 +36,6 @@ pub enum ConductorApiError {
     /// Serialization error
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
-
-    /// Database Error
-    #[error("Database error: {0:?}")]
-    Db(#[from] DnaStoreError),
 }
 
 /// All the serialization errors that can occur
