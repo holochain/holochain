@@ -15,6 +15,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use tokio::stream::StreamExt;
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tracing::*;
 use url2::url2;
 
@@ -45,14 +46,18 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 _ = stop_rx.recv() => { break; },
 
                 // establish a new connection to a client
-                maybe_con = listener.next() => if let Some(conn) = maybe_con {
-                    // TODO: TK-01260: this could take some time and should be spawned
-                    if let Ok((send_socket, recv_socket)) = conn.await {
-                        send_sockets.push(send_socket);
-                        listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-                            api.clone(),
-                            recv_socket,
-                        )));
+                maybe_con = listener.next() => if let Some(connection) = maybe_con {
+                    match connection {
+                        Ok((send_socket, recv_socket)) => {
+                            send_sockets.push(send_socket);
+                            listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                                api.clone(),
+                                recv_socket,
+                            )));
+                        }
+                        Err(err) => {
+                            warn!("Admin socket connection failed: {}", err);
+                        }
                     }
                 } else {
                     warn!(line = line!(), "Listener has returned none");
@@ -114,15 +119,29 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         tokio::select! {
             // break if we receive on the stop channel
             _ = stop_rx.recv() => { break; },
+
+            // establish a new connection to a client
             maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                let (send_socket, recv_socket) = connection.await?;
-                handle_connection(send_socket, recv_socket);
+                match connection {
+                    Ok((send_socket, recv_socket)) => {
+                        handle_connection(send_socket, recv_socket);
+                    }
+                    Err(err) => {
+                        warn!("Admin socket connection failed: {}", err);
+                    }
+                }
             } else {
                 break;
             }
         }
     }
 
+    handle_shutdown(listener_handles).await
+}
+
+async fn handle_shutdown(
+    listener_handles: Vec<JoinHandle<InterfaceResult<()>>>,
+) -> InterfaceResult<()> {
     for h in listener_handles {
         // Show if these are actually finishing
         match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
