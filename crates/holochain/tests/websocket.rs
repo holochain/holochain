@@ -16,37 +16,40 @@ use holochain_types::{
 use holochain_websocket::*;
 use matches::assert_matches;
 use std::sync::Arc;
-use std::{
-    io::Read,
-    path::PathBuf,
-    process::{Child, Command, ExitStatus, Stdio},
-    time::Duration,
-};
+use std::{path::PathBuf, process::Stdio, time::Duration};
 use tempdir::TempDir;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::{Child, Command};
 use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
 use uuid::Uuid;
 
-fn read_output(holochain: &mut Child) -> String {
-    let mut stdout = String::new();
-    let mut stderr = String::new();
-    if let Some(ref mut so) = holochain.stdout {
-        so.read_to_string(&mut stdout).ok();
-    }
-    if let Some(ref mut se) = holochain.stderr {
-        se.read_to_string(&mut stderr).ok();
-    }
-    format!("stdout: {}, stderr: {}", stdout, stderr)
+fn spawn_output(holochain: &mut Child) {
+    let stdout = holochain.stdout.take();
+    let stderr = holochain.stderr.take();
+    tokio::task::spawn(async move {
+        if let Some(stdout) = stdout {
+            let mut reader = BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                trace!("holochain bin stdout: {}", line);
+            }
+        }
+    });
+    tokio::task::spawn(async move {
+        if let Some(stderr) = stderr {
+            let mut reader = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                trace!("holochain bin stderr: {}", line);
+            }
+        }
+    });
 }
 
-fn check_started(started: Result<Option<ExitStatus>>, holochain: &mut Child) {
-    if let Ok(Some(status)) = started {
-        let output = read_output(holochain);
-        panic!(
-            "Holochain failed to start. status: {:?}, {}",
-            status, output
-        );
+async fn check_started(holochain: &mut Child) {
+    let started = tokio::time::timeout(std::time::Duration::from_secs(1), holochain).await;
+    if let Ok(status) = started {
+        panic!("Holochain failed to start. status: {:?}", status);
     }
 }
 
@@ -82,8 +85,7 @@ async fn check_timeout(
         Ok(response) => response.unwrap(),
         Err(_) => {
             holochain.kill().unwrap();
-            let output = read_output(holochain);
-            panic!("Timed out on request: {}", output)
+            panic!("Timed out on request");
         }
     }
 }
@@ -126,17 +128,18 @@ async fn call_admin() {
     let config = create_config(port, environment_path);
     let config_path = write_config(path, &config);
 
-    let mut cmd = Command::cargo_bin("holochain-2020").unwrap();
-    cmd.arg("--structured");
-    cmd.arg("--config-path");
-    cmd.arg(config_path);
-    cmd.env("RUST_LOG", "debug");
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
+    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
+    let mut cmd = Command::from(cmd);
+    cmd.arg("--structured")
+        .arg("--config-path")
+        .arg(config_path)
+        .env("RUST_LOG", "debug")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
     let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    let started = holochain.try_wait();
-    check_started(started.map_err(Into::into), &mut holochain);
+    spawn_output(&mut holochain);
+    check_started(&mut holochain).await;
 
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
