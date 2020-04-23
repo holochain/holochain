@@ -19,12 +19,18 @@ pub struct DnaWasm {
     code: Arc<Vec<u8>>,
 }
 
-impl TryFrom<DnaWasm> for SerializedBytes {
+impl TryFrom<&DnaWasm> for SerializedBytes {
     type Error = SerializedBytesError;
-    fn try_from(dna_wasm: DnaWasm) -> Result<Self, Self::Error> {
+    fn try_from(dna_wasm: &DnaWasm) -> Result<Self, Self::Error> {
         Ok(SerializedBytes::from(UnsafeBytes::from(
             (*dna_wasm.code).to_owned(),
         )))
+    }
+}
+impl TryFrom<DnaWasm> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(dna_wasm: DnaWasm) -> Result<Self, Self::Error> {
+        Self::try_from(&dna_wasm)
     }
 }
 
