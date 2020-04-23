@@ -35,7 +35,7 @@ pub enum ConductorApiError {
 
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]
-    InvalidDnaPath(String),
+    DnaReadError(String),
 }
 
 /// All the serialization errors that can occur
@@ -56,7 +56,7 @@ pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 /// so it should be readable and relevant
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
-pub enum WireError {
+pub enum ExternalApiWireError {
     // TODO: B-01506 Constrain these errors so they are relevant to
     // application developers and what they would need
     // to react to using code (i.e. not just print)
@@ -65,27 +65,26 @@ pub enum WireError {
     /// The input to the api failed to Deseralize
     Deserialization(String),
     /// The dna path provided was invalid
-    InvalidDnaPath(String),
+    DnaReadError(String),
 }
 
-impl WireError {
+impl ExternalApiWireError {
     /// Convert the error from the display.
-    /// Display is chosen as the only thing
-    /// the end user can do is print this and therefor
-    /// should use the version intended for users.
-    pub fn from_display<T: std::fmt::Display>(e: T) -> Self {
-        WireError::InternalError(e.to_string())
+    pub fn internal<T: std::fmt::Display>(e: T) -> Self {
+        // Display format is used because
+        // this version intended for users.
+        ExternalApiWireError::InternalError(e.to_string())
     }
 }
 
-impl From<ConductorApiError> for WireError {
+impl From<ConductorApiError> for ExternalApiWireError {
     fn from(e: ConductorApiError) -> Self {
-        WireError::from_display(e)
+        ExternalApiWireError::internal(e)
     }
 }
 
-impl From<SerializationError> for WireError {
+impl From<SerializationError> for ExternalApiWireError {
     fn from(e: SerializationError) -> Self {
-        WireError::Deserialization(format!("{:?}", e))
+        ExternalApiWireError::Deserialization(format!("{:?}", e))
     }
 }

@@ -1,6 +1,8 @@
 #![deny(missing_docs)]
 
-use super::error::{ConductorApiError, ConductorApiResult, SerializationError, WireError};
+use super::error::{
+    ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
+};
 use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
     ConductorHandle,
@@ -44,8 +46,8 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
         match res {
             Ok(response) => response,
-            Err(ConductorApiError::InvalidDnaPath(e)) => {
-                AdminResponse::Error(WireError::InvalidDnaPath(e))
+            Err(ConductorApiError::DnaReadError(e)) => {
+                AdminResponse::Error(ExternalApiWireError::DnaReadError(e))
             }
             Err(e) => AdminResponse::Error(e.into()),
         }
@@ -135,7 +137,7 @@ impl RealAdminInterfaceApi {
     ) -> ConductorApiResult<Dna> {
         let dna: UnsafeBytes = tokio::fs::read(dna_path)
             .await
-            .map_err(|e| ConductorApiError::InvalidDnaPath(format!("{:?}", e)))?
+            .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?
             .into();
         let dna = SerializedBytes::from(dna);
         let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
@@ -267,7 +269,7 @@ pub enum AdminResponse {
     /// A list of all installed [Dna]s
     ListDnas(Vec<Address>),
     /// An error has ocurred in this request
-    Error(WireError),
+    Error(ExternalApiWireError),
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface

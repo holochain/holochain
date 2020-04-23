@@ -208,7 +208,7 @@ where
 mod test {
     use super::*;
     use crate::conductor::{
-        api::{error::WireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
+        api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
         RealConductor,
@@ -245,7 +245,7 @@ mod test {
             let response: AdminResponse = bytes.try_into().unwrap();
             assert_matches!(
                 response,
-                AdminResponse::Error(WireError::Deserialization(_))
+                AdminResponse::Error(ExternalApiWireError::Deserialization(_))
             );
             async { Ok(()) }.boxed()
         };
@@ -262,7 +262,10 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error(WireError::InvalidDnaPath(_)));
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -291,7 +294,10 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error(WireError::InternalError(_)));
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::InternalError(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
