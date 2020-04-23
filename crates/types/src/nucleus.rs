@@ -12,7 +12,6 @@ pub type ZomeName = String;
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
-#[allow(missing_docs)] // members are self-explanitory
 // DO NOT CLONE THIS because payload can be huge
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocation {

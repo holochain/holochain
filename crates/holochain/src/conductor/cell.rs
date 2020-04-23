@@ -14,6 +14,7 @@ use holochain_types::{
     shims::*,
 };
 use std::hash::{Hash, Hasher};
+use super::api::CellConductorApiT;
 
 pub mod error;
 
@@ -78,10 +79,9 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
-        _conductor_api: CellConductorApi,
-        _invocation: ZomeInvocation,
+        invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
+        self.conductor_api.invoke_zome(invocation).await
     }
 
     // TODO: tighten up visibility: only WorkflowRunner needs to access this

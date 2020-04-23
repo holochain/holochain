@@ -227,11 +227,14 @@ where
 mod test {
     use super::*;
     use crate::conductor::interface::error::AdminInterfaceErrorKind;
-    use crate::conductor::{
-        api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
-        conductor::ConductorBuilder,
-        dna_store::{error::DnaStoreError, MockDnaStore},
-        RealConductor,
+    use crate::{
+        conductor::{
+            api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
+            conductor::ConductorBuilder,
+            dna_store::{error::DnaStoreError, MockDnaStore},
+            RealConductor,
+        },
+        core::ribosome::wasm_test::zome_invocation_from_names,
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
@@ -251,14 +254,19 @@ mod test {
         InstallsDna(String),
     }
 
-    async fn setup() -> RealAdminInterfaceApi {
+    async fn setup_admin() -> RealAdminInterfaceApi {
         let conductor = RealConductor::builder().test().await.unwrap();
         RealAdminInterfaceApi::new(conductor)
     }
 
+    async fn setup_app() -> RealAppInterfaceApi {
+        let conductor = RealConductor::builder().test().await.unwrap();
+        RealAppInterfaceApi::new(conductor)
+    }
+
     #[tokio::test]
     async fn serialization_failure() {
-        let admin_api = setup().await;
+        let admin_api = setup_admin().await;
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -274,7 +282,7 @@ mod test {
     #[tokio::test]
     async fn invalid_request() {
         observability::test_run().ok();
-        let admin_api = setup().await;
+        let admin_api = setup_admin().await;
         let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -324,5 +332,32 @@ mod test {
         // TODO: B-01440: this can't be done easily yet
         // because we can't serialize something that
         // doesn't deserialize
+    }
+
+    #[tokio::test]
+    async fn call_zome_function() {
+        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+        struct Payload {
+            a: u32,
+        }
+        let payload = Payload { a: 1 };
+        // TODO: Create the Mock for the cell-dna-api to provide a fake zome response
+        let app_api = setup_app().await;
+        let request = Box::new(zome_invocation_from_names(
+            "zomey",
+            "fun_times",
+            payload.try_into().unwrap(),
+        ));
+        let msg = AppRequest::ZomeInvocationRequest { request };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AppResponse = bytes.try_into().unwrap();
+            // FIXME: Test the inner of below is correct
+            assert_matches!(response, AppResponse::ZomeInvocationResponse{ .. });
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, app_api).await.unwrap();
     }
 }

@@ -29,12 +29,11 @@ impl CellConductorApi {
 impl CellConductorApiT for CellConductorApi {
     async fn invoke_zome(
         &self,
-        cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         let conductor = self.lock.read().await;
-        let cell: &Cell = conductor.cell_by_id(cell_id)?;
-        cell.invoke_zome(self.clone(), invocation)
+        let cell: &Cell = conductor.cell_by_id(&invocation.cell_id)?;
+        cell.invoke_zome(invocation)
             .await
             .map_err(Into::into)
     }
@@ -84,7 +83,6 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// An invocation on a different Cell than this one corresponds to a bridged call.
     async fn invoke_zome(
         &self,
-        cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 

@@ -211,10 +211,11 @@ impl RealAppInterfaceApi {
 impl AppInterfaceApi for RealAppInterfaceApi {
     async fn invoke_zome(
         &self,
-        _invocation: ZomeInvocation,
+        invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        let _conductor = self.conductor_handle.read().await;
-        unimplemented!()
+        let conductor = self.conductor_handle.read().await;
+        let cell = conductor.cell_by_id(&invocation.cell_id)?;
+        cell.invoke_zome(invocation).await
     }
 }
 
