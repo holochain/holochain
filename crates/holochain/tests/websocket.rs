@@ -172,6 +172,7 @@ async fn call_admin() {
 
 #[tokio::test]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
+    observability::test_run().ok();
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
