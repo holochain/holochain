@@ -925,6 +925,7 @@ dependencies = [
  "test_wasm_common",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
  "toml",
  "tracing",
  "tracing-futures",
@@ -2892,6 +2893,16 @@ dependencies = [
  "tokio",
  "tokio-tls",
  "tungstenite",
+]
+
+[[package]]
+name = "tokio_safe_block_on"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ee5dc4ab1deaa20795744a7c48840fd647ce280d56b3de00b045d2af57edaef"
+dependencies = [
+ "futures",
+ "tokio",
 ]
 
 [[package]]
