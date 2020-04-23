@@ -20,6 +20,32 @@ pub enum KeystoreError {
     /// Error serializing data.
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
+
+    /// Holochain Crypto Erro.
+    #[error("CryptoError: {0}")]
+    CryptoError(#[from] holochain_crypto::CryptoError),
+
+    /// Unexpected Internal Error.
+    #[error("Other: {0}")]
+    Other(String),
+}
+
+impl From<String> for KeystoreError {
+    fn from(e: String) -> Self {
+        KeystoreError::Other(e)
+    }
+}
+
+impl From<&String> for KeystoreError {
+    fn from(e: &String) -> Self {
+        e.to_string().into()
+    }
+}
+
+impl From<&str> for KeystoreError {
+    fn from(e: &str) -> Self {
+        e.to_string().into()
+    }
 }
 
 /// Keystore Result Type.
@@ -77,3 +103,46 @@ ghost_actor::ghost_actor! {
         ),
     }
 }
+
+/// add signature verification functionality to AgentHash's
+/// (because they are actually public keys)
+pub trait AgentHashExt {
+    /// verify a signature for given data with this agent public_key is valid
+    fn verify_signature<D>(&self, signature: &Signature, data: D) -> KeystoreFuture<bool>
+    where
+        D: TryInto<SerializedBytes, Error = SerializedBytesError>;
+}
+
+impl AgentHashExt for holo_hash::AgentHash {
+    fn verify_signature<D>(&self, signature: &Signature, data: D) -> KeystoreFuture<bool>
+    where
+        D: TryInto<SerializedBytes, Error = SerializedBytesError>,
+    {
+        use ghost_actor::dependencies::futures::future::FutureExt;
+        use holo_hash::HoloHashCoreHash;
+
+        let result: KeystoreResult<(
+            holochain_crypto::DynCryptoBytes,
+            holochain_crypto::DynCryptoBytes,
+            holochain_crypto::DynCryptoBytes,
+        )> = (|| {
+            let pub_key = holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_bytes())?;
+            let signature = holochain_crypto::crypto_insecure_buffer_from_bytes(&signature.0)?;
+            let data: SerializedBytes = data.try_into()?;
+            let data = holochain_crypto::crypto_insecure_buffer_from_bytes(data.bytes())?;
+            Ok((signature, data, pub_key))
+        })();
+
+        async move {
+            let (mut signature, mut data, mut pub_key) = result?;
+            Ok(
+                holochain_crypto::crypto_sign_verify(&mut signature, &mut data, &mut pub_key)
+                    .await?,
+            )
+        }
+        .boxed()
+        .into()
+    }
+}
+
+pub mod mock_keystore;
