@@ -19,6 +19,11 @@ use tokio::task::JoinHandle;
 use tracing::*;
 use url2::url2;
 
+// TODO: This is arbitrary, choose reasonable size.
+/// Number of singals in buffer before applying
+/// back pressure.
+pub(crate) const SIGNAL_BUFFER_SIZE: usize = 1000;
+
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
@@ -95,7 +100,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
     mut stop_rx: StopReceiver,
-) -> InterfaceResult<()> {
+) -> InterfaceResult<(u16, ManagedTaskHandle)> {
     trace!("Initializing App interface");
     let mut listener = websocket_bind(
         url2!("ws://127.0.0.1:{}", port),
@@ -103,53 +108,59 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     )
     .await?;
     trace!("LISTENING AT: {}", listener.local_addr());
-    let mut listener_handles = Vec::new();
+    let port = listener
+        .local_addr()
+        .port()
+        .ok_or(InterfaceError::PortError)?;
+    let task = tokio::task::spawn(async move {
+        let mut listener_handles = Vec::new();
 
-    let mut handle_connection = |send_socket: WebsocketSender, recv_socket: WebsocketReceiver| {
-        let signal_rx = signal_broadcaster.subscribe();
-        listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
-            api.clone(),
-            recv_socket,
-            signal_rx,
-            send_socket,
-        )));
-    };
+        let mut handle_connection =
+            |send_socket: WebsocketSender, recv_socket: WebsocketReceiver| {
+                let signal_rx = signal_broadcaster.subscribe();
+                listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
+                    api.clone(),
+                    recv_socket,
+                    signal_rx,
+                    send_socket,
+                )));
+            };
 
-    loop {
-        tokio::select! {
-            // break if we receive on the stop channel
-            _ = stop_rx.recv() => { break; },
+        loop {
+            tokio::select! {
+                // break if we receive on the stop channel
+                _ = stop_rx.recv() => { break; },
 
-            // establish a new connection to a client
-            maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                match connection {
-                    Ok((send_socket, recv_socket)) => {
-                        handle_connection(send_socket, recv_socket);
+                // establish a new connection to a client
+                maybe_con = listener.next() => if let Some(connection) = maybe_con {
+                    match connection {
+                        Ok((send_socket, recv_socket)) => {
+                            handle_connection(send_socket, recv_socket);
+                        }
+                        Err(err) => {
+                            warn!("Admin socket connection failed: {}", err);
+                        }
                     }
-                    Err(err) => {
-                        warn!("Admin socket connection failed: {}", err);
-                    }
+                } else {
+                    break;
                 }
-            } else {
-                break;
             }
         }
-    }
 
-    handle_shutdown(listener_handles).await
+        handle_shutdown(listener_handles).await;
+        ManagedTaskResult::Ok(())
+    });
+    Ok((port, task))
 }
 
-async fn handle_shutdown(
-    listener_handles: Vec<JoinHandle<InterfaceResult<()>>>,
-) -> InterfaceResult<()> {
+async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>) {
     for h in listener_handles {
         // Show if these are actually finishing
         match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
-            Ok(r) => r??,
-            Err(_) => warn!("Websocket listener failed to join child tasks"),
+            Ok(Ok(Ok(_))) => (),
+            r @ _ => warn!(message = "Websocket listener failed to join child tasks", result = ?r),
         }
     }
-    Ok(())
 }
 
 /// Polls for messages coming in from the external client.
@@ -448,5 +459,21 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, app_api).await.unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn attach_app_interface() {
+        observability::test_run().ok();
+        let admin_api = setup_admin().await;
+        let msg = AdminRequest::AttachAppInterface;
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::AppInterfaceAttached{ .. });
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
     }
 }

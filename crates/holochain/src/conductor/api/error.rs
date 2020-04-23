@@ -1,7 +1,7 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::{
-    conductor::{error::ConductorError, CellError},
+    conductor::{error::ConductorError, interface::error::InterfaceError, CellError},
     core::{
         ribosome::error::RibosomeError, state::workspace::WorkspaceError,
         workflow::error::WorkflowRunError,
@@ -73,6 +73,10 @@ pub enum ConductorApiError {
     /// Cell Error
     #[error(transparent)]
     CellError(#[from] CellError),
+
+    /// Error in the Interface
+    #[error("An error occurred in the interface: {0:?}")]
+    InterfaceError(#[from] InterfaceError),
 }
 
 /// All the serialization errors that can occur

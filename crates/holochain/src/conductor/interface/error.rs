@@ -4,23 +4,28 @@ use holochain_serialized_bytes::SerializedBytesError;
 /// Interface Error Type
 #[derive(Debug, thiserror::Error)]
 pub enum InterfaceError {
+    #[error(transparent)]
     SerializedBytes(#[from] SerializedBytesError),
+    #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
+    #[error(transparent)]
     SignalReceive(tokio::sync::broadcast::RecvError),
+    #[error(transparent)]
     RequestHandler(ConductorError),
+    #[error("Got an unexpected string: {0}")]
     UnexpectedMessage(String),
+    #[error("Failed to send across interface")]
     SendError,
+    #[error("Other error: {0}")]
     Other(String),
+    #[error("Interface closed")]
     Closed,
     // FIXME: update error types in holochain_websocket to use a more specific
     // type than io::Error
+    #[error(transparent)]
     IoTodo(#[from] std::io::Error),
-}
-
-impl std::fmt::Display for InterfaceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
+    #[error("Failed to find free port")]
+    PortError,
 }
 
 impl From<String> for InterfaceError {

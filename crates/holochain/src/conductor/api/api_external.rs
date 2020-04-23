@@ -155,6 +155,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
+            AttachAppInterface => {
+                let port = self
+                    .conductor_handle
+                    .add_app_interface_via_handle(self.conductor_handle.clone())
+                    .await?;
+                Ok(AdminResponse::AppInterfaceAttached { port })
+            }
         }
     }
 }
@@ -270,6 +277,11 @@ pub enum AdminResponse {
     GenerateAgentPubKey(AgentPubKey),
     /// Listing all the AgentPubKeys in the Keystore
     ListAgentPubKeys(Vec<AgentPubKey>),
+    /// [AppInterfaceApi] successfully attached
+    AppInterfaceAttached {
+        /// Port of the new [AppInterfaceApi]
+        port: u16,
+    },
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
 }
@@ -308,6 +320,8 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
+    /// Attach a [AppInterfaceApi]
+    AttachAppInterface,
 }
 
 #[allow(missing_docs)]

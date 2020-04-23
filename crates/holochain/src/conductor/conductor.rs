@@ -10,14 +10,17 @@
 //! users in a testing environment.
 
 use super::{
-    api::RealAdminInterfaceApi,
+    api::{RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
     dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
     handle::ConductorHandleImpl,
     interface::{
         error::InterfaceResult,
-        websocket::{spawn_admin_interface_task, spawn_websocket_listener},
+        websocket::{
+            spawn_admin_interface_task, spawn_app_interface_task, spawn_websocket_listener,
+            SIGNAL_BUFFER_SIZE,
+        },
     },
     manager::{
         keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
@@ -289,6 +292,22 @@ where
         Ok(())
     }
 
+    pub(super) async fn add_app_interface_via_handle(
+        &mut self,
+        handle: ConductorHandle,
+    ) -> ConductorResult<u16> {
+        let os_choose_port = 0;
+        let app_api = RealAppInterfaceApi::new(handle);
+        let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
+        let stop_rx = self.managed_task_stop_broadcaster.subscribe();
+        let (port, task) =
+            spawn_app_interface_task(os_choose_port, app_api, signal_broadcaster, stop_rx)
+                .await
+                .map_err(Box::new)?;
+        self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
+        Ok(port)
+    }
+
     /// Create the cells from the db
     pub(super) async fn create_cells(
         &mut self,
@@ -445,16 +464,16 @@ where
         Ok(new_state)
     }
 
+    fn add_admin_port(&mut self, port: u16) {
+        self.admin_websocket_ports.push(port);
+    }
+
     /// Sends a JoinHandle to the TaskManager task to be managed
     async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
         self.managed_task_add_sender
             .send(handle)
             .await
             .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
-    }
-
-    fn add_admin_port(&mut self, port: u16) {
-        self.admin_websocket_ports.push(port);
     }
 }
 
