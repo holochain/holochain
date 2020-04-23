@@ -212,7 +212,7 @@ mod test {
         api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
-        RealConductor,
+        Conductor,
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
@@ -233,7 +233,7 @@ mod test {
     }
 
     async fn setup() -> RealAdminInterfaceApi {
-        let conductor = RealConductor::builder().test().await.unwrap();
+        let conductor = Conductor::builder().test().await.unwrap();
         RealAdminInterfaceApi::new(conductor)
     }
 

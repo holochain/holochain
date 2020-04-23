@@ -1,6 +1,6 @@
 use holochain_2020::conductor::{
     config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath,
-    ConductorHandle, RealConductor,
+    ConductorHandle, Conductor,
 };
 use std::error::Error;
 use std::path::PathBuf;
@@ -113,7 +113,7 @@ async fn async_main() {
     }
 
     // Initialize the Conductor
-    let conductor: ConductorHandle = RealConductor::builder()
+    let conductor: ConductorHandle = Conductor::builder()
         .with_config(config)
         .await
         .expect("Could not initialize Conductor from configuration");

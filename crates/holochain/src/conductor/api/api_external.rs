@@ -105,28 +105,29 @@ impl RealAdminInterfaceApi {
             app_api,
         }
     }
+}
 
-    /// Installs a [Dna] from a file path
-    pub(crate) async fn install_dna(
-        &self,
-        dna_path: PathBuf,
-        properties: Option<serde_json::Value>,
-    ) -> ConductorApiResult<AdminResponse> {
-        trace!(?dna_path);
-        let dna = Self::read_parse_dna(dna_path, properties).await?;
-        self.add_dna(dna).await?;
-        Ok(AdminResponse::DnaInstalled)
+#[async_trait::async_trait]
+impl AdminInterfaceApi for RealAdminInterfaceApi {
+    async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
+        use AdminRequest::*;
+        match request {
+            Start(_cell_handle) => unimplemented!(),
+            Stop(_cell_handle) => unimplemented!(),
+            InstallDna(dna_path, properties) => {
+                trace!(?dna_path);
+                let dna = read_parse_dna(dna_path, properties).await?;
+                self.conductor_handle.install_dna(dna).await?;
+                Ok(AdminResponse::DnaInstalled)
+            },
+            ListDnas => {
+                let dna_list = self.conductor_handle.list_dnas().await?;
+                Ok(AdminResponse::ListDnas(dna_list))
+            },
+        }
     }
+}
 
-    /// Adds the [Dna] to the dna store
-    async fn add_dna(&self, dna: Dna) -> ConductorApiResult<()> {
-        self.conductor_handle
-            .write()
-            .await
-            .dna_store_mut()
-            .add(dna)
-            .map_err(|e| e.into())
-    }
 
     /// Reads the [Dna] from disk and parses to [SerializedBytes]
     async fn read_parse_dna(
@@ -145,26 +146,6 @@ impl RealAdminInterfaceApi {
         Ok(dna)
     }
 
-    /// Lists all the [Dna]'s in the dna store
-    pub(crate) async fn list_dnas(&self) -> ConductorApiResult<AdminResponse> {
-        let dna_list = self.conductor_handle.read().await.dna_store().list();
-        Ok(AdminResponse::ListDnas(dna_list))
-    }
-}
-
-#[async_trait::async_trait]
-impl AdminInterfaceApi for RealAdminInterfaceApi {
-    async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
-        use AdminRequest::*;
-        match request {
-            Start(_cell_handle) => unimplemented!(),
-            Stop(_cell_handle) => unimplemented!(),
-            InstallDna(dna_path, properties) => self.install_dna(dna_path, properties).await,
-            ListDnas => self.list_dnas().await,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl InterfaceApi for RealAdminInterfaceApi {
     type ApiRequest = AdminRequest;
@@ -177,9 +158,6 @@ impl InterfaceApi for RealAdminInterfaceApi {
         // Don't hold the read across both awaits
         {
             self.conductor_handle
-                .read()
-                .await
-                // Make sure the conductor is not in the process of shutting down
                 .check_running()
                 .map_err(InterfaceError::RequestHandler)?;
         }
@@ -213,7 +191,6 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         &self,
         _invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        let _conductor = self.conductor_handle.read().await;
         unimplemented!()
     }
 }
@@ -227,8 +204,6 @@ impl InterfaceApi for RealAppInterfaceApi {
         request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse> {
         self.conductor_handle
-            .read()
-            .await
             .check_running()
             .map_err(InterfaceError::RequestHandler)?;
         match request {
@@ -332,7 +307,7 @@ pub struct AddAgentArgs {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::conductor::RealConductor;
+    use crate::conductor::Conductor;
     use anyhow::Result;
     use matches::assert_matches;
     use sx_types::test_utils::{fake_dna, fake_dna_file};
@@ -340,7 +315,7 @@ mod test {
 
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
-        let conductor = RealConductor::builder().test().await?;
+        let conductor = Conductor::builder().test().await?;
         let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
