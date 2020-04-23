@@ -233,6 +233,19 @@ macro_rules! fixt_float {
 fixt_float!(f32, FixTF32);
 fixt_float!(f64, FixTF64);
 
+#[macro_export]
+/// a direct delegation of fixtures to the inner type for new types
+macro_rules! newtype_fixt {
+    ( $outer:ty, $inner:ty, $input:ty ) => {
+        impl FixT for $outer {
+            type Input = $input;
+            fn fixt(fixtt: FixTT<Self::Input>) -> Self {
+                Self(<$inner>::fixt(fixtt))
+            }
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,15 +328,15 @@ mod tests {
     macro_rules! float_test {
         ( $f:ident, $t:ident, $tt:ty ) => {
             #[rstest(
-                            i,
-                            o,
-                            case(FixTT::default(), 0.0),
-                            case(FixTT::Empty, 0.0),
-                            // hit NAN directly
-                            // case(FixTT::A, $a),
-                            case(FixTT::B, std::$t::NEG_INFINITY),
-                            case(FixTT::C, std::$t::INFINITY)
-                        )]
+                                                    i,
+                                                    o,
+                                                    case(FixTT::default(), 0.0),
+                                                    case(FixTT::Empty, 0.0),
+                                                    // hit NAN directly
+                                                    // case(FixTT::A, $a),
+                                                    case(FixTT::B, std::$t::NEG_INFINITY),
+                                                    case(FixTT::C, std::$t::INFINITY)
+                                                )]
             fn $f(i: FixTT<$tt>, o: $t) {
                 match i {
                     FixTT::Empty => assert_that!(&<$t>::fixt_empty(), eq(&o)),
@@ -346,12 +359,7 @@ mod tests {
     /// show an example of a newtype delegating to inner fixtures
     #[derive(Debug, PartialEq)]
     struct MyNewType(u32);
-    impl FixT for MyNewType {
-        type Input = FixTU32;
-        fn fixt(fixtt: FixTT<Self::Input>) -> Self {
-            Self(u32::fixt(fixtt))
-        }
-    }
+    newtype_fixt!(MyNewType, u32, FixTU32);
     basic_test!(
         new_type_test,
         MyNewType,
