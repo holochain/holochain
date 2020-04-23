@@ -113,6 +113,29 @@ impl FixT for char {
     }
 }
 
+pub enum FixTString {
+    RandomLength(usize),
+}
+impl FixT for String {
+    type Input = FixTString;
+    fn fixt(fixtt: FixTT<Self::Input>) -> Self {
+        match fixtt {
+            FixTT::A => "❤💩a".to_string(),
+            FixTT::B => "foo".to_string(),
+            FixTT::C => "bar".to_string(),
+            FixTT::Empty => "".to_string(),
+            FixTT::Random => Self::fixt(FixTT::Input(FixTString::RandomLength(10))),
+            FixTT::Input(fixt_string) => match fixt_string {
+                FixTString::RandomLength(len) => {
+                    let mut rng = rand::thread_rng();
+                    let vec: Vec<char> = (0..len).map(|_| rng.gen()).collect();
+                    vec.into_iter().collect()
+                }
+            },
+        }
+    }
+}
+
 macro_rules! fixt_unsigned {
     ( $t:ty, $tt:ident ) => {
         pub enum $tt {
@@ -242,11 +265,30 @@ mod tests {
 
     // function name, type to test, input type, default, empty, a, b, c
     basic_test!(unit_test, (), (), (), (), (), (), ());
-    basic_test!(char_test, char, (), '\u{0000}', '\u{0000}', '\u{2764}', '\u{1F4A9}', '\u{0061}');
+    basic_test!(
+        char_test,
+        char,
+        (),
+        '\u{0000}',
+        '\u{0000}',
+        '\u{2764}',
+        '\u{1F4A9}',
+        '\u{0061}'
+    );
+    basic_test!(
+        string_test,
+        String,
+        FixTString,
+        String::from(""),
+        String::from(""),
+        String::from("❤💩a"),
+        String::from("foo"),
+        String::from("bar")
+    );
 
     macro_rules! unsigned_test {
         ( $f:ident, $t:ty, $tt:ty ) => {
-            basic_test!( $f, $t, $tt, 0, 0, <$t>::min_value(), 1, <$t>::max_value() );
+            basic_test!($f, $t, $tt, 0, 0, <$t>::min_value(), 1, <$t>::max_value());
         };
     }
 
@@ -259,7 +301,7 @@ mod tests {
 
     macro_rules! signed_test {
         ( $f:ident, $t:ty, $tt:ty ) => {
-            basic_test!( $f, $t, $tt, 0, 0, <$t>::min_value(), 0, <$t>::max_value() );
+            basic_test!($f, $t, $tt, 0, 0, <$t>::min_value(), 0, <$t>::max_value());
         };
     }
 
@@ -273,15 +315,15 @@ mod tests {
     macro_rules! float_test {
         ( $f:ident, $t:ident, $tt:ty ) => {
             #[rstest(
-                i,
-                o,
-                case(FixTT::default(), 0.0),
-                case(FixTT::Empty, 0.0),
-                // hit NAN directly
-                // case(FixTT::A, $a),
-                case(FixTT::B, std::$t::NEG_INFINITY),
-                case(FixTT::C, std::$t::INFINITY)
-            )]
+                            i,
+                            o,
+                            case(FixTT::default(), 0.0),
+                            case(FixTT::Empty, 0.0),
+                            // hit NAN directly
+                            // case(FixTT::A, $a),
+                            case(FixTT::B, std::$t::NEG_INFINITY),
+                            case(FixTT::C, std::$t::INFINITY)
+                        )]
             fn $f(i: FixTT<$tt>, o: $t) {
                 match i {
                     FixTT::Empty => assert_that!(&<$t>::fixt_empty(), eq(&o)),
