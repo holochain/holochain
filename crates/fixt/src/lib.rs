@@ -95,6 +95,24 @@ impl FixT for bool {
     }
 }
 
+impl FixT for char {
+    type Input = ();
+    fn fixt(fixtt: FixTT<Self::Input>) -> Self {
+        match fixtt {
+            // ❤
+            FixTT::A => '\u{2764}',
+            // 💩
+            FixTT::B => '\u{1F4A9}',
+            // a
+            FixTT::C => '\u{0061}',
+            // null
+            FixTT::Empty => '\u{0000}',
+            FixTT::Random => rand::random(),
+            FixTT::Input(_) => unimplemented!(),
+        }
+    }
+}
+
 macro_rules! fixt_unsigned {
     ( $t:ty, $tt:ident ) => {
         pub enum $tt {
@@ -222,8 +240,9 @@ mod tests {
         };
     }
 
-    // function name, type to test, input type, empty, a, b, c
+    // function name, type to test, input type, default, empty, a, b, c
     basic_test!(unit_test, (), (), (), (), (), (), ());
+    basic_test!(char_test, char, (), '\u{0000}', '\u{0000}', '\u{2764}', '\u{1F4A9}', '\u{0061}');
 
     macro_rules! unsigned_test {
         ( $f:ident, $t:ty, $tt:ty ) => {
