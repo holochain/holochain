@@ -44,8 +44,8 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
         match res {
             Ok(response) => response,
-            Err(ConductorApiError::Io(e)) => {
-                AdminResponse::Error(WireError::InvalidDnaPath(format!("{:?}", e)))
+            Err(ConductorApiError::InvalidDnaPath(e)) => {
+                AdminResponse::Error(WireError::InvalidDnaPath(e))
             }
             Err(e) => AdminResponse::Error(e.into()),
         }
@@ -133,7 +133,10 @@ impl RealAdminInterfaceApi {
         dna_path: PathBuf,
         properties: Option<serde_json::Value>,
     ) -> ConductorApiResult<Dna> {
-        let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
+        let dna: UnsafeBytes = tokio::fs::read(dna_path)
+            .await
+            .map_err(|e| ConductorApiError::InvalidDnaPath(format!("{:?}", e)))?
+            .into();
         let dna = SerializedBytes::from(dna);
         let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
         if let Some(properties) = properties {

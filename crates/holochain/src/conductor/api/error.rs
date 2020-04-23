@@ -32,6 +32,10 @@ pub enum ConductorApiError {
     /// Database Error
     #[error("Database error: {0:?}")]
     Db(#[from] DnaStoreError),
+
+    /// The Dna file path provided was invalid
+    #[error("The Dna file path provided was invalid")]
+    InvalidDnaPath(String),
 }
 
 /// All the serialization errors that can occur
