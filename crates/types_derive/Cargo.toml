@@ -1,5 +1,5 @@
 [package]
-name = "sx_types_derive"
+name = "holochain_types_derive"
 version = "0.0.1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 description = "Provides derive macros for holochain serialized bytes."

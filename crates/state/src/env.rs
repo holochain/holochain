@@ -5,6 +5,7 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
+use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock as RwLockSync;
 use rkv::{EnvironmentFlags, Rkv};
@@ -13,7 +14,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use sx_types::cell::CellId;
 use tokio::sync::{RwLock, RwLockReadGuard};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;

@@ -42,10 +42,10 @@ use super::{
     chain_cas::ChainCasBuf,
     chain_meta::{ChainMetaBufT, EntryDhtStatus},
 };
+use holochain_state::{error::DatabaseResult, prelude::Reader};
+use holochain_types::entry::Entry;
+use holochain_types::entry::EntryAddress;
 use std::collections::HashSet;
-use sx_state::{error::DatabaseResult, prelude::Reader};
-use sx_types::entry::Entry;
-use sx_types::entry::EntryAddress;
 use tracing::*;
 
 #[cfg(test)]

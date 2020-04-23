@@ -8,20 +8,20 @@ use crate::{
     conductor::api::error::ConductorApiError,
     core::state::workspace::{Workspace, WorkspaceError},
 };
+use holochain_state::error::DatabaseError;
+use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
-use sx_types::{agent::AgentId, dna::Dna, nucleus::ZomeInvocation};
 use thiserror::Error;
 
 #[cfg(test)]
 use super::state::source_chain::SourceChainError;
-use sx_state::error::DatabaseError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
 #[derive(Debug)]
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
-    Genesis(Box<Dna>, AgentId),
+    Genesis(Box<Dna>, AgentHash),
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,
@@ -68,8 +68,8 @@ impl WorkflowTrigger {
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
-    #[error("AgentId is invalid: {0:?}")]
-    AgentIdInvalid(AgentId),
+    #[error("Agent is invalid: {0:?}")]
+    AgentInvalid(AgentHash),
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] ConductorApiError),

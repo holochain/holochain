@@ -1,11 +1,11 @@
 use super::HostContext;
 use super::WasmRibosome;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_zome_types::globals::ZomeGlobals;
+use holochain_zome_types::GlobalsInput;
+use holochain_zome_types::GlobalsOutput;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use sx_zome_types::globals::ZomeGlobals;
-use sx_zome_types::GlobalsInput;
-use sx_zome_types::GlobalsOutput;
 
 pub async fn globals(
     ribosome: Arc<WasmRibosome>,
@@ -13,12 +13,12 @@ pub async fn globals(
     _input: GlobalsInput,
 ) -> GlobalsOutput {
     GlobalsOutput::new(ZomeGlobals {
-        agent_address: "".into(),      // @TODO
-        agent_id_str: "".into(),       // @TODO
-        agent_initial_hash: "".into(), // @TODO
-        agent_latest_hash: "".into(),  // @TODO
-        dna_address: "".into(),        // @TODO
         dna_name: ribosome.dna.name.clone(),
+        agent_address: "".into(),                           // @TODO
+        agent_id_str: "".into(),                            // @TODO
+        agent_initial_hash: "".into(),                      // @TODO
+        agent_latest_hash: "".into(),                       // @TODO
+        dna_address: "".into(),                             // @TODO
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
         public_token: "".into(),                            // @TODO
     })
@@ -26,8 +26,8 @@ pub async fn globals(
 
 #[cfg(test)]
 pub mod test {
-    use sx_zome_types::GlobalsInput;
-    use sx_zome_types::GlobalsOutput;
+    use holochain_zome_types::GlobalsInput;
+    use holochain_zome_types::GlobalsOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_globals_test() {

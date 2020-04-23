@@ -1,8 +1,8 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::ScheduleInput;
+use holochain_zome_types::ScheduleOutput;
 use std::sync::Arc;
-use sx_zome_types::ScheduleInput;
-use sx_zome_types::ScheduleOutput;
 
 pub async fn schedule(
     _ribosome: Arc<WasmRibosome>,

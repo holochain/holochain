@@ -1,11 +1,11 @@
 use holo_hash::WasmHash;
+use holochain_state::buffer::CasBuf;
+use holochain_state::error::DatabaseResult;
+use holochain_state::exports::SingleStore;
+use holochain_state::transaction::Readable;
+use holochain_state::transaction::Reader;
+use holochain_types::dna::wasm::DnaWasm;
 use std::convert::TryInto;
-use sx_state::buffer::CasBuf;
-use sx_state::error::DatabaseResult;
-use sx_state::exports::SingleStore;
-use sx_state::transaction::Readable;
-use sx_state::transaction::Reader;
-use sx_types::dna::wasm::DnaWasm;
 
 pub type WasmCas<'env, R> = CasBuf<'env, DnaWasm, R>;
 
@@ -35,18 +35,19 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
 
 #[tokio::test]
 async fn wasm_store_round_trip() -> DatabaseResult<()> {
-    use sx_state::env::ReadManager;
-    sx_types::observability::test_run().ok();
+    use holochain_state::env::ReadManager;
+    holochain_types::observability::test_run().ok();
 
     // all the stuff needed to have a WasmBuf
-    let env = sx_state::test_utils::test_wasm_env();
+    let env = holochain_state::test_utils::test_wasm_env();
     let dbs = env.dbs().await?;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
-    let mut wasm_buf = WasmBuf::new(&reader, *dbs.get(&*sx_state::db::WASM).unwrap()).unwrap();
+    let mut wasm_buf =
+        WasmBuf::new(&reader, *dbs.get(&*holochain_state::db::WASM).unwrap()).unwrap();
 
     // a wasm
-    let wasm = DnaWasm::from(sx_wasm_test_utils::TestWasm::Foo);
+    let wasm = DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo);
     let hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
 
     // a wasm in the WasmBuf

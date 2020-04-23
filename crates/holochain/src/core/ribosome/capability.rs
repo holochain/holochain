@@ -1,8 +1,8 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::CapabilityInput;
+use holochain_zome_types::CapabilityOutput;
 use std::sync::Arc;
-use sx_zome_types::CapabilityInput;
-use sx_zome_types::CapabilityOutput;
 
 pub async fn capability(
     _ribosome: Arc<WasmRibosome>,

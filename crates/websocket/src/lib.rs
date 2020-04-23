@@ -135,7 +135,7 @@ mod tests {
 
     #[tokio::test]
     async fn sanity_test() {
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let mut server = websocket_bind(
             url2!("ws://127.0.0.1:0"),
             Arc::new(WebsocketConfig::default()),
