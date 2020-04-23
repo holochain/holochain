@@ -8,9 +8,9 @@ use crate::{
     conductor::api::error::ConductorApiError,
     core::state::workspace::{Workspace, WorkspaceError},
 };
+use holochain_state::error::DatabaseError;
+use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
-use sx_state::error::DatabaseError;
-use sx_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use thiserror::Error;
 
 #[cfg(test)]

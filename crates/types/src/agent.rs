@@ -7,7 +7,7 @@ use holochain_serialized_bytes::prelude::*;
 pub enum AgentError {
     /// Crypto Error
     #[error("CryptoError: {0}")]
-    CryptoError(#[from] sx_crypto::CryptoError),
+    CryptoError(#[from] holochain_crypto::CryptoError),
 
     /// Holo Hash Error
     #[error("HoloHashError: {0}")]
@@ -24,7 +24,7 @@ pub struct AgentSignature(#[serde(with = "serde_bytes")] Vec<u8>);
 /// this struct represents the raw private key bytes of an agent signing keypair
 /// Note - this is the part we'd like to extract into a different "keystore"
 /// system service so we don't expose the private keys as much.
-struct AgentPrivateKey(sx_crypto::DynCryptoBytes);
+struct AgentPrivateKey(holochain_crypto::DynCryptoBytes);
 
 /// This struct represents a fully realized agent able to sign things.
 pub struct Agent {
@@ -35,7 +35,7 @@ pub struct Agent {
 impl Agent {
     /// Create an agent keypair from pure entropy (no seed)
     pub async fn from_pure_entropy() -> AgentResult<Self> {
-        let (public_key, private_key) = sx_crypto::crypto_sign_keypair(None).await?;
+        let (public_key, private_key) = holochain_crypto::crypto_sign_keypair(None).await?;
         let public_key = public_key.read().to_vec();
         Ok(Self {
             private_key: AgentPrivateKey(private_key),
@@ -50,8 +50,8 @@ impl Agent {
 
     /// Sign some arbitrary data
     pub async fn sign(&mut self, data: &[u8]) -> AgentResult<AgentSignature> {
-        let mut data = sx_crypto::crypto_insecure_buffer_from_bytes(data)?;
-        let signature = sx_crypto::crypto_sign(&mut data, &mut self.private_key.0).await?;
+        let mut data = holochain_crypto::crypto_insecure_buffer_from_bytes(data)?;
+        let signature = holochain_crypto::crypto_sign(&mut data, &mut self.private_key.0).await?;
         let signature = signature.read().to_vec();
         Ok(AgentSignature(signature))
     }
@@ -78,19 +78,22 @@ impl AgentHashExt for holo_hash::AgentHash {
         use holo_hash::HoloHashCoreHash;
 
         let result: AgentResult<(
-            sx_crypto::DynCryptoBytes,
-            sx_crypto::DynCryptoBytes,
-            sx_crypto::DynCryptoBytes,
+            holochain_crypto::DynCryptoBytes,
+            holochain_crypto::DynCryptoBytes,
+            holochain_crypto::DynCryptoBytes,
         )> = (|| {
-            let pub_key = sx_crypto::crypto_insecure_buffer_from_bytes(self.get_bytes())?;
-            let signature = sx_crypto::crypto_insecure_buffer_from_bytes(&signature.0)?;
-            let data = sx_crypto::crypto_insecure_buffer_from_bytes(data)?;
+            let pub_key = holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_bytes())?;
+            let signature = holochain_crypto::crypto_insecure_buffer_from_bytes(&signature.0)?;
+            let data = holochain_crypto::crypto_insecure_buffer_from_bytes(data)?;
             Ok((signature, data, pub_key))
         })();
 
         async move {
             let (mut signature, mut data, mut pub_key) = result?;
-            Ok(sx_crypto::crypto_sign_verify(&mut signature, &mut data, &mut pub_key).await?)
+            Ok(
+                holochain_crypto::crypto_sign_verify(&mut signature, &mut data, &mut pub_key)
+                    .await?,
+            )
         }
         .boxed()
         .into()
@@ -104,7 +107,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_agent_signature_sanity() {
         tokio::task::spawn(async move {
-            let _ = sx_crypto::crypto_init_sodium();
+            let _ = holochain_crypto::crypto_init_sodium();
 
             let mut agent1 = Agent::from_pure_entropy().await.unwrap();
             let agent1_hash = agent1.agent_hash().clone();

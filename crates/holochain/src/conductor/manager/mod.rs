@@ -122,7 +122,7 @@ mod test {
     use super::*;
     use crate::conductor::error::ConductorError;
     use anyhow::Result;
-    use sx_types::observability;
+    use holochain_types::observability;
 
     #[tokio::test]
     async fn spawn_and_handle_dying_task() -> Result<()> {

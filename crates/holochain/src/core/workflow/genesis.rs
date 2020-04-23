@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use sx_types::{dna::Dna, entry::Entry, prelude::*};
+use holochain_types::{dna::Dna, entry::Entry, prelude::*};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -54,8 +54,8 @@ mod tests {
         },
     };
     use fallible_iterator::FallibleIterator;
-    use sx_state::{env::*, test_utils::test_cell_env};
-    use sx_types::{
+    use holochain_state::{env::*, test_utils::test_cell_env};
+    use holochain_types::{
         entry::Entry,
         observability,
         prelude::*,

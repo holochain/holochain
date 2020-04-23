@@ -2,7 +2,7 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::conductor::{dna_store::error::DnaStoreError, error::ConductorError};
-use sx_types::cell::CellId;
+use holochain_types::cell::CellId;
 use thiserror::Error;
 
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call

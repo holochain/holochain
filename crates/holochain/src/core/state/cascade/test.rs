@@ -4,16 +4,16 @@ use crate::core::state::{
     source_chain::SourceChainBuf,
 };
 use holo_hash::EntryHash;
+use holochain_state::{
+    db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
+    test_utils::test_cell_env,
+};
+use holochain_types::entry::EntryAddress;
+use holochain_types::{entry::Entry, observability, prelude::*, test_utils::fake_agent_hash};
 use maplit::hashset;
 use mockall::*;
 use std::collections::HashSet;
 use std::convert::TryInto;
-use sx_state::{
-    db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
-    test_utils::test_cell_env,
-};
-use sx_types::entry::EntryAddress;
-use sx_types::{entry::Entry, observability, prelude::*, test_utils::fake_agent_hash};
 
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,

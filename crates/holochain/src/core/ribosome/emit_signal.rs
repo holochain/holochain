@@ -1,8 +1,8 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::EmitSignalInput;
+use holochain_zome_types::EmitSignalOutput;
 use std::sync::Arc;
-use sx_zome_types::EmitSignalInput;
-use sx_zome_types::EmitSignalOutput;
 
 pub async fn emit_signal(
     _ribosome: Arc<WasmRibosome>,

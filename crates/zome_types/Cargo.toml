@@ -1,5 +1,5 @@
 [package]
-name = "sx_zome_types"
+name = "holochain_zome_types"
 version = "0.0.1"
 description = "Holochain zome types"
 license = "GPL-3.0-only"

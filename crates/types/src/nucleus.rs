@@ -2,7 +2,7 @@
 
 use crate::{cell::CellId, prelude::*, shims::CapToken};
 use holo_hash::AgentHash;
-use sx_zome_types::*;
+use holochain_zome_types::*;
 
 /// The ZomeId is a pair of CellId and ZomeName.
 pub type ZomeId = (CellId, ZomeName);

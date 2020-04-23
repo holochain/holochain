@@ -6,14 +6,14 @@ use crate::{
     core::ribosome::WasmRibosome,
 };
 use holo_hash::*;
-use std::hash::{Hash, Hasher};
-use sx_state::env::Environment;
-use sx_types::{
+use holochain_state::env::Environment;
+use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
+use std::hash::{Hash, Hasher};
 
 pub mod error;
 

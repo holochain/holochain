@@ -235,14 +235,14 @@ mod test {
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::{
+        observability,
+        test_utils::{fake_dna, fake_dna_file},
+    };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
     use mockall::predicate;
     use std::convert::TryInto;
-    use sx_types::{
-        observability,
-        test_utils::{fake_dna, fake_dna_file},
-    };
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

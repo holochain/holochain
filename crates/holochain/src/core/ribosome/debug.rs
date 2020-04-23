@@ -1,9 +1,9 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::debug::DebugMsg;
+use holochain_zome_types::DebugInput;
+use holochain_zome_types::DebugOutput;
 use std::sync::Arc;
-use sx_zome_types::debug::DebugMsg;
-use sx_zome_types::DebugInput;
-use sx_zome_types::DebugOutput;
 use tracing::*;
 
 pub async fn debug(
@@ -24,9 +24,9 @@ pub async fn debug(
 
 #[cfg(test)]
 pub mod wasm_test {
-    use sx_zome_types::debug_msg;
-    use sx_zome_types::DebugInput;
-    use sx_zome_types::DebugOutput;
+    use holochain_zome_types::debug_msg;
+    use holochain_zome_types::DebugInput;
+    use holochain_zome_types::DebugOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_debug_test() {

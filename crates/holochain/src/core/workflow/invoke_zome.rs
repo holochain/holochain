@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowResult};
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
-use sx_types::nucleus::ZomeInvocation;
+use holochain_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env>(
     workspace: InvokeZomeWorkspace<'_>,
@@ -24,7 +24,7 @@ pub mod tests {
         ribosome::MockRibosomeT,
         test_utils::fake_cell_id,
     };
-    use sx_types::{entry::Entry, error::SkunkResult};
+    use holochain_types::{entry::Entry, error::SkunkResult};
     use tempdir::TempDir;
 
     #[tokio::test]

@@ -7,6 +7,12 @@ use holochain_2020::conductor::{
     error::ConductorError,
     ConductorHandle, RealConductor,
 };
+use holochain_types::{
+    dna::Properties,
+    observability,
+    prelude::*,
+    test_utils::{fake_dna, fake_dna_file},
+};
 use holochain_websocket::*;
 use matches::assert_matches;
 use std::sync::Arc;
@@ -15,12 +21,6 @@ use std::{
     path::PathBuf,
     process::{Child, Command, ExitStatus, Stdio},
     time::Duration,
-};
-use sx_types::{
-    dna::Properties,
-    observability,
-    prelude::*,
-    test_utils::{fake_dna, fake_dna_file},
 };
 use tempdir::TempDir;
 use tokio::stream::StreamExt;

@@ -4,12 +4,12 @@
 //! cannot fail, so the function return types reflect that.
 
 use holo_hash::*;
+use holochain_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
 use shrinkwraprs::Shrinkwrap;
-use sx_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
 
 pub use error::*;
+use holochain_types::chain_header::HeaderAddress;
 pub use source_chain_buffer::*;
-use sx_types::chain_header::HeaderAddress;
 
 mod error;
 mod source_chain_buffer;

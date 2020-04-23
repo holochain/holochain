@@ -44,16 +44,16 @@ use self::{
 
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_host::prelude::*;
-use mockall::automock;
-use std::sync::Arc;
-use sx_types::{
+use holochain_types::{
     dna::Dna,
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use sx_zome_types::*;
+use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::*;
+use mockall::automock;
+use std::sync::Arc;
 
 /// Represents a type which has not been decided upon yet
 pub enum Todo {}
@@ -232,21 +232,21 @@ pub mod wasm_test {
     use crate::core::ribosome::RibosomeT;
     use core::time::Duration;
     use holochain_serialized_bytes::prelude::*;
-    use sx_types::{
+    use holochain_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
         shims::SourceChainCommitBundle,
         test_utils::{fake_agent_hash, fake_cap_token, fake_cell_id},
     };
-    use sx_wasm_test_utils::TestWasm;
-    use sx_zome_types::*;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
     use crate::core::ribosome::HostContext;
-    use std::collections::BTreeMap;
-    use sx_types::{
+    use holochain_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
     };
+    use std::collections::BTreeMap;
 
     fn zome_from_code(code: DnaWasm) -> Zome {
         let mut zome = fake_zome();
@@ -323,7 +323,7 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        &mut sx_types::shims::SourceChainCommitBundle::default(),
+                        &mut holochain_types::shims::SourceChainCommitBundle::default(),
                         invocation,
                     )
                     .unwrap();
@@ -337,7 +337,7 @@ pub mod wasm_test {
                 dbg!(ribosome_call_duration_nanos);
 
                 let output = match zome_invocation_response {
-                    sx_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
+                    holochain_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
                         guest_output.into_inner().try_into().unwrap()
                     }
                 };

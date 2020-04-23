@@ -1,15 +1,15 @@
 use crate::conductor::{error::ConductorError, interface::InterfaceDriver};
 
+use holochain_types::{
+    dna::{error::DnaError, Dna},
+    prelude::*,
+};
 use petgraph::{algo::toposort, graph::DiGraph, prelude::NodeIndex};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
     sync::Arc,
-};
-use sx_types::{
-    dna::{error::DnaError, Dna},
-    prelude::*,
 };
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
