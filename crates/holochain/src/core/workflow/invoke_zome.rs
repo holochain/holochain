@@ -30,7 +30,7 @@ pub mod tests {
     #[tokio::test]
     async fn can_invoke_zome_with_mock() {
         let cell_id = fake_cell_id("mario");
-        let tmpdir = TempDir::new("skunkworx").unwrap();
+        let tmpdir = TempDir::new("holochain_2020").unwrap();
         let persistence = SourceChainPersistence::test(tmpdir.path());
         let chain = test_initialized_chain("mario", &persistence);
         let invocation = ZomeInvocation {
