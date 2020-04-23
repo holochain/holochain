@@ -7,6 +7,7 @@ pub mod agent;
 pub mod autonomic;
 pub mod cell;
 pub mod chain_header;
+pub mod header;
 pub mod db;
 pub mod dna;
 pub mod entry;
