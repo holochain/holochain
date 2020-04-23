@@ -1,13 +1,6 @@
 #![deny(missing_docs)]
 //! holochain_keystore
 
-/// re-exported dependencies
-pub mod dependencies {
-    pub use ghost_actor::dependencies::must_future;
-}
-
-use dependencies::must_future::MustBoxFuture;
-
 use holochain_serialized_bytes::prelude::*;
 
 /// Keystore Error Type.
@@ -48,12 +41,6 @@ impl From<&str> for KeystoreError {
     }
 }
 
-/// Keystore Result Type.
-pub type KeystoreResult<T> = Result<T, KeystoreError>;
-
-/// Keystore Future Type.
-pub type KeystoreFuture<T> = MustBoxFuture<'static, KeystoreResult<T>>;
-
 /// Input structure for creating a signature.
 #[derive(Debug)]
 pub struct SignInput {
@@ -89,17 +76,17 @@ ghost_actor::ghost_actor! {
         GenerateSignKeypairFromPureEntropy::generate_sign_keypair_from_pure_entropy (
             "generates a new pure entropy keypair in the keystore, returning the public key",
             (),
-            KeystoreFuture<holo_hash::AgentHash>
+            holo_hash::AgentHash
         ),
         ListSignKeys::list_sign_keys (
             "list all the signature public keys this keystore is tracking",
             (),
-            KeystoreFuture<Vec<holo_hash::AgentHash>>
+            Vec<holo_hash::AgentHash>
         ),
         Sign::sign (
             "generate a signature for a given blob of binary data",
             SignInput,
-            KeystoreFuture<Signature>
+            Signature
         ),
     }
 }

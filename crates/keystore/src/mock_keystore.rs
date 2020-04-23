@@ -178,19 +178,13 @@ mod tests {
             let agent1 = keystore
                 .generate_sign_keypair_from_pure_entropy()
                 .await
-                .unwrap()
-                .await
                 .unwrap();
             let agent2 = keystore
                 .generate_sign_keypair_from_pure_entropy()
                 .await
-                .unwrap()
-                .await
                 .unwrap();
             let agent3 = keystore
                 .generate_sign_keypair_from_pure_entropy()
-                .await
-                .unwrap()
                 .await
                 .unwrap();
 
@@ -206,8 +200,6 @@ mod tests {
 
             let mut sign_keys = keystore
                 .list_sign_keys()
-                .await
-                .unwrap()
                 .await
                 .unwrap()
                 .iter()
@@ -234,8 +226,6 @@ mod tests {
             let agent_hash = keystore
                 .generate_sign_keypair_from_pure_entropy()
                 .await
-                .unwrap()
-                .await
                 .unwrap();
 
             #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -247,12 +237,16 @@ mod tests {
             let signature = keystore
                 .sign(SignInput::new(agent_hash.clone(), &my_data_1).unwrap())
                 .await
-                .unwrap()
-                .await
                 .unwrap();
 
-            assert!(agent_hash.verify_signature(&signature, &my_data_1).await.unwrap());
-            assert!(!agent_hash.verify_signature(&signature, &my_data_2).await.unwrap());
+            assert!(agent_hash
+                .verify_signature(&signature, &my_data_1)
+                .await
+                .unwrap());
+            assert!(!agent_hash
+                .verify_signature(&signature, &my_data_2)
+                .await
+                .unwrap());
         })
         .await
         .unwrap();
