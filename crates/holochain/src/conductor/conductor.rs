@@ -25,6 +25,7 @@ use crate::conductor::{
 };
 pub use builder::*;
 use derive_more::{AsRef, Deref, From};
+use holo_hash::*;
 use std::collections::HashMap;
 use std::{error::Error, sync::Arc};
 use sx_state::{
@@ -35,7 +36,6 @@ use sx_state::{
     typed::{Kv, UnitDbKey},
 };
 use sx_types::{
-    agent::AgentId,
     cell::{CellHandle, CellId},
     shims::Keystore,
 };
@@ -105,8 +105,8 @@ where
     /// Placeholder. A way to look up a Cell from its app-specific handle.
     _handle_map: HashMap<CellHandle, CellId>,
 
-    /// Placeholder. A way to get a Keystore from an AgentId.
-    _agent_keys: HashMap<AgentId, Keystore>,
+    /// Placeholder. A way to get a Keystore from an AgentHash.
+    _agent_keys: HashMap<AgentHash, Keystore>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,

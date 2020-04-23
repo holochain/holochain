@@ -145,6 +145,7 @@ async fn call_admin() {
 
     let uuid = Uuid::new_v4();
     let mut dna = fake_dna(&uuid.to_string());
+    let original_dna_hash = dna.dna_hash();
 
     // Make properties
     let json = serde_json::json!({
@@ -166,8 +167,8 @@ async fn call_admin() {
     let response = check_timeout(&mut holochain, response, 1000).await;
 
     dna.properties = Properties::new(properties.unwrap()).try_into().unwrap();
-    let dna_address = dna.address();
-    let expects = vec![dna_address];
+    assert_ne!(original_dna_hash, dna.dna_hash());
+    let expects = vec![dna.dna_hash()];
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
     holochain.kill().expect("Failed to kill holochain");

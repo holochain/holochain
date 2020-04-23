@@ -13,7 +13,3 @@ pub mod state;
 
 pub use cell::Cell;
 pub use conductor::{Conductor, ConductorHandle, RealConductor};
-
-//FIXME should this be here?
-// #[cfg(test)]
-// mod test_fixtures;

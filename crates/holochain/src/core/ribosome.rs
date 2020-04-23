@@ -113,7 +113,8 @@ impl WasmRibosome {
     }
 
     pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
-        format!("{}{}", &self.dna.name, zome_name).into_bytes()
+        // TODO: make this actually the hash of the wasm once we can do that
+        format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
     }
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
@@ -233,9 +234,8 @@ pub mod wasm_test {
     use holochain_serialized_bytes::prelude::*;
     use sx_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
-        prelude::Address,
         shims::SourceChainCommitBundle,
-        test_utils::{fake_agent_id, fake_capability_request, fake_cell_id},
+        test_utils::{fake_agent_hash, fake_cap_token, fake_cell_id},
     };
     use sx_wasm_test_utils::TestWasm;
     use sx_zome_types::*;
@@ -245,7 +245,7 @@ pub mod wasm_test {
     use std::collections::BTreeMap;
     use sx_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
-        test_utils::{fake_dna, fake_zome},
+        test_utils::{fake_dna, fake_header_hash, fake_zome},
     };
 
     fn zome_from_code(code: DnaWasm) -> Zome {
@@ -269,10 +269,10 @@ pub mod wasm_test {
             zome_name: zome_name.into(),
             fn_name: fn_name.into(),
             cell_id: fake_cell_id("bob"),
-            cap: fake_capability_request(),
+            cap: fake_cap_token(),
             payload: ZomeExternHostInput::new(payload),
-            provenance: fake_agent_id("bob"),
-            as_at: Address::from("fake"),
+            provenance: fake_agent_hash("bob"),
+            as_at: fake_header_hash("fake"),
         }
     }
 
