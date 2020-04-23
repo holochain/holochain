@@ -13,6 +13,7 @@ use super::{
     api::{AdminInterfaceApi, AppInterfaceApi},
     dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
+    handle::ConductorHandleImpl,
     manager::{spawn_task_manager, ManagedTaskAdd, TaskManagerRunHandle},
     state::ConductorState,
 };
@@ -22,10 +23,11 @@ use crate::conductor::{
     config::ConductorConfig,
     dna_store::MockDnaStore,
     error::ConductorResult,
+    handle::ConductorHandle,
 };
-pub use builder::*;
 use std::collections::HashMap;
 use std::error::Error;
+use std::sync::Arc;
 use sx_state::{
     db,
     env::{Environment, ReadManager},
@@ -35,10 +37,13 @@ use sx_state::{
 };
 use sx_types::{
     cell::{CellHandle, CellId},
+    prelude::*,
     shims::Keystore,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tracing::*;
+
+pub use builder::*;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -110,7 +115,7 @@ impl Conductor {
 
 impl<DS> Conductor<DS>
 where
-    DS: DnaStore,
+    DS: DnaStore + 'static,
 {
     async fn new(env: Environment, dna_store: DS) -> ConductorResult<Self> {
         let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
@@ -131,6 +136,7 @@ where
             dna_store,
         })
     }
+
     // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
     // the Conductor handle (from where this could be called)
     #[allow(dead_code)]
@@ -172,9 +178,10 @@ where
     }
 }
 
+// TODO: @freesig: is there a reason for the separate impl blocks here?
 impl<DS> Conductor<DS>
 where
-    DS: DnaStore,
+    DS: DnaStore + 'static,
 {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
         let item = self
@@ -243,6 +250,10 @@ where
     fn get_wait_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
+
+    pub fn into_handle(self) -> ConductorHandle {
+        Arc::new(ConductorHandleImpl::from(RwLock::new(self)))
+    }
 }
 
 type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
@@ -260,9 +271,11 @@ mod builder {
             InterfaceDriver,
         },
         manager::{keep_alive_task, ManagedTaskHandle},
+        ConductorHandle,
     };
     use futures::future;
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
+    use tokio::sync::RwLockWriteGuard;
 
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
@@ -295,10 +308,15 @@ mod builder {
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment, self.dna_store).await?;
             let stop_tx = conductor.managed_task_stop_broadcaster.clone();
-            let conductor_handle = ConductorHandle::new(conductor);
+            let conductor_mutex = RwLock::new(conductor);
+            let mut conductor_lock = conductor_mutex.write().await;
+            let conductor_handle: ConductorHandle =
+                Arc::new(ConductorHandleImpl::from(conductor_mutex));
+            let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
 
             setup_admin_interfaces_from_config(
-                conductor_handle.clone(),
+                &mut conductor_lock,
+                admin_api,
                 stop_tx,
                 config.admin_interfaces.unwrap_or_default(),
             )
@@ -310,20 +328,22 @@ mod builder {
         pub async fn test(self) -> ConductorResult<ConductorHandle> {
             let environment = test_conductor_env();
             let conductor = Conductor::new(environment, self.dna_store).await?;
-            let conductor_handle = ConductorHandle::new(conductor);
+            let conductor_handle: ConductorHandle = conductor.into_handle();
             Ok(conductor_handle)
         }
     }
 
     /// Spawn all admin interface tasks, register them with the TaskManager,
     /// and modify the conductor accordingly, based on the config passed in
-    async fn setup_admin_interfaces_from_config(
-        conductor_mutex: ConductorHandle,
+    async fn setup_admin_interfaces_from_config<DS>(
+        conductor_lock: &mut RwLockWriteGuard<'_, Conductor<DS>>,
+        admin_api: RealAdminInterfaceApi,
         stop_tx: StopBroadcaster,
         configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()> {
-        let admin_api = RealAdminInterfaceApi::new(conductor_mutex.clone());
-
+    ) -> ConductorResult<()>
+    where
+        DS: DnaStore + 'static,
+    {
         // Closure to process each admin config item
         let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
             let admin_api = admin_api.clone();
@@ -360,12 +380,11 @@ mod builder {
             .collect();
 
         {
-            let mut conductor = conductor_mutex.write().await;
             let mut ports = Vec::new();
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
-            conductor
+            conductor_lock
                 .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
                     stop_tx.subscribe(),
                 ))))
@@ -374,7 +393,7 @@ mod builder {
             // Now that tasks are spawned, register them with the TaskManager
             for (port, handle) in handles {
                 ports.push(port);
-                conductor
+                conductor_lock
                     .manage_task(ManagedTaskAdd::new(
                         handle,
                         Box::new(|result| {
@@ -387,7 +406,7 @@ mod builder {
                     .await?
             }
             for p in ports {
-                conductor.add_admin_port(p);
+                conductor_lock.add_admin_port(p);
             }
         }
         Ok(())

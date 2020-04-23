@@ -34,13 +34,16 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
-    async fn admin(&self, method: AdminRequest) -> ConductorApiResult<AdminResponse>;
+    async fn handle_admin_request_inner(
+        &self,
+        request: AdminRequest,
+    ) -> ConductorApiResult<AdminResponse>;
 
     // -- provided -- //
 
     /// Route the request to be handled
-    async fn handle_request(&self, request: AdminRequest) -> AdminResponse {
-        let res = self.admin(request).await;
+    async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
+        let res = self.handle_admin_request_inner(request).await;
 
         match res {
             Ok(response) => response,
@@ -109,7 +112,10 @@ impl RealAdminInterfaceApi {
 
 #[async_trait::async_trait]
 impl AdminInterfaceApi for RealAdminInterfaceApi {
-    async fn admin(&self, request: AdminRequest) -> ConductorApiResult<AdminResponse> {
+    async fn handle_admin_request_inner(
+        &self,
+        request: AdminRequest,
+    ) -> ConductorApiResult<AdminResponse> {
         use AdminRequest::*;
         match request {
             Start(_cell_handle) => unimplemented!(),
@@ -119,32 +125,31 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dna = read_parse_dna(dna_path, properties).await?;
                 self.conductor_handle.install_dna(dna).await?;
                 Ok(AdminResponse::DnaInstalled)
-            },
+            }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 Ok(AdminResponse::ListDnas(dna_list))
-            },
+            }
         }
     }
 }
 
-
-    /// Reads the [Dna] from disk and parses to [SerializedBytes]
-    async fn read_parse_dna(
-        dna_path: PathBuf,
-        properties: Option<serde_json::Value>,
-    ) -> ConductorApiResult<Dna> {
-        let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
-        let dna = SerializedBytes::from(dna);
-        let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
-        if let Some(properties) = properties {
-            let properties = Properties::new(properties);
-            dna.properties = (properties)
-                .try_into()
-                .map_err(|e| SerializationError::from(e))?;
-        }
-        Ok(dna)
+/// Reads the [Dna] from disk and parses to [SerializedBytes]
+async fn read_parse_dna(
+    dna_path: PathBuf,
+    properties: Option<serde_json::Value>,
+) -> ConductorApiResult<Dna> {
+    let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
+    let dna = SerializedBytes::from(dna);
+    let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
+    if let Some(properties) = properties {
+        let properties = Properties::new(properties);
+        dna.properties = (properties)
+            .try_into()
+            .map_err(|e| SerializationError::from(e))?;
     }
+    Ok(dna)
+}
 
 #[async_trait::async_trait]
 impl InterfaceApi for RealAdminInterfaceApi {
@@ -159,10 +164,11 @@ impl InterfaceApi for RealAdminInterfaceApi {
         {
             self.conductor_handle
                 .check_running()
+                .await
                 .map_err(InterfaceError::RequestHandler)?;
         }
         match request {
-            Ok(request) => Ok(AdminInterfaceApi::handle_request(self, request).await),
+            Ok(request) => Ok(AdminInterfaceApi::handle_admin_request(self, request).await),
             Err(e) => Ok(AdminResponse::Error {
                 debug: e.to_string(),
                 error_type: InterfaceError::SerializedBytes(e).into(),
@@ -205,6 +211,7 @@ impl InterfaceApi for RealAppInterfaceApi {
     ) -> InterfaceResult<Self::ApiResponse> {
         self.conductor_handle
             .check_running()
+            .await
             .map_err(InterfaceError::RequestHandler)?;
         match request {
             Ok(request) => Ok(AppInterfaceApi::handle_request(self, request).await),
@@ -319,9 +326,12 @@ mod test {
         let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
+        let (dna_path, _tempdir) = fake_dna_file(dna.clone()).unwrap();
         let dna_hash = dna.dna_hash();
-        admin_api.add_dna(dna).await?;
-        let dna_list = admin_api.list_dnas().await?;
+        admin_api
+            .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
+            .await;
+        let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
         Ok(())
@@ -337,7 +347,7 @@ mod test {
             "how_many": 42,
         });
         let properties = Some(json.clone());
-        let result = RealAdminInterfaceApi::read_parse_dna(dna_path, properties).await?;
+        let result = read_parse_dna(dna_path, properties).await?;
         let properties = Properties::new(json);
         dna.properties = properties.try_into().unwrap();
         assert_eq!(dna, result);

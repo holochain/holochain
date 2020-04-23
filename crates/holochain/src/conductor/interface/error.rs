@@ -75,6 +75,7 @@ impl From<ConductorApiError> for AdminInterfaceErrorKind {
         match e {
             ConductorApiError::CellMissing(_) => Cell,
             ConductorApiError::ConductorError(_) => Conductor,
+            ConductorApiError::ZomeInvocationCellMismatch { .. } => Conductor,
             ConductorApiError::Todo(_) => Other,
             ConductorApiError::Io(_) => Io,
             ConductorApiError::SerializationError(_) => Serialization,
