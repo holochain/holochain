@@ -4,23 +4,23 @@ use crate::core::state::{
     source_chain::SourceChainBuf,
 };
 use holo_hash::EntryHash;
+use holochain_state::{
+    db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
+    test_utils::test_cell_env,
+};
+use holochain_types::entry::EntryAddress;
+use holochain_types::{entry::Entry, observability, prelude::*, test_utils::fake_agent_hash};
 use maplit::hashset;
 use mockall::*;
 use std::collections::HashSet;
 use std::convert::TryInto;
-use sx_state::{
-    db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
-    test_utils::test_cell_env,
-};
-use sx_types::entry::EntryAddress;
-use sx_types::{agent::AgentId, entry::Entry, observability};
 
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
-    jimbo_id: AgentId,
+    jimbo_id: AgentHash,
     jimbo: Entry,
-    jessy_id: AgentId,
+    jessy_id: AgentHash,
     jessy: Entry,
     mock_primary_meta: MockChainMetaBuf,
     mock_cache_meta: MockChainMetaBuf,
@@ -32,10 +32,10 @@ fn setup_env<'env>(
 ) -> DatabaseResult<Chains<'env>> {
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;
-    let jimbo_id = AgentId::generate_fake("jimbos_id");
-    let jimbo = Entry::AgentId(AgentId::generate_fake("Jimbo"));
-    let jessy_id = AgentId::generate_fake("jessy_id");
-    let jessy = Entry::AgentId(AgentId::generate_fake("Jessy"));
+    let jimbo_id = fake_agent_hash("jimbos_id");
+    let jimbo = Entry::AgentKey(fake_agent_hash("Jimbo"));
+    let jessy_id = fake_agent_hash("jessy_id");
+    let jessy = Entry::AgentKey(fake_agent_hash("Jessy"));
     let mock_primary_meta = MockChainMetaBuf::new();
     let mock_cache_meta = MockChainMetaBuf::new();
     Ok(Chains {

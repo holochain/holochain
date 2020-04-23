@@ -40,7 +40,7 @@
 //!
 //! tokio::task::spawn(async move {
 //!     while let Some(maybe_con) = server.next().await {
-//!         let (_send, mut recv) = maybe_con.await.unwrap();
+//!         let (_send, mut recv) = maybe_con.unwrap();
 //!
 //!         tokio::task::spawn(async move {
 //!             if let Some(msg) = recv.next().await {
@@ -135,6 +135,7 @@ mod tests {
 
     #[tokio::test]
     async fn sanity_test() {
+        holochain_types::observability::test_run().ok();
         let mut server = websocket_bind(
             url2!("ws://127.0.0.1:0"),
             Arc::new(WebsocketConfig::default()),
@@ -146,7 +147,7 @@ mod tests {
 
         tokio::task::spawn(async move {
             while let Some(maybe_con) = server.next().await {
-                let (_send, mut recv) = maybe_con.await.unwrap();
+                let (_send, mut recv) = maybe_con.unwrap();
 
                 tokio::task::spawn(async move {
                     if let Some(msg) = recv.next().await {

@@ -19,7 +19,7 @@ holochain_wasmer_guest = "=0.0.24"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 holochain_serialized_bytes = "=0.0.38"
 serde = "=1.0.104"
-sx_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
+holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 
 [patch.crates-io]
 # holochain_serialized_bytes = { version = "=0.0.38", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }

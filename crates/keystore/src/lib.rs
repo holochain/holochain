@@ -41,23 +41,19 @@ pub struct SignInput {
 
 impl SignInput {
     /// construct a new SignInput struct.
-    pub fn new<D>(
-        key: holo_hash::AgentHash,
-        data: D,
-    ) -> Result<Self, KeystoreError>
+    pub fn new<D>(key: holo_hash::AgentHash, data: D) -> Result<Self, KeystoreError>
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
         let data: SerializedBytes = data.try_into()?;
-        Ok(Self {
-            key,
-            data,
-        })
+        Ok(Self { key, data })
     }
 }
 
 /// The raw bytes of a signature.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord,
+)]
 pub struct Signature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 ghost_actor::ghost_actor! {

@@ -6,8 +6,8 @@ use crate::{
     },
 };
 use futures::future::{join_all, BoxFuture, FutureExt};
+use holochain_state::{env::WriteManager, prelude::*};
 use std::sync::Arc;
-use sx_state::{env::WriteManager, prelude::*};
 use workflow::{WorkflowCallback, WorkflowSignal};
 
 use error::WorkflowRunResult;

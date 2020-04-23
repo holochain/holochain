@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
+use holochain_types::{dna::Dna, entry::Entry, prelude::*};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -13,22 +13,23 @@ pub async fn genesis(
     mut workspace: GenesisWorkspace<'_>,
     api: impl CellConductorApiT,
     dna: Dna,
-    agent_id: AgentId,
+    agent_hash: AgentHash,
 ) -> WorkflowResult<GenesisWorkspace<'_>> {
+    // TODO: this is a placeholder for a real DPKI request to show intent
     if api
-        .dpki_request("is_agent_id_valid".into(), agent_id.pub_sign_key().into())
+        .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
         .await?
         == "INVALID"
     {
-        return Err(WorkflowError::AgentIdInvalid(agent_id.clone()));
+        return Err(WorkflowError::AgentInvalid(agent_hash.clone()));
     }
 
     workspace
         .source_chain
-        .put_entry(Entry::Dna(Box::new(dna)), &agent_id)?;
+        .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)?;
     workspace
         .source_chain
-        .put_entry(Entry::AgentId(agent_id.clone()), &agent_id)?;
+        .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)?;
 
     Ok(WorkflowEffects {
         workspace,
@@ -53,12 +54,12 @@ mod tests {
         },
     };
     use fallible_iterator::FallibleIterator;
-    use sx_state::{env::*, test_utils::test_cell_env};
-    use sx_types::{
+    use holochain_state::{env::*, test_utils::test_cell_env};
+    use holochain_types::{
         entry::Entry,
         observability,
         prelude::*,
-        test_utils::{fake_agent_id, fake_dna},
+        test_utils::{fake_agent_hash, fake_dna},
     };
     use tracing::*;
 
@@ -69,7 +70,7 @@ mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
         let dna = fake_dna("a");
-        let agent_id = fake_agent_id("a");
+        let agent_hash = fake_agent_hash("a");
 
         {
             let reader = env.reader()?;
@@ -77,14 +78,14 @@ mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let fx = genesis(workspace, api, dna.clone(), agent_id.clone()).await?;
+            let fx = genesis(workspace, api, dna.clone(), agent_hash.clone()).await?;
             let writer = env.writer()?;
             fx.workspace.commit_txn(writer)?;
         }
 
         env.with_reader(|reader| {
             let source_chain = SourceChain::new(&reader, &dbs)?;
-            assert_eq!(source_chain.agent_id()?, agent_id);
+            assert_eq!(source_chain.agent_hash()?, agent_hash);
             source_chain.chain_head().expect("chain head should be set");
             let hashes: Vec<_> = source_chain
                 .iter_back()
@@ -97,7 +98,7 @@ mod tests {
             assert_eq!(
                 hashes,
                 vec![
-                    holo_hash::EntryHash::try_from(Entry::AgentId(agent_id))
+                    holo_hash::EntryHash::try_from(Entry::AgentKey(agent_hash))
                         .unwrap()
                         .into(),
                     holo_hash::EntryHash::try_from(Entry::Dna(Box::new(dna)))

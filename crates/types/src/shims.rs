@@ -1,9 +1,15 @@
-use crate::prelude::*;
+use crate::{prelude::*, signature::Provenance};
+use derive_more::Constructor;
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct AgentPubKey;
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapToken;
+#[derive(Clone, Constructor, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
+pub struct CapabilityRequest {
+    cap_token: CapToken,
+    provenance: Provenance,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct DhtOp;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]

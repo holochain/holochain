@@ -5,14 +5,14 @@ use crate::conductor::{
     interface::error::{AdminInterfaceErrorKind, InterfaceError, InterfaceResult},
     ConductorHandle,
 };
+use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use std::path::PathBuf;
-use sx_types::{
+use holochain_types::{
     cell::CellHandle,
     dna::{Dna, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*,
 };
+use std::path::PathBuf;
 use tracing::*;
 
 /// A trait that unifies both the admin and app interfaces
@@ -240,7 +240,7 @@ impl InterfaceApi for RealAppInterfaceApi {
     }
 }
 /// Responses to requests received on an App interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppResponse {
     /// There has been an error in the request
@@ -257,7 +257,7 @@ pub enum AppResponse {
 }
 
 /// Responses to messages received on an Admin interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminResponse {
     /// This response is unimplemented
@@ -265,7 +265,7 @@ pub enum AdminResponse {
     /// [Dna] has successfully been installed
     DnaInstalled,
     /// A list of all installed [Dna]s
-    ListDnas(Vec<Address>),
+    ListDnas(Vec<DnaHash>),
     /// An error has ocurred in this request
     Error {
         /// The error as a string
@@ -277,7 +277,7 @@ pub enum AdminResponse {
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppRequest {
     /// Asks the conductor to do some crypto
@@ -293,7 +293,7 @@ pub enum AppRequest {
 }
 
 /// The set of messages that a conductor understands how to handle over an Admin interface
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminRequest {
     /// Start a cell running
@@ -307,7 +307,7 @@ pub enum AdminRequest {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum CryptoRequest {
     Sign(String),
@@ -316,14 +316,14 @@ pub enum CryptoRequest {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum TestRequest {
     AddAgent(AddAgentArgs),
 }
 
 #[allow(dead_code, missing_docs)]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AddAgentArgs {
     id: String,
     name: String,
@@ -334,8 +334,8 @@ mod test {
     use super::*;
     use crate::conductor::conductor::RealConductor;
     use anyhow::Result;
+    use holochain_types::test_utils::{fake_dna, fake_dna_file};
     use matches::assert_matches;
-    use sx_types::test_utils::{fake_dna, fake_dna_file};
     use uuid::Uuid;
 
     #[tokio::test]
@@ -344,10 +344,10 @@ mod test {
         let admin_api = RealAdminInterfaceApi::new(conductor);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
-        let dna_address = dna.address();
+        let dna_hash = dna.dna_hash();
         admin_api.add_dna(dna).await?;
         let dna_list = admin_api.list_dnas().await?;
-        let expects = vec![dna_address];
+        let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
         Ok(())
     }

@@ -2,7 +2,7 @@ use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, Sou
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-use sx_state::{
+use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
         DbManager, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
@@ -12,7 +12,7 @@ use sx_state::{
     exports::SingleStore,
     prelude::{Readable, Reader, Writer},
 };
-use sx_types::{
+use holochain_types::{
     chain_header::HeaderAddress,
     chain_header::{ChainHeader, HeaderWithEntry},
     entry::Entry,

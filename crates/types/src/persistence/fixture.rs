@@ -1,7 +1,7 @@
 //! helper functions and data for persistence testing
 
 use crate::{persistence::cas::content::Addressable, prelude::*};
-use sx_zome_types::hash::HashString;
+use holochain_zome_types::hash::HashString;
 
 /// dummy hash based on the key of test_entry_a()
 pub fn test_hash_a() -> HashString {
@@ -24,7 +24,7 @@ pub fn test_eav_value() -> ExampleEntry {
     test_entry_b()
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, SerializedBytesAddress)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct ExampleEntry {
     pub data: String,
 }
