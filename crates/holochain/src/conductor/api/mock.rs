@@ -8,8 +8,7 @@ use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*,
-    signature::Signature,
+    signature::Signature, prelude::Todo,
 };
 use mockall::mock;
 
@@ -27,12 +26,12 @@ mock! {
             invocation: ZomeInvocation,
         ) -> ConductorApiResult<ZomeInvocationResponse>;
 
-        fn sync_network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
+        fn sync_network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
         fn sync_network_request(
             &self,
-            _message: Lib3hClientProtocol,
-        ) -> ConductorApiResult<Lib3hServerProtocol>;
+            _message: Todo,
+        ) -> ConductorApiResult<Todo>;
 
         fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
@@ -64,30 +63,30 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_dpki_request(method, args)
     }
 
-    // async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()> {
-    //     self.sync_network_send(message)
-    // }
+    async fn network_send(&self, message: Todo) -> ConductorApiResult<()> {
+        self.sync_network_send(message)
+    }
 
-    // async fn network_request(
-    //     &self,
-    //     _message: Lib3hClientProtocol,
-    // ) -> ConductorApiResult<Lib3hServerProtocol> {
-    //     self.sync_network_request(_message)
-    // }
+    async fn network_request(
+        &self,
+        _message: Todo,
+    ) -> ConductorApiResult<Todo> {
+        self.sync_network_request(_message)
+    }
 
-    // async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
-    //     self.sync_autonomic_cue(cue)
-    // }
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
+        self.sync_autonomic_cue(cue)
+    }
 
-    // async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
-    //     self.sync_crypto_sign(_payload)
-    // }
+    async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
+        self.sync_crypto_sign(_payload)
+    }
 
-    // async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String> {
-    //     self.sync_crypto_encrypt(_payload)
-    // }
+    async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String> {
+        self.sync_crypto_encrypt(_payload)
+    }
 
-    // async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
-    //     self.sync_crypto_decrypt(_payload)
-    // }
+    async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
+        self.sync_crypto_decrypt(_payload)
+    }
 }

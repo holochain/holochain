@@ -11,7 +11,7 @@ use std::sync::Arc;
 use holochain_types::{
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*,
+    prelude::*, autonomic::AutonomicCue, cell::CellId,
 };
 use tokio::sync::RwLock;
 
@@ -33,7 +33,7 @@ pub trait ConductorHandleT: Send + Sync {
         api: CellConductorApi,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
-
+    async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
     async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle>;
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
     async fn shutdown(&self);
@@ -73,9 +73,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         api: CellConductorApi,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        let conductor = self.0.read().await;
-        let cell: &Cell = conductor.cell_by_id(&invocation.cell_id)?;
+        let lock = self.0.read().await;
+        let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
         cell.invoke_zome(api, invocation).await.map_err(Into::into)
+    }
+
+    async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
+        let lock = self.0.write().await;
+        let cell = lock.cell_by_id(cell_id)?;
+        let _ = cell.handle_autonomic_process(cue.into()).await;
+        Ok(())
     }
 
     async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle> {

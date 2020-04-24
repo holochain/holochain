@@ -3,7 +3,7 @@ use crate::conductor::ConductorHandle;
 use async_trait::async_trait;
 use holochain_types::{
     cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    nucleus::{ZomeInvocation, ZomeInvocationResponse}, autonomic::AutonomicCue, signature::Signature, prelude::Todo,
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -49,40 +49,32 @@ impl CellConductorApiT for CellConductorApi {
         unimplemented!()
     }
 
-    // The following are just old ideas of what might be in here
-    //
-    // async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()> {
-    //     let mut tx = self.conductor_handle.read().await.tx_network().clone();
-    //     tx.send(message)
-    //         .await
-    //         .map_err(|e| ConductorApiError::Todo(e.to_string()))
-    // }
+    async fn network_send(&self, _message: Todo) -> ConductorApiResult<()> {
+        unimplemented!()
+    }
 
-    // async fn network_request(
-    //     &self,
-    //     _message: Lib3hClientProtocol,
-    // ) -> ConductorApiResult<Lib3hServerProtocol> {
-    //     unimplemented!()
-    // }
+    async fn network_request(
+        &self,
+        _message: Todo,
+    ) -> ConductorApiResult<Todo> {
+        unimplemented!()
+    }
 
-    // async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
-    //     let conductor = self.conductor_handle.write().await;
-    //     let cell = conductor.cell_by_id(&self.cell_id)?;
-    //     let _ = cell.handle_autonomic_process(cue.into()).await;
-    //     Ok(())
-    // }
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
+        self.conductor_handle.autonomic_cue(cue, &self.cell_id).await
+    }
 
-    // async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
-    //     unimplemented!()
-    // }
+    async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
+        unimplemented!()
+    }
 
-    // async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String> {
-    //     unimplemented!()
-    // }
+    async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String> {
+        unimplemented!()
+    }
 
-    // async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
-    //     unimplemented!()
-    // }
+    async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
+        unimplemented!()
+    }
 }
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
@@ -100,28 +92,28 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// TODO: decide on actual signature
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
-    // /// Send a message to the network engine, ignoring the response
-    // async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
+    /// Send a message to the network engine, ignoring the response
+    async fn network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
-    // /// Send a message to the network engine, and await the response
-    // async fn network_request(
-    //     &self,
-    //     _message: Lib3hClientProtocol,
-    // ) -> ConductorApiResult<Lib3hServerProtocol>;
+    /// Send a message to the network engine, and await the response
+    async fn network_request(
+        &self,
+        _message: Todo,
+    ) -> ConductorApiResult<Todo>;
 
-    // /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
-    // /// This is basically a heuristic designed to help things run more smoothly.
-    // async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
+    /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
+    /// This is basically a heuristic designed to help things run more smoothly.
+    async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
-    // /// Request the crypto system to sign some payload
-    // /// TODO: decide on actual signature
-    // async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature>;
+    /// Request the crypto system to sign some payload
+    /// TODO: decide on actual signature
+    async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature>;
 
-    // /// Request the crypto system to encrypt some payload
-    // /// TODO: decide on actual signature
-    // async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
+    /// Request the crypto system to encrypt some payload
+    /// TODO: decide on actual signature
+    async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
 
-    // /// Request the crypto system to decrypt some payload
-    // /// TODO: decide on actual signature
-    // async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
+    /// Request the crypto system to decrypt some payload
+    /// TODO: decide on actual signature
+    async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
 }
