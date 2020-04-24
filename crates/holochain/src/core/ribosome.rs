@@ -44,16 +44,16 @@ use self::{
 
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_host::prelude::*;
-use mockall::automock;
-use std::sync::Arc;
-use sx_types::{
+use holochain_types::{
     dna::Dna,
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use sx_zome_types::*;
+use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::*;
+use mockall::automock;
+use std::sync::Arc;
 
 /// Represents a type which has not been decided upon yet
 pub enum Todo {}
@@ -145,14 +145,21 @@ impl WasmRibosome {
                         ctx,
                         guest_allocation_ptr,
                     )?;
-                    // this could take a long time but it's fine because this all has its own
-                    // thread that has nothing to do with tokio, right?
-                    // note that wasmer doesn't seem to like async stuff
-                    let output_sb: SerializedBytes = $host_function(
-                        std::sync::Arc::clone(&closure_self_arc),
-                        std::sync::Arc::clone(&closure_host_context_arc),
-                        input,
+                    // this will be run in a tokio background thread
+                    // designed for doing blocking work.
+                    let output_sb: SerializedBytes = tokio_safe_block_on::tokio_safe_block_on(
+                        $host_function(
+                            std::sync::Arc::clone(&closure_self_arc),
+                            std::sync::Arc::clone(&closure_host_context_arc),
+                            input,
+                        ),
+                        // TODO - Identify calls that are essentially synchronous vs those that
+                        // may be async, such as get, send, etc.
+                        // async calls should require timeouts specified by hApp devs
+                        // pluck those timeouts out, and apply them here:
+                        std::time::Duration::from_secs(60),
                     )
+                    .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
                     .try_into()?;
                     let output_allocation_ptr: AllocationPtr = output_sb.into();
                     Ok(output_allocation_ptr.as_remote_ptr())
@@ -225,21 +232,21 @@ pub mod wasm_test {
     use crate::core::ribosome::RibosomeT;
     use core::time::Duration;
     use holochain_serialized_bytes::prelude::*;
-    use sx_types::{
+    use holochain_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
         shims::SourceChainCommitBundle,
         test_utils::{fake_agent_hash, fake_cap_token, fake_cell_id},
     };
-    use sx_wasm_test_utils::TestWasm;
-    use sx_zome_types::*;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
     use crate::core::ribosome::HostContext;
-    use std::collections::BTreeMap;
-    use sx_types::{
+    use holochain_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
     };
+    use std::collections::BTreeMap;
 
     fn zome_from_code(code: DnaWasm) -> Zome {
         let mut zome = fake_zome();
@@ -302,42 +309,46 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $zome:literal, $fn_name:literal, $input:expr ) => {{
-            use crate::core::ribosome::RibosomeT;
-            use std::convert::TryFrom;
-            use std::convert::TryInto;
-            let ribosome = $crate::core::ribosome::wasm_test::test_ribosome(Some($zome));
-            let t0 = $crate::core::ribosome::wasm_test::now();
-            let invocation = $crate::core::ribosome::wasm_test::zome_invocation_from_names(
-                $zome,
-                $fn_name,
-                $input.try_into().unwrap(),
-            );
-            let zome_invocation_response = ribosome
-                .call_zome_function(
-                    &mut sx_types::shims::SourceChainCommitBundle::default(),
-                    invocation,
-                )
-                .unwrap();
-            let t1 = $crate::core::ribosome::wasm_test::now();
+        ( $zome:literal, $fn_name:literal, $input:expr ) => {
+            tokio::task::spawn(async move {
+                use crate::core::ribosome::RibosomeT;
+                use std::convert::TryFrom;
+                use std::convert::TryInto;
+                let ribosome = $crate::core::ribosome::wasm_test::test_ribosome(Some($zome));
+                let t0 = $crate::core::ribosome::wasm_test::now();
+                let invocation = $crate::core::ribosome::wasm_test::zome_invocation_from_names(
+                    $zome,
+                    $fn_name,
+                    $input.try_into().unwrap(),
+                );
+                let zome_invocation_response = ribosome
+                    .call_zome_function(
+                        &mut holochain_types::shims::SourceChainCommitBundle::default(),
+                        invocation,
+                    )
+                    .unwrap();
+                let t1 = $crate::core::ribosome::wasm_test::now();
 
-            // display the function call timings
-            // all imported host functions are critical path performance as they are all exposed
-            // directly to happ developers
-            let ribosome_call_duration_nanos =
-                i128::try_from(t1.as_nanos()).unwrap() - i128::try_from(t0.as_nanos()).unwrap();
-            dbg!(ribosome_call_duration_nanos);
+                // display the function call timings
+                // all imported host functions are critical path performance as they are all exposed
+                // directly to happ developers
+                let ribosome_call_duration_nanos =
+                    i128::try_from(t1.as_nanos()).unwrap() - i128::try_from(t0.as_nanos()).unwrap();
+                dbg!(ribosome_call_duration_nanos);
 
-            let output = match zome_invocation_response {
-                sx_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
-                    guest_output.into_inner().try_into().unwrap()
-                }
-            };
-            // this is convenient for now as we flesh out the zome i/o behaviour
-            // maybe in the future this will be too noisy and we might want to remove it...
-            dbg!(&output);
-            output
-        }};
+                let output = match zome_invocation_response {
+                    holochain_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
+                        guest_output.into_inner().try_into().unwrap()
+                    }
+                };
+                // this is convenient for now as we flesh out the zome i/o behaviour
+                // maybe in the future this will be too noisy and we might want to remove it...
+                dbg!(&output);
+                output
+            })
+            .await
+            .unwrap();
+        };
     }
 
     #[test]

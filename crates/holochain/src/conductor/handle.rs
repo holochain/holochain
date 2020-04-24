@@ -8,7 +8,7 @@ use super::{
 };
 use derive_more::From;
 use std::sync::Arc;
-use sx_types::{
+use holochain_types::{
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,

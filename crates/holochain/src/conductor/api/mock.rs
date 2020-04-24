@@ -4,14 +4,14 @@
 use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
 use async_trait::async_trait;
-use mockall::mock;
-use sx_types::{
+use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
     signature::Signature,
 };
+use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
 // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented

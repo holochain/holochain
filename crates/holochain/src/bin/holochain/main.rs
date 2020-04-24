@@ -2,10 +2,10 @@ use holochain_2020::conductor::{
     config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
     ConductorHandle,
 };
+use holochain_types::observability::{self, Output};
 use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use sx_types::observability::{self, Output};
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;

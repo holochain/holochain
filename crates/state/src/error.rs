@@ -5,8 +5,8 @@
 
 use crate::db::DbName;
 use failure::Fail;
+use holochain_types::prelude::SerializedBytesError;
 use std::path::PathBuf;
-use sx_types::prelude::SerializedBytesError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

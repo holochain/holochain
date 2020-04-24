@@ -1,7 +1,7 @@
 use holochain_serialized_bytes::prelude::*;
-use sx_state::error::DatabaseError;
-use sx_types::chain_header::HeaderAddress;
-use sx_types::entry::EntryAddress;
+use holochain_state::error::DatabaseError;
+use holochain_types::chain_header::HeaderAddress;
+use holochain_types::entry::EntryAddress;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]

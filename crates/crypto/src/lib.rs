@@ -6,7 +6,7 @@
 //!
 //! ```
 //! # async fn async_main () {
-//! use sx_crypto::*;
+//! use holochain_crypto::*;
 //!
 //! // Make sure to call a system init function!
 //! // Otherwise, you'll get `PluginNotInitialized` errors from the api.

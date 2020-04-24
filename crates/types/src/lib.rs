@@ -27,7 +27,7 @@ pub mod universal_map;
 // #[cfg(test)]
 pub mod test_utils;
 
-use sx_zome_types;
+use holochain_zome_types;
 
 macro_rules! serial_hash {
     ( $( $input:ty, $output:ident )* ) => {

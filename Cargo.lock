@@ -901,8 +901,12 @@ dependencies = [
  "holo_hash",
  "holochain_common",
  "holochain_serialized_bytes",
+ "holochain_state",
+ "holochain_types",
+ "holochain_wasm_test_utils",
  "holochain_wasmer_host",
  "holochain_websocket",
+ "holochain_zome_types",
  "human-panic",
  "lazy_static",
  "maplit",
@@ -917,14 +921,11 @@ dependencies = [
  "serde_json",
  "shrinkwraprs",
  "structopt",
- "sx_state",
- "sx_types",
- "sx_wasm_test_utils",
- "sx_zome_types",
  "tempdir",
  "test_wasm_common",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
  "toml",
  "tracing",
  "tracing-futures",
@@ -942,6 +943,20 @@ checksum = "b1ea372338cb6550b0fa7f62b35c6d986e541181d9167083965adf6e15940b2d"
 dependencies = [
  "directories 1.0.2",
  "lazy_static",
+]
+
+[[package]]
+name = "holochain_crypto"
+version = "0.0.1"
+dependencies = [
+ "blake2b_simd",
+ "futures",
+ "lazy_static",
+ "libc",
+ "once_cell",
+ "rust_sodium_holochain_fork-sys",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -966,6 +981,89 @@ checksum = "4f9dcb58ed79199b69ab54407901b9d681a498bc48c9d145b8ec1d2255440eb5"
 dependencies = [
  "quote 0.6.11",
  "syn 0.15.31",
+]
+
+[[package]]
+name = "holochain_state"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "derive_more",
+ "either",
+ "failure",
+ "futures",
+ "holo_hash",
+ "holochain_types",
+ "lazy_static",
+ "mockall",
+ "nanoid",
+ "owning_ref",
+ "parking_lot 0.10.2",
+ "rkv",
+ "rmp-serde",
+ "serde",
+ "serde_derive",
+ "shrinkwraprs",
+ "tempdir",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+]
+
+[[package]]
+name = "holochain_types"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "backtrace",
+ "base64 0.10.1",
+ "chrono",
+ "derive_more",
+ "futures",
+ "hcid",
+ "holo_hash",
+ "holochain_crypto",
+ "holochain_serialized_bytes",
+ "holochain_types_derive",
+ "holochain_wasmer_common",
+ "holochain_zome_types",
+ "lazy_static",
+ "lib3h_crypto_api",
+ "maplit",
+ "matches",
+ "multihash",
+ "must_future",
+ "regex",
+ "rust-base58",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "shrinkwraprs",
+ "snowflake",
+ "tempdir",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-core",
+ "tracing-serde",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "holochain_types_derive"
+version = "0.0.1"
+dependencies = [
+ "quote 0.6.11",
+ "syn 0.15.31",
+]
+
+[[package]]
+name = "holochain_wasm_test_utils"
+version = "0.0.1"
+dependencies = [
+ "holochain_types",
 ]
 
 [[package]]
@@ -998,17 +1096,27 @@ version = "0.0.1"
 dependencies = [
  "futures",
  "holochain_serialized_bytes",
+ "holochain_types",
  "linefeed",
  "nanoid",
  "net2",
  "serde",
  "serde_bytes",
- "sx_types",
  "tokio",
  "tokio-tungstenite",
  "tracing",
  "tungstenite",
  "url2",
+]
+
+[[package]]
+name = "holochain_zome_types"
+version = "0.0.1"
+dependencies = [
+ "holochain_serialized_bytes",
+ "multihash",
+ "rust-base58",
+ "serde",
 ]
 
 [[package]]
@@ -2542,113 +2650,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sx_crypto"
-version = "0.0.1"
-dependencies = [
- "blake2b_simd",
- "futures",
- "lazy_static",
- "libc",
- "once_cell",
- "rust_sodium_holochain_fork-sys",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "sx_state"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "derive_more",
- "either",
- "failure",
- "futures",
- "holo_hash",
- "lazy_static",
- "mockall",
- "nanoid",
- "owning_ref",
- "parking_lot 0.10.2",
- "rkv",
- "rmp-serde",
- "serde",
- "serde_derive",
- "shrinkwraprs",
- "sx_types",
- "tempdir",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-futures",
-]
-
-[[package]]
-name = "sx_types"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "backtrace",
- "base64 0.10.1",
- "chrono",
- "derive_more",
- "futures",
- "hcid",
- "holo_hash",
- "holochain_serialized_bytes",
- "holochain_wasmer_common",
- "lazy_static",
- "lib3h_crypto_api",
- "maplit",
- "matches",
- "multihash",
- "must_future",
- "regex",
- "rust-base58",
- "serde",
- "serde_bytes",
- "serde_json",
- "shrinkwraprs",
- "snowflake",
- "sx_crypto",
- "sx_types_derive",
- "sx_zome_types",
- "tempdir",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-core",
- "tracing-serde",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "sx_types_derive"
-version = "0.0.1"
-dependencies = [
- "quote 0.6.11",
- "syn 0.15.31",
-]
-
-[[package]]
-name = "sx_wasm_test_utils"
-version = "0.0.1"
-dependencies = [
- "sx_types",
-]
-
-[[package]]
-name = "sx_zome_types"
-version = "0.0.1"
-dependencies = [
- "holochain_serialized_bytes",
- "multihash",
- "rust-base58",
- "serde",
-]
-
-[[package]]
 name = "syn"
 version = "0.15.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2892,6 +2893,16 @@ dependencies = [
  "tokio",
  "tokio-tls",
  "tungstenite",
+]
+
+[[package]]
+name = "tokio_safe_block_on"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ee5dc4ab1deaa20795744a7c48840fd647ce280d56b3de00b045d2af57edaef"
+dependencies = [
+ "futures",
+ "tokio",
 ]
 
 [[package]]

@@ -8,12 +8,12 @@ use crate::conductor::{
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use std::path::PathBuf;
-use sx_types::{
+use holochain_types::{
     cell::CellHandle,
     dna::{Dna, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
+use std::path::PathBuf;
 use tracing::*;
 
 /// A trait that unifies both the admin and app interfaces
@@ -326,8 +326,8 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
+    use holochain_types::test_utils::{fake_dna, fake_dna_file};
     use matches::assert_matches;
-    use sx_types::test_utils::{fake_dna, fake_dna_file};
     use uuid::Uuid;
 
     #[tokio::test]

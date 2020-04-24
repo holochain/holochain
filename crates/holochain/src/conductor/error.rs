@@ -1,8 +1,8 @@
 use super::dna_store::error::DnaStoreError;
 use crate::conductor::cell::error::CellError;
+use holochain_state::error::DatabaseError;
+use holochain_types::cell::{CellHandle, CellId};
 use std::path::PathBuf;
-use sx_state::error::DatabaseError;
-use sx_types::cell::{CellHandle, CellId};
 use thiserror::Error;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;

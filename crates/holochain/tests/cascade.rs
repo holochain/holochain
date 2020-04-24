@@ -2,9 +2,9 @@ use holo_hash::EntryHash;
 use holochain_2020::core::state::{
     cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
 };
+use holochain_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
+use holochain_types::{entry::Entry, test_utils::fake_agent_hash};
 use std::convert::TryInto;
-use sx_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
-use sx_types::{entry::Entry, test_utils::fake_agent_hash};
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {

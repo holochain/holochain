@@ -36,14 +36,14 @@ use crate::conductor::{
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
-use sx_state::{
+use holochain_state::{
     db,
     env::{Environment, ReadManager},
     exports::SingleStore,
     prelude::WriteManager,
     typed::{Kv, UnitDbKey},
 };
-use sx_types::{
+use holochain_types::{
     cell::{CellHandle, CellId},
     prelude::*,
     shims::Keystore,
@@ -345,7 +345,7 @@ mod builder {
 
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
+    use holochain_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
@@ -417,7 +417,7 @@ pub mod tests {
 
     use super::{Conductor, ConductorState};
     use crate::conductor::{dna_store::MockDnaStore, state::CellConfig};
-    use sx_state::test_utils::test_conductor_env;
+    use holochain_state::test_utils::test_conductor_env;
 
     #[tokio::test]
     async fn can_update_state() {
