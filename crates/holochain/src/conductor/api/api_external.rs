@@ -1,5 +1,3 @@
-#![deny(missing_docs)]
-
 use super::error::{ConductorApiResult, SerializationError};
 use crate::conductor::{
     config::AdminInterfaceConfig,

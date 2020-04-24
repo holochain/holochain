@@ -1,3 +1,5 @@
+//! The CellConductorApi allows Cells to talk to their Conductor
+
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::ConductorHandle;
 use async_trait::async_trait;

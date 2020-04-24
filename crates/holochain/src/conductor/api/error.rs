@@ -1,4 +1,3 @@
-#![deny(missing_docs)]
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::conductor::error::ConductorError;
