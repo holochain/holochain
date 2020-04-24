@@ -347,6 +347,7 @@ mod builder {
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
     use holochain_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
+    /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
         config: ConductorConfig,
@@ -354,12 +355,14 @@ mod builder {
     }
 
     impl ConductorBuilder<RealDnaStore> {
+        /// Default ConductorBuilder
         pub fn new() -> Self {
             Self::default()
         }
     }
 
     impl ConductorBuilder<MockDnaStore> {
+        /// ConductorBuilder using mocked DnaStore, for testing
         pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
             ConductorBuilder {
                 dna_store,

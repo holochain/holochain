@@ -13,5 +13,5 @@ pub mod paths;
 pub mod state;
 
 pub use cell::Cell;
-pub use conductor::Conductor;
+pub use conductor::{Conductor, ConductorBuilder};
 pub use handle::ConductorHandle;
