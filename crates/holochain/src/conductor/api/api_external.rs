@@ -1,8 +1,10 @@
 #![deny(missing_docs)]
 
-use super::error::{ConductorApiResult, SerializationError};
+use super::error::{
+    ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
+};
 use crate::conductor::{
-    interface::error::{AdminInterfaceErrorKind, InterfaceError, InterfaceResult},
+    interface::error::{InterfaceError, InterfaceResult},
     ConductorHandle,
 };
 use holo_hash::*;
@@ -44,10 +46,10 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
         match res {
             Ok(response) => response,
-            Err(e) => AdminResponse::Error {
-                debug: e.to_string(),
-                error_type: e.into(),
-            },
+            Err(ConductorApiError::DnaReadError(e)) => {
+                AdminResponse::Error(ExternalApiWireError::DnaReadError(e))
+            }
+            Err(e) => AdminResponse::Error(e.into()),
         }
     }
 }
@@ -133,7 +135,10 @@ impl RealAdminInterfaceApi {
         dna_path: PathBuf,
         properties: Option<serde_json::Value>,
     ) -> ConductorApiResult<Dna> {
-        let dna: UnsafeBytes = tokio::fs::read(dna_path).await?.into();
+        let dna: UnsafeBytes = tokio::fs::read(dna_path)
+            .await
+            .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?
+            .into();
         let dna = SerializedBytes::from(dna);
         let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
         if let Some(properties) = properties {
@@ -185,10 +190,7 @@ impl InterfaceApi for RealAdminInterfaceApi {
         }
         match request {
             Ok(request) => Ok(AdminInterfaceApi::handle_request(self, request).await),
-            Err(e) => Ok(AdminResponse::Error {
-                debug: e.to_string(),
-                error_type: InterfaceError::SerializedBytes(e).into(),
-            }),
+            Err(e) => Ok(AdminResponse::Error(SerializationError::from(e).into())),
         }
     }
 }
@@ -267,13 +269,7 @@ pub enum AdminResponse {
     /// A list of all installed [Dna]s
     ListDnas(Vec<DnaHash>),
     /// An error has ocurred in this request
-    Error {
-        /// The error as a string
-        debug: String,
-        /// A simplified version of the error
-        /// Useful for reacting to an error
-        error_type: AdminInterfaceErrorKind,
-    },
+    Error(ExternalApiWireError),
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
