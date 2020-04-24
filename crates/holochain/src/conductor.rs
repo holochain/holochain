@@ -1,4 +1,3 @@
-
 // TODO: clean up deny's once parent is fully documented
 #[deny(missing_docs)]
 pub mod api;
