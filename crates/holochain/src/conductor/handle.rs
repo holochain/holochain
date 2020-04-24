@@ -1,9 +1,12 @@
 use super::{
-    api::{error::ConductorApiResult, CellConductorApi, RealAdminInterfaceApi},
+    api::{error::ConductorApiResult, CellConductorApi},
+    config::AdminInterfaceConfig,
     dna_store::DnaStore,
     error::ConductorResult,
-    Cell, Conductor, config::AdminInterfaceConfig, manager::TaskManagerRunHandle,
+    manager::TaskManagerRunHandle,
+    Cell, Conductor,
 };
+use derive_more::From;
 use std::sync::Arc;
 use sx_types::{
     dna::Dna,
@@ -11,8 +14,6 @@ use sx_types::{
     prelude::*,
 };
 use tokio::sync::RwLock;
-use derive_more::From;
-
 
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
 pub type ConductorHandleInner<DS> = RwLock<Conductor<DS>>;
@@ -20,7 +21,11 @@ pub type ConductorHandleInner<DS> = RwLock<Conductor<DS>>;
 #[async_trait::async_trait]
 pub trait ConductorHandleT: Send + Sync {
     async fn check_running(&self) -> ConductorResult<()>;
-    async fn add_admin_interfaces_via_handle(&self, handle: ConductorHandle, configs: Vec<AdminInterfaceConfig>) -> ConductorResult<()>;
+    async fn add_admin_interfaces_via_handle(
+        &self,
+        handle: ConductorHandle,
+        configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()>;
     async fn install_dna(&self, dna: Dna) -> ConductorResult<()>;
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
     async fn invoke_zome(
@@ -34,7 +39,6 @@ pub trait ConductorHandleT: Send + Sync {
     async fn shutdown(&self);
 }
 
-
 /// A handle to the conductor that can easily be passed
 /// around and cheaply cloned
 #[derive(From)]
@@ -47,7 +51,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.0.read().await.check_running()
     }
 
-    async fn add_admin_interfaces_via_handle(&self, handle: ConductorHandle, configs: Vec<AdminInterfaceConfig>) -> ConductorResult<()> {
+    async fn add_admin_interfaces_via_handle(
+        &self,
+        handle: ConductorHandle,
+        configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorResult<()> {
         let mut lock = self.0.write().await;
         lock.add_admin_interfaces_via_handle(handle, configs).await
     }
@@ -55,7 +63,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_dna(&self, dna: Dna) -> ConductorResult<()> {
         Ok(self.0.write().await.dna_store_mut().add(dna)?)
     }
-    
+
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
         Ok(self.0.read().await.dna_store().list())
     }
@@ -81,7 +89,4 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn shutdown(&self) {
         self.0.write().await.shutdown()
     }
-
 }
-
-

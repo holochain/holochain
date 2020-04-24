@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::conductor::{dna_store::error::DnaStoreError, error::ConductorError};
+use crate::conductor::error::ConductorError;
 use sx_types::cell::CellId;
 use thiserror::Error;
 

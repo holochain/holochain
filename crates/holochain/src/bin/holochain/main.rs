@@ -1,6 +1,6 @@
 use holochain_2020::conductor::{
-    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath,
-    ConductorHandle, Conductor,
+    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
+    ConductorHandle,
 };
 use std::error::Error;
 use std::path::PathBuf;
@@ -121,7 +121,8 @@ async fn async_main() {
     info!("Conductor successfully initialized.");
     // kick off actual conductor task here
     let waiting_handle = conductor
-        .get_wait_handle().await
+        .get_wait_handle()
+        .await
         .expect("No wait handle in conductor");
 
     waiting_handle

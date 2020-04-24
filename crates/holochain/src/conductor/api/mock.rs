@@ -90,6 +90,4 @@ impl CellConductorApiT for MockCellConductorApi {
     // async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
     //     self.sync_crypto_decrypt(_payload)
     // }
-
-
 }

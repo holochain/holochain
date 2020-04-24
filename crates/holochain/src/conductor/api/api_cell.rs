@@ -1,12 +1,9 @@
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::{cell::Cell, ConductorHandle};
+use crate::conductor::ConductorHandle;
 use async_trait::async_trait;
 use sx_types::{
-    autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*,
-    signature::Signature,
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give

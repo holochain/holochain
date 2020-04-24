@@ -11,15 +11,23 @@
 
 use super::{
     api::{AdminInterfaceApi, AppInterfaceApi, RealAdminInterfaceApi},
+    config::{AdminInterfaceConfig, InterfaceDriver},
     dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
     handle::ConductorHandleImpl,
-    manager::{spawn_task_manager, ManagedTaskAdd, TaskManagerRunHandle, ManagedTaskHandle, keep_alive_task},
-    state::ConductorState, config::{InterfaceDriver, AdminInterfaceConfig}, interface::{error::InterfaceResult, websocket::{spawn_admin_interface_task, spawn_websocket_listener}},
+    interface::{
+        error::InterfaceResult,
+        websocket::{spawn_admin_interface_task, spawn_websocket_listener},
+    },
+    manager::{
+        keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
+        TaskManagerRunHandle,
+    },
+    state::ConductorState,
 };
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
-    cell::{Cell, NetSender},
+    cell::Cell,
     config::ConductorConfig,
     dna_store::MockDnaStore,
     error::ConductorResult,
@@ -192,10 +200,6 @@ where
         Ok(&item.cell)
     }
 
-    fn tx_network(&self) -> &NetSender {
-        unimplemented!()
-    }
-
     /// Sends a JoinHandle to the TaskManager task to be managed
     async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
         self.managed_task_add_sender
@@ -253,17 +257,16 @@ where
     }
 
     /// Move this [Conductor] into a shared [ConductorHandle].
-    /// 
+    ///
     /// After this happens, direct mutable access to the Conductor becomes impossible,
-    /// and you must interact with it through the ConductorHandle, a limited cloneable interface 
+    /// and you must interact with it through the ConductorHandle, a limited cloneable interface
     /// for which all mutation is synchronized across all shared copies by a RwLock.
-    /// 
+    ///
     /// This signals the completion of Conductor initialization and the beginning of its lifecycle
     /// as the driver of its various interface handling loops
     pub fn into_handle(self) -> ConductorHandle {
         Arc::new(ConductorHandleImpl::from(RwLock::new(self)))
     }
-
 
     /// Spawn all admin interface tasks, register them with the TaskManager,
     /// and modify the conductor accordingly, based on the config passed in
@@ -318,26 +321,24 @@ where
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
-            self
-                .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
-                    stop_tx.subscribe(),
-                ))))
-                .await?;
+            self.manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
+                stop_tx.subscribe(),
+            ))))
+            .await?;
 
             // Now that tasks are spawned, register them with the TaskManager
             for (port, handle) in handles {
                 ports.push(port);
-                self
-                    .manage_task(ManagedTaskAdd::new(
-                        handle,
-                        Box::new(|result| {
-                            result.unwrap_or_else(|e| {
-                                error!(error = &e as &dyn std::error::Error, "Interface died")
-                            });
-                            None
-                        }),
-                    ))
-                    .await?
+                self.manage_task(ManagedTaskAdd::new(
+                    handle,
+                    Box::new(|result| {
+                        result.unwrap_or_else(|e| {
+                            error!(error = &e as &dyn std::error::Error, "Interface died")
+                        });
+                        None
+                    }),
+                ))
+                .await?
             }
             for p in ports {
                 self.add_admin_port(p);
@@ -352,21 +353,9 @@ type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
 mod builder {
 
     use super::*;
-    use crate::conductor::{
-        api::RealAdminInterfaceApi,
-        config::AdminInterfaceConfig,
-        dna_store::RealDnaStore,
-        interface::{
-            error::InterfaceResult,
-            websocket::{spawn_admin_interface_task, spawn_websocket_listener},
-            InterfaceDriver,
-        },
-        manager::{keep_alive_task, ManagedTaskHandle},
-        ConductorHandle,
-    };
-    use futures::future;
+    use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
+
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
-    use tokio::sync::RwLockWriteGuard;
 
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
@@ -401,11 +390,13 @@ mod builder {
             let conductor_handle: ConductorHandle = conductor.into_handle();
 
             if let Some(configs) = config.admin_interfaces {
-                conductor_handle.add_admin_interfaces_via_handle(conductor_handle.clone(), configs).await?;
+                conductor_handle
+                    .add_admin_interfaces_via_handle(conductor_handle.clone(), configs)
+                    .await?;
             }
             // let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
 
-            // TODO: initialzie admin interfafaces 
+            // TODO: initialzie admin interfafaces
             // setup_admin_interfaces_from_config(
             //     &mut conductor_lock,
             //     admin_api,
@@ -424,7 +415,6 @@ mod builder {
             Ok(conductor_handle)
         }
     }
-
 }
 
 #[cfg(test)]
