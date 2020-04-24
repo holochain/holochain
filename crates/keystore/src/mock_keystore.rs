@@ -35,14 +35,15 @@ pub async fn spawn_mock_keystore(
 struct PrivateKey(pub holochain_crypto::DynCryptoBytes);
 
 ghost_actor::ghost_chan! {
-    name: MockKeystoreInternal,
-    error: KeystoreError,
-    api: {
-        FinalizeNewKeypair::finalize_new_keypair (
+    Visibility(),
+    Name(MockKeystoreInternal),
+    Error(KeystoreError),
+    Api {
+        FinalizeNewKeypair(
             "we have generated a keypair, now track it",
             (holo_hash::AgentHash, PrivateKey),
-            ()
-        )
+            (),
+        ),
     }
 }
 

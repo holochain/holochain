@@ -4,23 +4,24 @@
 use crate::*;
 
 ghost_actor::ghost_actor! {
-    name: pub Keystore,
-    error: KeystoreError,
-    api: {
-        GenerateSignKeypairFromPureEntropy::generate_sign_keypair_from_pure_entropy (
+    Visibility(pub),
+    Name(Keystore),
+    Error(KeystoreError),
+    Api {
+        GenerateSignKeypairFromPureEntropy(
             "generates a new pure entropy keypair in the keystore, returning the public key",
             (),
-            holo_hash::AgentHash
+            holo_hash::AgentHash,
         ),
-        ListSignKeys::list_sign_keys (
+        ListSignKeys(
             "list all the signature public keys this keystore is tracking",
             (),
-            Vec<holo_hash::AgentHash>
+            Vec<holo_hash::AgentHash>,
         ),
-        Sign::sign (
+        Sign(
             "generate a signature for a given blob of binary data",
             SignInput,
-            Signature
+            Signature,
         ),
     }
 }
