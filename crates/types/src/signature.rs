@@ -30,6 +30,8 @@ impl Provenance {
         self.1.clone()
     }
 }
+
+/*
 /// Signature is a wrapper structure for a cryptographic signature
 /// it is stored as a string and can be validated as having been signed
 /// by the private key associated with a given public key.
@@ -80,3 +82,4 @@ impl From<Signature> for String {
         s.0
     }
 }
+*/

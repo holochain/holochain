@@ -847,9 +847,9 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.1.0-alpha.5"
+version = "0.1.0-alpha.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c73c594b1b7cf8c737da08632a9d9dcd9c9d347c0508805621ba979e18e5be2e"
+checksum = "1c03d294911bd6007de6e670f5eb32d9ce5c3aebb9445faca3da5b97f5a79807"
 dependencies = [
  "futures",
  "must_future",
@@ -1071,6 +1071,7 @@ dependencies = [
  "hcid",
  "holo_hash",
  "holochain_crypto",
+ "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types_derive",
  "holochain_wasmer_common",
@@ -1091,6 +1092,7 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
  "tracing",
  "tracing-core",
  "tracing-serde",
