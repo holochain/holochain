@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{dna::Dna, entry::Entry, prelude::*};
+use holochain_types::{dna::Dna, entry::Entry,     header, prelude::*};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -24,12 +24,29 @@ pub async fn genesis(
         return Err(WorkflowError::AgentInvalid(agent_hash.clone()));
     }
 
+    let header = ChainHeader::Dna(
+        header::Dna {
+            timestamp: chrono::Utc::now().timestamp().into(),
+            author: agent_hash.clone(),
+            dna.hash(),
+        }
+    )
+    let element = ChainElement(signature, header, Some<Box<dna>>);
     workspace
         .source_chain
-        .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)?;
+        .put_element(element)?;
+
+    let header = ChainHeader::(
+        header::EntryCreate {
+            timestamp: chrono::Utc::now().timestamp().into(),
+            author: agent_hash.clone(),
+            entryagent_hash,
+        }
+    )
+        let element = ChainElement(signature, header, Some<Box<dna>>);
     workspace
         .source_chain
-        .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)?;
+        .put_element(element)?;
 
     Ok(WorkflowEffects {
         workspace,
@@ -91,7 +108,7 @@ mod tests {
                 .iter_back()
                 .map(|h| {
                     debug!("header: {:?}", h);
-                    Ok(h.entry_address().clone())
+                    Ok(h.entry_address())
                 })
                 .collect()
                 .unwrap();

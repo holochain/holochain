@@ -64,39 +64,47 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         self.headers.get(&header_address.into())
     }
 
-    /// Given a ChainHeader, return the corresponding HeaderWithEntry
-    pub fn header_with_entry(
+    // Given a SignedHeader, return the corresponding ChainElement
+    fn chain_element(
         &self,
-        header: ChainHeader,
-    ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(entry) = self.get_entry(header.entry_address().to_owned())? {
-            Ok(Some(HeaderWithEntry::new(header, entry)))
-        } else {
-            Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(header.entry_address().to_owned()),
-            ))
-        }
+        signed_header: SignedHeader,
+    ) -> SourceChainResult<Option<ChainElement>> {
+        maybe_entry = signed_header.header.entry_address().map(|entry_address| {
+            // if the header has an address it better have been stored!
+            let maybe_entry = self.get_entry(entry_address())?;
+            if maybe_entry.is_none() {
+                return Err(SourceChainError::InvalidStructure(
+                    ChainInvalidReason::MissingData(header.entry_address()),
+                ));
+            }
+            maybe_entry
+        });
+        ChainElement::new(signed_header.signature, signed_header.header, maybe_entry);
     }
 
-    pub fn get_header_with_entry(
+    /// given a header address return the full chain element for that address
+    pub fn get_element(
         &self,
         header_address: &HeaderAddress,
-    ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(header) = self.get_header(header_address.to_owned())? {
-            self.header_with_entry(header)
+    ) -> SourceChainResult<Option<ChainElement>> {
+        if let Some(singed_header) = self.get_header(header_address.to_owned())? {
+            self.chain_element(signed_header)
         } else {
             Ok(None)
         }
     }
 
-    pub fn put(&mut self, v: (ChainHeader, Entry)) -> DatabaseResult<()> {
-        let (header, entry) = v;
-        self.entries.put((&entry).try_into()?, entry);
-        self.headers.put((&header).try_into()?, header);
+    pub fn put(&mut self, v: ChainElement) -> DatabaseResult<()> {
+        let (signature, header, maybe_entry) = v;
+        let signed_header = SignedHeader { signature, header };
+        if is_some(maybe_entry) {
+            self.entries.put((&entry).try_into()?, entry);
+        }
+        self.headers.put((&header).try_into()?, signed_header);
         Ok(())
     }
 
-    // TODO: consolidate into single delete which handles entry and header together
+    // TODO: consolidate into single delete which handles full element deleted together
     pub fn delete_entry(&mut self, k: EntryHash) {
         self.entries.delete(k.into())
     }

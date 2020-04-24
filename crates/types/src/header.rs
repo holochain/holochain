@@ -1,110 +1,114 @@
-pub struct Address;
-pub struct Signature;
-pub struct PublicKey;
-pub struct Timestamp;
-pub struct DnaHash;
-pub struct HeaderHash;
-pub struct SerializedBytes;
-pub struct EntryHash;
+//! Holochain's header variations
+//!
+//! All header variations contain the fields `author` and `timestamp`.
+//! Furthermore, all variations besides pub struct `Dna` (which is the first header
+//! in a chain) contain the field `prev_header`.
+
+#![allow(missing_docs)]
+
+//pub struct Signature;
 pub struct CapTokenClaim;
 pub struct CapTokenGrant;
-pub struct ZomeId;
+pub type ZomeId = String;
 
-use crate::{
-    entry::{Entry, EntryAddress},
-    prelude::*,
-};
+use crate::{prelude::*, time::Iso8601};
 
-/// Holochain's header variations
-///
-/// All header variations contain the fields `author` and `timestamp`.
-/// Furthermore, all variations besides pub struct `Dna` (which is the first header
-/// in a chain) contain the field `prev_header`.
+/// defines a timestamp as used in a header
+pub type Timestamp = Iso8601;
 
+/// header for a DNA entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     // No previous header, because DNA is always first chain entry
-
     pub hash: DnaHash,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct LinkAdd {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
-    pub base: Address,   // Not Address, but HeaderHash or EntryHash or PublicKey
-    pub target: Address, // Not Address, but HeaderHash or EntryHash or PublicKey
+    pub base: HoloHash,   // Not HoloHash, but HeaderHash or EntryHash or AgentHash
+    pub target: HoloHash, // Not HoloHash, but HeaderHash or EntryHash or AgentHash
     pub tag: SerializedBytes,
-    pub link_type: SerializedBytes
+    pub link_type: SerializedBytes,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct LinkRemove {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
     /// The address of the `LinkAdd` being reversed
-    pub link_add_hash: Address, // not Address byt LinkAddHash or maybe its HeaderHash?
+    pub link_add_hash: HoloHash, // not HoloHash byt LinkAddHash or maybe its HeaderHash?
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainOpen {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
     pub prev_dna_hash: DnaHash,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainClose {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
     pub new_dna_hash: DnaHash,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryCreate {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
     pub entry_type: EntryType,
-    pub entry_hash: EntryHash,
+    pub entry_address: EntryAddress,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryUpdate {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
-    pub replaces: Address, // not Address but EntryHash or HeaderHash ??
+    pub replaces: HoloHash, // not HoloHash but EntryHash or HeaderHash ??
 
     pub entry_type: EntryType,
-    pub entry_hash: EntryHash,
+    pub entry_address: EntryAddress,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryDelete {
-    pub author: PublicKey,
+    pub author: AgentHash,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
     /// Hash Address of the Element being deleted
-    pub removes: Address, // not Address but EntryHash or HeaderHash ??
+    pub removes: HoloHash, // not HoloHash but EntryHash or HeaderHash ??
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum EntryType {
     AgentKey,
     // Stores the App's provided filtration data
     // FIXME: Change this if we are keeping Zomes
-    App {
-        zome_id: ZomeId,
-        app_entry_type: AppEntryType,
-        is_public: bool,
-    },
+    App(AppEntryType),
     CapTokenClaim,
     CapTokenGrant,
 }
 
-
-pub struct AppEntryType(Vec<u8>);
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct AppEntryType {
+    id: Vec<u8>,
+    zome_id: ZomeId,
+    is_public: bool,
+}

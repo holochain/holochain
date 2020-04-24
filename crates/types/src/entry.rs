@@ -20,6 +20,8 @@ pub enum Entry {
     /// The AgentKey system entry, the second entry of every source chain,
     /// which grants authoring capability for this agent. (Name TBD)
     AgentKey(AgentHash),
+    /// The application entry data for entries that aren't system created entries
+    App(SerializedBytes),
 }
 
 impl Entry {
@@ -39,6 +41,8 @@ pub enum EntryAddress {
     Entry(EntryHash),
     /// agents are entries too
     Agent(AgentHash),
+    /// the DNA is an entries too
+    Dna(DnaHash),
 }
 
 impl From<EntryAddress> for HoloHash {
@@ -46,6 +50,7 @@ impl From<EntryAddress> for HoloHash {
         match entry_address {
             EntryAddress::Entry(entry_hash) => entry_hash.into(),
             EntryAddress::Agent(agent_hash) => agent_hash.into(),
+            EntryAddress::Dna(dna_hash) => dna_hash.into(),
         }
     }
 }
@@ -62,6 +67,7 @@ impl AsRef<[u8]> for &EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
             EntryAddress::Agent(agent_hash) => agent_hash.as_ref(),
+            EntryAddress::Dna(dna_hash) => dna_hash.as_ref(),
         }
     }
 }
@@ -71,6 +77,7 @@ impl std::fmt::Display for EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
             EntryAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
+            EntryAddress::Dna(dna_hash) => write!(f, "{}", dna_hash),
         }
     }
 }

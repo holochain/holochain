@@ -14,7 +14,7 @@ use holochain_state::{
 use holochain_types::chain_header::HeaderAddress;
 use holochain_types::entry::EntryAddress;
 use holochain_types::{
-    chain_header::ChainHeader,
+    chain_header::{ChainHeader, Element},
     entry::Entry,
     prelude::*,
     signature::{Provenance, Signature},
@@ -61,12 +61,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &self.cas
     }
 
-    // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
-    #[allow(dead_code, unreachable_code)]
-    pub fn put_entry(&mut self, entry: Entry, agent_hash: &AgentHash) -> DatabaseResult<()> {
-        let header = header_for_entry(&entry, agent_hash, self.chain_head().cloned())?;
+    pub fn put_element(&mut self, element: Element) -> DatabaseResult<()> {
+        let (_, header, _) = element;
+        trace!("PUT {} {:?}", entry.entry_hash(), entry);
         self.sequence.put_header((&header).try_into()?);
-        self.cas.put((header, entry))?;
+        self.cas.put(element)?;
         Ok(())
     }
 
@@ -105,7 +104,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 .iter_back()
                 .map(|h| {
                     Ok(JsonChainDump {
-                        entry: self.get_entry(h.entry_address().to_owned())?,
+                        entry: self.get_entry(h.entry_address())?,
                         header: h,
                     })
                 })
@@ -122,20 +121,6 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
         self.sequence.flush_to_txn(writer)?;
         Ok(())
     }
-}
-
-fn header_for_entry(
-    entry: &Entry,
-    agent_hash: &AgentHash,
-    prev_head: Option<HeaderAddress>,
-) -> Result<ChainHeader, SerializedBytesError> {
-    let _provenances = &[Provenance::new(agent_hash.clone(), Signature::fake())];
-    let _timestamp: Iso8601 = chrono::Utc::now().timestamp().into();
-    trace!("PUT {} {:?}", entry.entry_hash(), entry);
-    Ok(ChainHeader {
-        entry_address: EntryAddress::try_from(entry)?,
-        prev_header_address: prev_head,
-    })
 }
 
 pub struct SourceChainBackwardIterator<'env, R: Readable> {
@@ -222,7 +207,7 @@ pub mod tests {
             assert_eq!(
                 store
                     .iter_back()
-                    .map(|h| Ok(store.get_entry(h.entry_address().to_owned())?))
+                    .map(|h| Ok(store.get_entry(h.entry_address())?))
                     .collect::<Vec<_>>()
                     .unwrap(),
                 vec![Some(agent_entry), Some(dna_entry)]
