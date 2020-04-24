@@ -1,8 +1,8 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::LinkEntriesInput;
+use holochain_zome_types::LinkEntriesOutput;
 use std::sync::Arc;
-use sx_zome_types::LinkEntriesInput;
-use sx_zome_types::LinkEntriesOutput;
 
 pub async fn link_entries(
     _ribosome: Arc<WasmRibosome>,

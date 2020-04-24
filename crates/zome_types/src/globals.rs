@@ -1,7 +1,7 @@
 use crate::hash::HashString;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct ZomeGlobals {
     pub dna_name: String,
     pub dna_address: HashString,

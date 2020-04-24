@@ -1,8 +1,8 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::CallInput;
+use holochain_zome_types::CallOutput;
 use std::sync::Arc;
-use sx_zome_types::CallInput;
-use sx_zome_types::CallOutput;
 
 pub async fn call(
     _ribosome: Arc<WasmRibosome>,

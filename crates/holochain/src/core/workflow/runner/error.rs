@@ -1,5 +1,5 @@
 use crate::core::{state::workspace::WorkspaceError, workflow::WorkflowError};
-use sx_state::error::DatabaseError;
+use holochain_state::error::DatabaseError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

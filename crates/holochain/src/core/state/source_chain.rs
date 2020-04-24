@@ -1,14 +1,14 @@
 //! A SourceChain is guaranteed to be initialized, i.e. it has gone through the CellGenesis workflow.
 //! It has the same interface as its underlying SourceChainBuf, except that certain operations,
-//! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentId,
+//! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentHash,
 //! cannot fail, so the function return types reflect that.
 
+use holo_hash::*;
+use holochain_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
 use shrinkwraprs::Shrinkwrap;
-use sx_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
-use sx_types::agent::AgentId;
-use sx_types::chain_header::HeaderAddress;
 
 pub use error::*;
+use holochain_types::chain_header::HeaderAddress;
 pub use source_chain_buffer::*;
 
 mod error;
@@ -20,10 +20,12 @@ mod source_chain_buffer;
 pub struct SourceChain<'env, R: Readable>(SourceChainBuf<'env, R>);
 
 impl<'env, R: Readable> SourceChain<'env, R> {
-    pub fn agent_id(&self) -> SourceChainResult<AgentId> {
-        self.0.agent_id()?.ok_or(SourceChainError::InvalidStructure(
-            ChainInvalidReason::GenesisDataMissing,
-        ))
+    pub fn agent_hash(&self) -> SourceChainResult<AgentHash> {
+        self.0
+            .agent_hash()?
+            .ok_or(SourceChainError::InvalidStructure(
+                ChainInvalidReason::GenesisDataMissing,
+            ))
     }
 
     pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {

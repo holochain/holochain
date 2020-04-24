@@ -1,8 +1,8 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
+use holochain_types::dna::error::DnaError;
 use holochain_wasmer_host::prelude::WasmError;
-use sx_types::dna::error::DnaError;
 use thiserror::Error;
 
 /// Errors occurring during a [Ribosome] call

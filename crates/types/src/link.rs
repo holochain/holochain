@@ -76,27 +76,3 @@ impl<S: Into<String>> LinkMatch<S> {
         }
     }
 }
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use crate::entry::test_entry_address;
-    use crate::entry::test_entry_address_b;
-
-    pub fn example_link() -> Link {
-        Link::new(
-            &test_entry_address(),
-            &test_entry_address_b(),
-            &example_link_type(),
-            &example_link_tag(),
-        )
-    }
-
-    pub fn example_link_type() -> LinkType {
-        LinkType::from("foo-link-type")
-    }
-
-    pub fn example_link_tag() -> LinkTag {
-        LinkTag::from("foo-link-tag")
-    }
-}

@@ -3,7 +3,7 @@
 
 use crate::conductor::{dna_store::error::DnaStoreError, error::ConductorError};
 use holochain_serialized_bytes::prelude::*;
-use sx_types::cell::CellId;
+use holochain_types::cell::CellId;
 use thiserror::Error;
 
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
@@ -54,7 +54,7 @@ pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 /// Error type that goes over the websocket wire.
 /// This intends to be application developer facing
 /// so it should be readable and relevant
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum ExternalApiWireError {
     // TODO: B-01506 Constrain these errors so they are relevant to

@@ -1,14 +1,14 @@
 #![allow(clippy::ptr_arg)]
-use mockall::mock;
-use std::collections::HashSet;
-use std::fmt::Debug;
-use sx_state::{
+use holochain_state::{
     buffer::{BufMultiVal, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::DatabaseResult,
     prelude::*,
 };
-use sx_types::entry::EntryAddress;
+use holochain_types::entry::EntryAddress;
+use mockall::mock;
+use std::collections::HashSet;
+use std::fmt::Debug;
 
 type Tag = String;
 

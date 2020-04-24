@@ -1,8 +1,8 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::ShowEnvInput;
+use holochain_zome_types::ShowEnvOutput;
 use std::sync::Arc;
-use sx_zome_types::ShowEnvInput;
-use sx_zome_types::ShowEnvOutput;
 
 pub async fn show_env(
     _ribosome: Arc<WasmRibosome>,
