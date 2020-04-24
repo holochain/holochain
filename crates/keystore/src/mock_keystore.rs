@@ -116,7 +116,7 @@ impl KeystoreHandler<(), MockKeystoreInternal> for MockKeystore {
     fn handle_ghost_actor_internal(&mut self, msg: MockKeystoreInternal) -> KeystoreResult<()> {
         match msg {
             MockKeystoreInternal::FinalizeNewKeypair(msg) => {
-                let ghost_actor::GhostChanItem {
+                let ghost_actor::ghost_chan::GhostChanItem {
                     input,
                     respond,
                     span,
