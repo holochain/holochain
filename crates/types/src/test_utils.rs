@@ -87,13 +87,6 @@ pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
     ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }
 
-/*
-/// A fixture example Signature for unit testing.
-pub fn fake_signature() -> Signature {
-    Signature::from("fake")
-}
-*/
-
 /// A fixture example Provenance for unit testing.
 pub fn fake_provenance() -> Provenance {
     let fake_agent = AgentHash::with_pre_hashed_sync(vec![0; 32]);
