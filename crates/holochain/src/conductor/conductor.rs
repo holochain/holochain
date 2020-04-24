@@ -10,7 +10,7 @@
 //! users in a testing environment.
 
 use super::{
-    api::{AdminInterfaceApi, AppInterfaceApi, RealAdminInterfaceApi},
+    api::RealAdminInterfaceApi,
     config::{AdminInterfaceConfig, InterfaceDriver},
     dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
@@ -122,72 +122,35 @@ impl Conductor {
     }
 }
 
+//-----------------------------------------------------------------------------
+// Public methods
+//-----------------------------------------------------------------------------
 impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    async fn new(env: Environment, dna_store: DS) -> ConductorResult<Self> {
-        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
-        let (task_tx, task_manager_run_handle) = spawn_task_manager();
-        let task_manager_run_handle = Some(task_manager_run_handle);
-        let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
-        Ok(Self {
-            env,
-            state_db: Kv::new(db)?,
-            cells: HashMap::new(),
-            _handle_map: HashMap::new(),
-            _agent_keys: HashMap::new(),
-            shutting_down: false,
-            managed_task_add_sender: task_tx,
-            managed_task_stop_broadcaster: stop_tx,
-            task_manager_run_handle,
-            admin_websocket_ports: Vec::new(),
-            dna_store,
-        })
+    /// Move this [Conductor] into a shared [ConductorHandle].
+    ///
+    /// After this happens, direct mutable access to the Conductor becomes impossible,
+    /// and you must interact with it through the ConductorHandle, a limited cloneable interface
+    /// for which all mutation is synchronized across all shared copies by a RwLock.
+    ///
+    /// This signals the completion of Conductor initialization and the beginning of its lifecycle
+    /// as the driver of its various interface handling loops
+    pub fn into_handle(self) -> ConductorHandle {
+        Arc::new(ConductorHandleImpl::from(RwLock::new(self)))
     }
 
-    // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
-    // the Conductor handle (from where this could be called)
-    #[allow(dead_code)]
-    async fn spawn_admin_interface<Api: AdminInterfaceApi>(
-        &mut self,
-        _api: Api,
-    ) -> ConductorResult<()> {
-        self.check_running()?;
-        unimplemented!()
-    }
-
-    // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
-    // the Conductor handle (from where this could be called)
-    /// The common way to spawn a new app interface, whether read from
-    /// ConductorState on startup, or generated on-the-fly by an admin method
-    #[allow(dead_code)]
-    async fn spawn_app_interface<Api: AppInterfaceApi>(
-        &mut self,
-        _api: Api,
-    ) -> ConductorResult<()> {
-        self.check_running()?;
-        unimplemented!()
-    }
-
-    // FIXME: remove allow once we actually use this function
-    #[allow(dead_code)]
-    async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
-    where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
-    {
-        self.check_running()?;
-        let guard = self.env.guard().await;
-        let mut writer = guard.writer()?;
-        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
-        let new_state = f(state)?;
-        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
-        writer.commit()?;
-        Ok(new_state)
+    /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
+    /// on it. Useful for specifying port 0 and letting the OS choose a free port.
+    pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+        self.admin_websocket_ports.get(0).copied()
     }
 }
 
-// TODO: @freesig: is there a reason for the separate impl blocks here?
+//-----------------------------------------------------------------------------
+/// Methods used by the [ConductorHandle]
+//-----------------------------------------------------------------------------
 impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
@@ -200,14 +163,6 @@ where
         Ok(&item.cell)
     }
 
-    /// Sends a JoinHandle to the TaskManager task to be managed
-    async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
-        self.managed_task_add_sender
-            .send(handle)
-            .await
-            .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
-    }
-
     /// A gate to put at the top of public functions to ensure that work is not
     /// attempted after a shutdown has been issued
     pub(super) fn check_running(&self) -> ConductorResult<()> {
@@ -218,28 +173,12 @@ where
         }
     }
 
-    /// Returns a port that was chosen by the OS
-    pub(super) fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
-        self.admin_websocket_ports.get(0).copied()
-    }
-
-    #[allow(dead_code)]
-    async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let guard = self.env.guard().await;
-        let reader = guard.reader()?;
-        Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
-    }
-
     pub(super) fn dna_store(&self) -> &DS {
         &self.dna_store
     }
 
     pub(super) fn dna_store_mut(&mut self) -> &mut DS {
         &mut self.dna_store
-    }
-
-    fn add_admin_port(&mut self, port: u16) {
-        self.admin_websocket_ports.push(port);
     }
 
     pub(super) fn shutdown(&mut self) {
@@ -256,21 +195,9 @@ where
         self.task_manager_run_handle.take()
     }
 
-    /// Move this [Conductor] into a shared [ConductorHandle].
-    ///
-    /// After this happens, direct mutable access to the Conductor becomes impossible,
-    /// and you must interact with it through the ConductorHandle, a limited cloneable interface
-    /// for which all mutation is synchronized across all shared copies by a RwLock.
-    ///
-    /// This signals the completion of Conductor initialization and the beginning of its lifecycle
-    /// as the driver of its various interface handling loops
-    pub fn into_handle(self) -> ConductorHandle {
-        Arc::new(ConductorHandleImpl::from(RwLock::new(self)))
-    }
-
     /// Spawn all admin interface tasks, register them with the TaskManager,
     /// and modify the conductor accordingly, based on the config passed in
-    pub(crate) async fn add_admin_interfaces_via_handle(
+    pub(super) async fn add_admin_interfaces_via_handle(
         &mut self,
         handle: ConductorHandle,
         configs: Vec<AdminInterfaceConfig>,
@@ -345,6 +272,70 @@ where
             }
         }
         Ok(())
+    }
+}
+
+//-----------------------------------------------------------------------------
+/// Private methods
+//-----------------------------------------------------------------------------
+impl<DS> Conductor<DS>
+where
+    DS: DnaStore + 'static,
+{
+    async fn new(env: Environment, dna_store: DS) -> ConductorResult<Self> {
+        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
+        let (task_tx, task_manager_run_handle) = spawn_task_manager();
+        let task_manager_run_handle = Some(task_manager_run_handle);
+        let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
+        Ok(Self {
+            env,
+            state_db: Kv::new(db)?,
+            cells: HashMap::new(),
+            _handle_map: HashMap::new(),
+            _agent_keys: HashMap::new(),
+            shutting_down: false,
+            managed_task_add_sender: task_tx,
+            managed_task_stop_broadcaster: stop_tx,
+            task_manager_run_handle,
+            admin_websocket_ports: Vec::new(),
+            dna_store,
+        })
+    }
+
+    // FIXME: remove allow once we actually use this function
+    #[allow(dead_code)]
+    async fn get_state(&self) -> ConductorResult<ConductorState> {
+        let guard = self.env.guard().await;
+        let reader = guard.reader()?;
+        Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
+    }
+
+    // FIXME: remove allow once we actually use this function
+    #[allow(dead_code)]
+    async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+    {
+        self.check_running()?;
+        let guard = self.env.guard().await;
+        let mut writer = guard.writer()?;
+        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
+        let new_state = f(state)?;
+        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
+        writer.commit()?;
+        Ok(new_state)
+    }
+
+    /// Sends a JoinHandle to the TaskManager task to be managed
+    async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
+        self.managed_task_add_sender
+            .send(handle)
+            .await
+            .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
+    }
+
+    fn add_admin_port(&mut self, port: u16) {
+        self.admin_websocket_ports.push(port);
     }
 }
 
