@@ -114,7 +114,8 @@ async fn async_main() {
 
     // Initialize the Conductor
     let conductor: ConductorHandle = Conductor::builder()
-        .with_config(config)
+        .config(config)
+        .with_admin()
         .await
         .expect("Could not initialize Conductor from configuration");
 

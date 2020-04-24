@@ -332,8 +332,8 @@ mod test {
 
     #[tokio::test]
     async fn install_list_dna() -> Result<()> {
-        let conductor = Conductor::builder().test().await?;
-        let admin_api = RealAdminInterfaceApi::new(conductor);
+        let handle = Conductor::builder().test().await?.into_handle();
+        let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
         let (dna_path, _tempdir) = fake_dna_file(dna.clone()).unwrap();

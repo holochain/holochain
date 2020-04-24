@@ -4,10 +4,11 @@ use std::collections::HashMap;
 use sx_types::{dna::Dna, prelude::*};
 
 /// Placeholder for real dna store
+#[derive(Default)]
 pub struct RealDnaStore(HashMap<DnaHash, Dna>);
 
 #[automock]
-pub trait DnaStore: Send + Sync {
+pub trait DnaStore: Default + Send + Sync {
     fn add(&mut self, dna: Dna) -> DnaStoreResult<()>;
     // TODO: FAST: Make this return an iterator to avoid allocating
     fn list(&self) -> Vec<DnaHash>;

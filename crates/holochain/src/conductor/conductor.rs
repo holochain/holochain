@@ -104,7 +104,7 @@ where
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
 
-    /// broadcast channel sender, used to end all managed tasks
+    /// By sending on this channel,
     managed_task_stop_broadcaster: StopBroadcaster,
 
     /// The main task join handle to await on.
@@ -345,25 +345,26 @@ mod builder {
 
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-
     use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
 
     #[derive(Default)]
     pub struct ConductorBuilder<DS = RealDnaStore> {
+        config: ConductorConfig,
         dna_store: DS,
     }
 
-    impl ConductorBuilder {
+    impl ConductorBuilder<RealDnaStore> {
         pub fn new() -> Self {
-            ConductorBuilder {
-                dna_store: RealDnaStore::new(),
-            }
+            Self::default()
         }
     }
 
     impl ConductorBuilder<MockDnaStore> {
         pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
-            ConductorBuilder { dna_store }
+            ConductorBuilder {
+                dna_store,
+                ..Default::default()
+            }
         }
     }
 
@@ -371,39 +372,42 @@ mod builder {
     where
         DS: DnaStore + 'static,
     {
-        pub async fn with_config(
-            self,
-            config: ConductorConfig,
-        ) -> ConductorResult<ConductorHandle> {
-            let env_path = config.environment_path;
+        /// Set the ConductorConfig used to build this Conductor
+        pub fn config(mut self, config: ConductorConfig) -> Self {
+            self.config = config;
+            self
+        }
+
+        /// Initialize a "production" Conductor
+        pub async fn build(self) -> ConductorResult<Conductor<DS>> {
+            let env_path = self.config.environment_path;
             let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
             let conductor = Conductor::new(environment, self.dna_store).await?;
-            let conductor_handle: ConductorHandle = conductor.into_handle();
+            Ok(conductor)
+        }
 
-            if let Some(configs) = config.admin_interfaces {
+        /// Create a ConductorHandle to a Conductor with admin interfaces started.
+        ///
+        /// The reason that a ConductorHandle is returned instead of a Conductor is because
+        /// the admin interfaces need a handle to the conductor themselves, so we must
+        /// move the Conductor into a handle to proceed
+        pub async fn with_admin(self) -> ConductorResult<ConductorHandle> {
+            let conductor_config = self.config.clone();
+            let conductor_handle: ConductorHandle = self.build().await?.into_handle();
+            if let Some(configs) = conductor_config.admin_interfaces {
                 conductor_handle
                     .add_admin_interfaces_via_handle(conductor_handle.clone(), configs)
                     .await?;
             }
-            // let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-
-            // TODO: initialzie admin interfafaces
-            // setup_admin_interfaces_from_config(
-            //     &mut conductor_lock,
-            //     admin_api,
-            //     stop_tx,
-            //     config.admin_interfaces.unwrap_or_default(),
-            // )
-            // .await?;
 
             Ok(conductor_handle)
         }
 
-        pub async fn test(self) -> ConductorResult<ConductorHandle> {
+        /// Build a Conductor with a test environment
+        pub async fn test(self) -> ConductorResult<Conductor<DS>> {
             let environment = test_conductor_env();
             let conductor = Conductor::new(environment, self.dna_store).await?;
-            let conductor_handle: ConductorHandle = conductor.into_handle();
-            Ok(conductor_handle)
+            Ok(conductor)
         }
     }
 }
