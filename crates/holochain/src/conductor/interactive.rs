@@ -42,6 +42,7 @@ pub fn ask_yn(prompt: String, default_yes: Option<bool>) -> std::io::Result<bool
     }
 }
 
+/// Prompts user to enter an LMDB environment path
 pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<bool> {
     let prompt = format!(
         "There is no database environment set at the path specified ({})\nWould you like to create one now?", path.display()
