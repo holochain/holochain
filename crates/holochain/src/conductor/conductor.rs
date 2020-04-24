@@ -33,9 +33,6 @@ use crate::conductor::{
     error::ConductorResult,
     handle::ConductorHandle,
 };
-use std::collections::HashMap;
-use std::error::Error;
-use std::sync::Arc;
 use holochain_state::{
     db,
     env::{Environment, ReadManager},
@@ -48,6 +45,9 @@ use holochain_types::{
     prelude::*,
     shims::Keystore,
 };
+use std::collections::HashMap;
+use std::error::Error;
+use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 

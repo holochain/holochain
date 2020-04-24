@@ -48,7 +48,8 @@ use holochain_types::{
     dna::Dna,
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*, prelude::Todo,
+    prelude::Todo,
+    shims::*,
 };
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::*;

@@ -7,12 +7,14 @@ use super::{
     Cell, Conductor,
 };
 use derive_more::From;
-use std::sync::Arc;
 use holochain_types::{
+    autonomic::AutonomicCue,
+    cell::CellId,
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*, autonomic::AutonomicCue, cell::CellId,
+    prelude::*,
 };
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;

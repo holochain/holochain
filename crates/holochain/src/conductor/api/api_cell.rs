@@ -2,8 +2,11 @@ use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::ConductorHandle;
 use async_trait::async_trait;
 use holochain_types::{
+    autonomic::AutonomicCue,
     cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse}, autonomic::AutonomicCue, signature::Signature, prelude::Todo,
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    prelude::Todo,
+    signature::Signature,
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -53,15 +56,14 @@ impl CellConductorApiT for CellConductorApi {
         unimplemented!()
     }
 
-    async fn network_request(
-        &self,
-        _message: Todo,
-    ) -> ConductorApiResult<Todo> {
+    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo> {
         unimplemented!()
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
-        self.conductor_handle.autonomic_cue(cue, &self.cell_id).await
+        self.conductor_handle
+            .autonomic_cue(cue, &self.cell_id)
+            .await
     }
 
     async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
@@ -96,10 +98,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
     /// Send a message to the network engine, and await the response
-    async fn network_request(
-        &self,
-        _message: Todo,
-    ) -> ConductorApiResult<Todo>;
+    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo>;
 
     /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
     /// This is basically a heuristic designed to help things run more smoothly.

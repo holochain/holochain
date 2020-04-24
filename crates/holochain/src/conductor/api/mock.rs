@@ -8,7 +8,8 @@ use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    signature::Signature, prelude::Todo,
+    prelude::Todo,
+    signature::Signature,
 };
 use mockall::mock;
 
@@ -67,10 +68,7 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_network_send(message)
     }
 
-    async fn network_request(
-        &self,
-        _message: Todo,
-    ) -> ConductorApiResult<Todo> {
+    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo> {
         self.sync_network_request(_message)
     }
 
