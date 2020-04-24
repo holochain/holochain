@@ -1,10 +1,10 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_zome_types::SysTimeInput;
+use holochain_zome_types::SysTimeOutput;
 use std::sync::Arc;
-use sx_zome_types::SysTimeInput;
-use sx_zome_types::SysTimeOutput;
 
-pub fn sys_time(
+pub async fn sys_time(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: SysTimeInput,
@@ -18,10 +18,10 @@ pub fn sys_time(
 
 #[cfg(test)]
 pub mod wasm_test {
-    use sx_zome_types::{SysTimeInput, SysTimeOutput};
+    use holochain_zome_types::{SysTimeInput, SysTimeOutput};
 
-    #[test]
-    fn invoke_import_sys_time_test() {
+    #[tokio::test(threaded_scheduler)]
+    async fn invoke_import_sys_time_test() {
         let _: SysTimeOutput =
             crate::call_test_ribosome!("imports", "sys_time", SysTimeInput::new(()));
     }

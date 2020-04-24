@@ -18,7 +18,7 @@ async fn integration_test() {
         std::process::exit(1);
     }));
 
-    sx_types::observability::test_run().unwrap();
+    holochain_types::observability::test_run().unwrap();
 
     let server = websocket_bind(
         url2!("ws://127.0.0.1:0"),
@@ -77,40 +77,38 @@ async fn channels_properly_close() {
 fn spawn_listener_loop(mut server: WebsocketListener) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn(async move {
         while let Some(maybe_con) = server.next().await {
-            tokio::task::spawn(async move {
-                let (_send, mut recv) = maybe_con.await.unwrap();
-                tracing::info!(
-                    test = "incoming connection",
-                    remote_addr = %recv.remote_addr(),
-                );
-                while let Some(msg) = recv.next().await {
-                    match msg {
-                        WebsocketMessage::Close(close) => {
-                            tracing::error!(error = ?close);
-                            break;
-                        }
-                        WebsocketMessage::Signal(data) => {
-                            let msg: TestMessage = data.try_into().unwrap();
-                            tracing::info!(
-                                test = "incoming signal",
-                                data = %msg.0,
-                            );
+            let (_send, mut recv) = maybe_con.unwrap();
+            tracing::info!(
+                test = "incoming connection",
+                remote_addr = %recv.remote_addr(),
+            );
+            while let Some(msg) = recv.next().await {
+                match msg {
+                    WebsocketMessage::Close(close) => {
+                        tracing::error!(error = ?close);
+                        break;
+                    }
+                    WebsocketMessage::Signal(data) => {
+                        let msg: TestMessage = data.try_into().unwrap();
+                        tracing::info!(
+                            test = "incoming signal",
+                            data = %msg.0,
+                        );
 
-                            assert_eq!("test-signal", msg.0,);
-                        }
-                        WebsocketMessage::Request(data, respond) => {
-                            let msg: TestMessage = data.try_into().unwrap();
-                            tracing::info!(
-                                test = "incoming message",
-                                data = %msg.0,
-                            );
-                            let msg = TestMessage(format!("echo: {}", msg.0));
-                            respond(msg.try_into().unwrap()).await.unwrap();
-                        }
+                        assert_eq!("test-signal", msg.0,);
+                    }
+                    WebsocketMessage::Request(data, respond) => {
+                        let msg: TestMessage = data.try_into().unwrap();
+                        tracing::info!(
+                            test = "incoming message",
+                            data = %msg.0,
+                        );
+                        let msg = TestMessage(format!("echo: {}", msg.0));
+                        respond(msg.try_into().unwrap()).await.unwrap();
                     }
                 }
-                tracing::info!(test = "exit srv con loop");
-            });
+            }
+            tracing::info!(test = "exit srv con loop");
         }
         tracing::info!(test = "exit srv listen loop");
     })

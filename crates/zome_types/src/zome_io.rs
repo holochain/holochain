@@ -5,7 +5,7 @@ use holochain_serialized_bytes::prelude::*;
 macro_rules! wasm_io_types {
     ( $( pub struct $t:ident($t_inner:ty); )* ) => {
         $(
-            #[derive(Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
+            #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
             pub struct $t($t_inner);
 
             impl $t {

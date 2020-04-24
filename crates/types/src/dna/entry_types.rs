@@ -1,6 +1,5 @@
 //! File holding all the structs for handling entry types defined by DNA.
 
-use crate::{dna::zome::ZomeEntryTypes, entry::entry_type::EntryType};
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::serde::ser::SerializeMap;
 use holochain_serialized_bytes::serde::{de::Deserializer, ser::Serializer};
