@@ -1,3 +1,4 @@
+use super::dna_store::error::DnaStoreError;
 use crate::conductor::cell::error::CellError;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::{CellHandle, CellId};
@@ -52,6 +53,9 @@ pub enum ConductorError {
 
     #[error("Error while trying to send a task to the task manager: {0}")]
     SubmitTaskError(String),
+
+    #[error("DNA store error: {0:?}")]
+    DnaStoreError(#[from] DnaStoreError),
 }
 
 // TODO: can this be removed?

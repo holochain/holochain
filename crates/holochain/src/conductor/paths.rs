@@ -3,13 +3,12 @@
 use derive_more::{AsRef, Display, From, FromStr, Into};
 use std::path::PathBuf;
 
-pub const QUALIFIER: &str = "org";
-pub const ORGANIZATION: &str = "holochain";
-pub const APPLICATION: &str = "holochain";
-pub const KEYS_DIRECTORY: &str = "keys";
-pub const DATABASES_DIRECTORY: &str = "databases";
-pub const DNA_EXTENSION: &str = "dna.json";
-pub const CONFIG_FILENAME: &str = "conductor-config.toml";
+const QUALIFIER: &str = "org";
+const ORGANIZATION: &str = "holochain";
+const APPLICATION: &str = "holochain";
+const KEYS_DIRECTORY: &str = "keys";
+const DATABASES_DIRECTORY: &str = "databases";
+const CONFIG_FILENAME: &str = "conductor-config.toml";
 
 /// Returns the project root builder for holochain directories.
 fn project_root() -> Option<directories::ProjectDirs> {
@@ -42,6 +41,7 @@ pub fn keys_directory() -> PathBuf {
     config_root().join(KEYS_DIRECTORY)
 }
 
+/// Newtype for the LMDB environment path. Has a Default.
 #[derive(
     Clone,
     From,
@@ -62,6 +62,7 @@ impl Default for EnvironmentRootPath {
     }
 }
 
+/// Newtype for the Conductor Config file path. Has a Default.
 #[derive(
     Clone,
     From,
