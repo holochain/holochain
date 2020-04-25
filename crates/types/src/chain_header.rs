@@ -114,30 +114,6 @@ pub enum ChainHeader {
 
 impl ChainHeader {
 
-    pub fn new(author: AgentHash,  prev_header: Option<HeaderHash>, entry: Option<Entry>,
-    ) -> Result<Self,> {
-        let timestamp: Iso8601 = chrono::Utc::now().timestamp().into();
-        match entry {
-            Entry::Dna(dna) => header::Dna{author, timestamp, hash: dna.hash() },
-//            Entry::AgentKey(agent_hash) => header::
-            App(entry) => header::
-        }
-    }
-
-    fn header_for_entry(
-        entry: &Entry,
-        agent_hash: &AgentHash,
-        prev_head: Option<HeaderAddress>,
-    ) -> Result<ChainHeader, SerializedBytesError> {
-        let _provenances = &[Provenance::new(agent_hash.clone(), Signature::fake())];
-        let _timestamp: Iso8601 = chrono::Utc::now().timestamp().into();w
-        Ok(ChainHeader {
-            entry_address: EntryAddress::try_from(entry)?,
-            prev_header_address: prev_head,
-        })
-    }
-
-
     /// Return the previous ChainHeader's Address in the chain
     pub fn prev_header_address(&self) -> Option<HeaderAddress> {
         self.prev_header().map(|h| h.to_owned().into())

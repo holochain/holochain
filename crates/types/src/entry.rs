@@ -9,6 +9,7 @@ use crate::dna::Dna;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
+// FIXME: I think this comment is wrong? --zippy
 /// Structure holding actual data in a source chain "Item"
 /// data is stored as a JsonString
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

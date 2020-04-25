@@ -24,26 +24,32 @@ pub async fn genesis(
         return Err(WorkflowError::AgentInvalid(agent_hash.clone()));
     }
 
-    let header = ChainHeader::Dna(
+    // create a DNA chain element and add it directly to the store
+    let dna_header = ChainHeader::Dna(
         header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_hash.clone(),
             dna.hash(),
         }
-    )
-    let element = ChainElement(signature, header, Some<Box<dna>>);
+    );
+    //FIXME: real signature.
+    let element = ChainElement(Signature::fake(), dna_header, Some(Entry::Dna(Box::new(dna)));
     workspace
         .source_chain
         .put_element(element)?;
 
-    let header = ChainHeader::(
+    // create a agent chain element and add it directly to the store
+    let agent_header = ChainHeader::(
         header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_hash.clone(),
-            entryagent_hash,
+            prev_headr: dna_header.hash(),
+            entry_type: header::EntryType::AgentKey,
+            entry_address: agent_hash.into(),
         }
-    )
-        let element = ChainElement(signature, header, Some<Box<dna>>);
+    );
+    //FIXME: real signature.
+    let element = ChainElement(Signature::fake(), agent_header, Some(Entry::AgentKey(agent_hash));
     workspace
         .source_chain
         .put_element(element)?;

@@ -9,7 +9,7 @@ use holochain_state::{
     test_utils::test_cell_env,
 };
 use holochain_types::entry::EntryAddress;
-use holochain_types::{entry::Entry, observability, prelude::*, test_utils::fake_agent_hash};
+use holochain_types::{entry::Entry, observability, prelude::*, test_utils::{fake_agent_hash, fake_header_hash}};
 use maplit::hashset;
 use mockall::*;
 use std::collections::HashSet;
@@ -26,16 +26,44 @@ struct Chains<'env> {
     mock_cache_meta: MockChainMetaBuf,
 }
 
+
 fn setup_env<'env>(
     reader: &'env Reader<'env>,
     dbs: &'env DbManager,
 ) -> DatabaseResult<Chains<'env>> {
+
+    let previous_header = fake_header_hash("previous");
+
+    let jimbo_id = fake_agent_hash("Jimbo");
+    let jimbo = Entry::AgentKey(jimbo_id.clone());
+    let jessy_id = fake_agent_hash("Jessy");
+    let jessy = Entry::AgentKey(jessy_id.clone());
+
+    let jimbo_header = ChainHeader::Dna(
+        header::EntryCreate {
+            timestamp: chrono::Utc::now().timestamp().into(),
+            author: jimbo_id.clone(),
+            prev_headr: previous_header,
+            entry_type: header::EntryType::AgentKey,
+            entry_address: jimbo.entry_address(),
+        }
+    );
+    let jimbo = ChainElement(Signature::fake(), jimbo_header, Some(jimbo));
+
+    let jessy_header = ChainHeader::(
+        header::EntryCreate {
+            timestamp: chrono::Utc::now().timestamp().into(),
+            author: jessy_id.clone(),
+            prev_headr: previous_header,
+            entry_type: header::EntryType::AgentKey,
+            entry_address: jessy.entry_address(),
+        }
+    );
+    let jessy = ChainElement(Signature::fake(), jessy_header, Some(jessy));
+
+
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;
-    let jimbo_id = fake_agent_hash("jimbos_id");
-    let jimbo = Entry::AgentKey(fake_agent_hash("Jimbo"));
-    let jessy_id = fake_agent_hash("jessy_id");
-    let jessy = Entry::AgentKey(fake_agent_hash("Jessy"));
     let mock_primary_meta = MockChainMetaBuf::new();
     let mock_cache_meta = MockChainMetaBuf::new();
     Ok(Chains {
@@ -66,8 +94,8 @@ async fn live_local_return() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
-    let hash: EntryHash = (&jimbo).try_into()?;
+    source_chain.put_element(jimbo)?;
+    let hash: EntryHash = (&jimbo.entry().unwrap()).try_into()?;
 
     // set it's metadata to LIVE
     mock_primary_meta
@@ -107,8 +135,8 @@ async fn dead_local_none() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
-    let hash: EntryHash = jimbo.try_into()?;
+    source_chain.put_element(jimbo.clone())?;
+    let hash: EntryHash = jimbo.entry().unwrap().try_into()?;
 
     // set it's metadata to Dead
     mock_primary_meta
@@ -148,8 +176,8 @@ async fn notfound_goto_cache_live() -> DatabaseResult<()> {
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    cache.put_entry(jimbo.clone(), &jimbo_id)?;
-    let hash: EntryHash = (&jimbo).try_into()?;
+    cache.put_element(jimbo)?;
+    let hash: EntryHash = (&jimbo.entry().unwrap()).try_into()?;
 
     // set it's metadata to Live
     mock_cache_meta
@@ -224,10 +252,10 @@ async fn links_local_return() -> DatabaseResult<()> {
         mut mock_primary_meta,
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
-    source_chain.put_entry(jessy.clone(), &jessy_id)?;
-    let base: EntryHash = jimbo.try_into()?;
-    let target: EntryHash = jessy.try_into()?;
+    source_chain.put_element(jimbo)?;
+    source_chain.put_element(jessy.clone())?;
+    let base: EntryHash = jimbo.entry().unwrap().try_into()?;
+    let target: EntryHash = jessy.entry().unwrap().try_into()?;
     let result = target.clone();
 
     // Return a link between entries
@@ -272,10 +300,10 @@ async fn links_cache_return() -> DatabaseResult<()> {
         mut mock_primary_meta,
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
-    source_chain.put_entry(jessy.clone(), &jessy_id)?;
-    let base: EntryHash = jimbo.try_into()?;
-    let target: EntryHash = jessy.try_into()?;
+    source_chain.put_element(jimbo)?;
+    source_chain.put_element(jessy.clone())?;
+    let base: EntryHash = jimbo.entry().unwrap().try_into()?;
+    let target: EntryHash = jessy.entry().unwrap().try_into()?;
     let result = target.clone();
 
     // Return empty links

@@ -14,7 +14,8 @@ use holochain_state::{
 use holochain_types::chain_header::HeaderAddress;
 use holochain_types::entry::EntryAddress;
 use holochain_types::{
-    chain_header::{ChainHeader, Element},
+    chain_header::{ChainHeader, ChainElement},
+    header,
     entry::Entry,
     prelude::*,
     signature::{Provenance, Signature},
@@ -49,7 +50,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.chain_head()
     }
 
-    pub fn get_entry(&self, k: EntryAddress) -> DatabaseResult<Option<Entry>> {
+    /*pub fn get_entry(&self, k: EntryAddress) -> DatabaseResult<Option<Entry>> {
+        self.cas.get_entry(k)
+    }*/
+
+    pub fn get_element(&self, k: HeaderAddress) -> DatabaseResult<Option<ChainElement>> {
         self.cas.get_entry(k)
     }
 
@@ -93,19 +98,29 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     /// dump the entire source chain as a pretty-printed json string
     pub fn dump_as_json(&self) -> Result<String, SourceChainError> {
+
         #[derive(Serialize, Deserialize)]
-        struct JsonChainDump {
+        struct JsonChainElement {
+            pub signature: Signature,
             pub header: ChainHeader,
             pub entry: Option<Entry>,
+        }
+        #[derive(Serialize, Deserialize)]
+        struct JsonChainDump {
+            element: JsonChainElement,
         }
 
         Ok(serde_json::to_string_pretty(
             &self
                 .iter_back()
                 .map(|h| {
+                    let (signature, header, entry) = self.get_element(h.header_address())?;
                     Ok(JsonChainDump {
-                        entry: self.get_entry(h.entry_address())?,
-                        header: h,
+                        element: JsonChainElement {
+                            signature,
+                            header,
+                            entry,
+                        }
                     })
                 })
                 .collect::<Vec<_>>()?,
@@ -171,29 +186,68 @@ pub mod tests {
         test_utils::{fake_agent_hash, fake_dna},
     };
 
-    #[tokio::test]
-    async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
-
+    fn fixtures() -> (AgentHash, ChainElement,ChainElement) {
         let dna = fake_dna("a");
         let agent_hash = fake_agent_hash("a");
 
         let dna_entry = Entry::Dna(Box::new(dna));
         let agent_entry = Entry::AgentKey(agent_hash.clone());
 
+        let dna_header = ChainHeader::Dna(
+            header::Dna {
+                timestamp: chrono::Utc::now().timestamp().into(),
+                author: agent_hash.clone(),
+                dna.hash(),
+            }
+        );
+        let dna_element = ChainElement(Signature::fake(), dna_header, Some(dna_entry));
+
+        let agent_header = ChainHeader::(
+            header::EntryCreate {
+                timestamp: chrono::Utc::now().timestamp().into(),
+                author: agent_hash.clone(),
+                prev_headr: dna_header.hash(),
+                entry_type: header::EntryType::AgentKey,
+                entry_address: agent_hash.into(),
+            }
+        );
+        let agent_element = ChainElement(Signature::fake(), agent_header, Some(agent_entry));
+        (agent_hash, dna_element, agent_element)
+    }
+
+    #[tokio::test]
+    async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let dbs = arc.dbs().await?;
+
+        let (agent_hash, dna_element, agent_element) = fixtures();
+
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put_entry(dna_entry.clone(), &agent_hash)?;
-            store.put_entry(agent_entry.clone(), &agent_hash)?;
+            store.put_element(dna_element.clone())?;
+            store.put_element(agent_element.clone())?;
             env.with_commit(|writer| store.flush_to_txn(writer))
         })?;
 
         env.with_reader(|reader| {
             let store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_some());
+
+            // get the full element
+            let dna_element_fetched = store
+                .get_element((&dna_header).hash().into())
+                .expect("error retrieving")
+                .expect("entry not found");
+            let agent_element_fetched = store
+                .get_element((&agent_header).hash().into())
+                .expect("error retrieving")
+                .expect("entry not found");
+            assert_eq!(dna_element, dna_element_fetched);
+            assert_eq!(agent_element, agent_element_fetched);
+
+            /* get just the entries
             let dna_entry_fetched = store
                 .get_entry((&dna_entry).try_into()?)
                 .expect("error retrieving")
@@ -203,14 +257,16 @@ pub mod tests {
                 .expect("error retrieving")
                 .expect("entry not found");
             assert_eq!(dna_entry, dna_entry_fetched);
-            assert_eq!(agent_entry, agent_entry_fetched);
+            assert_eq!(agent_entry, agent_entry_fetched);*/
+
+            // check that you can iterate on the chain
             assert_eq!(
                 store
                     .iter_back()
-                    .map(|h| Ok(store.get_entry(h.entry_address())?))
+                    .map(|h| Ok(store.get_element(h.header_address())?))
                     .collect::<Vec<_>>()
                     .unwrap(),
-                vec![Some(agent_entry), Some(dna_entry)]
+                vec![Some(agent_element), Some(dna_element)]
             );
             Ok(())
         })
@@ -222,16 +278,12 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
-        let dna = fake_dna("a");
-        let agent_hash = fake_agent_hash("a");
-
-        let dna_entry = Entry::Dna(Box::new(dna));
-        let agent_entry = Entry::AgentKey(agent_hash.clone());
+        let (agent_hash, dna_element, agent_element) = fixtures();
 
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put_entry(dna_entry.clone(), &agent_hash)?;
-            store.put_entry(agent_entry.clone(), &agent_hash)?;
+            store.put_element(dna_element.clone())?;
+            store.put_element(agent_element.clone())?;
             env.with_commit(|writer| store.flush_to_txn(writer))
         })?;
 
