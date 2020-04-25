@@ -1,7 +1,6 @@
-#![deny(missing_docs)]
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::conductor::{dna_store::error::DnaStoreError, error::ConductorError};
+use crate::conductor::error::ConductorError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use thiserror::Error;
@@ -12,6 +11,15 @@ pub enum ConductorApiError {
     /// Cell was referenced, but is missing from the conductor.
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
+
+    /// Cell was referenced, but is missing from the conductor.
+    #[error("A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {invocation_cell_id:?}")]
+    ZomeInvocationCellMismatch {
+        /// The CellId which is referenced by the CellConductorApi
+        api_cell_id: CellId,
+        /// The CellId which is referenced by the ZomeInvocation
+        invocation_cell_id: CellId,
+    },
 
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
@@ -29,21 +37,19 @@ pub enum ConductorApiError {
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
 
-    /// Database Error
-    #[error("Database error: {0:?}")]
-    Db(#[from] DnaStoreError),
-
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]
     DnaReadError(String),
 }
 
 /// All the serialization errors that can occur
-#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum SerializationError {
+    /// Denotes inability to move into or out of SerializedBytes
     #[error(transparent)]
     Bytes(#[from] holochain_serialized_bytes::SerializedBytesError),
+
+    /// Denotes inability to parse a UUID
     #[error(transparent)]
     Uuid(#[from] uuid::parser::ParseError),
 }
@@ -78,8 +84,11 @@ impl ExternalApiWireError {
 }
 
 impl From<ConductorApiError> for ExternalApiWireError {
-    fn from(e: ConductorApiError) -> Self {
-        ExternalApiWireError::internal(e)
+    fn from(err: ConductorApiError) -> Self {
+        match err {
+            ConductorApiError::DnaReadError(e) => ExternalApiWireError::DnaReadError(e),
+            e => ExternalApiWireError::internal(e),
+        }
     }
 }
 

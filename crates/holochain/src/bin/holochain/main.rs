@@ -1,6 +1,6 @@
 use holochain_2020::conductor::{
-    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath,
-    ConductorHandle, RealConductor,
+    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
+    ConductorHandle,
 };
 use holochain_types::observability::{self, Output};
 use std::error::Error;
@@ -113,17 +113,17 @@ async fn async_main() {
     }
 
     // Initialize the Conductor
-    let conductor: ConductorHandle = RealConductor::builder()
-        .with_config(config)
+    let conductor: ConductorHandle = Conductor::builder()
+        .config(config)
+        .with_admin()
         .await
         .expect("Could not initialize Conductor from configuration");
 
     info!("Conductor successfully initialized.");
     // kick off actual conductor task here
     let waiting_handle = conductor
-        .write()
-        .await
         .get_wait_handle()
+        .await
         .expect("No wait handle in conductor");
 
     waiting_handle
