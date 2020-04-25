@@ -78,11 +78,11 @@ pub struct SignedHeader {
 impl ChainElement {
     /// Element constructor.
     pub fn new(signature: Signature, header: ChainHeader, maybe_entry: Option<Entry>) -> Self {
-        Self(signature, header, entry)
+        Self(signature, header, maybe_entry)
     }
 
     /// Access the signature portion of this triple.
-    pub fn header(&self) -> &Signature {
+    pub fn signature(&self) -> &Signature {
         &self.0
     }
 
@@ -92,7 +92,7 @@ impl ChainElement {
     }
 
     /// Access the Entry portion of this triple.
-    pub fn entry(&self) -> Option<&Entry> {
+    pub fn entry(&self) -> &Option<Entry> {
         &self.2
     }
 }
