@@ -12,8 +12,7 @@ edition = "2018"
 
 [dependencies]
 rand = "0.7"
-rstest = "0.6.3"
-hamcrest2 = "0.3.0"
+paste = "0.1.10"
 
 [features]
 fixt = []

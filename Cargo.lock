@@ -634,9 +634,8 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 name = "fixt"
 version = "0.0.1"
 dependencies = [
- "hamcrest2",
+ "paste",
  "rand 0.7.3",
- "rstest",
 ]
 
 [[package]]
@@ -833,16 +832,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
-]
-
-[[package]]
-name = "hamcrest2"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49f837c62de05dc9cc71ff6486cd85de8856a330395ae338a04bfcefe5e91075"
-dependencies = [
- "num",
- "regex",
 ]
 
 [[package]]
@@ -1825,6 +1814,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab4fb1930692d1b6a9cfabdde3d06ea0a7d186518e2f4d67660d8970e2fa647a"
+dependencies = [
+ "paste-impl",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "paste-impl"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a62486e111e571b1e93b710b61e8f493c0013be39629b714cb166bdb06aa5a8a"
+dependencies = [
+ "proc-macro-hack",
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.17",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2339,19 +2350,6 @@ dependencies = [
  "byteorder",
  "rmp",
  "serde",
-]
-
-[[package]]
-name = "rstest"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea1555a95dd3db6095e7695ff1cb173d9d57731209684ef544ead2ff0f6d7077"
-dependencies = [
- "cfg-if",
- "proc-macro2 1.0.10",
- "quote 1.0.3",
- "rustc_version",
- "syn 1.0.17",
 ]
 
 [[package]]
