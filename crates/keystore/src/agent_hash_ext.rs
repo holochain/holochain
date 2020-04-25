@@ -21,7 +21,7 @@ pub trait AgentHashExt {
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>;
 
-    /// verify a signature for given raw bytes with this agent publick_key is valid
+    /// verify a signature for given raw bytes with this agent public_key is valid
     fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreFuture<bool>;
 }
 
