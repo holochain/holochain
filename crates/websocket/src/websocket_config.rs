@@ -23,6 +23,9 @@ pub struct WebsocketConfig {
 
     /// Maximum websocket frame size. [default = 16M]
     pub max_frame_size: usize,
+
+    /// Maximum number of pending new incoming connections. [default = 255]
+    pub max_pending_connections: usize,
 }
 
 impl Default for WebsocketConfig {
@@ -34,6 +37,7 @@ impl Default for WebsocketConfig {
             max_send_queue: 10,
             max_message_size: 64 << 20,
             max_frame_size: 16 << 20,
+            max_pending_connections: 255,
         }
     }
 }

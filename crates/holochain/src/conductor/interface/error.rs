@@ -39,7 +39,7 @@ impl From<futures::channel::mpsc::SendError> for InterfaceError {
 /// Interface Result Type
 pub type InterfaceResult<T> = Result<T, InterfaceError>;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminInterfaceErrorKind {
     Serialization,

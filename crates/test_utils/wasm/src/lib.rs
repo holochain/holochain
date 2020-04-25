@@ -1,4 +1,4 @@
-use sx_types::dna::wasm::DnaWasm;
+use holochain_types::dna::wasm::DnaWasm;
 
 pub enum TestWasm {
     Debug,

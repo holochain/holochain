@@ -1,6 +1,6 @@
 use super::Workspace;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
-use sx_state::{db::DbManager, prelude::*};
+use holochain_state::{db::DbManager, prelude::*};
 
 pub struct InvokeZomeWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,

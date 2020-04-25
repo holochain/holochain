@@ -1,7 +1,7 @@
 //! Placeholder for the ZomeApi interface. May be deleted.
 
 use super::error::ZomeApiResult;
-use sx_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
+use holochain_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
 
 /// The ZomeApi defines the functions which are imported into the Wasm runtime,
 /// i.e. the core API which is made accessible to hApps for interacting with Holochain.
