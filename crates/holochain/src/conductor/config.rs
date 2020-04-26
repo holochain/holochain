@@ -25,7 +25,7 @@ use std::path::Path;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Deserialize, Serialize, Default, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
     /// The path to the LMDB environment for this conductor.
     /// If omitted, chooses a default path.

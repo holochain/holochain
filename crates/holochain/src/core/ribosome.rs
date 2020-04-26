@@ -48,15 +48,13 @@ use holochain_types::{
     dna::Dna,
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
+    prelude::Todo,
     shims::*,
 };
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::*;
 use mockall::automock;
 use std::sync::Arc;
-
-/// Represents a type which has not been decided upon yet
-pub enum Todo {}
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
