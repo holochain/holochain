@@ -76,7 +76,6 @@ mod tests {
     basic_test!(
         char,
         EMPTY_CHAR,
-        PREDICTABLE_CHARS.chars().count() * 2,
         vec![
             '💯', '❤', '💩', '.', '!', 'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a', 'z', '!', '.', '💩',
             '❤', '💯', '💯', '❤', '💩', '.', '!', 'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a', 'z', '!',
@@ -87,7 +86,6 @@ mod tests {
     basic_test!(
         String,
         String::from(EMPTY_STR),
-        PREDICTABLE_STRS.len() * 2,
         vec![
             "💯", "❤", "💩", ".", "!", "foo", "bar", "baz", "bing", "!", "💯", "❤", "💩", ".", "!",
             "foo", "bar", "baz", "bing", "!"

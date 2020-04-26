@@ -17,5 +17,5 @@ pub mod tests {
 
     type Unit = ();
 
-    basic_test!(Unit, (), 5, vec![(), (), (), (), ()], false);
+    basic_test!(Unit, (), vec![(), (), (), (), ()], false);
 }
