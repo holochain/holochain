@@ -39,11 +39,7 @@ pub async fn genesis(
     });
     //FIXME: real signature.
     // FIXME we store the dna to the private store on genesis
-    let element = ChainElement::new(
-        Signature::fake(),
-        dna_header.clone(),
-        None, // Some(Entry::Dna(Box::new(dna))),
-    );
+    let element = ChainElement::new(Signature::fake(), dna_header.clone(), None);
     workspace.source_chain.put_element(element)?;
 
     // create a agent chain element and add it directly to the store
@@ -128,17 +124,6 @@ mod tests {
                 .collect()
                 .unwrap();
             assert_eq!(hashes, vec![Some(EntryAddress::Agent(agent_hash)), None,]);
-            /*            assert_eq!(
-                hashes,
-                vec![
-                    holo_hash::EntryHash::try_from(Entry::AgentKey(agent_hash))
-                        .unwrap()
-                        .into(),
-                    holo_hash::EntryHash::try_from(Entry::Dna(Box::new(dna)))
-                        .unwrap()
-                        .into(),
-                ]
-            );*/
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())

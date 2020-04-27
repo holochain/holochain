@@ -196,7 +196,6 @@ pub mod tests {
         let dna = fake_dna("a");
         let agent_hash = fake_agent_hash("a");
 
-        //let dna_entry = Entry::Dna(Box::new(dna));
         let agent_entry = Entry::AgentKey(agent_hash.clone());
 
         let dna_header = ChainHeader::Dna(header::Dna {
@@ -204,11 +203,7 @@ pub mod tests {
             author: agent_hash.clone(),
             hash: dna.dna_hash(),
         });
-        let dna_element = ChainElement::new(
-            Signature::fake(),
-            dna_header.clone(),
-            None, //Some(Entry::Dna(Box::new(dna))),
-        );
+        let dna_element = ChainElement::new(Signature::fake(), dna_header.clone(), None);
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_hash.clone(),
@@ -302,7 +297,6 @@ pub mod tests {
                 .iter()
                 .map(|item| {
                     let item = item.as_object().unwrap();
-                    dbg!(item);
                     let element = item.get("element").unwrap();
                     let header = element.get("header").unwrap();
                     let header_type = header.get("type").unwrap().as_str().unwrap();

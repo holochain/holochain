@@ -14,9 +14,10 @@ use holochain_state::{
 };
 use holochain_types::{
     chain_header::HeaderAddress,
-    chain_header::{ChainElement, SignedHeader},
+    chain_header::{ChainElement, ChainHeader, SignedHeader},
     entry::Entry,
     entry::EntryAddress,
+    header,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -73,7 +74,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         signed_header: SignedHeader,
     ) -> SourceChainResult<Option<ChainElement>> {
-        let maybe_entry_address = signed_header.header.entry_address();
+        let maybe_entry_address = match signed_header.clone().header {
+            ChainHeader::EntryCreate(header::EntryCreate { entry_address, .. }) => {
+                Some(entry_address)
+            }
+            ChainHeader::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
+                Some(entry_address)
+            }
+            _ => None,
+        };
         let maybe_entry = match maybe_entry_address {
             None => None,
             Some(entry_address) => {
@@ -99,7 +108,6 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
-        dbg!("GET: {:?}", header_address);
         if let Some(signed_header) = self.get_header(header_address)? {
             self.chain_element(signed_header)
         } else {
@@ -113,9 +121,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
             signature: v.signature().to_owned(),
             header: header.to_owned(),
         };
-        dbg!("PUT: {:?}", v.clone());
         if let Some(entry) = v.entry() {
-            dbg!("PUT: {:?}", entry.entry_address());
             self.entries
                 .put(entry.entry_address().into(), entry.to_owned());
         }
