@@ -52,6 +52,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     }*/
 
     pub fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
+        debug!("GET {:?}", k);
         self.cas.get_element(k)
     }
 
@@ -65,7 +66,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     pub fn put_element(&mut self, element: ChainElement) -> DatabaseResult<()> {
         let header = element.header();
-        trace!("PUT {} {:?}", element.header().hash(), element);
+        debug!("PUT {} {:?}", element.header().hash(), element);
         self.sequence.put_header(header.hash().into());
         self.cas.put(element)?;
         Ok(())
@@ -165,7 +166,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 if let Some(signed_header) = self.store.get_header(top)? {
-                    self.current = signed_header.header.prev_header_address().clone();
+                    self.current = signed_header.header.prev_header_address();
                     Ok(Some(signed_header))
                 } else {
                     Ok(None)
@@ -206,7 +207,7 @@ pub mod tests {
         let dna_element = ChainElement::new(
             Signature::fake(),
             dna_header.clone(),
-            Some(Entry::Dna(Box::new(dna))),
+            None, //Some(Entry::Dna(Box::new(dna))),
         );
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),
@@ -301,38 +302,20 @@ pub mod tests {
                 .iter()
                 .map(|item| {
                     let item = item.as_object().unwrap();
-                    let header = item.get("header").unwrap();
-                    let entry = item.get("entry").unwrap();
-                    dbg!(entry);
-                    let _entry_address = header
-                        .get("entry_address")
-                        .unwrap()
-                        .get("Entry")
-                        .unwrap()
-                        .as_array()
-                        .unwrap();
-                    let entry_type = entry.get("entry_type").unwrap().as_str().unwrap();
-                    let _entry_data: serde_json::Value = match entry_type {
-                        "AgentKey" => entry.get("entry").unwrap().clone(),
-                        "Dna" => entry
-                            .get("entry")
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .get("uuid")
-                            .unwrap()
-                            .clone(),
-                        _ => serde_json::Value::Null,
-                    };
+                    dbg!(item);
+                    let element = item.get("element").unwrap();
+                    let header = element.get("header").unwrap();
+                    let header_type = header.get("type").unwrap().as_str().unwrap();
+
                     // FIXME: this test is very specific; commenting out the specifics for now
                     // until we finalize the Entry and Header format
                     // serde_json::json!([entry_type, entry_address, entry_data])
-                    serde_json::json!(entry_type)
+                    serde_json::json!(header_type)
                 })
                 .collect::<Vec<_>>();
 
             assert_eq!(
-                "[\"AgentKey\",\"Dna\"]",
+                "[\"EntryCreate\",\"Dna\"]",
                 &serde_json::to_string(&parsed).unwrap(),
             );
 

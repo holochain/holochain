@@ -1,4 +1,3 @@
-use holo_hash::EntryHash;
 use holochain_2020::core::state::{
     cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
 };
@@ -25,7 +24,7 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         author: jimbo_id.clone(),
         prev_header: previous_header.clone(),
         entry_type: header::EntryType::AgentKey,
-        entry_address: jimbo_entry.entry_hash().into(),
+        entry_address: jimbo_entry.entry_address(),
     });
     let jimbo_element = ChainElement(Signature::fake(), jimbo_header, Some(jimbo_entry));
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
@@ -33,7 +32,7 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         author: jessy_id.clone(),
         prev_header: previous_header.clone(),
         entry_type: header::EntryType::AgentKey,
-        entry_address: jessy_entry.entry_hash().into(),
+        entry_address: jessy_entry.entry_address(),
     });
     let jessy_element = ChainElement(Signature::fake(), jessy_header, Some(jessy_entry));
     (jimbo_id, jimbo_element, jessy_id, jessy_element)
@@ -55,7 +54,7 @@ async fn get_links() -> DatabaseResult<()> {
 
     let (_jimbo_id, jimbo, _jessy_id, jessy) = fixtures();
 
-    let base: EntryHash = jimbo.entry().clone().unwrap().entry_hash();
+    let base = jimbo.entry().clone().unwrap().entry_address();
     source_chain.put_element(jimbo)?;
     source_chain.put_element(jessy)?;
 

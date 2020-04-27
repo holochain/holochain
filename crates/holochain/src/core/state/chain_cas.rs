@@ -99,6 +99,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
+        dbg!("GET: {:?}", header_address);
         if let Some(signed_header) = self.get_header(header_address)? {
             self.chain_element(signed_header)
         } else {
@@ -112,9 +113,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
             signature: v.signature().to_owned(),
             header: header.to_owned(),
         };
+        dbg!("PUT: {:?}", v.clone());
         if let Some(entry) = v.entry() {
+            dbg!("PUT: {:?}", entry.entry_address());
             self.entries
-                .put(entry.entry_hash().into(), entry.to_owned());
+                .put(entry.entry_address().into(), entry.to_owned());
         }
         self.headers.put(header.hash().into(), signed_header);
         Ok(())

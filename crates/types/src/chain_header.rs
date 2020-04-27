@@ -103,6 +103,7 @@ impl ChainElement {
 /// ChainHeader contains variants for each type of header.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[serde(tag = "type")]
 pub enum ChainHeader {
     // The first header in a chain (for the DNA) doesn't have a previous header
     Dna(header::Dna),
@@ -129,9 +130,10 @@ impl ChainHeader {
     //   pub fn timestamp() -> Timestamp { unimplemented!() }
 
     /// Return the EntryAddress this header points to if it does (system actions don't have entries)
+    // TODO REMOVE!
     pub fn entry_address(&self) -> Option<EntryAddress> {
         Some(match self {
-            Self::Dna(header::Dna { hash, .. }) => EntryAddress::Dna(hash.to_owned()),
+            Self::Dna(header::Dna { .. }) => return None, //EntryAddress::Dna(hash.to_owned()),
             Self::LinkAdd(header::LinkAdd { .. }) => return None,
             Self::LinkRemove(header::LinkRemove { .. }) => return None,
             Self::EntryDelete(header::EntryDelete { .. }) => return None,

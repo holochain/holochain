@@ -5,19 +5,15 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::dna::Dna;
+//use crate::dna::Dna;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
-// FIXME: I think this comment is wrong? --zippy
-/// Structure holding actual data in a source chain "Item"
-/// data is stored as a JsonString
+/// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[allow(clippy::large_enum_variant)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
-    /// The Dna system entry, the first entry of every source chain
-    Dna(Box<Dna>),
     /// The AgentKey system entry, the second entry of every source chain,
     /// which grants authoring capability for this agent. (Name TBD)
     AgentKey(AgentHash),
@@ -26,12 +22,16 @@ pub enum Entry {
 }
 
 impl Entry {
-    /// Get the EntryHash of this entry
+    /// Get the EntryAddress of this entry
     // FIXME: use async with_data, or consider wrapper type
     // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
-    pub fn entry_hash(&self) -> EntryHash {
-        let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
-        EntryHash::with_data_sync(&sb.bytes())
+    pub fn entry_address(&self) -> EntryAddress {
+        match self {
+            Entry::AgentKey(key) => EntryAddress::Agent(key.to_owned()),
+            Entry::App(serialized_bytes) => {
+                EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.bytes()))
+            }
+        }
     }
 }
 
@@ -42,8 +42,8 @@ pub enum EntryAddress {
     Entry(EntryHash),
     /// agents are entries too
     Agent(AgentHash),
-    /// the DNA is an entries too
-    Dna(DnaHash),
+    // /// the DNA is an entries too
+    //Dna(DnaHash),
 }
 
 impl From<EntryAddress> for HoloHash {
@@ -51,7 +51,7 @@ impl From<EntryAddress> for HoloHash {
         match entry_address {
             EntryAddress::Entry(entry_hash) => entry_hash.into(),
             EntryAddress::Agent(agent_hash) => agent_hash.into(),
-            EntryAddress::Dna(dna_hash) => dna_hash.into(),
+            //      EntryAddress::Dna(dna_hash) => dna_hash.into(),
         }
     }
 }
@@ -68,7 +68,7 @@ impl AsRef<[u8]> for &EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
             EntryAddress::Agent(agent_hash) => agent_hash.as_ref(),
-            EntryAddress::Dna(dna_hash) => dna_hash.as_ref(),
+            //    EntryAddress::Dna(dna_hash) => dna_hash.as_ref(),
         }
     }
 }
@@ -78,7 +78,7 @@ impl std::fmt::Display for EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
             EntryAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
-            EntryAddress::Dna(dna_hash) => write!(f, "{}", dna_hash),
+            //  EntryAddress::Dna(dna_hash) => write!(f, "{}", dna_hash),
         }
     }
 }

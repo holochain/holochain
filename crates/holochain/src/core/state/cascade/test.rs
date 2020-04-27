@@ -3,7 +3,6 @@ use crate::core::state::{
     chain_meta::{EntryDhtStatus, MockChainMetaBuf},
     source_chain::SourceChainBuf,
 };
-use holo_hash::EntryHash;
 use holochain_state::{
     db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
     test_utils::test_cell_env,
@@ -48,7 +47,7 @@ fn setup_env<'env>(
         author: jimbo_id.clone(),
         prev_header: previous_header.clone(),
         entry_type: header::EntryType::AgentKey,
-        entry_address: jimbo_entry.entry_hash().into(),
+        entry_address: jimbo_entry.entry_address(),
     });
     let jimbo = ChainElement::new(Signature::fake(), jimbo_header, Some(jimbo_entry));
 
@@ -57,7 +56,7 @@ fn setup_env<'env>(
         author: jessy_id.clone(),
         prev_header: previous_header.clone(),
         entry_type: header::EntryType::AgentKey,
-        entry_address: jessy_entry.entry_hash().into(),
+        entry_address: jessy_entry.entry_address(),
     });
     let jessy = ChainElement(Signature::fake(), jessy_header, Some(jessy_entry));
 
@@ -94,12 +93,12 @@ async fn live_local_return() -> DatabaseResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain.put_element(jimbo.clone())?;
-    let hash: EntryHash = jimbo.entry().as_ref().unwrap().entry_hash();
+    let address = jimbo.entry().as_ref().unwrap().entry_address();
 
     // set it's metadata to LIVE
     mock_primary_meta
         .expect_get_crud()
-        .with(predicate::eq(EntryAddress::from(hash.clone())))
+        .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
 
     // call dht_get with above address
@@ -109,7 +108,7 @@ async fn live_local_return() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(hash.clone().into()).await?;
+    let entry = cascade.dht_get(address.clone().into()).await?;
     // check it returns
     assert_eq!(entry, *jimbo.entry());
     // check it doesn't hit the cache
@@ -135,12 +134,12 @@ async fn dead_local_none() -> DatabaseResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain.put_element(jimbo.clone())?;
-    let hash: EntryHash = jimbo.entry().as_ref().unwrap().entry_hash();
+    let address = jimbo.entry().as_ref().unwrap().entry_address();
 
     // set it's metadata to Dead
     mock_primary_meta
         .expect_get_crud()
-        .with(predicate::eq(EntryAddress::from(hash.clone())))
+        .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Dead));
 
     // call dht_get with above address
@@ -150,7 +149,7 @@ async fn dead_local_none() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(hash.into()).await?;
+    let entry = cascade.dht_get(address.into()).await?;
     // check it returns none
     assert_eq!(entry, None);
     // check it doesn't hit the cache
@@ -176,12 +175,12 @@ async fn notfound_goto_cache_live() -> DatabaseResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     cache.put_element(jimbo.clone())?;
-    let hash: EntryHash = jimbo.entry().as_ref().unwrap().entry_hash();
+    let address = jimbo.entry().as_ref().unwrap().entry_address();
 
     // set it's metadata to Live
     mock_cache_meta
         .expect_get_crud()
-        .with(predicate::eq(EntryAddress::from(hash.clone())))
+        .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
 
     // call dht_get with above address
@@ -191,7 +190,7 @@ async fn notfound_goto_cache_live() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let _entry = cascade.dht_get(hash.into()).await?;
+    let _entry = cascade.dht_get(address).await?;
     // check it returns
 
     // FIXME!
@@ -217,7 +216,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    let hash: EntryHash = jimbo.entry().as_ref().unwrap().entry_hash();
+    let address = jimbo.entry().as_ref().unwrap().entry_address();
 
     // call dht_get with above address
     let cascade = Cascade::new(
@@ -226,7 +225,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(hash.into()).await?;
+    let entry = cascade.dht_get(address).await?;
     // check it returns
     assert_eq!(entry, None);
     // check it doesn't hit the primary
@@ -255,8 +254,8 @@ async fn links_local_return() -> DatabaseResult<()> {
     } = setup_env(&reader, &dbs)?;
     source_chain.put_element(jimbo.clone())?;
     source_chain.put_element(jessy.clone())?;
-    let base: EntryHash = jimbo.entry().as_ref().unwrap().entry_hash();
-    let target: EntryHash = jessy.entry().as_ref().unwrap().entry_hash();
+    let base = jimbo.entry().as_ref().unwrap().entry_address();
+    let target = jessy.entry().as_ref().unwrap().entry_address();
     let result = target.clone();
 
     // Return a link between entries
@@ -266,7 +265,7 @@ async fn links_local_return() -> DatabaseResult<()> {
             predicate::eq(EntryAddress::from(base.clone())),
             predicate::eq("".to_string()),
         )
-        .returning(move |_, _| Ok(hashset! {EntryAddress::from(target.clone())}));
+        .returning(move |_, _| Ok(hashset! {target.clone()}));
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -303,25 +302,19 @@ async fn links_cache_return() -> DatabaseResult<()> {
     } = setup_env(&reader, &dbs)?;
     source_chain.put_element(jimbo.clone())?;
     source_chain.put_element(jessy.clone())?;
-    let base: EntryHash = jimbo.entry().as_ref().unwrap().entry_hash();
-    let target: EntryHash = jessy.entry().as_ref().unwrap().entry_hash();
+    let base = jimbo.entry().as_ref().unwrap().entry_address();
+    let target = jessy.entry().as_ref().unwrap().entry_address();
     let result = target.clone();
 
     // Return empty links
     mock_primary_meta
         .expect_get_links()
-        .with(
-            predicate::eq(EntryAddress::from(base.clone())),
-            predicate::eq("".to_string()),
-        )
+        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
         .returning(move |_, _| Ok(HashSet::new()));
     // Return a link between entries
     mock_cache_meta
         .expect_get_links()
-        .with(
-            predicate::eq(EntryAddress::from(base.clone())),
-            predicate::eq("".to_string()),
-        )
+        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
         .returning(move |_, _| Ok(hashset! {target.clone().into()}));
 
     // call dht_get_links with above base
@@ -355,17 +348,14 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
 
-    let base: EntryHash = jimbo.entry().as_ref().unwrap().entry_hash();
-    let target: EntryHash = jessy.entry().as_ref().unwrap().entry_hash();
+    let base = jimbo.entry().as_ref().unwrap().entry_address();
+    let target = jessy.entry().as_ref().unwrap().entry_address();
     let result = target.clone();
 
     // Return empty links
     mock_cache_meta
         .expect_get_links()
-        .with(
-            predicate::eq(EntryAddress::from(base.clone())),
-            predicate::eq("".to_string()),
-        )
+        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
         .returning(move |_, _| Ok(hashset! {target.clone().into()}));
 
     // call dht_get_links with above base

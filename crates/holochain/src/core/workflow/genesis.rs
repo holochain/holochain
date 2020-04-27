@@ -38,10 +38,11 @@ pub async fn genesis(
         hash: dna.dna_hash(),
     });
     //FIXME: real signature.
+    // FIXME we store the dna to the private store on genesis
     let element = ChainElement::new(
         Signature::fake(),
         dna_header.clone(),
-        Some(Entry::Dna(Box::new(dna))),
+        None, // Some(Entry::Dna(Box::new(dna))),
     );
     workspace.source_chain.put_element(element)?;
 
@@ -56,7 +57,7 @@ pub async fn genesis(
     //FIXME: real signature.
     let element = ChainElement::new(
         Signature::fake(),
-        agent_header.clone(),
+        agent_header,
         Some(Entry::AgentKey(agent_hash)),
     );
     workspace.source_chain.put_element(element)?;
@@ -86,12 +87,13 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        //        entry::Entry,
+        entry::EntryAddress,
         observability,
-        //        prelude::*,
+        //      prelude::*,
         test_utils::{fake_agent_hash, fake_dna},
     };
-    use tracing::*;
+    //use tracing::*;
+    // use std::convert::TryFrom;
 
     #[tokio::test]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
@@ -120,12 +122,12 @@ mod tests {
             let hashes: Vec<_> = source_chain
                 .iter_back()
                 .map(|h| {
-                    debug!("header: {:?}", h);
-                    Ok(h.entry_address())
+                    // debug!("header: {:?}", h);
+                    Ok(h.header.entry_address())
                 })
                 .collect()
                 .unwrap();
-            assert_eq!(format!("{:?}", hashes), "fish");
+            assert_eq!(hashes, vec![Some(EntryAddress::Agent(agent_hash)), None,]);
             /*            assert_eq!(
                 hashes,
                 vec![
