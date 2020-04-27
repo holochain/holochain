@@ -2,12 +2,7 @@
 //! in the sense that it implements the pointers between hashes that a hash chain relies on, which
 //! are then used to check the integrity of data using cryptographic hash functions.
 
-use crate::{
-    entry::{Entry, EntryAddress},
-    header,
-    prelude::*,
-    signature::Signature,
-};
+use crate::{entry::Entry, header, prelude::*, signature::Signature};
 use shrinkwraprs::Shrinkwrap;
 
 /// wraps header hash to promote it to an "address" e.g. for use in a CAS
@@ -128,25 +123,6 @@ impl ChainHeader {
     }
     //    pub fn author() -> PublicKey { unimplemented!() }
     //   pub fn timestamp() -> Timestamp { unimplemented!() }
-
-    /// Return the EntryAddress this header points to if it does (system actions don't have entries)
-    // TODO REMOVE!
-    pub fn entry_address(&self) -> Option<EntryAddress> {
-        Some(match self {
-            Self::Dna(header::Dna { .. }) => return None, //EntryAddress::Dna(hash.to_owned()),
-            Self::LinkAdd(header::LinkAdd { .. }) => return None,
-            Self::LinkRemove(header::LinkRemove { .. }) => return None,
-            Self::EntryDelete(header::EntryDelete { .. }) => return None,
-            Self::ChainClose(header::ChainClose { .. }) => return None,
-            Self::ChainOpen(header::ChainOpen { .. }) => return None,
-            Self::EntryCreate(header::EntryCreate { entry_address, .. }) => {
-                entry_address.to_owned()
-            }
-            Self::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
-                entry_address.to_owned()
-            }
-        })
-    }
 
     // FIXME: use async with_data, or consider wrapper type
     // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841

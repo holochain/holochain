@@ -83,9 +83,8 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        entry::EntryAddress,
-        observability,
-        //      prelude::*,
+        chain_header::ChainHeader,
+        header, observability,
         test_utils::{fake_agent_hash, fake_dna},
     };
     //use tracing::*;
@@ -118,12 +117,20 @@ mod tests {
             let hashes: Vec<_> = source_chain
                 .iter_back()
                 .map(|h| {
-                    // debug!("header: {:?}", h);
-                    Ok(h.header.entry_address())
+                    Ok(match h.header {
+                        ChainHeader::Dna(header::Dna { .. }) => "Dna",
+                        ChainHeader::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
+                        ChainHeader::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
+                        ChainHeader::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
+                        ChainHeader::ChainClose(header::ChainClose { .. }) => "ChainClose",
+                        ChainHeader::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
+                        ChainHeader::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
+                        ChainHeader::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
+                    })
                 })
                 .collect()
                 .unwrap();
-            assert_eq!(hashes, vec![Some(EntryAddress::Agent(agent_hash)), None,]);
+            assert_eq!(hashes, vec!["EntryCreate", "Dna"]);
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())
