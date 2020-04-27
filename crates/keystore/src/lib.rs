@@ -16,7 +16,7 @@
 //!     tokio::task::spawn(async move {
 //!         let _ = holochain_crypto::crypto_init_sodium();
 //!
-//!         let keystore = mock_keystore::spawn_mock_keystore(vec![]).await.unwrap();
+//!         let keystore = test_keystore::spawn_test_keystore(vec![]).await.unwrap();
 //!         let agent_hash = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
 //!
 //!         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -46,4 +46,4 @@ use keystore_actor::*;
 mod agent_hash_ext;
 pub use agent_hash_ext::*;
 
-pub mod mock_keystore;
+pub mod test_keystore;

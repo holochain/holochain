@@ -15,13 +15,13 @@ pub struct MockKeypair {
     pub sec_key: Vec<u8>,
 }
 
-/// Construct a new MockKeystore.
+/// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
-pub async fn spawn_mock_keystore(
+pub async fn spawn_test_keystore(
     fixture_keypairs: Vec<MockKeypair>,
 ) -> KeystoreResult<KeystoreSender> {
     let (sender, driver) = KeystoreSender::ghost_actor_spawn(Box::new(move |internal_sender| {
-        async move { Ok(MockKeystore::new(internal_sender, fixture_keypairs)) }
+        async move { Ok(TestKeystore::new(internal_sender, fixture_keypairs)) }
             .boxed()
             .into()
     }))
@@ -36,7 +36,7 @@ struct PrivateKey(pub holochain_crypto::DynCryptoBytes);
 
 ghost_actor::ghost_chan! {
     Visibility(),
-    Name(MockKeystoreInternal),
+    Name(TestKeystoreInternal),
     Error(KeystoreError),
     Api {
         FinalizeNewKeypair(
@@ -48,15 +48,15 @@ ghost_actor::ghost_chan! {
 }
 
 /// Internal mock keystore struct.
-struct MockKeystore {
-    internal_sender: KeystoreInternalSender<MockKeystoreInternal>,
+struct TestKeystore {
+    internal_sender: KeystoreInternalSender<TestKeystoreInternal>,
     fixture_keypairs: Vec<MockKeypair>,
     active_keypairs: HashMap<holo_hash::AgentHash, PrivateKey>,
 }
 
-impl MockKeystore {
+impl TestKeystore {
     fn new(
-        internal_sender: KeystoreInternalSender<MockKeystoreInternal>,
+        internal_sender: KeystoreInternalSender<TestKeystoreInternal>,
         fixture_keypairs: Vec<MockKeypair>,
     ) -> Self {
         Self {
@@ -67,7 +67,7 @@ impl MockKeystore {
     }
 }
 
-impl KeystoreHandler<(), MockKeystoreInternal> for MockKeystore {
+impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
     fn handle_generate_sign_keypair_from_pure_entropy(
         &mut self,
     ) -> KeystoreHandlerResult<holo_hash::AgentHash> {
@@ -114,9 +114,9 @@ impl KeystoreHandler<(), MockKeystoreInternal> for MockKeystore {
         .into())
     }
 
-    fn handle_ghost_actor_internal(&mut self, msg: MockKeystoreInternal) -> KeystoreResult<()> {
+    fn handle_ghost_actor_internal(&mut self, msg: TestKeystoreInternal) -> KeystoreResult<()> {
         match msg {
-            MockKeystoreInternal::FinalizeNewKeypair(msg) => {
+            TestKeystoreInternal::FinalizeNewKeypair(msg) => {
                 let ghost_actor::ghost_chan::GhostChanItem {
                     input,
                     respond,
@@ -168,11 +168,11 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_mock_keystore_can_supply_fixture_keys() {
+    async fn test_test_keystore_can_supply_fixture_keys() {
         let _ = crypto_init_sodium();
         use holo_hash::AgentHash;
         tokio::task::spawn(async move {
-            let mut keystore = spawn_mock_keystore(fixture_keypairs()).await.unwrap();
+            let mut keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
 
             let agent1 = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
             let agent2 = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
@@ -207,11 +207,11 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_mock_keystore_can_sign_and_validate_data() {
+    async fn test_test_keystore_can_sign_and_validate_data() {
         let _ = crypto_init_sodium();
         use holo_hash::AgentHash;
         tokio::task::spawn(async move {
-            let keystore = spawn_mock_keystore(fixture_keypairs()).await.unwrap();
+            let keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
 
             let agent_hash = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
 
