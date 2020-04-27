@@ -40,7 +40,7 @@ pub async fn genesis(
     //FIXME: real signature.
     let element = ChainElement::new(
         Signature::fake(),
-        dna_header,
+        dna_header.clone(),
         Some(Entry::Dna(Box::new(dna))),
     );
     workspace.source_chain.put_element(element)?;
@@ -51,12 +51,12 @@ pub async fn genesis(
         author: agent_hash.clone(),
         prev_header: dna_header.hash(),
         entry_type: header::EntryType::AgentKey,
-        entry_address: agent_hash.into(),
+        entry_address: agent_hash.clone().into(),
     });
     //FIXME: real signature.
     let element = ChainElement::new(
         Signature::fake(),
-        agent_header,
+        agent_header.clone(),
         Some(Entry::AgentKey(agent_hash)),
     );
     workspace.source_chain.put_element(element)?;
@@ -86,9 +86,9 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        entry::Entry,
+        //        entry::Entry,
         observability,
-        prelude::*,
+        //        prelude::*,
         test_utils::{fake_agent_hash, fake_dna},
     };
     use tracing::*;
@@ -125,7 +125,8 @@ mod tests {
                 })
                 .collect()
                 .unwrap();
-            assert_eq!(
+            assert_eq!(format!("{:?}", hashes), "fish");
+            /*            assert_eq!(
                 hashes,
                 vec![
                     holo_hash::EntryHash::try_from(Entry::AgentKey(agent_hash))
@@ -135,7 +136,7 @@ mod tests {
                         .unwrap()
                         .into(),
                 ]
-            );
+            );*/
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())

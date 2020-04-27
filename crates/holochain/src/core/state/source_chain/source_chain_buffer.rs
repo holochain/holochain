@@ -1,7 +1,7 @@
 use crate::core::state::{
     chain_cas::{ChainCasBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
-    source_chain::SourceChainError,
+    source_chain::{SourceChainError, SourceChainResult},
 };
 
 use fallible_iterator::FallibleIterator;
@@ -13,7 +13,7 @@ use holochain_state::{
 };
 use holochain_types::chain_header::HeaderAddress;
 use holochain_types::{
-    chain_header::{ChainElement, ChainHeader},
+    chain_header::{ChainElement, ChainHeader, SignedHeader},
     entry::Entry,
     prelude::*,
     signature::Signature,
@@ -51,12 +51,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_entry(k)
     }*/
 
-    pub fn get_element(&self, k: &HeaderAddress) -> DatabaseResult<Option<ChainElement>> {
-        self.cas.get_element(k).into()
+    pub fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
+        self.cas.get_element(k)
     }
 
-    pub fn get_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<ChainHeader>> {
-        self.cas.get_header(k).into()
+    pub fn get_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<SignedHeader>> {
+        self.cas.get_header(k)
     }
 
     pub fn cas(&self) -> &ChainCasBuf<R> {
@@ -66,7 +66,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     pub fn put_element(&mut self, element: ChainElement) -> DatabaseResult<()> {
         let header = element.header();
         trace!("PUT {} {:?}", element.header().hash(), element);
-        self.sequence.put_header(header.hash().try_into()?);
+        self.sequence.put_header(header.hash().into());
         self.cas.put(element)?;
         Ok(())
     }
@@ -115,7 +115,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 .map(|h| {
                     let maybe_element = self.get_element(&h.hash().into())?;
                     match maybe_element {
-                        None => Ok(JsonChainDump {element: None}),
+                        None => Ok(JsonChainDump { element: None }),
                         Some(element) => Ok(JsonChainDump {
                             element: Some(JsonChainElement {
                                 signature: element.signature().to_owned(),
@@ -157,16 +157,16 @@ impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
 /// Follows ChainHeader.link through every previous Entry (of any EntryType) in the chain
 // #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
 impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
-    type Item = ChainHeader;
+    type Item = SignedHeader;
     type Error = SourceChainError;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         match &self.current {
             None => Ok(None),
             Some(top) => {
-                if let Some(header) = self.store.get_header(top)? {
-                    self.current = header.prev_header_address().clone();
-                    Ok(Some(header))
+                if let Some(signed_header) = self.store.get_header(top)? {
+                    self.current = signed_header.header.prev_header_address().clone();
+                    Ok(Some(signed_header))
                 } else {
                     Ok(None)
                 }
@@ -195,7 +195,7 @@ pub mod tests {
         let dna = fake_dna("a");
         let agent_hash = fake_agent_hash("a");
 
-        let dna_entry = Entry::Dna(Box::new(dna));
+        //let dna_entry = Entry::Dna(Box::new(dna));
         let agent_entry = Entry::AgentKey(agent_hash.clone());
 
         let dna_header = ChainHeader::Dna(header::Dna {
@@ -205,15 +205,15 @@ pub mod tests {
         });
         let dna_element = ChainElement::new(
             Signature::fake(),
-            dna_header,
+            dna_header.clone(),
             Some(Entry::Dna(Box::new(dna))),
         );
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_hash.clone(),
-            prev_headr: dna_header.hash(),
+            prev_header: dna_header.hash(),
             entry_type: header::EntryType::AgentKey,
-            entry_address: agent_hash.into(),
+            entry_address: agent_hash.clone().into(),
         });
         let agent_element = ChainElement::new(Signature::fake(), agent_header, Some(agent_entry));
         (agent_hash, dna_element, agent_element)
@@ -225,7 +225,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
-        let (agent_hash, dna_element, agent_element) = fixtures();
+        let (_agent_hash, dna_element, agent_element) = fixtures();
 
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
@@ -282,7 +282,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
-        let (agent_hash, dna_element, agent_element) = fixtures();
+        let (_agent_hash, dna_element, agent_element) = fixtures();
 
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;

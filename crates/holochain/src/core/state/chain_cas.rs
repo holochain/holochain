@@ -1,7 +1,7 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_serialized_bytes::prelude::*;
+//use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -64,7 +64,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header_address: &HeaderAddress,
     ) -> DatabaseResult<Option<SignedHeader>> {
-        self.headers.get(header_address.into())
+        self.headers.get(&header_address.to_owned().into())
     }
 
     // local helper function which given a SignedHeader, looks for an entry in the cas
@@ -78,7 +78,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
             None => None,
             Some(entry_address) => {
                 // if the header has an address it better have been stored!
-                let maybe_cas_entry = self.get_entry(entry_address)?;
+                let maybe_cas_entry = self.get_entry(entry_address.clone())?;
                 if maybe_cas_entry.is_none() {
                     return Err(SourceChainError::InvalidStructure(
                         ChainInvalidReason::MissingData(entry_address),
@@ -114,9 +114,9 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         };
         if let Some(entry) = v.entry() {
             self.entries
-                .put(entry.entry_hash().try_into()?, entry.to_owned());
+                .put(entry.entry_hash().into(), entry.to_owned());
         }
-        self.headers.put(header.hash().try_into()?, signed_header);
+        self.headers.put(header.hash().into(), signed_header);
         Ok(())
     }
 
