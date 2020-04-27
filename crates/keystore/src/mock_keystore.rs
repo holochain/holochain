@@ -126,7 +126,7 @@ impl KeystoreHandler<(), MockKeystoreInternal> for MockKeystore {
                 let (agent_hash, sec_key) = input;
                 self.active_keypairs.insert(agent_hash, sec_key);
                 if let Err(e) = respond(Ok(())) {
-                    ghost_actor::dependencies::tracing::error!(error = ?e);
+                    tracing::error!(error = ?e);
                 }
             }
         }
