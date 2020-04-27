@@ -63,8 +63,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
-    pub fn put_entry(&mut self, entry: Entry, agent_hash: &AgentHash) -> DatabaseResult<()> {
-        let header = header_for_entry(&entry, agent_hash, self.chain_head().cloned())?;
+    pub async fn put_entry(&mut self, entry: Entry, agent_hash: &AgentHash) -> DatabaseResult<()> {
+        let header = header_for_entry(&entry, agent_hash, self.chain_head().cloned()).await?;
         self.sequence.put_header((&header).try_into()?);
         self.cas.put((header, entry))?;
         Ok(())
@@ -124,7 +124,7 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
     }
 }
 
-fn header_for_entry(
+async fn header_for_entry(
     entry: &Entry,
     agent_hash: &AgentHash,
     prev_head: Option<HeaderAddress>,
@@ -198,15 +198,19 @@ pub mod tests {
         let dna_entry = Entry::Dna(Box::new(dna));
         let agent_entry = Entry::AgentKey(agent_hash.clone());
 
-        env.with_reader(|reader| {
+        {
+            let reader = env.reader()?;
+
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put_entry(dna_entry.clone(), &agent_hash)?;
-            store.put_entry(agent_entry.clone(), &agent_hash)?;
-            env.with_commit(|writer| store.flush_to_txn(writer))
-        })?;
+            store.put_entry(dna_entry.clone(), &agent_hash).await?;
+            store.put_entry(agent_entry.clone(), &agent_hash).await?;
+            env.with_commit(|writer| store.flush_to_txn(writer))?;
+        }
 
-        env.with_reader(|reader| {
+        {
+            let reader = env.reader()?;
+
             let store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_some());
             let dna_entry_fetched = store
@@ -228,7 +232,7 @@ pub mod tests {
                 vec![Some(agent_entry), Some(dna_entry)]
             );
             Ok(())
-        })
+        }
     }
 
     #[tokio::test]
@@ -243,14 +247,18 @@ pub mod tests {
         let dna_entry = Entry::Dna(Box::new(dna));
         let agent_entry = Entry::AgentKey(agent_hash.clone());
 
-        env.with_reader(|reader| {
-            let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put_entry(dna_entry.clone(), &agent_hash)?;
-            store.put_entry(agent_entry.clone(), &agent_hash)?;
-            env.with_commit(|writer| store.flush_to_txn(writer))
-        })?;
+        {
+            let reader = env.reader()?;
 
-        env.with_reader(|reader| {
+            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            store.put_entry(dna_entry.clone(), &agent_hash).await?;
+            store.put_entry(agent_entry.clone(), &agent_hash).await?;
+            env.with_commit(|writer| store.flush_to_txn(writer))?;
+        }
+
+        {
+            let reader = env.reader()?;
+
             let store = SourceChainBuf::new(&reader, &dbs)?;
             let json = store.dump_as_json()?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -294,10 +302,7 @@ pub mod tests {
                 "[\"AgentKey\",\"Dna\"]",
                 &serde_json::to_string(&parsed).unwrap(),
             );
-
-            Ok(())
-        })
+        }
+        Ok(())
     }
-
-    // async fn header_for_entry() -> SourceChainResult<()> {}
 }

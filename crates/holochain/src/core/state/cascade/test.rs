@@ -66,7 +66,7 @@ async fn live_local_return() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
+    source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
     let hash: EntryHash = (&jimbo).try_into()?;
 
     // set it's metadata to LIVE
@@ -107,7 +107,7 @@ async fn dead_local_none() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
+    source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
     let hash: EntryHash = jimbo.try_into()?;
 
     // set it's metadata to Dead
@@ -148,7 +148,7 @@ async fn notfound_goto_cache_live() -> DatabaseResult<()> {
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    cache.put_entry(jimbo.clone(), &jimbo_id)?;
+    cache.put_entry(jimbo.clone(), &jimbo_id).await?;
     let hash: EntryHash = (&jimbo).try_into()?;
 
     // set it's metadata to Live
@@ -224,8 +224,8 @@ async fn links_local_return() -> DatabaseResult<()> {
         mut mock_primary_meta,
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
-    source_chain.put_entry(jessy.clone(), &jessy_id)?;
+    source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
+    source_chain.put_entry(jessy.clone(), &jessy_id).await?;
     let base: EntryHash = jimbo.try_into()?;
     let target: EntryHash = jessy.try_into()?;
     let result = target.clone();
@@ -272,8 +272,8 @@ async fn links_cache_return() -> DatabaseResult<()> {
         mut mock_primary_meta,
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_entry(jimbo.clone(), &jimbo_id)?;
-    source_chain.put_entry(jessy.clone(), &jessy_id)?;
+    source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
+    source_chain.put_entry(jessy.clone(), &jessy_id).await?;
     let base: EntryHash = jimbo.try_into()?;
     let target: EntryHash = jessy.try_into()?;
     let result = target.clone();
