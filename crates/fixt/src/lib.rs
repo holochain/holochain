@@ -5,38 +5,13 @@ pub mod string;
 pub mod unit;
 
 #[derive(Clone)]
-/// the Fixturator is the struct that we need to impl Iterator for
+/// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over
 /// each combination of Item and Curve needs its own Iterator implementation for Fixturator
-/// Item represents the type that we want to generate fixtures for
+/// Item is the Foo type of FooFixturator, i.e. the type of thing we are generating examples of
 /// Curve represents some algorithm capable of generating fixtures
 /// the Item is PhantomData because it simply represents a type to output
 /// the Curve must be provided when the Fixturator is constructed to allow for paramaterized curves
-/// for example, we could implement a step function over `Foo(u32)` with a `Step(u32)` curve:
-///
-/// ```rust
-/// use fixt::prelude::*;
-/// pub struct Step(u32);
-/// pub struct Foo(u32);
-/// impl Fixt for Foo {};
-/// impl Iterator for Fixturator<Foo, Step> {
-///     type Item = Foo;
-///
-///     fn next(&mut self) -> Option<Self::Item> {
-///         let ret = Some(Foo(self.index as u32 * self.curve.0));
-///         self.index = self.index + 1;
-///         ret
-///     }
-/// }
-/// // the first argument to new() is the curve, the second is the starting index
-/// let mut fixturator = Fixturator::<u32, Step>::new(Step(5), 0);
-/// assert_eq!(fixturator.next().unwrap(), Foo(0));
-/// assert_eq!(fixturator.next().unwrap(), Foo(5)); // jumps according to paramaterised curve
-///
-/// // this syntax is the same thing due to the Fixt impl
-/// let mut fixturator = Foo::fixturator(Step(5));
-/// assert_eq!(fixturator.next().unwrap(), Foo(0));
-/// assert_eq!(fixturator.next().unwrap(), Foo(5));
-/// ```
+/// this is most easily handled in most cases with the fixturator! and newtype_fixturator! macros
 ///
 /// The inner index is always a single usize.
 /// It can be ignored, e.g. in the case of Unpredictable implementations based on `rand::random()`.
@@ -46,7 +21,9 @@ pub mod unit;
 /// reach any specific index, c.f. the direct multiplication in the step function above.
 /// Following this standard allows for wrapper structs to delegate their curves to the curves of
 /// their inner types by constructing an inner Fixturator directly with the outer index passed in.
-/// @see newtype_fixt! macro defined below for an example of this.
+/// If we can always assume the inner fixturators can be efficiently constructed at any index this
+/// allows us to efficiently compose fixturators.
+/// @see newtype_fixturator! macro defined below for an example of this.
 ///
 /// Fixturator implements Clone for convenience but note that this will clone the current index.
 ///
@@ -65,19 +42,19 @@ pub mod unit;
 /// If you are implementing an iteration over some finite sequence then wrap the iteration back to
 /// the start of the sequence once the index exceeds the sequence's bounds or reset the index to 0
 /// after seq.len() iterations.
+/// essentially, the iteration of a fixturator should work like some_iter.cycle()
 pub struct Fixturator<Item, Curve> {
     item: std::marker::PhantomData<Item>,
     curve: Curve,
-    index: usize,
+    pub index: usize,
 }
 
 impl<Curve, Item> Fixturator<Item, Curve> {
     /// constructs a Fixturator of type <Item, Curve> from a Curve and starting index
     /// raw calls are a little verbose, e.g. `Fixturator::<u32, Predictable>::new(Predictable, 0)`
-    /// @see the `Fixt` trait for an ergomonic `fixturator(Curve)` wrapper method
     /// the starting index is exposed to facilitate wrapper structs to delegate their indexes to
     /// internal Fixturators
-    /// @see newtype_fixt! macro below for an example of this
+    /// @see newtype_fixturator! macro below for an example of this
     pub fn new(curve: Curve, start: usize) -> Self {
         Fixturator::<Item, Curve> {
             curve,
@@ -85,6 +62,130 @@ impl<Curve, Item> Fixturator<Item, Curve> {
             item: std::marker::PhantomData,
         }
     }
+}
+
+// /// set of basic tests that can be used to test any FooFixturator implementation
+// /// usage:
+// /// - type: the Foo of FooFixturator to be tested
+// /// - empty_expected: vector of any length of empties that we predict from Empty
+// /// - predictable_expected: vector of any length (can wrap) that we predict from Predictable
+// /// - test_unpredictable (optional): whether to try and test the unpredictable case
+// /// @see the tests in modules in this crate
+#[macro_export]
+macro_rules! basic_test {
+    ( $type:ty, $empty_expected:expr, $predictable_expected:expr ) => {
+        basic_test!($type, $empty_expected, $predictable_expected, true);
+    };
+    ( $type:ty, $empty_expected:expr, $predictable_expected:expr, $test_unpredictable:literal ) => {
+        paste::item! {
+            #[test]
+            #[cfg(test)]
+            fn [<$type:lower _empty>] () {
+                let empties = [<$type:camel Fixturator>]::new(Empty);
+                // we can make many empties from the Empty curve
+                assert_eq!(
+                    $empty_expected,
+                    empties.take($empty_expected.len()).collect::<Vec<$type>>(),
+                );
+            }
+        }
+
+        paste::item! {
+            #[test]
+            #[cfg(test)]
+            fn [<$type:lower _predictable>] () {
+                let predictables = [<$type:camel Fixturator>]::new(Predictable);
+                // we can predict some vector of values from the Predictable curve
+                assert_eq!(
+                    $predictable_expected,
+                    predictables.take($predictable_expected.len()).collect::<Vec<$type>>(),
+                );
+            }
+        }
+
+        paste::item! {
+            #[test]
+            #[cfg(test)]
+            fn [<$type:lower _unpredictable>] () {
+                if $test_unpredictable {
+                    let empties = [<$type:camel Fixturator>]::new(Empty);
+                    let unpredictables = [<$type:camel Fixturator>]::new(Unpredictable);
+
+                    // the Unpredictable curve is not Empty
+                    assert_ne!(
+                        empties.take(100).collect::<Vec<$type>>(),
+                        unpredictables.take(100).collect::<Vec<$type>>(),
+                    );
+
+                    let predictables = [<$type:camel Fixturator>]::new(Predictable);
+                    let unpredictables = [<$type:camel Fixturator>]::new(Unpredictable);
+
+                    // the Unpredictable curve is not Predictable
+                    assert_ne!(
+                        predictables.take(100).collect::<Vec<$type>>(),
+                        unpredictables.take(100).collect::<Vec<$type>>(),
+                    );
+                }
+            }
+        }
+    };
+}
+
+/// implements a FooFixturator for any type Foo
+/// this simply wraps Fixturator<Foo, Curve> up as FooFixturator<Curve>
+///
+/// this macro serves a few purposes:
+/// - we avoid the orphan rule that would prevent us implementing Iterator on Fixturator directly
+/// - we avoid the verbosity of type and impl juggling around every new FooFixturator
+/// - we create a FooFixturator implementation that is compatible with basic_test! macro
+/// - we cover all three basic curves
+/// - we standardiize the new() and new_indexed() methods without relying on traits
+///
+/// the expressions passed into the macro are the body of the next calls for Empty, Unpredictable
+/// and Predictable, in order
+#[macro_export]
+macro_rules! fixturator {
+    ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
+        paste::item! {
+            pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
+
+            impl <Curve>[<$type:camel Fixturator>]<Curve> {
+                pub fn new(curve: Curve) -> [<$type:camel Fixturator>]<Curve> {
+                    Self::new_indexed(curve, 0)
+                }
+                pub fn new_indexed(curve: Curve, start: usize) -> [<$type:camel Fixturator>]<Curve> {
+                    [<$type:camel Fixturator>](Fixturator::<$type, Curve>::new(curve, start))
+                }
+            }
+
+            impl Iterator for [<$type:camel Fixturator>]<Empty> {
+                type Item = $type;
+
+                /// false has an empty ring to it
+                fn next(&mut self) -> Option<Self::Item> {
+                    Some($empty)
+                }
+            }
+
+            impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
+                type Item = $type;
+
+                /// fallback to default rust randomness
+                fn next(&mut self) -> Option<Self::Item> {
+                    Some($unpredictable)
+                }
+            }
+
+            impl Iterator for [<$type:camel Fixturator>]<Predictable> {
+                type Item = $type;
+
+                /// simple alternation between true/false vals starting with true
+                fn next(&mut self) -> Option<Self::Item> {
+                    Some($predictable)
+                }
+            }
+        }
+    };
 }
 
 /// represents an unpredictable curve
@@ -138,133 +239,22 @@ pub struct Predictable;
 #[derive(Clone)]
 pub struct Empty;
 
-/// an ergonomic wrapper around the raw Fixturator::<Item, Curve>::new(curve, index) verbosity
-/// the default implementation of Fixt exposes a single, simple `foo.fixturator(curve)` method
-pub trait Fixt {
-    fn fixturator<Curve>(curve: Curve) -> Fixturator<Self, Curve>
-    where
-        Self: Sized,
-    {
-        Fixturator::<Self, Curve>::new(curve, 0)
-    }
-}
-
-/// set of basic tests that can be used to test any Fixt implementation
-/// usage:
-/// - type: the Item of the Fixturator and Fixt impl to be tested
-/// - empty_expected: what value should the Empty curve return (assumes a singular Empty)
-/// - predictable_expected: vector of any length (can wrap) that we predict from Predictable
-/// - test_unpredictable (optional): whether to try and test the unpredictable case
-/// @see the tests in modules in this crate
-#[macro_export]
-macro_rules! basic_test {
-    ( $type:ty, $empty_expected:expr, $predictable_expected:expr ) => {
-        basic_test!($type, $empty_expected, $predictable_expected, true);
-    };
-    ( $type:ty, $empty_expected:expr, $predictable_expected:expr, $test_unpredictable:literal ) => {
-        paste::item! {
-            #[test]
-            fn [<$type:lower _empty>] () {
-                // we can generate 100 empty values and that they are all empty
-                // this mutable loop allows us to avoid Clone on $empty_expected which may cause
-                // problems for new types if we enforced it
-                let mut fixturator = <$type>::fixturator(Empty);
-                for _ in 0..100 {
-                    assert_eq!(
-                        &$empty_expected,
-                        &fixturator.next().unwrap(),
-                    )
-                }
-            }
-        }
-
-        paste::item! {
-            #[test]
-            fn [<$type:lower _predictable>] () {
-                let fixturator = <$type>::fixturator(Predictable);
-                // we can predict some vector of values from the Predictable curve
-                assert_eq!(
-                    $predictable_expected,
-                    fixturator.take($predictable_expected.len()).collect::<Vec<$type>>(),
-                );
-            }
-        }
-
-        paste::item! {
-            #[test]
-            fn [<$type:lower _unpredictable>] () {
-                if $test_unpredictable {
-                    let empty = <$type>::fixturator(Empty);
-                    let unpredictable = <$type>::fixturator(Unpredictable);
-
-                    // the Unpredictable curve is not Empty
-                    assert_ne!(
-                        empty.take(100).collect::<Vec<$type>>(),
-                        unpredictable.take(100).collect::<Vec<$type>>(),
-                    );
-
-                    let predictable = <$type>::fixturator(Predictable);
-                    let unpredictable = <$type>::fixturator(Unpredictable);
-
-                    // the Unpredictable curve is not Predictable
-                    assert_ne!(
-                        predictable.take(100).collect::<Vec<$type>>(),
-                        unpredictable.take(100).collect::<Vec<$type>>(),
-                    );
-                }
-            }
-        }
-    };
-}
-
 #[macro_export]
 /// a direct delegation of fixtures to the inner type for new types
-/// IMPORTANT: the inner type needs to implement .into() to the outer type
-macro_rules! newtype_fixt {
-    // implements a single Fixturator curve
-    ( $outer:ident<$inner:ident>, $curve:ident ) => {
-        impl Iterator for Fixturator<$outer, $curve> {
-            type Item = $outer;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                // constructs a Fixturator off the $inner type and inits it at the current index
-                // of self so we can delegate the next() call to the $inner type and wrap it in
-                // the $outer type via an .into() call
-                let ret = Fixturator::<$inner, $curve>::new($curve, self.index)
-                    .next()
-                    .map(|v| v.into());
-                self.index = self.index + 1;
-                ret
-            }
-        }
-    };
-    // implements all standard Fixturator curves AND Fixt trait for the outer newtype
-    ( $outer:ident<$inner:ident> ) => {
-        impl Fixt for $outer {}
-        newtype_fixt!($outer<$inner>, Empty);
-        newtype_fixt!($outer<$inner>, Unpredictable);
-        newtype_fixt!($outer<$inner>, Predictable);
-    };
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::prelude::*;
-
-    #[derive(Debug, PartialEq)]
-    struct MyNewType(bool);
-    impl From<bool> for MyNewType {
-        fn from(b: bool) -> Self {
-            Self(b)
-        }
+macro_rules! newtype_fixturator {
+    ( $outer:ident<$inner:ty> ) => {
+        fixturator!($outer, {
+            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
+            self.0.index = self.0.index + 1;
+            $outer(fixturator.next().unwrap())
+        }, {
+            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
+            self.0.index = self.0.index + 1;
+            $outer(fixturator.next().unwrap())
+        }, {
+            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
+            self.0.index = self.0.index + 1;
+            $outer(fixturator.next().unwrap())
+        });
     }
-    newtype_fixt!(MyNewType<bool>);
-    basic_test!(
-        MyNewType,
-        MyNewType(false),
-        vec![true, false, true, false, true, false, true, false, true, false]
-            .into_iter()
-            .map(|b| MyNewType(b))
-            .collect::<Vec<MyNewType>>()
-    );
 }

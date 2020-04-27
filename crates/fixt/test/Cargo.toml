@@ -1,7 +1,7 @@
 [package]
-name = "fixt"
+name = "fixt_test"
 version = "0.0.1"
-description = "minimum viable fixtures"
+description = "tests the fixturator macros in an external crate"
 license = "Apache-2.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
@@ -11,8 +11,5 @@ categories = ["fixtures"]
 edition = "2018"
 
 [dependencies]
-rand = "0.7"
+fixt = { path = ".." }
 paste = "0.1.11"
-
-[features]
-fixt = []

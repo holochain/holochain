@@ -4,94 +4,61 @@ use rand::Rng;
 const EMPTY_CHAR: char = '\u{0000}';
 const PREDICTABLE_CHARS: &str = "💯❤💩.!foobarbaz!.💩❤💯";
 
-impl Iterator for Fixturator<char, Empty> {
-    type Item = char;
+fixturator!(char, EMPTY_CHAR, rand::random(), {
+    let ret = PREDICTABLE_CHARS
+        .chars()
+        .nth(self.0.index % PREDICTABLE_CHARS.chars().count())
+        .unwrap();
+    self.0.index = self.0.index + 1;
+    ret
+});
 
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(EMPTY_CHAR)
-    }
-}
-
-impl Iterator for Fixturator<char, Unpredictable> {
-    type Item = char;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(rand::random())
-    }
-}
-
-impl Iterator for Fixturator<char, Predictable> {
-    type Item = char;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let ret = PREDICTABLE_CHARS
-            .chars()
-            .nth(self.index % PREDICTABLE_CHARS.chars().count());
-        self.index = self.index + 1;
-        ret
-    }
-}
-
-impl Fixt for char {}
+#[cfg(test)]
+basic_test!(
+    char,
+    vec![EMPTY_CHAR; 40],
+    PREDICTABLE_CHARS
+        .chars()
+        .cycle()
+        .take(40)
+        .collect::<Vec<char>>()
+);
 
 const EMPTY_STR: &str = "";
 const PREDICTABLE_STRS: [&str; 10] = ["💯", "❤", "💩", ".", "!", "foo", "bar", "baz", "bing", "!"];
+const UNPREDICTABLE_MIN_LEN: usize = 0;
+const UNPREDICTABLE_MAX_LEN: usize = 64;
 
-impl Iterator for Fixturator<String, Empty> {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(String::from(EMPTY_STR))
-    }
-}
-
-impl Iterator for Fixturator<String, Unpredictable> {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
+fixturator!(
+    String,
+    String::from(EMPTY_STR),
+    {
         let mut rng = rand::thread_rng();
-        let len = rng.gen_range(0, 64);
+        let len = rng.gen_range(UNPREDICTABLE_MIN_LEN, UNPREDICTABLE_MAX_LEN);
         let vec: Vec<char> = (0..len).map(|_| rng.gen()).collect();
-        let string: String = vec.into_iter().collect();
-        Some(string)
+        let string: String = vec.iter().collect();
+        string
+    },
+    {
+        let ret = PREDICTABLE_STRS
+            .iter()
+            .cycle()
+            .nth(self.0.index)
+            .unwrap()
+            .to_string();
+        self.0.index = self.0.index + 1;
+        ret
     }
-}
-
-impl Iterator for Fixturator<String, Predictable> {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let ret: &str = PREDICTABLE_STRS[self.index % PREDICTABLE_STRS.len()];
-        self.index = self.index + 1;
-        Some(String::from(ret))
-    }
-}
-
-impl Fixt for String {}
+);
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    basic_test!(
-        char,
-        EMPTY_CHAR,
-        vec![
-            '💯', '❤', '💩', '.', '!', 'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a', 'z', '!', '.', '💩',
-            '❤', '💯', '💯', '❤', '💩', '.', '!', 'f', 'o', 'o', 'b', 'a', 'r', 'b', 'a', 'z', '!',
-            '.', '💩', '❤', '💯'
-        ]
-    );
-
-    basic_test!(
-        String,
-        String::from(EMPTY_STR),
-        vec![
-            "💯", "❤", "💩", ".", "!", "foo", "bar", "baz", "bing", "!", "💯", "❤", "💩", ".", "!",
-            "foo", "bar", "baz", "bing", "!"
-        ]
-        .into_iter()
+basic_test!(
+    String,
+    vec![String::from(EMPTY_STR); 40],
+    PREDICTABLE_STRS
+        .iter()
         .map(|s| s.to_string())
+        .cycle()
+        .take(40)
         .collect::<Vec<String>>()
-    );
-}
+);

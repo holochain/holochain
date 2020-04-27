@@ -639,6 +639,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixt_test"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "paste",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1815,9 +1823,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab4fb1930692d1b6a9cfabdde3d06ea0a7d186518e2f4d67660d8970e2fa647a"
+checksum = "a3c897744f63f34f7ae3a024d9162bb5001f4ad661dd24bea0dc9f075d2de1c6"
 dependencies = [
  "paste-impl",
  "proc-macro-hack",
@@ -1825,9 +1833,9 @@ dependencies = [
 
 [[package]]
 name = "paste-impl"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a62486e111e571b1e93b710b61e8f493c0013be39629b714cb166bdb06aa5a8a"
+checksum = "66fd6f92e3594f2dd7b3fc23e42d82e292f7bcda6d8e5dcd167072327234ab89"
 dependencies = [
  "proc-macro-hack",
  "proc-macro2 1.0.10",
