@@ -230,7 +230,7 @@ mod test {
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
-        RealConductor,
+        Conductor,
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
@@ -251,8 +251,8 @@ mod test {
     }
 
     async fn setup() -> RealAdminInterfaceApi {
-        let conductor = RealConductor::builder().test().await.unwrap();
-        RealAdminInterfaceApi::new(conductor)
+        let conductor_handle = Conductor::builder().test().await.unwrap().into_handle();
+        RealAdminInterfaceApi::new(conductor_handle)
     }
 
     #[tokio::test]
@@ -304,11 +304,12 @@ mod test {
             .with(predicate::eq(dna))
             .returning(|_| Err(DnaStoreError::WriteFail));
 
-        let conductor = ConductorBuilder::with_mock_dna_store(dna_cache)
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
             .test()
             .await
-            .unwrap();
-        let admin_api = RealAdminInterfaceApi::new(conductor);
+            .unwrap()
+            .into_handle();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
         let msg = AdminRequest::InstallDna(fake_dna_path, None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
