@@ -226,16 +226,13 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::interface::error::AdminInterfaceErrorKind;
-    use crate::{
-        conductor::{
-            api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
-            conductor::ConductorBuilder,
-            dna_store::{error::DnaStoreError, MockDnaStore},
-            RealConductor,
-        },
-        core::ribosome::wasm_test::zome_invocation_from_names,
+    use crate::conductor::{
+        api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
+        conductor::ConductorBuilder,
+        dna_store::{error::DnaStoreError, MockDnaStore},
+        Conductor,
     };
+    use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
@@ -255,12 +252,12 @@ mod test {
     }
 
     async fn setup_admin() -> RealAdminInterfaceApi {
-        let conductor = RealConductor::builder().test().await.unwrap();
-        RealAdminInterfaceApi::new(conductor)
+        let conductor_handle = Conductor::builder().test().await.unwrap().into_handle();
+        RealAdminInterfaceApi::new(conductor_handle)
     }
 
     async fn setup_app() -> RealAppInterfaceApi {
-        let conductor = RealConductor::builder().test().await.unwrap();
+        let conductor = Conductor::builder().test().await.unwrap();
         RealAppInterfaceApi::new(conductor)
     }
 
@@ -271,7 +268,10 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Serialization, ..});
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::Deserialization(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -287,7 +287,10 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Io, ..});
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -307,23 +310,25 @@ mod test {
             .with(predicate::eq(dna))
             .returning(|_| Err(DnaStoreError::WriteFail));
 
-        let conductor = ConductorBuilder::with_mock_dna_store(dna_cache)
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
             .test()
             .await
-            .unwrap();
-        let admin_api = RealAdminInterfaceApi::new(conductor);
+            .unwrap()
+            .into_handle();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
         let msg = AdminRequest::InstallDna(fake_dna_path, None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Cache, ..});
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::InternalError(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap()
-        // TODO: B-01440: this can't be done easily yet
-        // because we can't cause the cache to fail from an input
     }
 
     #[ignore]

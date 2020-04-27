@@ -1,3 +1,4 @@
+use super::api::CellConductorApiT;
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
@@ -14,7 +15,6 @@ use holochain_types::{
     shims::*,
 };
 use std::hash::{Hash, Hasher};
-use super::api::CellConductorApiT;
 
 pub mod error;
 
@@ -113,11 +113,3 @@ trait NetSend {
 #[allow(dead_code)]
 /// TODO - this is a shim until we need a real NetError
 enum NetError {}
-
-/// Simplification of holochain_net::connection::NetSend
-/// Could use the trait instead, but we will want an impl of it
-/// for just a basic crossbeam_channel::Sender, so I'm simplifying
-/// to avoid making a change to holochain_net
-///
-/// This is just a "sketch", can be removed.
-pub type NetSender = tokio::sync::mpsc::Sender<Lib3hClientProtocol>;
