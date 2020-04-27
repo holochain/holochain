@@ -5,6 +5,7 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
+use holochain_keystore::KeystoreSender;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock as RwLockSync;
@@ -59,6 +60,44 @@ fn rkv_builder(
     }
 }
 
+/// TODO - delete me and use a real keystore when we have one
+async fn temp_build_test_keystore() -> KeystoreSender {
+    use std::convert::TryFrom;
+    let _ = holochain_crypto::crypto_init_sodium();
+    let mut keystore = holochain_keystore::test_keystore::spawn_test_keystore(vec![
+        holochain_keystore::test_keystore::MockKeypair {
+            pub_key: holo_hash::AgentHash::try_from(
+                "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
+            )
+            .unwrap(),
+            sec_key: vec![
+                220, 218, 15, 212, 178, 51, 204, 96, 121, 97, 6, 205, 179, 84, 80, 159, 84,
+                163, 193, 46, 127, 15, 47, 91, 134, 106, 72, 72, 51, 76, 26, 16, 195, 236, 235,
+                182, 216, 152, 165, 215, 192, 97, 126, 31, 71, 165, 188, 12, 245, 29, 133, 230,
+                73, 251, 84, 44, 68, 14, 28, 76, 137, 166, 205, 54,
+            ],
+        },
+        holochain_keystore::test_keystore::MockKeypair {
+            pub_key: holo_hash::AgentHash::try_from(
+                "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
+            )
+            .unwrap(),
+            sec_key: vec![
+                170, 205, 134, 46, 233, 225, 100, 162, 101, 124, 207, 157, 12, 131, 239, 244,
+                216, 190, 244, 161, 209, 56, 159, 135, 240, 134, 88, 28, 48, 75, 227, 244, 162,
+                97, 243, 122, 69, 52, 251, 30, 233, 235, 101, 166, 174, 235, 29, 196, 61, 176,
+                247, 7, 35, 117, 168, 194, 243, 206, 188, 240, 145, 146, 76, 74,
+            ],
+        },
+    ]).await.unwrap();
+
+    // prepopulate the keystore with our two test agent_hashes
+    keystore.generate_sign_keypair_from_pure_entropy().await.unwrap();
+    keystore.generate_sign_keypair_from_pure_entropy().await.unwrap();
+
+    keystore
+}
+
 /// The canonical representation of a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
@@ -66,11 +105,12 @@ fn rkv_builder(
 pub struct Environment {
     arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
+    keystore: KeystoreSender,
 }
 
 impl Environment {
     /// Create an environment,
-    pub fn new(path_prefix: &Path, kind: EnvironmentKind) -> DatabaseResult<Environment> {
+    pub async fn new(path_prefix: &Path, kind: EnvironmentKind) -> DatabaseResult<Environment> {
         let mut map = ENVIRONMENTS.write();
         let path = path_prefix.join(kind.path());
         if !path.is_dir() {
@@ -81,15 +121,22 @@ impl Environment {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => e
                 .insert({
+                    let keystore = temp_build_test_keystore().await;
                     let rkv = rkv_builder(None, None)(&path)?;
                     Environment {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
+                        keystore,
                     }
                 })
                 .clone(),
         };
         Ok(env)
+    }
+
+    /// Get a reference to the keystore associated with this environment
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
     }
 
     /// Get a read-only lock on the Environment. The most typical use case is

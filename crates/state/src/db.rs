@@ -138,6 +138,11 @@ impl DbManager {
         Ok(this)
     }
 
+    /// Get a reference to the keystore associated with this environment
+    pub fn keystore(&self) -> &holochain_keystore::KeystoreSender {
+        self.env.keystore()
+    }
+
     /// Get a `rkv` Database reference from a key
     pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> DatabaseResult<&V> {
         self.um

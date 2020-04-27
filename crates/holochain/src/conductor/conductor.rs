@@ -384,7 +384,8 @@ mod builder {
         /// Initialize a "production" Conductor
         pub async fn build(self) -> ConductorResult<Conductor<DS>> {
             let env_path = self.config.environment_path;
-            let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
+            let environment =
+                Environment::new(env_path.as_ref(), EnvironmentKind::Conductor).await?;
             let conductor = Conductor::new(environment, self.dna_store).await?;
             Ok(conductor)
         }
@@ -408,7 +409,7 @@ mod builder {
 
         /// Build a Conductor with a test environment
         pub async fn test(self) -> ConductorResult<Conductor<DS>> {
-            let environment = test_conductor_env();
+            let environment = test_conductor_env().await;
             let conductor = Conductor::new(environment, self.dna_store).await?;
             Ok(conductor)
         }
@@ -424,7 +425,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn can_update_state() {
-        let environment = test_conductor_env();
+        let environment = test_conductor_env().await;
         let dna_store = MockDnaStore::new();
         let conductor = Conductor::new(environment, dna_store).await.unwrap();
         let state = conductor.get_state().await.unwrap();

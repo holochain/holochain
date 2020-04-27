@@ -125,7 +125,7 @@ pub mod tests {
     #[tokio::test]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
         env.with_reader(|reader| {
@@ -188,7 +188,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
@@ -295,7 +295,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
-        let arc1 = test_cell_env();
+        let arc1 = test_cell_env().await;
         let arc2 = arc1.clone();
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();

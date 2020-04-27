@@ -61,23 +61,47 @@ impl HeaderWithEntry {
     }
 }
 
-/// Temporary minimal structure of a ChainHeader
-// TODO: this becomes an enum
-#[allow(missing_docs)]
+/// The portion of the chain header that is serialized + signed
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[serde(tag = "header_type", content = "content")]
+pub enum ChainHeaderContent {
+    /// Fill these types in with the actual holochain formalization
+    /// header types.
+    StubHeaderType {
+        /// delete the option here - the previous header this header chains from
+        prev_header_address: Option<HeaderAddress>,
+
+        /// the entry address this header points to
+        entry_address: EntryAddress,
+    }
+}
+
+/// This type encompases a header's content and any signatures.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainHeader {
-    pub prev_header_address: Option<HeaderAddress>,
-    pub entry_address: EntryAddress,
+    /// The content of the header
+    pub content: ChainHeaderContent,
+
+    /// The signatures
+    pub provenance: Vec<crate::signature::Provenance>,
 }
 
 impl ChainHeader {
     /// Return the EntryHash this header points to
     pub fn entry_address(&self) -> &EntryAddress {
-        &self.entry_address
+        match &self.content {
+            ChainHeaderContent::StubHeaderType { entry_address, .. } => {
+                entry_address
+            }
+        }
     }
 
     /// Return the previous ChainHeader in the chain
     pub fn prev_header_address(&self) -> Option<&HeaderAddress> {
-        self.prev_header_address.as_ref()
+        match &self.content {
+            ChainHeaderContent::StubHeaderType { prev_header_address, .. } => {
+                prev_header_address.as_ref()
+            }
+        }
     }
 }

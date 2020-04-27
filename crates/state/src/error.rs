@@ -56,6 +56,9 @@ pub enum DatabaseError {
     #[error("SerializedBytes error when attempting to interact with LMDB: {0}")]
     SerializedBytes(#[from] SerializedBytesError),
 
+    #[error("Keystore Error: {0}")]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

@@ -63,7 +63,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn workspace_sanity_check() -> WorkspaceResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
         let addr1 = EntryHash::with_data_sync("hello".as_bytes());

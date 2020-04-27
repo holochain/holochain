@@ -8,7 +8,7 @@ use std::convert::TryInto;
 
 #[tokio::test]
 async fn get_links() -> DatabaseResult<()> {
-    let env = test_cell_env();
+    let env = test_cell_env().await;
     let dbs = env.dbs().await?;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;

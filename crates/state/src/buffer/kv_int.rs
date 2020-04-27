@@ -208,7 +208,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvint_iterators() -> DatabaseResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -244,7 +244,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn kvint_empty_iterators() -> DatabaseResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -262,7 +262,7 @@ pub mod tests {
     #[tokio::test]
     async fn kvint_indicate_value_overwritten() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
         env.with_reader(|reader| {
@@ -280,7 +280,7 @@ pub mod tests {
     async fn kvint_deleted_persisted() -> DatabaseResult<()> {
         use tracing::*;
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -313,7 +313,7 @@ pub mod tests {
     #[tokio::test]
     async fn kvint_deleted_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -351,7 +351,7 @@ pub mod tests {
     #[tokio::test]
     async fn kvint_get_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -371,7 +371,7 @@ pub mod tests {
     #[tokio::test]
     async fn kvint_get_persisted() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -397,7 +397,7 @@ pub mod tests {
     #[tokio::test]
     async fn kvint_get_del_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
@@ -417,7 +417,7 @@ pub mod tests {
     #[tokio::test]
     async fn kvint_get_del_persisted() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_integer("kv", StoreOptions::create())?;
 
