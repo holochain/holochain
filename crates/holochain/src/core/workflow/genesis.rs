@@ -26,10 +26,12 @@ pub async fn genesis(
 
     workspace
         .source_chain
-        .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)?;
+        .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)
+        .await?;
     workspace
         .source_chain
-        .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)?;
+        .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)
+        .await?;
 
     Ok(WorkflowEffects {
         workspace,

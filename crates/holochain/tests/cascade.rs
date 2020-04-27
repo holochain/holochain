@@ -25,8 +25,8 @@ async fn get_links() -> DatabaseResult<()> {
     let jessy_id = fake_agent_hash("Jessy");
     let jessy = Entry::AgentKey(jessy_id.clone());
     let base: EntryHash = (&jimbo).try_into()?;
-    source_chain.put_entry(jimbo, &jimbo_id)?;
-    source_chain.put_entry(jessy, &jessy_id)?;
+    source_chain.put_entry(jimbo, &jimbo_id).await?;
+    source_chain.put_entry(jessy, &jessy_id).await?;
 
     // Pass in stores as references
     let cascade = Cascade::new(
