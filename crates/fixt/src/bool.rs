@@ -2,11 +2,7 @@ use crate::prelude::*;
 
 fixturator!(bool, false, rand::random(), {
     self.0.index = self.0.index + 1;
-    if self.0.index % 2 == 0 {
-        false
-    } else {
-        true
-    }
+    self.0.index % 2 != 0
 });
 
 basic_test!(
