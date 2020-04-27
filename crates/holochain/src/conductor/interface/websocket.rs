@@ -257,8 +257,8 @@ mod test {
     }
 
     async fn setup_app() -> RealAppInterfaceApi {
-        let conductor = Conductor::builder().test().await.unwrap();
-        RealAppInterfaceApi::new(conductor)
+        let conductor_handle = Conductor::builder().test().await.unwrap().into_handle();
+        RealAppInterfaceApi::new(conductor_handle)
     }
 
     #[tokio::test]

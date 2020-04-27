@@ -38,7 +38,7 @@ impl CellConductorApiT for CellConductorApi {
     ) -> ConductorApiResult<ZomeInvocationResponse> {
         if self.cell_id == invocation.cell_id {
             self.conductor_handle
-                .invoke_zome(self.clone(), invocation)
+                .invoke_zome(invocation)
                 .await
                 .map_err(Into::into)
         } else {

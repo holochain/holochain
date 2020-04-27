@@ -200,11 +200,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         &self,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        // FIXME: Does this mean the read handle is held for 
-        // the length of the zome call
-        let conductor = self.conductor_handle.read().await;
-        let cell = conductor.cell_by_id(&invocation.cell_id)?;
-        cell.invoke_zome(invocation).await
+        self.conductor_handle.invoke_zome(invocation).await
     }
 }
 

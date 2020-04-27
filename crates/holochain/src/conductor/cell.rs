@@ -79,9 +79,10 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
+        api: CellConductorApi,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        self.conductor_api.invoke_zome(invocation).await
+        api.invoke_zome(invocation).await
     }
 
     // TODO: tighten up visibility: only WorkflowRunner needs to access this

@@ -93,7 +93,6 @@ pub trait ConductorHandleT: Send + Sync {
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
         &self,
-        api: CellConductorApi,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 
@@ -147,9 +146,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn invoke_zome(
         &self,
-        api: CellConductorApi,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
+        // FIXME: Are we holding this read lock for
+        // the entire call to invoke_zome ?
         let lock = self.0.read().await;
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
         cell.invoke_zome(api, invocation).await.map_err(Into::into)
