@@ -1,6 +1,13 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{dna::Dna, entry::Entry,     header, prelude::*};
+use holochain_types::{
+    chain_header::{ChainElement, ChainHeader},
+    dna::Dna,
+    entry::Entry,
+    header,
+    prelude::*,
+    signature::Signature,
+};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -25,34 +32,34 @@ pub async fn genesis(
     }
 
     // create a DNA chain element and add it directly to the store
-    let dna_header = ChainHeader::Dna(
-        header::Dna {
-            timestamp: chrono::Utc::now().timestamp().into(),
-            author: agent_hash.clone(),
-            dna.hash(),
-        }
-    );
+    let dna_header = ChainHeader::Dna(header::Dna {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: agent_hash.clone(),
+        hash: dna.dna_hash(),
+    });
     //FIXME: real signature.
-    let element = ChainElement(Signature::fake(), dna_header, Some(Entry::Dna(Box::new(dna)));
-    workspace
-        .source_chain
-        .put_element(element)?;
+    let element = ChainElement::new(
+        Signature::fake(),
+        dna_header,
+        Some(Entry::Dna(Box::new(dna))),
+    );
+    workspace.source_chain.put_element(element)?;
 
     // create a agent chain element and add it directly to the store
-    let agent_header = ChainHeader::(
-        header::EntryCreate {
-            timestamp: chrono::Utc::now().timestamp().into(),
-            author: agent_hash.clone(),
-            prev_headr: dna_header.hash(),
-            entry_type: header::EntryType::AgentKey,
-            entry_address: agent_hash.into(),
-        }
-    );
+    let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: agent_hash.clone(),
+        prev_header: dna_header.hash(),
+        entry_type: header::EntryType::AgentKey,
+        entry_address: agent_hash.into(),
+    });
     //FIXME: real signature.
-    let element = ChainElement(Signature::fake(), agent_header, Some(Entry::AgentKey(agent_hash));
-    workspace
-        .source_chain
-        .put_element(element)?;
+    let element = ChainElement::new(
+        Signature::fake(),
+        agent_header,
+        Some(Entry::AgentKey(agent_hash)),
+    );
+    workspace.source_chain.put_element(element)?;
 
     Ok(WorkflowEffects {
         workspace,

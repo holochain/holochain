@@ -6,6 +6,8 @@
 
 #![allow(missing_docs)]
 
+use crate::entry::EntryAddress;
+
 //pub struct Signature;
 pub struct CapTokenClaim;
 pub struct CapTokenGrant;

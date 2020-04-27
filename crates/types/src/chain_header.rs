@@ -4,9 +4,9 @@
 
 use crate::{
     entry::{Entry, EntryAddress},
-    signature::Signature,
     header,
     prelude::*,
+    signature::Signature,
 };
 use shrinkwraprs::Shrinkwrap;
 
@@ -66,13 +66,16 @@ impl HeaderWithEntry {
 
 /// a chain element which is a triple containing the signature of the header along with the
 /// entry if the header type has one.
-pub struct ChainElement(Signature, ChainHeader, Option<Entry>);
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChainElement(pub Signature, pub ChainHeader, pub Option<Entry>);
 
 /// the header and the signature that signed it
-#[derive(Shrinkwrap)]
+#[derive(Shrinkwrap, Clone, Debug, Serialize, Deserialize)]
+#[allow(dead_code, missing_docs)]
 pub struct SignedHeader {
-    #[shrinkwrap(main_field)] header: ChainHeader,
-    signature: Signature,
+    #[shrinkwrap(main_field)]
+    pub header: ChainHeader,
+    pub signature: Signature,
 }
 
 impl ChainElement {
@@ -113,7 +116,6 @@ pub enum ChainHeader {
 }
 
 impl ChainHeader {
-
     /// Return the previous ChainHeader's Address in the chain
     pub fn prev_header_address(&self) -> Option<HeaderAddress> {
         self.prev_header().map(|h| h.to_owned().into())
@@ -135,11 +137,11 @@ impl ChainHeader {
             Self::EntryDelete(header::EntryDelete { .. }) => return None,
             Self::ChainClose(header::ChainClose { .. }) => return None,
             Self::ChainOpen(header::ChainOpen { .. }) => return None,
-            Self::EntryCreate(header::EntryCreate { entry_hash, .. }) => {
-                EntryAddress::Entry(entry_hash.to_owned())
+            Self::EntryCreate(header::EntryCreate { entry_address, .. }) => {
+                entry_address.to_owned()
             }
-            Self::EntryUpdate(header::EntryUpdate { entry_hash, .. }) => {
-                EntryAddress::Entry(entry_hash.to_owned())
+            Self::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
+                entry_address.to_owned()
             }
         })
     }

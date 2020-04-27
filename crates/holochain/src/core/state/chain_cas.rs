@@ -14,13 +14,13 @@ use holochain_state::{
 };
 use holochain_types::{
     chain_header::HeaderAddress,
-    chain_header::{ChainHeader, HeaderWithEntry},
+    chain_header::{ChainElement, SignedHeader},
     entry::Entry,
     entry::EntryAddress,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
-pub type HeaderCas<'env, R> = CasBuf<'env, ChainHeader, R>;
+pub type HeaderCas<'env, R> = CasBuf<'env, SignedHeader, R>;
 
 /// A convenient pairing of two CasBufs, one for entries and one for headers
 pub struct ChainCasBuf<'env, R: Readable = Reader<'env>> {
@@ -60,26 +60,38 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         self.entries.get(&entry_address.into()).map(|e| e.is_some())
     }
 
-    pub fn get_header(&self, header_address: HeaderAddress) -> DatabaseResult<Option<ChainHeader>> {
-        self.headers.get(&header_address.into())
+    pub fn get_header(
+        &self,
+        header_address: &HeaderAddress,
+    ) -> DatabaseResult<Option<SignedHeader>> {
+        self.headers.get(header_address.into())
     }
 
-    // Given a SignedHeader, return the corresponding ChainElement
+    // local helper function which given a SignedHeader, looks for an entry in the cas
+    // and builds a ChainElement struct
     fn chain_element(
         &self,
         signed_header: SignedHeader,
     ) -> SourceChainResult<Option<ChainElement>> {
-        maybe_entry = signed_header.header.entry_address().map(|entry_address| {
-            // if the header has an address it better have been stored!
-            let maybe_entry = self.get_entry(entry_address())?;
-            if maybe_entry.is_none() {
-                return Err(SourceChainError::InvalidStructure(
-                    ChainInvalidReason::MissingData(header.entry_address()),
-                ));
+        let maybe_entry_address = signed_header.header.entry_address();
+        let maybe_entry = match maybe_entry_address {
+            None => None,
+            Some(entry_address) => {
+                // if the header has an address it better have been stored!
+                let maybe_cas_entry = self.get_entry(entry_address)?;
+                if maybe_cas_entry.is_none() {
+                    return Err(SourceChainError::InvalidStructure(
+                        ChainInvalidReason::MissingData(entry_address),
+                    ));
+                }
+                maybe_cas_entry
             }
-            maybe_entry
-        });
-        ChainElement::new(signed_header.signature, signed_header.header, maybe_entry);
+        };
+        Ok(Some(ChainElement::new(
+            signed_header.signature,
+            signed_header.header,
+            maybe_entry,
+        )))
     }
 
     /// given a header address return the full chain element for that address
@@ -87,7 +99,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
-        if let Some(singed_header) = self.get_header(header_address.to_owned())? {
+        if let Some(signed_header) = self.get_header(header_address)? {
             self.chain_element(signed_header)
         } else {
             Ok(None)
@@ -95,12 +107,16 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     }
 
     pub fn put(&mut self, v: ChainElement) -> DatabaseResult<()> {
-        let (signature, header, maybe_entry) = v;
-        let signed_header = SignedHeader { signature, header };
-        if is_some(maybe_entry) {
-            self.entries.put((&entry).try_into()?, entry);
+        let header = v.header();
+        let signed_header = SignedHeader {
+            signature: v.signature().to_owned(),
+            header: header.to_owned(),
+        };
+        if let Some(entry) = v.entry() {
+            self.entries
+                .put(entry.entry_hash().try_into()?, entry.to_owned());
         }
-        self.headers.put((&header).try_into()?, signed_header);
+        self.headers.put(header.hash().try_into()?, signed_header);
         Ok(())
     }
 

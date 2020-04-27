@@ -8,8 +8,14 @@ use holochain_state::{
     db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
     test_utils::test_cell_env,
 };
-use holochain_types::entry::EntryAddress;
-use holochain_types::{entry::Entry, observability, prelude::*, test_utils::{fake_agent_hash, fake_header_hash}};
+use holochain_types::{
+    chain_header::{ChainElement, ChainHeader},
+    entry::{Entry, EntryAddress},
+    header, observability,
+    prelude::*,
+    signature::Signature,
+    test_utils::{fake_agent_hash, fake_header_hash},
+};
 use maplit::hashset;
 use mockall::*;
 use std::collections::HashSet;
@@ -26,12 +32,10 @@ struct Chains<'env> {
     mock_cache_meta: MockChainMetaBuf,
 }
 
-
 fn setup_env<'env>(
     reader: &'env Reader<'env>,
     dbs: &'env DbManager,
 ) -> DatabaseResult<Chains<'env>> {
-
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_hash("Jimbo");
@@ -39,28 +43,23 @@ fn setup_env<'env>(
     let jessy_id = fake_agent_hash("Jessy");
     let jessy = Entry::AgentKey(jessy_id.clone());
 
-    let jimbo_header = ChainHeader::Dna(
-        header::EntryCreate {
-            timestamp: chrono::Utc::now().timestamp().into(),
-            author: jimbo_id.clone(),
-            prev_headr: previous_header,
-            entry_type: header::EntryType::AgentKey,
-            entry_address: jimbo.entry_address(),
-        }
-    );
-    let jimbo = ChainElement(Signature::fake(), jimbo_header, Some(jimbo));
+    let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: jimbo_id.clone(),
+        prev_headr: previous_header,
+        entry_type: header::EntryType::AgentKey,
+        entry_address: jimbo.entry_address(),
+    });
+    let jimbo = ChainElement::new(Signature::fake(), jimbo_header, Some(jimbo));
 
-    let jessy_header = ChainHeader::(
-        header::EntryCreate {
-            timestamp: chrono::Utc::now().timestamp().into(),
-            author: jessy_id.clone(),
-            prev_headr: previous_header,
-            entry_type: header::EntryType::AgentKey,
-            entry_address: jessy.entry_address(),
-        }
-    );
+    let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: jessy_id.clone(),
+        prev_headr: previous_header,
+        entry_type: header::EntryType::AgentKey,
+        entry_address: jessy.entry_address(),
+    });
     let jessy = ChainElement(Signature::fake(), jessy_header, Some(jessy));
-
 
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;
