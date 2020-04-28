@@ -8,8 +8,6 @@
 
 use crate::entry::EntryAddress;
 
-pub struct CapTokenClaim;
-pub struct CapTokenGrant;
 pub type ZomeId = u8;
 
 use crate::{prelude::*, time::Iso8601};

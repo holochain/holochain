@@ -8,6 +8,14 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
+//TODO move to capabilities module
+/// Entry data for a capability claim
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct CapTokenClaim;
+/// Entry data for a capability grant
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct CapTokenGrant;
+
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[allow(clippy::large_enum_variant)]
@@ -18,6 +26,12 @@ pub enum Entry {
     AgentKey(AgentHash),
     /// The application entry data for entries that aren't system created entries
     App(SerializedBytes),
+    /// The capability claim system entry which allows committing a granted permission
+    /// for later use
+    CapTokenClaim(CapTokenClaim),
+    /// The capability grant system entry which allows granting of application defined
+    /// capabilities
+    CapTokenGrant(CapTokenGrant),
 }
 
 impl Entry {
@@ -28,6 +42,16 @@ impl Entry {
         match self {
             Entry::AgentKey(key) => EntryAddress::Agent(key.to_owned()),
             Entry::App(serialized_bytes) => {
+                EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.bytes()))
+            }
+            Entry::CapTokenClaim(claim) => {
+                // TODO fix unwrap
+                let serialized_bytes: SerializedBytes = claim.try_into().unwrap();
+                EntryAddress::Entry(EntryHash::with_data_sync(serialized_bytes.bytes()))
+            }
+            Entry::CapTokenGrant(grant) => {
+                // TODO fix unwrap
+                let serialized_bytes: SerializedBytes = grant.try_into().unwrap();
                 EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.bytes()))
             }
         }
