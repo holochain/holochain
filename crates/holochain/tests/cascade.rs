@@ -27,7 +27,7 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         entry_address: jimbo_entry.entry_address(),
     });
     let fake_signature = Signature(vec![0; 32]);
-    let jimbo_element = ChainElement(fake_signature.clone(), jimbo_header, Some(jimbo_entry));
+    let jimbo_element = ChainElement::new(fake_signature.clone(), jimbo_header, Some(jimbo_entry));
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jessy_id.clone(),
@@ -35,7 +35,7 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });
-    let jessy_element = ChainElement(fake_signature, jessy_header, Some(jessy_entry));
+    let jessy_element = ChainElement::new(fake_signature, jessy_header, Some(jessy_entry));
     (jimbo_id, jimbo_element, jessy_id, jessy_element)
 }
 

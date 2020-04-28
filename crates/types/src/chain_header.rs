@@ -5,6 +5,21 @@
 use crate::{entry::Entry, header, prelude::*};
 use holochain_keystore::Signature;
 use shrinkwraprs::Shrinkwrap;
+use thiserror::Error;
+
+/// Error type regarding chain elements
+#[derive(Error, Debug, PartialEq)]
+pub enum ChainElementError {
+    /// Element signature doesn't validate against the header
+    #[error("Element signature is invalid")]
+    InvalidSignature,
+    /// Element's header and entry types don't match
+    #[error("Element header and entry type mismatch")]
+    TypeMismatch,
+}
+
+/// Convenience result type for ChainElementError
+pub type ChainElementResult<T> = Result<T, ChainElementError>;
 
 /// wraps header hash to promote it to an "address" e.g. for use in a CAS
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -43,7 +58,7 @@ impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
 /// a chain element which is a triple containing the signature of the header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ChainElement(pub Signature, pub ChainHeader, pub Option<Entry>);
+pub struct ChainElement(Signature, ChainHeader, Option<Entry>);
 
 /// the header and the signature that signed it
 #[derive(Shrinkwrap, Clone, Debug, Serialize, Deserialize)]
@@ -58,6 +73,15 @@ impl ChainElement {
     /// Element constructor.
     pub fn new(signature: Signature, header: ChainHeader, maybe_entry: Option<Entry>) -> Self {
         Self(signature, header, maybe_entry)
+    }
+
+    /// Validates a chain element
+    pub fn validate(&self) -> ChainElementResult<()> {
+        //TODO: gheck that signature is of the header:
+        //      ChainElementError::InvalidSignature
+        //TODO: make sure that any cases around entry existence are valid:
+        //      ChainElementError::TypeMismatch,
+        unimplemented!()
     }
 
     /// Access the signature portion of this triple.

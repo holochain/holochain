@@ -59,7 +59,7 @@ fn setup_env<'env>(
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });
-    let jessy = ChainElement(fake_signature, jessy_header, Some(jessy_entry));
+    let jessy = ChainElement::new(fake_signature, jessy_header, Some(jessy_entry));
 
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;
