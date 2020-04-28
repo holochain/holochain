@@ -112,17 +112,25 @@ pub enum ChainHeader {
 }
 
 impl ChainHeader {
-    /// Return the previous ChainHeader's Address in the chain
+    /// return the previous ChainHeader's Address in the chain
     pub fn prev_header_address(&self) -> Option<HeaderAddress> {
         self.prev_header().map(|h| h.to_owned().into())
     }
 
-    /// Returns whether this header's entry data is public
+    /// returns whether this header's entry data is public
     pub fn is_public(&self) -> bool {
         unimplemented!()
     }
-    //    pub fn author() -> PublicKey { unimplemented!() }
-    //   pub fn timestamp() -> Timestamp { unimplemented!() }
+
+    /// returns the author who signed the header
+    pub fn author() -> AgentHash {
+        unimplemented!()
+    }
+
+    /// returns the timestamp of when the header was created
+    pub fn timestamp() -> header::Timestamp {
+        unimplemented!()
+    }
 
     // FIXME: use async with_data, or consider wrapper type
     // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
