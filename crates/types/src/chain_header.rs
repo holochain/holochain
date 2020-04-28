@@ -39,26 +39,6 @@ impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
     }
 }
 
-/// ChainHeader + Entry.
-pub struct HeaderWithEntry(ChainHeader, Entry);
-
-impl HeaderWithEntry {
-    /// HeaderWithEntry constructor.
-    pub fn new(header: ChainHeader, entry: Entry) -> Self {
-        Self(header, entry)
-    }
-
-    /// Access the ChainHeader portion of this pair.
-    pub fn header(&self) -> &ChainHeader {
-        &self.0
-    }
-
-    /// Access the Entry portion of this pair.
-    pub fn entry(&self) -> &Entry {
-        &self.1
-    }
-}
-
 /// a chain element which is a triple containing the signature of the header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq)]
