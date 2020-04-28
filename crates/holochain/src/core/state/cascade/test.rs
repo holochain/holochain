@@ -50,135 +50,85 @@ fn setup_env<'env>(
     })
 }
 
-fn is_send<X: Send>(x: X) -> X {
-    x
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn is_env_send() -> DatabaseResult<()> {
-    tokio::task::spawn(async move {
-        let env = is_send(test_cell_env());
-        let dbs = is_send(env.dbs().await?);
-        let env_ref = is_send(env.guard().await);
-        let reader = is_send(env_ref.reader()?);
-        let Chains {
-            mut source_chain,
-            cache,
-            jimbo_id,
-            jimbo,
-            mut mock_primary_meta,
-            mock_cache_meta,
-            ..
-        } = setup_env(&reader, &dbs)?;
-        source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
-        let hash: EntryHash = (&jimbo).try_into()?;
-
-        mock_primary_meta
-            .expect_get_crud()
-            .with(predicate::eq(EntryAddress::from(hash.clone())))
-            .returning(|_| Ok(EntryDhtStatus::Live));
-
-        let cascade = Cascade::new(
-            &source_chain.cas(),
-            &mock_primary_meta,
-            &cache.cas(),
-            &mock_cache_meta,
-        );
-        let _entry = cascade.dht_get(hash.clone().into()).await?;
-
-        Ok(())
-    })
-    .await
-    .unwrap()
-}
-
 #[tokio::test(threaded_scheduler)]
 async fn live_local_return() -> DatabaseResult<()> {
-    tokio::task::spawn(async move {
-        // setup some data thats in the scratch
-        let env = test_cell_env();
-        let dbs = env.dbs().await?;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader()?;
-        let Chains {
-            mut source_chain,
-            cache,
-            jimbo_id,
-            jimbo,
-            mut mock_primary_meta,
-            mock_cache_meta,
-            ..
-        } = setup_env(&reader, &dbs)?;
-        source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
-        let hash: EntryHash = (&jimbo).try_into()?;
+    // setup some data thats in the scratch
+    let env = test_cell_env();
+    let dbs = env.dbs().await?;
+    let env_ref = env.guard().await;
+    let reader = env_ref.reader()?;
+    let Chains {
+        mut source_chain,
+        cache,
+        jimbo_id,
+        jimbo,
+        mut mock_primary_meta,
+        mock_cache_meta,
+        ..
+    } = setup_env(&reader, &dbs)?;
+    source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
+    let hash: EntryHash = (&jimbo).try_into()?;
 
-        // set it's metadata to LIVE
-        mock_primary_meta
-            .expect_get_crud()
-            .with(predicate::eq(EntryAddress::from(hash.clone())))
-            .returning(|_| Ok(EntryDhtStatus::Live));
+    // set it's metadata to LIVE
+    mock_primary_meta
+        .expect_get_crud()
+        .with(predicate::eq(EntryAddress::from(hash.clone())))
+        .returning(|_| Ok(EntryDhtStatus::Live));
 
-        // call dht_get with above address
-        let cascade = Cascade::new(
-            &source_chain.cas(),
-            &mock_primary_meta,
-            &cache.cas(),
-            &mock_cache_meta,
-        );
-        let entry = cascade.dht_get(hash.clone().into()).await?;
-        // check it returns
-        assert_eq!(entry, Some(jimbo));
-        // check it doesn't hit the cache
-        // this is implied by the mock not expecting calls
-        Ok(())
-    })
-    .await
-    .unwrap()
+    // call dht_get with above address
+    let cascade = Cascade::new(
+        &source_chain.cas(),
+        &mock_primary_meta,
+        &cache.cas(),
+        &mock_cache_meta,
+    );
+    let entry = cascade.dht_get(hash.clone().into()).await?;
+    // check it returns
+    assert_eq!(entry, Some(jimbo));
+    // check it doesn't hit the cache
+    // this is implied by the mock not expecting calls
+    Ok(())
 }
 
 #[tokio::test(threaded_scheduler)]
 async fn dead_local_none() -> DatabaseResult<()> {
-    tokio::task::spawn(async move {
-        observability::test_run().ok();
-        // setup some data thats in the scratch
-        let env = test_cell_env();
-        let dbs = env.dbs().await?;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader()?;
-        let Chains {
-            mut source_chain,
-            cache,
-            jimbo_id,
-            jimbo,
-            mut mock_primary_meta,
-            mock_cache_meta,
-            ..
-        } = setup_env(&reader, &dbs)?;
-        source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
-        let hash: EntryHash = jimbo.try_into()?;
+    observability::test_run().ok();
+    // setup some data thats in the scratch
+    let env = test_cell_env();
+    let dbs = env.dbs().await?;
+    let env_ref = env.guard().await;
+    let reader = env_ref.reader()?;
+    let Chains {
+        mut source_chain,
+        cache,
+        jimbo_id,
+        jimbo,
+        mut mock_primary_meta,
+        mock_cache_meta,
+        ..
+    } = setup_env(&reader, &dbs)?;
+    source_chain.put_entry(jimbo.clone(), &jimbo_id).await?;
+    let hash: EntryHash = jimbo.try_into()?;
 
-        // set it's metadata to Dead
-        mock_primary_meta
-            .expect_get_crud()
-            .with(predicate::eq(EntryAddress::from(hash.clone())))
-            .returning(|_| Ok(EntryDhtStatus::Dead));
+    // set it's metadata to Dead
+    mock_primary_meta
+        .expect_get_crud()
+        .with(predicate::eq(EntryAddress::from(hash.clone())))
+        .returning(|_| Ok(EntryDhtStatus::Dead));
 
-        // call dht_get with above address
-        let cascade = Cascade::new(
-            &source_chain.cas(),
-            &mock_primary_meta,
-            &cache.cas(),
-            &mock_cache_meta,
-        );
-        let entry = cascade.dht_get(hash.into()).await?;
-        // check it returns none
-        assert_eq!(entry, None);
-        // check it doesn't hit the cache
-        // this is implied by the mock not expecting calls
-        Ok(())
-    })
-    .await
-    .unwrap()
+    // call dht_get with above address
+    let cascade = Cascade::new(
+        &source_chain.cas(),
+        &mock_primary_meta,
+        &cache.cas(),
+        &mock_cache_meta,
+    );
+    let entry = cascade.dht_get(hash.into()).await?;
+    // check it returns none
+    assert_eq!(entry, None);
+    // check it doesn't hit the cache
+    // this is implied by the mock not expecting calls
+    Ok(())
 }
 
 #[tokio::test(threaded_scheduler)]

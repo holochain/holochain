@@ -37,6 +37,8 @@ mock! {
         fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
         fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
+
+        fn mock_keystore(&self) -> &KeystoreSender;
     }
 
     trait Clone {
@@ -62,8 +64,8 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_network_send(message)
     }
 
-    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo> {
-        self.sync_network_request(_message)
+    async fn network_request(&self, message: Todo) -> ConductorApiResult<Todo> {
+        self.sync_network_request(message)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
@@ -71,6 +73,6 @@ impl CellConductorApiT for MockCellConductorApi {
     }
 
     fn keystore(&self) -> &KeystoreSender {
-        unimplemented!()
+        self.mock_keystore()
     }
 }
