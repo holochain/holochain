@@ -5,7 +5,6 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-//use crate::dna::Dna;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
