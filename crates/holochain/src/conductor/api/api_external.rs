@@ -147,12 +147,10 @@ async fn read_parse_dna(
         .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?
         .into();
     let dna = SerializedBytes::from(dna);
-    let mut dna: Dna = dna.try_into().map_err(|e| SerializationError::from(e))?;
+    let mut dna: Dna = dna.try_into().map_err(SerializationError::from)?;
     if let Some(properties) = properties {
         let properties = Properties::new(properties);
-        dna.properties = (properties)
-            .try_into()
-            .map_err(|e| SerializationError::from(e))?;
+        dna.properties = (properties).try_into().map_err(SerializationError::from)?;
     }
     Ok(dna)
 }

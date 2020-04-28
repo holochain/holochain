@@ -7,8 +7,7 @@ use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::Todo,
-    signature::Signature,
+    prelude::{Signature, Todo},
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
