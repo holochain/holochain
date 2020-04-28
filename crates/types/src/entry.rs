@@ -48,7 +48,6 @@ impl From<EntryAddress> for HoloHash {
         match entry_address {
             EntryAddress::Entry(entry_hash) => entry_hash.into(),
             EntryAddress::Agent(agent_hash) => agent_hash.into(),
-            //      EntryAddress::Dna(dna_hash) => dna_hash.into(),
         }
     }
 }
