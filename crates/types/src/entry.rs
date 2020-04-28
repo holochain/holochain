@@ -42,8 +42,6 @@ pub enum EntryAddress {
     Entry(EntryHash),
     /// agents are entries too
     Agent(AgentHash),
-    // /// the DNA is an entries too
-    //Dna(DnaHash),
 }
 
 impl From<EntryAddress> for HoloHash {
