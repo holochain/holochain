@@ -66,7 +66,6 @@ impl AsRef<[u8]> for &EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
             EntryAddress::Agent(agent_hash) => agent_hash.as_ref(),
-            //    EntryAddress::Dna(dna_hash) => dna_hash.as_ref(),
         }
     }
 }
