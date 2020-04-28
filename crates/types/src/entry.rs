@@ -5,7 +5,6 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-//use crate::dna::Dna;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
@@ -42,8 +41,6 @@ pub enum EntryAddress {
     Entry(EntryHash),
     /// agents are entries too
     Agent(AgentHash),
-    // /// the DNA is an entries too
-    //Dna(DnaHash),
 }
 
 impl From<EntryAddress> for HoloHash {
@@ -51,7 +48,6 @@ impl From<EntryAddress> for HoloHash {
         match entry_address {
             EntryAddress::Entry(entry_hash) => entry_hash.into(),
             EntryAddress::Agent(agent_hash) => agent_hash.into(),
-            //      EntryAddress::Dna(dna_hash) => dna_hash.into(),
         }
     }
 }
@@ -68,7 +64,6 @@ impl AsRef<[u8]> for &EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
             EntryAddress::Agent(agent_hash) => agent_hash.as_ref(),
-            //    EntryAddress::Dna(dna_hash) => dna_hash.as_ref(),
         }
     }
 }
@@ -78,7 +73,6 @@ impl std::fmt::Display for EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
             EntryAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
-            //  EntryAddress::Dna(dna_hash) => write!(f, "{}", dna_hash),
         }
     }
 }
