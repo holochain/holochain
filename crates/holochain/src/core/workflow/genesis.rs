@@ -90,8 +90,6 @@ mod tests {
         header, observability,
         test_utils::{fake_agent_hash, fake_dna},
     };
-    //use tracing::*;
-    // use std::convert::TryFrom;
 
     #[tokio::test]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
