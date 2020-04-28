@@ -34,16 +34,17 @@ impl CellConductorApi {
 impl CellConductorApiT for CellConductorApi {
     async fn invoke_zome(
         &self,
+        cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        if self.cell_id == invocation.cell_id {
+        if *cell_id == invocation.cell_id {
             self.conductor_handle
                 .invoke_zome(invocation)
                 .await
                 .map_err(Into::into)
         } else {
             Err(ConductorApiError::ZomeInvocationCellMismatch {
-                api_cell_id: self.cell_id.clone(),
+                api_cell_id: cell_id.clone(),
                 invocation_cell_id: invocation.cell_id,
             })
         }
@@ -87,6 +88,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// An invocation on a different Cell than this one corresponds to a bridged call.
     async fn invoke_zome(
         &self,
+        cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 

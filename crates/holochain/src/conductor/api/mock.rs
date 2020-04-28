@@ -6,6 +6,7 @@ use crate::conductor::api::error::ConductorApiResult;
 use async_trait::async_trait;
 use holochain_types::{
     autonomic::AutonomicCue,
+    cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
     signature::Signature,
@@ -22,6 +23,7 @@ mock! {
 
         fn sync_invoke_zome(
             &self,
+            cell_id: &CellId,
             invocation: ZomeInvocation,
         ) -> ConductorApiResult<ZomeInvocationResponse>;
 
@@ -52,9 +54,10 @@ mock! {
 impl CellConductorApiT for MockCellConductorApi {
     async fn invoke_zome(
         &self,
+        cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        self.sync_invoke_zome(invocation)
+        self.sync_invoke_zome(cell_id, invocation)
     }
 
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {

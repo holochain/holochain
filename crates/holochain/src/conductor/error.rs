@@ -1,5 +1,5 @@
 use super::dna_store::error::DnaStoreError;
-use crate::conductor::cell::error::CellError;
+use crate::{conductor::cell::error::CellError, core::workflow::runner::error::WorkflowRunError};
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::{CellHandle, CellId};
 use std::path::PathBuf;
@@ -56,6 +56,9 @@ pub enum ConductorError {
 
     #[error("DNA store error: {0:?}")]
     DnaStoreError(#[from] DnaStoreError),
+
+    #[error("Workflow error: {0:?}")]
+    WorkflowRunError(#[from] WorkflowRunError),
 }
 
 // TODO: can this be removed?

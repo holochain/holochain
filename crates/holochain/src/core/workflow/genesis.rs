@@ -1,5 +1,8 @@
-use super::{WorkflowEffects, WorkflowError, WorkflowResult};
-use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
+use super::{runner::error::WorkflowRunError, WorkflowEffects, WorkflowError};
+use crate::{
+    conductor::api::{error::ConductorApiResult, CellConductorApiT},
+    core::state::workspace::GenesisWorkspace,
+};
 use holochain_types::{dna::Dna, entry::Entry, prelude::*};
 
 /// Initialize the source chain with the initial entries:
@@ -14,22 +17,24 @@ pub async fn genesis(
     api: impl CellConductorApiT,
     dna: Dna,
     agent_hash: AgentHash,
-) -> WorkflowResult<GenesisWorkspace<'_>> {
+) -> ConductorApiResult<WorkflowEffects<GenesisWorkspace<'_>>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
         .await?
         == "INVALID"
     {
-        return Err(WorkflowError::AgentInvalid(agent_hash.clone()));
+        return Err(WorkflowRunError::from(WorkflowError::AgentInvalid(agent_hash.clone())).into());
     }
 
     workspace
         .source_chain
-        .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)?;
+        .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)
+        .map_err(|e| WorkflowRunError::from(e))?;
     workspace
         .source_chain
-        .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)?;
+        .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)
+        .map_err(|e| WorkflowRunError::from(e))?;
 
     Ok(WorkflowEffects {
         workspace,

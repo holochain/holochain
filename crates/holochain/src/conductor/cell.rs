@@ -1,12 +1,16 @@
-use super::api::CellConductorApiT;
+use super::api::error::SerializationError;
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    core::ribosome::WasmRibosome,
+    core::{
+        ribosome::WasmRibosome,
+        workflow::{runner::WorkflowRunner, WorkflowCall},
+    },
 };
 use holo_hash::*;
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::Environment;
 use holochain_types::{
     autonomic::AutonomicProcess,
@@ -14,7 +18,11 @@ use holochain_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use std::hash::{Hash, Hasher};
+
+use std::{
+    convert::TryInto,
+    hash::{Hash, Hasher},
+};
 
 pub mod error;
 
@@ -79,10 +87,21 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
-        api: CellConductorApi,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        api.invoke_zome(invocation).await
+        // create the workflow runner
+        let runner = WorkflowRunner::new(&self);
+        // create the work flow call
+        let call = WorkflowCall::InvokeZome(invocation.into());
+        // call the workflow
+        // FIXME Can't impliment this error WokflowRunError -> ConductorApiError
+        // obviously remove this unwrap
+        // FIXME this result isn't actualy returned
+        let result = runner.run_workflow(call).await?;
+        let result: SerializedBytes = result.try_into().map_err(|e| SerializationError::from(e))?;
+        Ok(ZomeInvocationResponse::ZomeApiFn(
+            result.try_into().map_err(|e| SerializationError::from(e))?,
+        ))
     }
 
     // TODO: tighten up visibility: only WorkflowRunner needs to access this

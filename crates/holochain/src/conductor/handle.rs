@@ -44,12 +44,8 @@
 //! code which interacted with the Conductor would also have to be highly generic.
 
 use super::{
-    api::{error::ConductorApiResult, CellConductorApi},
-    config::AdminInterfaceConfig,
-    dna_store::DnaStore,
-    error::ConductorResult,
-    manager::TaskManagerRunHandle,
-    Cell, Conductor,
+    api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
+    error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
 };
 use derive_more::From;
 use holochain_types::{
@@ -152,7 +148,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         // the entire call to invoke_zome ?
         let lock = self.0.read().await;
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        cell.invoke_zome(api, invocation).await.map_err(Into::into)
+        cell.invoke_zome(invocation).await.map_err(Into::into)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {

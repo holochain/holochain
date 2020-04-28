@@ -341,6 +341,7 @@ mod test {
 
     #[tokio::test]
     async fn call_zome_function() {
+        observability::test_run().ok();
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
         struct Payload {
             a: u32,

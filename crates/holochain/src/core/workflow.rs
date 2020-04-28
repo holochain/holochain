@@ -2,12 +2,9 @@ mod genesis;
 mod invoke_zome;
 pub mod runner;
 pub(crate) use genesis::genesis;
-pub(crate) use invoke_zome::invoke_zome;
+//pub (crate) use invoke_zome::invoke_zome;
 
-use crate::{
-    conductor::api::error::ConductorApiError,
-    core::state::workspace::{Workspace, WorkspaceError},
-};
+use crate::core::state::workspace::{Workspace, WorkspaceError};
 use holochain_state::error::DatabaseError;
 use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
@@ -71,9 +68,10 @@ pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
     AgentInvalid(AgentHash),
 
+    /*
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] ConductorApiError),
-
+    */
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
 

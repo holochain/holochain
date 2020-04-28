@@ -34,6 +34,10 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
     }
+
+    pub fn into_inner(self) -> SourceChainBuf<'env, R> {
+        self.0
+    }
 }
 
 impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {
