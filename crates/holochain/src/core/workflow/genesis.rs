@@ -120,7 +120,7 @@ mod tests {
             let hashes: Vec<_> = source_chain
                 .iter_back()
                 .map(|h| {
-                    Ok(match h.header {
+                    Ok(match h.header() {
                         ChainHeader::Dna(header::Dna { .. }) => "Dna",
                         ChainHeader::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
                         ChainHeader::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",

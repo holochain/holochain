@@ -114,7 +114,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             &self
                 .iter_back()
                 .map(|h| {
-                    let maybe_element = self.get_element(&h.hash().into())?;
+                    let maybe_element = self.get_element(&h.header().hash().into())?;
                     match maybe_element {
                         None => Ok(JsonChainDump { element: None }),
                         Some(element) => Ok(JsonChainDump {
@@ -166,7 +166,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 if let Some(signed_header) = self.store.get_header(top)? {
-                    self.current = signed_header.header.prev_header_address();
+                    self.current = signed_header.header().prev_header_address();
                     Ok(Some(signed_header))
                 } else {
                     Ok(None)
@@ -268,7 +268,7 @@ pub mod tests {
             assert_eq!(
                 store
                     .iter_back()
-                    .map(|h| Ok(store.get_element(&h.hash().into())?))
+                    .map(|h| Ok(store.get_element(&h.header().hash().into())?))
                     .collect::<Vec<_>>()
                     .unwrap(),
                 vec![Some(agent_element), Some(dna_element)]

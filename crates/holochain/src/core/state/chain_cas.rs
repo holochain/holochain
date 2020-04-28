@@ -73,7 +73,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         &self,
         signed_header: SignedHeader,
     ) -> SourceChainResult<Option<ChainElement>> {
-        let maybe_entry_address = match signed_header.clone().header {
+        let maybe_entry_address = match signed_header.header().clone() {
             ChainHeader::EntryCreate(header::EntryCreate { entry_address, .. }) => {
                 Some(entry_address)
             }
@@ -96,8 +96,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
             }
         };
         Ok(Some(ChainElement::new(
-            signed_header.signature,
-            signed_header.header,
+            signed_header.signature().to_owned(),
+            signed_header.header().to_owned(),
             maybe_entry,
         )))
     }
@@ -116,10 +116,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
     pub fn put(&mut self, v: ChainElement) -> DatabaseResult<()> {
         let header = v.header();
-        let signed_header = SignedHeader {
-            signature: v.signature().to_owned(),
-            header: header.to_owned(),
-        };
+        let signed_header = SignedHeader::new(v.signature().to_owned(), header.to_owned());
         if let Some(entry) = v.entry() {
             self.entries
                 .put(entry.entry_address().into(), entry.to_owned());

@@ -4,7 +4,6 @@
 
 use crate::{entry::Entry, header, prelude::*};
 use holochain_keystore::Signature;
-use shrinkwraprs::Shrinkwrap;
 use thiserror::Error;
 
 /// Error type regarding chain elements
@@ -61,12 +60,33 @@ impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
 pub struct ChainElement(Signature, ChainHeader, Option<Entry>);
 
 /// the header and the signature that signed it
-#[derive(Shrinkwrap, Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[allow(dead_code, missing_docs)]
 pub struct SignedHeader {
-    #[shrinkwrap(main_field)]
-    pub header: ChainHeader,
-    pub signature: Signature,
+    header: ChainHeader,
+    signature: Signature,
+}
+
+impl SignedHeader {
+    /// SignedHeader constructor.
+    pub fn new(signature: Signature, header: ChainHeader) -> Self {
+        Self { signature, header }
+    }
+
+    /// Access the ChainHeader portion.
+    pub fn header(&self) -> &ChainHeader {
+        &self.header
+    }
+    /// Access the signature portion.
+    pub fn signature(&self) -> &Signature {
+        &self.signature
+    }
+    /// Validates a signed header
+    pub fn validate(&self) -> ChainElementResult<()> {
+        //TODO: gheck that signature is of the header:
+        //      ChainElementError::InvalidSignature
+        unimplemented!()
+    }
 }
 
 impl ChainElement {
