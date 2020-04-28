@@ -75,7 +75,6 @@ impl std::fmt::Display for EntryAddress {
         match self {
             EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
             EntryAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
-            //  EntryAddress::Dna(dna_hash) => write!(f, "{}", dna_hash),
         }
     }
 }
