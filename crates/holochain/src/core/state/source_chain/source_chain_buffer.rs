@@ -13,13 +13,7 @@ use holochain_state::{
 };
 use holochain_types::chain_header::HeaderAddress;
 use holochain_types::entry::EntryAddress;
-use holochain_types::{
-    chain_header::ChainHeader,
-    entry::Entry,
-    prelude::*,
-    signature::{Provenance, Signature},
-    time::Iso8601,
-};
+use holochain_types::{chain_header::ChainHeader, entry::Entry, prelude::*, time::Iso8601};
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -129,7 +123,7 @@ async fn header_for_entry(
     agent_hash: &AgentHash,
     prev_head: Option<HeaderAddress>,
 ) -> Result<ChainHeader, SerializedBytesError> {
-    let _provenances = &[Provenance::new(agent_hash.clone(), Signature::fake())];
+    let _provenances = holochain_types::test_utils::fake_provenance_for_agent(&agent_hash);
     let _timestamp: Iso8601 = chrono::Utc::now().timestamp().into();
     trace!("PUT {} {:?}", entry.entry_hash(), entry);
     Ok(ChainHeader {

@@ -5,7 +5,7 @@ use crate::{
     dna::{wasm::DnaWasm, zome::Zome, Dna},
     prelude::*,
     shims::{CapToken, CapabilityRequest},
-    signature::{Provenance, Signature},
+    signature::Provenance,
 };
 use holo_hash::AgentHash;
 use holochain_zome_types::ZomeExternHostInput;
@@ -87,15 +87,17 @@ pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
     ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }
 
-/// A fixture example Signature for unit testing.
-pub fn fake_signature() -> Signature {
-    Signature::from("fake")
+/// A fixture example Provenance for unit testing.
+pub fn fake_provenance() -> Provenance {
+    let fake_agent = AgentHash::with_pre_hashed_sync(vec![0; 32]);
+    fake_provenance_for_agent(&fake_agent)
 }
 
 /// A fixture example Provenance for unit testing.
-pub fn fake_provenance() -> Provenance {
-    Provenance::new(
-        AgentHash::try_from("fake").expect("TODO, will fail"),
-        fake_signature(),
-    )
+pub fn fake_provenance_for_agent(agent_hash: &AgentHash) -> Provenance {
+    let agent_hash = agent_hash.clone();
+
+    let fake_signature = Signature(vec![0; 32]);
+
+    Provenance::new(agent_hash, fake_signature)
 }

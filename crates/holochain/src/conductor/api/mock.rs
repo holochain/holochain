@@ -8,8 +8,7 @@ use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::Todo,
-    signature::Signature,
+    prelude::{Signature, Todo},
 };
 use mockall::mock;
 
