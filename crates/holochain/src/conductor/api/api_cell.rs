@@ -1,27 +1,31 @@
+//! The CellConductorApi allows Cells to talk to their Conductor
+
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::{cell::Cell, ConductorHandle};
+use crate::conductor::ConductorHandle;
 use async_trait::async_trait;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*,
-    signature::Signature,
+    prelude::{Signature, Todo},
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].
 #[derive(Clone)]
 pub struct CellConductorApi {
-    lock: ConductorHandle,
+    conductor_handle: ConductorHandle,
     cell_id: CellId,
 }
 
 impl CellConductorApi {
     /// Instantiate from a Conductor reference and a CellId to identify which Cell
     /// this API instance is associated with
-    pub fn new(lock: ConductorHandle, cell_id: CellId) -> Self {
-        Self { cell_id, lock }
+    pub fn new(conductor_handle: ConductorHandle, cell_id: CellId) -> Self {
+        Self {
+            cell_id,
+            conductor_handle,
+        }
     }
 }
 
@@ -32,32 +36,35 @@ impl CellConductorApiT for CellConductorApi {
         cell_id: &CellId,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        let conductor = self.lock.read().await;
-        let cell: &Cell = conductor.cell_by_id(cell_id)?;
-        cell.invoke_zome(self.clone(), invocation)
-            .await
-            .map_err(Into::into)
+        if *cell_id == invocation.cell_id {
+            self.conductor_handle
+                .invoke_zome(self.clone(), invocation)
+                .await
+                .map_err(Into::into)
+        } else {
+            Err(ConductorApiError::ZomeInvocationCellMismatch {
+                api_cell_id: cell_id.clone(),
+                invocation_cell_id: invocation.cell_id,
+            })
+        }
     }
 
-    async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()> {
-        let mut tx = self.lock.read().await.tx_network().clone();
-        tx.send(message)
-            .await
-            .map_err(|e| ConductorApiError::Todo(e.to_string()))
+    async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
+        unimplemented!()
     }
 
-    async fn network_request(
-        &self,
-        _message: Lib3hClientProtocol,
-    ) -> ConductorApiResult<Lib3hServerProtocol> {
+    async fn network_send(&self, _message: Todo) -> ConductorApiResult<()> {
+        unimplemented!()
+    }
+
+    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo> {
         unimplemented!()
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
-        let conductor = self.lock.write().await;
-        let cell = conductor.cell_by_id(&self.cell_id)?;
-        let _ = cell.handle_autonomic_process(cue.into()).await;
-        Ok(())
+        self.conductor_handle
+            .autonomic_cue(cue, &self.cell_id)
+            .await
     }
 
     async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
@@ -69,10 +76,6 @@ impl CellConductorApiT for CellConductorApi {
     }
 
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
-        unimplemented!()
-    }
-
-    async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
         unimplemented!()
     }
 }
@@ -88,14 +91,15 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse>;
 
+    /// Make a request to the DPKI service running for this Conductor.
+    /// TODO: decide on actual signature
+    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
+
     /// Send a message to the network engine, ignoring the response
-    async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
+    async fn network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
     /// Send a message to the network engine, and await the response
-    async fn network_request(
-        &self,
-        _message: Lib3hClientProtocol,
-    ) -> ConductorApiResult<Lib3hServerProtocol>;
+    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo>;
 
     /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
     /// This is basically a heuristic designed to help things run more smoothly.
@@ -112,8 +116,4 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// Request the crypto system to decrypt some payload
     /// TODO: decide on actual signature
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
-
-    /// Make a request to the DPKI service running for this Conductor.
-    /// TODO: decide on actual signature
-    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 }

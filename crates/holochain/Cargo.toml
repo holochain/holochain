@@ -15,6 +15,8 @@ hcid = "0.0.6"
 futures = "0.3.1"
 holochain_state = { path = "../state" }
 holochain_types = { path = "../types" }
+holochain_keystore = { version = "0.0.1", path = "../keystore" }
+holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_websocket = { path = "../websocket" }
 holochain_zome_types = { path = "../zome_types" }
 serde = { version = "1.0.104", features = ["derive"] }

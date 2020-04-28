@@ -8,8 +8,7 @@ use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*,
-    signature::Signature,
+    prelude::{Signature, Todo},
 };
 use mockall::mock;
 
@@ -27,12 +26,12 @@ mock! {
             invocation: ZomeInvocation,
         ) -> ConductorApiResult<ZomeInvocationResponse>;
 
-        fn sync_network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()>;
+        fn sync_network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
         fn sync_network_request(
             &self,
-            _message: Lib3hClientProtocol,
-        ) -> ConductorApiResult<Lib3hServerProtocol>;
+            _message: Todo,
+        ) -> ConductorApiResult<Todo>;
 
         fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
@@ -60,14 +59,15 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_invoke_zome(cell_id, invocation)
     }
 
-    async fn network_send(&self, message: Lib3hClientProtocol) -> ConductorApiResult<()> {
+    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
+        self.sync_dpki_request(method, args)
+    }
+
+    async fn network_send(&self, message: Todo) -> ConductorApiResult<()> {
         self.sync_network_send(message)
     }
 
-    async fn network_request(
-        &self,
-        _message: Lib3hClientProtocol,
-    ) -> ConductorApiResult<Lib3hServerProtocol> {
+    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo> {
         self.sync_network_request(_message)
     }
 
@@ -85,9 +85,5 @@ impl CellConductorApiT for MockCellConductorApi {
 
     async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
         self.sync_crypto_decrypt(_payload)
-    }
-
-    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
-        self.sync_dpki_request(method, args)
     }
 }

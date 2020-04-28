@@ -2,7 +2,8 @@
 //! in the sense that it implements the pointers between hashes that a hash chain relies on, which
 //! are then used to check the integrity of data using cryptographic hash functions.
 
-use crate::{entry::Entry, header, prelude::*, signature::Signature};
+use crate::{entry::Entry, header, prelude::*};
+use holochain_keystore::Signature;
 use shrinkwraprs::Shrinkwrap;
 
 /// wraps header hash to promote it to an "address" e.g. for use in a CAS

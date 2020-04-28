@@ -8,7 +8,6 @@
 
 use crate::entry::EntryAddress;
 
-//pub struct Signature;
 pub struct CapTokenClaim;
 pub struct CapTokenGrant;
 pub type ZomeId = String;

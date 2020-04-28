@@ -1,12 +1,12 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
+use holochain_keystore::Signature;
 use holochain_types::{
     chain_header::{ChainElement, ChainHeader},
     dna::Dna,
     entry::Entry,
     header,
     prelude::*,
-    signature::Signature,
 };
 
 /// Initialize the source chain with the initial entries:
@@ -39,7 +39,10 @@ pub async fn genesis(
     });
     //FIXME: real signature.
     // FIXME we store the dna to the private store on genesis
-    let element = ChainElement::new(Signature::fake(), dna_header.clone(), None);
+    //let signature = agent_hash.sign(&keystore, &dan.into_serialized_bytes()?).await?;
+    let fake_signature = Signature(vec![0; 32]);
+
+    let element = ChainElement::new(fake_signature.clone(), dna_header.clone(), None);
     workspace.source_chain.put_element(element)?;
 
     // create a agent chain element and add it directly to the store
@@ -52,7 +55,7 @@ pub async fn genesis(
     });
     //FIXME: real signature.
     let element = ChainElement::new(
-        Signature::fake(),
+        fake_signature,
         agent_header,
         Some(Entry::AgentKey(agent_hash)),
     );

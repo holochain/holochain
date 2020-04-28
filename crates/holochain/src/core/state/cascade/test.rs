@@ -3,6 +3,7 @@ use crate::core::state::{
     chain_meta::{EntryDhtStatus, MockChainMetaBuf},
     source_chain::SourceChainBuf,
 };
+use holochain_keystore::Signature;
 use holochain_state::{
     db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
     test_utils::test_cell_env,
@@ -12,7 +13,6 @@ use holochain_types::{
     entry::{Entry, EntryAddress},
     header, observability,
     prelude::*,
-    signature::Signature,
     test_utils::{fake_agent_hash, fake_header_hash},
 };
 use maplit::hashset;
@@ -49,7 +49,8 @@ fn setup_env<'env>(
         entry_type: header::EntryType::AgentKey,
         entry_address: jimbo_entry.entry_address(),
     });
-    let jimbo = ChainElement::new(Signature::fake(), jimbo_header, Some(jimbo_entry));
+    let fake_signature = Signature(vec![0; 32]);
+    let jimbo = ChainElement::new(fake_signature.clone(), jimbo_header, Some(jimbo_entry));
 
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
@@ -58,7 +59,7 @@ fn setup_env<'env>(
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });
-    let jessy = ChainElement(Signature::fake(), jessy_header, Some(jessy_entry));
+    let jessy = ChainElement(fake_signature, jessy_header, Some(jessy_entry));
 
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;

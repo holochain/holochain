@@ -5,19 +5,19 @@ use crate::core::state::{
 };
 
 use fallible_iterator::FallibleIterator;
+use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
     db::DbManager,
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::chain_header::HeaderAddress;
 use holochain_types::{
-    chain_header::{ChainElement, ChainHeader, SignedHeader},
+    chain_header::{ChainElement, ChainHeader, HeaderAddress, SignedHeader},
     entry::Entry,
     prelude::*,
-    signature::Signature,
 };
+
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -182,19 +182,20 @@ pub mod tests {
     use super::SourceChainBuf;
     use crate::core::state::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
+    use holochain_keystore::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
         chain_header::{ChainElement, ChainHeader},
         entry::Entry,
         header,
         prelude::*,
-        signature::Signature,
         test_utils::{fake_agent_hash, fake_dna},
     };
 
     fn fixtures() -> (AgentHash, ChainElement, ChainElement) {
+        let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna("a");
-        let agent_hash = fake_agent_hash("a");
+        let agent_hash = fake_agent_hash("agent");
 
         let agent_entry = Entry::AgentKey(agent_hash.clone());
 
@@ -203,7 +204,9 @@ pub mod tests {
             author: agent_hash.clone(),
             hash: dna.dna_hash(),
         });
-        let dna_element = ChainElement::new(Signature::fake(), dna_header.clone(), None);
+
+        let fake_signature = Signature(vec![0; 32]);
+        let dna_element = ChainElement::new(fake_signature.clone(), dna_header.clone(), None);
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_hash.clone(),
@@ -211,7 +214,9 @@ pub mod tests {
             entry_type: header::EntryType::AgentKey,
             entry_address: agent_hash.clone().into(),
         });
-        let agent_element = ChainElement::new(Signature::fake(), agent_header, Some(agent_entry));
+
+        //let signature = agent_hash.sign(&keystore, &agent_entry.into()).await.unwrap();
+        let agent_element = ChainElement::new(fake_signature, agent_header, Some(agent_entry));
         (agent_hash, dna_element, agent_element)
     }
 
@@ -316,6 +321,4 @@ pub mod tests {
             Ok(())
         })
     }
-
-    // async fn header_for_entry() -> SourceChainResult<()> {}
 }

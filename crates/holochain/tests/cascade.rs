@@ -1,13 +1,13 @@
 use holochain_2020::core::state::{
     cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
 };
+use holochain_keystore::Signature;
 use holochain_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
 use holochain_types::{
     chain_header::{ChainElement, ChainHeader},
     entry::Entry,
     header,
     prelude::*,
-    signature::Signature,
     test_utils::{fake_agent_hash, fake_header_hash},
 };
 
@@ -26,7 +26,8 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         entry_type: header::EntryType::AgentKey,
         entry_address: jimbo_entry.entry_address(),
     });
-    let jimbo_element = ChainElement(Signature::fake(), jimbo_header, Some(jimbo_entry));
+    let fake_signature = Signature(vec![0; 32]);
+    let jimbo_element = ChainElement(fake_signature.clone(), jimbo_header, Some(jimbo_entry));
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jessy_id.clone(),
@@ -34,7 +35,7 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });
-    let jessy_element = ChainElement(Signature::fake(), jessy_header, Some(jessy_entry));
+    let jessy_element = ChainElement(fake_signature, jessy_header, Some(jessy_entry));
     (jimbo_id, jimbo_element, jessy_id, jessy_element)
 }
 
