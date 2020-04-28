@@ -1,7 +1,6 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-//use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
