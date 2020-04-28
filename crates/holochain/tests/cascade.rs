@@ -6,7 +6,7 @@ use holochain_state::{env::ReadManager, error::DatabaseResult, test_utils::test_
 use holochain_types::{entry::Entry, test_utils::fake_agent_hash};
 use std::convert::TryInto;
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn get_links() -> DatabaseResult<()> {
     let env = test_cell_env();
     let dbs = env.dbs().await?;

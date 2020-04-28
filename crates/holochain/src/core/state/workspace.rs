@@ -61,7 +61,7 @@ pub mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn workspace_sanity_check() -> WorkspaceResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;

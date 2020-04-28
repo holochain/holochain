@@ -65,7 +65,7 @@ mod tests {
     };
     use tracing::*;
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
         let arc = test_cell_env();

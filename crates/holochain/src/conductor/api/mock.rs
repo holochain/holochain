@@ -4,11 +4,12 @@
 use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
 use async_trait::async_trait;
+use holochain_keystore::KeystoreSender;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::{Signature, Todo},
+    prelude::Todo,
 };
 use mockall::mock;
 
@@ -34,12 +35,6 @@ mock! {
         ) -> ConductorApiResult<Todo>;
 
         fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
-
-        fn sync_crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature>;
-
-        fn sync_crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
-
-        fn sync_crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
 
         fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
     }
@@ -75,15 +70,7 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_autonomic_cue(cue)
     }
 
-    async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
-        self.sync_crypto_sign(_payload)
-    }
-
-    async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String> {
-        self.sync_crypto_encrypt(_payload)
-    }
-
-    async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
-        self.sync_crypto_decrypt(_payload)
+    fn keystore(&self) -> &KeystoreSender {
+        unimplemented!()
     }
 }
