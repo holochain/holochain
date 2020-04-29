@@ -541,7 +541,7 @@ pub mod tests {
         assert_eq!(state.cells, [cell_config]);
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn can_set_fake_state() {
         let state = ConductorState::default();
         let conductor = ConductorBuilder::new()
