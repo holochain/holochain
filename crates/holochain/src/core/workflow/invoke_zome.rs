@@ -1,8 +1,26 @@
-use super::{WorkflowEffects, WorkflowResult};
+use super::{WorkflowEffects, WorkflowResult, WorkflowCaller, runner::error::WorkflowRunResult};
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
 use holochain_types::{prelude::Todo, nucleus::ZomeInvocation};
+use holochain_state::{db::DbManager, prelude::Reader};
 
 pub type ZomeInvocationResult = Todo;
+
+pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
+    _ribosome: Ribosome,
+    _invocation: ZomeInvocation,
+}
+
+#[async_trait::async_trait]
+impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>> for InvokeZomeWorkflow<Ribosome> {
+    fn workspace(reader: &'env Reader, dbs: &'env DbManager) -> WorkflowRunResult<InvokeZomeWorkspace<'env>> {
+        Ok(InvokeZomeWorkspace::new(reader, dbs)?)
+    }
+
+    // doesn't work probably because of lifetime param in return type
+    async fn call(self, workspace: InvokeZomeWorkspace<'env>) -> WorkflowResult<ZomeInvocationResult, InvokeZomeWorkspace<'env>> {
+        unimplemented!()
+    }
+}
 
 pub async fn invoke_zome<'env>(
     workspace: InvokeZomeWorkspace<'_>,

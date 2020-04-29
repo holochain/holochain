@@ -8,17 +8,19 @@ use crate::{
     conductor::api::error::ConductorApiError,
     core::state::workspace::{Workspace, WorkspaceError},
 };
-use holochain_state::error::DatabaseError;
+use holochain_state::{prelude::Reader, error::DatabaseError, db::DbManager};
 use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
 use thiserror::Error;
 
 #[cfg(test)]
 use super::state::source_chain::SourceChainError;
+use runner::error::WorkflowRunResult;
 
 #[async_trait::async_trait]
-pub trait WorkflowCaller<O, W: Workspace> {
-    async fn call(self) -> (O, WorkflowEffects<W>);
+pub trait WorkflowCaller<'env, O, W: Workspace> {
+    fn workspace(reader: &'env Reader, dbs: &'env DbManager) -> WorkflowRunResult<W>;
+    async fn call(self, workspace: W) -> WorkflowResult<O, W>;
 }
 
 /// A WorkflowEffects is returned from each Workspace function.

@@ -21,16 +21,16 @@ pub mod error;
 /// reference needs to be long-lived and threadsafe.
 ///
 /// FIXME: see finish_triggers for note on task spawning
-pub struct WorkflowRunner(Arc<Cell>);
+pub struct WorkflowRunner<'env>(&'env Cell);
 
-impl WorkflowRunner {
-    pub async fn run_workflow<O, W: Workspace, C: WorkflowCaller<O, W>>(&self, caller: C) -> WorkflowRunResult<O> {
-        let environ = Arc::clone(&self.0).state_env();
+impl<'env> WorkflowRunner<'env> {
+    pub async fn run_workflow<O, W: Workspace, C: 'env + WorkflowCaller<'env, O, W>>(&self, caller: C) -> WorkflowRunResult<O> {
+        let environ = self.0.state_env();
         let env = environ.guard().await;
         let dbs = environ.dbs().await?;
         let reader = env.reader()?;
-
-        let (result, effects) = caller.call().await;
+        let workspace = C::workspace(&reader, &dbs)?;
+        let (result, effects) = caller.call(workspace).await?;
         self.finish(effects).await?;
         Ok(result)
         // // TODO: is it possible to DRY this up with a macro?
