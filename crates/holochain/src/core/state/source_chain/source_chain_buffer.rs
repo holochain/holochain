@@ -20,6 +20,7 @@ use tracing::*;
 pub struct SourceChainBuf<'env, R: Readable> {
     cas: ChainCasBuf<'env, R>,
     sequence: ChainSequenceBuf<'env, R>,
+    keystore: KeystoreSender,
 }
 
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
@@ -27,6 +28,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
+            keystore: dbs.keystore().clone(),
         })
     }
 
@@ -37,6 +39,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         Ok(Self {
             cas: ChainCasBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
+            keystore: dbs.keystore().clone(),
         })
     }
 
@@ -66,7 +69,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         header: ChainHeader,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<()> {
-        let signed_header = SignedHeader::new(/*keystore, */ header.to_owned()).await?;
+        let signed_header = SignedHeader::new(&self.keystore, header.to_owned()).await?;
 
         /*
         FIXME: this needs to happen here.
@@ -196,7 +199,7 @@ pub mod tests {
         entry::Entry,
         header,
         prelude::*,
-        test_utils::{fake_agent_pubkey, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna},
     };
 
     fn fixtures() -> (
@@ -208,7 +211,7 @@ pub mod tests {
     ) {
         let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna("a");
-        let agent_pubkey = fake_agent_pubkey("agent");
+        let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());
 

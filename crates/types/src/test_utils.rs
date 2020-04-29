@@ -53,7 +53,7 @@ pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
 
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (fake_dna_hash(name), fake_agent_pubkey(name)).into()
+    (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }
 
 /// A fixture example DnaHash for unit testing.
@@ -62,8 +62,19 @@ pub fn fake_dna_hash(name: &str) -> DnaHash {
 }
 
 /// A fixture example AgentPubKey for unit testing.
-pub fn fake_agent_pubkey(name: &str) -> AgentPubKey {
-    AgentPubKey::with_data_sync(name.as_bytes())
+pub fn fake_agent_pubkey_1() -> AgentPubKey {
+    holo_hash::AgentPubKey::try_from(
+        "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
+    )
+    .unwrap()
+}
+
+/// Another fixture example AgentPubKey for unit testing.
+pub fn fake_agent_pubkey_2() -> AgentPubKey {
+    holo_hash::AgentPubKey::try_from(
+        "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
+    )
+    .unwrap()
 }
 
 /// A fixture example HeaderHash for unit testing.

@@ -72,7 +72,7 @@ mod tests {
     use holochain_types::{
         chain_header::ChainHeader,
         header, observability,
-        test_utils::{fake_agent_pubkey, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna},
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -82,7 +82,7 @@ mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
         let dna = fake_dna("a");
-        let agent_pubkey = fake_agent_pubkey("a");
+        let agent_pubkey = fake_agent_pubkey_1();
 
         {
             let reader = env.reader()?;

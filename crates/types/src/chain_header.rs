@@ -27,12 +27,21 @@ impl ChainHeader {
     }
 
     /// Returns the public key of the agent who signed this header.
-    pub fn author() -> AgentPubKey {
-        unimplemented!()
+    pub fn author(&self) -> &AgentPubKey {
+        match self {
+            ChainHeader::Dna(i) => &i.author,
+            ChainHeader::LinkAdd(i) => &i.author,
+            ChainHeader::LinkRemove(i) => &i.author,
+            ChainHeader::ChainOpen(i) => &i.author,
+            ChainHeader::ChainClose(i) => &i.author,
+            ChainHeader::EntryCreate(i) => &i.author,
+            ChainHeader::EntryUpdate(i) => &i.author,
+            ChainHeader::EntryDelete(i) => &i.author,
+        }
     }
 
     /// returns the timestamp of when the header was created
-    pub fn timestamp() -> header::Timestamp {
+    pub fn timestamp(&self) -> header::Timestamp {
         unimplemented!()
     }
 

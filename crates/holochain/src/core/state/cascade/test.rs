@@ -13,7 +13,7 @@ use holochain_types::{
     entry::Entry,
     header, observability,
     prelude::*,
-    test_utils::{fake_agent_pubkey, fake_header_hash},
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
 };
 use maplit::hashset;
 use mockall::*;
@@ -39,9 +39,9 @@ fn setup_env<'env>(
 ) -> DatabaseResult<Chains<'env>> {
     let previous_header = fake_header_hash("previous");
 
-    let jimbo_id = fake_agent_pubkey("Jimbo");
+    let jimbo_id = fake_agent_pubkey_1();
     let jimbo_entry = Entry::Agent(jimbo_id.clone());
-    let jessy_id = fake_agent_pubkey("Jessy");
+    let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
