@@ -114,14 +114,19 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn put(&mut self, v: ChainElement) -> DatabaseResult<()> {
-        let header = v.header();
-        let signed_header = SignedHeader::new(v.signature().to_owned(), header.to_owned());
-        if let Some(entry) = v.entry() {
+    /// Puts a signed header and optional entry onto the CAS.
+    /// N.B. this code assumes that the header and entry have been validated
+    pub fn put(
+        &mut self,
+        signed_header: SignedHeader,
+        maybe_entry: Option<Entry>,
+    ) -> DatabaseResult<()> {
+        if let Some(entry) = maybe_entry {
             self.entries
                 .put(entry.entry_address().into(), entry.to_owned());
         }
-        self.headers.put(header.hash().into(), signed_header);
+        self.headers
+            .put(signed_header.header().hash().into(), signed_header);
         Ok(())
     }
 

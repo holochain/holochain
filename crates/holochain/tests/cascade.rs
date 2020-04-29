@@ -26,8 +26,7 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         entry_type: header::EntryType::AgentKey,
         entry_address: jimbo_entry.entry_address(),
     });
-    let fake_signature = Signature(vec![0; 32]);
-    let jimbo_element = ChainElement::new(fake_signature.clone(), jimbo_header, Some(jimbo_entry));
+
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jessy_id.clone(),
@@ -35,8 +34,7 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });
-    let jessy_element = ChainElement::new(fake_signature, jessy_header, Some(jessy_entry));
-    (jimbo_id, jimbo_element, jessy_id, jessy_element)
+    (jimbo_id, jimbo_entry, jesse_entry, jessy_id, jessy_eheader, jessy_entry)
 }
 
 #[tokio::test]
@@ -53,11 +51,11 @@ async fn get_links() -> DatabaseResult<()> {
     let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
     let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
 
-    let (_jimbo_id, jimbo, _jessy_id, jessy) = fixtures();
+    let (_jimbo_id, jimbo_entry, jimbo_entry, _jessy_id, jessy_entry, jesse_header) = fixtures();
 
     let base = jimbo.entry().clone().unwrap().entry_address();
-    source_chain.put_element(jimbo)?;
-    source_chain.put_element(jessy)?;
+    source_chain.put(jimbo_header, jimbo_entry)?;
+    source_chain.put(jessy_header, jessy_entry)?;
 
     // Pass in stores as references
     let cascade = Cascade::new(

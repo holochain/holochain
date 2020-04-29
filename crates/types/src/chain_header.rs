@@ -15,6 +15,9 @@ pub enum ChainElementError {
     /// Element's header and entry types don't match
     #[error("Element header and entry type mismatch")]
     TypeMismatch,
+    /// Signing error
+    #[error("Unable to sign header")]
+    SigningError,
 }
 
 /// Convenience result type for ChainElementError
@@ -68,9 +71,11 @@ pub struct SignedHeader {
 }
 
 impl SignedHeader {
-    /// SignedHeader constructor.
-    pub fn new(signature: Signature, header: ChainHeader) -> Self {
-        Self { signature, header }
+    /// SignedHeader constructor, assumes that we
+    pub fn new(/*keystore: Keystore, */ header: ChainHeader) -> ChainElementResult<Self> {
+        //let signature = header.author().sign(&keystore, &dan.into_serialized_bytes()?).await?;
+        let signature = Signature(vec![0; 32]); // fake signature
+        Ok(Self { signature, header })
     }
 
     /// Access the ChainHeader portion.
@@ -90,7 +95,7 @@ impl SignedHeader {
 }
 
 impl ChainElement {
-    /// Element constructor.
+    /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signature: Signature, header: ChainHeader, maybe_entry: Option<Entry>) -> Self {
         Self(signature, header, maybe_entry)
     }

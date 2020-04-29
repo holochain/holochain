@@ -1,15 +1,14 @@
 use super::Cascade;
 use crate::core::state::{
     chain_meta::{EntryDhtStatus, MockChainMetaBuf},
-    source_chain::SourceChainBuf,
+    source_chain::{SourceChainBuf, SourceChainResult},
 };
-use holochain_keystore::Signature;
 use holochain_state::{
     db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
     test_utils::test_cell_env,
 };
 use holochain_types::{
-    chain_header::{ChainElement, ChainHeader},
+    chain_header::ChainHeader,
     entry::{Entry, EntryAddress},
     header, observability,
     prelude::*,
@@ -24,9 +23,11 @@ struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
     jimbo_id: AgentHash,
-    jimbo: ChainElement,
+    jimbo_header: ChainHeader,
+    jimbo_entry: Entry,
     jessy_id: AgentHash,
-    jessy: ChainElement,
+    jessy_header: ChainHeader,
+    jessy_entry: Entry,
     mock_primary_meta: MockChainMetaBuf,
     mock_cache_meta: MockChainMetaBuf,
 }
@@ -49,8 +50,6 @@ fn setup_env<'env>(
         entry_type: header::EntryType::AgentKey,
         entry_address: jimbo_entry.entry_address(),
     });
-    let fake_signature = Signature(vec![0; 32]);
-    let jimbo = ChainElement::new(fake_signature.clone(), jimbo_header, Some(jimbo_entry));
 
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
@@ -59,7 +58,6 @@ fn setup_env<'env>(
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });
-    let jessy = ChainElement::new(fake_signature, jessy_header, Some(jessy_entry));
 
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;
@@ -69,16 +67,18 @@ fn setup_env<'env>(
         source_chain,
         cache,
         jimbo_id,
-        jimbo,
+        jimbo_header,
+        jimbo_entry,
         jessy_id,
-        jessy,
+        jessy_header,
+        jessy_entry,
         mock_primary_meta,
         mock_cache_meta,
     })
 }
 
 #[tokio::test]
-async fn live_local_return() -> DatabaseResult<()> {
+async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
     let dbs = env.dbs().await?;
@@ -88,13 +88,14 @@ async fn live_local_return() -> DatabaseResult<()> {
         mut source_chain,
         cache,
         jimbo_id: _,
-        jimbo,
+        jimbo_header,
+        jimbo_entry,
         mut mock_primary_meta,
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_element(jimbo.clone())?;
-    let address = jimbo.entry().as_ref().unwrap().entry_address();
+    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    let address = jimbo_entry.entry_address();
 
     // set it's metadata to LIVE
     mock_primary_meta
@@ -111,14 +112,14 @@ async fn live_local_return() -> DatabaseResult<()> {
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
     // check it returns
-    assert_eq!(entry, *jimbo.entry());
+    assert_eq!(entry.unwrap(), jimbo_entry);
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
 }
 
 #[tokio::test]
-async fn dead_local_none() -> DatabaseResult<()> {
+async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
@@ -129,13 +130,14 @@ async fn dead_local_none() -> DatabaseResult<()> {
         mut source_chain,
         cache,
         jimbo_id: _,
-        jimbo,
+        jimbo_header,
+        jimbo_entry,
         mut mock_primary_meta,
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_element(jimbo.clone())?;
-    let address = jimbo.entry().as_ref().unwrap().entry_address();
+    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    let address = jimbo_entry.entry_address();
 
     // set it's metadata to Dead
     mock_primary_meta
@@ -159,7 +161,7 @@ async fn dead_local_none() -> DatabaseResult<()> {
 }
 
 #[tokio::test]
-async fn notfound_goto_cache_live() -> DatabaseResult<()> {
+async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
@@ -170,13 +172,14 @@ async fn notfound_goto_cache_live() -> DatabaseResult<()> {
         source_chain,
         mut cache,
         jimbo_id: _,
-        jimbo,
+        jimbo_header,
+        jimbo_entry,
         mock_primary_meta,
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    cache.put_element(jimbo.clone())?;
-    let address = jimbo.entry().as_ref().unwrap().entry_address();
+    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    let address = jimbo_entry.entry_address();
 
     // set it's metadata to Live
     mock_cache_meta
@@ -212,12 +215,13 @@ async fn notfound_cache() -> DatabaseResult<()> {
     let Chains {
         source_chain,
         cache,
-        jimbo,
+        jimbo_header,
+        jimbo_entry,
         mock_primary_meta,
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    let address = jimbo.entry().as_ref().unwrap().entry_address();
+    let address = jimbo_entry.entry_address();
 
     // call dht_get with above address
     let cascade = Cascade::new(
@@ -237,7 +241,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
 }
 
 #[tokio::test]
-async fn links_local_return() -> DatabaseResult<()> {
+async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
     let dbs = env.dbs().await?;
@@ -247,16 +251,18 @@ async fn links_local_return() -> DatabaseResult<()> {
         mut source_chain,
         cache,
         jimbo_id: _,
-        jimbo,
+        jimbo_header,
+        jimbo_entry,
         jessy_id: _,
-        jessy,
+        jessy_header,
+        jessy_entry,
         mut mock_primary_meta,
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_element(jimbo.clone())?;
-    source_chain.put_element(jessy.clone())?;
-    let base = jimbo.entry().as_ref().unwrap().entry_address();
-    let target = jessy.entry().as_ref().unwrap().entry_address();
+    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    source_chain.put(jessy_header.clone(), Some(jessy_entry.clone()))?;
+    let base = jimbo_entry.entry_address();
+    let target = jessy_entry.entry_address();
     let result = target.clone();
 
     // Return a link between entries
@@ -284,7 +290,7 @@ async fn links_local_return() -> DatabaseResult<()> {
 }
 
 #[tokio::test]
-async fn links_cache_return() -> DatabaseResult<()> {
+async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
@@ -295,16 +301,18 @@ async fn links_cache_return() -> DatabaseResult<()> {
         mut source_chain,
         cache,
         jimbo_id: _,
-        jimbo,
+        jimbo_header,
+        jimbo_entry,
         jessy_id: _,
-        jessy,
+        jessy_header,
+        jessy_entry,
         mut mock_primary_meta,
-        mut mock_cache_meta,
+        mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put_element(jimbo.clone())?;
-    source_chain.put_element(jessy.clone())?;
-    let base = jimbo.entry().as_ref().unwrap().entry_address();
-    let target = jessy.entry().as_ref().unwrap().entry_address();
+    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    source_chain.put(jessy_header.clone(), Some(jessy_entry.clone()))?;
+    let base = jimbo_entry.entry_address();
+    let target = jessy_entry.entry_address();
     let result = target.clone();
 
     // Return empty links
@@ -342,15 +350,18 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let Chains {
         source_chain,
         cache,
-        jimbo,
-        jessy,
+        jimbo_header,
+        jimbo_entry,
+        jessy_id: _,
+        jessy_header,
+        jessy_entry,
         mock_primary_meta,
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
 
-    let base = jimbo.entry().as_ref().unwrap().entry_address();
-    let target = jessy.entry().as_ref().unwrap().entry_address();
+    let base = jimbo_entry.entry_address();
+    let target = jessy_entry.entry_address();
     let result = target.clone();
 
     // Return empty links
