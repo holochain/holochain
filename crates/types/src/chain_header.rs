@@ -38,7 +38,7 @@ impl ChainHeader {
 
     // FIXME: use async with_data, or consider wrapper type
     // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
-    /// calculates the hash of the header
+    /// Computes the hash of this header.
     pub fn hash(&self) -> HeaderHash {
         // hash the header enum variant struct
         let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
