@@ -1,5 +1,5 @@
 use crate::{
-    conductor::{api::error::ConductorApiResult, error::ConductorError, Cell},
+    conductor::Cell,
     core::{
         state::workspace::{self, Workspace, WorkspaceError},
         workflow::{self, WorkflowCall, WorkflowEffects, WorkflowTrigger},
@@ -27,11 +27,11 @@ impl<'b> WorkflowRunner<'b> {
         WorkflowRunner(cell)
     }
 
-    pub async fn run_workflow(&self, call: WorkflowCall) -> ConductorApiResult<()> {
+    pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
         let environ = &self.0.state_env();
         let env = environ.guard().await;
-        let dbs = environ.dbs().await.map_err(|e| ConductorError::from(e))?;
-        let reader = env.reader().map_err(|e| ConductorError::from(e))?;
+        let dbs = environ.dbs().await?;
+        let reader = env.reader()?;
 
         // TODO: is it possible to DRY this up with a macro?
         match call {
@@ -66,7 +66,7 @@ impl<'b> WorkflowRunner<'b> {
     fn finish<'a, W: 'a + Workspace>(
         &'a self,
         effects: WorkflowEffects<W>,
-    ) -> BoxFuture<ConductorApiResult<()>> {
+    ) -> BoxFuture<WorkflowRunResult<()>> {
         async move {
             let WorkflowEffects {
                 workspace,
@@ -117,7 +117,7 @@ impl<'b> WorkflowRunner<'b> {
     /// a new task for each. The difficulty with that is that tokio::spawn
     /// requires the future to be 'static, which is currently not the case due
     /// to our LMDB Environment lifetimes.
-    async fn finish_triggers(&self, triggers: Vec<WorkflowTrigger>) -> ConductorApiResult<()> {
+    async fn finish_triggers(&self, triggers: Vec<WorkflowTrigger>) -> WorkflowRunResult<()> {
         let calls: Vec<_> = triggers
             .into_iter()
             .map(|WorkflowTrigger { call, interval }| {
