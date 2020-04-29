@@ -4,7 +4,41 @@ use crate::{chain_header::ChainHeader, entry::Entry};
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
-/// address type for hashes that can be used to retrieve entries from the cas or dht
+/// address type for header hash to promote it to an "address" e.g. for use in a CAS
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum HeaderAddress {
+    /// a header hash, the only option
+    Header(HeaderHash),
+}
+
+impl From<HeaderAddress> for HoloHash {
+    fn from(header_address: HeaderAddress) -> HoloHash {
+        match header_address {
+            HeaderAddress::Header(header_hash) => header_hash.into(),
+        }
+    }
+}
+
+impl From<holo_hash::holo_hash_core::HeaderHash> for HeaderAddress {
+    fn from(header_hash: holo_hash::holo_hash_core::HeaderHash) -> HeaderAddress {
+        holo_hash::HeaderHash::from(header_hash).into()
+    }
+}
+
+impl From<HeaderHash> for HeaderAddress {
+    fn from(header_hash: HeaderHash) -> HeaderAddress {
+        HeaderAddress::Header(header_hash)
+    }
+}
+
+impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
+    type Error = SerializedBytesError;
+    fn try_from(chain_header: &ChainHeader) -> Result<Self, Self::Error> {
+        Ok(HeaderAddress::Header(HeaderHash::try_from(chain_header)?))
+    }
+}
+
+/// address type for entry hashes that can be used to retrieve entries from the cas or dht
 #[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntryAddress {
     /// standard entry hash

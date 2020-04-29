@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::address::{DhtAddress, EntryAddress};
+use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
 
 pub type ZomeId = u8;
 
@@ -28,7 +28,7 @@ pub struct Dna {
 pub struct LinkAdd {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub prev_header: HeaderHash,
+    pub prev_header: HeaderAddress,
 
     pub base_address: DhtAddress,
     pub target_address: DhtAddress,
@@ -40,16 +40,16 @@ pub struct LinkAdd {
 pub struct LinkRemove {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub prev_header: HeaderHash,
+    pub prev_header: HeaderAddress,
     /// The address of the `LinkAdd` being reversed
-    pub link_add_hash: HeaderHash,
+    pub link_add_address: HeaderAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainOpen {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub prev_header: HeaderHash,
+    pub prev_header: HeaderAddress,
 
     pub prev_dna_hash: DnaHash,
 }
@@ -58,7 +58,7 @@ pub struct ChainOpen {
 pub struct ChainClose {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub prev_header: HeaderHash,
+    pub prev_header: HeaderAddress,
 
     pub new_dna_hash: DnaHash,
 }
@@ -67,7 +67,7 @@ pub struct ChainClose {
 pub struct EntryCreate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub prev_header: HeaderHash,
+    pub prev_header: HeaderAddress,
 
     pub entry_type: EntryType,
     pub entry_address: EntryAddress,
@@ -77,7 +77,7 @@ pub struct EntryCreate {
 pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub prev_header: HeaderHash,
+    pub prev_header: HeaderAddress,
 
     pub replaces_address: DhtAddress,
 
@@ -89,9 +89,9 @@ pub struct EntryUpdate {
 pub struct EntryDelete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub prev_header: HeaderHash,
+    pub prev_header: HeaderAddress,
 
-    /// Hash Address of the Element being deleted
+    /// Address of the Element being deleted
     pub removes_address: DhtAddress,
 }
 

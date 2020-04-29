@@ -2,41 +2,7 @@
 //! in the sense that it implements the pointers between hashes that a hash chain relies on, which
 //! are then used to check the integrity of data using cryptographic hash functions.
 
-use crate::{header, prelude::*};
-
-/// wraps header hash to promote it to an "address" e.g. for use in a CAS
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum HeaderAddress {
-    /// a header hash, the only option
-    Header(HeaderHash),
-}
-
-impl From<HeaderAddress> for HoloHash {
-    fn from(header_address: HeaderAddress) -> HoloHash {
-        match header_address {
-            HeaderAddress::Header(header_hash) => header_hash.into(),
-        }
-    }
-}
-
-impl From<holo_hash::holo_hash_core::HeaderHash> for HeaderAddress {
-    fn from(header_hash: holo_hash::holo_hash_core::HeaderHash) -> HeaderAddress {
-        holo_hash::HeaderHash::from(header_hash).into()
-    }
-}
-
-impl From<HeaderHash> for HeaderAddress {
-    fn from(header_hash: HeaderHash) -> HeaderAddress {
-        HeaderAddress::Header(header_hash)
-    }
-}
-
-impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
-    type Error = SerializedBytesError;
-    fn try_from(chain_header: &ChainHeader) -> Result<Self, Self::Error> {
-        Ok(HeaderAddress::Header(HeaderHash::try_from(chain_header)?))
-    }
-}
+use crate::{address::HeaderAddress, header, prelude::*};
 
 /// ChainHeader contains variants for each type of header.
 #[allow(missing_docs)]
@@ -57,7 +23,7 @@ pub enum ChainHeader {
 impl ChainHeader {
     /// return the previous ChainHeader's Address in the chain
     pub fn prev_header_address(&self) -> Option<HeaderAddress> {
-        self.prev_header().map(|h| h.to_owned().into())
+        self.prev_header().map(|h| h.to_owned())
     }
 
     /// returns whether this header's entry data is public
@@ -85,7 +51,7 @@ impl ChainHeader {
     }
 
     /// returns the previous header except for the DNA header which doesn't have a previous
-    pub fn prev_header(&self) -> Option<&HeaderHash> {
+    pub fn prev_header(&self) -> Option<&HeaderAddress> {
         Some(match self {
             Self::Dna(header::Dna { .. }) => return None,
             Self::LinkAdd(header::LinkAdd { prev_header, .. }) => prev_header,

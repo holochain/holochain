@@ -47,7 +47,7 @@ fn setup_env<'env>(
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jimbo_id.clone(),
-        prev_header: previous_header.clone(),
+        prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentKey,
         entry_address: jimbo_entry.entry_address(),
     });
@@ -55,7 +55,7 @@ fn setup_env<'env>(
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jessy_id.clone(),
-        prev_header: previous_header.clone(),
+        prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });

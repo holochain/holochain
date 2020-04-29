@@ -36,7 +36,7 @@ pub async fn genesis(
     let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: agent_pubkey.clone(),
-        prev_header: dna_header.hash(),
+        prev_header: dna_header.hash().into(),
         entry_type: header::EntryType::AgentKey,
         entry_address: agent_pubkey.clone().into(),
     });
