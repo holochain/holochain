@@ -45,7 +45,7 @@ impl Entry {
             entry => {
                 // TODO fix unwrap
                 let serialized_bytes: SerializedBytes = entry.try_into().unwrap();
-                EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.into()))
+                EntryAddress::Entry(EntryHash::with_data_sync(serialized_bytes.bytes()))
             }
         }
     }
