@@ -42,18 +42,10 @@ impl Entry {
     pub fn entry_address(&self) -> EntryAddress {
         match self {
             Entry::Agent(key) => EntryAddress::Agent(key.to_owned()),
-            Entry::App(serialized_bytes) => {
-                EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.bytes()))
-            }
-            Entry::CapTokenClaim(claim) => {
+            entry => {
                 // TODO fix unwrap
-                let serialized_bytes: SerializedBytes = claim.try_into().unwrap();
-                EntryAddress::Entry(EntryHash::with_data_sync(serialized_bytes.bytes()))
-            }
-            Entry::CapTokenGrant(grant) => {
-                // TODO fix unwrap
-                let serialized_bytes: SerializedBytes = grant.try_into().unwrap();
-                EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.bytes()))
+                let serialized_bytes: SerializedBytes = entry.try_into().unwrap();
+                EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.into()))
             }
         }
     }
