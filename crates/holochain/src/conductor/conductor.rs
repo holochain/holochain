@@ -397,7 +397,7 @@ mod builder {
 
         #[cfg(test)]
         /// Sets some fake conductor state for tests
-        pub fn set_fake_state(mut self, state: ConductorState) -> Self {
+        pub fn fake_state(mut self, state: ConductorState) -> Self {
             self.state = Some(state);
             self
         }
@@ -450,10 +450,6 @@ pub mod tests {
     use crate::conductor::{dna_store::MockDnaStore, state::CellConfig};
     use holochain_state::test_utils::test_conductor_env;
 
-    pub fn fake_conductor_state() -> ConductorState {
-        Default::default()
-    }
-
     #[tokio::test]
     async fn can_update_state() {
         let environment = test_conductor_env();
@@ -481,9 +477,9 @@ pub mod tests {
 
     #[tokio::test]
     async fn can_set_fake_state() {
-        let state = fake_conductor_state();
+        let state = ConductorState::default();
         let conductor = ConductorBuilder::new()
-            .set_fake_state(state.clone())
+            .fake_state(state.clone())
             .test()
             .await
             .unwrap();
