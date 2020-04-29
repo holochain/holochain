@@ -22,8 +22,8 @@ pub struct CapTokenGrant;
 #[allow(clippy::large_enum_variant)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
-    /// The Agent system entry, the second entry of every source chain,
-    /// which grants authoring capability for this agent. (Name TBD)
+    /// The `Agent` system entry, the third entry of every source chain,
+    /// which grants authoring capability for this agent.
     Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
     App(SerializedBytes),

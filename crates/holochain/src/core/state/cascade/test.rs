@@ -88,7 +88,6 @@ async fn live_local_return() -> SourceChainResult<()> {
     let Chains {
         mut source_chain,
         cache,
-        jimbo_id: _,
         jimbo_header,
         jimbo_entry,
         mut mock_primary_meta,
