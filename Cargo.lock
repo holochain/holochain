@@ -948,6 +948,8 @@ dependencies = [
  "hcid",
  "holo_hash",
  "holochain_common",
+ "holochain_crypto",
+ "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_state",
  "holochain_types",

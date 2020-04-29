@@ -15,7 +15,6 @@ pub struct CasBuf<'env, V, R>(KvBuf<'env, HoloHash, V, R>)
 where
     V: BufVal,
     R: Readable;
-
 impl<'env, V, R> CasBuf<'env, V, R>
 where
     V: BufVal,

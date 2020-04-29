@@ -1,10 +1,10 @@
 use crate::*;
 
-/// Extend holo_hash::AgentHash with additional signature functionality
+/// Extend holo_hash::AgentPubKey with additional signature functionality
 /// from Keystore.
-pub trait AgentHashExt {
-    /// create a new agent keypair in given keystore, returning the AgentHash
-    fn new_from_pure_entropy(keystore: &KeystoreSender) -> KeystoreFuture<holo_hash::AgentHash>
+pub trait AgentPubKeyExt {
+    /// create a new agent keypair in given keystore, returning the AgentPubKey
+    fn new_from_pure_entropy(keystore: &KeystoreSender) -> KeystoreFuture<holo_hash::AgentPubKey>
     where
         Self: Sized;
 
@@ -25,8 +25,8 @@ pub trait AgentHashExt {
     fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreFuture<bool>;
 }
 
-impl AgentHashExt for holo_hash::AgentHash {
-    fn new_from_pure_entropy(keystore: &KeystoreSender) -> KeystoreFuture<holo_hash::AgentHash>
+impl AgentPubKeyExt for holo_hash::AgentPubKey {
+    fn new_from_pure_entropy(keystore: &KeystoreSender) -> KeystoreFuture<holo_hash::AgentPubKey>
     where
         Self: Sized,
     {

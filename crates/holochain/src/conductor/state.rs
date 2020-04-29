@@ -65,10 +65,10 @@ impl ConductorState {
     }
 
     /// Returns the agent configuration with the given ID if present
-    pub fn update_agent_address_by_id(&mut self, id: &str, agent_hash: &AgentHash) {
+    pub fn update_agent_address_by_id(&mut self, id: &str, agent_pubkey: &AgentPubKey) {
         self.agents.iter_mut().for_each(|ac| {
             if ac.id == *id {
-                ac.hash = agent_hash.clone()
+                ac.hash = agent_pubkey.clone()
             }
         })
     }
@@ -133,7 +133,7 @@ impl ConductorState {
 pub struct AgentConfig {
     pub id: String,
     pub name: String,
-    pub hash: AgentHash,
+    pub hash: AgentPubKey,
     pub keystore_file: String,
     /// If set to true conductor will ignore keystore_file and instead use the remote signer
     /// accessible through signing_service_uri to request signatures.
