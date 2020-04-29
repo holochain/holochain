@@ -15,18 +15,11 @@ pub async fn invoke_zome<'env>(
     })
 }
 
-#[cfg(test_TODO_FIX)]
+#[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{
-        agent::{source_chain::tests::test_initialized_chain, SourceChainCommitBundle},
-        conductor_api::MockCellConductorApi,
-        ribosome::MockRibosomeT,
-        test_utils::fake_cell_id,
-    };
-    use holochain_types::{entry::Entry, error::SkunkResult};
-    use tempdir::TempDir;
 
+    #[cfg(test_TODO_FIX)]
     #[tokio::test]
     async fn can_invoke_zome_with_mock() {
         let cell_id = fake_cell_id("mario");
