@@ -42,8 +42,10 @@ use self::{
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 
+use super::state::source_chain::SourceChain;
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::prelude::Reader;
 use holochain_types::{
     dna::Dna,
     entry::Entry,
@@ -53,12 +55,11 @@ use holochain_types::{
 };
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::*;
-use mockall::automock;
+use mockall::mock;
 use std::sync::Arc;
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
-#[automock]
 pub trait RibosomeT: Sized {
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
@@ -77,8 +78,9 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        // FIXME: Use [SourceChain] instead
-        _bundle: &mut SourceChainCommitBundle<'env>,
+        _source_chain: &mut SourceChain<'env, Reader<'env>>,
+        // TODO NetworkRequest,
+        // TODO Cascade,
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
 }
@@ -209,8 +211,7 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        // FIXME: Use [SourceChain] instead
-        _bundle: &mut SourceChainCommitBundle<'env>,
+        _bundle: &mut SourceChain<'env, Reader>,
         invocation: ZomeInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
@@ -224,6 +225,36 @@ impl RibosomeT for WasmRibosome {
     }
 }
 
+mock! {
+    pub RibosomeT
+    {
+        fn run_callback(self, data: ()) -> Todo;
+
+        fn call_zome_function<'env>(
+            self,
+            // FIXME: Use [SourceChain] instead
+            _bundle: &mut SourceChain<'env, Reader<'env>>,
+            // TODO NetworkRequest,
+            // TODO Cascade,
+            invocation: ZomeInvocation,
+        ) -> RibosomeResult<ZomeInvocationResponse>;
+    }
+}
+
+impl RibosomeT for MockRibosomeT {
+    fn run_callback(self, _data: ()) -> Todo {
+        self.run_callback(_data)
+    }
+
+    fn call_zome_function<'env>(
+        self,
+        _bundle: &mut SourceChain<'env, Reader<'env>>,
+        invocation: ZomeInvocation,
+    ) -> RibosomeResult<ZomeInvocationResponse> {
+        self.call_zome_function(_bundle, invocation)
+    }
+}
+
 #[cfg(test)]
 pub mod wasm_test {
     use super::WasmRibosome;
@@ -232,7 +263,6 @@ pub mod wasm_test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
-        shims::SourceChainCommitBundle,
         test_utils::{fake_agent_hash, fake_cap_token, fake_cell_id},
     };
     use holochain_wasm_test_utils::TestWasm;
@@ -321,7 +351,8 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        &mut holochain_types::shims::SourceChainCommitBundle::default(),
+                        //&mut holochain_types::shims::SourceChainCommitBundle::default(),
+                        todo!("Make a version of SourceChain that can be used here"),
                         invocation,
                     )
                     .unwrap();
@@ -350,6 +381,7 @@ pub mod wasm_test {
     }
 
     #[test]
+    #[allow(unused_variables, unreachable_code)]
     fn invoke_foo_test() {
         let ribosome = test_ribosome(Some("foo"));
 
@@ -361,7 +393,7 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+                .call_zome_function(&mut todo!("Make SouceChain to use here"), invocation)
                 .unwrap()
         );
     }

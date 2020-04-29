@@ -57,8 +57,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     // FIXME: put this function in SourceChain, replace with simple put_entry and put_header
     #[allow(dead_code, unreachable_code)]
-    pub async fn put_entry(&mut self, entry: Entry, agent_hash: &AgentHash) -> DatabaseResult<()> {
-        let header = header_for_entry(&entry, agent_hash, self.chain_head().cloned()).await?;
+    pub fn put_entry(&mut self, entry: Entry, agent_hash: &AgentHash) -> DatabaseResult<()> {
+        let header = header_for_entry(&entry, agent_hash, self.chain_head().cloned())?;
         self.sequence.put_header((&header).try_into()?);
         self.cas.put((header, entry))?;
         Ok(())
@@ -118,7 +118,7 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
     }
 }
 
-async fn header_for_entry(
+fn header_for_entry(
     entry: &Entry,
     agent_hash: &AgentHash,
     prev_head: Option<HeaderAddress>,
@@ -197,8 +197,8 @@ pub mod tests {
 
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put_entry(dna_entry.clone(), &agent_hash).await?;
-            store.put_entry(agent_entry.clone(), &agent_hash).await?;
+            store.put_entry(dna_entry.clone(), &agent_hash)?;
+            store.put_entry(agent_entry.clone(), &agent_hash)?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
@@ -245,8 +245,8 @@ pub mod tests {
             let reader = env.reader()?;
 
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put_entry(dna_entry.clone(), &agent_hash).await?;
-            store.put_entry(agent_entry.clone(), &agent_hash).await?;
+            store.put_entry(dna_entry.clone(), &agent_hash)?;
+            store.put_entry(agent_entry.clone(), &agent_hash)?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
 

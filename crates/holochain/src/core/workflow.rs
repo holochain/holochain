@@ -1,5 +1,6 @@
 mod genesis;
 mod invoke_zome;
+pub(crate) mod system_validation;
 pub mod runner;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
@@ -22,6 +23,7 @@ use super::state::source_chain::SourceChainError;
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
     Genesis(Box<Dna>, AgentHash),
+    InitializeZome,
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,
@@ -66,6 +68,16 @@ impl WorkflowTrigger {
     }
 }
 
+impl<W: Workspace> std::fmt::Debug for WorkflowEffects<W> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WorkflowEffects")
+            .field("triggers", &self.triggers)
+            .field("callbacks", &self.callbacks)
+            .field("signals", &self.signals)
+            .finish()
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
@@ -83,6 +95,9 @@ pub enum WorkflowError {
     #[cfg(test)]
     #[error("Source chain error: {0}")]
     SourceChainError(#[from] SourceChainError),
+
+    #[error("Capability token missing")]
+    CapabilityMissing,
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
