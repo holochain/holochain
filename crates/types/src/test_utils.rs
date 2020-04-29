@@ -2,7 +2,7 @@
 
 use crate::{
     cell::CellId,
-    dna::{wasm::DnaWasm, zome::Zome, Dna},
+    dna::{wasm::DnaWasm, zome::Zome, DnaDef},
     prelude::*,
     shims::{CapToken, CapabilityRequest},
     signature::Provenance,
@@ -24,13 +24,14 @@ pub fn fake_dna_wasm() -> DnaWasm {
 /// simple Zome fixture
 pub fn fake_zome() -> Zome {
     Zome {
-        code: fake_dna_wasm(),
+        wasm_hash: holo_hash_core::WasmHash::new(vec![0; 36]),
+        // code: fake_dna_wasm(),
     }
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna(uuid: &str) -> Dna {
-    Dna {
+pub fn fake_dna(uuid: &str) -> DnaDef {
+    DnaDef {
         name: "test".to_string(),
         properties: ().try_into().unwrap(),
         uuid: uuid.to_string(),
@@ -43,7 +44,7 @@ pub fn fake_dna(uuid: &str) -> Dna {
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
-pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+pub fn fake_dna_file(dna: DnaDef) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
     path.push("dna");

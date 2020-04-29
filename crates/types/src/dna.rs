@@ -16,9 +16,16 @@ pub struct Properties {
     properties: serde_json::Value,
 }
 
+impl Properties {
+    /// Create new properties from json value
+    pub fn new(properties: serde_json::Value) -> Self {
+        Properties { properties }
+    }
+}
+
 /// Represents the top-level holochain dna object.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
-pub struct Dna {
+pub struct DnaDef {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
 
@@ -33,7 +40,7 @@ pub struct Dna {
     pub zomes: BTreeMap<String, zome::Zome>,
 }
 
-impl Dna {
+impl DnaDef {
     /// Gets DnaHash from Dna
     // FIXME: use async with_data, or consider wrapper type
     // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413222920
@@ -50,9 +57,26 @@ impl Dna {
     }
 }
 
-impl Properties {
-    /// Create new properties from json value
-    pub fn new(properties: serde_json::Value) -> Self {
-        Properties { properties }
+/// Represents a full dna file including Webassembly bytecode.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
+pub struct DnaFile {
+    /// The hashable portion that can be shared with hApp code.
+    pub dna: DnaDef,
+
+    /// The hash of the dna def
+    /// (this can be a full holo_hash because we never send a DnaFile to WASM)
+    pub dna_hash: holo_hash::DnaHash,
+
+    /// The bytes of the WASM zomes referenced in the Dna portion.
+    pub code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
+}
+
+impl DnaFile {
+    /// Fetch the Webassembly byte code for a zome.
+    pub fn get_wasm_for_zome(&self, zome_name: &str) -> Result<&wasm::DnaWasm, DnaError> {
+        let wasm_hash = &self.dna.get_zome(zome_name)?.wasm_hash;
+        self.code
+            .get(wasm_hash)
+            .ok_or_else(|| DnaError::Invalid("wasm not found".to_string()))
     }
 }

@@ -5,7 +5,7 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::dna::Dna;
+use crate::dna::DnaDef;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
@@ -16,7 +16,7 @@ use holochain_serialized_bytes::prelude::*;
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The Dna system entry, the first entry of every source chain
-    Dna(Box<Dna>),
+    Dna(Box<DnaDef>),
     /// The AgentKey system entry, the second entry of every source chain,
     /// which grants authoring capability for this agent. (Name TBD)
     AgentKey(AgentHash),

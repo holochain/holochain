@@ -45,7 +45,7 @@ use self::{
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    dna::Dna,
+    dna::DnaFile,
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
@@ -87,7 +87,11 @@ pub trait RibosomeT: Sized {
 /// The only WasmRibosome is a Wasm ribosome.
 #[derive(Clone)]
 pub struct WasmRibosome {
-    dna: Dna,
+    /// NOTE - Currently taking a full DnaFile here.
+    ///      - It would be an optimization to pre-ensure the WASM bytecode
+    ///      - is already in the wasm cache, and only include the Dna portion
+    ///      - here in the ribosome.
+    dna_file: DnaFile,
 }
 
 pub struct HostContext {
@@ -106,19 +110,18 @@ impl From<&ZomeInvocation> for HostContext {
 
 impl WasmRibosome {
     /// Create a new instance
-    pub fn new(dna: Dna) -> Self {
-        Self { dna }
+    pub fn new(dna_file: DnaFile) -> Self {
+        Self { dna_file }
     }
 
     pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
         // TODO: make this actually the hash of the wasm once we can do that
-        format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
+        format!("{}{}", &self.dna_file.dna.dna_hash(), zome_name).into_bytes()
     }
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
         let zome_name = host_context.zome_name.clone();
-        let zome = self.dna.get_zome(&zome_name)?;
-        let wasm: Arc<Vec<u8>> = zome.code.code();
+        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = WasmRibosome::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             &self.wasm_cache_key(&zome_name),
@@ -241,21 +244,30 @@ pub mod wasm_test {
 
     use crate::core::ribosome::HostContext;
     use holochain_types::{
-        dna::{wasm::DnaWasm, zome::Zome, Dna},
+        dna::{wasm::DnaWasm, DnaFile},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
     };
     use std::collections::BTreeMap;
 
-    fn zome_from_code(code: DnaWasm) -> Zome {
-        let mut zome = fake_zome();
-        zome.code = code;
-        zome
-    }
-
-    fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
-        let mut dna = fake_dna("uuid");
-        dna.zomes = zomes;
-        dna
+    fn build_dna_file(zomes: Vec<(String, DnaWasm)>) -> DnaFile {
+        let mut dna_file = DnaFile {
+            dna: fake_dna("uuid"),
+            // set a temp value until we're done building:
+            dna_hash: holo_hash_core::WasmHash::new(vec![0; 36]),
+            code: BTreeMap::new(),
+        };
+        for (zome_name, wasm) in zomes.into_iter() {
+            let wasm_hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
+            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+            let mut zome = fake_zome();
+            zome.wasm_hash = wasm_hash.clone();
+            dna_file.dna.zomes.insert(zome_name, zome);
+            dna_file.code.insert(wasm_hash, wasm);
+        }
+        let sb: SerializedBytes = (&dna_file.dna).try_into().unwrap();
+        let dna_hash = holo_hash::DnaHash::with_data_sync(&sb);
+        dna_file.dna_hash = dna_hash;
+        dna_file
     }
 
     pub fn zome_invocation_from_names(
@@ -284,19 +296,12 @@ pub mod wasm_test {
                 })
                 .unwrap();
         }
-        WasmRibosome::new(dna_from_zomes({
-            let mut v = std::collections::BTreeMap::new();
-            v.insert(String::from("foo"), zome_from_code(TestWasm::Foo.into()));
-            v.insert(
-                String::from("imports"),
-                zome_from_code(TestWasm::Imports.into()),
-            );
-            v.insert(
-                String::from("debug"),
-                zome_from_code(TestWasm::Debug.into()),
-            );
-            v
-        }))
+        let dna_file = build_dna_file(vec![
+            (String::from("foo"), TestWasm::Foo.into()),
+            (String::from("imports"), TestWasm::Imports.into()),
+            (String::from("debug"), TestWasm::Debug.into()),
+        ]);
+        WasmRibosome::new(dna_file)
     }
 
     pub fn now() -> Duration {

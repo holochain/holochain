@@ -1,22 +1,22 @@
 use error::DnaStoreResult;
-use holochain_types::{dna::Dna, prelude::*};
+use holochain_types::{dna::DnaFile, prelude::*};
 use mockall::automock;
 use std::collections::HashMap;
 
 /// Placeholder for real dna store
 #[derive(Default)]
-pub struct RealDnaStore(HashMap<DnaHash, Dna>);
+pub struct RealDnaStore(HashMap<DnaHash, DnaFile>);
 
 #[automock]
 pub trait DnaStore: Default + Send + Sync {
-    fn add(&mut self, dna: Dna) -> DnaStoreResult<()>;
+    fn add(&mut self, dna: DnaFile) -> DnaStoreResult<()>;
     // TODO: FAST: Make this return an iterator to avoid allocating
     fn list(&self) -> Vec<DnaHash>;
 }
 
 impl DnaStore for RealDnaStore {
-    fn add(&mut self, dna: Dna) -> DnaStoreResult<()> {
-        self.0.insert(dna.dna_hash(), dna);
+    fn add(&mut self, dna: DnaFile) -> DnaStoreResult<()> {
+        self.0.insert(dna.dna_hash, dna);
         Ok(())
     }
     fn list(&self) -> Vec<DnaHash> {
