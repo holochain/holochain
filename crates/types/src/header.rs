@@ -30,8 +30,8 @@ pub struct LinkAdd {
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
-    pub base: DhtAddress,
-    pub target: DhtAddress,
+    pub base_address: DhtAddress,
+    pub target_address: DhtAddress,
     pub tag: SerializedBytes,
     pub link_type: SerializedBytes,
 }
@@ -42,7 +42,7 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
     /// The address of the `LinkAdd` being reversed
-    pub link_add_hash: DhtAddress,
+    pub link_add_hash: HeaderHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -79,7 +79,7 @@ pub struct EntryUpdate {
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
-    pub replaces: HoloHash, // not HoloHash but EntryHash or HeaderHash ??
+    pub replaces_address: DhtAddress,
 
     pub entry_type: EntryType,
     pub entry_address: EntryAddress,
@@ -92,7 +92,7 @@ pub struct EntryDelete {
     pub prev_header: HeaderHash,
 
     /// Hash Address of the Element being deleted
-    pub removes: DhtAddress,
+    pub removes_address: DhtAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
