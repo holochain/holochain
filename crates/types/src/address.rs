@@ -38,14 +38,6 @@ impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
     }
 }
 
-impl AsRef<[u8]> for &HeaderAddress {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            HeaderAddress::Header(hash) => hash.as_ref(),
-        }
-    }
-}
-
 impl std::fmt::Display for HeaderAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -55,7 +47,9 @@ impl std::fmt::Display for HeaderAddress {
 }
 
 /// address type for entry hashes that can be used to retrieve entries from the cas or dht
-#[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+)]
 pub enum EntryAddress {
     /// standard entry hash
     Entry(EntryHash),
@@ -76,15 +70,6 @@ impl TryFrom<&Entry> for EntryAddress {
     type Error = SerializedBytesError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         Ok(EntryAddress::Entry(EntryHash::try_from(entry)?))
-    }
-}
-
-impl AsRef<[u8]> for &EntryAddress {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
-            EntryAddress::Agent(agent_pubkey) => agent_pubkey.as_ref(),
-        }
     }
 }
 
@@ -136,16 +121,6 @@ impl TryFrom<&AgentPubKey> for DhtAddress {
     type Error = SerializedBytesError;
     fn try_from(agent: &AgentPubKey) -> Result<Self, Self::Error> {
         Ok(DhtAddress::Agent(agent.to_owned()))
-    }
-}
-
-impl AsRef<[u8]> for &DhtAddress {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            DhtAddress::Entry(entry_hash) => entry_hash.as_ref(),
-            DhtAddress::Agent(agent_pubkey) => agent_pubkey.as_ref(),
-            DhtAddress::Header(header_hash) => header_hash.as_ref(),
-        }
     }
 }
 
