@@ -174,7 +174,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 if let Some(signed_header) = self.store.get_header(top)? {
-                    self.current = signed_header.header().prev_header_address();
+                    self.current = signed_header.header().prev_header().map(|h| h.to_owned());
                     Ok(Some(signed_header))
                 } else {
                     Ok(None)

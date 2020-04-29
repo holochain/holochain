@@ -21,11 +21,6 @@ pub enum ChainHeader {
 }
 
 impl ChainHeader {
-    /// return the previous ChainHeader's Address in the chain
-    pub fn prev_header_address(&self) -> Option<HeaderAddress> {
-        self.prev_header().map(|h| h.to_owned())
-    }
-
     /// returns whether this header's entry data is public
     pub fn is_public(&self) -> bool {
         unimplemented!()
