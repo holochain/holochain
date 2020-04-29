@@ -91,7 +91,7 @@ impl ChainElement {
 
 impl SignedHeader {
     /// SignedHeader constructor
-    pub fn new(/*keystore: Keystore, */ header: ChainHeader) -> SourceChainResult<Self> {
+    pub async fn new(/*keystore: Keystore, */ header: ChainHeader) -> SourceChainResult<Self> {
         //let signature = header.author().sign(&keystore, &dan.into_serialized_bytes()?).await?;
         let signature = Signature(vec![0; 32]); // fake signature
         Ok(Self { signature, header })

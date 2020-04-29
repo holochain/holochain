@@ -94,7 +94,9 @@ async fn live_local_return() -> SourceChainResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
     let address = jimbo_entry.entry_address();
 
     // set it's metadata to LIVE
@@ -136,7 +138,9 @@ async fn dead_local_none() -> SourceChainResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
     let address = jimbo_entry.entry_address();
 
     // set it's metadata to Dead
@@ -178,7 +182,9 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    cache.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    cache
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
     let address = jimbo_entry.entry_address();
 
     // set it's metadata to Live
@@ -259,8 +265,12 @@ async fn links_local_return() -> SourceChainResult<()> {
         mut mock_primary_meta,
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
-    source_chain.put(jessy_header.clone(), Some(jessy_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
+    source_chain
+        .put(jessy_header.clone(), Some(jessy_entry.clone()))
+        .await?;
     let base = jimbo_entry.entry_address();
     let target = jessy_entry.entry_address();
     let result = target.clone();
@@ -309,8 +319,12 @@ async fn links_cache_return() -> SourceChainResult<()> {
         mut mock_primary_meta,
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
-    source_chain.put(jessy_header.clone(), Some(jessy_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
+    source_chain
+        .put(jessy_header.clone(), Some(jessy_entry.clone()))
+        .await?;
     let base = jimbo_entry.entry_address();
     let target = jessy_entry.entry_address();
     let result = target.clone();

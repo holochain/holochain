@@ -30,7 +30,7 @@ pub async fn genesis(
         author: agent_pubkey.clone(),
         hash: dna.dna_hash(),
     });
-    workspace.source_chain.put(dna_header.clone(), None)?;
+    workspace.source_chain.put(dna_header.clone(), None).await?;
 
     // create a agent chain element and add it directly to the store
     let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
@@ -42,7 +42,8 @@ pub async fn genesis(
     });
     workspace
         .source_chain
-        .put(agent_header, Some(Entry::Agent(agent_pubkey)))?;
+        .put(agent_header, Some(Entry::Agent(agent_pubkey)))
+        .await?;
 
     Ok(WorkflowEffects {
         workspace,

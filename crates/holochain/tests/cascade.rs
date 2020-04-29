@@ -69,8 +69,8 @@ async fn get_links() -> SourceChainResult<()> {
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
     let base = jimbo_entry.entry_address();
-    source_chain.put(jimbo_header, Some(jimbo_entry))?;
-    source_chain.put(jessy_header, Some(jessy_entry))?;
+    source_chain.put(jimbo_header, Some(jimbo_entry)).await?;
+    source_chain.put(jessy_header, Some(jessy_entry)).await?;
 
     // Pass in stores as references
     let cascade = Cascade::new(
