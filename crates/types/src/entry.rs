@@ -22,9 +22,9 @@ pub struct CapTokenGrant;
 #[allow(clippy::large_enum_variant)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
-    /// The AgentKey system entry, the second entry of every source chain,
+    /// The Agent system entry, the second entry of every source chain,
     /// which grants authoring capability for this agent. (Name TBD)
-    AgentKey(AgentPubKey),
+    Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
     App(SerializedBytes),
     /// The capability claim system entry which allows committing a granted permission
@@ -41,7 +41,7 @@ impl Entry {
     // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
     pub fn entry_address(&self) -> EntryAddress {
         match self {
-            Entry::AgentKey(key) => EntryAddress::Agent(key.to_owned()),
+            Entry::Agent(key) => EntryAddress::Agent(key.to_owned()),
             Entry::App(serialized_bytes) => {
                 EntryAddress::Entry(EntryHash::with_data_sync(&serialized_bytes.bytes()))
             }

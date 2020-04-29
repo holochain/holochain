@@ -99,7 +99,7 @@ pub struct EntryDelete {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum EntryType {
-    AgentKey,
+    AgentPubKey,
     // Stores the App's provided filtration data
     // FIXME: Change this if we are keeping Zomes
     App(AppEntryType),

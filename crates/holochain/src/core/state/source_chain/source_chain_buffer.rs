@@ -92,7 +92,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             .entries()
             .iter_raw()?
             .filter_map(|(_, e)| match e {
-                Entry::AgentKey(agent_pubkey) => Some(agent_pubkey),
+                Entry::Agent(agent_pubkey) => Some(agent_pubkey),
                 _ => None,
             })
             .next())
@@ -210,7 +210,7 @@ pub mod tests {
         let dna = fake_dna("a");
         let agent_pubkey = fake_agent_pubkey("agent");
 
-        let agent_entry = Entry::AgentKey(agent_pubkey.clone());
+        let agent_entry = Entry::Agent(agent_pubkey.clone());
 
         let dna_header = ChainHeader::Dna(header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),
@@ -222,7 +222,7 @@ pub mod tests {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_pubkey.clone(),
             prev_header: dna_header.hash().into(),
-            entry_type: header::EntryType::AgentKey,
+            entry_type: header::EntryType::AgentPubKey,
             entry_address: agent_pubkey.clone().into(),
         });
 
@@ -327,7 +327,7 @@ pub mod tests {
                         .unwrap();
                     let entry_type = entry.get("entry_type").unwrap().as_str().unwrap();
                     let _entry_data: serde_json::Value = match entry_type {
-                        "AgentKey" => entry.get("entry").unwrap().clone(),
+                        "AgentPubKey" => entry.get("entry").unwrap().clone(),
                         "Dna" => entry
                             .get("entry")
                             .unwrap()

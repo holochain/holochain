@@ -40,15 +40,15 @@ fn setup_env<'env>(
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey("Jimbo");
-    let jimbo_entry = Entry::AgentKey(jimbo_id.clone());
+    let jimbo_entry = Entry::Agent(jimbo_id.clone());
     let jessy_id = fake_agent_pubkey("Jessy");
-    let jessy_entry = Entry::AgentKey(jessy_id.clone());
+    let jessy_entry = Entry::Agent(jessy_id.clone());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
-        entry_type: header::EntryType::AgentKey,
+        entry_type: header::EntryType::AgentPubKey,
         entry_address: jimbo_entry.entry_address(),
     });
 
@@ -56,7 +56,7 @@ fn setup_env<'env>(
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
-        entry_type: header::EntryType::AgentKey,
+        entry_type: header::EntryType::AgentPubKey,
         entry_address: jessy_entry.entry_address(),
     });
 

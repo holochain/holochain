@@ -37,12 +37,12 @@ pub async fn genesis(
         timestamp: chrono::Utc::now().timestamp().into(),
         author: agent_pubkey.clone(),
         prev_header: dna_header.hash().into(),
-        entry_type: header::EntryType::AgentKey,
+        entry_type: header::EntryType::AgentPubKey,
         entry_address: agent_pubkey.clone().into(),
     });
     workspace
         .source_chain
-        .put(agent_header, Some(Entry::AgentKey(agent_pubkey)))?;
+        .put(agent_header, Some(Entry::Agent(agent_pubkey)))?;
 
     Ok(WorkflowEffects {
         workspace,
