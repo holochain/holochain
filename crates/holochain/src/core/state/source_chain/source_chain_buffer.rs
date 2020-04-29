@@ -315,9 +315,6 @@ pub mod tests {
                     let header = element.get("header").unwrap();
                     let header_type = header.get("type").unwrap().as_str().unwrap();
 
-                    // FIXME: this test is very specific; commenting out the specifics for now
-                    // until we finalize the Entry and Header format
-                    // serde_json::json!([entry_type, entry_address, entry_data])
                     /*let _entry_address = header
                         .get("entry_address")
                         .unwrap()
@@ -338,6 +335,9 @@ pub mod tests {
                             .clone(),
                         _ => serde_json::Value::Null,
                     };*/
+                    // FIXME: this test is very specific; commenting out the specifics for now
+                    // until we finalize the Entry and Header format
+                    // serde_json::json!([entry_type, entry_address, entry_data])
                     serde_json::json!(header_type)
                 })
                 .collect::<Vec<_>>();
