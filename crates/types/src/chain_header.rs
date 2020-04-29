@@ -21,7 +21,7 @@ pub enum ChainHeader {
 }
 
 impl ChainHeader {
-    /// returns whether this header's entry data is public
+    /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
     pub fn is_public(&self) -> bool {
         unimplemented!()
     }
