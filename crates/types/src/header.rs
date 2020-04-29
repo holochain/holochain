@@ -8,6 +8,8 @@
 
 use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
 
+/// this id in an internal reference, which also serves as a canonical ordering
+/// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 pub type ZomeId = u8;
 
 use crate::{prelude::*, time::Iso8601};

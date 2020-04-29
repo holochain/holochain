@@ -269,18 +269,6 @@ pub mod tests {
             assert_eq!(agent_header, *agent_element_fetched.header());
             assert_eq!(agent_entry, *agent_element_fetched.entry());
 
-            /* get just the entries
-            let dna_entry_fetched = store
-                .get_entry((&dna_entry).try_into()?)
-                .expect("error retrieving")
-                .expect("entry not found");
-            let agent_entry_fetched = store
-                .get_entry((&agent_entry).try_into()?)
-                .expect("error retrieving")
-                .expect("entry not found");
-            assert_eq!(dna_entry, dna_entry_fetched);
-            assert_eq!(agent_entry, agent_entry_fetched);*/
-
             // check that you can iterate on the chain
             assert_eq!(
                 store
@@ -330,6 +318,26 @@ pub mod tests {
                     // FIXME: this test is very specific; commenting out the specifics for now
                     // until we finalize the Entry and Header format
                     // serde_json::json!([entry_type, entry_address, entry_data])
+                    /*let _entry_address = header
+                        .get("entry_address")
+                        .unwrap()
+                        .get("Entry")
+                        .unwrap()
+                        .as_array()
+                        .unwrap();
+                    let entry_type = entry.get("entry_type").unwrap().as_str().unwrap();
+                    let _entry_data: serde_json::Value = match entry_type {
+                        "AgentKey" => entry.get("entry").unwrap().clone(),
+                        "Dna" => entry
+                            .get("entry")
+                            .unwrap()
+                            .as_object()
+                            .unwrap()
+                            .get("uuid")
+                            .unwrap()
+                            .clone(),
+                        _ => serde_json::Value::Null,
+                    };*/
                     serde_json::json!(header_type)
                 })
                 .collect::<Vec<_>>();
