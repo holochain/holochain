@@ -5,7 +5,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::*,
 };
-use holochain_types::entry::EntryAddress;
+use holochain_types::address::EntryAddress;
 use mockall::mock;
 use std::collections::HashSet;
 use std::fmt::Debug;

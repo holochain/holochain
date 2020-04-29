@@ -14,9 +14,9 @@ use holochain_state::{
     prelude::{Readable, Reader, Writer},
 };
 use holochain_types::{
+    address::EntryAddress,
     chain_header::{ChainHeader, HeaderAddress},
     entry::Entry,
-    entry::EntryAddress,
     header,
 };
 

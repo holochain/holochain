@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::entry::EntryAddress;
+use crate::address::EntryAddress;
 
 pub type ZomeId = u8;
 

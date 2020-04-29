@@ -3,6 +3,7 @@
 #![allow(clippy::cognitive_complexity)]
 #![deny(missing_docs)]
 
+pub mod address;
 pub mod autonomic;
 pub mod cell;
 pub mod chain_header;

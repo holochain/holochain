@@ -8,8 +8,9 @@ use holochain_state::{
     test_utils::test_cell_env,
 };
 use holochain_types::{
+    address::EntryAddress,
     chain_header::ChainHeader,
-    entry::{Entry, EntryAddress},
+    entry::Entry,
     header, observability,
     prelude::*,
     test_utils::{fake_agent_hash, fake_header_hash},
