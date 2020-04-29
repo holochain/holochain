@@ -7,7 +7,7 @@ use crate::{
     shims::{CapToken, CapabilityRequest},
     signature::Provenance,
 };
-use holo_hash::AgentHash;
+use holo_hash::AgentPubKey;
 use holochain_zome_types::ZomeExternHostInput;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -53,7 +53,7 @@ pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
 
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (fake_dna_hash(name), fake_agent_hash(name)).into()
+    (fake_dna_hash(name), fake_agent_pubkey(name)).into()
 }
 
 /// A fixture example DnaHash for unit testing.
@@ -61,9 +61,9 @@ pub fn fake_dna_hash(name: &str) -> DnaHash {
     DnaHash::with_data_sync(name.as_bytes())
 }
 
-/// A fixture example AgentHash for unit testing.
-pub fn fake_agent_hash(name: &str) -> AgentHash {
-    AgentHash::with_data_sync(name.as_bytes())
+/// A fixture example AgentPubKey for unit testing.
+pub fn fake_agent_pubkey(name: &str) -> AgentPubKey {
+    AgentPubKey::with_data_sync(name.as_bytes())
 }
 
 /// A fixture example HeaderHash for unit testing.
@@ -89,15 +89,15 @@ pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
 
 /// A fixture example Provenance for unit testing.
 pub fn fake_provenance() -> Provenance {
-    let fake_agent = AgentHash::with_pre_hashed_sync(vec![0; 32]);
+    let fake_agent = AgentPubKey::with_pre_hashed_sync(vec![0; 32]);
     fake_provenance_for_agent(&fake_agent)
 }
 
 /// A fixture example Provenance for unit testing.
-pub fn fake_provenance_for_agent(agent_hash: &AgentHash) -> Provenance {
-    let agent_hash = agent_hash.clone();
+pub fn fake_provenance_for_agent(agent_pubkey: &AgentPubKey) -> Provenance {
+    let agent_pubkey = agent_pubkey.clone();
 
     let fake_signature = Signature(vec![0; 32]);
 
-    Provenance::new(agent_hash, fake_signature)
+    Provenance::new(agent_pubkey, fake_signature)
 }

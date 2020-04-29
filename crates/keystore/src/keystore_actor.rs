@@ -11,12 +11,12 @@ ghost_actor::ghost_actor! {
         GenerateSignKeypairFromPureEntropy(
             "generates a new pure entropy keypair in the keystore, returning the public key",
             (),
-            holo_hash::AgentHash,
+            holo_hash::AgentPubKey,
         ),
         ListSignKeys(
             "list all the signature public keys this keystore is tracking",
             (),
-            Vec<holo_hash::AgentHash>,
+            Vec<holo_hash::AgentPubKey>,
         ),
         Sign(
             "generate a signature for a given blob of binary data",

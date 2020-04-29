@@ -5,7 +5,7 @@ use crate::*;
 pub struct SignInput {
     /// The public key associated with the private key that should be used to
     /// generate the signature.
-    pub key: holo_hash::AgentHash,
+    pub key: holo_hash::AgentPubKey,
 
     /// The data that should be signed.
     pub data: SerializedBytes,
@@ -13,7 +13,7 @@ pub struct SignInput {
 
 impl SignInput {
     /// construct a new SignInput struct.
-    pub fn new<D>(key: holo_hash::AgentHash, data: D) -> Result<Self, KeystoreError>
+    pub fn new<D>(key: holo_hash::AgentPubKey, data: D) -> Result<Self, KeystoreError>
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
@@ -22,7 +22,7 @@ impl SignInput {
     }
 
     /// construct a new SignInput struct from raw bytes.
-    pub fn new_raw(key: holo_hash::AgentHash, data: Vec<u8>) -> Self {
+    pub fn new_raw(key: holo_hash::AgentPubKey, data: Vec<u8>) -> Self {
         Self {
             key,
             data: holochain_serialized_bytes::UnsafeBytes::from(data).into(),

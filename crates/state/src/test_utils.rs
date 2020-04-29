@@ -29,7 +29,7 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
         async move {
             let mut keystore = holochain_keystore::test_keystore::spawn_test_keystore(vec![
                 holochain_keystore::test_keystore::MockKeypair {
-                    pub_key: holo_hash::AgentHash::try_from(
+                    pub_key: holo_hash::AgentPubKey::try_from(
                         "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
                     )
                     .unwrap(),
@@ -41,7 +41,7 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
                     ],
                 },
                 holochain_keystore::test_keystore::MockKeypair {
-                    pub_key: holo_hash::AgentHash::try_from(
+                    pub_key: holo_hash::AgentPubKey::try_from(
                         "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
                     )
                     .unwrap(),
