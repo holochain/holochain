@@ -94,8 +94,6 @@ impl Cell {
         // create the work flow call
         let call = WorkflowCall::InvokeZome(invocation.into());
         // call the workflow
-        // FIXME Can't impliment this error WokflowRunError -> ConductorApiError
-        // obviously remove this unwrap
         // FIXME this result isn't actualy returned
         let result = runner.run_workflow(call).await?;
         let result: SerializedBytes = result.try_into().map_err(|e| SerializationError::from(e))?;
