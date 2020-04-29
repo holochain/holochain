@@ -26,7 +26,7 @@ impl ChainHeader {
         unimplemented!()
     }
 
-    /// returns the author who signed the header
+    /// Returns the public key of the agent who signed this header.
     pub fn author() -> AgentPubKey {
         unimplemented!()
     }
