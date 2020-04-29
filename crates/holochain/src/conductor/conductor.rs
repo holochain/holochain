@@ -407,6 +407,8 @@ mod builder {
     pub struct ConductorBuilder<DS = RealDnaStore> {
         config: ConductorConfig,
         dna_store: DS,
+        #[cfg(test)]
+        state: Option<ConductorState>,
     }
 
     impl ConductorBuilder<RealDnaStore> {
@@ -440,12 +442,36 @@ mod builder {
         pub async fn build(self) -> ConductorResult<Conductor<DS>> {
             let keystore = delete_me_create_test_keystore().await;
             let env_path = self.config.environment_path;
+
             let environment = Environment::new(
                 env_path.as_ref(),
                 EnvironmentKind::Conductor,
                 keystore.clone(),
             )?;
+
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+
+            #[cfg(test)]
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
+
+            Ok(conductor)
+        }
+
+        #[cfg(test)]
+        /// Sets some fake conductor state for tests
+        pub fn fake_state(mut self, state: ConductorState) -> Self {
+            self.state = Some(state);
+            self
+        }
+
+        #[cfg(test)]
+        async fn update_fake_state(
+            state: Option<ConductorState>,
+            conductor: Conductor<DS>,
+        ) -> ConductorResult<Conductor<DS>> {
+            if let Some(state) = state {
+                conductor.update_state(move |_| Ok(state)).await?;
+            }
             Ok(conductor)
         }
 
@@ -471,6 +497,10 @@ mod builder {
             let environment = test_conductor_env();
             let keystore = environment.keystore().clone();
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+
+            #[cfg(test)]
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
+
             Ok(conductor)
         }
     }
@@ -478,7 +508,7 @@ mod builder {
 
 #[cfg(test)]
 pub mod tests {
-
+    use super::*;
     use super::{Conductor, ConductorState};
     use crate::conductor::{dna_store::MockDnaStore, state::CellConfig};
     use holochain_state::test_utils::test_conductor_env;
@@ -509,5 +539,16 @@ pub mod tests {
             .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state.cells, [cell_config]);
+    }
+
+    #[tokio::test]
+    async fn can_set_fake_state() {
+        let state = ConductorState::default();
+        let conductor = ConductorBuilder::new()
+            .fake_state(state.clone())
+            .test()
+            .await
+            .unwrap();
+        assert_eq!(state, conductor.get_state().await.unwrap());
     }
 }
