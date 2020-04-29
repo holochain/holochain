@@ -38,6 +38,22 @@ impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
     }
 }
 
+impl AsRef<[u8]> for &HeaderAddress {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            HeaderAddress::Header(hash) => hash.as_ref(),
+        }
+    }
+}
+
+impl std::fmt::Display for HeaderAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            HeaderAddress::Header(hash) => write!(f, "{}", hash),
+        }
+    }
+}
+
 /// address type for entry hashes that can be used to retrieve entries from the cas or dht
 #[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntryAddress {

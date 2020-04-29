@@ -199,7 +199,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     // check it returns
 
     // FIXME!
-    //    assert_eq!(entry, Some(jimbo));
+    //    assert_eq!(entry, Some(jimbo_entry));
     // check it doesn't hit the primary
     // this is implied by the mock not expecting calls
     Ok(())
