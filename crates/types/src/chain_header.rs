@@ -2,26 +2,7 @@
 //! in the sense that it implements the pointers between hashes that a hash chain relies on, which
 //! are then used to check the integrity of data using cryptographic hash functions.
 
-use crate::{entry::Entry, header, prelude::*};
-use holochain_keystore::Signature;
-use thiserror::Error;
-
-/// Error type regarding chain elements
-#[derive(Error, Debug, PartialEq)]
-pub enum ChainElementError {
-    /// Element signature doesn't validate against the header
-    #[error("Element signature is invalid")]
-    InvalidSignature,
-    /// Element's header and entry types don't match
-    #[error("Element header and entry type mismatch")]
-    TypeMismatch,
-    /// Signing error
-    #[error("Unable to sign header")]
-    SigningError,
-}
-
-/// Convenience result type for ChainElementError
-pub type ChainElementResult<T> = Result<T, ChainElementError>;
+use crate::{header, prelude::*};
 
 /// wraps header hash to promote it to an "address" e.g. for use in a CAS
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -54,74 +35,6 @@ impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
     type Error = SerializedBytesError;
     fn try_from(chain_header: &ChainHeader) -> Result<Self, Self::Error> {
         Ok(HeaderAddress::Header(HeaderHash::try_from(chain_header)?))
-    }
-}
-
-/// a chain element which is a triple containing the signature of the header along with the
-/// entry if the header type has one.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ChainElement(Signature, ChainHeader, Option<Entry>);
-
-/// the header and the signature that signed it
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[allow(dead_code, missing_docs)]
-pub struct SignedHeader {
-    header: ChainHeader,
-    signature: Signature,
-}
-
-impl SignedHeader {
-    /// SignedHeader constructor, assumes that we
-    pub fn new(/*keystore: Keystore, */ header: ChainHeader) -> ChainElementResult<Self> {
-        //let signature = header.author().sign(&keystore, &dan.into_serialized_bytes()?).await?;
-        let signature = Signature(vec![0; 32]); // fake signature
-        Ok(Self { signature, header })
-    }
-
-    /// Access the ChainHeader portion.
-    pub fn header(&self) -> &ChainHeader {
-        &self.header
-    }
-    /// Access the signature portion.
-    pub fn signature(&self) -> &Signature {
-        &self.signature
-    }
-    /// Validates a signed header
-    pub fn validate(&self) -> ChainElementResult<()> {
-        //TODO: gheck that signature is of the header:
-        //      ChainElementError::InvalidSignature
-        unimplemented!()
-    }
-}
-
-impl ChainElement {
-    /// Raw element constructor.  Used only when we know that the values are valid.
-    pub fn new(signature: Signature, header: ChainHeader, maybe_entry: Option<Entry>) -> Self {
-        Self(signature, header, maybe_entry)
-    }
-
-    /// Validates a chain element
-    pub fn validate(&self) -> ChainElementResult<()> {
-        //TODO: gheck that signature is of the header:
-        //      ChainElementError::InvalidSignature
-        //TODO: make sure that any cases around entry existence are valid:
-        //      ChainElementError::TypeMismatch,
-        unimplemented!()
-    }
-
-    /// Access the signature portion of this triple.
-    pub fn signature(&self) -> &Signature {
-        &self.0
-    }
-
-    /// Access the ChainHeader portion of this triple.
-    pub fn header(&self) -> &ChainHeader {
-        &self.1
-    }
-
-    /// Access the Entry portion of this triple.
-    pub fn entry(&self) -> &Option<Entry> {
-        &self.2
     }
 }
 

@@ -178,7 +178,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    cache.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
     let address = jimbo_entry.entry_address();
 
     // set it's metadata to Live
@@ -215,7 +215,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     let Chains {
         source_chain,
         cache,
-        jimbo_header,
+        jimbo_header: _,
         jimbo_entry,
         mock_primary_meta,
         mock_cache_meta,
@@ -307,7 +307,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
         jessy_header,
         jessy_entry,
         mut mock_primary_meta,
-        mock_cache_meta,
+        mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
     source_chain.put(jessy_header.clone(), Some(jessy_entry.clone()))?;
@@ -350,10 +350,10 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let Chains {
         source_chain,
         cache,
-        jimbo_header,
+        jimbo_header: _,
         jimbo_entry,
         jessy_id: _,
-        jessy_header,
+        jessy_header: _,
         jessy_entry,
         mock_primary_meta,
         mut mock_cache_meta,

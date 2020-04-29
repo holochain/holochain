@@ -31,6 +31,14 @@ pub enum SourceChainError {
 
     #[error("SerdeJson Error: {0}")]
     SerdeJsonError(String),
+
+    /// Element signature doesn't validate against the header
+    #[error("Element signature is invalid")]
+    InvalidSignature,
+
+    /// Signing error
+    #[error("Unable to sign header")]
+    SigningError,
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

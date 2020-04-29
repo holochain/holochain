@@ -1,4 +1,6 @@
-use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
+use crate::core::state::source_chain::{
+    ChainElement, ChainInvalidReason, SignedHeader, SourceChainError, SourceChainResult,
+};
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_state::{
@@ -12,8 +14,7 @@ use holochain_state::{
     prelude::{Readable, Reader, Writer},
 };
 use holochain_types::{
-    chain_header::HeaderAddress,
-    chain_header::{ChainElement, ChainHeader, SignedHeader},
+    chain_header::{ChainHeader, HeaderAddress},
     entry::Entry,
     entry::EntryAddress,
     header,
@@ -122,8 +123,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         maybe_entry: Option<Entry>,
     ) -> DatabaseResult<()> {
         if let Some(entry) = maybe_entry {
-            self.entries
-                .put(entry.entry_address().into(), entry.to_owned());
+            self.entries.put(entry.entry_address().into(), entry);
         }
         self.headers
             .put(signed_header.header().hash().into(), signed_header);

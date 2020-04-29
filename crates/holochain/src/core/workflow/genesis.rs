@@ -1,12 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{
-    chain_header::ChainHeader,
-    dna::Dna,
-    entry::Entry,
-    header,
-    prelude::*,
-};
+use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna

@@ -1,17 +1,18 @@
 use holochain_2020::core::state::{
-    cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
+    cascade::Cascade,
+    chain_meta::ChainMetaBuf,
+    source_chain::{SourceChainBuf, SourceChainResult},
 };
-use holochain_keystore::Signature;
-use holochain_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
+use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    chain_header::{ChainElement, ChainHeader},
+    chain_header::ChainHeader,
     entry::Entry,
     header,
     prelude::*,
     test_utils::{fake_agent_hash, fake_header_hash},
 };
 
-fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
+fn fixtures() -> (AgentHash, ChainHeader, Entry, AgentHash, ChainHeader, Entry) {
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_hash("Jimbo");
@@ -34,11 +35,18 @@ fn fixtures() -> (AgentHash, ChainElement, AgentHash, ChainElement) {
         entry_type: header::EntryType::AgentKey,
         entry_address: jessy_entry.entry_address(),
     });
-    (jimbo_id, jimbo_entry, jesse_entry, jessy_id, jessy_eheader, jessy_entry)
+    (
+        jimbo_id,
+        jimbo_header,
+        jimbo_entry,
+        jessy_id,
+        jessy_header,
+        jessy_entry,
+    )
 }
 
 #[tokio::test]
-async fn get_links() -> DatabaseResult<()> {
+async fn get_links() -> SourceChainResult<()> {
     let env = test_cell_env();
     let dbs = env.dbs().await?;
     let env_ref = env.guard().await;
@@ -51,11 +59,11 @@ async fn get_links() -> DatabaseResult<()> {
     let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
     let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
 
-    let (_jimbo_id, jimbo_entry, jimbo_entry, _jessy_id, jessy_entry, jesse_header) = fixtures();
+    let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
-    let base = jimbo.entry().clone().unwrap().entry_address();
-    source_chain.put(jimbo_header, jimbo_entry)?;
-    source_chain.put(jessy_header, jessy_entry)?;
+    let base = jimbo_entry.entry_address();
+    source_chain.put(jimbo_header, Some(jimbo_entry))?;
+    source_chain.put(jessy_header, Some(jessy_entry))?;
 
     // Pass in stores as references
     let cascade = Cascade::new(
