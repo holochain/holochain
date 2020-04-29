@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::address::EntryAddress;
+use crate::address::{DhtAddress, EntryAddress};
 
 pub type ZomeId = u8;
 
@@ -30,8 +30,8 @@ pub struct LinkAdd {
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
-    pub base: HoloHash,   // Not HoloHash, but HeaderHash or EntryHash or AgentHash
-    pub target: HoloHash, // Not HoloHash, but HeaderHash or EntryHash or AgentHash
+    pub base: DhtAddress,
+    pub target: DhtAddress,
     pub tag: SerializedBytes,
     pub link_type: SerializedBytes,
 }
@@ -42,7 +42,7 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
     /// The address of the `LinkAdd` being reversed
-    pub link_add_hash: HoloHash, // not HoloHash byt LinkAddHash or maybe its HeaderHash?
+    pub link_add_hash: DhtAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -92,7 +92,7 @@ pub struct EntryDelete {
     pub prev_header: HeaderHash,
 
     /// Hash Address of the Element being deleted
-    pub removes: HoloHash, // not HoloHash but EntryHash or HeaderHash ??
+    pub removes: DhtAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
