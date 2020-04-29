@@ -2,7 +2,7 @@ use crate::{
     conductor::Cell,
     core::{
         state::workspace::{self, Workspace, WorkspaceError},
-        workflow::{self, WorkflowCall, WorkflowEffects},
+        workflow::{self, WorkflowEffects},
     },
 };
 use futures::future::{join_all, BoxFuture, FutureExt};

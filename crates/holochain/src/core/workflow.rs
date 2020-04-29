@@ -16,21 +16,6 @@ use thiserror::Error;
 #[cfg(test)]
 use super::state::source_chain::SourceChainError;
 
-/// Specify the workflow-specific arguments to the functions that make the workflow go
-/// It's intended that resources like Workspaces and Conductor APIs don't go here.
-#[derive(Debug)]
-pub enum WorkflowCall {
-    InvokeZome(Box<ZomeInvocation>),
-    Genesis(Box<Dna>, AgentHash),
-    // AppValidation(Vec<DhtOp>),
-    // {
-    //     invocation: ZomeInvocation,
-    //     source_chain: SourceChain<'_>,
-    //     ribosome: Ribo,
-    //     conductor_api: Api,
-    // }
-}
-
 #[async_trait::async_trait]
 pub trait WorkflowCaller<O, W: Workspace> {
     async fn call(self) -> (O, WorkflowEffects<W>);
