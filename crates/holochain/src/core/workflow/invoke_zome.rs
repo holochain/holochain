@@ -1,18 +1,22 @@
 use super::{WorkflowEffects, WorkflowResult};
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
-use holochain_types::nucleus::ZomeInvocation;
+use holochain_types::{prelude::Todo, nucleus::ZomeInvocation};
+
+pub type ZomeInvocationResult = Todo;
 
 pub async fn invoke_zome<'env>(
     workspace: InvokeZomeWorkspace<'_>,
     _ribosome: impl RibosomeT,
     _invocation: ZomeInvocation,
-) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
-    Ok(WorkflowEffects {
+) -> WorkflowResult<ZomeInvocationResult, InvokeZomeWorkspace<'_>> {
+    let fx = WorkflowEffects {
         workspace,
-        triggers: Default::default(),
+        triggers: todo!(""),
         signals: Default::default(),
         callbacks: Default::default(),
-    })
+    };
+    let result = todo!("this will be the actual zome function return value");
+    Ok((result, fx))
 }
 
 #[cfg(test_TODO_FIX)]

@@ -2,13 +2,13 @@ use crate::{
     conductor::Cell,
     core::{
         state::workspace::{self, Workspace, WorkspaceError},
-        workflow::{self, WorkflowCall, WorkflowEffects, WorkflowTrigger},
+        workflow::{self, WorkflowCall, WorkflowEffects},
     },
 };
 use futures::future::{join_all, BoxFuture, FutureExt};
 use holochain_state::{env::WriteManager, prelude::*};
 use std::sync::Arc;
-use workflow::{WorkflowCallback, WorkflowSignal};
+use workflow::{WorkflowCallback, WorkflowSignal, WorkflowCaller, WorkflowTriggers};
 
 use error::WorkflowRunResult;
 
@@ -24,28 +24,31 @@ pub mod error;
 pub struct WorkflowRunner(Arc<Cell>);
 
 impl WorkflowRunner {
-    pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
+    pub async fn run_workflow<O, W: Workspace, C: WorkflowCaller<O, W>>(&self, caller: C) -> WorkflowRunResult<O> {
         let environ = Arc::clone(&self.0).state_env();
         let env = environ.guard().await;
         let dbs = environ.dbs().await?;
         let reader = env.reader()?;
 
-        // TODO: is it possible to DRY this up with a macro?
-        match call {
-            WorkflowCall::InvokeZome(invocation) => {
-                let workspace = workspace::InvokeZomeWorkspace::new(&reader, &dbs)?;
-                let effects =
-                    workflow::invoke_zome(workspace, self.0.get_ribosome(), *invocation).await?;
-                self.finish(effects).await?;
-            }
-            WorkflowCall::Genesis(dna, agent_id) => {
-                let workspace = workspace::GenesisWorkspace::new(&reader, &dbs)?;
-                let api = self.0.get_conductor_api();
-                let effects = workflow::genesis(workspace, api, *dna, agent_id).await?;
-                self.finish(effects).await?;
-            }
-        }
-        Ok(())
+        let (result, effects) = caller.call().await;
+        self.finish(effects).await?;
+        Ok(result)
+        // // TODO: is it possible to DRY this up with a macro?
+        // match call {
+        //     WorkflowCall::InvokeZome(invocation) => {
+        //         let workspace = workspace::InvokeZomeWorkspace::new(&reader, &dbs)?;
+        //         let (output, effects) =
+        //             workflow::invoke_zome(workspace, self.0.get_ribosome(), *invocation).await?;
+        //         self.finish(effects).await?;
+        //     }
+        //     WorkflowCall::Genesis(dna, agent_id) => {
+        //         let workspace = workspace::GenesisWorkspace::new(&reader, &dbs)?;
+        //         let api = self.0.get_conductor_api();
+        //         let (output, effects) = workflow::genesis(workspace, api, *dna, agent_id).await?;
+        //         self.finish(effects).await?;
+        //     }
+        // }
+        // Ok(())
     }
 
     /// Apply the WorkflowEffects to finalize the Workflow.
@@ -68,7 +71,7 @@ impl WorkflowRunner {
             self.finish_workspace(workspace).await?;
             self.finish_callbacks(callbacks).await?;
             self.finish_signals(signals).await?;
-            self.finish_triggers(triggers).await?;
+            // self.finish_triggers(triggers).await?;
 
             Ok(())
         }
@@ -107,18 +110,19 @@ impl WorkflowRunner {
     /// a new task for each. The difficulty with that is that tokio::spawn
     /// requires the future to be 'static, which is currently not the case due
     /// to our LMDB Environment lifetimes.
-    async fn finish_triggers(&self, triggers: Vec<WorkflowTrigger>) -> WorkflowRunResult<()> {
-        let calls: Vec<_> = triggers
-            .into_iter()
-            .map(|WorkflowTrigger { call, interval }| {
-                if let Some(_delay) = interval {
-                    // FIXME: implement or discard
-                    unimplemented!()
-                } else {
-                    self.run_workflow(call)
-                }
-            })
-            .collect();
-        join_all(calls).await.into_iter().collect()
+    async fn finish_triggers(&self, triggers: WorkflowTriggers) -> WorkflowRunResult<()> {
+        todo!("")
+        // let calls: Vec<_> = triggers
+        //     .into_iter()
+        //     .map(|WorkflowTrigger { call, interval }| {
+        //         if let Some(_delay) = interval {
+        //             // FIXME: implement or discard
+        //             unimplemented!()
+        //         } else {
+        //             self.run_workflow(call)
+        //         }
+        //     })
+        //     .collect();
+        // join_all(calls).await.into_iter().collect()
     }
 }

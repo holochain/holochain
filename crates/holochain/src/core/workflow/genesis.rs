@@ -14,7 +14,7 @@ pub async fn genesis(
     api: impl CellConductorApiT,
     dna: Dna,
     agent_hash: AgentHash,
-) -> WorkflowResult<GenesisWorkspace<'_>> {
+) -> WorkflowResult<(), GenesisWorkspace<'_>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
@@ -33,12 +33,15 @@ pub async fn genesis(
         .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)
         .await?;
 
-    Ok(WorkflowEffects {
+    let fx = WorkflowEffects {
         workspace,
-        triggers: Default::default(),
+        triggers: todo!(""),
         signals: Default::default(),
         callbacks: Default::default(),
-    })
+    };
+    let result = ();
+    
+    Ok((result, fx))
 }
 
 #[cfg(test)]
@@ -80,7 +83,7 @@ mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let fx = genesis(workspace, api, dna.clone(), agent_hash.clone()).await?;
+            let (_, fx) = genesis(workspace, api, dna.clone(), agent_hash.clone()).await?;
             let writer = env.writer()?;
             fx.workspace.commit_txn(writer)?;
         }

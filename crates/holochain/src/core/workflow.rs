@@ -31,40 +31,46 @@ pub enum WorkflowCall {
     // }
 }
 
+#[async_trait::async_trait]
+pub trait WorkflowCaller<O, W: Workspace> {
+    async fn call(self) -> (O, WorkflowEffects<W>);
+}
+
 /// A WorkflowEffects is returned from each Workspace function.
 /// It's just a data structure with no methods of its own, hence the public fields
 pub struct WorkflowEffects<W: Workspace> {
     pub workspace: W,
-    pub triggers: Vec<WorkflowTrigger>,
+    pub triggers: WorkflowTriggers,
     pub callbacks: Vec<WorkflowCallback>,
     pub signals: Vec<WorkflowSignal>,
 }
 
-pub type WorkflowCallback = ();
-pub type WorkflowSignal = ();
+pub type WorkflowCallback = Todo;
+pub type WorkflowSignal = Todo;
+pub type WorkflowTriggers = Todo;
 
-#[derive(Debug)]
-pub struct WorkflowTrigger {
-    pub(crate) call: WorkflowCall,
-    pub(crate) interval: Option<Duration>,
-}
+// #[derive(Debug)]
+// pub struct WorkflowTrigger<O, W: Workspace> {
+//     pub(crate) call: WorkflowCaller<O, W>,
+//     pub(crate) interval: Option<Duration>,
+// }
 
-#[allow(dead_code)]
-impl WorkflowTrigger {
-    pub fn immediate(call: WorkflowCall) -> Self {
-        Self {
-            call,
-            interval: None,
-        }
-    }
+// #[allow(dead_code)]
+// impl WorkflowTrigger {
+//     pub fn immediate(call: WorkflowCall) -> Self {
+//         Self {
+//             call,
+//             interval: None,
+//         }
+//     }
 
-    pub fn delayed(call: WorkflowCall, interval: Duration) -> Self {
-        Self {
-            call,
-            interval: Some(interval),
-        }
-    }
-}
+//     pub fn delayed(call: WorkflowCall, interval: Duration) -> Self {
+//         Self {
+//             call,
+//             interval: Some(interval),
+//         }
+//     }
+// }
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
@@ -86,4 +92,4 @@ pub enum WorkflowError {
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
-pub type WorkflowResult<W> = Result<WorkflowEffects<W>, WorkflowError>;
+pub type WorkflowResult<O, W> = Result<(O, WorkflowEffects<W>), WorkflowError>;
