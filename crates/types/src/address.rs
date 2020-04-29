@@ -10,14 +10,14 @@ pub enum EntryAddress {
     /// standard entry hash
     Entry(EntryHash),
     /// agents are entries too
-    Agent(AgentHash),
+    Agent(AgentPubKey),
 }
 
 impl From<EntryAddress> for HoloHash {
     fn from(entry_address: EntryAddress) -> HoloHash {
         match entry_address {
             EntryAddress::Entry(entry_hash) => entry_hash.into(),
-            EntryAddress::Agent(agent_hash) => agent_hash.into(),
+            EntryAddress::Agent(agent_pubkey) => agent_pubkey.into(),
         }
     }
 }
@@ -33,7 +33,7 @@ impl AsRef<[u8]> for &EntryAddress {
     fn as_ref(&self) -> &[u8] {
         match self {
             EntryAddress::Entry(entry_hash) => entry_hash.as_ref(),
-            EntryAddress::Agent(agent_hash) => agent_hash.as_ref(),
+            EntryAddress::Agent(agent_pubkey) => agent_pubkey.as_ref(),
         }
     }
 }
@@ -42,7 +42,7 @@ impl std::fmt::Display for EntryAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
-            EntryAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
+            EntryAddress::Agent(agent_pubkey) => write!(f, "{}", agent_pubkey),
         }
     }
 }
@@ -53,7 +53,7 @@ pub enum DhtAddress {
     /// standard entry hash
     Entry(EntryHash),
     /// agents can be stored
-    Agent(AgentHash),
+    Agent(AgentPubKey),
     /// headers can be stored
     Header(HeaderHash),
 }
@@ -62,7 +62,7 @@ impl From<DhtAddress> for HoloHash {
     fn from(entry_address: DhtAddress) -> HoloHash {
         match entry_address {
             DhtAddress::Entry(entry_hash) => entry_hash.into(),
-            DhtAddress::Agent(agent_hash) => agent_hash.into(),
+            DhtAddress::Agent(agent_pubkey) => agent_pubkey.into(),
             DhtAddress::Header(header_hash) => header_hash.into(),
         }
     }
@@ -82,9 +82,9 @@ impl TryFrom<&ChainHeader> for DhtAddress {
     }
 }
 
-impl TryFrom<&AgentHash> for DhtAddress {
+impl TryFrom<&AgentPubKey> for DhtAddress {
     type Error = SerializedBytesError;
-    fn try_from(agent: &AgentHash) -> Result<Self, Self::Error> {
+    fn try_from(agent: &AgentPubKey) -> Result<Self, Self::Error> {
         Ok(DhtAddress::Agent(agent.to_owned()))
     }
 }
@@ -93,7 +93,7 @@ impl AsRef<[u8]> for &DhtAddress {
     fn as_ref(&self) -> &[u8] {
         match self {
             DhtAddress::Entry(entry_hash) => entry_hash.as_ref(),
-            DhtAddress::Agent(agent_hash) => agent_hash.as_ref(),
+            DhtAddress::Agent(agent_pubkey) => agent_pubkey.as_ref(),
             DhtAddress::Header(header_hash) => header_hash.as_ref(),
         }
     }
@@ -103,7 +103,7 @@ impl std::fmt::Display for DhtAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             DhtAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
-            DhtAddress::Agent(agent_hash) => write!(f, "{}", agent_hash),
+            DhtAddress::Agent(agent_pubkey) => write!(f, "{}", agent_pubkey),
             DhtAddress::Header(header_hash) => write!(f, "{}", header_hash),
         }
     }

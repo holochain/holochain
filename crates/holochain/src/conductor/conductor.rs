@@ -98,8 +98,8 @@ where
     /// Placeholder. A way to look up a Cell from its app-specific handle.
     _handle_map: HashMap<CellHandle, CellId>,
 
-    /// Placeholder. A way to get a Keystore from an AgentHash.
-    _agent_keys: HashMap<AgentHash, Keystore>,
+    /// Placeholder. A way to get a Keystore from an AgentPubKey.
+    _agent_keys: HashMap<AgentPubKey, Keystore>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,

@@ -20,7 +20,7 @@ use super::state::source_chain::SourceChainError;
 #[derive(Debug)]
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
-    Genesis(Box<Dna>, AgentHash),
+    Genesis(Box<Dna>, AgentPubKey),
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,
@@ -68,7 +68,7 @@ impl WorkflowTrigger {
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
-    AgentInvalid(AgentHash),
+    AgentInvalid(AgentPubKey),
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] ConductorApiError),

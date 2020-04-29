@@ -1,6 +1,6 @@
 //! A SourceChain is guaranteed to be initialized, i.e. it has gone through the CellGenesis workflow.
 //! It has the same interface as its underlying SourceChainBuf, except that certain operations,
-//! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentHash,
+//! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
 use holo_hash::*;
@@ -25,9 +25,9 @@ mod source_chain_buffer;
 pub struct SourceChain<'env, R: Readable>(SourceChainBuf<'env, R>);
 
 impl<'env, R: Readable> SourceChain<'env, R> {
-    pub fn agent_hash(&self) -> SourceChainResult<AgentHash> {
+    pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
         self.0
-            .agent_hash()?
+            .agent_pubkey()?
             .ok_or(SourceChainError::InvalidStructure(
                 ChainInvalidReason::GenesisDataMissing,
             ))

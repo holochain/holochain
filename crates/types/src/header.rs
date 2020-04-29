@@ -18,7 +18,7 @@ pub type Timestamp = Iso8601;
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     // No previous header, because DNA is always first chain entry
     pub hash: DnaHash,
@@ -26,7 +26,7 @@ pub struct Dna {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct LinkAdd {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
@@ -38,7 +38,7 @@ pub struct LinkAdd {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct LinkRemove {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
     /// The address of the `LinkAdd` being reversed
@@ -47,7 +47,7 @@ pub struct LinkRemove {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainOpen {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
@@ -56,7 +56,7 @@ pub struct ChainOpen {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainClose {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
@@ -65,7 +65,7 @@ pub struct ChainClose {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryCreate {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
@@ -75,7 +75,7 @@ pub struct EntryCreate {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryUpdate {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 
@@ -87,7 +87,7 @@ pub struct EntryUpdate {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryDelete {
-    pub author: AgentHash,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub prev_header: HeaderHash,
 

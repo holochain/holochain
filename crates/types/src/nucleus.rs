@@ -1,7 +1,7 @@
 //! Types related to making calls into Zomes.
 
 use crate::{cell::CellId, prelude::*, shims::CapToken};
-use holo_hash::AgentHash;
+use holo_hash::AgentPubKey;
 use holochain_zome_types::*;
 
 /// The ZomeId is a pair of CellId and ZomeName.
@@ -27,7 +27,7 @@ pub struct ZomeInvocation {
     /// The serialized data to pass an an argument to the Zome call
     pub payload: ZomeExternHostInput,
     /// the provenance of the call
-    pub provenance: AgentHash,
+    pub provenance: AgentPubKey,
     /// the hash of the top header at the time of call
     pub as_at: HeaderHash,
 }

@@ -24,7 +24,7 @@ pub struct CapTokenGrant;
 pub enum Entry {
     /// The AgentKey system entry, the second entry of every source chain,
     /// which grants authoring capability for this agent. (Name TBD)
-    AgentKey(AgentHash),
+    AgentKey(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
     App(SerializedBytes),
     /// The capability claim system entry which allows committing a granted permission

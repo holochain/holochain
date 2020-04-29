@@ -13,7 +13,7 @@ use holochain_types::{
     entry::Entry,
     header, observability,
     prelude::*,
-    test_utils::{fake_agent_hash, fake_header_hash},
+    test_utils::{fake_agent_pubkey, fake_header_hash},
 };
 use maplit::hashset;
 use mockall::*;
@@ -23,10 +23,10 @@ use std::collections::HashSet;
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
-    jimbo_id: AgentHash,
+    jimbo_id: AgentPubKey,
     jimbo_header: ChainHeader,
     jimbo_entry: Entry,
-    jessy_id: AgentHash,
+    jessy_id: AgentPubKey,
     jessy_header: ChainHeader,
     jessy_entry: Entry,
     mock_primary_meta: MockChainMetaBuf,
@@ -39,9 +39,9 @@ fn setup_env<'env>(
 ) -> DatabaseResult<Chains<'env>> {
     let previous_header = fake_header_hash("previous");
 
-    let jimbo_id = fake_agent_hash("Jimbo");
+    let jimbo_id = fake_agent_pubkey("Jimbo");
     let jimbo_entry = Entry::AgentKey(jimbo_id.clone());
-    let jessy_id = fake_agent_hash("Jessy");
+    let jessy_id = fake_agent_pubkey("Jessy");
     let jessy_entry = Entry::AgentKey(jessy_id.clone());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {

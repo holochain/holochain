@@ -86,15 +86,15 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &self.cas.headers()
     }
 
-    /// Get the AgentHash from the entry committed to the chain.
+    /// Get the AgentPubKey from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
-    pub fn agent_hash(&self) -> DatabaseResult<Option<AgentHash>> {
+    pub fn agent_pubkey(&self) -> DatabaseResult<Option<AgentPubKey>> {
         Ok(self
             .cas
             .entries()
             .iter_raw()?
             .filter_map(|(_, e)| match e {
-                Entry::AgentKey(agent_hash) => Some(agent_hash),
+                Entry::AgentKey(agent_pubkey) => Some(agent_pubkey),
                 _ => None,
             })
             .next())
@@ -198,11 +198,11 @@ pub mod tests {
         entry::Entry,
         header,
         prelude::*,
-        test_utils::{fake_agent_hash, fake_dna},
+        test_utils::{fake_agent_pubkey, fake_dna},
     };
 
     fn fixtures() -> (
-        AgentHash,
+        AgentPubKey,
         ChainHeader,
         Option<Entry>,
         ChainHeader,
@@ -210,26 +210,26 @@ pub mod tests {
     ) {
         let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna("a");
-        let agent_hash = fake_agent_hash("agent");
+        let agent_pubkey = fake_agent_pubkey("agent");
 
-        let agent_entry = Entry::AgentKey(agent_hash.clone());
+        let agent_entry = Entry::AgentKey(agent_pubkey.clone());
 
         let dna_header = ChainHeader::Dna(header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),
-            author: agent_hash.clone(),
+            author: agent_pubkey.clone(),
             hash: dna.dna_hash(),
         });
 
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),
-            author: agent_hash.clone(),
+            author: agent_pubkey.clone(),
             prev_header: dna_header.hash(),
             entry_type: header::EntryType::AgentKey,
-            entry_address: agent_hash.clone().into(),
+            entry_address: agent_pubkey.clone().into(),
         });
 
         (
-            agent_hash,
+            agent_pubkey,
             dna_header,
             None,
             agent_header,
@@ -243,7 +243,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
-        let (_agent_hash, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
@@ -306,7 +306,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
-        let (_agent_hash, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         env.with_reader(|reader| {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;

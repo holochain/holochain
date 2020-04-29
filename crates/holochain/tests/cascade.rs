@@ -9,15 +9,22 @@ use holochain_types::{
     entry::Entry,
     header,
     prelude::*,
-    test_utils::{fake_agent_hash, fake_header_hash},
+    test_utils::{fake_agent_pubkey, fake_header_hash},
 };
 
-fn fixtures() -> (AgentHash, ChainHeader, Entry, AgentHash, ChainHeader, Entry) {
+fn fixtures() -> (
+    AgentPubKey,
+    ChainHeader,
+    Entry,
+    AgentPubKey,
+    ChainHeader,
+    Entry,
+) {
     let previous_header = fake_header_hash("previous");
 
-    let jimbo_id = fake_agent_hash("Jimbo");
+    let jimbo_id = fake_agent_pubkey("Jimbo");
     let jimbo_entry = Entry::AgentKey(jimbo_id.clone());
-    let jessy_id = fake_agent_hash("Jessy");
+    let jessy_id = fake_agent_pubkey("Jessy");
     let jessy_entry = Entry::AgentKey(jessy_id.clone());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
