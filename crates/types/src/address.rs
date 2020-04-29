@@ -91,8 +91,8 @@ impl AsRef<[u8]> for &EntryAddress {
 impl std::fmt::Display for EntryAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            EntryAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
-            EntryAddress::Agent(agent_pubkey) => write!(f, "{}", agent_pubkey),
+            EntryAddress::Entry(entry_hash) => entry_hash.fmt(f),
+            EntryAddress::Agent(agent_pubkey) => agent_pubkey.fmt(f),
         }
     }
 }
