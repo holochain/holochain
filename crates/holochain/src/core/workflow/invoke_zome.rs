@@ -12,10 +12,11 @@ pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
 }
 
 impl<'env, Ribosome: RibosomeT + Send + Sync>
-    WorkflowCaller<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>>
+    WorkflowCaller<'env>
     for InvokeZomeWorkflow<Ribosome>
 {
-    // type Workspace = InvokeZomeWorkspace<'env>;
+    type Output = ZomeInvocationResult;
+    type Workspace = InvokeZomeWorkspace<'env>;
     
     fn call(
         self,

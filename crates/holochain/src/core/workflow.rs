@@ -18,9 +18,11 @@ use runner::error::WorkflowRunResult;
 use std::time::Duration;
 use thiserror::Error;
 
-pub trait WorkflowCaller<'env, O, W: Workspace<'env>> {
+pub trait WorkflowCaller<'env> {
+    type Output;
+    type Workspace: Workspace<'env>;
     
-    fn call(self) -> MustBoxFuture<'env, WorkflowResult<'env, O, W>>;
+    fn call(self) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self::Workspace>>;
 }
 
 /// A WorkflowEffects is returned from each Workspace function.

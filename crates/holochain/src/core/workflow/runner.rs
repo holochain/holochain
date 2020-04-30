@@ -27,7 +27,7 @@ impl<'env> WorkflowRunner<'env> {
     pub async fn run_workflow<C, O, W>(&'env self, caller: C) -> WorkflowRunResult<O>
     where
         W: Workspace<'env>,
-        C: WorkflowCaller<'env, O, W>,
+        C: WorkflowCaller<'env, Output=O, Workspace=W>,
     {
         let environ = self.0.state_env();
         let env = environ.guard().await;
