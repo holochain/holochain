@@ -1,7 +1,7 @@
-use super::{WorkflowEffects, WorkflowResult, WorkflowCaller, runner::error::WorkflowRunResult};
+use super::{runner::error::WorkflowRunResult, WorkflowCaller, WorkflowEffects, WorkflowResult};
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
-use holochain_types::{prelude::Todo, nucleus::ZomeInvocation};
 use holochain_state::{db::DbManager, prelude::Reader};
+use holochain_types::{nucleus::ZomeInvocation, prelude::Todo};
 use must_future::MustBoxFuture;
 
 pub type ZomeInvocationResult = Todo;
@@ -11,27 +11,29 @@ pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     _invocation: ZomeInvocation,
 }
 
-impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>> for InvokeZomeWorkflow<Ribosome> {
-    fn workspace(reader: &'env Reader, dbs: &'env DbManager) -> WorkflowRunResult<InvokeZomeWorkspace<'env>> {
-        Ok(InvokeZomeWorkspace::new(reader, dbs)?)
-    }
-
-    // doesn't work probably because of lifetime param in return type
-    fn call(self, workspace: InvokeZomeWorkspace<'env>) -> MustBoxFuture<'env, WorkflowResult<ZomeInvocationResult, InvokeZomeWorkspace<'env>>> {
+impl<'env, Ribosome: RibosomeT + Send + Sync>
+    WorkflowCaller<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>>
+    for InvokeZomeWorkflow<Ribosome>
+{
+    // type Workspace = InvokeZomeWorkspace<'env>;
+    
+    fn call(
+        self,
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>>> {
         unimplemented!()
     }
 }
 
 pub async fn invoke_zome<'env>(
-    workspace: InvokeZomeWorkspace<'_>,
+    workspace: InvokeZomeWorkspace<'env>,
     _ribosome: impl RibosomeT,
     _invocation: ZomeInvocation,
-) -> WorkflowResult<ZomeInvocationResult, InvokeZomeWorkspace<'_>> {
+) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>> {
     let fx = WorkflowEffects {
         workspace,
         triggers: todo!(""),
         signals: Default::default(),
-        callbacks: Default::default(),
+        callbacks: Default::default(),_lifetime: std::marker::PhantomData
     };
     let result = todo!("this will be the actual zome function return value");
     Ok((result, fx))

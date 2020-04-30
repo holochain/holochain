@@ -24,17 +24,17 @@ pub mod error;
 pub struct WorkflowRunner<'env>(&'env Cell);
 
 impl<'env> WorkflowRunner<'env> {
-    pub async fn run_workflow<C, O, W>(&self, caller: C) -> WorkflowRunResult<O>
+    pub async fn run_workflow<C, O, W>(&'env self, caller: C) -> WorkflowRunResult<O>
     where
-        W: 'env + Workspace,
-        C: 'env + WorkflowCaller<'env, O, W>,
+        W: Workspace<'env>,
+        C: WorkflowCaller<'env, O, W>,
     {
         let environ = self.0.state_env();
         let env = environ.guard().await;
         let dbs = environ.dbs().await?;
         let reader = env.reader()?;
-        let workspace = C::workspace(&reader, &dbs)?;
-        let (result, effects) = caller.call(workspace).await?;
+        let workspace = unimplemented!();
+        let (result, effects) = caller.call().await?;
         self.finish(effects).await?;
         Ok(result)
         // // TODO: is it possible to DRY this up with a macro?
@@ -60,16 +60,18 @@ impl<'env> WorkflowRunner<'env> {
     /// 2. Call any Wasm callbacks
     /// 3. Emit any Signals
     /// 4. Trigger any subsequent Workflows
-    fn finish<'a, W: 'a + Workspace>(
-        &'a self,
-        effects: WorkflowEffects<W>,
-    ) -> BoxFuture<WorkflowRunResult<()>> {
-        async move {
+    async fn finish<W: Workspace<'env>>(
+        &'env self,
+        effects: WorkflowEffects<'env, W>,
+    ) -> WorkflowRunResult<()> {
+    // ) -> BoxFuture<WorkflowRunResult<()>> {
+        // async move {
             let WorkflowEffects {
                 workspace,
                 triggers,
                 callbacks,
                 signals,
+                ..
             } = effects;
 
             self.finish_workspace(workspace).await?;
@@ -78,11 +80,11 @@ impl<'env> WorkflowRunner<'env> {
             // self.finish_triggers(triggers).await?;
 
             Ok(())
-        }
-        .boxed()
+        // }
+        // .boxed()
     }
 
-    async fn finish_workspace<W: Workspace>(&self, workspace: W) -> WorkflowRunResult<()> {
+    async fn finish_workspace<W: Workspace<'env>>(&self, workspace: W) -> WorkflowRunResult<()> {
         let arc = self.0.state_env();
         let env = arc.guard().await;
         let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;

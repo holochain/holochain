@@ -26,21 +26,21 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'e, R> = IntKvBuf<'e, u32, ChainSequenceItem, R>;
+type Store<'env, R> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
 
 /// A BufferedStore for interacting with the ChainSequence database
-pub struct ChainSequenceBuf<'e, R: Readable> {
-    db: Store<'e, R>,
+pub struct ChainSequenceBuf<'env, R: Readable> {
+    db: Store<'env, R>,
     next_index: u32,
     tx_seq: u32,
     current_head: Option<HeaderAddress>,
     persisted_head: Option<HeaderAddress>,
 }
 
-impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
+impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
     /// Create a new instance from a read-only transaction and a database reference
-    pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
-        let db: Store<'e, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
+    pub fn new(reader: &'env R, dbs: &DbManager) -> DatabaseResult<Self> {
+        let db: Store<'env, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 
@@ -48,12 +48,12 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     /// as an existing instance. Useful for getting a fresh read-only snapshot of a database.
     pub fn with_reader<RR: Readable>(
         &self,
-        reader: &'e RR,
-    ) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
+        reader: &'env RR,
+    ) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
         Self::from_db(self.db.with_reader(reader))
     }
 
-    fn from_db<RR: Readable>(db: Store<'e, RR>) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
+    fn from_db<RR: Readable>(db: Store<'env, RR>) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         debug!("{:?}", latest);
         let (next_index, tx_seq, current_head) = latest

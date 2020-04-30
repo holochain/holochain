@@ -9,12 +9,12 @@ use holochain_types::{dna::Dna, entry::Entry, prelude::*};
 ///
 /// FIXME: understand the details of actually getting the DNA
 /// FIXME: creating entries in the config db
-pub async fn genesis(
-    mut workspace: GenesisWorkspace<'_>,
+pub async fn genesis<'env>(
+    mut workspace: GenesisWorkspace<'env>,
     api: impl CellConductorApiT,
     dna: Dna,
     agent_hash: AgentHash,
-) -> WorkflowResult<(), GenesisWorkspace<'_>> {
+) -> WorkflowResult<'env, (), GenesisWorkspace<'env>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
@@ -38,6 +38,7 @@ pub async fn genesis(
         triggers: todo!(""),
         signals: Default::default(),
         callbacks: Default::default(),
+        _lifetime: std::marker::PhantomData,
     };
     let result = ();
     

@@ -28,7 +28,7 @@ struct Chains<'env> {
 
 fn setup_env<'env>(
     reader: &'env Reader<'env>,
-    dbs: &'env DbManager,
+    dbs: &DbManager,
 ) -> DatabaseResult<Chains<'env>> {
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;

@@ -4,33 +4,33 @@ pub mod runner;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 
+#[cfg(test)]
+use super::state::source_chain::SourceChainError;
+
 use crate::{
     conductor::api::error::ConductorApiError,
     core::state::workspace::{Workspace, WorkspaceError},
 };
-use holochain_state::{prelude::Reader, error::DatabaseError, db::DbManager};
+use holochain_state::{db::DbManager, error::DatabaseError, prelude::Reader};
 use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
+use must_future::MustBoxFuture;
+use runner::error::WorkflowRunResult;
 use std::time::Duration;
 use thiserror::Error;
-use must_future::MustBoxFuture;
 
-#[cfg(test)]
-use super::state::source_chain::SourceChainError;
-use runner::error::WorkflowRunResult;
-
-#[async_trait::async_trait]
-pub trait WorkflowCaller<'env, O, W: 'env + Workspace> {
-    fn workspace(reader: &'env Reader, dbs: &'env DbManager) -> WorkflowRunResult<W>;
-    fn call(self, workspace: W) -> MustBoxFuture<'env, WorkflowResult<O, W>>;
+pub trait WorkflowCaller<'env, O, W: Workspace<'env>> {
+    
+    fn call(self) -> MustBoxFuture<'env, WorkflowResult<'env, O, W>>;
 }
 
 /// A WorkflowEffects is returned from each Workspace function.
 /// It's just a data structure with no methods of its own, hence the public fields
-pub struct WorkflowEffects<W: Workspace> {
+pub struct WorkflowEffects<'env, W: Workspace<'env>> {
     pub workspace: W,
     pub triggers: WorkflowTriggers,
     pub callbacks: Vec<WorkflowCallback>,
     pub signals: Vec<WorkflowSignal>,
+    _lifetime: std::marker::PhantomData<&'env ()>,
 }
 
 pub type WorkflowCallback = Todo;
@@ -80,4 +80,4 @@ pub enum WorkflowError {
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
-pub type WorkflowResult<O, W> = Result<(O, WorkflowEffects<W>), WorkflowError>;
+pub type WorkflowResult<'env, O, W> = Result<(O, WorkflowEffects<'env, W>), WorkflowError>;

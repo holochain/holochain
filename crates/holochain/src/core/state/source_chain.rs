@@ -31,7 +31,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
-    pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &DbManager) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
     }
 }

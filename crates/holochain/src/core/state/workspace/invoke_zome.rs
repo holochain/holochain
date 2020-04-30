@@ -6,13 +6,11 @@ pub struct InvokeZomeWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
-impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(_reader: &Reader<'env>, _dbs: &DbManager) -> WorkspaceResult<Self> {
+
+impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
+    fn new(_reader: &'env Reader<'env>, _dbs: &DbManager) -> WorkspaceResult<Self> {
         unimplemented!()
     }
-}
-
-impl<'env> Workspace for InvokeZomeWorkspace<'env> {
     fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
         self.source_chain.flush_to_txn(&mut writer)?;
         writer.commit()?;

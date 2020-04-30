@@ -1,5 +1,5 @@
 use super::source_chain::SourceChainError;
-use holochain_state::{error::DatabaseError, prelude::Writer};
+use holochain_state::{error::DatabaseError, prelude::{Reader, Writer}, db::DbManager};
 use thiserror::Error;
 
 mod app_validation;
@@ -20,7 +20,8 @@ pub enum WorkspaceError {
 
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
-pub trait Workspace: Send {
+pub trait Workspace<'env>: Send + Sized {
+    fn new(reader: &'env Reader<'env>, dbs: &DbManager) -> WorkspaceResult<Self>;
     fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
 }
 
@@ -43,16 +44,14 @@ pub mod tests {
         two: KvBuf<'env, String, bool>,
     }
 
-    impl<'env> TestWorkspace<'env> {
-        pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
+    impl<'env> Workspace<'env> for TestWorkspace<'env> {
+        fn new(reader: &'env Reader<'env>, dbs: &DbManager) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?)?,
                 two: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_HEADERS)?)?,
             })
         }
-    }
 
-    impl<'env> Workspace for TestWorkspace<'env> {
         fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(&mut writer)?;
             self.two.flush_to_txn(&mut writer)?;
