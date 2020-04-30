@@ -34,7 +34,7 @@ impl<'env> WorkflowRunner<'env> {
         let dbs = environ.dbs().await?;
         let reader = env.reader()?;
         let workspace = unimplemented!();
-        let (result, effects) = caller.call().await?;
+        let (result, effects) = caller.run(workspace).await?;
         self.finish(effects).await?;
         Ok(result)
         // // TODO: is it possible to DRY this up with a macro?

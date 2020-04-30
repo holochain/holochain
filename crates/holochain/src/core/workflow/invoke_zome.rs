@@ -18,9 +18,10 @@ impl<'env, Ribosome: RibosomeT + Send + Sync>
     type Output = ZomeInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
     
-    fn call(
+    fn run(
         self,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>>> {
+        workspace: Self::Workspace
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self::Workspace>> {
         unimplemented!()
     }
 }
@@ -29,7 +30,7 @@ pub async fn invoke_zome<'env>(
     workspace: InvokeZomeWorkspace<'env>,
     _ribosome: impl RibosomeT,
     _invocation: ZomeInvocation,
-) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>> {
+) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkspace<'env>>{
     let fx = WorkflowEffects {
         workspace,
         triggers: todo!(""),

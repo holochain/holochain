@@ -1,6 +1,22 @@
-use super::{WorkflowEffects, WorkflowError, WorkflowResult};
+use super::{WorkflowCaller, WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
 use holochain_types::{dna::Dna, entry::Entry, prelude::*};
+use must_future::MustBoxFuture;
+
+pub struct GenesisWorkflow<Api: CellConductorApiT> {
+    api: Api,
+    dna: Dna,
+    agent_hash: AgentHash,
+}
+
+impl<'env, Api: CellConductorApiT + Send + Sync> WorkflowCaller<'env> for GenesisWorkflow<Api> {
+    type Output = ();
+    type Workspace = GenesisWorkspace<'env>;
+
+    fn run(self, workspace: Self::Workspace) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self::Workspace>> {
+        unimplemented!()
+    }
+}
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -41,7 +57,7 @@ pub async fn genesis<'env>(
         _lifetime: std::marker::PhantomData,
     };
     let result = ();
-    
+
     Ok((result, fx))
 }
 

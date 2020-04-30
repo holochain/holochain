@@ -22,7 +22,7 @@ pub trait WorkflowCaller<'env> {
     type Output;
     type Workspace: Workspace<'env>;
     
-    fn call(self) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self::Workspace>>;
+    fn run(self, workspace: Self::Workspace) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self::Workspace>>;
 }
 
 /// A WorkflowEffects is returned from each Workspace function.
@@ -81,5 +81,6 @@ pub enum WorkflowError {
     SourceChainError(#[from] SourceChainError),
 }
 
-/// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
+/// The `Result::Ok` of any workflow function is 
+/// a tuple of the function output and a `WorkflowEffects` struct.
 pub type WorkflowResult<'env, O, W> = Result<(O, WorkflowEffects<'env, W>), WorkflowError>;
