@@ -9,7 +9,7 @@ use holochain_types::{
     entry::Entry,
     header,
     prelude::*,
-    test_utils::{fake_agent_pubkey, fake_header_hash},
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
 };
 
 fn fixtures() -> (
@@ -22,9 +22,9 @@ fn fixtures() -> (
 ) {
     let previous_header = fake_header_hash("previous");
 
-    let jimbo_id = fake_agent_pubkey("Jimbo");
+    let jimbo_id = fake_agent_pubkey_1();
     let jimbo_entry = Entry::Agent(jimbo_id.clone());
-    let jessy_id = fake_agent_pubkey("Jessy");
+    let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
@@ -69,8 +69,8 @@ async fn get_links() -> SourceChainResult<()> {
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
     let base = jimbo_entry.entry_address();
-    source_chain.put(jimbo_header, Some(jimbo_entry))?;
-    source_chain.put(jessy_header, Some(jessy_entry))?;
+    source_chain.put(jimbo_header, Some(jimbo_entry)).await?;
+    source_chain.put(jessy_header, Some(jessy_entry)).await?;
 
     // Pass in stores as references
     let cascade = Cascade::new(
