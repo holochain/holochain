@@ -45,48 +45,53 @@ impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {
     }
 }
 
-/// the header and the signature that signed it
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[allow(dead_code, missing_docs)]
-pub struct SignedHeader {
-    header: ChainHeader,
-    signature: Signature,
-}
-
 /// a chain element which is a triple containing the signature of the header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ChainElement(Signature, ChainHeader, Option<Entry>);
+pub struct ChainElement {
+    signed_header: SignedHeader,
+    maybe_entry: Option<Entry>,
+}
 
 impl ChainElement {
     /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signature: Signature, header: ChainHeader, maybe_entry: Option<Entry>) -> Self {
-        Self(signature, header, maybe_entry)
+        Self {
+            signed_header: SignedHeader { signature, header },
+            maybe_entry,
+        }
     }
 
     /// Validates a chain element
-    pub fn validate(&self) -> SourceChainResult<()> {
-        //TODO: gheck that signature is of the header:
-        //      SourceChainError::InvalidSignature
+    pub async fn validate(&self) -> SourceChainResult<()> {
+        self.signed_header.validate().await?;
+
         //TODO: make sure that any cases around entry existence are valid:
         //      SourceChainError::InvalidStructure(HeaderAndEntryMismatch(address)),
-        unimplemented!()
+        Ok(())
     }
 
     /// Access the signature portion of this triple.
     pub fn signature(&self) -> &Signature {
-        &self.0
+        self.signed_header.signature()
     }
 
     /// Access the ChainHeader portion of this triple.
     pub fn header(&self) -> &ChainHeader {
-        &self.1
+        self.signed_header.header()
     }
 
     /// Access the Entry portion of this triple.
     pub fn entry(&self) -> &Option<Entry> {
-        &self.2
+        &self.maybe_entry
     }
+}
+
+/// the header and the signature that signed it
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SignedHeader {
+    header: ChainHeader,
+    signature: Signature,
 }
 
 impl SignedHeader {
@@ -105,9 +110,15 @@ impl SignedHeader {
         &self.signature
     }
     /// Validates a signed header
-    pub fn validate(&self) -> SourceChainResult<()> {
-        //TODO: gheck that signature is of the header:
-        //      SourceChainError::InvalidSignature
-        unimplemented!()
+    pub async fn validate(&self) -> SourceChainResult<()> {
+        if !self
+            .header
+            .author()
+            .verify_signature(&self.signature, &self.header)
+            .await?
+        {
+            return Err(SourceChainError::InvalidSignature);
+        }
+        Ok(())
     }
 }
