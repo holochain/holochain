@@ -5,7 +5,7 @@ use shrinkwraprs::Shrinkwrap;
 
 #[derive(Shrinkwrap)]
 pub struct InvokeZomeWorkspace<'env> {
-    source_chain: SourceChain<'env, Reader<'env>>,
+    pub source_chain: SourceChain<'env, Reader<'env>>,
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {

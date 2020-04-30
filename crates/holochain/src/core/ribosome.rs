@@ -55,11 +55,12 @@ use holochain_types::{
 };
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::*;
-use mockall::mock;
+use mockall::automock;
 use std::sync::Arc;
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
+#[automock]
 pub trait RibosomeT: Sized {
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
@@ -78,7 +79,7 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        _source_chain: &mut SourceChain<'env, Reader<'env>>,
+        source_chain: &mut SourceChain<'env, Reader<'env>>,
         // TODO NetworkRequest,
         // TODO Cascade,
         invocation: ZomeInvocation,
@@ -93,11 +94,14 @@ pub struct WasmRibosome {
 }
 
 pub struct HostContext {
+    //source_chain: *mut SourceChain<'static, Reader<'static>>,
+    source_chain: *mut std::ffi::c_void,
     zome_name: String,
 }
 
 /// build the HostContext from a _reference_ to ZomeInvocation to avoid cloning potentially huge
 /// serialized bytes
+/*
 impl From<&ZomeInvocation> for HostContext {
     fn from(zome_invocation: &ZomeInvocation) -> HostContext {
         HostContext {
@@ -105,6 +109,7 @@ impl From<&ZomeInvocation> for HostContext {
         }
     }
 }
+*/
 
 impl WasmRibosome {
     /// Create a new instance
@@ -209,15 +214,20 @@ impl RibosomeT for WasmRibosome {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
-        _bundle: &mut SourceChain<'env, Reader>,
+        source_chain: &mut SourceChain<Reader>,
         invocation: ZomeInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeInvocationResponse> {
+        let source_chain = source_chain as *mut SourceChain<Reader> as *mut std::ffi::c_void; 
+        let host_context = HostContext {
+            source_chain,
+            zome_name: invocation.zome_name.clone(),
+        };
         let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
-            &mut self.instance(HostContext::from(&invocation))?,
+            &mut self.instance(host_context)?,
             &invocation.fn_name,
             invocation.payload,
         )?;
@@ -225,15 +235,15 @@ impl RibosomeT for WasmRibosome {
     }
 }
 
+/*
 mock! {
     pub RibosomeT
     {
         fn run_callback(self, data: ()) -> Todo;
 
-        fn call_zome_function<'env>(
+        fn call_zome_function(
             self,
-            // FIXME: Use [SourceChain] instead
-            _bundle: &mut SourceChain<'env, Reader<'env>>,
+            source_chain: &mut SourceChain<Reader>,
             // TODO NetworkRequest,
             // TODO Cascade,
             invocation: ZomeInvocation,
@@ -246,15 +256,15 @@ impl RibosomeT for MockRibosomeT {
         self.run_callback(_data)
     }
 
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
-        _bundle: &mut SourceChain<'env, Reader<'env>>,
+        _bundle: &mut SourceChain<Reader>,
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse> {
         self.call_zome_function(_bundle, invocation)
     }
 }
-
+*/
 #[cfg(test)]
 pub mod wasm_test {
     use super::WasmRibosome;
@@ -306,6 +316,7 @@ pub mod wasm_test {
 
     pub fn test_ribosome(warm: Option<&str>) -> WasmRibosome {
         // warm the zome module in the module cache
+        /*
         if let Some(zome_name) = warm {
             let ribosome = test_ribosome(None);
             let _ = ribosome
@@ -314,6 +325,7 @@ pub mod wasm_test {
                 })
                 .unwrap();
         }
+        */
         WasmRibosome::new(dna_from_zomes({
             let mut v = std::collections::BTreeMap::new();
             v.insert(String::from("foo"), zome_from_code(TestWasm::Foo.into()));

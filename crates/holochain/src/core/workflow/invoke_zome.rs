@@ -3,10 +3,13 @@ use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
 use holochain_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env>(
-    workspace: InvokeZomeWorkspace<'_>,
-    _ribosome: impl RibosomeT,
-    _invocation: ZomeInvocation,
+    mut workspace: InvokeZomeWorkspace<'_>,
+    ribosome: impl RibosomeT,
+    invocation: ZomeInvocation,
 ) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
+    let source_chain = &mut workspace.source_chain;
+    ribosome.call_zome_function(source_chain, invocation);
+
     Ok(WorkflowEffects {
         workspace,
         triggers: Default::default(),
