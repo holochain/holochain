@@ -5,6 +5,7 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
+use holochain_keystore::KeystoreSender;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock as RwLockSync;
@@ -66,11 +67,16 @@ fn rkv_builder(
 pub struct Environment {
     arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
+    keystore: KeystoreSender,
 }
 
 impl Environment {
     /// Create an environment,
-    pub fn new(path_prefix: &Path, kind: EnvironmentKind) -> DatabaseResult<Environment> {
+    pub fn new(
+        path_prefix: &Path,
+        kind: EnvironmentKind,
+        keystore: KeystoreSender,
+    ) -> DatabaseResult<Environment> {
         let mut map = ENVIRONMENTS.write();
         let path = path_prefix.join(kind.path());
         if !path.is_dir() {
@@ -85,6 +91,7 @@ impl Environment {
                     Environment {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
+                        keystore,
                     }
                 })
                 .clone(),
@@ -121,6 +128,11 @@ impl Environment {
                 .clone(),
         };
         Ok(dbs)
+    }
+
+    /// Request access to this conductor's keystore
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
     }
 }
 

@@ -1059,6 +1059,8 @@ dependencies = [
  "failure",
  "futures",
  "holo_hash",
+ "holochain_crypto",
+ "holochain_keystore",
  "holochain_types",
  "lazy_static",
  "mockall",
@@ -1073,6 +1075,7 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
  "tracing",
  "tracing-futures",
 ]

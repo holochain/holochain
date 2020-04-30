@@ -52,7 +52,7 @@ fn fixtures() -> (
     )
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn get_links() -> SourceChainResult<()> {
     let env = test_cell_env();
     let dbs = env.dbs().await?;

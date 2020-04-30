@@ -78,7 +78,7 @@ fn setup_env<'env>(
     })
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
@@ -118,7 +118,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -160,7 +160,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -204,7 +204,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn notfound_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -240,7 +240,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
@@ -289,7 +289,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -339,7 +339,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn links_notauth_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch

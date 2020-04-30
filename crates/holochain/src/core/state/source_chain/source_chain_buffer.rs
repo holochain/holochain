@@ -235,7 +235,7 @@ pub mod tests {
         )
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -286,7 +286,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;

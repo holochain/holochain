@@ -319,7 +319,7 @@ mod test {
     use matches::assert_matches;
     use uuid::Uuid;
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn install_list_dna() -> Result<()> {
         let handle = Conductor::builder().test().await?.into_handle();
         let admin_api = RealAdminInterfaceApi::new(handle);
@@ -336,7 +336,7 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
         let mut dna = fake_dna(&uuid.to_string());
