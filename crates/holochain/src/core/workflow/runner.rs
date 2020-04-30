@@ -8,7 +8,7 @@ use crate::{
 use futures::future::{join_all, BoxFuture, FutureExt};
 use holochain_state::{env::WriteManager, prelude::*};
 use std::sync::Arc;
-use workflow::{WorkflowCallback, WorkflowSignal, WorkflowCaller, WorkflowTriggers};
+use workflow::{WorkflowCallback, WorkflowCaller, WorkflowSignal, WorkflowTriggers};
 
 use error::WorkflowRunResult;
 
@@ -24,7 +24,11 @@ pub mod error;
 pub struct WorkflowRunner<'env>(&'env Cell);
 
 impl<'env> WorkflowRunner<'env> {
-    pub async fn run_workflow<O, W: Workspace, C: 'env + WorkflowCaller<'env, O, W>>(&self, caller: C) -> WorkflowRunResult<O> {
+    pub async fn run_workflow<C, O, W>(&self, caller: C) -> WorkflowRunResult<O>
+    where
+        W: 'env + Workspace,
+        C: 'env + WorkflowCaller<'env, O, W>,
+    {
         let environ = self.0.state_env();
         let env = environ.guard().await;
         let dbs = environ.dbs().await?;

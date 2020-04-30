@@ -960,6 +960,7 @@ dependencies = [
  "maplit",
  "matches",
  "mockall",
+ "must_future",
  "num_cpus",
  "owning_ref",
  "parking_lot 0.10.2",

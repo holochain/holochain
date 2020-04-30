@@ -12,15 +12,16 @@ use holochain_state::{prelude::Reader, error::DatabaseError, db::DbManager};
 use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
 use thiserror::Error;
+use must_future::MustBoxFuture;
 
 #[cfg(test)]
 use super::state::source_chain::SourceChainError;
 use runner::error::WorkflowRunResult;
 
 #[async_trait::async_trait]
-pub trait WorkflowCaller<'env, O, W: Workspace> {
+pub trait WorkflowCaller<'env, O, W: 'env + Workspace> {
     fn workspace(reader: &'env Reader, dbs: &'env DbManager) -> WorkflowRunResult<W>;
-    async fn call(self, workspace: W) -> WorkflowResult<O, W>;
+    fn call(self, workspace: W) -> MustBoxFuture<'env, WorkflowResult<O, W>>;
 }
 
 /// A WorkflowEffects is returned from each Workspace function.
