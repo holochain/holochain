@@ -90,7 +90,7 @@ pub trait RibosomeT: Sized {
 pub struct WasmRibosome {
     /// NOTE - Currently taking a full DnaFile here.
     ///      - It would be an optimization to pre-ensure the WASM bytecode
-    ///      - is already in the wasm cache, and only include the Dna portion
+    ///      - is already in the wasm cache, and only include the DnaDef portion
     ///      - here in the ribosome.
     dna_file: DnaFile,
 }
