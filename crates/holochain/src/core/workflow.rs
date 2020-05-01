@@ -1,7 +1,7 @@
 mod genesis;
 mod invoke_zome;
-pub(crate) mod system_validation;
 pub mod runner;
+pub(crate) mod system_validation;
 pub(crate) use genesis::genesis;
 pub(crate) use invoke_zome::invoke_zome;
 

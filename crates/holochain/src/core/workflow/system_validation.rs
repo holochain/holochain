@@ -1,5 +1,5 @@
-use mockall::automock;
 use error::SysValidationResult;
+use mockall::automock;
 
 #[automock]
 pub(crate) trait SystemValidation {

@@ -1,10 +1,7 @@
 use super::{WorkflowEffects, WorkflowResult};
 use crate::core::{
     ribosome::RibosomeT,
-    state::{
-        source_chain::{UnsafeSourceChain},
-        workspace::InvokeZomeWorkspace,
-    },
+    state::{source_chain::UnsafeSourceChain, workspace::InvokeZomeWorkspace},
 };
 
 use holochain_types::nucleus::ZomeInvocation;
@@ -37,7 +34,7 @@ pub mod tests {
     use holochain_types::{
         entry::Entry, nucleus::ZomeInvocationResponse, test_utils::fake_agent_hash,
     };
-    
+
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

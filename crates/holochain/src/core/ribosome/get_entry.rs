@@ -1,9 +1,9 @@
 use super::HostContext;
 use super::WasmRibosome;
+use holochain_types::test_utils::fake_agent_hash;
 use holochain_zome_types::GetEntryInput;
 use holochain_zome_types::GetEntryOutput;
 use std::sync::Arc;
-use holochain_types::test_utils::fake_agent_hash;
 
 pub async fn get_entry(
     _ribosome: Arc<WasmRibosome>,

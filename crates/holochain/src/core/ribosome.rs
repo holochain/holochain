@@ -42,7 +42,7 @@ use self::{
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 
-use super::state::source_chain::{UnsafeSourceChain};
+use super::state::source_chain::UnsafeSourceChain;
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
@@ -220,7 +220,6 @@ impl RibosomeT for WasmRibosome {
     }
 }
 
-
 #[cfg(test)]
 pub mod wasm_test {
     use super::WasmRibosome;
@@ -235,7 +234,7 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::{state::source_chain::UnsafeSourceChain, ribosome::HostContext};
+    use crate::core::{ribosome::HostContext, state::source_chain::UnsafeSourceChain};
     use holochain_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
