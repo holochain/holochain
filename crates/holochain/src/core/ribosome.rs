@@ -71,7 +71,7 @@ pub trait RibosomeT: Sized {
     ///
     /// This is differentiated from calling a zome function, even though in both
     /// cases it amounts to a FFI call of a guest function.
-    fn run_callback(self, data: ()) -> Todo;
+    fn run_callback(self, callback: CallbackInvocation) -> RibosomeResult<CallbackResult>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -200,9 +200,49 @@ impl WasmRibosome {
     }
 }
 
+pub enum CallbackResult {
+    Pass,
+    Fail,
+    NotImplemented,
+}
+
+pub struct CallbackInvocation {
+    /// e.g. ["username", "validate", "create"]
+    components: Vec<String>,
+    payload: SerializedBytes,
+}
+
 impl RibosomeT for WasmRibosome {
-    fn run_callback(self, _data: ()) -> Todo {
-        unimplemented!()
+    fn run_callback(self, invocation: CallbackInvocation) -> RibosomeResult<Vec<CallbackGuestOutput>> {
+
+        let mut fn_components = invocation.components.clone();
+        let mut results: Vec<CallbackGuestOutput> = vec![];
+
+        loop {
+            if fn_components.len() > 0 {
+                let mut instance = self.instance(HostContext::from(&invocation))?;
+                let fn_name = fn_components.join("_");
+                match instance.exports().get(fn_name) {
+                    Some(_) => {
+                        let wasm_callback_response: CallbackGuestOutput = holochain_wasmer_host::guest::call(
+                            &mut instance,
+                            &fn_name,
+                            invocation.payload.clone(),
+                        )?;
+                        results.push(wasm_callback_response);
+                    },
+                    None => {
+                        result.push(CallbackResult::NotImplemented.into());
+                    }
+                }
+                fn_components.pop();
+            } else {
+                break;
+            }
+        }
+
+        /// reverse the vector so that most specific results are first
+        Ok(results.into_iter().rev().collect())
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
