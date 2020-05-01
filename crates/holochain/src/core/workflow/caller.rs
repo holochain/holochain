@@ -12,7 +12,7 @@ use holochain_state::env::{Environment, ReadManager};
 use must_future::MustBoxFuture;
 
 // #[async_trait::async_trait]
-pub trait WorkflowCaller<'env>: Sized + Send {
+pub trait WorkflowCaller<'env>: Sized + Send{
     type Output: Send;
     type Workspace: Workspace<'env>;
     type Triggers: WorkflowTriggers;
@@ -21,24 +21,19 @@ pub trait WorkflowCaller<'env>: Sized + Send {
         self,
         workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
+}
 
-    fn run(self, cell: &'env Cell) -> MustBoxFuture<'env, WorkflowRunResult<Self::Output>> {
-        let arc = cell.state_env();
-        async {
-            let arc = arc;
-            {
-                let env = arc.guard().await;
-                let dbs = arc.dbs().await?;
-                let reader = env.reader()?;
-                let workspace = Self::Workspace::new(&reader, &dbs)?;
-                let (output, effects) = self.workflow(workspace).await?;
-                finish(cell, effects).await?;
-                Ok(output)
-            }
-        }
-        .boxed()
-        .into()
+pub fn run_workflow<'env, WC: WorkflowCaller<'env>>(
+    wc: WC,
+    workspace: WC::Workspace,
+    cell: &'env Cell,
+) -> MustBoxFuture<'env, WorkflowRunResult<WC::Output>> {
+    async move {
+        let (output, effects) = wc.workflow(workspace).await?;
+        finish(cell, effects).await?;
+        Ok(output)
     }
+    .boxed().into()
 }
 
 /// Apply the WorkflowEffects to finalize the Workflow.
