@@ -115,14 +115,8 @@ impl WasmRibosome {
         Self { dna_file }
     }
 
-    pub fn wasm_cache_key(&self, zome_name: &str) -> Result<Vec<u8>, DnaError> {
-        Ok(self
-            .dna_file
-            .dna()
-            .get_zome(zome_name)?
-            .wasm_hash
-            .get_raw()
-            .to_vec())
+    pub fn wasm_cache_key(&self, zome_name: &str) -> Result<&[u8], DnaError> {
+        Ok(self.dna_file.dna().get_zome(zome_name)?.wasm_hash.get_raw())
     }
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
@@ -130,7 +124,7 @@ impl WasmRibosome {
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = WasmRibosome::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
-            &self.wasm_cache_key(&zome_name)?,
+            self.wasm_cache_key(&zome_name)?,
             &wasm,
             &imports,
         )?)
@@ -249,14 +243,7 @@ pub mod wasm_test {
     use test_wasm_common::TestString;
 
     use crate::core::ribosome::HostContext;
-    use holochain_types::{
-        dna::{wasm::DnaWasm, DnaFile},
-        test_utils::{fake_dna_zomes, fake_header_hash},
-    };
-
-    fn build_dna_file(zomes: Vec<(String, DnaWasm)>) -> DnaFile {
-        fake_dna_zomes("uuid", zomes)
-    }
+    use holochain_types::test_utils::{fake_dna_zomes, fake_header_hash};
 
     pub fn zome_invocation_from_names(
         zome_name: &str,
@@ -284,11 +271,14 @@ pub mod wasm_test {
                 })
                 .unwrap();
         }
-        let dna_file = build_dna_file(vec![
-            (String::from("foo"), TestWasm::Foo.into()),
-            (String::from("imports"), TestWasm::Imports.into()),
-            (String::from("debug"), TestWasm::Debug.into()),
-        ]);
+        let dna_file = fake_dna_zomes(
+            "uuid",
+            vec![
+                (String::from("foo"), TestWasm::Foo.into()),
+                (String::from("imports"), TestWasm::Imports.into()),
+                (String::from("debug"), TestWasm::Debug.into()),
+            ],
+        );
         WasmRibosome::new(dna_file)
     }
 
