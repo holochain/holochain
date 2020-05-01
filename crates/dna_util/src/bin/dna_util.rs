@@ -21,7 +21,7 @@ pub async fn main() {
     let opt = Opt::from_args();
 
     if opt.extract.is_none() && opt.compile.is_none() {
-        Opt::clap().print_long_help().unwrap();
+        Opt::clap().print_help().unwrap();
         return;
     }
 

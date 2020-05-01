@@ -568,6 +568,8 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "structopt",
+ "tempdir",
+ "thiserror",
  "tokio",
 ]
 
