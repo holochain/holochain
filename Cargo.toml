@@ -26,9 +26,6 @@ holochain_wasmer_common = { version = "=0.0.24", git = "https://github.com/holoc
 # holochain_wasmer_guest = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 holochain_wasmer_host = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 
-lib3h_crypto_api = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }
-# lib3h_sodium = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }
-
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 #rkv = { path = "../../rust/rkv" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }

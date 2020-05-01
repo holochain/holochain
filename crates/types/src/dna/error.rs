@@ -29,4 +29,17 @@ pub enum DnaError {
     /// SerializedBytesError
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+
+    /// std::io::Error
+    #[error("std::io::Error: {0}")]
+    StdIoError(String),
+}
+
+// WHY THE F*$&# do we have all those derives on an ERROR TYPE
+// Clone? Ord? Seriously?
+// makes us have to do lame things like this:
+impl From<std::io::Error> for DnaError {
+    fn from(e: std::io::Error) -> Self {
+        DnaError::StdIoError(format!("{:?}", e))
+    }
 }
