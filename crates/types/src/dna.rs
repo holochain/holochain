@@ -69,6 +69,15 @@ pub struct DnaFile {
     code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
 }
 
+impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
+    fn from(dna_file: DnaFile) -> (DnaDef, Vec<wasm::DnaWasm>) {
+        (
+            dna_file.dna,
+            dna_file.code.into_iter().map(|(_, w)| w).collect(),
+        )
+    }
+}
+
 impl DnaFile {
     /// Construct a new DnaFile instance.
     pub async fn new(
