@@ -9,7 +9,7 @@ use crate::{
     core::state::workspace::{Workspace, WorkspaceError},
 };
 use holochain_state::error::DatabaseError;
-use holochain_types::{dna::DnaDef, nucleus::ZomeInvocation, prelude::*};
+use holochain_types::{dna::DnaFile, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
 use thiserror::Error;
 
@@ -20,7 +20,7 @@ use super::state::source_chain::SourceChainError;
 #[derive(Debug)]
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
-    Genesis(Box<DnaDef>, AgentPubKey),
+    Genesis(Box<DnaFile>, AgentPubKey),
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,
