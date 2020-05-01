@@ -76,7 +76,7 @@ impl DnaFile {
         wasm: impl IntoIterator<Item = wasm::DnaWasm>,
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
-        for wasm in wasm.into_iter() {
+        for wasm in wasm {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
             let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             code.insert(wasm_hash, wasm);
