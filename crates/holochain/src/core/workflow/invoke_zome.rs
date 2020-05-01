@@ -3,46 +3,50 @@ use super::{
     WorkflowTriggers,
 };
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use futures::future::FutureExt;
 use holochain_state::{db::DbManager, prelude::Reader};
 use holochain_types::{nucleus::ZomeInvocation, prelude::Todo};
 use must_future::MustBoxFuture;
 
 pub type ZomeInvocationResult = Todo;
 
-pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
-    _ribosome: Ribosome,
-    _invocation: ZomeInvocation,
+pub struct InvokeZomeWorkflow<'env, Ribosome: RibosomeT + 'env> {
+    ribosome: Ribosome,
+    invocation: ZomeInvocation,
+    __lifetime: std::marker::PhantomData<&'env ()>,
 }
 
 pub struct InvokeZomeTriggers;
 impl WorkflowTriggers for InvokeZomeTriggers {}
 
 impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env>
-    for InvokeZomeWorkflow<Ribosome>
+    for InvokeZomeWorkflow<'env, Ribosome>
 {
     type Output = ZomeInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = InvokeZomeTriggers;
 
-    fn run(
+    fn workflow(
         self,
         workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
-        unimplemented!()
+        invoke_zome(workspace, self.ribosome, self.invocation)
+            .boxed()
+            .into()
     }
 }
 
-pub async fn invoke_zome<'env, Ribosome: RibosomeT + Send + Sync>(
+async fn invoke_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
     workspace: InvokeZomeWorkspace<'env>,
     _ribosome: Ribosome,
     _invocation: ZomeInvocation,
-) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<Ribosome>> {
+) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<'env, Ribosome>> {
     let fx = WorkflowEffects {
         workspace,
         triggers: todo!(""),
         signals: Default::default(),
         callbacks: Default::default(),
-        _lifetime: std::marker::PhantomData,
+        __lifetime: std::marker::PhantomData,
     };
     let result = todo!("this will be the actual zome function return value");
     Ok((result, fx))

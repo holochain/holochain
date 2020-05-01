@@ -3,28 +3,32 @@ use super::{
     WorkflowCaller, WorkflowEffects, WorkflowTriggers,
 };
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
+use futures::future::FutureExt;
 use holochain_types::{dna::Dna, entry::Entry, prelude::*};
 use must_future::MustBoxFuture;
 
-pub struct GenesisWorkflow<Api: CellConductorApiT> {
+pub struct GenesisWorkflow<'env, Api: CellConductorApiT + 'env> {
     api: Api,
     dna: Dna,
     agent_hash: AgentHash,
+    __lifetime: std::marker::PhantomData<&'env ()>,
 }
 
 pub struct GenesisWorkflowTriggers;
 impl WorkflowTriggers for GenesisWorkflowTriggers {}
 
-impl<'env, Api: CellConductorApiT + Send + Sync> WorkflowCaller<'env> for GenesisWorkflow<Api> {
+impl<'env, Api: CellConductorApiT + Send + Sync> WorkflowCaller<'env> for GenesisWorkflow<'env, Api> {
     type Output = ();
     type Workspace = GenesisWorkspace<'env>;
     type Triggers = GenesisWorkflowTriggers;
 
-    fn run(
+    fn workflow(
         self,
         workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
-        unimplemented!()
+        genesis(workspace, self.api, self.dna, self.agent_hash)
+            .boxed()
+            .into()
     }
 }
 
@@ -35,12 +39,12 @@ impl<'env, Api: CellConductorApiT + Send + Sync> WorkflowCaller<'env> for Genesi
 ///
 /// FIXME: understand the details of actually getting the DNA
 /// FIXME: creating entries in the config db
-pub async fn genesis<'env, Api: CellConductorApiT>(
+async fn genesis<'env, Api: CellConductorApiT + 'env>(
     mut workspace: GenesisWorkspace<'env>,
     api: Api,
     dna: Dna,
     agent_hash: AgentHash,
-) -> WorkflowResult<'env, (), GenesisWorkflow<Api>> {
+) -> WorkflowResult<'env, (), GenesisWorkflow<'env, Api>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
@@ -64,7 +68,7 @@ pub async fn genesis<'env, Api: CellConductorApiT>(
         triggers: todo!(""),
         signals: Default::default(),
         callbacks: Default::default(),
-        _lifetime: std::marker::PhantomData,
+        __lifetime: std::marker::PhantomData,
     };
     let result = ();
 

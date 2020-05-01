@@ -18,7 +18,7 @@ pub trait WorkflowCaller<'env>: Sized + Send + Sync {
     type Workspace: Workspace<'env>;
     type Triggers: WorkflowTriggers;
 
-    fn run(
+    fn workflow(
         self,
         workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
