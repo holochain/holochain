@@ -61,8 +61,8 @@ pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
     dna: DnaDef,
 
-    /// The hash of the dna def
-    /// (this can be a full holo_hash because we never send a DnaFile to WASM)
+    /// The hash of `self.dna` converted through `SerializedBytes`.
+    /// (This can be a full holo_hash because we never send a `DnaFile` to Wasm.)
     dna_hash: holo_hash::DnaHash,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
