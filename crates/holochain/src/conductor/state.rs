@@ -1,7 +1,7 @@
 use crate::conductor::interface::InterfaceDriver;
 
 use holochain_types::{
-    dna::{error::DnaError, Dna},
+    dna::{error::DnaError, DnaFile},
     prelude::*,
 };
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ fn _detect_dupes<'a, I: Iterator<Item = &'a String>>(
     }
 }
 
-pub type DnaLoader = Arc<Box<dyn FnMut(&PathBuf) -> Result<Dna, DnaError> + Send + Sync>>;
+pub type DnaLoader = Arc<Box<dyn FnMut(&PathBuf) -> Result<DnaFile, DnaError> + Send + Sync>>;
 
 impl ConductorState {
     pub fn check_consistency(&self) -> Result<(), DnaError> {

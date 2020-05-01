@@ -10,7 +10,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     cell::CellHandle,
-    dna::{Dna, Properties},
+    dna::{DnaFile, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
 use std::path::PathBuf;
@@ -141,16 +141,19 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 async fn read_parse_dna(
     dna_path: PathBuf,
     properties: Option<serde_json::Value>,
-) -> ConductorApiResult<Dna> {
+) -> ConductorApiResult<DnaFile> {
     let dna: UnsafeBytes = tokio::fs::read(dna_path)
         .await
         .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?
         .into();
     let dna = SerializedBytes::from(dna);
-    let mut dna: Dna = dna.try_into().map_err(SerializationError::from)?;
+    let mut dna: DnaFile = dna.try_into().map_err(SerializationError::from)?;
     if let Some(properties) = properties {
         let properties = Properties::new(properties);
-        dna.properties = (properties).try_into().map_err(SerializationError::from)?;
+        let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
+        let mut tmp_dna = dna.dna().clone();
+        tmp_dna.properties = (properties).try_into().map_err(SerializationError::from)?;
+        dna = DnaFile::new(tmp_dna, tmp_wasm).await?;
     }
     Ok(dna)
 }
@@ -326,7 +329,7 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
         let (dna_path, _tempdir) = fake_dna_file(dna.clone()).unwrap();
-        let dna_hash = dna.dna_hash();
+        let dna_hash = dna.dna_hash().clone();
         admin_api
             .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
             .await;
@@ -339,7 +342,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
-        let mut dna = fake_dna(&uuid.to_string());
+        let dna = fake_dna(&uuid.to_string());
         let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
         let json = serde_json::json!({
             "test": "example",
@@ -348,8 +351,9 @@ mod test {
         let properties = Some(json.clone());
         let result = read_parse_dna(dna_path, properties).await?;
         let properties = Properties::new(json);
+        let mut dna = dna.dna().clone();
         dna.properties = properties.try_into().unwrap();
-        assert_eq!(dna, result);
+        assert_eq!(&dna, result.dna());
         Ok(())
     }
 }

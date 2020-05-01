@@ -7,7 +7,7 @@ pub mod error;
 pub mod wasm;
 pub mod zome;
 use crate::prelude::*;
-use error::DnaError;
+pub use error::DnaError;
 pub use holo_hash::*;
 use std::collections::BTreeMap;
 /// A type to allow json values to be used as [SerializedBtyes]
@@ -41,12 +41,10 @@ pub struct DnaDef {
 }
 
 impl DnaDef {
-    /// Gets DnaHash from Dna
-    // FIXME: use async with_data, or consider wrapper type
-    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413222920
-    pub fn dna_hash(&self) -> DnaHash {
-        let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
-        DnaHash::with_data_sync(&sb.bytes())
+    /// Calculate DnaHash for DnaDef
+    pub async fn dna_hash(&self) -> DnaHash {
+        let sb: SerializedBytes = self.try_into().expect("failed to hash DnaDef");
+        DnaHash::with_data(&sb.bytes()).await
     }
 
     /// Return a Zome
@@ -61,17 +59,50 @@ impl DnaDef {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
-    pub dna: DnaDef,
+    dna: DnaDef,
 
     /// The hash of the dna def
     /// (this can be a full holo_hash because we never send a DnaFile to WASM)
-    pub dna_hash: holo_hash::DnaHash,
+    dna_hash: holo_hash::DnaHash,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
-    pub code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
+    code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
 }
 
 impl DnaFile {
+    /// Construct a new DnaFile instance.
+    pub async fn new(dna: DnaDef, wasm: Vec<wasm::DnaWasm>) -> Result<Self, DnaError> {
+        let mut code = BTreeMap::new();
+        for wasm in wasm.into_iter() {
+            let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
+            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+            code.insert(wasm_hash, wasm);
+        }
+        let dna_sb: SerializedBytes = (&dna).try_into()?;
+        let dna_hash = holo_hash::DnaHash::with_data(dna_sb.bytes()).await;
+        Ok(Self {
+            dna,
+            dna_hash,
+            code,
+        })
+    }
+
+    /// The hashable portion that can be shared with hApp code.
+    pub fn dna(&self) -> &DnaDef {
+        &self.dna
+    }
+
+    /// The hash of the dna def
+    /// (this can be a full holo_hash because we never send a DnaFile to WASM)
+    pub fn dna_hash(&self) -> &holo_hash::DnaHash {
+        &self.dna_hash
+    }
+
+    /// The bytes of the WASM zomes referenced in the Dna portion.
+    pub fn code(&self) -> &BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm> {
+        &self.code
+    }
+
     /// Fetch the Webassembly byte code for a zome.
     pub fn get_wasm_for_zome(&self, zome_name: &str) -> Result<&wasm::DnaWasm, DnaError> {
         let wasm_hash = &self.dna.get_zome(zome_name)?.wasm_hash;

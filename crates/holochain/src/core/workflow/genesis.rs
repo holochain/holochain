@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
+use holochain_types::{chain_header::ChainHeader, dna::DnaDef, entry::Entry, header, prelude::*};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -12,7 +12,7 @@ use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header,
 pub async fn genesis(
     mut workspace: GenesisWorkspace<'_>,
     api: impl CellConductorApiT,
-    dna: Dna,
+    dna: DnaDef,
     agent_pubkey: AgentPubKey,
 ) -> WorkflowResult<GenesisWorkspace<'_>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
@@ -28,7 +28,7 @@ pub async fn genesis(
     let dna_header = ChainHeader::Dna(header::Dna {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: agent_pubkey.clone(),
-        hash: dna.dna_hash(),
+        hash: dna.dna_hash().await,
     });
     workspace.source_chain.put(dna_header.clone(), None).await?;
 
@@ -90,7 +90,7 @@ mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let fx = genesis(workspace, api, dna.clone(), agent_pubkey.clone()).await?;
+            let fx = genesis(workspace, api, dna.dna().clone(), agent_pubkey.clone()).await?;
             let writer = env.writer()?;
             fx.workspace.commit_txn(writer)?;
         }

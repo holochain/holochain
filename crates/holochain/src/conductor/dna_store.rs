@@ -16,7 +16,7 @@ pub trait DnaStore: Default + Send + Sync {
 
 impl DnaStore for RealDnaStore {
     fn add(&mut self, dna: DnaFile) -> DnaStoreResult<()> {
-        self.0.insert(dna.dna_hash, dna);
+        self.0.insert(dna.dna_hash().clone(), dna);
         Ok(())
     }
     fn list(&self) -> Vec<DnaHash> {

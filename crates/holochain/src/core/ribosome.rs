@@ -43,9 +43,10 @@ use self::{
 };
 
 use error::RibosomeResult;
+use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    dna::DnaFile,
+    dna::{DnaError, DnaFile},
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
@@ -114,9 +115,14 @@ impl WasmRibosome {
         Self { dna_file }
     }
 
-    pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
-        // TODO: make this actually the hash of the wasm once we can do that
-        format!("{}{}", &self.dna_file.dna.dna_hash(), zome_name).into_bytes()
+    pub fn wasm_cache_key(&self, zome_name: &str) -> Result<Vec<u8>, DnaError> {
+        Ok(self
+            .dna_file
+            .dna()
+            .get_zome(zome_name)?
+            .wasm_hash
+            .get_raw()
+            .to_vec())
     }
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
@@ -124,7 +130,7 @@ impl WasmRibosome {
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = WasmRibosome::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
-            &self.wasm_cache_key(&zome_name),
+            &self.wasm_cache_key(&zome_name)?,
             &wasm,
             &imports,
         )?)
@@ -245,29 +251,11 @@ pub mod wasm_test {
     use crate::core::ribosome::HostContext;
     use holochain_types::{
         dna::{wasm::DnaWasm, DnaFile},
-        test_utils::{fake_dna, fake_header_hash, fake_zome},
+        test_utils::{fake_dna_zomes, fake_header_hash},
     };
-    use std::collections::BTreeMap;
 
     fn build_dna_file(zomes: Vec<(String, DnaWasm)>) -> DnaFile {
-        let mut dna_file = DnaFile {
-            dna: fake_dna("uuid"),
-            // set a temp value until we're done building:
-            dna_hash: holo_hash_core::WasmHash::new(vec![0; 36]),
-            code: BTreeMap::new(),
-        };
-        for (zome_name, wasm) in zomes.into_iter() {
-            let wasm_hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
-            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
-            let mut zome = fake_zome();
-            zome.wasm_hash = wasm_hash.clone();
-            dna_file.dna.zomes.insert(zome_name, zome);
-            dna_file.code.insert(wasm_hash, wasm);
-        }
-        let sb: SerializedBytes = (&dna_file.dna).try_into().unwrap();
-        let dna_hash = holo_hash::DnaHash::with_data_sync(&sb);
-        dna_file.dna_hash = dna_hash;
-        dna_file
+        fake_dna_zomes("uuid", zomes)
     }
 
     pub fn zome_invocation_from_names(
@@ -354,8 +342,8 @@ pub mod wasm_test {
         };
     }
 
-    #[test]
-    fn invoke_foo_test() {
+    #[tokio::test(threaded_scheduler)]
+    async fn invoke_foo_test() {
         let ribosome = test_ribosome(Some("foo"));
 
         let invocation =

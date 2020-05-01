@@ -218,7 +218,7 @@ pub mod tests {
         let dna_header = ChainHeader::Dna(header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_pubkey.clone(),
-            hash: dna.dna_hash(),
+            hash: dna.dna_hash().clone(),
         });
 
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {

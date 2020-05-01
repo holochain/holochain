@@ -1116,6 +1116,7 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
  "tracing",
  "tracing-core",
  "tracing-serde",

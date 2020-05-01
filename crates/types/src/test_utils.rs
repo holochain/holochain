@@ -2,7 +2,7 @@
 
 use crate::{
     cell::CellId,
-    dna::{wasm::DnaWasm, zome::Zome, DnaDef},
+    dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile},
     prelude::*,
     shims::CapToken,
 };
@@ -24,26 +24,39 @@ pub fn fake_dna_wasm() -> DnaWasm {
 pub fn fake_zome() -> Zome {
     Zome {
         wasm_hash: holo_hash_core::WasmHash::new(vec![0; 36]),
-        // code: fake_dna_wasm(),
     }
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna(uuid: &str) -> DnaDef {
-    DnaDef {
+pub fn fake_dna(uuid: &str) -> DnaFile {
+    fake_dna_zomes(uuid, vec![("test".into(), vec![].into())])
+}
+
+/// A fixture example dna for unit testing.
+pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
+    let mut dna = DnaDef {
         name: "test".to_string(),
         properties: ().try_into().unwrap(),
         uuid: uuid.to_string(),
-        zomes: {
-            let mut v = BTreeMap::new();
-            v.insert("test".into(), fake_zome());
-            v
-        },
+        zomes: BTreeMap::new(),
+    };
+    let mut wasm_code = Vec::new();
+    for (zome_name, wasm) in zomes.into_iter() {
+        let wasm_hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
+        let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+        dna.zomes.insert(zome_name, Zome { wasm_hash });
+        wasm_code.push(wasm);
     }
+    tokio_safe_block_on::tokio_safe_block_on(
+        DnaFile::new(dna, wasm_code),
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap()
+    .unwrap()
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
-pub fn fake_dna_file(dna: DnaDef) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+pub fn fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
     path.push("dna");
