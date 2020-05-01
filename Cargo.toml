@@ -2,6 +2,7 @@
 
 members = [
   "crates/crypto",
+  "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
   "crates/keystore",
