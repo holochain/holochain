@@ -39,4 +39,4 @@ pub enum WorkflowRunError {
 }
 
 /// Internal type to handle running workflows
-pub type WorkflowRunResult<T: Sized> = Result<T, WorkflowRunError>;
+pub type WorkflowRunResult<T> = Result<T, WorkflowRunError>;
