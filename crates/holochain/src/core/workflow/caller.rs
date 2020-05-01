@@ -6,10 +6,11 @@ use crate::{
     conductor::{api::error::ConductorApiError, Cell},
     core::state::workspace::{Workspace, WorkspaceError},
 };
-use futures::future::{BoxFuture, FutureExt};
+use futures::{Future, future::{BoxFuture, FutureExt}};
 use holochain_state::env::WriteManager;
 use holochain_state::env::{Environment, ReadManager};
 use must_future::MustBoxFuture;
+use std::pin::Pin;
 
 // #[async_trait::async_trait]
 pub trait WorkflowCaller<'env>: Sized + Send{
@@ -23,18 +24,52 @@ pub trait WorkflowCaller<'env>: Sized + Send{
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
 }
 
-pub fn run_workflow<'env, WC: WorkflowCaller<'env>>(
+// works
+pub fn run_workflow<'env, WC: WorkflowCaller<'env> + 'env>(
     wc: WC,
     workspace: WC::Workspace,
-    cell: &'env Cell,
-) -> MustBoxFuture<'env, WorkflowRunResult<WC::Output>> {
-    async move {
+    arc: Environment,
+) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
+    Box::new(async move {
+        // unimplemented!()
         let (output, effects) = wc.workflow(workspace).await?;
-        finish(cell, effects).await?;
+        finish(arc, effects).await?;
         Ok(output)
-    }
-    .boxed().into()
+    })
+    // .boxed().into()
 }
+
+// works
+pub fn run_workflow_2<'env, WC: WorkflowCaller<'env> + 'env>(
+    wc: WC,
+    workspace: WC::Workspace,
+    arc: Environment,
+) -> Pin<Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env>> {
+    Box::pin(async move {
+        // unimplemented!()
+        let (output, effects) = wc.workflow(workspace).await?;
+        finish(arc, effects).await?;
+        Ok(output)
+    })
+    // .boxed().into()
+}
+
+pub fn run_workflow_3<'env, O: Send, WC: WorkflowCaller<'env, Output=O> + 'env>(
+    wc: WC,
+    workspace: WC::Workspace,
+    arc: Environment,
+// ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
+) -> impl Future<Output = WorkflowRunResult<O>> + 'env {
+    Box::pin(async move {
+        // unimplemented!()
+        let (output, effects) = wc.workflow(workspace).await?;
+        finish(arc, effects).await?;
+        Ok(output)
+    })
+    // .boxed().into()
+}
+
+
 
 /// Apply the WorkflowEffects to finalize the Workflow.
 /// 1. Persist DB changes via `Workspace::commit_txn`
@@ -42,7 +77,7 @@ pub fn run_workflow<'env, WC: WorkflowCaller<'env>>(
 /// 3. Emit any Signals
 /// 4. Trigger any subsequent Workflows
 async fn finish<'env, WC: WorkflowCaller<'env>>(
-    cell: &'env Cell,
+    arc: Environment,
     effects: WorkflowEffects<'env, WC>,
 ) -> WorkflowRunResult<()> {
     let WorkflowEffects {
@@ -55,7 +90,7 @@ async fn finish<'env, WC: WorkflowCaller<'env>>(
 
     // finish workspace
     {
-        let arc = cell.state_env();
+        // let arc = cell.state_env();
         let env = arc.guard().await;
         let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
         workspace

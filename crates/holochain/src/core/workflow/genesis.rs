@@ -78,7 +78,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
 mod tests {
 
     use super::GenesisWorkflow;
-    use crate::core::workflow::caller::WorkflowCaller;
+    use crate::core::workflow::caller::{run_workflow_3, WorkflowCaller};
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{
@@ -114,15 +114,14 @@ mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let (_, fx) = GenesisWorkflow {
+            let workflow = GenesisWorkflow {
                 api,
                 dna: dna.clone(),
                 agent_hash: agent_hash.clone(),
-            }
-            .workflow(workspace)
-            .await?;
-            let writer = env.writer()?;
-            fx.workspace.commit_txn(writer)?;
+            };
+            let _ = run_workflow_3(workflow, workspace, arc.clone()).await?;
+            // let writer = env.writer()?;
+            // fx.workspace.commit_txn(writer)?;
         }
 
         env.with_reader(|reader| {
