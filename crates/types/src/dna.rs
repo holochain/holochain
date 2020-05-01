@@ -55,18 +55,27 @@ impl DnaDef {
     }
 }
 
-/// Represents a full dna file including Webassembly bytecode.
+/// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
     dna: DnaDef,
 
-    /// The hash of the dna def
-    /// (this can be a full holo_hash because we never send a DnaFile to WASM)
+    /// The hash of `self.dna` converted through `SerializedBytes`.
+    /// (This can be a full holo_hash because we never send a `DnaFile` to Wasm.)
     dna_hash: holo_hash::DnaHash,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
     code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
+}
+
+impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
+    fn from(dna_file: DnaFile) -> (DnaDef, Vec<wasm::DnaWasm>) {
+        (
+            dna_file.dna,
+            dna_file.code.into_iter().map(|(_, w)| w).collect(),
+        )
+    }
 }
 
 impl DnaFile {
@@ -76,7 +85,7 @@ impl DnaFile {
         wasm: impl IntoIterator<Item = wasm::DnaWasm>,
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
-        for wasm in wasm.into_iter() {
+        for wasm in wasm {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
             let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             code.insert(wasm_hash, wasm);
