@@ -2,12 +2,12 @@
 #![allow(clippy::needless_doctest_main)]
 //! A Keystore is a secure repository of private keys. KeystoreSender is a
 //! reference to a Keystore. KeystoreSender allows async generation of keypairs,
-//! and usage of those keypairs, reference by the public AgentHash.
+//! and usage of those keypairs, reference by the public AgentPubKey.
 //!
 //! # Example
 //!
 //! ```
-//! use holo_hash::AgentHash;
+//! use holo_hash::AgentPubKey;
 //! use holochain_keystore::*;
 //! use holochain_serialized_bytes::prelude::*;
 //!
@@ -17,16 +17,16 @@
 //!         let _ = holochain_crypto::crypto_init_sodium();
 //!
 //!         let keystore = test_keystore::spawn_test_keystore(vec![]).await.unwrap();
-//!         let agent_hash = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
+//!         let agent_pubkey = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
 //!
 //!         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 //!         struct MyData(Vec<u8>);
 //!
 //!         let my_data_1 = MyData(b"signature test data 1".to_vec());
 //!
-//!         let signature = agent_hash.sign(&keystore, &my_data_1).await.unwrap();
+//!         let signature = agent_pubkey.sign(&keystore, &my_data_1).await.unwrap();
 //!
-//!         assert!(agent_hash.verify_signature(&signature, &my_data_1).await.unwrap());
+//!         assert!(agent_pubkey.verify_signature(&signature, &my_data_1).await.unwrap());
 //!     }).await.unwrap();
 //! }
 //! ```
@@ -43,7 +43,7 @@ pub mod keystore_actor;
 pub use keystore_actor::KeystoreSender;
 use keystore_actor::*;
 
-mod agent_hash_ext;
-pub use agent_hash_ext::*;
+mod agent_pubkey_ext;
+pub use agent_pubkey_ext::*;
 
 pub mod test_keystore;

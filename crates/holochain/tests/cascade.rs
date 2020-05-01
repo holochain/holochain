@@ -1,13 +1,59 @@
-use holo_hash::EntryHash;
 use holochain_2020::core::state::{
-    cascade::Cascade, chain_meta::ChainMetaBuf, source_chain::SourceChainBuf,
+    cascade::Cascade,
+    chain_meta::ChainMetaBuf,
+    source_chain::{SourceChainBuf, SourceChainResult},
 };
-use holochain_state::{env::ReadManager, error::DatabaseResult, test_utils::test_cell_env};
-use holochain_types::{entry::Entry, test_utils::fake_agent_hash};
-use std::convert::TryInto;
+use holochain_state::{env::ReadManager, test_utils::test_cell_env};
+use holochain_types::{
+    chain_header::ChainHeader,
+    entry::Entry,
+    header,
+    prelude::*,
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
+};
 
-#[tokio::test]
-async fn get_links() -> DatabaseResult<()> {
+fn fixtures() -> (
+    AgentPubKey,
+    ChainHeader,
+    Entry,
+    AgentPubKey,
+    ChainHeader,
+    Entry,
+) {
+    let previous_header = fake_header_hash("previous");
+
+    let jimbo_id = fake_agent_pubkey_1();
+    let jimbo_entry = Entry::Agent(jimbo_id.clone());
+    let jessy_id = fake_agent_pubkey_2();
+    let jessy_entry = Entry::Agent(jessy_id.clone());
+
+    let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: jimbo_id.clone(),
+        prev_header: previous_header.clone().into(),
+        entry_type: header::EntryType::AgentPubKey,
+        entry_address: jimbo_entry.entry_address(),
+    });
+
+    let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: jessy_id.clone(),
+        prev_header: previous_header.clone().into(),
+        entry_type: header::EntryType::AgentPubKey,
+        entry_address: jessy_entry.entry_address(),
+    });
+    (
+        jimbo_id,
+        jimbo_header,
+        jimbo_entry,
+        jessy_id,
+        jessy_header,
+        jessy_entry,
+    )
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn get_links() -> SourceChainResult<()> {
     let env = test_cell_env();
     let dbs = env.dbs().await?;
     let env_ref = env.guard().await;
@@ -20,13 +66,11 @@ async fn get_links() -> DatabaseResult<()> {
     let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
     let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
 
-    let jimbo_id = fake_agent_hash("Jimbo");
-    let jimbo = Entry::AgentKey(jimbo_id.clone());
-    let jessy_id = fake_agent_hash("Jessy");
-    let jessy = Entry::AgentKey(jessy_id.clone());
-    let base: EntryHash = (&jimbo).try_into()?;
-    source_chain.put_entry(jimbo, &jimbo_id).await?;
-    source_chain.put_entry(jessy, &jessy_id).await?;
+    let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
+
+    let base = jimbo_entry.entry_address();
+    source_chain.put(jimbo_header, Some(jimbo_entry)).await?;
+    source_chain.put(jessy_header, Some(jessy_entry)).await?;
 
     // Pass in stores as references
     let cascade = Cascade::new(

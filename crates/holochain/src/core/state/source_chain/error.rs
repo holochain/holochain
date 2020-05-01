@@ -1,7 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
-use holochain_types::chain_header::HeaderAddress;
-use holochain_types::entry::EntryAddress;
+use holochain_types::address::{EntryAddress, HeaderAddress};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -31,6 +30,13 @@ pub enum SourceChainError {
 
     #[error("SerdeJson Error: {0}")]
     SerdeJsonError(String),
+
+    /// Element signature doesn't validate against the header
+    #[error("Element signature is invalid")]
+    InvalidSignature,
+
+    #[error("KeystoreError: {0}")]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??
