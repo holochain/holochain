@@ -1,12 +1,17 @@
 use error::SysValidationResult;
+use holo_hash::HoloHash;
 use mockall::automock;
 
 #[automock]
-pub(crate) trait SystemValidation {
-    fn check_entry_hash() -> SysValidationResult<()> {
+pub trait SystemValidation {
+    fn check_entry_hash(&self, _entry_hash: &HoloHash) -> SysValidationResult<()> {
         todo!()
     }
 }
+
+pub(crate) struct PlaceholderSysVal {}
+
+impl SystemValidation for PlaceholderSysVal {}
 
 pub mod error {
     use thiserror::Error;

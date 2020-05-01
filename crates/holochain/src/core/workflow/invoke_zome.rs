@@ -1,19 +1,42 @@
-use super::{WorkflowEffects, WorkflowResult};
+use super::{system_validation::SystemValidation, WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::core::{
     ribosome::RibosomeT,
     state::{source_chain::UnsafeSourceChain, workspace::InvokeZomeWorkspace},
 };
-
+use fallible_iterator::FallibleIterator;
 use holochain_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env>(
     mut workspace: InvokeZomeWorkspace<'_>,
     ribosome: impl RibosomeT,
     invocation: ZomeInvocation,
+    sv: impl SystemValidation,
 ) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
-    let (_g, source_chain) = UnsafeSourceChain::from_mut(&mut workspace.source_chain);
-
-    ribosome.call_zome_function(source_chain, invocation);
+    let chain_head_start = workspace.chain_head()?.clone();
+    {
+        let (_g, source_chain) = UnsafeSourceChain::from_mut(&mut workspace.source_chain);
+        let _result = ribosome.call_zome_function(source_chain, invocation)?;
+    }
+    let chain_head_end = workspace.chain_head()?;
+    // Has there been changes?
+    if chain_head_start != *chain_head_end {
+        // get the changes
+        workspace
+            .iter_back()
+            .scan(None, |current_header, entry| {
+                let my_header = current_header.clone();
+                *current_header = entry.prev_header_address.clone();
+                let r = match my_header {
+                    Some(current_header) if current_header == chain_head_start => None,
+                    _ => Some(entry),
+                };
+                Ok(r)
+            })
+            .map_err(|e| WorkflowError::from(e))
+            // call the sys validation on the changes
+            .map(|chain_head| Ok(sv.check_entry_hash(&chain_head.entry_address.into())?))
+            .collect::<Vec<_>>()?;
+    }
 
     Ok(WorkflowEffects {
         workspace,
@@ -28,13 +51,21 @@ pub mod tests {
     use super::*;
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use crate::core::ribosome::MockRibosomeT;
-    use crate::core::workflow::{WorkflowCall, WorkflowError};
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-    use holochain_types::{
-        entry::Entry, nucleus::ZomeInvocationResponse, test_utils::fake_agent_hash,
+    use crate::core::{
+        state::source_chain::SourceChain,
+        workflow::{WorkflowCall, WorkflowError},
     };
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_state::{env::ReadManager, prelude::Reader, test_utils::test_cell_env};
+    use holochain_types::{
+        entry::Entry,
+        nucleus::ZomeInvocationResponse,
+        observability,
+        test_utils::{fake_agent_hash, fake_dna},
+    };
+    use holochain_zome_types::ZomeExternGuestOutput;
 
+    use crate::core::workflow::system_validation::{MockSystemValidation, PlaceholderSysVal};
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -42,9 +73,6 @@ pub mod tests {
         a: u32,
     }
 
-    // FIXME, This test is redundant because the `SourceChain` cannot be created
-    // without being initialized
-    // 0.5. Check if source chain seq/head ("as at") is less than 3, if so, run INIT.
     #[tokio::test]
     async fn runs_init() {
         let env = test_cell_env();
@@ -55,7 +83,9 @@ pub mod tests {
         let ribosome = MockRibosomeT::new();
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
-        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
+        let effects = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
+            .await
+            .unwrap();
         assert!(effects.triggers.is_empty());
         assert_matches!(effects.triggers[0].interval, None);
         assert_matches!(effects.triggers[0].call, WorkflowCall::InitializeZome);
@@ -79,7 +109,7 @@ pub mod tests {
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
         invocation.cap = todo!("Make secret cap token");
-        let error = invoke_zome(workspace, ribosome, invocation)
+        let error = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
             .await
             .unwrap_err();
         assert_matches!(error, WorkflowError::CapabilityMissing);
@@ -118,29 +148,47 @@ pub mod tests {
     //   DHT Op that would be produced by it
     #[tokio::test]
     async fn calls_system_validation() {
+        observability::test_run().ok();
         let env = test_cell_env();
         let dbs = env.dbs().await.unwrap();
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+        // Genesis
+        let agent_hash = fake_agent_hash("cool agent");
+        let agent_entry = Entry::AgentKey(agent_hash.clone());
+        let dna_entry = Entry::Dna(Box::new(fake_dna("cool dna")));
+        workspace.put_entry(agent_entry, &agent_hash).unwrap();
+        workspace.put_entry(dna_entry, &agent_hash).unwrap();
+
         let mut ribosome = MockRibosomeT::new();
         // Call zome mock that it writes to source chain
-        let agent_hash = fake_agent_hash("cool");
-        // FIXME: This should be panicing because it's never called but it doesn't panic??
         ribosome
             .expect_call_zome_function()
             .returning(move |source_chain, _invocation| {
                 let agent_entry = Entry::AgentKey(agent_hash.clone());
-                source_chain.apply_mut(|source_chain| {
+                let call = |source_chain: &mut SourceChain<Reader>| {
                     source_chain.put_entry(agent_entry, &agent_hash).unwrap()
-                });
-                let x = SerializedBytes::try_from(()).unwrap();
-                Ok(ZomeInvocationResponse::ZomeApiFn(x.try_into().unwrap()))
+                };
+                unsafe { source_chain.apply_mut(call) };
+                let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
+                Ok(ZomeInvocationResponse::ZomeApiFn(
+                    ZomeExternGuestOutput::new(x),
+                ))
             });
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
         // TODO: Mock the system validation and check it's called
-        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
+        let mut sys_val = MockSystemValidation::new();
+        sys_val
+            .expect_check_entry_hash()
+            .times(1)
+            .returning(|_entry_hash| Ok(()));
+
+        let effects = invoke_zome(workspace, ribosome, invocation, sys_val)
+            .await
+            .unwrap();
         assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());
@@ -162,7 +210,9 @@ pub mod tests {
         // TODO: Mock the app validation and check it's called
         // TODO: How can I pass a app validation into this?
         // These are just static calls
-        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
+        let effects = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
+            .await
+            .unwrap();
         assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());
@@ -182,7 +232,9 @@ pub mod tests {
         // TODO: Make this mock return an output
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
-        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
+        let effects = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
+            .await
+            .unwrap();
         assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());

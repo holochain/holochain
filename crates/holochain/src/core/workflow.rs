@@ -14,8 +14,9 @@ use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
 use thiserror::Error;
 
-#[cfg(test)]
-use super::state::source_chain::SourceChainError;
+use super::{ribosome::error::RibosomeError, state::source_chain::SourceChainError};
+
+use system_validation::error::SysValidationError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
@@ -92,7 +93,12 @@ pub enum WorkflowError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),
 
-    #[cfg(test)]
+    #[error(transparent)]
+    SysValidationError(#[from] SysValidationError),
+
+    #[error(transparent)]
+    RibosomeError(#[from] RibosomeError),
+
     #[error("Source chain error: {0}")]
     SourceChainError(#[from] SourceChainError),
 

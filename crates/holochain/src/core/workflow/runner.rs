@@ -8,7 +8,7 @@ use crate::{
 use futures::future::{join_all, BoxFuture, FutureExt};
 use holochain_state::{env::WriteManager, prelude::*};
 use std::sync::Arc;
-use workflow::{WorkflowCallback, WorkflowSignal};
+use workflow::{system_validation::PlaceholderSysVal, WorkflowCallback, WorkflowSignal};
 
 use error::WorkflowRunResult;
 
@@ -34,8 +34,13 @@ impl WorkflowRunner {
         match call {
             WorkflowCall::InvokeZome(invocation) => {
                 let workspace = workspace::InvokeZomeWorkspace::new(&reader, &dbs)?;
-                let effects =
-                    workflow::invoke_zome(workspace, self.0.get_ribosome(), *invocation).await?;
+                let effects = workflow::invoke_zome(
+                    workspace,
+                    self.0.get_ribosome(),
+                    *invocation,
+                    PlaceholderSysVal {},
+                )
+                .await?;
                 self.finish(effects).await?;
             }
             WorkflowCall::Genesis(dna, agent_id) => {

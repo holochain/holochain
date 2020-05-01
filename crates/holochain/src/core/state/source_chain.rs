@@ -51,6 +51,8 @@ impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {
     }
 }
 
+// TODO put this into a mod
+
 // TODO write tests to varify the invariant.
 /// This is needed to use the database where
 /// the lifetimes cannot be verified by
@@ -64,8 +66,12 @@ pub struct UnsafeSourceChain {
     source_chain: std::sync::Weak<std::sync::RwLock<*mut std::ffi::c_void>>,
 }
 
+// TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
 /// If this guard is dropped the underlying
-/// ptr cannot be used
+/// ptr cannot be used.
+/// ## Safety
+/// Don't use `mem::forget` on this type as it will
+/// break the checks.
 pub struct UnsafeSourceChainGuard {
     source_chain: Option<std::sync::Arc<std::sync::RwLock<*mut std::ffi::c_void>>>,
 }
@@ -94,7 +100,10 @@ impl UnsafeSourceChain {
         Self { source_chain }
     }
 
-    pub fn apply_ref<R: 'static, F: FnOnce(&SourceChain<Reader>) -> R>(&self, f: F) -> Option<R> {
+    pub unsafe fn apply_ref<R: 'static, F: FnOnce(&SourceChain<Reader>) -> R>(
+        &self,
+        f: F,
+    ) -> Option<R> {
         // Check it exists
         self.source_chain
             .upgrade()
@@ -102,12 +111,12 @@ impl UnsafeSourceChain {
             .and_then(|lock| {
                 lock.try_read().ok().and_then(|guard| {
                     let sc = *guard as *const SourceChain<Reader>;
-                    unsafe { sc.as_ref() }.map(|s| f(s))
+                    sc.as_ref().map(|s| f(s))
                 })
             })
     }
 
-    pub fn apply_mut<R, F: FnOnce(&mut SourceChain<Reader>) -> R>(&self, f: F) -> Option<R> {
+    pub unsafe fn apply_mut<R, F: FnOnce(&mut SourceChain<Reader>) -> R>(&self, f: F) -> Option<R> {
         // Check it exists
         self.source_chain
             .upgrade()
@@ -115,7 +124,7 @@ impl UnsafeSourceChain {
             .and_then(|lock| {
                 lock.try_write().ok().and_then(|guard| {
                     let sc = *guard as *mut SourceChain<Reader>;
-                    unsafe { sc.as_mut() }.map(|s| f(s))
+                    sc.as_mut().map(|s| f(s))
                 })
             })
     }

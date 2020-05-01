@@ -4,6 +4,7 @@ use holochain_state::{db::DbManager, prelude::*};
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Shrinkwrap)]
+#[shrinkwrap(mutable)]
 pub struct InvokeZomeWorkspace<'env> {
     pub source_chain: SourceChain<'env, Reader<'env>>,
 }
