@@ -71,7 +71,10 @@ pub struct DnaFile {
 
 impl DnaFile {
     /// Construct a new DnaFile instance.
-    pub async fn new(dna: DnaDef, wasm: Vec<wasm::DnaWasm>) -> Result<Self, DnaError> {
+    pub async fn new(
+        dna: DnaDef,
+        wasm: impl IntoIterator<Item = wasm::DnaWasm>,
+    ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
         for wasm in wasm.into_iter() {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
