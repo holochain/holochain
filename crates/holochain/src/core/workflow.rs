@@ -8,6 +8,7 @@ use error::WorkflowRunResult;
 use holochain_types::prelude::*;
 use std::time::Duration;
 use thiserror::Error;
+use must_future::MustBoxFuture;
 
 /// A WorkflowEffects is returned from each Workspace function.
 /// It's just a data structure with no methods of its own, hence the public fields
@@ -39,4 +40,6 @@ impl<'env, WC: WorkflowCaller<'env>> WorkflowEffects<'env, WC> {
 pub type WorkflowCallback = Todo;
 pub type WorkflowSignal = Todo;
 
-pub trait WorkflowTriggers: Send + Sync {}
+pub trait WorkflowTriggers: Send + Sync {
+    // fn run(self) -> MustBoxFuture<'static, WorkflowRunResult<()>>;
+}

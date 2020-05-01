@@ -1,16 +1,18 @@
-
+use super::{
+    error::{WorkflowResult, WorkflowRunResult},
+    WorkflowEffects, WorkflowTriggers,
+};
 use crate::{
     conductor::{api::error::ConductorApiError, Cell},
     core::state::workspace::{Workspace, WorkspaceError},
 };
-use super::{WorkflowTriggers, error::{WorkflowResult, WorkflowRunResult}, WorkflowEffects};
-use futures::future::{FutureExt};
+use futures::future::{BoxFuture, FutureExt};
 use holochain_state::env::WriteManager;
+use holochain_state::env::{Environment, ReadManager};
 use must_future::MustBoxFuture;
-use holochain_state::env::ReadManager;
 
-
-pub trait WorkflowCaller<'env>: Sized + Send + Sync {
+// #[async_trait::async_trait]
+pub trait WorkflowCaller<'env>: Sized + Send {
     type Output: Send;
     type Workspace: Workspace<'env>;
     type Triggers: WorkflowTriggers;
@@ -20,18 +22,22 @@ pub trait WorkflowCaller<'env>: Sized + Send + Sync {
         workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
 
-    fn run<W: WorkflowCaller<'env>>(w: W, cell: &'env Cell) -> MustBoxFuture<WorkflowRunResult<Self::Output>> {
+    fn run(self, cell: &'env Cell) -> MustBoxFuture<'env, WorkflowRunResult<Self::Output>> {
+        let arc = cell.state_env();
         async {
-            let arc = cell.state_env();
-            let env = arc.guard().await;
-            let dbs = arc.dbs().await?;
-            let reader = env.reader()?;
-            let workspace = W::Workspace::new(&reader, &dbs)?;
-            let (output, effects) = w.workflow(workspace).await?;
-            finish(cell, effects).await?;
-            Ok(output)
+            let arc = arc;
+            {
+                let env = arc.guard().await;
+                let dbs = arc.dbs().await?;
+                let reader = env.reader()?;
+                let workspace = Self::Workspace::new(&reader, &dbs)?;
+                let (output, effects) = self.workflow(workspace).await?;
+                finish(cell, effects).await?;
+                Ok(output)
+            }
         }
-        .boxed().into()
+        .boxed()
+        .into()
     }
 }
 
@@ -46,12 +52,13 @@ async fn finish<'env, WC: WorkflowCaller<'env>>(
 ) -> WorkflowRunResult<()> {
     let WorkflowEffects {
         workspace,
-        triggers,
+        // triggers,
         callbacks,
         signals,
         ..
     } = effects;
 
+    // finish workspace
     {
         let arc = cell.state_env();
         let env = arc.guard().await;
@@ -61,18 +68,22 @@ async fn finish<'env, WC: WorkflowCaller<'env>>(
             .map_err(Into::<WorkspaceError>::into)?;
     }
 
+    // finish callbacks
     {
         for _callback in callbacks {
             // TODO
         }
     }
 
+    // finish signals
     {
         for _signal in signals {
             // TODO
         }
     }
-    // self.finish_triggers(triggers).await?;
+
+    // finish triggers
+    // triggers.run().await?;
 
     Ok(())
 }
