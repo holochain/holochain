@@ -1,4 +1,7 @@
-use super::{WorkflowCaller, WorkflowEffects, WorkflowError, WorkflowResult};
+use super::{
+    error::{WorkflowError, WorkflowResult},
+    WorkflowCaller, WorkflowEffects, WorkflowTriggers,
+};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
 use holochain_types::{dna::Dna, entry::Entry, prelude::*};
 use must_future::MustBoxFuture;
@@ -9,11 +12,18 @@ pub struct GenesisWorkflow<Api: CellConductorApiT> {
     agent_hash: AgentHash,
 }
 
+pub struct GenesisWorkflowTriggers;
+impl WorkflowTriggers for GenesisWorkflowTriggers {}
+
 impl<'env, Api: CellConductorApiT + Send + Sync> WorkflowCaller<'env> for GenesisWorkflow<Api> {
     type Output = ();
     type Workspace = GenesisWorkspace<'env>;
+    type Triggers = GenesisWorkflowTriggers;
 
-    fn run(self, workspace: Self::Workspace) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self::Workspace>> {
+    fn run(
+        self,
+        workspace: Self::Workspace,
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
         unimplemented!()
     }
 }
@@ -25,12 +35,12 @@ impl<'env, Api: CellConductorApiT + Send + Sync> WorkflowCaller<'env> for Genesi
 ///
 /// FIXME: understand the details of actually getting the DNA
 /// FIXME: creating entries in the config db
-pub async fn genesis<'env>(
+pub async fn genesis<'env, Api: CellConductorApiT>(
     mut workspace: GenesisWorkspace<'env>,
-    api: impl CellConductorApiT,
+    api: Api,
     dna: Dna,
     agent_hash: AgentHash,
-) -> WorkflowResult<'env, (), GenesisWorkspace<'env>> {
+) -> WorkflowResult<'env, (), GenesisWorkflow<Api>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
     if api
         .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
@@ -72,7 +82,7 @@ mod tests {
                 source_chain::SourceChain,
                 workspace::{GenesisWorkspace, Workspace},
             },
-            workflow::WorkflowError,
+            workflow::error::WorkflowError,
         },
     };
     use fallible_iterator::FallibleIterator;
