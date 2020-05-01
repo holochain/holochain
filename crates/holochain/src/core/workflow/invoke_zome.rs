@@ -10,17 +10,16 @@ use must_future::MustBoxFuture;
 
 pub type ZomeInvocationResult = Todo;
 
-pub struct InvokeZomeWorkflow<'env, Ribosome: RibosomeT + 'env> {
+pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     ribosome: Ribosome,
     invocation: ZomeInvocation,
-    __lifetime: std::marker::PhantomData<&'env ()>,
 }
 
 pub struct InvokeZomeTriggers;
 impl WorkflowTriggers for InvokeZomeTriggers {}
 
 impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env>
-    for InvokeZomeWorkflow<'env, Ribosome>
+    for InvokeZomeWorkflow<Ribosome>
 {
     type Output = ZomeInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
@@ -30,26 +29,19 @@ impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env>
         self,
         workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
-        invoke_zome(workspace, self.ribosome, self.invocation)
+        async {
+            let fx = WorkflowEffects::new(
+                workspace,
+                Default::default(),
+                Default::default(),
+                InvokeZomeTriggers,
+            );
+            let result = todo!("this will be the actual zome function return value");
+            Ok((result, fx))
+        }
             .boxed()
             .into()
     }
-}
-
-async fn invoke_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
-    workspace: InvokeZomeWorkspace<'env>,
-    _ribosome: Ribosome,
-    _invocation: ZomeInvocation,
-) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<'env, Ribosome>> {
-    let fx = WorkflowEffects {
-        workspace,
-        triggers: todo!(""),
-        signals: Default::default(),
-        callbacks: Default::default(),
-        __lifetime: std::marker::PhantomData,
-    };
-    let result = todo!("this will be the actual zome function return value");
-    Ok((result, fx))
 }
 
 #[cfg(test_TODO_FIX)]

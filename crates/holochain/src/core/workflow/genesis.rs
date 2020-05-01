@@ -1,3 +1,10 @@
+/// Genesis Workflow: Initialize the source chain with the initial entries:
+/// - Dna
+/// - AgentValidationPkg
+/// - AgentId
+///
+/// FIXME: understand the details of actually getting the DNA
+/// FIXME: creating entries in the config db
 use super::{
     error::{WorkflowError, WorkflowResult},
     WorkflowCaller, WorkflowEffects, WorkflowTriggers,
@@ -7,78 +14,71 @@ use futures::future::FutureExt;
 use holochain_types::{dna::Dna, entry::Entry, prelude::*};
 use must_future::MustBoxFuture;
 
-pub struct GenesisWorkflow<'env, Api: CellConductorApiT + 'env> {
+pub struct GenesisWorkflow<Api: CellConductorApiT> {
     api: Api,
     dna: Dna,
     agent_hash: AgentHash,
-    __lifetime: std::marker::PhantomData<&'env ()>,
 }
 
 pub struct GenesisWorkflowTriggers;
 impl WorkflowTriggers for GenesisWorkflowTriggers {}
 
-impl<'env, Api: CellConductorApiT + Send + Sync> WorkflowCaller<'env> for GenesisWorkflow<'env, Api> {
+impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
+    for GenesisWorkflow<Api>
+{
     type Output = ();
     type Workspace = GenesisWorkspace<'env>;
     type Triggers = GenesisWorkflowTriggers;
 
     fn workflow(
         self,
-        workspace: Self::Workspace,
+        mut workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
-        genesis(workspace, self.api, self.dna, self.agent_hash)
-            .boxed()
-            .into()
+        async {
+            let Self {
+                api,
+                dna,
+                agent_hash,
+            } = self;
+            // TODO: this is a placeholder for a real DPKI request to show intent
+            if api
+                .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
+                .await?
+                == "INVALID"
+            {
+                return Err(WorkflowError::AgentInvalid(agent_hash.clone()));
+            }
+
+            workspace
+                .source_chain
+                .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)
+                .await?;
+            workspace
+                .source_chain
+                .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)
+                .await?;
+
+            let fx = WorkflowEffects {
+                workspace,
+                signals: Default::default(),
+                callbacks: Default::default(),
+                triggers: GenesisWorkflowTriggers,
+                __lifetime: Default::default(),
+            };
+            let result = ();
+
+            Ok((result, fx))
+        }
+        .boxed()
+        .into()
     }
-}
-
-/// Initialize the source chain with the initial entries:
-/// - Dna
-/// - AgentId
-/// - CapTokenGrant
-///
-/// FIXME: understand the details of actually getting the DNA
-/// FIXME: creating entries in the config db
-async fn genesis<'env, Api: CellConductorApiT + 'env>(
-    mut workspace: GenesisWorkspace<'env>,
-    api: Api,
-    dna: Dna,
-    agent_hash: AgentHash,
-) -> WorkflowResult<'env, (), GenesisWorkflow<'env, Api>> {
-    // TODO: this is a placeholder for a real DPKI request to show intent
-    if api
-        .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
-        .await?
-        == "INVALID"
-    {
-        return Err(WorkflowError::AgentInvalid(agent_hash.clone()));
-    }
-
-    workspace
-        .source_chain
-        .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)
-        .await?;
-    workspace
-        .source_chain
-        .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)
-        .await?;
-
-    let fx = WorkflowEffects {
-        workspace,
-        triggers: todo!(""),
-        signals: Default::default(),
-        callbacks: Default::default(),
-        __lifetime: std::marker::PhantomData,
-    };
-    let result = ();
-
-    Ok((result, fx))
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::genesis;
+    use super::GenesisWorkflow;
+    use crate::core::workflow::caller::WorkflowCaller;
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{
@@ -114,7 +114,13 @@ mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let (_, fx) = genesis(workspace, api, dna.clone(), agent_hash.clone()).await?;
+            let (_, fx) = GenesisWorkflow {
+                api,
+                dna: dna.clone(),
+                agent_hash: agent_hash.clone(),
+            }
+            .workflow(workspace)
+            .await?;
             let writer = env.writer()?;
             fx.workspace.commit_txn(writer)?;
         }
