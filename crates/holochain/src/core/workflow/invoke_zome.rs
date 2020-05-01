@@ -1,5 +1,12 @@
 use super::{WorkflowEffects, WorkflowResult};
-use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use crate::core::{
+    ribosome::RibosomeT,
+    state::{
+        source_chain::{UnsafeSourceChain},
+        workspace::InvokeZomeWorkspace,
+    },
+};
+
 use holochain_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env>(
@@ -7,7 +14,8 @@ pub async fn invoke_zome<'env>(
     ribosome: impl RibosomeT,
     invocation: ZomeInvocation,
 ) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
-    let source_chain = &mut workspace.source_chain;
+    let (_g, source_chain) = UnsafeSourceChain::from_mut(&mut workspace.source_chain);
+
     ribosome.call_zome_function(source_chain, invocation);
 
     Ok(WorkflowEffects {
@@ -29,7 +37,7 @@ pub mod tests {
     use holochain_types::{
         entry::Entry, nucleus::ZomeInvocationResponse, test_utils::fake_agent_hash,
     };
-    use holochain_zome_types::ZomeExternGuestOutput;
+    
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -126,7 +134,9 @@ pub mod tests {
             .expect_call_zome_function()
             .returning(move |source_chain, _invocation| {
                 let agent_entry = Entry::AgentKey(agent_hash.clone());
-                source_chain.put_entry(agent_entry, &agent_hash).unwrap();
+                source_chain.apply_mut(|source_chain| {
+                    source_chain.put_entry(agent_entry, &agent_hash).unwrap()
+                });
                 let x = SerializedBytes::try_from(()).unwrap();
                 Ok(ZomeInvocationResponse::ZomeApiFn(x.try_into().unwrap()))
             });

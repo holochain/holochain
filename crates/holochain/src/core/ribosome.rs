@@ -42,10 +42,9 @@ use self::{
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 
-use super::state::source_chain::SourceChain;
+use super::state::source_chain::{UnsafeSourceChain};
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::prelude::Reader;
 use holochain_types::{
     dna::Dna,
     entry::Entry,
@@ -77,9 +76,9 @@ pub trait RibosomeT: Sized {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
-        source_chain: &mut SourceChain<'env, Reader<'env>>,
+        source_chain: UnsafeSourceChain,
         // TODO NetworkRequest,
         // TODO Cascade,
         invocation: ZomeInvocation,
@@ -94,22 +93,9 @@ pub struct WasmRibosome {
 }
 
 pub struct HostContext {
-    //source_chain: *mut SourceChain<'static, Reader<'static>>,
-    source_chain: *mut std::ffi::c_void,
+    source_chain: UnsafeSourceChain,
     zome_name: String,
 }
-
-/// build the HostContext from a _reference_ to ZomeInvocation to avoid cloning potentially huge
-/// serialized bytes
-/*
-impl From<&ZomeInvocation> for HostContext {
-    fn from(zome_invocation: &ZomeInvocation) -> HostContext {
-        HostContext {
-            zome_name: zome_invocation.zome_name.clone(),
-        }
-    }
-}
-*/
 
 impl WasmRibosome {
     /// Create a new instance
@@ -216,12 +202,11 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         self,
-        source_chain: &mut SourceChain<Reader>,
+        source_chain: UnsafeSourceChain,
         invocation: ZomeInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeInvocationResponse> {
-        let source_chain = source_chain as *mut SourceChain<Reader> as *mut std::ffi::c_void; 
         let host_context = HostContext {
             source_chain,
             zome_name: invocation.zome_name.clone(),
@@ -235,36 +220,7 @@ impl RibosomeT for WasmRibosome {
     }
 }
 
-/*
-mock! {
-    pub RibosomeT
-    {
-        fn run_callback(self, data: ()) -> Todo;
 
-        fn call_zome_function(
-            self,
-            source_chain: &mut SourceChain<Reader>,
-            // TODO NetworkRequest,
-            // TODO Cascade,
-            invocation: ZomeInvocation,
-        ) -> RibosomeResult<ZomeInvocationResponse>;
-    }
-}
-
-impl RibosomeT for MockRibosomeT {
-    fn run_callback(self, _data: ()) -> Todo {
-        self.run_callback(_data)
-    }
-
-    fn call_zome_function(
-        self,
-        _bundle: &mut SourceChain<Reader>,
-        invocation: ZomeInvocation,
-    ) -> RibosomeResult<ZomeInvocationResponse> {
-        self.call_zome_function(_bundle, invocation)
-    }
-}
-*/
 #[cfg(test)]
 pub mod wasm_test {
     use super::WasmRibosome;
@@ -279,7 +235,7 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::ribosome::HostContext;
+    use crate::core::{state::source_chain::UnsafeSourceChain, ribosome::HostContext};
     use holochain_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
@@ -316,16 +272,15 @@ pub mod wasm_test {
 
     pub fn test_ribosome(warm: Option<&str>) -> WasmRibosome {
         // warm the zome module in the module cache
-        /*
         if let Some(zome_name) = warm {
             let ribosome = test_ribosome(None);
             let _ = ribosome
                 .instance(HostContext {
                     zome_name: zome_name.to_string(),
+                    source_chain: UnsafeSourceChain::test(),
                 })
                 .unwrap();
         }
-        */
         WasmRibosome::new(dna_from_zomes({
             let mut v = std::collections::BTreeMap::new();
             v.insert(String::from("foo"), zome_from_code(TestWasm::Foo.into()));
@@ -363,8 +318,7 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        //&mut holochain_types::shims::SourceChainCommitBundle::default(),
-                        todo!("Make a version of SourceChain that can be used here"),
+                        $crate::core::state::source_chain::UnsafeSourceChain::test(),
                         invocation,
                     )
                     .unwrap();
@@ -393,7 +347,6 @@ pub mod wasm_test {
     }
 
     #[test]
-    #[allow(unused_variables, unreachable_code)]
     fn invoke_foo_test() {
         let ribosome = test_ribosome(Some("foo"));
 
@@ -405,7 +358,7 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(&mut todo!("Make SouceChain to use here"), invocation)
+                .call_zome_function(UnsafeSourceChain::test(), invocation)
                 .unwrap()
         );
     }
