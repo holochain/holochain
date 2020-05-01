@@ -60,14 +60,45 @@ pub fn run_workflow_3<'env, O: Send, WC: WorkflowCaller<'env, Output=O> + 'env>(
     arc: Environment,
 // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
 ) -> impl Future<Output = WorkflowRunResult<O>> + 'env {
-    Box::pin(async move {
+    async move {
         // unimplemented!()
         let (output, effects) = wc.workflow(workspace).await?;
         finish(arc, effects).await?;
         Ok(output)
-    })
+    }
     // .boxed().into()
 }
+
+pub async fn run_workflow_4<'env, O: Send, WC: WorkflowCaller<'env, Output=O> + 'env>(
+    wc: WC,
+    workspace: WC::Workspace,
+    arc: Environment,
+// ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
+) -> WorkflowRunResult<O> {
+    // async move {
+        // unimplemented!()
+        let (output, effects) = wc.workflow(workspace).await?;
+        finish(arc, effects).await?;
+        Ok(output)
+    // }.await
+    // .boxed().into()
+}
+
+// FAILS
+// pub async fn run_workflow_5<'env, WC: WorkflowCaller<'env> + 'env>(
+//     wc: WC,
+//     workspace: WC::Workspace,
+//     arc: Environment,
+// // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
+// ) -> WorkflowRunResult<WC::Output> {
+//     // async move {
+//         // unimplemented!()
+//         let (output, effects) = wc.workflow(workspace).await?;
+//         finish(arc, effects).await?;
+//         Ok(output)
+//     // }.await
+//     // .boxed().into()
+// }
 
 
 

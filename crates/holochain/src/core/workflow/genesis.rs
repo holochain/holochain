@@ -78,7 +78,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
 mod tests {
 
     use super::GenesisWorkflow;
-    use crate::core::workflow::caller::{run_workflow_3, WorkflowCaller};
+    use crate::core::workflow::caller::{run_workflow_3, WorkflowCaller, run_workflow_4};
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{
@@ -119,7 +119,7 @@ mod tests {
                 dna: dna.clone(),
                 agent_hash: agent_hash.clone(),
             };
-            let _ = run_workflow_3(workflow, workspace, arc.clone()).await?;
+            let _ = run_workflow_4(workflow, workspace, arc.clone()).await?;
             // let writer = env.writer()?;
             // fx.workspace.commit_txn(writer)?;
         }
