@@ -150,7 +150,7 @@ async fn read_parse_dna(
     let mut dna: DnaFile = dna.try_into().map_err(SerializationError::from)?;
     if let Some(properties) = properties {
         let properties = Properties::new(properties);
-        let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
+        let tmp_wasm = dna.code().values().cloned();
         let mut tmp_dna = dna.dna().clone();
         tmp_dna.properties = properties.try_into().map_err(SerializationError::from)?;
         dna = DnaFile::new(tmp_dna, tmp_wasm).await?;
