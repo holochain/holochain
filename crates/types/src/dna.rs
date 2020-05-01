@@ -55,7 +55,7 @@ impl DnaDef {
     }
 }
 
-/// Represents a full dna file including Webassembly bytecode.
+/// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
