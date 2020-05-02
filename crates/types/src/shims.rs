@@ -22,6 +22,8 @@ pub struct Lib3hToServer;
 pub struct Lib3hToServerResponse;
 pub struct Lib3hServerProtocol;
 pub struct Keystore;
+
+#[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidationResult {
     Valid,
     Invalid,

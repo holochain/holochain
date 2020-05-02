@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
+use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
 use holochain_wasmer_host::prelude::WasmError;
 use thiserror::Error;
@@ -15,6 +16,10 @@ pub enum RibosomeError {
     /// Wasm error while working with Ribosome.
     #[error("Wasm error while working with Ribosome: {0}")]
     WasmError(#[from] WasmError),
+
+    /// Serialization error while working with Ribosome.
+    #[error("Serialization error while working with Ribosome: {0}")]
+    SerializationError(#[from] SerializedBytesError),
 }
 
 /// Type alias

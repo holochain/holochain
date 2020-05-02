@@ -30,9 +30,9 @@ tracing-serde = "=0.1.1"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
-holochain_serialized_bytes = "=0.0.38"
+holochain_serialized_bytes = "=0.0.39"
 holochain_types_derive = { version = "=0.0.1", path = "../types_derive" }
-holochain_wasmer_common = "=0.0.24"
+holochain_wasmer_common = "=0.0.28"
 holochain_zome_types = { path = "../zome_types" }
 futures = "0.3"
 must_future = "0.1.1"

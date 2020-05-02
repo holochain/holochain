@@ -105,6 +105,17 @@ wasm_io_types!(
     // DebugMsg includes line numbers etc. so the wasm can tell the host about it's own code
     pub struct DebugInput(crate::debug::DebugMsg);
     pub struct DebugOutput(());
+    // every callback function that the zome developer exposes to holochain returns CallbackGuestOutput
+    // as the zome developer can expose callbacks in a "sparse" way based on names and the functions
+    // can take different input (e.g. validation vs. hooks like init, etc.) all we can say is that
+    // some SerializedBytes are being returned
+    // note though, that _unlike_ zome externs, the host _does_ know exactly the guest should be
+    // returning, it's just that the unpacking of the return happens in two steps:
+    // - first the sparse callback is triggered with SB input/output
+    // - then the guest inflates the expected input or the host the expected output based on the
+    //   callback flavour
+    pub struct CallbackHostInput(crate::SerializedBytes);
+    pub struct CallbackGuestOutput(crate::SerializedBytes);
     // every externed function that the zome developer exposes to holochain returns ZomeExternOutput
     // as the zome developer can expose arbitrary functions and the client will expect arbitrary data
     // all we can say is that some SerializedBytes are being returned

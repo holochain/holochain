@@ -48,10 +48,10 @@ use holochain_types::{
     dna::Dna,
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::Todo,
     shims::*,
 };
 use holochain_wasmer_host::prelude::*;
+// use holochain_wasmer_host::prelude::__imports_internal;
 use holochain_zome_types::*;
 use mockall::automock;
 use std::sync::Arc;
@@ -63,15 +63,61 @@ pub trait RibosomeT: Sized {
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validation(self, _entry: Entry) -> ValidationResult {
-        unimplemented!()
+    fn run_validation(self, zome_name: String, entry: &Entry) -> RibosomeResult<ValidationResult> {
+        let callback_invocation = CallbackInvocation {
+            components: vec![
+                "validate_entry".into(),
+                match entry {
+                    Entry::Agent(_) => "agent",
+                    Entry::App(_) => "app",
+                    Entry::CapTokenClaim(_) => "cap_token_claim",
+                    Entry::CapTokenGrant(_) => "cap_token_grant",
+                }
+                .into(),
+            ],
+            zome_name,
+            payload: CallbackHostInput::new(entry.try_into()?),
+        };
+        Ok(self
+            .run_callback(callback_invocation)?
+            .into_iter()
+            .map(|r| match r {
+                Some(implemented) => match ValidationResult::try_from(implemented.into_inner()) {
+                    Ok(v) => v,
+                    // failing to inflate is an invalid result
+                    Err(_) => ValidationResult::Invalid,
+                },
+                // not implemented = valid
+                // note that if NO callbacks are implemented we always pass validation
+                None => ValidationResult::Valid,
+            })
+            // folded into a single validation result
+            .fold(ValidationResult::Valid, |acc, x| {
+                match x {
+                    // validation is invalid if any x is invalid
+                    ValidationResult::Invalid => x,
+                    // validation is pending if any x is pending, unless we already know it is invalid
+                    ValidationResult::Pending => {
+                        if acc == ValidationResult::Invalid {
+                            acc
+                        } else {
+                            x
+                        }
+                    }
+                    // valid x allows validaiton to continue
+                    ValidationResult::Valid => acc,
+                }
+            }))
     }
 
     /// Runs a callback function defined in a zome.
     ///
     /// This is differentiated from calling a zome function, even though in both
     /// cases it amounts to a FFI call of a guest function.
-    fn run_callback(self, callback: CallbackInvocation) -> RibosomeResult<CallbackResult>;
+    fn run_callback(
+        self,
+        callback: CallbackInvocation,
+    ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -104,6 +150,14 @@ impl From<&ZomeInvocation> for HostContext {
     }
 }
 
+impl From<&CallbackInvocation> for HostContext {
+    fn from(callback_invocation: &CallbackInvocation) -> HostContext {
+        HostContext {
+            zome_name: callback_invocation.zome_name.clone(),
+        }
+    }
+}
+
 impl WasmRibosome {
     /// Create a new instance
     pub fn new(dna: Dna) -> Self {
@@ -115,11 +169,15 @@ impl WasmRibosome {
         format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
     }
 
-    pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
+    pub fn instance(
+        &self,
+        host_context: HostContext,
+        allow_side_effects: bool,
+    ) -> RibosomeResult<Instance> {
         let zome_name = host_context.zome_name.clone();
         let zome = self.dna.get_zome(&zome_name)?;
         let wasm: Arc<Vec<u8>> = zome.code.code();
-        let imports: ImportObject = WasmRibosome::imports(self, host_context);
+        let imports: ImportObject = WasmRibosome::imports(self, host_context, allow_side_effects);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             &self.wasm_cache_key(&zome_name),
             &wasm,
@@ -127,7 +185,7 @@ impl WasmRibosome {
         )?)
     }
 
-    fn imports(&self, host_context: HostContext) -> ImportObject {
+    fn imports(&self, host_context: HostContext, allow_side_effects: bool) -> ImportObject {
         // it is important that WasmRibosome and ZomeInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
         let host_context_arc = std::sync::Arc::new(host_context);
@@ -145,94 +203,109 @@ impl WasmRibosome {
                     )?;
                     // this will be run in a tokio background thread
                     // designed for doing blocking work.
-                    let output_sb: SerializedBytes = tokio_safe_block_on::tokio_safe_block_on(
-                        $host_function(
-                            std::sync::Arc::clone(&closure_self_arc),
-                            std::sync::Arc::clone(&closure_host_context_arc),
-                            input,
-                        ),
-                        // TODO - Identify calls that are essentially synchronous vs those that
-                        // may be async, such as get, send, etc.
-                        // async calls should require timeouts specified by hApp devs
-                        // pluck those timeouts out, and apply them here:
-                        std::time::Duration::from_secs(60),
-                    )
-                    .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
-                    .try_into()?;
+                    let output_sb: holochain_wasmer_host::prelude::SerializedBytes =
+                        tokio_safe_block_on::tokio_safe_block_on(
+                            $host_function(
+                                std::sync::Arc::clone(&closure_self_arc),
+                                std::sync::Arc::clone(&closure_host_context_arc),
+                                input,
+                            ),
+                            // TODO - Identify calls that are essentially synchronous vs those that
+                            // may be async, such as get, send, etc.
+                            // async calls should require timeouts specified by hApp devs
+                            // pluck those timeouts out, and apply them here:
+                            std::time::Duration::from_secs(60),
+                        )
+                        .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
+                        .try_into()?;
                     let output_allocation_ptr: AllocationPtr = output_sb.into();
                     Ok(output_allocation_ptr.as_remote_ptr())
                 }
             }};
         }
-        imports! {
-            "env" => {
-                // standard memory handling used by the holochain_wasmer guest and host macros
-                "__import_allocation" => func!(holochain_wasmer_host::import::__import_allocation),
-                "__import_bytes" => func!(holochain_wasmer_host::import::__import_bytes),
+        let mut imports = imports! {};
+        let mut ns = Namespace::new();
 
-                // imported host functions for core
-                "__globals" => func!(invoke_host_function!(globals)),
-                "__call" => func!(invoke_host_function!(call)),
-                "__capability" => func!(invoke_host_function!(capability)),
-                "__commit_entry" => func!(invoke_host_function!(commit_entry)),
-                "__debug" => func!(invoke_host_function!(debug)),
-                "__decrypt" => func!(invoke_host_function!(decrypt)),
-                "__emit_signal" => func!(invoke_host_function!(emit_signal)),
-                "__encrypt" => func!(invoke_host_function!(encrypt)),
-                "__entry_address" => func!(invoke_host_function!(entry_address)),
-                "__entry_type_properties" => func!(invoke_host_function!(entry_type_properties)),
-                "__get_entry" => func!(invoke_host_function!(get_entry)),
-                "__get_links" => func!(invoke_host_function!(get_links)),
-                "__keystore" => func!(invoke_host_function!(keystore)),
-                "__link_entries" => func!(invoke_host_function!(link_entries)),
-                "__property" => func!(invoke_host_function!(property)),
-                "__query" => func!(invoke_host_function!(query)),
-                "__remove_link" => func!(invoke_host_function!(remove_link)),
-                "__send" => func!(invoke_host_function!(send)),
-                "__sign" => func!(invoke_host_function!(sign)),
-                "__schedule" => func!(invoke_host_function!(schedule)),
-                "__update_entry" => func!(invoke_host_function!(update_entry)),
-                "__remove_entry" => func!(invoke_host_function!(remove_entry)),
-                "__show_env" => func!(invoke_host_function!(show_env)),
-                "__sys_time" => func!(invoke_host_function!(sys_time)),
-            },
+        // standard memory handling used by the holochain_wasmer guest and host macros
+        ns.insert(
+            "__import_allocation",
+            func!(holochain_wasmer_host::import::__import_allocation),
+        );
+        ns.insert(
+            "__import_bytes",
+            func!(holochain_wasmer_host::import::__import_bytes),
+        );
+
+        // imported host functions for core
+        ns.insert("__globals", func!(invoke_host_function!(globals)));
+        ns.insert("__debug", func!(invoke_host_function!(debug)));
+        ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
+        ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
+        ns.insert(
+            "__entry_address",
+            func!(invoke_host_function!(entry_address)),
+        );
+        ns.insert(
+            "__entry_type_properties",
+            func!(invoke_host_function!(entry_type_properties)),
+        );
+        ns.insert("__get_entry", func!(invoke_host_function!(get_entry)));
+        ns.insert("__get_links", func!(invoke_host_function!(get_links)));
+        ns.insert("__keystore", func!(invoke_host_function!(keystore)));
+        ns.insert("__property", func!(invoke_host_function!(property)));
+        ns.insert("__query", func!(invoke_host_function!(query)));
+        ns.insert("__sign", func!(invoke_host_function!(sign)));
+        ns.insert("__show_env", func!(invoke_host_function!(show_env)));
+        ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
+        ns.insert("__schedule", func!(invoke_host_function!(schedule)));
+        ns.insert("__capability", func!(invoke_host_function!(capability)));
+
+        if allow_side_effects {
+            ns.insert("__call", func!(invoke_host_function!(call)));
+            ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
+            ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
+            ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
+            ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
+            ns.insert("__send", func!(invoke_host_function!(send)));
+            ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
+            ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
+            imports.register("env", ns);
         }
+        imports
     }
 }
 
-pub enum CallbackResult {
-    Pass,
-    Fail,
-    NotImplemented,
-}
-
 pub struct CallbackInvocation {
+    zome_name: String,
     /// e.g. ["username", "validate", "create"]
     components: Vec<String>,
-    payload: SerializedBytes,
+    payload: CallbackHostInput,
 }
 
 impl RibosomeT for WasmRibosome {
-    fn run_callback(self, invocation: CallbackInvocation) -> RibosomeResult<Vec<CallbackGuestOutput>> {
-
+    fn run_callback(
+        self,
+        invocation: CallbackInvocation,
+    ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>> {
         let mut fn_components = invocation.components.clone();
-        let mut results: Vec<CallbackGuestOutput> = vec![];
+        let mut results: Vec<Option<CallbackGuestOutput>> = vec![];
 
         loop {
             if fn_components.len() > 0 {
-                let mut instance = self.instance(HostContext::from(&invocation))?;
+                let mut instance = self.instance(HostContext::from(&invocation), false)?;
                 let fn_name = fn_components.join("_");
-                match instance.exports().get(fn_name) {
-                    Some(_) => {
-                        let wasm_callback_response: CallbackGuestOutput = holochain_wasmer_host::guest::call(
-                            &mut instance,
-                            &fn_name,
-                            invocation.payload.clone(),
-                        )?;
-                        results.push(wasm_callback_response);
-                    },
-                    None => {
-                        result.push(CallbackResult::NotImplemented.into());
+                match instance.resolve_func(&fn_name) {
+                    Ok(_) => {
+                        let wasm_callback_response: CallbackGuestOutput =
+                            holochain_wasmer_host::guest::call(
+                                &mut instance,
+                                &fn_name,
+                                invocation.payload.clone(),
+                            )?;
+                        results.push(Some(wasm_callback_response));
+                    }
+                    Err(_) => {
+                        results.push(None);
                     }
                 }
                 fn_components.pop();
@@ -241,7 +314,7 @@ impl RibosomeT for WasmRibosome {
             }
         }
 
-        /// reverse the vector so that most specific results are first
+        // reverse the vector so that most specific results are first
         Ok(results.into_iter().rev().collect())
     }
 
@@ -256,7 +329,7 @@ impl RibosomeT for WasmRibosome {
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeInvocationResponse> {
         let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
-            &mut self.instance(HostContext::from(&invocation))?,
+            &mut self.instance(HostContext::from(&invocation), true)?,
             &invocation.fn_name,
             invocation.payload,
         )?;
@@ -319,9 +392,12 @@ pub mod wasm_test {
         if let Some(zome_name) = warm {
             let ribosome = test_ribosome(None);
             let _ = ribosome
-                .instance(HostContext {
-                    zome_name: zome_name.to_string(),
-                })
+                .instance(
+                    HostContext {
+                        zome_name: zome_name.to_string(),
+                    },
+                    true,
+                )
                 .unwrap();
         }
         WasmRibosome::new(dna_from_zomes({

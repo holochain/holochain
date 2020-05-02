@@ -78,9 +78,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.38"
+version = "0.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6be38f6ee21d935ce62a55ca27d2708e2dcce0ac4fda46c792bbdc76b2be83b4"
+checksum = "01d69e13b9478fc7d89eb4168e2747be1345706b61a03f4eaf3ebbd42540f7e0"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -92,9 +92,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.38"
+version = "0.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f9dcb58ed79199b69ab54407901b9d681a498bc48c9d145b8ec1d2255440eb5"
+checksum = "a176ead4e41cf09a7e47516ad585de6e7cf71185fd1576c2129655d6bb22ae67"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -102,8 +102,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.24"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
+version = "0.0.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1eb1e3812b631bae029d9972d25a714f2de1c03da83c861c1f297b0835e4cdd5"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -113,8 +114,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.24"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
+version = "0.0.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9083d8a03e238811f20ad237106d45c3b8afb6fdca76642fa0e01378badbd415"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -507,8 +509,3 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[patch.unused]]
-name = "holochain_wasmer_host"
-version = "0.0.24"
-source = "git+https://github.com/holochain/holochain-wasmer.git?branch=unpinned#abb388b8cd74421700779ff9c00d9d5516b4ce36"
