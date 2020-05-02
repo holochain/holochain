@@ -208,8 +208,8 @@ pub trait ReadManager<'e> {
 
 /// Implementors are able to create a new read-write LMDB transaction
 pub trait WriteManager<'e> {
-    /// Create a new read-write LMDB transaction
-    fn writer(&'e self) -> DatabaseResult<Writer<'e>>;
+    // /// Create a new read-write LMDB transaction
+    // fn writer(&'e self) -> DatabaseResult<Writer<'e>>;
 
     /// Run a closure, passing in a mutable reference to a read-write
     /// transaction, and commit the transaction after the closure has run
@@ -235,17 +235,14 @@ impl<'e> ReadManager<'e> for EnvironmentRefRw<'e> {
 }
 
 impl<'e> WriteManager<'e> for EnvironmentRefRw<'e> {
-    fn writer(&'e self) -> DatabaseResult<Writer<'e>> {
-        let writer = Writer::from(self.rkv.write()?);
-        Ok(writer)
-    }
 
+    // FIXME: add write error handling (see old holochain_persistence)
     fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
-        let mut writer = self.writer()?;
+        let mut writer = Writer::from(self.rkv.write().map_err(Into::into)?);
         let result = f(&mut writer);
         writer.commit().map_err(Into::into)?;
         result
@@ -271,6 +268,14 @@ impl<'e> EnvironmentRefRw<'e> {
 
     pub(crate) fn keystore(&self) -> KeystoreSender {
         self.keystore.clone()
+    }
+
+    /// Get a raw read-write transaction for this environment.
+    /// It is preferable to use WriterManager::with_commit for database writes,
+    /// which can properly recover from and manage write failures
+    pub fn writer_unmanaged(&'e self) -> DatabaseResult<Writer<'e>> {
+        let writer = Writer::from(self.rkv.write()?);
+        Ok(writer)
     }
 }
 
