@@ -5,6 +5,7 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
+use derive_more::From;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock as RwLockSync;
@@ -15,6 +16,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::{RwLock, RwLockReadGuard};
+use shrinkwraprs::Shrinkwrap;
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
@@ -124,6 +126,21 @@ impl Environment {
     }
 }
 
+
+/// A variation on Environment which cannot produce read-write transactions
+#[derive(Clone, From, Shrinkwrap)]
+pub struct EnvironmentReadonly(Environment);
+
+impl EnvironmentReadonly {
+    /// Get a read-only lock on the Environment which is only allowed to
+    /// produce read-only transactions (not read-write)
+    pub async fn guard(&self) -> EnvironmentRefReadOnly<'_> {
+        EnvironmentRefReadOnly(self.arc.read().await)
+    }
+
+}
+
+
 /// The various types of LMDB environment, used to specify the list of databases to initialize in the DbManager
 #[derive(Clone)]
 pub enum EnvironmentKind {
@@ -148,6 +165,10 @@ impl EnvironmentKind {
 
 /// Newtype wrapper for a read-only lock guard on the Environment
 pub struct EnvironmentRef<'e>(RwLockReadGuard<'e, Rkv>);
+
+/// Newtype wrapper for a read-only lock guard on the Environment,
+/// with read-only access to the underlying guard
+pub struct EnvironmentRefReadOnly<'e>(RwLockReadGuard<'e, Rkv>);
 
 /// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
@@ -211,5 +232,20 @@ impl<'e> EnvironmentRef<'e> {
     /// Access the underlying lock guard
     pub fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
         &self.0
+    }
+}
+
+impl<'e> ReadManager<'e> for EnvironmentRefReadOnly<'e> {
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
+        let reader = Reader::from(ThreadsafeRkvReader::from(self.0.read()?));
+        Ok(reader)
+    }
+
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Reader) -> Result<R, E>,
+    {
+        f(self.reader()?)
     }
 }

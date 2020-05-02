@@ -15,15 +15,12 @@ pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     invocation: ZomeInvocation,
 }
 
-pub struct InvokeZomeTriggers;
-impl WorkflowTriggers for InvokeZomeTriggers {}
-
 impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env>
     for InvokeZomeWorkflow<Ribosome>
 {
     type Output = ZomeInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
-    type Triggers = InvokeZomeTriggers;
+    type Triggers = ();
 
     fn workflow(
         self,
@@ -34,7 +31,7 @@ impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env>
                 workspace,
                 Default::default(),
                 Default::default(),
-                InvokeZomeTriggers,
+                (),
             );
             let result = todo!("this will be the actual zome function return value");
             Ok((result, fx))

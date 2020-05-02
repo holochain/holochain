@@ -20,15 +20,13 @@ pub struct GenesisWorkflow<Api: CellConductorApiT> {
     agent_hash: AgentHash,
 }
 
-pub struct GenesisWorkflowTriggers;
-impl WorkflowTriggers for GenesisWorkflowTriggers {}
 
 impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
     for GenesisWorkflow<Api>
 {
     type Output = ();
     type Workspace = GenesisWorkspace<'env>;
-    type Triggers = GenesisWorkflowTriggers;
+    type Triggers = ();
 
     fn workflow(
         self,
@@ -62,7 +60,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
                 workspace,
                 signals: Default::default(),
                 callbacks: Default::default(),
-                triggers: GenesisWorkflowTriggers,
+                triggers: (),
                 __lifetime: Default::default(),
             };
             let result = ();
@@ -119,7 +117,7 @@ mod tests {
                 dna: dna.clone(),
                 agent_hash: agent_hash.clone(),
             };
-            let _ = run_workflow_4(workflow, workspace, arc.clone()).await?;
+            let _: () = run_workflow_4(workflow, workspace, arc.clone()).await?;
             // let writer = env.writer()?;
             // fx.workspace.commit_txn(writer)?;
         }
