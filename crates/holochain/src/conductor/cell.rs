@@ -6,7 +6,7 @@ use crate::{
     core::ribosome::WasmRibosome,
 };
 use holo_hash::*;
-use holochain_state::env::Environment;
+use holochain_state::env::EnvironmentRw;
 use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
@@ -44,7 +44,7 @@ impl PartialEq for Cell {
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorApi,
-    state_env: Environment,
+    state_env: EnvironmentRw,
 }
 
 impl Cell {
@@ -90,7 +90,7 @@ impl Cell {
     }
 
     // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn state_env(&self) -> Environment {
+    pub(crate) fn state_env(&self) -> EnvironmentRw {
         self.state_env.clone()
     }
 

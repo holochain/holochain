@@ -106,7 +106,7 @@ impl WorkflowRunner {
     /// triggers, this will be a problem, and we will have to actually spawn
     /// a new task for each. The difficulty with that is that tokio::spawn
     /// requires the future to be 'static, which is currently not the case due
-    /// to our LMDB Environment lifetimes.
+    /// to our LMDB EnvironmentRw lifetimes.
     async fn finish_triggers(&self, triggers: Vec<WorkflowTrigger>) -> WorkflowRunResult<()> {
         let calls: Vec<_> = triggers
             .into_iter()
