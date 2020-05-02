@@ -21,7 +21,7 @@ const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
 lazy_static! {
-    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, Environment>> =
+    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, EnvironmentRw>> =
         RwLockSync::new(HashMap::new());
 }
 
@@ -63,33 +63,33 @@ fn rkv_builder(
 /// The wrapper contains methods for managing transactions and database connections,
 /// tucked away into separate traits.
 #[derive(Clone)]
-pub struct Environment {
+pub struct EnvironmentRw {
     arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
     path: PathBuf,
     keystore: KeystoreSender,
 }
 
-impl Environment {
+impl EnvironmentRw {
     /// Create an environment,
     pub async fn new(
         path_prefix: &Path,
         kind: EnvironmentKind,
         keystore: KeystoreSender,
-    ) -> DatabaseResult<Environment> {
+    ) -> DatabaseResult<EnvironmentRw> {
         let mut map = ENVIRONMENTS.write();
         let path = path_prefix.join(kind.path());
         if !path.is_dir() {
             std::fs::create_dir(path.clone())
                 .map_err(|_e| DatabaseError::EnvironmentMissing(path.clone()))?;
         }
-        let env: Environment = match map.entry(path.clone()) {
+        let env: EnvironmentRw = match map.entry(path.clone()) {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => e
                 .insert({
                     let rkv = rkv_builder(None, None)(&path)?;
                     initialize_databases(&rkv, &kind).await?;
-                    Environment {
+                    EnvironmentRw {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
                         keystore,
@@ -101,12 +101,12 @@ impl Environment {
         Ok(env)
     }
 
-    /// Get a read-only lock on the Environment. The most typical use case is
+    /// Get a read-only lock on the EnvironmentRw. The most typical use case is
     /// to get a lock in order to create a read-only transaction. The lock guard
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
-    pub async fn guard<'e>(&'e self) -> EnvironmentRef<'e> {
-        EnvironmentRef {
+    pub async fn guard<'e>(&'e self) -> EnvironmentRefRw<'e> {
+        EnvironmentRefRw {
             rkv: self.arc.read().await,
             keystore: self.keystore.clone(),
         }
@@ -117,7 +117,7 @@ impl Environment {
         self.arc.read().await
     }
 
-    /// Accessor for the [EnvironmentKind] of the Environment
+    /// Accessor for the [EnvironmentKind] of the EnvironmentRw
     pub fn kind(&self) -> &EnvironmentKind {
         &self.kind
     }
@@ -133,7 +133,7 @@ impl Environment {
     }
 }
 
-impl GetDb for Environment {
+impl GetDb for EnvironmentRw {
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
         get_db(&self.path, key)
     }
@@ -166,8 +166,8 @@ impl EnvironmentKind {
     }
 }
 
-/// Newtype wrapper for a read-only lock guard on the Environment
-pub struct EnvironmentRef<'e> {
+/// Newtype wrapper for a read-only lock guard on the EnvironmentRw
+pub struct EnvironmentRefRw<'e> {
     rkv: RwLockReadGuard<'e, Rkv>,
     keystore: KeystoreSender,
 }
@@ -197,7 +197,7 @@ pub trait WriteManager<'e> {
         F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
-impl<'e> ReadManager<'e> for EnvironmentRef<'e> {
+impl<'e> ReadManager<'e> for EnvironmentRefRw<'e> {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
         let reader = Reader::from(ThreadsafeRkvReader::from(self.rkv.read()?));
         Ok(reader)
@@ -212,7 +212,7 @@ impl<'e> ReadManager<'e> for EnvironmentRef<'e> {
     }
 }
 
-impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
+impl<'e> WriteManager<'e> for EnvironmentRefRw<'e> {
     fn writer(&'e self) -> DatabaseResult<Writer<'e>> {
         let writer = Writer::from(self.rkv.write()?);
         Ok(writer)
@@ -230,7 +230,7 @@ impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
     }
 }
 
-impl<'e> GetDb for EnvironmentRef<'e> {
+impl<'e> GetDb for EnvironmentRefRw<'e> {
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
         let path = self.inner().path().clone();
         get_db(path, key)
@@ -241,7 +241,7 @@ impl<'e> GetDb for EnvironmentRef<'e> {
     }
 }
 
-impl<'e> EnvironmentRef<'e> {
+impl<'e> EnvironmentRefRw<'e> {
     /// Access the underlying lock guard
     pub(crate) fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
         &self.rkv
