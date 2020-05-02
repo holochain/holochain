@@ -5,11 +5,13 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
+use derive_more::From;
 use holochain_keystore::KeystoreSender;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock as RwLockSync;
 use rkv::{EnvironmentFlags, Rkv};
+use shrinkwraprs::Shrinkwrap;
 use std::{
     collections::{hash_map, HashMap},
     path::{Path, PathBuf},
@@ -131,6 +133,11 @@ impl EnvironmentRw {
     pub async fn dbs(&self) -> impl GetDb + '_ {
         self.guard().await
     }
+
+    /// Transform this Environment into its read-only counterpart
+    pub fn as_readonly(self) -> EnvironmentRo {
+        self.into()
+    }
 }
 
 impl GetDb for EnvironmentRw {
@@ -140,6 +147,22 @@ impl GetDb for EnvironmentRw {
 
     fn keystore(&self) -> KeystoreSender {
         self.keystore.clone()
+    }
+}
+
+/// A read-only version of [EnvironmentRw].
+///
+/// This struct
+#[derive(Shrinkwrap, From)]
+pub struct EnvironmentRo(EnvironmentRw);
+
+impl EnvironmentRo {
+    /// Get a read-only lock on the EnvironmentRw. The most typical use case is
+    /// to get a lock in order to create a read-only transaction. The lock guard
+    /// must outlive the transaction, so it has to be returned here and managed
+    /// explicitly.
+    pub async fn guard<'e>(&'e self) -> EnvironmentRefRo<'e> {
+        self.0.guard().await.into()
     }
 }
 
@@ -248,5 +271,35 @@ impl<'e> EnvironmentRefRw<'e> {
 
     pub(crate) fn keystore(&self) -> KeystoreSender {
         self.keystore.clone()
+    }
+}
+
+/// A reference to a read-only EnvironmentRo.
+/// This has the distinction of being unable to create a read-write transaction, because unlike
+/// [EnvironmentRefRw], this does not implement WriteManager
+#[derive(Shrinkwrap, From)]
+pub struct EnvironmentRefRo<'e>(EnvironmentRefRw<'e>);
+
+impl<'e> ReadManager<'e> for EnvironmentRefRo<'e> {
+    fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
+        self.0.reader()
+    }
+
+    fn with_reader<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(Reader) -> Result<R, E>,
+    {
+        self.0.with_reader(f)
+    }
+}
+
+impl<'e> GetDb for EnvironmentRefRo<'e> {
+    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
+        self.0.get_db(key)
+    }
+
+    fn keystore(&self) -> KeystoreSender {
+        self.0.keystore()
     }
 }
