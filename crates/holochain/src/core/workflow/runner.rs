@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use futures::future::{join_all, BoxFuture, FutureExt};
-use holochain_state::{env::WriteManager, prelude::*};
+use holochain_state::prelude::*;
 use std::sync::Arc;
 use workflow::{WorkflowCallback, WorkflowSignal};
 
@@ -78,7 +78,8 @@ impl WorkflowRunner {
     async fn finish_workspace<W: Workspace>(&self, workspace: W) -> WorkflowRunResult<()> {
         let arc = self.0.state_env();
         let env = arc.guard().await;
-        let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
+        let writer = env.writer_unmanaged().map_err(Into::<WorkspaceError>::into)?;
+        // FIXME: add write error handling
         workspace
             .commit_txn(writer)
             .map_err(Into::<WorkspaceError>::into)?;

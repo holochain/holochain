@@ -373,11 +373,12 @@ where
     {
         self.check_running()?;
         let guard = self.env.guard().await;
-        let mut writer = guard.writer()?;
-        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
-        let new_state = f(state)?;
-        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
-        writer.commit()?;
+        let new_state = guard.with_commit(|txn| {
+            let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
+            let new_state = f(state)?;
+            self.state_db.put(txn, &UnitDbKey, &new_state)?;
+            Result::<_, ConductorError>::Ok(new_state)
+        })?;
         Ok(new_state)
     }
 

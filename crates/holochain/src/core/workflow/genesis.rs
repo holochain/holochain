@@ -91,7 +91,7 @@ mod tests {
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
             let fx = genesis(workspace, api, dna.clone(), agent_pubkey.clone()).await?;
-            let writer = env.writer()?;
+            let writer = env.writer_unmanaged()?;
             fx.workspace.commit_txn(writer)?;
         }
 
