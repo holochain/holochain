@@ -31,7 +31,7 @@ pub mod tests {
     use crate::core::state::workspace::WorkspaceResult;
     use holochain_state::{
         buffer::{BufferedStore, KvBuf},
-        db::{DbManager, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
+        db::{GetDb, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         prelude::{Reader, Writer},
         test_utils::test_cell_env,
@@ -44,10 +44,10 @@ pub mod tests {
     }
 
     impl<'env> TestWorkspace<'env> {
-        pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
+        pub fn new(reader: &'env Reader<'env>, dbs: &'env impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?)?,
-                two: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_HEADERS)?)?,
+                one: KvBuf::new(reader, dbs.db(&*PRIMARY_CHAIN_ENTRIES)?)?,
+                two: KvBuf::new(reader, dbs.db(&*PRIMARY_CHAIN_HEADERS)?)?,
             })
         }
     }
@@ -63,9 +63,9 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn workspace_sanity_check() -> WorkspaceResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
         let addr1 = EntryHash::with_data_sync("hello".as_bytes());
         let addr2 = "hi".to_string();
         {

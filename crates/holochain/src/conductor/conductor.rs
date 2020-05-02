@@ -338,7 +338,7 @@ where
         dna_store: DS,
         keystore: KeystoreSender,
     ) -> ConductorResult<Self> {
-        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
+        let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE).await?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
@@ -447,7 +447,8 @@ mod builder {
                 env_path.as_ref(),
                 EnvironmentKind::Conductor,
                 keystore.clone(),
-            )?;
+            )
+            .await?;
 
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
 
@@ -494,7 +495,7 @@ mod builder {
 
         /// Build a Conductor with a test environment
         pub async fn test(self) -> ConductorResult<Conductor<DS>> {
-            let environment = test_conductor_env();
+            let environment = test_conductor_env().await;
             let keystore = environment.keystore().clone();
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
 
@@ -515,7 +516,7 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn can_update_state() {
-        let environment = test_conductor_env();
+        let environment = test_conductor_env().await;
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
         let conductor = Conductor::new(environment, dna_store, keystore)

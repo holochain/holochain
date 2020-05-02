@@ -1,13 +1,13 @@
 use super::Workspace;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
-use holochain_state::{db::DbManager, prelude::*};
+use holochain_state::{db::GetDb, prelude::*};
 
 pub struct InvokeZomeWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(_reader: &Reader<'env>, _dbs: &DbManager) -> WorkspaceResult<Self> {
+    pub fn new(_reader: &Reader<'env>, _dbs: &impl GetDb) -> WorkspaceResult<Self> {
         unimplemented!()
     }
 }

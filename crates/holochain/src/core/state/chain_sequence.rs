@@ -10,7 +10,7 @@
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 use holochain_state::{
     buffer::{BufferedStore, IntKvBuf},
-    db::{DbManager, CHAIN_SEQUENCE},
+    db::{GetDb, CHAIN_SEQUENCE},
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
@@ -39,8 +39,8 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
 
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     /// Create a new instance from a read-only transaction and a database reference
-    pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
-        let db: Store<'e, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
+    pub fn new(reader: &'e R, dbs: &'e impl GetDb) -> DatabaseResult<Self> {
+        let db: Store<'e, R> = IntKvBuf::new(reader, dbs.db(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 
@@ -125,9 +125,9 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
@@ -188,9 +188,9 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
@@ -295,14 +295,14 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
-        let arc1 = test_cell_env();
+        let arc1 = test_cell_env().await;
         let arc2 = arc1.clone();
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
             let env = arc1.guard().await;
-            let dbs = arc1.clone().dbs().await?;
+            let dbs = arc1.dbs().await;
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(
@@ -338,7 +338,7 @@ pub mod tests {
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
             let env = arc2.guard().await;
-            let dbs = arc2.clone().dbs().await?;
+            let dbs = arc2.dbs().await;
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(

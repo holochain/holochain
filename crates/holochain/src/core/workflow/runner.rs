@@ -27,7 +27,7 @@ impl WorkflowRunner {
     pub async fn run_workflow(&self, call: WorkflowCall) -> WorkflowRunResult<()> {
         let environ = Arc::clone(&self.0).state_env();
         let env = environ.guard().await;
-        let dbs = environ.dbs().await?;
+        let dbs = environ.dbs().await;
         let reader = env.reader()?;
 
         // TODO: is it possible to DRY this up with a macro?

@@ -78,9 +78,9 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
         let dna = fake_dna("a");
         let agent_pubkey = fake_agent_pubkey_1();
 

@@ -5,7 +5,7 @@
 
 use holo_hash::*;
 use holochain_keystore::Signature;
-use holochain_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
+use holochain_state::{db::GetDb, error::DatabaseResult, prelude::Readable};
 use holochain_types::{
     address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
 };
@@ -34,7 +34,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
-    pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
     }
 }

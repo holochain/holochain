@@ -104,15 +104,15 @@ where
             links_meta: KvvBuf::new(reader, links_meta)?,
         })
     }
-    pub fn primary(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
-        let system_meta = *dbs.get(&*PRIMARY_SYSTEM_META)?;
-        let links_meta = *dbs.get(&*PRIMARY_LINKS_META)?;
+    pub fn primary(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+        let system_meta = dbs.db(&*PRIMARY_SYSTEM_META)?;
+        let links_meta = dbs.db(&*PRIMARY_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 
-    pub fn cache(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
-        let system_meta = *dbs.get(&*CACHE_SYSTEM_META)?;
-        let links_meta = *dbs.get(&*CACHE_LINKS_META)?;
+    pub fn cache(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+        let system_meta = dbs.db(&*CACHE_SYSTEM_META)?;
+        let links_meta = dbs.db(&*CACHE_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 }

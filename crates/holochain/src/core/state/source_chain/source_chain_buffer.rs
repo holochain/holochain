@@ -7,7 +7,7 @@ use crate::core::state::{
 use fallible_iterator::FallibleIterator;
 use holochain_state::{
     buffer::BufferedStore,
-    db::DbManager,
+    db::GetDb,
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
@@ -24,22 +24,22 @@ pub struct SourceChainBuf<'env, R: Readable> {
 }
 
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
-    pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
-            keystore: dbs.keystore().clone(),
+            keystore: dbs.keystore(),
         })
     }
 
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
-            keystore: dbs.keystore().clone(),
+            keystore: dbs.keystore(),
         })
     }
 
@@ -240,9 +240,9 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
@@ -296,9 +296,9 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 

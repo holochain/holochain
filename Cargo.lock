@@ -1064,6 +1064,7 @@ dependencies = [
  "holochain_types",
  "lazy_static",
  "mockall",
+ "must_future",
  "nanoid",
  "owning_ref",
  "parking_lot 0.10.2",

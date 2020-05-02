@@ -4,8 +4,7 @@ use crate::core::state::{
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain_state::{
-    db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
-    test_utils::test_cell_env,
+    db::GetDb, env::ReadManager, error::DatabaseResult, prelude::Reader, test_utils::test_cell_env,
 };
 use holochain_types::{
     address::EntryAddress,
@@ -35,7 +34,7 @@ struct Chains<'env> {
 
 fn setup_env<'env>(
     reader: &'env Reader<'env>,
-    dbs: &'env DbManager,
+    dbs: &'env impl GetDb,
 ) -> DatabaseResult<Chains<'env>> {
     let previous_header = fake_header_hash("previous");
 
@@ -60,8 +59,8 @@ fn setup_env<'env>(
         entry_address: jessy_entry.entry_address(),
     });
 
-    let source_chain = SourceChainBuf::new(reader, &dbs)?;
-    let cache = SourceChainBuf::cache(reader, &dbs)?;
+    let source_chain = SourceChainBuf::new(reader, dbs)?;
+    let cache = SourceChainBuf::cache(reader, dbs)?;
     let mock_primary_meta = MockChainMetaBuf::new();
     let mock_cache_meta = MockChainMetaBuf::new();
     Ok(Chains {
@@ -81,8 +80,8 @@ fn setup_env<'env>(
 #[tokio::test(threaded_scheduler)]
 async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
-    let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let env = test_cell_env().await;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -124,8 +123,8 @@ async fn live_local_return() -> SourceChainResult<()> {
 async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let env = test_cell_env().await;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -168,8 +167,8 @@ async fn dead_local_none() -> SourceChainResult<()> {
 async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let env = test_cell_env().await;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -214,8 +213,8 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
 async fn notfound_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let env = test_cell_env().await;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -249,8 +248,8 @@ async fn notfound_cache() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
-    let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let env = test_cell_env().await;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -303,8 +302,8 @@ async fn links_local_return() -> SourceChainResult<()> {
 async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let env = test_cell_env().await;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -357,8 +356,8 @@ async fn links_cache_return() -> SourceChainResult<()> {
 async fn links_notauth_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let env = test_cell_env().await;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
