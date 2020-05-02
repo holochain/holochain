@@ -4,7 +4,7 @@ use crate::core::state::{
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain_state::{
-    db::GetDb, env::ReadManager, error::DatabaseResult, prelude::Reader, test_utils::test_cell_env,
+    env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
 use holochain_types::{
     address::EntryAddress,

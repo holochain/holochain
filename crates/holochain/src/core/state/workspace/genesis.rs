@@ -1,6 +1,6 @@
 use super::Workspace;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
-use holochain_state::{db::GetDb, prelude::*};
+use holochain_state::prelude::*;
 
 // TODO: visibility
 pub struct GenesisWorkspace<'env> {

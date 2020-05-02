@@ -40,7 +40,7 @@ pub struct ChainSequenceBuf<'e, R: Readable> {
 impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     /// Create a new instance from a read-only transaction and a database reference
     pub fn new(reader: &'e R, dbs: &'e impl GetDb) -> DatabaseResult<Self> {
-        let db: Store<'e, R> = IntKvBuf::new(reader, dbs.db(&*CHAIN_SEQUENCE)?)?;
+        let db: Store<'e, R> = IntKvBuf::new(reader, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 

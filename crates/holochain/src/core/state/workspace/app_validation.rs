@@ -1,7 +1,7 @@
 use super::Workspace;
 
 use crate::core::state::workspace::WorkspaceResult;
-use holochain_state::{db::GetDb, error::DatabaseResult, prelude::*};
+use holochain_state::{error::DatabaseResult, prelude::*};
 
 pub struct AppValidationWorkspace {}
 

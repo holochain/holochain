@@ -1,7 +1,7 @@
 //! Functionality for safely accessing LMDB database references.
 
 use crate::{
-    env::{EnvironmentKind, EnvironmentRef},
+    env::{EnvironmentKind},
     error::{DatabaseError, DatabaseResult},
 };
 use holochain_keystore::KeystoreSender;
@@ -207,18 +207,7 @@ async fn register_db<'env, V: 'static + Send + Sync>(
 /// LMDB Database references.
 pub trait GetDb {
     /// TODO
-    fn db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V>;
+    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V>;
     /// Get a KeystoreSender to communicate with the Keystore task for this environment
     fn keystore(&self) -> KeystoreSender;
-}
-
-impl<'e> GetDb for EnvironmentRef<'e> {
-    fn db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        let path = self.inner().path().clone();
-        get_db(path, key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.keystore()
-    }
 }

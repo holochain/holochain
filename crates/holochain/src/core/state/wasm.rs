@@ -35,8 +35,8 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
 
 #[tokio::test(threaded_scheduler)]
 async fn wasm_store_round_trip() -> DatabaseResult<()> {
-    use holochain_state::db::GetDb;
     use holochain_state::env::ReadManager;
+    use holochain_state::prelude::*;
     holochain_types::observability::test_run().ok();
 
     // all the stuff needed to have a WasmBuf
@@ -44,7 +44,8 @@ async fn wasm_store_round_trip() -> DatabaseResult<()> {
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
-    let mut wasm_buf = WasmBuf::new(&reader, dbs.db(&*holochain_state::db::WASM).unwrap()).unwrap();
+    let mut wasm_buf =
+        WasmBuf::new(&reader, dbs.get_db(&*holochain_state::db::WASM).unwrap()).unwrap();
 
     // a wasm
     let wasm = DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo);

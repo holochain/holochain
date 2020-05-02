@@ -41,7 +41,7 @@ use holochain_state::{
     db,
     env::{Environment, ReadManager},
     exports::SingleStore,
-    prelude::WriteManager,
+    prelude::*,
     typed::{Kv, UnitDbKey},
 };
 use holochain_types::cell::{CellHandle, CellId};
@@ -338,7 +338,7 @@ where
         dna_store: DS,
         keystore: KeystoreSender,
     ) -> ConductorResult<Self> {
-        let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE).await?;
+        let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);

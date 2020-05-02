@@ -66,6 +66,7 @@ fn rkv_builder(
 pub struct Environment {
     arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
+    path: PathBuf,
     keystore: KeystoreSender,
 }
 
@@ -92,6 +93,7 @@ impl Environment {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
                         keystore,
+                        path,
                     }
                 })
                 .clone(),
@@ -129,17 +131,18 @@ impl Environment {
     pub async fn dbs<'e>(&'e self) -> impl GetDb + 'e {
         self.guard().await
     }
+}
 
-    /// Get a database from this environment by its key
-    pub async fn get_db<V: 'static + Copy + Send + Sync>(
-        &self,
-        key: &'static DbKey<V>,
-    ) -> DatabaseResult<V> {
-        let r = self.inner().await;
-        let path = r.path().clone();
-        get_db(path, key)
+impl GetDb for Environment {
+    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
+        get_db(&self.path, key)
+    }
+
+    fn keystore(&self) -> KeystoreSender {
+        self.keystore.clone()
     }
 }
+
 
 /// The various types of LMDB environment, used to specify the list of databases to initialize
 #[derive(Clone)]
@@ -227,6 +230,17 @@ impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
     }
 }
 
+impl<'e> GetDb for EnvironmentRef<'e> {
+    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
+        let path = self.inner().path().clone();
+        get_db(path, key)
+    }
+
+    fn keystore(&self) -> KeystoreSender {
+        self.keystore()
+    }
+}
+
 impl<'e> EnvironmentRef<'e> {
     /// Access the underlying lock guard
     pub(crate) fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
@@ -237,3 +251,4 @@ impl<'e> EnvironmentRef<'e> {
         self.keystore.clone()
     }
 }
+

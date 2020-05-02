@@ -7,9 +7,8 @@ use crate::core::state::{
 use fallible_iterator::FallibleIterator;
 use holochain_state::{
     buffer::BufferedStore,
-    db::GetDb,
     error::DatabaseResult,
-    prelude::{Readable, Writer},
+    prelude::*,
 };
 use holochain_types::{
     address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
