@@ -6,7 +6,7 @@ pub async fn run_validation(
     dna: Dna,
     zome_name: String,
     entry: &Entry,
-) -> RibosomeResult<ValidationResult> {
+) -> RibosomeResult<ValidationCallbackResult> {
     let ribosome = WasmRibosome::new(dna);
     ribosome.run_validation(zome_name, entry)
 }

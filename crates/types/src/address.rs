@@ -5,7 +5,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
 /// address type for header hash to promote it to an "address" e.g. for use in a CAS
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum HeaderAddress {
     /// a header hash, the only option
     Header(HeaderHash),

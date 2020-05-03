@@ -41,6 +41,7 @@ use self::{
     query::query, remove_entry::remove_entry, remove_link::remove_link, schedule::schedule,
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
+use holochain_types::address::HeaderAddress;
 
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
@@ -55,15 +56,205 @@ use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::*;
 use mockall::automock;
 use std::sync::Arc;
+use holochain_types::header::AppEntryType;
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
 #[automock]
 pub trait RibosomeT: Sized {
+    // ribosomes need a dna
+    fn dna(&self) -> &Dna;
+
+    /// @todo list out all the available callbacks and maybe cache them somewhere
+    fn list_callbacks(&self) {
+        unimplemented!()
+        // pseudocode
+        // self.instance().exports().filter(|e| e.is_callback())
+    }
+
+    /// @todo list out all the available zome functions and maybe cache them somewhere
+    fn list_zome_fns(&self) {
+        unimplemented!()
+        // pseudocode
+        // self.instance().exports().filter(|e| !e.is_callback())
+    }
+
+    fn run_init(&self) -> RibosomeResult<InitDnaResult> {
+        let mut init_dna_result = InitDnaResult::Pass;
+
+        // we need to init every zome in a dna together, in order
+        let zomes = self.dna().zomes.keys();
+        for zome_name in zomes {
+            let callback_invocation = CallbackInvocation {
+                components: vec![
+                    "init".into()
+                ],
+                zome_name: zome_name.to_string(),
+                payload: CallbackHostInput::new(().try_into()?),
+            };
+            let callback_output: Vec<Option<CallbackGuestOutput>> = self.run_callback(callback_invocation)?;
+
+            let callback_result: Option<CallbackGuestOutput> = match callback_output.into_iter().nth(0) {
+                Some(v) => v,
+                None => unreachable!(),
+            };
+
+            // attempt to deserialize the callback result for this zome
+            init_dna_result = match callback_result {
+                Some(implemented) => match InitCallbackResult::try_from(implemented.into_inner()) {
+                    Ok(zome_init_result) => match zome_init_result {
+                        // if this zome passes keep current init dna result
+                        InitCallbackResult::Pass => init_dna_result,
+                        InitCallbackResult::UnresolvedDependencies(entry_hashes) => InitDnaResult::UnresolvedDependencies(zome_name.to_string(), entry_hashes),
+                        // if this zome fails then the dna fails
+                        InitCallbackResult::Fail(fail_string) => InitDnaResult::Fail(zome_name.to_string(), fail_string),
+                    },
+                    // failing to deserialize an implemented callback result is a fail
+                    Err(e) => InitDnaResult::Fail(zome_name.to_string(), format!("{:?}", e)),
+                },
+                // no init callback for a zome means we keep the current dna state
+                None => init_dna_result,
+            };
+
+            // any fail is a break
+            // continue in the case of unresolved dependencies in case a later zome would fail and
+            // allow us to definitively drop the dna installation
+            match init_dna_result {
+                InitDnaResult::Fail(_, _) => break,
+                _ => {},
+            }
+        }
+        Ok(init_dna_result)
+    }
+
+    fn run_agent_migrate_dna(&self, agent_migrate_direction: AgentMigrateDnaDirection) -> RibosomeResult<AgentMigrateDnaResult> {
+        let mut agent_migrate_dna_result = AgentMigrateDnaResult::Pass;
+
+        // we need to ask every zome in order if the agent is ready to migrate
+        'zomes: for zome_name in self.dna().zomes.keys() {
+            let callback_invocation = CallbackInvocation {
+                components: vec![
+                    "agency_migration".into(),
+                    match agent_migrate_direction {
+                        AgentMigrateDnaDirection::Open => "open",
+                        AgentMigrateDnaDirection::Close => "close",
+                    }.into(),
+                ],
+                zome_name: zome_name.to_string(),
+                // @todo - don't send the whole dna into the wasm?? maybe dna def if/when it lands
+                payload: CallbackHostInput::new(self.dna().try_into()?),
+            };
+            let callback_outputs: Vec<Option<CallbackGuestOutput>> = self.run_callback(callback_invocation)?;
+            assert_eq!(callback_outputs.len(), 2);
+
+            for callback_output in callback_outputs {
+                agent_migrate_dna_result = match callback_output {
+                    // if a callback is implemented try to deserialize the result
+                    Some(implemented) => match AgentMigrateCallbackResult::try_from(implemented.into_inner()) {
+                        Ok(v) => match v {
+                            // if a callback passes keep the current dna result
+                            AgentMigrateCallbackResult::Pass => agent_migrate_dna_result,
+                            // if a callback fails then the dna migrate needs to fail
+                            AgentMigrateCallbackResult::Fail(fail_string) => AgentMigrateDnaResult::Fail(zome_name.to_string(), fail_string),
+                        },
+                        // failing to deserialize an implemented callback result is a fail
+                        Err(e) => AgentMigrateDnaResult::Fail(zome_name.to_string(), format!("{:?}", e)),
+                    },
+                    // if a callback is not implemented keep the current dna result
+                    None => agent_migrate_dna_result,
+                };
+
+                // if dna result has failed due to _any_ zome we need to break the outer loop for
+                // all zomes
+                match agent_migrate_dna_result {
+                    AgentMigrateDnaResult::Fail(_, _) => break 'zomes,
+                    _ => {},
+                }
+            }
+        }
+
+        Ok(agent_migrate_dna_result)
+    }
+
+    fn run_custom_validation_package(&self, zome_name: String, app_entry_type: &AppEntryType) -> RibosomeResult<ValidationPackageCallbackResult> {
+        let callback_invocation = CallbackInvocation {
+            components: vec![
+                "custom_validation_package".into(),
+                // @todo zome_id is a u8, is this really an ergonomic way for us to interact with
+                // entry types at the happ code level?
+                format!("{}", app_entry_type.zome_id()),
+            ],
+            zome_name: zome_name.clone(),
+            payload: CallbackHostInput::new(app_entry_type.try_into()?),
+        };
+        let mut callback_outputs: Vec<Option<CallbackGuestOutput>> = self.run_callback(callback_invocation)?;
+        assert_eq!(callback_outputs.len(), 2);
+
+        // discard all unimplemented results
+        callback_outputs.retain(|r| r.is_some());
+
+        // we only keep the most specific implemented package, if it exists
+        // note this means that if zome devs are ambiguous about their implementations it could
+        // lead to redundant work, but this is an edge case easily avoided by a happ dev and hard
+        // for us to guard against, so we leave that thinking up to the implementation
+        Ok(match callback_outputs.into_iter().nth(0) {
+            Some(Some(implemented)) => match ValidationPackageCallbackResult::try_from(implemented.into_inner()) {
+                // if we manage to deserialize a package nicely we return it
+                Ok(v) => v,
+                // if we can't deserialize the package, that's a fail
+                Err(e) => ValidationPackageCallbackResult::Fail(format!("{:?}", e)),
+            },
+            // a missing validation package callback for a specific app entry type and zome is a
+            // fail because this callback should only be triggered _if we know we need package_
+            // because core has already decided that the default subconscious packages are not
+            // sufficient
+            _ => ValidationPackageCallbackResult::Fail(format!("Missing validation package callback for entry type: {:?} in zome: {:?}", &app_entry_type, &zome_name)),
+        })
+    }
+
+    fn run_post_commit(&self, zome_name: String, headers: Vec<HeaderAddress>) -> RibosomeResult<Vec<Option<PostCommitCallbackResult>>> {
+        let mut callback_results: Vec<Option<PostCommitCallbackResult>> = vec![];
+
+        // build all outputs for all callbacks for all headers
+        for header in headers {
+            let callback_invocation = CallbackInvocation {
+                components: vec![
+                    "post_commit".into(),
+                    // @todo - if we want to handle entry types we need to decide which ones and
+                    // how/where to construct an enum that represents this as every header type
+                    // is a different struct, and many headers have no associated entry, there is
+                    // no generic way to do something like this pseudocode:
+                    // header.entry_type,
+                ],
+                zome_name: zome_name.clone(),
+                payload: CallbackHostInput::new((&header).try_into()?),
+            };
+            let callback_outputs: Vec<Option<CallbackGuestOutput>> = self.run_callback(callback_invocation)?;
+            assert_eq!(callback_outputs.len(), 2);
+
+            // return the list of results and options so we can log what happened or whatever
+            // there is no early return of failures because we want to know our response to all
+            // of the commits
+            for callback_output in callback_outputs {
+                callback_results.push(match callback_output {
+                    Some(implemented) => match PostCommitCallbackResult::try_from(implemented.into_inner()) {
+                        // if we deserialize pass straight through
+                        Ok(v) => Some(v),
+                        // if we fail to deserialize this is considered a failure by the happ
+                        // developer to implement the callback correctly
+                        Err(e) => Some(PostCommitCallbackResult::Fail(header.clone(), format!("{:?}", e))),
+                    },
+                    None => None,
+                });
+            }
+        }
+        Ok(callback_results)
+    }
+
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validation(self, zome_name: String, entry: &Entry) -> RibosomeResult<ValidationResult> {
+    fn run_validation(&self, zome_name: String, entry: &Entry) -> RibosomeResult<ValidationCallbackResult> {
         let callback_invocation = CallbackInvocation {
             components: vec![
                 "validate_entry".into(),
@@ -78,34 +269,35 @@ pub trait RibosomeT: Sized {
             zome_name,
             payload: CallbackHostInput::new(entry.try_into()?),
         };
-        Ok(self
-            .run_callback(callback_invocation)?
+        let callback_outputs: Vec<Option<CallbackGuestOutput>> = self.run_callback(callback_invocation)?;
+        assert_eq!(callback_outputs.len(), 2);
+
+        Ok(callback_outputs
             .into_iter()
             .map(|r| match r {
-                Some(implemented) => match ValidationResult::try_from(implemented.into_inner()) {
+                Some(implemented) => match ValidationCallbackResult::try_from(implemented.into_inner()) {
                     Ok(v) => v,
                     // failing to inflate is an invalid result
-                    Err(_) => ValidationResult::Invalid,
+                    Err(e) => ValidationCallbackResult::Invalid(format!("{:?}", e)),
                 },
                 // not implemented = valid
                 // note that if NO callbacks are implemented we always pass validation
-                None => ValidationResult::Valid,
+                None => ValidationCallbackResult::Valid,
             })
             // folded into a single validation result
-            .fold(ValidationResult::Valid, |acc, x| {
+            .fold(ValidationCallbackResult::Valid, |acc, x| {
                 match x {
                     // validation is invalid if any x is invalid
-                    ValidationResult::Invalid => x,
-                    // validation is pending if any x is pending, unless we already know it is invalid
-                    ValidationResult::Pending => {
-                        if acc == ValidationResult::Invalid {
-                            acc
-                        } else {
-                            x
+                    ValidationCallbackResult::Invalid(_) => x,
+                    // return unresolved dependencies if it's otherwise valid
+                    ValidationCallbackResult::UnresolvedDependencies(_) => {
+                        match acc {
+                            ValidationCallbackResult::Invalid(_) => acc,
+                            _ => x,
                         }
-                    }
-                    // valid x allows validaiton to continue
-                    ValidationResult::Valid => acc,
+                    },
+                    // valid x allows validation to continue
+                    ValidationCallbackResult::Valid => acc,
                 }
             }))
     }
@@ -115,7 +307,7 @@ pub trait RibosomeT: Sized {
     /// This is differentiated from calling a zome function, even though in both
     /// cases it amounts to a FFI call of a guest function.
     fn run_callback(
-        self,
+        &self,
         callback: CallbackInvocation,
     ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>>;
 
@@ -283,8 +475,12 @@ pub struct CallbackInvocation {
 }
 
 impl RibosomeT for WasmRibosome {
+    fn dna(&self) -> &Dna {
+        &self.dna
+    }
+
     fn run_callback(
-        self,
+        &self,
         invocation: CallbackInvocation,
     ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>> {
         let mut fn_components = invocation.components.clone();

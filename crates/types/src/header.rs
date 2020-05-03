@@ -113,3 +113,9 @@ pub struct AppEntryType {
     zome_id: ZomeId,
     is_public: bool,
 }
+
+impl AppEntryType {
+    pub fn zome_id(&self) -> &ZomeId {
+        &self.zome_id
+    }
+}
