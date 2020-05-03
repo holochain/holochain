@@ -1,7 +1,7 @@
+use crate::address::HeaderAddress;
+use crate::nucleus::ZomeName;
 use crate::{prelude::*, signature::Provenance};
 use derive_more::Constructor;
-use crate::nucleus::ZomeName;
-use crate::address::HeaderAddress;
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapToken;
