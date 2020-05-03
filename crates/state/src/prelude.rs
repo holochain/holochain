@@ -2,7 +2,7 @@
 
 pub use crate::{
     buffer::BufferedStore,
-    db::DbManager,
+    db::GetDb,
     env::{ReadManager, WriteManager},
     exports::*,
     transaction::{Readable, Reader, Writer},

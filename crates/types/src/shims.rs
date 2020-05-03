@@ -1,14 +1,13 @@
-use crate::{prelude::*, signature::Provenance};
+use crate::prelude::*;
 use derive_more::Constructor;
 
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
-pub struct AgentPubKey;
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapToken;
 #[derive(Clone, Constructor, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapabilityRequest {
     cap_token: CapToken,
-    provenance: Provenance,
+    signature: holochain_keystore::Signature,
+    agent_pub_key: holo_hash::AgentPubKey,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct DhtOp;
@@ -23,7 +22,6 @@ pub struct Lib3hClientProtocol;
 pub struct Lib3hToServer;
 pub struct Lib3hToServerResponse;
 pub struct Lib3hServerProtocol;
-pub struct Keystore;
 pub enum ValidationResult {
     Valid,
     Invalid,

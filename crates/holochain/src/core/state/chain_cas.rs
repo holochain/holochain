@@ -1,11 +1,12 @@
-use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
+use crate::core::state::source_chain::{
+    ChainElement, ChainInvalidReason, SignedHeader, SourceChainError, SourceChainResult,
+};
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
-        DbManager, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
+        GetDb, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
         PRIMARY_CHAIN_HEADERS,
     },
     error::{DatabaseError, DatabaseResult},
@@ -13,14 +14,14 @@ use holochain_state::{
     prelude::{Readable, Reader, Writer},
 };
 use holochain_types::{
-    chain_header::HeaderAddress,
-    chain_header::{ChainHeader, HeaderWithEntry},
+    address::{EntryAddress, HeaderAddress},
+    chain_header::ChainHeader,
     entry::Entry,
-    entry::EntryAddress,
+    header,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
-pub type HeaderCas<'env, R> = CasBuf<'env, ChainHeader, R>;
+pub type HeaderCas<'env, R> = CasBuf<'env, SignedHeader, R>;
 
 /// A convenient pairing of two CasBufs, one for entries and one for headers
 pub struct ChainCasBuf<'env, R: Readable = Reader<'env>> {
@@ -40,15 +41,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         })
     }
 
-    pub fn primary(reader: &'env R, dbs: &DbManager) -> DatabaseResult<Self> {
-        let entries = *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?;
-        let headers = *dbs.get(&*PRIMARY_CHAIN_HEADERS)?;
+    pub fn primary(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+        let entries = dbs.get_db(&*PRIMARY_CHAIN_ENTRIES)?;
+        let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 
-    pub fn cache(reader: &'env R, dbs: &DbManager) -> DatabaseResult<Self> {
-        let entries = *dbs.get(&*CACHE_CHAIN_ENTRIES)?;
-        let headers = *dbs.get(&*CACHE_CHAIN_HEADERS)?;
+    pub fn cache(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+        let entries = dbs.get_db(&*CACHE_CHAIN_ENTRIES)?;
+        let headers = dbs.get_db(&*CACHE_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 
@@ -60,43 +61,76 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         self.entries.get(&entry_address.into()).map(|e| e.is_some())
     }
 
-    pub fn get_header(&self, header_address: HeaderAddress) -> DatabaseResult<Option<ChainHeader>> {
-        self.headers.get(&header_address.into())
-    }
-
-    /// Given a ChainHeader, return the corresponding HeaderWithEntry
-    pub fn header_with_entry(
-        &self,
-        header: ChainHeader,
-    ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(entry) = self.get_entry(header.entry_address().to_owned())? {
-            Ok(Some(HeaderWithEntry::new(header, entry)))
-        } else {
-            Err(SourceChainError::InvalidStructure(
-                ChainInvalidReason::MissingData(header.entry_address().to_owned()),
-            ))
-        }
-    }
-
-    pub fn get_header_with_entry(
+    pub fn get_header(
         &self,
         header_address: &HeaderAddress,
-    ) -> SourceChainResult<Option<HeaderWithEntry>> {
-        if let Some(header) = self.get_header(header_address.to_owned())? {
-            self.header_with_entry(header)
+    ) -> DatabaseResult<Option<SignedHeader>> {
+        self.headers.get(&header_address.to_owned().into())
+    }
+
+    // local helper function which given a SignedHeader, looks for an entry in the cas
+    // and builds a ChainElement struct
+    fn chain_element(
+        &self,
+        signed_header: SignedHeader,
+    ) -> SourceChainResult<Option<ChainElement>> {
+        let maybe_entry_address = match signed_header.header().clone() {
+            ChainHeader::EntryCreate(header::EntryCreate { entry_address, .. }) => {
+                Some(entry_address)
+            }
+            ChainHeader::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
+                Some(entry_address)
+            }
+            _ => None,
+        };
+        let maybe_entry = match maybe_entry_address {
+            None => None,
+            Some(entry_address) => {
+                // if the header has an address it better have been stored!
+                let maybe_cas_entry = self.get_entry(entry_address.clone())?;
+                if maybe_cas_entry.is_none() {
+                    return Err(SourceChainError::InvalidStructure(
+                        ChainInvalidReason::MissingData(entry_address),
+                    ));
+                }
+                maybe_cas_entry
+            }
+        };
+        Ok(Some(ChainElement::new(
+            signed_header.signature().to_owned(),
+            signed_header.header().to_owned(),
+            maybe_entry,
+        )))
+    }
+
+    /// given a header address return the full chain element for that address
+    pub fn get_element(
+        &self,
+        header_address: &HeaderAddress,
+    ) -> SourceChainResult<Option<ChainElement>> {
+        if let Some(signed_header) = self.get_header(header_address)? {
+            self.chain_element(signed_header)
         } else {
             Ok(None)
         }
     }
 
-    pub fn put(&mut self, v: (ChainHeader, Entry)) -> DatabaseResult<()> {
-        let (header, entry) = v;
-        self.entries.put((&entry).try_into()?, entry);
-        self.headers.put((&header).try_into()?, header);
+    /// Puts a signed header and optional entry onto the CAS.
+    /// N.B. this code assumes that the header and entry have been validated
+    pub fn put(
+        &mut self,
+        signed_header: SignedHeader,
+        maybe_entry: Option<Entry>,
+    ) -> DatabaseResult<()> {
+        if let Some(entry) = maybe_entry {
+            self.entries.put(entry.entry_address().into(), entry);
+        }
+        self.headers
+            .put(signed_header.header().hash().into(), signed_header);
         Ok(())
     }
 
-    // TODO: consolidate into single delete which handles entry and header together
+    // TODO: consolidate into single delete which handles full element deleted together
     pub fn delete_entry(&mut self, k: EntryHash) {
         self.entries.delete(k.into())
     }

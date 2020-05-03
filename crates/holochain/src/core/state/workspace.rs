@@ -1,5 +1,9 @@
 use super::source_chain::SourceChainError;
-use holochain_state::{error::DatabaseError, prelude::{Reader, Writer}, db::DbManager};
+use holochain_state::{
+    db::GetDb,
+    error::DatabaseError,
+    prelude::{Reader, Writer},
+};
 use thiserror::Error;
 
 mod app_validation;
@@ -21,7 +25,7 @@ pub enum WorkspaceError {
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
 pub trait Workspace<'env>: Send + Sized {
-    fn new(reader: &'env Reader<'env>, dbs: &DbManager) -> WorkspaceResult<Self>;
+    // fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self>;
     fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
 }
 
@@ -32,26 +36,27 @@ pub mod tests {
     use crate::core::state::workspace::WorkspaceResult;
     use holochain_state::{
         buffer::{BufferedStore, KvBuf},
-        db::{DbManager, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
-        env::{ReadManager, WriteManager},
-        prelude::{Reader, Writer},
+        db::{GetDb, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
+        prelude::*,
         test_utils::test_cell_env,
     };
     use holochain_types::prelude::*;
 
-    pub struct TestWorkspace<'env> {
-        one: KvBuf<'env, EntryHash, u32>,
-        two: KvBuf<'env, String, bool>,
+    pub struct TestWorkspace<'env, R: Readable> {
+        one: KvBuf<'env, EntryHash, u32, R>,
+        two: KvBuf<'env, String, bool, R>,
     }
 
-    impl<'env> Workspace<'env> for TestWorkspace<'env> {
-        fn new(reader: &'env Reader<'env>, dbs: &DbManager) -> WorkspaceResult<Self> {
+    impl<'env, R: Readable> TestWorkspace<'env, R> {
+        pub fn new(reader: &'env R, dbs: &'env impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?)?,
-                two: KvBuf::new(reader, *dbs.get(&*PRIMARY_CHAIN_HEADERS)?)?,
+                one: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_ENTRIES)?)?,
+                two: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?)?,
             })
         }
+    }
 
+    impl<'env, R: Readable + Send + Sync> Workspace<'env> for TestWorkspace<'env, R> {
         fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(&mut writer)?;
             self.two.flush_to_txn(&mut writer)?;
@@ -60,24 +65,23 @@ pub mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn workspace_sanity_check() -> WorkspaceResult<()> {
-        let arc = test_cell_env();
+    #[tokio::test(threaded_scheduler)]
+    async fn workspace_sanity_check() -> anyhow::Result<()> {
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
         let addr1 = EntryHash::with_data_sync("hello".as_bytes());
         let addr2 = "hi".to_string();
-        {
-            let reader = env.reader()?;
-            let mut workspace = TestWorkspace::new(&reader, &dbs)?;
+        env.with_commit(|txn| {
+            let mut workspace = TestWorkspace::new(txn, &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, None);
 
             workspace.one.put(addr1.clone(), 1);
             workspace.two.put(addr2.clone(), true);
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
             assert_eq!(workspace.two.get(&addr2)?, Some(true));
-            workspace.commit_txn(env.writer()?)?;
-        }
+            Ok(()) as Result<_, anyhow::Error>
+        })?;
 
         // Ensure that the data was persisted
         {

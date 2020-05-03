@@ -1,13 +1,15 @@
 #![allow(clippy::ptr_arg)]
+use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufMultiVal, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::DatabaseResult,
     prelude::*,
 };
-use holochain_types::entry::EntryAddress;
+use holochain_types::address::EntryAddress;
 use mockall::mock;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::fmt::Debug;
 
 type Tag = String;
@@ -39,7 +41,12 @@ struct LinkKey<'a> {
 
 impl<'a> LinkKey<'a> {
     fn to_key(&self) -> Vec<u8> {
-        let mut vec: Vec<u8> = self.base.as_ref().to_vec();
+        // Possibly FIXME if this expect is actually not true
+        let sb: SerializedBytes = self
+            .base
+            .try_into()
+            .expect("entry addresses don't have the unserialize problem");
+        let mut vec: Vec<u8> = sb.bytes().to_vec();
         vec.extend_from_slice(self.tag.as_ref());
         vec
     }
@@ -97,15 +104,15 @@ where
             links_meta: KvvBuf::new(reader, links_meta)?,
         })
     }
-    pub fn primary(reader: &'env R, dbs: &DbManager) -> DatabaseResult<Self> {
-        let system_meta = *dbs.get(&*PRIMARY_SYSTEM_META)?;
-        let links_meta = *dbs.get(&*PRIMARY_LINKS_META)?;
+    pub fn primary(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+        let system_meta = dbs.get_db(&*PRIMARY_SYSTEM_META)?;
+        let links_meta = dbs.get_db(&*PRIMARY_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 
-    pub fn cache(reader: &'env R, dbs: &DbManager) -> DatabaseResult<Self> {
-        let system_meta = *dbs.get(&*CACHE_SYSTEM_META)?;
-        let links_meta = *dbs.get(&*CACHE_LINKS_META)?;
+    pub fn cache(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+        let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
+        let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 }

@@ -12,7 +12,7 @@ use futures::{
 };
 use holochain_state::env::WriteManager;
 use holochain_state::{
-    env::{Environment, ReadManager, EnvironmentReadonly},
+    env::{EnvironmentRo, EnvironmentRw, ReadManager},
     prelude::Reader,
 };
 use must_future::MustBoxFuture;
@@ -21,12 +21,12 @@ use std::pin::Pin;
 // #[async_trait::async_trait]
 pub trait WorkflowCaller<'env>: Sized + Send {
     type Output: Send;
-    type Workspace: Workspace<'env>;
+    type Workspace: Workspace<'env> + 'env;
     type Triggers: WorkflowTriggers<'env>;
 
     fn workflow(
         self,
-        env: EnvironmentReadonly,
+        workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
 }
 
@@ -34,7 +34,7 @@ pub trait WorkflowCaller<'env>: Sized + Send {
 // pub fn run_workflow<'env, WC: WorkflowCaller<'env> + 'env>(
 //     wc: WC,
 //     workspace: WC::Workspace,
-//     arc: Environment,
+//     arc: EnvironmentRw,
 // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
 //     Box::new(async move {
 //         // unimplemented!()
@@ -49,7 +49,7 @@ pub trait WorkflowCaller<'env>: Sized + Send {
 // pub fn run_workflow_2<'env, WC: WorkflowCaller<'env> + 'env>(
 //     wc: WC,
 //     workspace: WC::Workspace,
-//     arc: Environment,
+//     arc: EnvironmentRw,
 // ) -> Pin<Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env>> {
 //     Box::pin(async move {
 //         // unimplemented!()
@@ -63,7 +63,7 @@ pub trait WorkflowCaller<'env>: Sized + Send {
 // pub fn run_workflow_3<'env, O: Send, WC: WorkflowCaller<'env, Output = O> + 'env>(
 //     wc: WC,
 //     workspace: WC::Workspace,
-//     arc: Environment,
+//     arc: EnvironmentRw,
 //     // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
 // ) -> impl Future<Output = WorkflowRunResult<O>> + 'env {
 //     async move {
@@ -78,7 +78,7 @@ pub trait WorkflowCaller<'env>: Sized + Send {
 // pub async fn run_workflow_4<'env, O: Send, WC: WorkflowCaller<'env, Output = O> + 'env>(
 //     wc: WC,
 //     workspace: WC::Workspace,
-//     arc: Environment,
+//     arc: EnvironmentRw,
 //     // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
 // ) -> WorkflowRunResult<O> {
 //     // async move {
@@ -92,10 +92,12 @@ pub trait WorkflowCaller<'env>: Sized + Send {
 
 pub async fn run_workflow_5<'env, O: Send, WC: WorkflowCaller<'env, Output = O> + 'env>(
     wc: WC,
-    arc: Environment,
+    arc: EnvironmentRw,
+    workspace: WC::Workspace,
     // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
 ) -> WorkflowRunResult<O> {
-    let (output, effects) = wc.workflow(arc.clone().into()).await?;
+    // let arc_ro = arc.clone().into();
+    let (output, effects) = wc.workflow(workspace).await?;
     finish(arc, effects).await?;
     Ok(output)
 }
@@ -107,7 +109,7 @@ pub async fn run_workflow_5<'env, O: Send, WC: WorkflowCaller<'env, Output = O> 
 // >(
 //     wc: WC,
 //     // workspace: WC::Workspace,
-//     arc: Environment,
+//     arc: EnvironmentRw,
 //     // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
 // ) -> tokio::task::JoinHandle<WorkflowRunResult<O>> {
 //     let arc = arc.clone();
@@ -127,7 +129,7 @@ pub async fn run_workflow_5<'env, O: Send, WC: WorkflowCaller<'env, Output = O> 
 // pub async fn run_workflow_5<'env, WC: WorkflowCaller<'env> + 'env>(
 //     wc: WC,
 //     workspace: WC::Workspace,
-//     arc: Environment,
+//     arc: EnvironmentRw,
 // // ) -> Box<dyn Future<Output = WorkflowRunResult<WC::Output>> + 'env> {
 // ) -> WorkflowRunResult<WC::Output> {
 //     // async move {
@@ -145,7 +147,7 @@ pub async fn run_workflow_5<'env, O: Send, WC: WorkflowCaller<'env, Output = O> 
 /// 3. Emit any Signals
 /// 4. Trigger any subsequent Workflows
 async fn finish<'env, WC: WorkflowCaller<'env>>(
-    arc: Environment,
+    arc: EnvironmentRw,
     effects: WorkflowEffects<'env, WC>,
 ) -> WorkflowRunResult<()> {
     let WorkflowEffects {
@@ -160,7 +162,9 @@ async fn finish<'env, WC: WorkflowCaller<'env>>(
     {
         // let arc = cell.state_env();
         let env = arc.guard().await;
-        let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
+        let writer = env
+            .writer_unmanaged()
+            .map_err(Into::<WorkspaceError>::into)?;
         workspace
             .commit_txn(writer)
             .map_err(Into::<WorkspaceError>::into)?;

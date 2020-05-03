@@ -3,16 +3,19 @@ pub mod error;
 mod genesis;
 mod invoke_zome;
 
+use crate::core::state::workspace::Workspace;
 use caller::{run_workflow_5, WorkflowCaller};
 use error::WorkflowRunResult;
-use futures::{Future, future::{BoxFuture, FutureExt}};
+use futures::{
+    future::{BoxFuture, FutureExt},
+    Future,
+};
+use holochain_state::env::EnvironmentRo;
+use holochain_state::env::{EnvironmentRw, ReadManager};
 use holochain_types::prelude::*;
 use must_future::MustBoxFuture;
 use std::time::Duration;
 use thiserror::Error;
-use holochain_state::env::Environment;
-use holochain_state::env::ReadManager;
-use crate::core::state::workspace::Workspace;
 
 /// A WorkflowEffects is returned from each Workspace function.
 /// It's just a data structure with no methods of its own, hence the public fields
@@ -48,28 +51,28 @@ pub type WorkflowSignal = Todo;
 pub type TriggerOutput = tokio::task::JoinHandle<WorkflowRunResult<()>>;
 
 pub trait WorkflowTriggers<'env>: Send {
-    fn run(self, env: Environment) -> TriggerOutput;
+    fn run(self, env: EnvironmentRw) -> TriggerOutput;
 }
 
 impl<'env> WorkflowTriggers<'env> for () {
-    fn run(self, env: Environment) -> TriggerOutput {
+    fn run(self, env: EnvironmentRw) -> TriggerOutput {
         tokio::spawn(async { Ok(()) })
     }
 }
 
-impl<'env, W1: 'static + WorkflowCaller<'static, Output=()>> WorkflowTriggers<'env> for W1 {
-    fn run(self, env: Environment) -> TriggerOutput {
+impl<'env, W1: 'static + WorkflowCaller<'static, Output = ()>> WorkflowTriggers<'env> for W1 {
+    fn run(self, env: EnvironmentRw) -> TriggerOutput {
         // Box::new(
         tokio::spawn(async {
-            let _handle = run_workflow_5(self, env);
+            let _handle = run_workflow_5(self, env, todo!("workspace"));
             Ok(())
         })
-    // )
-    }    
+        // )
+    }
 }
 
 // impl<'env, W1: WorkflowCaller<'env> + 'env> WorkflowTriggers for W1 {
-//     fn run(self, env: Environment) -> Box<dyn Future<Output=WorkflowRunResult<W1::Output>> + 'env> {
+//     fn run(self, env: EnvironmentRo) -> Box<dyn Future<Output=WorkflowRunResult<W1::Output>> + 'env> {
 //         Box::new(async {
 //             let e = env.guard().await;
 //             let reader = e.reader()?;
@@ -77,5 +80,5 @@ impl<'env, W1: 'static + WorkflowCaller<'static, Output=()>> WorkflowTriggers<'e
 //             let workspace = W1::Workspace::new(&reader, &dbs)?;
 //             run_workflow_5(self, workspace, env).await
 //         })
-//     }    
+//     }
 // }

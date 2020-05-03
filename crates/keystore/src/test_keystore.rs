@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// The private keys have not been handled securely!
 pub struct MockKeypair {
     /// The agent public key.
-    pub pub_key: holo_hash::AgentHash,
+    pub pub_key: holo_hash::AgentPubKey,
 
     /// The private secret key DANGER - this is not handled securely!!
     pub sec_key: Vec<u8>,
@@ -41,7 +41,7 @@ ghost_actor::ghost_chan! {
     Api {
         FinalizeNewKeypair(
             "we have generated a keypair, now track it",
-            (holo_hash::AgentHash, PrivateKey),
+            (holo_hash::AgentPubKey, PrivateKey),
             (),
         ),
     }
@@ -51,7 +51,7 @@ ghost_actor::ghost_chan! {
 struct TestKeystore {
     internal_sender: KeystoreInternalSender<TestKeystoreInternal>,
     fixture_keypairs: Vec<MockKeypair>,
-    active_keypairs: HashMap<holo_hash::AgentHash, PrivateKey>,
+    active_keypairs: HashMap<holo_hash::AgentPubKey, PrivateKey>,
 }
 
 impl TestKeystore {
@@ -70,7 +70,7 @@ impl TestKeystore {
 impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
     fn handle_generate_sign_keypair_from_pure_entropy(
         &mut self,
-    ) -> KeystoreHandlerResult<holo_hash::AgentHash> {
+    ) -> KeystoreHandlerResult<holo_hash::AgentPubKey> {
         if !self.fixture_keypairs.is_empty() {
             let MockKeypair { pub_key, sec_key } = self.fixture_keypairs.remove(0);
             // we're loading this out of insecure memory - but this is just a mock
@@ -82,18 +82,18 @@ impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
         Ok(async move {
             let (pub_key, sec_key) = crypto_sign_keypair(None).await?;
             let pub_key = pub_key.read().to_vec();
-            let agent_hash = holo_hash::AgentHash::with_pre_hashed(pub_key).await;
+            let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key).await;
             let sec_key = PrivateKey(sec_key);
             i_s.ghost_actor_internal()
-                .finalize_new_keypair((agent_hash.clone(), sec_key))
+                .finalize_new_keypair((agent_pubkey.clone(), sec_key))
                 .await?;
-            Ok(agent_hash)
+            Ok(agent_pubkey)
         }
         .boxed()
         .into())
     }
 
-    fn handle_list_sign_keys(&mut self) -> KeystoreHandlerResult<Vec<holo_hash::AgentHash>> {
+    fn handle_list_sign_keys(&mut self) -> KeystoreHandlerResult<Vec<holo_hash::AgentPubKey>> {
         let keys = self.active_keypairs.keys().cloned().collect();
         Ok(async move { Ok(keys) }.boxed().into())
     }
@@ -123,8 +123,8 @@ impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
                     span,
                 } = msg;
                 let _g = span.enter();
-                let (agent_hash, sec_key) = input;
-                self.active_keypairs.insert(agent_hash, sec_key);
+                let (agent_pubkey, sec_key) = input;
+                self.active_keypairs.insert(agent_pubkey, sec_key);
                 if let Err(e) = respond(Ok(())) {
                     tracing::error!(error = ?e);
                 }
@@ -141,7 +141,7 @@ mod tests {
     fn fixture_keypairs() -> Vec<MockKeypair> {
         vec![
             MockKeypair {
-                pub_key: holo_hash::AgentHash::try_from(
+                pub_key: holo_hash::AgentPubKey::try_from(
                     "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
                 )
                 .unwrap(),
@@ -153,7 +153,7 @@ mod tests {
                 ],
             },
             MockKeypair {
-                pub_key: holo_hash::AgentHash::try_from(
+                pub_key: holo_hash::AgentPubKey::try_from(
                     "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
                 )
                 .unwrap(),
@@ -170,13 +170,13 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_test_keystore_can_supply_fixture_keys() {
         let _ = crypto_init_sodium();
-        use holo_hash::AgentHash;
+        use holo_hash::AgentPubKey;
         tokio::task::spawn(async move {
             let mut keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
 
-            let agent1 = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
-            let agent2 = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
-            let agent3 = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
+            let agent1 = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
+            let agent2 = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
+            let agent3 = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
 
             assert_eq!(
                 "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
@@ -209,11 +209,11 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_test_keystore_can_sign_and_validate_data() {
         let _ = crypto_init_sodium();
-        use holo_hash::AgentHash;
+        use holo_hash::AgentPubKey;
         tokio::task::spawn(async move {
             let keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
 
-            let agent_hash = AgentHash::new_from_pure_entropy(&keystore).await.unwrap();
+            let agent_pubkey = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
 
             #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
             struct MyData(Vec<u8>);
@@ -221,13 +221,13 @@ mod tests {
             let my_data_1 = MyData(b"signature test data 1".to_vec());
             let my_data_2 = MyData(b"signature test data 2".to_vec());
 
-            let signature = agent_hash.sign(&keystore, &my_data_1).await.unwrap();
+            let signature = agent_pubkey.sign(&keystore, &my_data_1).await.unwrap();
 
-            assert!(agent_hash
+            assert!(agent_pubkey
                 .verify_signature(&signature, &my_data_1)
                 .await
                 .unwrap());
-            assert!(!agent_hash
+            assert!(!agent_pubkey
                 .verify_signature(&signature, &my_data_2)
                 .await
                 .unwrap());

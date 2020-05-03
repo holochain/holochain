@@ -1,5 +1,8 @@
 use super::WorkflowEffects;
-use crate::{conductor::api::error::ConductorApiError, core::state::{source_chain::SourceChainError, workspace::WorkspaceError}};
+use crate::{
+    conductor::api::error::ConductorApiError,
+    core::state::{source_chain::SourceChainError, workspace::WorkspaceError},
+};
 use holochain_state::error::DatabaseError;
 use holochain_types::prelude::*;
 use thiserror::Error;
@@ -7,7 +10,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
-    AgentInvalid(AgentHash),
+    AgentInvalid(AgentPubKey),
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] ConductorApiError),

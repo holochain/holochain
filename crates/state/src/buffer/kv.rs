@@ -190,9 +190,9 @@ pub mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_iterators() -> DatabaseResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
@@ -221,9 +221,9 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_empty_iterators() -> DatabaseResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env
             .inner()
@@ -243,9 +243,9 @@ pub mod tests {
     }
 
     /// TODO break up into smaller tests
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_store_sanity_check() -> DatabaseResult<()> {
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
         let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
@@ -254,29 +254,29 @@ pub mod tests {
             name: "Joe".to_owned(),
         };
 
-        let writer = env.with_reader::<DatabaseError, _, _>(|reader| {
-            let mut writer = env.writer()?;
+        env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
             let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
 
-            kv1.put("hi".to_owned(), testval.clone());
-            kv2.put("salutations".to_owned(), "folks".to_owned());
-
-            // Check that the underlying store contains no changes yet
-            assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
-            assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);
-            kv1.flush_to_txn(&mut writer)?;
+            env.with_commit(|writer| {
+                kv1.put("hi".to_owned(), testval.clone());
+                kv2.put("salutations".to_owned(), "folks".to_owned());
+    
+                // Check that the underlying store contains no changes yet
+                assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
+                assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);
+                kv1.flush_to_txn(writer)
+            })?;
 
             // Ensure that mid-transaction, there has still been no persistence,
             // just for kicks
-            let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
-            assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
-            kv2.flush_to_txn(&mut writer)?;
-            Ok(writer)
-        })?;
 
-        // Finish finalizing the transaction
-        writer.commit()?;
+            env.with_commit(|writer| {
+                let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1)?;
+                assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
+                kv2.flush_to_txn(writer)
+            })
+        })?;
 
         env.with_reader(|reader| {
             // Now open some fresh Readers to see that our data was persisted
@@ -292,10 +292,10 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
         env.with_reader(|reader| {
@@ -309,11 +309,11 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_deleted_persisted() -> DatabaseResult<()> {
         use tracing::*;
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
@@ -343,10 +343,10 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_deleted_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
@@ -381,10 +381,10 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
@@ -401,10 +401,10 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_persisted() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
@@ -427,10 +427,10 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_del_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 
@@ -447,10 +447,10 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_del_persisted() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
 

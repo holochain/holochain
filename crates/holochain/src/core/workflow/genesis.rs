@@ -11,15 +11,15 @@ use super::{
 };
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
 use futures::future::FutureExt;
-use holochain_types::{dna::Dna, entry::Entry, prelude::*};
+use holochain_state::{env::EnvironmentRo, prelude::*};
+use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
 use must_future::MustBoxFuture;
 
 pub struct GenesisWorkflow<Api: CellConductorApiT> {
     api: Api,
     dna: Dna,
-    agent_hash: AgentHash,
+    agent_pubkey: AgentPubKey,
 }
-
 
 impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
     for GenesisWorkflow<Api>
@@ -30,31 +30,37 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
 
     fn workflow(
         self,
+        // environment: &'env EnvironmentRo,
         mut workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
         async {
             let Self {
                 api,
                 dna,
-                agent_hash,
+                agent_pubkey,
             } = self;
             // TODO: this is a placeholder for a real DPKI request to show intent
             if api
-                .dpki_request("is_agent_hash_valid".into(), agent_hash.to_string())
+                .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
                 .await?
                 == "INVALID"
             {
-                return Err(WorkflowError::AgentInvalid(agent_hash.clone()));
+                return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
             }
+            // let env = environment.guard().await;
+            // let mut workspace = GenesisWorkspace::new(&env.reader()?, &env)?;
 
-            workspace
-                .source_chain
-                .put_entry(Entry::Dna(Box::new(dna)), &agent_hash)
-                .await?;
-            workspace
-                .source_chain
-                .put_entry(Entry::AgentKey(agent_hash.clone()), &agent_hash)
-                .await?;
+            // workspace
+            //     .source_chain
+            //     .put(todo!("construct DNA header"), None)
+            //     .await?;
+            // workspace
+            //     .source_chain
+            //     .put(
+            //         todo!("construct AgentPubKey header"),
+            //         Some(todo!("construct entry")),
+            //     )
+            //     .await?;
 
             let fx = WorkflowEffects {
                 workspace,
@@ -76,7 +82,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
 mod tests {
 
     use super::GenesisWorkflow;
-    use crate::core::workflow::caller::{run_workflow_3, WorkflowCaller, run_workflow_4};
+    use crate::core::workflow::caller::{run_workflow_5, WorkflowCaller};
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{
@@ -90,21 +96,19 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        entry::Entry,
-        observability,
-        prelude::*,
-        test_utils::{fake_agent_hash, fake_dna},
+        chain_header::ChainHeader,
+        header, observability,
+        test_utils::{fake_agent_pubkey_1, fake_dna},
     };
-    use tracing::*;
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
-        let arc = test_cell_env();
+        let arc = test_cell_env().await;
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
         let dna = fake_dna("a");
-        let agent_hash = fake_agent_hash("a");
+        let agent_pubkey = fake_agent_pubkey_1();
 
         {
             let reader = env.reader()?;
@@ -115,36 +119,34 @@ mod tests {
             let workflow = GenesisWorkflow {
                 api,
                 dna: dna.clone(),
-                agent_hash: agent_hash.clone(),
+                agent_pubkey: agent_pubkey.clone(),
             };
-            let _: () = run_workflow_4(workflow, workspace, arc.clone()).await?;
+            let _: () = run_workflow_5(workflow, arc.clone(), workspace).await?;
             // let writer = env.writer()?;
             // fx.workspace.commit_txn(writer)?;
         }
 
         env.with_reader(|reader| {
             let source_chain = SourceChain::new(&reader, &dbs)?;
-            assert_eq!(source_chain.agent_hash()?, agent_hash);
+            assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
             let hashes: Vec<_> = source_chain
                 .iter_back()
                 .map(|h| {
-                    debug!("header: {:?}", h);
-                    Ok(h.entry_address().clone())
+                    Ok(match h.header() {
+                        ChainHeader::Dna(header::Dna { .. }) => "Dna",
+                        ChainHeader::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
+                        ChainHeader::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
+                        ChainHeader::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
+                        ChainHeader::ChainClose(header::ChainClose { .. }) => "ChainClose",
+                        ChainHeader::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
+                        ChainHeader::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
+                        ChainHeader::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
+                    })
                 })
                 .collect()
                 .unwrap();
-            assert_eq!(
-                hashes,
-                vec![
-                    holo_hash::EntryHash::try_from(Entry::AgentKey(agent_hash))
-                        .unwrap()
-                        .into(),
-                    holo_hash::EntryHash::try_from(Entry::Dna(Box::new(dna)))
-                        .unwrap()
-                        .into(),
-                ]
-            );
+            assert_eq!(hashes, vec!["EntryCreate", "Dna"]);
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())

@@ -1,13 +1,16 @@
 //! Functionality for safely accessing LMDB database references.
 
 use crate::{
-    env::{Environment, EnvironmentKind},
+    env::{EnvironmentKind},
     error::{DatabaseError, DatabaseResult},
 };
+use holochain_keystore::KeystoreSender;
 use holochain_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
-
-use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
+use parking_lot::RwLock;
+use rkv::{IntegerStore, MultiStore, Rkv, SingleStore, StoreOptions};
+use std::collections::{hash_map, HashMap};
+use std::path::{Path, PathBuf};
 
 /// TODO This is incomplete
 /// Enumeration of all databases needed by Holochain
@@ -86,6 +89,8 @@ pub enum DbKind {
 /// database types
 pub type DbKey<V> = UmKey<DbName, V>;
 
+type DbMap = UniversalMap<DbName>;
+
 lazy_static! {
     /// The key to access the ChainEntries database
     pub static ref PRIMARY_CHAIN_ENTRIES: DbKey<SingleStore> =
@@ -115,100 +120,94 @@ lazy_static! {
     pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
 }
 
-/// DbManager is intended to be used as a singleton store for LMDB Database references,
-/// so its constructor is intentionally private.
-/// It uses a UniversalMap to retrieve heterogeneously typed data via special keys
-/// whose type includes the type of the corresponding value.
-pub struct DbManager {
-    env: Environment,
-    um: UniversalMap<DbName>,
+lazy_static! {
+    static ref DB_MAP_MAP: RwLock<HashMap<PathBuf, DbMap>> = RwLock::new(HashMap::new());
 }
 
-impl DbManager {
-    pub(crate) async fn new(env: Environment) -> DatabaseResult<Self> {
-        let mut this = Self {
-            env,
-            um: UniversalMap::new(),
-        };
-        // TODO: rethink this. If multiple DbManagers exist for this environment, we might create DBs twice,
-        // which could cause a panic.
-        // This can be simplified (and made safer) if DbManager, ReadManager and WriteManager
-        // are just traits of the Rkv environment.
-        this.initialize().await?;
-        Ok(this)
-    }
-
-    /// Get a `rkv` Database reference from a key
-    pub fn get<V: 'static + Send + Sync>(&self, key: &DbKey<V>) -> DatabaseResult<&V> {
-        self.um
-            .get(key)
-            .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().to_owned()))
-    }
-
-    async fn create<V: 'static + Send + Sync>(&mut self, key: &DbKey<V>) -> DatabaseResult<()> {
-        let db_name = key.key();
-        let db_str = format!("{}", db_name);
-        let _ = match db_name.kind() {
-            DbKind::Single => self.um.insert(
-                key.with_value_type(),
-                self.env
-                    .inner()
-                    .await
-                    .open_single(db_str.as_str(), StoreOptions::create())?,
-            ),
-            DbKind::SingleInt => self.um.insert(
-                key.with_value_type(),
-                self.env
-                    .inner()
-                    .await
-                    .open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
-            ),
-            DbKind::Multi => self.um.insert(
-                key.with_value_type(),
-                self.env
-                    .inner()
-                    .await
-                    .open_multi(db_str.as_str(), StoreOptions::create())?,
-            ),
-        };
-        Ok(())
-    }
-
-    /// Get a `rkv` Database reference from a key, or create a new Database
-    /// of the proper type if not yet created
-    /*
-    pub async fn get_or_create<V: 'static + Send + Sync>(
-        &mut self,
-        key: &DbKey<V>,
-    ) -> DatabaseResult<&V> {
-        if self.um.get(key).is_some() {
-            Ok(self.um.get(key).unwrap())
-        } else {
-            self.create(key).await?;
-            Ok(self.um.get(key).unwrap())
+/// Get access to the singleton database manager ([GetDb]),
+/// in order to access individual LMDB databases
+pub(super) async fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> DatabaseResult<()> {
+    let mut dbmap = DB_MAP_MAP.write();
+    let path = rkv.path().to_owned();
+    match dbmap.entry(path.clone()) {
+        hash_map::Entry::Occupied(_) => {
+            return Err(DatabaseError::EnvironmentDoubleInitialized(path))
         }
-    }*/
+        hash_map::Entry::Vacant(e) => e.insert({
+            let mut um = UniversalMap::new();
+            register_databases(&rkv, kind, &mut um).await?;
+            um
+        }),
+    };
+    Ok(())
+}
 
-    async fn initialize(&mut self) -> DatabaseResult<()> {
-        match self.env.kind() {
-            EnvironmentKind::Cell(_) => {
-                self.create(&*PRIMARY_CHAIN_ENTRIES).await?;
-                self.create(&*PRIMARY_CHAIN_HEADERS).await?;
-                self.create(&*PRIMARY_SYSTEM_META).await?;
-                self.create(&*PRIMARY_LINKS_META).await?;
-                self.create(&*CHAIN_SEQUENCE).await?;
-                self.create(&*CACHE_CHAIN_ENTRIES).await?;
-                self.create(&*CACHE_CHAIN_HEADERS).await?;
-                self.create(&*CACHE_SYSTEM_META).await?;
-                self.create(&*CACHE_LINKS_META).await?;
-            }
-            EnvironmentKind::Conductor => {
-                self.create(&*CONDUCTOR_STATE).await?;
-            }
-            EnvironmentKind::Wasm => {
-                self.create(&*WASM).await?;
-            }
+pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
+    path: &Path,
+    key: &'static DbKey<V>,
+) -> DatabaseResult<V> {
+    let dbmap = DB_MAP_MAP.read();
+    let um: &DbMap = dbmap.get(path).expect("TODO");
+    let db = *um.get(key).expect("TODO");
+    Ok(db)
+}
+
+async fn register_databases<'env>(
+    env: &Rkv,
+    kind: &EnvironmentKind,
+    um: &mut DbMap,
+) -> DatabaseResult<()> {
+    match kind {
+        EnvironmentKind::Cell(_) => {
+            register_db(env, um, &*PRIMARY_CHAIN_ENTRIES).await?;
+            register_db(env, um, &*PRIMARY_CHAIN_HEADERS).await?;
+            register_db(env, um, &*PRIMARY_SYSTEM_META).await?;
+            register_db(env, um, &*PRIMARY_LINKS_META).await?;
+            register_db(env, um, &*CHAIN_SEQUENCE).await?;
+            register_db(env, um, &*CACHE_CHAIN_ENTRIES).await?;
+            register_db(env, um, &*CACHE_CHAIN_HEADERS).await?;
+            register_db(env, um, &*CACHE_SYSTEM_META).await?;
+            register_db(env, um, &*CACHE_LINKS_META).await?;
         }
-        Ok(())
+        EnvironmentKind::Conductor => {
+            register_db(env, um, &*CONDUCTOR_STATE).await?;
+        }
+        EnvironmentKind::Wasm => {
+            register_db(env, um, &*WASM).await?;
+        }
     }
+    Ok(())
+}
+
+async fn register_db<'env, V: 'static + Send + Sync>(
+    env: &Rkv,
+    um: &mut DbMap,
+    key: &DbKey<V>,
+) -> DatabaseResult<()> {
+    let db_name = key.key();
+    let db_str = format!("{}", db_name);
+    let _ = match db_name.kind() {
+        DbKind::Single => um.insert(
+            key.with_value_type(),
+            env.open_single(db_str.as_str(), StoreOptions::create())?,
+        ),
+        DbKind::SingleInt => um.insert(
+            key.with_value_type(),
+            env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
+        ),
+        DbKind::Multi => um.insert(
+            key.with_value_type(),
+            env.open_multi(db_str.as_str(), StoreOptions::create())?,
+        ),
+    };
+    Ok(())
+}
+
+/// GetDb allows access to the UniversalMap which stores the heterogeneously typed
+/// LMDB Database references.
+pub trait GetDb {
+    /// TODO
+    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V>;
+    /// Get a KeystoreSender to communicate with the Keystore task for this environment
+    fn keystore(&self) -> KeystoreSender;
 }

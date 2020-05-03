@@ -4,7 +4,7 @@ use super::{
 };
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
 use futures::future::FutureExt;
-use holochain_state::{db::DbManager, prelude::Reader};
+use holochain_state::{env::EnvironmentRo, prelude::*};
 use holochain_types::{nucleus::ZomeInvocation, prelude::Todo};
 use must_future::MustBoxFuture;
 
@@ -24,20 +24,18 @@ impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env>
 
     fn workflow(
         self,
-        workspace: Self::Workspace,
+        // environment: &'env EnvironmentRo,
+        mut workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
         async {
-            let fx = WorkflowEffects::new(
-                workspace,
-                Default::default(),
-                Default::default(),
-                (),
-            );
+            // let env = environment.guard().await;
+            // let mut workspace = InvokeZomeWorkspace::new(&env.reader()?, &env)?;
+            let fx = WorkflowEffects::new(workspace, Default::default(), Default::default(), ());
             let result = todo!("this will be the actual zome function return value");
             Ok((result, fx))
         }
-            .boxed()
-            .into()
+        .boxed()
+        .into()
     }
 }
 
