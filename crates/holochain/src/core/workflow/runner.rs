@@ -8,7 +8,7 @@ use crate::{
 use futures::future::{join_all, BoxFuture, FutureExt};
 use holochain_state::{env::WriteManager, prelude::*};
 use std::sync::Arc;
-use workflow::{system_validation::PlaceholderSysVal, WorkflowCallback, WorkflowSignal};
+use workflow::{WorkflowCallback, WorkflowSignal};
 
 use error::WorkflowRunResult;
 
@@ -38,7 +38,6 @@ impl WorkflowRunner {
                     workspace,
                     self.0.get_ribosome(),
                     *invocation,
-                    PlaceholderSysVal {},
                 )
                 .await?;
                 self.finish(effects).await?;

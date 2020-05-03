@@ -204,8 +204,6 @@ impl RibosomeT for WasmRibosome {
         self,
         source_chain: UnsafeSourceChain,
         invocation: ZomeInvocation,
-        // cell_conductor_api: CellConductorApi,
-        // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeInvocationResponse> {
         let host_context = HostContext {
             source_chain,

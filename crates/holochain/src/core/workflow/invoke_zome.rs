@@ -1,4 +1,4 @@
-use super::{system_validation::SystemValidation, WorkflowEffects, WorkflowError, WorkflowResult};
+use super::{WorkflowCall, WorkflowEffects, WorkflowError, WorkflowResult, WorkflowTrigger};
 use crate::core::{
     ribosome::RibosomeT,
     state::{source_chain::UnsafeSourceChain, workspace::InvokeZomeWorkspace},
@@ -10,14 +10,30 @@ pub async fn invoke_zome<'env>(
     mut workspace: InvokeZomeWorkspace<'_>,
     ribosome: impl RibosomeT,
     invocation: ZomeInvocation,
-    sv: impl SystemValidation,
 ) -> WorkflowResult<InvokeZomeWorkspace<'_>> {
+    // Setup
+    let mut triggers = Vec::new();
+
+    // Check if the initialize workflow has been successfully run
+    // TODO: PERF: Backwards iterator is a slow way to get length as it's
+    // calling get for each item
+    if workspace.iter_back().count()? < 4 {
+        triggers.push(WorkflowTrigger::immediate(WorkflowCall::InitializeZome));
+    }
+
+    // Get te current head
     let chain_head_start = workspace.chain_head()?.clone();
+
+    // Create the unsafe sourcechain for use with wasm closure
     {
         let (_g, source_chain) = UnsafeSourceChain::from_mut(&mut workspace.source_chain);
+        // TODO: TK-01564: Return this result
         let _result = ribosome.call_zome_function(source_chain, invocation)?;
     }
+
+    // Get the new head
     let chain_head_end = workspace.chain_head()?;
+
     // Has there been changes?
     if chain_head_start != *chain_head_end {
         // get the changes
@@ -33,14 +49,17 @@ pub async fn invoke_zome<'env>(
                 Ok(r)
             })
             .map_err(|e| WorkflowError::from(e))
-            // call the sys validation on the changes
-            .map(|chain_head| Ok(sv.check_entry_hash(&chain_head.entry_address.into())?))
+            // call the sys validation on the changes etc.
+            .map(|chain_head| {
+                // check_entry_hash(&chain_head.entry_address.into())?
+                Ok(chain_head)
+            })
             .collect::<Vec<_>>()?;
     }
 
     Ok(WorkflowEffects {
         workspace,
-        triggers: Default::default(),
+        triggers,
         signals: Default::default(),
         callbacks: Default::default(),
     })
@@ -65,7 +84,6 @@ pub mod tests {
     };
     use holochain_zome_types::ZomeExternGuestOutput;
 
-    use crate::core::workflow::system_validation::{MockSystemValidation, PlaceholderSysVal};
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -73,20 +91,46 @@ pub mod tests {
         a: u32,
     }
 
+    fn fake_genesis(workspace: &mut InvokeZomeWorkspace) {
+        let agent_hash = fake_agent_hash("cool agent");
+        let agent_entry = Entry::AgentKey(agent_hash.clone());
+        let dna_entry = Entry::Dna(Box::new(fake_dna("cool dna")));
+        workspace.put_entry(agent_entry, &agent_hash).unwrap();
+        workspace.put_entry(dna_entry, &agent_hash).unwrap();
+    }
+
+    // TODO: TODAY: Make this pass
     #[tokio::test]
     async fn runs_init() {
         let env = test_cell_env();
         let dbs = env.dbs().await.unwrap();
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
-        let ribosome = MockRibosomeT::new();
+        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut ribosome = MockRibosomeT::new();
+
+        // Genesis
+        fake_genesis(&mut workspace);
+
+        // Setup the ribosome mock
+        ribosome
+            .expect_call_zome_function()
+            .returning(move |_source_chain, _invocation| {
+                let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
+                Ok(ZomeInvocationResponse::ZomeApiFn(
+                    ZomeExternGuestOutput::new(x),
+                ))
+            });
+
+        // Call the zome function
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
-        let effects = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
-            .await
-            .unwrap();
-        assert!(effects.triggers.is_empty());
+        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
+
+        // Check the initialize zome was added to a trigger
+        assert!(effects.signals.is_empty());
+        assert!(effects.callbacks.is_empty());
+        assert!(!effects.triggers.is_empty());
         assert_matches!(effects.triggers[0].interval, None);
         assert_matches!(effects.triggers[0].call, WorkflowCall::InitializeZome);
     }
@@ -109,7 +153,7 @@ pub mod tests {
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
         invocation.cap = todo!("Make secret cap token");
-        let error = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
+        let error = invoke_zome(workspace, ribosome, invocation)
             .await
             .unwrap_err();
         assert_matches!(error, WorkflowError::CapabilityMissing);
@@ -127,11 +171,10 @@ pub mod tests {
     // 1.3 If the CapabiltyGrant has pre-filled parameters, check that the ui is passing exactly the
     // parameters needed and no more to complete the call. (MVI)
 
-    // TODO: What is pre-flight cain extention?
+    // TODO: TODAY: (turn into PR question) What is pre-flight chain extention?
     // 2. Set Context (Cascading Cursor w/ Pre-flight chain extension) MVT
 
-    // TODO: How is the Cursor (I guess the cascade?) passed to the wasm invokation?
-    // Might just be inside the ribosome?
+    // TODO: TODAY: How is the Cursor (I guess the cascade?) passed to the wasm invokation?
     // 3. Invoke WASM (w/ Cursor) MVM
     // WASM receives external call handles:
     // (gets & commits via cascading cursor, crypto functions & bridge calls via conductor,
@@ -146,6 +189,8 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
+    // TODO: SYSTEM_VALIDATION: Finish when sys val lands
+    #[ignore]
     #[tokio::test]
     async fn calls_system_validation() {
         observability::test_run().ok();
@@ -156,12 +201,9 @@ pub mod tests {
         let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         // Genesis
-        let agent_hash = fake_agent_hash("cool agent");
-        let agent_entry = Entry::AgentKey(agent_hash.clone());
-        let dna_entry = Entry::Dna(Box::new(fake_dna("cool dna")));
-        workspace.put_entry(agent_entry, &agent_hash).unwrap();
-        workspace.put_entry(dna_entry, &agent_hash).unwrap();
+        fake_genesis(&mut workspace);
 
+        let agent_hash = fake_agent_hash("cool agent");
         let mut ribosome = MockRibosomeT::new();
         // Call zome mock that it writes to source chain
         ribosome
@@ -177,18 +219,19 @@ pub mod tests {
                     ZomeExternGuestOutput::new(x),
                 ))
             });
+
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
-        // TODO: Mock the system validation and check it's called
+        // IDEA: Mock the system validation and check it's called
+        /* This is one way to test the correctness of the calls to sys val
         let mut sys_val = MockSystemValidation::new();
         sys_val
             .expect_check_entry_hash()
             .times(1)
             .returning(|_entry_hash| Ok(()));
+        */
 
-        let effects = invoke_zome(workspace, ribosome, invocation, sys_val)
-            .await
-            .unwrap();
+        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
         assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());
@@ -197,6 +240,8 @@ pub mod tests {
     // 4.2. Call app validation of list of entries and headers: (MVI)
     // - Call validate_set_of_entries_and_headers (any necessary get
     //   results where we receive None / Timeout on retrieving validation dependencies, should produce error/fail)
+    // TODO: APP_VALIDATION: Finish when app val lands
+    #[ignore]
     #[tokio::test]
     async fn calls_app_validation() {
         let env = test_cell_env();
@@ -210,9 +255,7 @@ pub mod tests {
         // TODO: Mock the app validation and check it's called
         // TODO: How can I pass a app validation into this?
         // These are just static calls
-        let effects = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
-            .await
-            .unwrap();
+        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
         assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());
@@ -221,6 +264,7 @@ pub mod tests {
     // 4.3. Write output results via SC gatekeeper (wrap in transaction): (MVI)
     // This is handled by the workflow runner however I should test that
     // we can create outputs
+    #[ignore]
     #[tokio::test]
     async fn creates_outputs() {
         let env = test_cell_env();
@@ -232,64 +276,10 @@ pub mod tests {
         // TODO: Make this mock return an output
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
-        let effects = invoke_zome(workspace, ribosome, invocation, PlaceholderSysVal {})
-            .await
-            .unwrap();
+        let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
         assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());
         // TODO: Check the workspace has changes
     }
-
-    #[cfg(test_TODO_FIX)]
-    #[tokio::test]
-    async fn can_invoke_zome_with_mock() {
-        let cell_id = fake_cell_id("mario");
-        let tmpdir = TempDir::new("holochain_2020").unwrap();
-        let persistence = SourceChainPersistence::test(tmpdir.path());
-        let chain = test_initialized_chain("mario", &persistence);
-        let invocation = ZomeInvocation {
-            cell_id: cell_id.clone(),
-            zome_name: "zome".into(),
-            fn_name: "fn".into(),
-            as_at: "KwyXHisn".into(),
-            args: "args".into(),
-            provenance: cell_id.agent_id().to_owned(),
-            cap: CapabilityRequest,
-        };
-
-        let mut ribosome = MockRibosomeT::new();
-        ribosome
-            .expect_call_zome_function()
-            .times(1)
-            .returning(|bundle, _| Ok(ZomeInvocationResponse));
-
-        // TODO: make actual assertions on the conductor_api, once more of the
-        // actual logic is fleshed out
-        let mut conductor_api = MockCellConductorApi::new();
-
-        let result = invoke_zome(invocation, chain, ribosome, conductor_api).await;
-        assert!(result.is_ok());
-    }
-
-    // TODO: can try making a fake (not mock) ribosome that has some hard-coded logic
-    // for calling into a ZomeApi, rather than needing to write a test DNA. This will
-    // have to wait until the whole WasmRibosome thing is more fleshed out.
-    // struct FakeRibosome;
-
-    // impl RibosomeT for FakeRibosome {
-    //     fn run_validation(self, cursor: &source_chain::Cursor, entry: Entry) -> ValidationResult {
-    //         unimplemented!()
-    //     }
-
-    //     /// Runs the specified zome fn. Returns the cursor used by HDK,
-    //     /// so that it can be passed on to source chain manager for transactional writes
-    //     fn call_zome_function(
-    //         self,
-    //         bundle: SourceChainCommitBundle,
-    //         invocation: ZomeInvocation,
-    //     ) -> SkunkResult<(ZomeInvocationResponse, SourceChainCommitBundle)> {
-    //         unimplemented!()
-    //     }
-    // }
 }
