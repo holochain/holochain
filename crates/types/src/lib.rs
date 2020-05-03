@@ -16,6 +16,9 @@ pub mod nucleus;
 pub mod observability;
 pub mod persistence;
 pub mod prelude;
+pub mod init;
+pub mod migrate_agent;
+pub mod validate;
 
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]

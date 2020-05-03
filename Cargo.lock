@@ -1233,6 +1233,7 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.1"
 dependencies = [
+ "holo_hash_core",
  "holochain_serialized_bytes",
  "multihash",
  "rust-base58",

@@ -77,6 +77,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "holo_hash_core"
+version = "0.0.1"
+dependencies = [
+ "holochain_serialized_bytes",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -127,6 +136,7 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.1"
 dependencies = [
+ "holo_hash_core",
  "holochain_serialized_bytes",
  "multihash",
  "rust-base58",
@@ -334,6 +344,15 @@ name = "serde-transcode"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97528f0dfcf8ce2d51d995cb513a103b9cd301dc3f387a9cae5ef974381d4e1c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf487fbf5c6239d7ea2ff8b10cb6b811cd4b5080d1c2aeed1dec18753c06e10"
 dependencies = [
  "serde",
 ]
