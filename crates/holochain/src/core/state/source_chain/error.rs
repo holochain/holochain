@@ -35,9 +35,8 @@ pub enum SourceChainError {
     #[error("Element signature is invalid")]
     InvalidSignature,
 
-    /// Signing error
-    #[error("Unable to sign header")]
-    SigningError,
+    #[error("KeystoreError: {0}")]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

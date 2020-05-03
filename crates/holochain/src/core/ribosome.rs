@@ -586,7 +586,7 @@ pub mod wasm_test {
     use holochain_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
         shims::SourceChainCommitBundle,
-        test_utils::{fake_agent_pubkey, fake_cap_token, fake_cell_id},
+        test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::*;
@@ -622,7 +622,7 @@ pub mod wasm_test {
             cell_id: fake_cell_id("bob"),
             cap: fake_cap_token(),
             payload: ZomeExternHostInput::new(payload),
-            provenance: fake_agent_pubkey("bob"),
+            provenance: fake_agent_pubkey_1(),
             as_at: fake_header_hash("fake"),
         }
     }

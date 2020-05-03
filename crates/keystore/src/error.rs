@@ -20,6 +20,12 @@ pub enum KeystoreError {
     Other(String),
 }
 
+impl std::cmp::PartialEq for KeystoreError {
+    fn eq(&self, o: &Self) -> bool {
+        format!("{:?}", self) == format!("{:?}", o)
+    }
+}
+
 impl From<String> for KeystoreError {
     fn from(e: String) -> Self {
         KeystoreError::Other(e)

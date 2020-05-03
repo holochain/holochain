@@ -13,7 +13,7 @@ use holochain_types::{
     entry::Entry,
     header, observability,
     prelude::*,
-    test_utils::{fake_agent_pubkey, fake_header_hash},
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
 };
 use maplit::hashset;
 use mockall::*;
@@ -39,9 +39,9 @@ fn setup_env<'env>(
 ) -> DatabaseResult<Chains<'env>> {
     let previous_header = fake_header_hash("previous");
 
-    let jimbo_id = fake_agent_pubkey("Jimbo");
+    let jimbo_id = fake_agent_pubkey_1();
     let jimbo_entry = Entry::Agent(jimbo_id.clone());
-    let jessy_id = fake_agent_pubkey("Jessy");
+    let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
@@ -78,7 +78,7 @@ fn setup_env<'env>(
     })
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
@@ -94,7 +94,9 @@ async fn live_local_return() -> SourceChainResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
     let address = jimbo_entry.entry_address();
 
     // set it's metadata to LIVE
@@ -118,7 +120,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -136,7 +138,9 @@ async fn dead_local_none() -> SourceChainResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
     let address = jimbo_entry.entry_address();
 
     // set it's metadata to Dead
@@ -160,7 +164,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -178,7 +182,9 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    cache.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
+    cache
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
     let address = jimbo_entry.entry_address();
 
     // set it's metadata to Live
@@ -204,7 +210,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn notfound_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -240,7 +246,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
@@ -259,8 +265,12 @@ async fn links_local_return() -> SourceChainResult<()> {
         mut mock_primary_meta,
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
-    source_chain.put(jessy_header.clone(), Some(jessy_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
+    source_chain
+        .put(jessy_header.clone(), Some(jessy_entry.clone()))
+        .await?;
     let base = jimbo_entry.entry_address();
     let target = jessy_entry.entry_address();
     let result = target.clone();
@@ -289,7 +299,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -309,8 +319,12 @@ async fn links_cache_return() -> SourceChainResult<()> {
         mut mock_primary_meta,
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
-    source_chain.put(jimbo_header.clone(), Some(jimbo_entry.clone()))?;
-    source_chain.put(jessy_header.clone(), Some(jessy_entry.clone()))?;
+    source_chain
+        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .await?;
+    source_chain
+        .put(jessy_header.clone(), Some(jessy_entry.clone()))
+        .await?;
     let base = jimbo_entry.entry_address();
     let target = jessy_entry.entry_address();
     let result = target.clone();
@@ -339,7 +353,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn links_notauth_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch

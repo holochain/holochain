@@ -9,6 +9,8 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
+holochain_crypto = { version = "0.0.1", path = "../crypto" }
+holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_types = { path = "../types"}
 futures = "0.3.1"
 thiserror = "1.0.10"
@@ -26,6 +28,7 @@ parking_lot = "0.10.0"
 tracing = "0.1.13"
 tracing-futures = "0.2.3"
 anyhow = "1.0.26"
+tokio_safe_block_on = "0.1.1"
 tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
 derive_more = "0.99.3"
 async-trait = "0.1.24"

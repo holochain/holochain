@@ -122,7 +122,7 @@ pub mod tests {
     };
     use holochain_types::observability;
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
         let arc = test_cell_env();
@@ -186,7 +186,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -293,7 +293,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
         let arc1 = test_cell_env();
         let arc2 = arc1.clone();

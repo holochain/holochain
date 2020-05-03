@@ -20,6 +20,7 @@ use tracing::*;
 pub struct SourceChainBuf<'env, R: Readable> {
     cas: ChainCasBuf<'env, R>,
     sequence: ChainSequenceBuf<'env, R>,
+    keystore: KeystoreSender,
 }
 
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
@@ -27,6 +28,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
+            keystore: dbs.keystore().clone(),
         })
     }
 
@@ -37,6 +39,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         Ok(Self {
             cas: ChainCasBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
+            keystore: dbs.keystore().clone(),
         })
     }
 
@@ -61,12 +64,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &self.cas
     }
 
-    pub fn put(
+    pub async fn put(
         &mut self,
         header: ChainHeader,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<()> {
-        let signed_header = SignedHeader::new(/*keystore, */ header.to_owned())?;
+        let signed_header = SignedHeader::new(&self.keystore, header.to_owned()).await?;
 
         /*
         FIXME: this needs to happen here.
@@ -196,7 +199,7 @@ pub mod tests {
         entry::Entry,
         header,
         prelude::*,
-        test_utils::{fake_agent_pubkey, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna},
     };
 
     fn fixtures() -> (
@@ -208,7 +211,7 @@ pub mod tests {
     ) {
         let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna("a");
-        let agent_pubkey = fake_agent_pubkey("agent");
+        let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());
 
@@ -235,7 +238,7 @@ pub mod tests {
         )
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -243,15 +246,19 @@ pub mod tests {
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
-        env.with_reader(|reader| {
+        {
+            let reader = env.reader()?;
+
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put(dna_header.clone(), dna_entry.clone())?;
-            store.put(agent_header.clone(), agent_entry.clone())?;
-            env.with_commit(|writer| store.flush_to_txn(writer))
-        })?;
+            store.put(dna_header.clone(), dna_entry.clone()).await?;
+            store.put(agent_header.clone(), agent_entry.clone()).await?;
+            env.with_commit(|writer| store.flush_to_txn(writer))?;
+        };
 
-        env.with_reader(|reader| {
+        {
+            let reader = env.reader()?;
+
             let store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_some());
 
@@ -282,11 +289,12 @@ pub mod tests {
                     .unwrap(),
                 vec![agent_header, dna_header]
             );
-            Ok(())
-        })
+        }
+
+        Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -294,14 +302,18 @@ pub mod tests {
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
-        env.with_reader(|reader| {
-            let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put(dna_header.clone(), dna_entry)?;
-            store.put(agent_header.clone(), agent_entry)?;
-            env.with_commit(|writer| store.flush_to_txn(writer))
-        })?;
+        {
+            let reader = env.reader()?;
 
-        env.with_reader(|reader| {
+            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            store.put(dna_header.clone(), dna_entry).await?;
+            store.put(agent_header.clone(), agent_entry).await?;
+            env.with_commit(|writer| store.flush_to_txn(writer))?;
+        }
+
+        {
+            let reader = env.reader()?;
+
             let store = SourceChainBuf::new(&reader, &dbs)?;
             let json = store.dump_as_json()?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -346,8 +358,8 @@ pub mod tests {
                 "[\"EntryCreate\",\"Dna\"]",
                 &serde_json::to_string(&parsed).unwrap(),
             );
+        }
 
-            Ok(())
-        })
+        Ok(())
     }
 }
