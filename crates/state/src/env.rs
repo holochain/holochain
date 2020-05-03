@@ -114,11 +114,6 @@ impl EnvironmentRw {
         }
     }
 
-    /// Access the underlying `Rkv` object
-    pub async fn inner(&self) -> RwLockReadGuard<'_, Rkv> {
-        self.arc.read().await
-    }
-
     /// Accessor for the [EnvironmentKind] of the EnvironmentRw
     pub fn kind(&self) -> &EnvironmentKind {
         &self.kind
@@ -152,7 +147,7 @@ impl GetDb for EnvironmentRw {
 
 /// A read-only version of [EnvironmentRw].
 ///
-/// This struct
+/// This environment can only generate read-only transactions, never read-write.
 #[derive(Shrinkwrap, From)]
 pub struct EnvironmentRo(EnvironmentRw);
 
@@ -208,11 +203,10 @@ pub trait ReadManager<'e> {
 
 /// Implementors are able to create a new read-write LMDB transaction
 pub trait WriteManager<'e> {
-    // /// Create a new read-write LMDB transaction
-    // fn writer(&'e self) -> DatabaseResult<Writer<'e>>;
-
     /// Run a closure, passing in a mutable reference to a read-write
-    /// transaction, and commit the transaction after the closure has run
+    /// transaction, and commit the transaction after the closure has run.
+    /// If there is a LMDB error, recover from it and re-run the closure.
+    // FIXME: B-01566: implement write failure detection
     fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -235,17 +229,15 @@ impl<'e> ReadManager<'e> for EnvironmentRefRw<'e> {
 }
 
 impl<'e> WriteManager<'e> for EnvironmentRefRw<'e> {
-
-    // FIXME: add write error handling (see old holochain_persistence)
     fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: FnOnce(&mut Writer) -> Result<R, E>,
     {
         let mut writer = Writer::from(self.rkv.write().map_err(Into::into)?);
-        let result = f(&mut writer);
+        let result = f(&mut writer)?;
         writer.commit().map_err(Into::into)?;
-        result
+        Ok(result)
     }
 }
 
@@ -262,6 +254,7 @@ impl<'e> GetDb for EnvironmentRefRw<'e> {
 
 impl<'e> EnvironmentRefRw<'e> {
     /// Access the underlying lock guard
+    // TODO: disable for EnvironmentRefRo
     pub(crate) fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
         &self.rkv
     }
