@@ -1,7 +1,7 @@
 //! Functionality for safely accessing LMDB database references.
 
 use crate::{
-    env::{EnvironmentKind},
+    env::EnvironmentKind,
     error::{DatabaseError, DatabaseResult},
 };
 use holochain_keystore::KeystoreSender;

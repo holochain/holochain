@@ -143,7 +143,6 @@ impl GetDb for Environment {
     }
 }
 
-
 /// The various types of LMDB environment, used to specify the list of databases to initialize
 #[derive(Clone)]
 pub enum EnvironmentKind {
@@ -251,4 +250,3 @@ impl<'e> EnvironmentRef<'e> {
         self.keystore.clone()
     }
 }
-

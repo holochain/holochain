@@ -5,11 +5,7 @@ use crate::core::state::{
 };
 
 use fallible_iterator::FallibleIterator;
-use holochain_state::{
-    buffer::BufferedStore,
-    error::DatabaseResult,
-    prelude::*,
-};
+use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
 use holochain_types::{
     address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
 };
