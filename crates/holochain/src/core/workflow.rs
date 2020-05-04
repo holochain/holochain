@@ -23,15 +23,14 @@
 
 mod effects;
 pub mod error;
-mod genesis;
-mod invoke_zome;
+mod genesis_workflow;
+mod invoke_zome_workflow;
 
 pub use effects::*;
 
 use crate::core::state::workspace::{Workspace, WorkspaceError};
 use error::*;
 use holochain_state::env::EnvironmentRw;
-use holochain_state::env::WriteManager;
 use must_future::MustBoxFuture;
 
 /// Definition of a Workflow.
