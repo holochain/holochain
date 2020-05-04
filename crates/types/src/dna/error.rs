@@ -29,4 +29,8 @@ pub enum DnaError {
     /// SerializedBytesError
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+
+    /// InvalidWasmHash
+    #[error("InvalidWasmHash")]
+    InvalidWasmHash,
 }

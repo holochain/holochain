@@ -120,6 +120,6 @@ impl DnaFile {
         let wasm_hash = &self.dna.get_zome(zome_name)?.wasm_hash;
         self.code
             .get(wasm_hash)
-            .ok_or_else(|| DnaError::Invalid("wasm not found".to_string()))
+            .ok_or_else(|| DnaError::InvalidWasmHash)
     }
 }
