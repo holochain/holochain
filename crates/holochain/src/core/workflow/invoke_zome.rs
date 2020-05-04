@@ -1,8 +1,9 @@
-use super::{
-    error::WorkflowResult, error::WorkflowRunResult, Workflow, WorkflowEffects, WorkflowTriggers,
-};
-use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
+use super::Workspace;
+use super::{error::WorkflowResult, Workflow, WorkflowEffects, WorkflowTriggers};
+use crate::core::ribosome::RibosomeT;
+use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use futures::future::FutureExt;
+use holochain_state::prelude::*;
 use holochain_state::{env::EnvironmentRo, prelude::*};
 use holochain_types::{nucleus::ZomeInvocation, prelude::Todo};
 use must_future::MustBoxFuture;
@@ -33,6 +34,23 @@ impl<'env, Ribosome: RibosomeT + Send + Sync> Workflow<'env> for InvokeZomeWorkf
         }
         .boxed()
         .into()
+    }
+}
+
+pub struct InvokeZomeWorkspace<'env> {
+    source_chain: SourceChainBuf<'env, Reader<'env>>,
+}
+
+impl<'env> InvokeZomeWorkspace<'env> {
+    pub fn new(_reader: &Reader<'env>, _dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        unimplemented!()
+    }
+}
+impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
+    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn(&mut writer)?;
+        writer.commit()?;
+        Ok(())
     }
 }
 

@@ -1,3 +1,4 @@
+use super::Workspace;
 /// Genesis Workflow: Initialize the source chain with the initial entries:
 /// - Dna
 /// - AgentValidationPkg
@@ -9,8 +10,10 @@ use super::{
     error::{WorkflowError, WorkflowResult},
     Workflow, WorkflowEffects, WorkflowTriggers,
 };
-use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
+use crate::conductor::api::CellConductorApiT;
+use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use futures::future::FutureExt;
+use holochain_state::prelude::*;
 use holochain_state::{env::EnvironmentRo, prelude::*};
 use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
 use must_future::MustBoxFuture;
@@ -77,17 +80,34 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
     }
 }
 
+pub struct GenesisWorkspace<'env> {
+    source_chain: SourceChainBuf<'env, Reader<'env>>,
+}
+
+impl<'env> GenesisWorkspace<'env> {
+    pub fn new(reader: &'env Reader<'env>, dbs: &'env impl GetDb) -> WorkspaceResult<Self> {
+        Ok(Self {
+            source_chain: SourceChainBuf::<'env>::new(reader, dbs)?,
+        })
+    }
+}
+
+impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
+    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn(&mut writer)?;
+        writer.commit()?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
-    use super::GenesisWorkflow;
+    use super::{GenesisWorkflow, GenesisWorkspace};
     use crate::core::workflow::run_workflow;
     use crate::{
         conductor::api::MockCellConductorApi,
-        core::{
-            state::{source_chain::SourceChain, workspace::GenesisWorkspace},
-            workflow::error::WorkflowError,
-        },
+        core::{state::source_chain::SourceChain, workflow::error::WorkflowError},
     };
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};

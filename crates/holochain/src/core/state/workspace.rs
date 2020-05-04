@@ -7,13 +7,6 @@ use super::source_chain::SourceChainError;
 use holochain_state::{error::DatabaseError, prelude::Writer};
 use thiserror::Error;
 
-mod app_validation;
-mod genesis;
-mod invoke_zome;
-pub use app_validation::AppValidationWorkspace;
-pub use genesis::GenesisWorkspace;
-pub use invoke_zome::InvokeZomeWorkspace;
-
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum WorkspaceError {
