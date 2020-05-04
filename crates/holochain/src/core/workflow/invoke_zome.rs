@@ -1,7 +1,7 @@
 use super::{WorkflowCall, WorkflowEffects, WorkflowError, WorkflowResult, WorkflowTrigger};
 use crate::core::{
     ribosome::RibosomeT,
-    state::{source_chain::UnsafeSourceChain, workspace::InvokeZomeWorkspace},
+    state::{source_chain::UnsafeSourceChain, workspace::InvokeZomeWorkspace, cascade::raw::UnsafeCascade},
 };
 use fallible_iterator::FallibleIterator;
 use holochain_types::nucleus::ZomeInvocation;
@@ -17,27 +17,30 @@ pub async fn invoke_zome<'env>(
     // Check if the initialize workflow has been successfully run
     // TODO: PERF: Backwards iterator is a slow way to get length as it's
     // calling get for each item
-    if workspace.iter_back().count()? < 4 {
+    if workspace.source_chain.iter_back().count()? < 4 {
         triggers.push(WorkflowTrigger::immediate(WorkflowCall::InitializeZome));
     }
 
     // Get te current head
-    let chain_head_start = workspace.chain_head()?.clone();
+    let chain_head_start = workspace.source_chain.chain_head()?.clone();
 
     // Create the unsafe sourcechain for use with wasm closure
     {
+        // FIXME: Figure out how to create this without aiasing the mut borrow of the sourcechain
+        let cascade = UnsafeCascade::test(); 
         let (_g, source_chain) = UnsafeSourceChain::from_mut(&mut workspace.source_chain);
         // TODO: TK-01564: Return this result
-        let _result = ribosome.call_zome_function(source_chain, invocation)?;
+        let _result = ribosome.call_zome_function(source_chain, cascade, invocation)?;
     }
 
     // Get the new head
-    let chain_head_end = workspace.chain_head()?;
+    let chain_head_end = workspace.source_chain.chain_head()?;
 
     // Has there been changes?
     if chain_head_start != *chain_head_end {
         // get the changes
         workspace
+            .source_chain
             .iter_back()
             .scan(None, |current_header, entry| {
                 let my_header = current_header.clone();
@@ -95,11 +98,14 @@ pub mod tests {
         let agent_hash = fake_agent_hash("cool agent");
         let agent_entry = Entry::AgentKey(agent_hash.clone());
         let dna_entry = Entry::Dna(Box::new(fake_dna("cool dna")));
-        workspace.put_entry(agent_entry, &agent_hash).unwrap();
-        workspace.put_entry(dna_entry, &agent_hash).unwrap();
+        workspace.source_chain.put_entry(agent_entry, &agent_hash).unwrap();
+        workspace.source_chain.put_entry(dna_entry, &agent_hash).unwrap();
     }
 
-    // TODO: TODAY: Make this pass
+    // 0.5. Initialization Complete?
+    // Check if source chain seq/head ("as at") is less than 4, if so, 
+    // Call Initialize zomes workflows (which will end up adding an entry 
+    // for "zome initialization complete") MVI
     #[tokio::test]
     async fn runs_init() {
         let env = test_cell_env();
@@ -115,7 +121,7 @@ pub mod tests {
         // Setup the ribosome mock
         ribosome
             .expect_call_zome_function()
-            .returning(move |_source_chain, _invocation| {
+            .returning(move |_source_chain, _cascade, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
                 Ok(ZomeInvocationResponse::ZomeApiFn(
                     ZomeExternGuestOutput::new(x),
@@ -179,6 +185,8 @@ pub mod tests {
     // WASM receives external call handles:
     // (gets & commits via cascading cursor, crypto functions & bridge calls via conductor,
     // send via network function call for send direct message)
+    
+    // There is no test for `3.` only that it compiles
 
     // 4. When the WASM code execution finishes, If workspace has new chain entries:
     // 4.1. Call system validation of list of entries and headers: (MVI)
@@ -208,7 +216,7 @@ pub mod tests {
         // Call zome mock that it writes to source chain
         ribosome
             .expect_call_zome_function()
-            .returning(move |source_chain, _invocation| {
+            .returning(move |source_chain, _cascade, _invocation| {
                 let agent_entry = Entry::AgentKey(agent_hash.clone());
                 let call = |source_chain: &mut SourceChain<Reader>| {
                     source_chain.put_entry(agent_entry, &agent_hash).unwrap()

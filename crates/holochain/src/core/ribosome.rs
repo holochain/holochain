@@ -43,6 +43,7 @@ use self::{
 };
 
 use super::state::source_chain::UnsafeSourceChain;
+use super::state::cascade::raw::UnsafeCascade;
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
@@ -79,8 +80,8 @@ pub trait RibosomeT: Sized {
     fn call_zome_function(
         self,
         source_chain: UnsafeSourceChain,
+        cascade: UnsafeCascade,
         // TODO NetworkRequest,
-        // TODO Cascade,
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
 }
@@ -94,6 +95,7 @@ pub struct WasmRibosome {
 
 pub struct HostContext {
     source_chain: UnsafeSourceChain,
+    cascade: UnsafeCascade,
     zome_name: String,
 }
 
@@ -203,9 +205,11 @@ impl RibosomeT for WasmRibosome {
     fn call_zome_function(
         self,
         source_chain: UnsafeSourceChain,
+        cascade: UnsafeCascade,
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse> {
         let host_context = HostContext {
+            cascade,
             source_chain,
             zome_name: invocation.zome_name.clone(),
         };
@@ -232,7 +236,7 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::{ribosome::HostContext, state::source_chain::UnsafeSourceChain};
+    use crate::core::{ribosome::HostContext, state::{source_chain::UnsafeSourceChain, cascade::raw::UnsafeCascade}};
     use holochain_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
@@ -275,6 +279,7 @@ pub mod wasm_test {
                 .instance(HostContext {
                     zome_name: zome_name.to_string(),
                     source_chain: UnsafeSourceChain::test(),
+                    cascade: UnsafeCascade::test(),
                 })
                 .unwrap();
         }
@@ -316,6 +321,7 @@ pub mod wasm_test {
                 let zome_invocation_response = ribosome
                     .call_zome_function(
                         $crate::core::state::source_chain::UnsafeSourceChain::test(),
+                        $crate::core::state::cascade::raw::UnsafeCascade::test(),
                         invocation,
                     )
                     .unwrap();
@@ -355,7 +361,7 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(UnsafeSourceChain::test(), invocation)
+                .call_zome_function(UnsafeSourceChain::test(), UnsafeCascade::test(), invocation)
                 .unwrap()
         );
     }
