@@ -20,8 +20,8 @@ use super::{ribosome::error::RibosomeError, state::source_chain::SourceChainErro
 #[derive(Debug)]
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
-    Genesis(Box<Dna>, AgentHash),
     InitializeZome,
+    Genesis(Box<Dna>, AgentPubKey),
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,
@@ -79,7 +79,7 @@ impl<W: Workspace> std::fmt::Debug for WorkflowEffects<W> {
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
-    AgentInvalid(AgentHash),
+    AgentInvalid(AgentPubKey),
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] ConductorApiError),

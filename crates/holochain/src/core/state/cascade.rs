@@ -43,8 +43,8 @@ use super::{
     chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus},
 };
 use holochain_state::{error::DatabaseResult, prelude::Reader};
+use holochain_types::address::EntryAddress;
 use holochain_types::entry::Entry;
-use holochain_types::entry::EntryAddress;
 use std::collections::HashSet;
 use tracing::*;
 

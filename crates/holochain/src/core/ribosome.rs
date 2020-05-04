@@ -230,7 +230,7 @@ pub mod wasm_test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
-        test_utils::{fake_agent_hash, fake_cap_token, fake_cell_id},
+        test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::*;
@@ -266,7 +266,7 @@ pub mod wasm_test {
             cell_id: fake_cell_id("bob"),
             cap: fake_cap_token(),
             payload: ZomeExternHostInput::new(payload),
-            provenance: fake_agent_hash("bob"),
+            provenance: fake_agent_pubkey_1(),
             as_at: fake_header_hash("fake"),
         }
     }

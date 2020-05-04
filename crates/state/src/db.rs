@@ -211,4 +211,9 @@ impl DbManager {
         }
         Ok(())
     }
+
+    /// Request access to this conductor's keystore
+    pub fn keystore(&self) -> &holochain_keystore::KeystoreSender {
+        self.env.keystore()
+    }
 }

@@ -4,10 +4,9 @@ use crate::{
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, Dna},
     prelude::*,
-    shims::{CapToken, CapabilityRequest},
-    signature::Provenance,
+    shims::CapToken,
 };
-use holo_hash::AgentHash;
+use holo_hash::AgentPubKey;
 use holochain_zome_types::ZomeExternHostInput;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -53,7 +52,7 @@ pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
 
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (fake_dna_hash(name), fake_agent_hash(name)).into()
+    (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }
 
 /// A fixture example DnaHash for unit testing.
@@ -61,9 +60,16 @@ pub fn fake_dna_hash(name: &str) -> DnaHash {
     DnaHash::with_data_sync(name.as_bytes())
 }
 
-/// A fixture example AgentHash for unit testing.
-pub fn fake_agent_hash(name: &str) -> AgentHash {
-    AgentHash::with_data_sync(name.as_bytes())
+/// A fixture example AgentPubKey for unit testing.
+pub fn fake_agent_pubkey_1() -> AgentPubKey {
+    holo_hash::AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4")
+        .unwrap()
+}
+
+/// Another fixture example AgentPubKey for unit testing.
+pub fn fake_agent_pubkey_2() -> AgentPubKey {
+    holo_hash::AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK")
+        .unwrap()
 }
 
 /// A fixture example HeaderHash for unit testing.
@@ -77,27 +83,7 @@ pub fn fake_cap_token() -> CapToken {
     CapToken
 }
 
-/// A fixture example CapabilityRequest for unit testing.
-pub fn fake_capability_request() -> CapabilityRequest {
-    CapabilityRequest::new(CapToken, fake_provenance())
-}
-
 /// A fixture example ZomeInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
     ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
-}
-
-/// A fixture example Provenance for unit testing.
-pub fn fake_provenance() -> Provenance {
-    let fake_agent = AgentHash::with_pre_hashed_sync(vec![0; 32]);
-    fake_provenance_for_agent(&fake_agent)
-}
-
-/// A fixture example Provenance for unit testing.
-pub fn fake_provenance_for_agent(agent_hash: &AgentHash) -> Provenance {
-    let agent_hash = agent_hash.clone();
-
-    let fake_signature = Signature(vec![0; 32]);
-
-    Provenance::new(agent_hash, fake_signature)
 }

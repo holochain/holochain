@@ -33,7 +33,7 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
     }
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn wasm_store_round_trip() -> DatabaseResult<()> {
     use holochain_state::env::ReadManager;
     holochain_types::observability::test_run().ok();
