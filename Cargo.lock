@@ -562,6 +562,8 @@ dependencies = [
 name = "dna_util"
 version = "0.0.1"
 dependencies = [
+ "holo_hash",
+ "holo_hash_core",
  "holochain_serialized_bytes",
  "holochain_types",
  "serde",

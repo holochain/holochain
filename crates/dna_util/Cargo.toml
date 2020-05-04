@@ -11,6 +11,8 @@ categories = ["command-line-utilities", "development-tools::build-utils", "files
 edition = "2018"
 
 [dependencies]
+holo_hash = { version = "0.0.1", path = "../holo_hash" }
+holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
 holochain_serialized_bytes = "=0.0.38"
 holochain_types = { version = "0.0.1", path = "../types" }
 serde = { version = "1.0.104", features = ["derive"] }
