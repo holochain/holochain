@@ -53,6 +53,4 @@ pub async fn main() {
     if let Some(compile) = opt.compile {
         dna_util::compile(compile).await.unwrap();
     }
-
-    println!("yo");
 }
