@@ -122,8 +122,6 @@ mod tests {
                 agent_pubkey: agent_pubkey.clone(),
             };
             let _: () = run_workflow_5(workflow, arc.clone(), workspace).await?;
-            // let writer = env.writer()?;
-            // fx.workspace.commit_txn(writer)?;
         }
 
         env.with_reader(|reader| {
