@@ -14,5 +14,7 @@ pub async fn init_dna(dna: Dna) -> RibosomeResult<InitDnaResult> {
     // thing and at the end of which we can say init complete
     // if one zome inits and another does not we have to retry
     // @todo if any of these fail, fail the whole thing
+    // NOTE: the InitDnaResult already aggregates InitCallbackResult values in the ribosome
+    // any fail already = total fail
     ribosome.run_init()
 }

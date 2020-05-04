@@ -99,7 +99,7 @@ pub trait RibosomeT: Sized {
                 payload: CallbackHostInput::new(().try_into()?),
             };
             let callback_output: Vec<Option<CallbackGuestOutput>> =
-                self.run_callback(callback_invocation)?;
+                self.run_callback(callback_invocation, true)?;
 
             let callback_result: Option<CallbackGuestOutput> =
                 match callback_output.into_iter().nth(0) {
@@ -164,7 +164,7 @@ pub trait RibosomeT: Sized {
                 payload: CallbackHostInput::new(self.dna().try_into()?),
             };
             let callback_outputs: Vec<Option<CallbackGuestOutput>> =
-                self.run_callback(callback_invocation)?;
+                self.run_callback(callback_invocation, false)?;
             assert_eq!(callback_outputs.len(), 2);
 
             for callback_output in callback_outputs {
@@ -219,7 +219,7 @@ pub trait RibosomeT: Sized {
             payload: CallbackHostInput::new(app_entry_type.try_into()?),
         };
         let mut callback_outputs: Vec<Option<CallbackGuestOutput>> =
-            self.run_callback(callback_invocation)?;
+            self.run_callback(callback_invocation, false)?;
         assert_eq!(callback_outputs.len(), 2);
 
         // discard all unimplemented results
@@ -271,7 +271,7 @@ pub trait RibosomeT: Sized {
                 payload: CallbackHostInput::new((&header).try_into()?),
             };
             let callback_outputs: Vec<Option<CallbackGuestOutput>> =
-                self.run_callback(callback_invocation)?;
+                self.run_callback(callback_invocation, true)?;
             assert_eq!(callback_outputs.len(), 2);
 
             // return the list of results and options so we can log what happened or whatever
@@ -321,7 +321,7 @@ pub trait RibosomeT: Sized {
             payload: CallbackHostInput::new(entry.try_into()?),
         };
         let callback_outputs: Vec<Option<CallbackGuestOutput>> =
-            self.run_callback(callback_invocation)?;
+            self.run_callback(callback_invocation, false)?;
         assert_eq!(callback_outputs.len(), 2);
 
         Ok(callback_outputs
@@ -361,6 +361,7 @@ pub trait RibosomeT: Sized {
     fn run_callback(
         &self,
         callback: CallbackInvocation,
+        allow_side_effects: bool,
     ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
@@ -534,13 +535,15 @@ impl RibosomeT for WasmRibosome {
     fn run_callback(
         &self,
         invocation: CallbackInvocation,
+        allow_side_effects: bool,
     ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>> {
         let mut fn_components = invocation.components.clone();
         let mut results: Vec<Option<CallbackGuestOutput>> = vec![];
 
         loop {
             if fn_components.len() > 0 {
-                let mut instance = self.instance(HostContext::from(&invocation), false)?;
+                let mut instance =
+                    self.instance(HostContext::from(&invocation), allow_side_effects)?;
                 let fn_name = fn_components.join("_");
                 match instance.resolve_func(&fn_name) {
                     Ok(_) => {
