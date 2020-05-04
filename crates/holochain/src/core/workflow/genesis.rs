@@ -30,7 +30,6 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
 
     fn workflow(
         self,
-        // environment: &'env EnvironmentRo,
         mut workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
         async {
@@ -39,6 +38,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
                 dna,
                 agent_pubkey,
             } = self;
+
             // TODO: this is a placeholder for a real DPKI request to show intent
             if api
                 .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
@@ -47,20 +47,27 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
             {
                 return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
             }
-            // let env = environment.guard().await;
-            // let mut workspace = GenesisWorkspace::new(&env.reader()?, &env)?;
 
-            // workspace
-            //     .source_chain
-            //     .put(todo!("construct DNA header"), None)
-            //     .await?;
-            // workspace
-            //     .source_chain
-            //     .put(
-            //         todo!("construct AgentPubKey header"),
-            //         Some(todo!("construct entry")),
-            //     )
-            //     .await?;
+            // create a DNA chain element and add it directly to the store
+            let dna_header = ChainHeader::Dna(header::Dna {
+                timestamp: chrono::Utc::now().timestamp().into(),
+                author: agent_pubkey.clone(),
+                hash: dna.dna_hash(),
+            });
+            workspace.source_chain.put(dna_header.clone(), None).await?;
+
+            // create a agent chain element and add it directly to the store
+            let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
+                timestamp: chrono::Utc::now().timestamp().into(),
+                author: agent_pubkey.clone(),
+                prev_header: dna_header.hash().into(),
+                entry_type: header::EntryType::AgentPubKey,
+                entry_address: agent_pubkey.clone().into(),
+            });
+            workspace
+                .source_chain
+                .put(agent_header, Some(Entry::Agent(agent_pubkey)))
+                .await?;
 
             let fx = WorkflowEffects {
                 workspace,
