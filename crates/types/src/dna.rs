@@ -116,6 +116,14 @@ impl DnaFile {
         .expect("blocking thread panic!d - panicing here too")
     }
 
+    /// Transform this DnaFile into a new DnaFile with different properties
+    /// and, hence, a different DnaHash.
+    pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
+        let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
+        dna.properties = properties;
+        DnaFile::new(dna, wasm).await
+    }
+
     /// The hashable portion that can be shared with hApp code.
     pub fn dna(&self) -> &DnaDef {
         &self.dna
