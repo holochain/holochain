@@ -17,5 +17,4 @@ pub mod signal;
 pub mod state;
 #[allow(missing_docs)]
 pub mod validation;
-#[allow(missing_docs)]
 pub mod workflow;

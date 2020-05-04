@@ -1,3 +1,26 @@
+//! Workflows are the core building block of Holochain functionality.
+//!
+//! ## Properties
+//!
+//! Workflows are **transactional**, so that if any workflow fails to run to
+//! completion, nothing will happen.
+
+//! In order to achieve this, workflow functions are **free of any side-effects
+//! which modify cryptographic state**: they will not modify the source chain
+//! nor send network messages which could cause other agents to update their own
+//! source chain.
+//!
+//! Workflows are **never nested**. A workflow cannot call another workflow.
+//! However, a workflow can specify that any number of other workflows should
+//! be triggered after this one completes.
+//!
+//! Side effects and triggering of other workflows is specified declaratively
+//! rather than imperatively. Each workflow returns a `WorkflowEffects` value
+//! representing the side effects that should be run. The `finish` function
+//! processes this value and performs the necessary actions, including
+//! committing changes to the associated Workspace and triggering other
+//! workflows.
+
 mod effects;
 pub mod error;
 mod genesis;
@@ -11,17 +34,33 @@ use holochain_state::env::EnvironmentRw;
 use holochain_state::env::WriteManager;
 use must_future::MustBoxFuture;
 
+/// Definition of a Workflow.
+///
+/// The workflow logic is defined in the `workflow` function. Additional
+/// parameters can be specified as struct fields on the impls.
+///
+/// There are three associated types:
+/// - Output, the return value of the function
+/// - Workspace, the bundle of Buffered Stores used to stage changes to be persisted later
+/// - Triggers, a type representing workflows to be triggered upon completion
 pub trait Workflow<'env>: Sized + Send {
+    /// The return value of the workflow function
     type Output: Send;
+    /// The Workspace associated with this Workflow
     type Workspace: Workspace<'env> + 'env;
+    /// Represents Workflows to be triggered upon completion
     type Triggers: WorkflowTriggers<'env>;
 
+    /// Defines the actual logic for this Workflow
     fn workflow(
         self,
         workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
 }
 
+/// This is the main way to run a Workflow. By constructing a Workflow and
+/// Workspace, this runs the Workflow and executes the `finish` function on
+/// the WorkflowEffects, returning the Output value of the workflow
 pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
     wc: Wf,
     arc: EnvironmentRw,

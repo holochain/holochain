@@ -1,3 +1,6 @@
+// Error types are self-explanatory
+#![allow(missing_docs)]
+
 use super::WorkflowEffects;
 use crate::{
     conductor::api::error::ConductorApiError,
