@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
+use holochain_types::{chain_header::ChainHeader, dna::DnaFile, entry::Entry, header, prelude::*};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -12,7 +12,7 @@ use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header,
 pub async fn genesis(
     mut workspace: GenesisWorkspace<'_>,
     api: impl CellConductorApiT,
-    dna: Dna,
+    dna: DnaFile,
     agent_pubkey: AgentPubKey,
 ) -> WorkflowResult<GenesisWorkspace<'_>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
@@ -28,7 +28,7 @@ pub async fn genesis(
     let dna_header = ChainHeader::Dna(header::Dna {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: agent_pubkey.clone(),
-        hash: dna.dna_hash(),
+        hash: dna.dna_hash().clone(),
     });
     workspace.source_chain.put(dna_header.clone(), None).await?;
 
@@ -72,7 +72,7 @@ mod tests {
     use holochain_types::{
         chain_header::ChainHeader,
         header, observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file},
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -81,7 +81,7 @@ mod tests {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
-        let dna = fake_dna("a");
+        let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
@@ -90,7 +90,7 @@ mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let fx = genesis(workspace, api, dna.clone(), agent_pubkey.clone()).await?;
+            let fx = genesis(workspace, api, dna, agent_pubkey.clone()).await?;
             let writer = env.writer()?;
             fx.workspace.commit_txn(writer)?;
         }
