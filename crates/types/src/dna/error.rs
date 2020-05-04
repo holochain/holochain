@@ -1,10 +1,9 @@
 //! Holochain DnaError type.
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Holochain DnaError type.
-#[derive(Clone, Debug, Error, PartialEq, Hash, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Error)]
 pub enum DnaError {
     /// ZomeNotFound
     #[error("Zome not found: {0}")]
@@ -32,18 +31,9 @@ pub enum DnaError {
 
     /// std::io::Error
     #[error("std::io::Error: {0}")]
-    StdIoError(String),
+    StdIoError(#[from] std::io::Error),
 
     /// InvalidWasmHash
     #[error("InvalidWasmHash")]
     InvalidWasmHash,
-}
-
-// WHY THE F*$&# do we have all those derives on an ERROR TYPE
-// Clone? Ord? Seriously?
-// makes us have to do lame things like this:
-impl From<std::io::Error> for DnaError {
-    fn from(e: std::io::Error) -> Self {
-        DnaError::StdIoError(format!("{:?}", e))
-    }
 }

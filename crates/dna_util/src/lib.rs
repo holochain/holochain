@@ -4,7 +4,6 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
 use std::collections::BTreeMap;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]
@@ -66,6 +65,7 @@ fn dna_file_path_convert(
             ))
         })?
         .to_string_lossy();
+
     let new_name = if to_work_dir {
         let filename_base = &filename[..filename.len() - 7];
         format!("{}.dna_work_dir", filename_base)
@@ -73,9 +73,11 @@ fn dna_file_path_convert(
         let filename_base = &filename[..filename.len() - 13];
         format!("{}.dna.gz", filename_base)
     };
+
     let mut dir = std::path::PathBuf::new();
     dir.push(dna_file_path);
     dir.set_file_name(new_name);
+
     Ok(dir)
 }
 
@@ -85,18 +87,14 @@ pub async fn extract(dna_file_path: impl AsRef<std::path::Path>) -> DnaUtilResul
     let dir = dna_file_path_convert(&dna_file_path, true)?;
     tokio::fs::create_dir_all(&dir).await?;
 
-    let mut file = tokio::fs::File::open(dna_file_path).await?;
-    let mut data = Vec::new();
-    file.read_to_end(&mut data).await?;
-    let dna_file = DnaFile::from_file_content(&data).await?;
+    let dna_file = DnaFile::from_file_content(&tokio::fs::read(dna_file_path).await?).await?;
 
     for (zome_name, zome) in &dna_file.dna().zomes {
         let wasm_hash = &zome.wasm_hash;
         let wasm = dna_file.code().get(wasm_hash).expect("dna_file corrupted");
         let mut wasm_filename = dir.clone();
         wasm_filename.push(format!("{}.wasm", zome_name));
-        let mut wasm_file = tokio::fs::File::create(wasm_filename).await?;
-        wasm_file.write_all(&wasm.code()).await?;
+        tokio::fs::write(wasm_filename, &*wasm.code()).await?;
     }
 
     let dna_json = DnaDefJson::from_dna_def(dna_file.dna())?;
@@ -104,8 +102,7 @@ pub async fn extract(dna_file_path: impl AsRef<std::path::Path>) -> DnaUtilResul
 
     let mut json_filename = dir.clone();
     json_filename.push("dna.json");
-    let mut json_file = tokio::fs::File::create(json_filename).await?;
-    json_file.write_all(dna_json.as_bytes()).await?;
+    tokio::fs::write(json_filename, dna_json.as_bytes()).await?;
 
     Ok(())
 }
@@ -117,18 +114,15 @@ pub async fn compile(dna_work_dir: impl AsRef<std::path::Path>) -> DnaUtilResult
 
     let mut json_filename = dna_work_dir.clone();
     json_filename.push("dna.json");
-    let mut json_file = tokio::fs::File::open(json_filename).await?;
 
-    let mut json_data = Vec::new();
-    json_file.read_to_end(&mut json_data).await?;
+    let json_data = tokio::fs::read(json_filename).await?;
 
     let json_file: DnaDefJson = serde_json::from_slice(&json_data)?;
 
     let dna_file_content = json_file.compile_dna_file(&dna_work_dir).await?;
     let dna_file_content = dna_file_content.as_file_content().await?;
 
-    let mut dna_file = tokio::fs::File::create(dna_file_path).await?;
-    dna_file.write_all(&dna_file_content).await?;
+    tokio::fs::write(dna_file_path, &dna_file_content).await?;
 
     Ok(())
 }
@@ -192,9 +186,7 @@ impl DnaDefJson {
             let mut zome_file_path = work_dir_z.clone();
             zome_file_path.push(&zome.wasm_path);
 
-            let mut zome_content = Vec::new();
-            let mut zome_file = tokio::fs::File::open(zome_file_path).await?;
-            zome_file.read_to_end(&mut zome_content).await?;
+            let zome_content = tokio::fs::read(zome_file_path).await?;
 
             let wasm: DnaWasm = zome_content.into();
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
@@ -229,15 +221,22 @@ mod tests {
                 ("test-zome-2".into(), vec![5, 6, 7, 8].into()),
             ],
         );
+        let properties = JsonValueDecodeHelper(serde_json::json!({
+            "test_prop_1": ["a", 42],
+            "test_prop_2": {
+                "bool": true,
+            }
+        }));
+        let dna_file = dna_file
+            .with_properties(SerializedBytes::try_from(properties).unwrap())
+            .await
+            .unwrap();
 
         let dna_filename = tmp_dir.path().join("test-dna.dna.gz");
 
-        {
-            let mut file = tokio::fs::File::create(&dna_filename).await.unwrap();
-            file.write_all(&dna_file.as_file_content().await.unwrap())
-                .await
-                .unwrap();
-        }
+        tokio::fs::write(&dna_filename, dna_file.as_file_content().await.unwrap())
+            .await
+            .unwrap();
 
         extract(&dna_filename).await.unwrap();
 
@@ -247,13 +246,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut dna_file_reader = tokio::fs::File::open(&dna_filename).await.unwrap();
-        let mut dna_file_content = Vec::new();
-        dna_file_reader
-            .read_to_end(&mut dna_file_content)
-            .await
-            .unwrap();
-
+        let dna_file_content = tokio::fs::read(&dna_filename).await.unwrap();
         let dna_file2 = DnaFile::from_file_content(&dna_file_content).await.unwrap();
 
         assert_eq!(dna_file, dna_file2);
