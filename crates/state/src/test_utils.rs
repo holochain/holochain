@@ -1,6 +1,6 @@
 //! Helpers for unit tests
 
-use crate::env::{EnvironmentRw, EnvironmentKind};
+use crate::env::{EnvironmentKind, EnvironmentRw};
 use holochain_types::test_utils::fake_cell_id;
 use tempdir::TempDir;
 

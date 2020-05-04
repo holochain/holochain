@@ -261,7 +261,7 @@ pub mod tests {
             env.with_commit(|writer| {
                 kv1.put("hi".to_owned(), testval.clone());
                 kv2.put("salutations".to_owned(), "folks".to_owned());
-    
+
                 // Check that the underlying store contains no changes yet
                 assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
                 assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);

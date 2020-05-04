@@ -149,7 +149,7 @@ impl EnvironmentRw {
 
     /// Get a read-only lock guard on the environment.
     /// This reference can create read-write transactions.
-    pub async fn guard<'e>(&'e self) -> EnvironmentRefRw<'e> {
+    pub async fn guard(&self) -> EnvironmentRefRw<'_> {
         EnvironmentRefRw(self.0.guard().await)
     }
 }

@@ -497,7 +497,7 @@ mod builder {
         /// Build a Conductor with a test environment
         pub async fn test(self) -> ConductorResult<Conductor<DS>> {
             let environment = test_conductor_env().await;
-            let keystore = environment.keystore().clone();
+            let keystore = environment.keystore();
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
 
             #[cfg(test)]
