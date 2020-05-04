@@ -23,7 +23,7 @@ use super::{
         keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
         TaskManagerRunHandle,
     },
-    state::ConductorState,
+    state::{CellConfig, ConductorState},
 };
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
@@ -157,6 +157,7 @@ where
     DS: DnaStore + 'static,
 {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+        debug!(cells_map = ?self.cells.keys().collect::<Vec<_>>());
         let item = self
             .cells
             .get(cell_id)
@@ -381,6 +382,24 @@ where
         Ok(new_state)
     }
 
+    fn update_cells(&mut self, cells: &[CellConfig]) -> ConductorResult<()> {
+        let id = todo!("Make or get cell id");
+        // FIXME: I don't think we want to or can get the conductor handle
+        // whilst inside the conductor?
+        let conductor_handle = todo!();
+        for cell in cells {
+            self.cells.entry(id).or_insert_with(|| {
+                let cell = Cell::create(id, conductor_handle)
+                    .expect("Handle this error while keeping this process lazy");
+                CellItem {
+                    cell,
+                    _state: CellState { _active: false },
+                }
+            });
+        }
+        Ok(())
+    }
+
     /// Sends a JoinHandle to the TaskManager task to be managed
     async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
         self.managed_task_add_sender
@@ -469,9 +488,13 @@ mod builder {
             state: Option<ConductorState>,
             conductor: Conductor<DS>,
         ) -> ConductorResult<Conductor<DS>> {
+            let s = conductor.get_state().await;
+            debug!(before = ?s);
             if let Some(state) = state {
                 conductor.update_state(move |_| Ok(state)).await?;
             }
+            let s = conductor.get_state().await;
+            debug!(after = ?s);
             Ok(conductor)
         }
 

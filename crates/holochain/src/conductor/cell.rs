@@ -1,4 +1,4 @@
-use super::api::error::SerializationError;
+use super::{api::error::SerializationError, ConductorHandle};
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
@@ -11,7 +11,7 @@ use crate::{
 };
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::Environment;
+use holochain_state::env::{Environment, EnvironmentKind};
 use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
@@ -57,6 +57,19 @@ pub struct Cell {
 }
 
 impl Cell {
+    pub fn create(id: CellId, conductor_handle: ConductorHandle) -> CellResult<Self> {
+        let conductor_api = CellConductorApi::new(conductor_handle, id);
+        let state_env = Environment::new(
+            todo!("Get env path"),
+            EnvironmentKind::Cell(id),
+            todo!("get keystore"),
+        )?;
+        Ok(Self {
+            id,
+            conductor_api,
+            state_env,
+        })
+    }
     #[allow(dead_code)]
     fn dna_hash(&self) -> &DnaHash {
         &self.id.dna_hash()

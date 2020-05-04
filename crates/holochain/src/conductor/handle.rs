@@ -57,6 +57,7 @@ use holochain_types::{
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::*;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -150,6 +151,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         // FIXME: Are we holding this read lock for
         // the entire call to invoke_zome ?
         let lock = self.0.read().await;
+        debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
         cell.invoke_zome(invocation).await.map_err(Into::into)
     }

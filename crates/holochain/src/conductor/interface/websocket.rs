@@ -230,6 +230,7 @@ mod test {
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
+        state::{CellConfig, ConductorState},
         Conductor,
     };
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
@@ -237,7 +238,7 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
         observability,
-        test_utils::{fake_dna, fake_dna_file},
+        test_utils::{fake_dna, fake_dna_file, fake_cell_id},
     };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
@@ -256,8 +257,21 @@ mod test {
         RealAdminInterfaceApi::new(conductor_handle)
     }
 
-    async fn setup_app() -> RealAppInterfaceApi {
-        let conductor_handle = Conductor::builder().test().await.unwrap().into_handle();
+    async fn setup_app(id: String) -> RealAppInterfaceApi {
+        let cell = CellConfig {
+            id,
+            dna: "".into(),
+            agent: "".into(),
+        };
+        let mut state = ConductorState::default();
+        state.cells.push(cell);
+
+        let conductor_handle = Conductor::builder()
+            .fake_state(state)
+            .test()
+            .await
+            .unwrap()
+            .into_handle();
         RealAppInterfaceApi::new(conductor_handle)
     }
 
@@ -339,7 +353,7 @@ mod test {
         // doesn't deserialize
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn call_zome_function() {
         observability::test_run().ok();
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -348,7 +362,7 @@ mod test {
         }
         let payload = Payload { a: 1 };
         // TODO: Create the Mock for the cell-dna-api to provide a fake zome response
-        let app_api = setup_app().await;
+        let app_api = setup_app(fake_cell_id("bob").to_string()).await;
         let request = Box::new(zome_invocation_from_names(
             "zomey",
             "fun_times",

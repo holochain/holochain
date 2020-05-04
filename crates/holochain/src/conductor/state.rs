@@ -158,8 +158,12 @@ pub struct DnaConfig {
 /// Each cell has its own storage configuration.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct CellConfig {
+    // FIXME: The id is a combination of the DnaHash and
+    // the AgentPubKey so should this be removed?
     pub id: String,
+    // FIXME: Should this be DnaHash instead of string?
     pub dna: String,
+    // FIXME: Should this be AgentPubKey instead of string?
     pub agent: String,
 }
 
