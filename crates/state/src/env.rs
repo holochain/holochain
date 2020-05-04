@@ -5,7 +5,7 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
-use derive_more::{From, Into};
+use derive_more::Into;
 use holochain_keystore::KeystoreSender;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
@@ -61,16 +61,60 @@ fn rkv_builder(
     }
 }
 
-/// The canonical representation of a (singleton) LMDB environment.
-/// The wrapper contains methods for managing transactions and database connections,
-/// tucked away into separate traits.
+/// A read-only version of [EnvironmentRw].
+/// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
-pub struct EnvironmentRw {
+pub struct EnvironmentRo {
     arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
     path: PathBuf,
     keystore: KeystoreSender,
 }
+
+impl EnvironmentRo {
+    /// Get a read-only lock on the EnvironmentRw. The most typical use case is
+    /// to get a lock in order to create a read-only transaction. The lock guard
+    /// must outlive the transaction, so it has to be returned here and managed
+    /// explicitly.
+    pub async fn guard(&self) -> EnvironmentRefRo<'_> {
+        EnvironmentRefRo {
+            rkv: self.arc.read().await,
+            path: &self.path,
+            keystore: self.keystore.clone(),
+        }
+    }
+
+    /// Accessor for the [EnvironmentKind] of the EnvironmentRw
+    pub fn kind(&self) -> &EnvironmentKind {
+        &self.kind
+    }
+
+    /// Request access to this conductor's keystore
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
+    }
+
+    /// Return a `GetDb`, which can synchronously get databases from this environment
+    pub async fn dbs(&self) -> impl GetDb + '_ {
+        self.guard().await
+    }
+}
+
+impl GetDb for EnvironmentRw {
+    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
+        get_db(&self.path, key)
+    }
+
+    fn keystore(&self) -> KeystoreSender {
+        self.keystore.clone()
+    }
+}
+
+/// The canonical representation of a (singleton) LMDB environment.
+/// The wrapper contains methods for managing transactions
+/// and database connections,
+#[derive(Clone, Shrinkwrap, Into)]
+pub struct EnvironmentRw(EnvironmentRo);
 
 impl EnvironmentRw {
     /// Create an environment,
@@ -91,74 +135,22 @@ impl EnvironmentRw {
                 .insert({
                     let rkv = rkv_builder(None, None)(&path)?;
                     initialize_databases(&rkv, &kind).await?;
-                    EnvironmentRw {
+                    EnvironmentRw(EnvironmentRo {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
                         keystore,
                         path,
-                    }
+                    })
                 })
                 .clone(),
         };
         Ok(env)
     }
 
-    /// Get a read-only lock on the EnvironmentRw. The most typical use case is
-    /// to get a lock in order to create a read-only transaction. The lock guard
-    /// must outlive the transaction, so it has to be returned here and managed
-    /// explicitly.
-    pub async fn guard(&self) -> EnvironmentRefRw<'_> {
-        EnvironmentRefRw(EnvironmentRefRo {
-            rkv: self.arc.read().await,
-            path: &self.path,
-            keystore: self.keystore.clone(),
-        })
-    }
-
-    /// Accessor for the [EnvironmentKind] of the EnvironmentRw
-    pub fn kind(&self) -> &EnvironmentKind {
-        &self.kind
-    }
-
-    /// Request access to this conductor's keystore
-    pub fn keystore(&self) -> &KeystoreSender {
-        &self.keystore
-    }
-
-    /// Return a `GetDb`, which can synchronously get databases from this environment
-    pub async fn dbs(&self) -> impl GetDb + '_ {
-        EnvironmentRefRo::from(self.guard().await)
-    }
-
-    /// Transform this Environment into its read-only counterpart
-    pub fn as_readonly(self) -> EnvironmentRo {
-        self.into()
-    }
-}
-
-impl GetDb for EnvironmentRw {
-    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        get_db(&self.path, key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.keystore.clone()
-    }
-}
-
-/// A read-only version of [EnvironmentRw].
-///
-/// This environment can only generate read-only transactions, never read-write.
-#[derive(Shrinkwrap, From)]
-pub struct EnvironmentRo(EnvironmentRw);
-
-impl EnvironmentRo {
-    /// Get a read-only lock on the EnvironmentRw. The most typical use case is
-    /// to get a lock in order to create a read-only transaction. The lock guard
-    /// must outlive the transaction, so it has to be returned here and managed
-    /// explicitly.
-    pub async fn guard<'e>(&'e self) -> EnvironmentRefRo<'e> {
-        self.0.guard().await.into()
+    /// Get a read-only lock guard on the environment.
+    /// This reference can create read-write transactions.
+    pub async fn guard<'e>(&'e self) -> EnvironmentRefRw<'e> {
+        EnvironmentRefRw(self.0.guard().await)
     }
 }
 
