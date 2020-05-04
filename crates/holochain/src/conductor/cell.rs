@@ -88,7 +88,7 @@ impl Cell {
             invocation,
         };
         let workspace = InvokeZomeWorkspace::new(&env.reader()?, &env)?;
-        Ok(run_workflow(self.state_env().into(), workflow, workspace)
+        Ok(run_workflow(self.state_env(), workflow, workspace)
             .await
             .map_err(Box::new)?)
     }
