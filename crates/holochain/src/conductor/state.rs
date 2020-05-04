@@ -1,11 +1,8 @@
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::{
-    dna::{error::DnaError, DnaFile},
-    prelude::*,
-};
+use holochain_types::{dna::error::DnaError, prelude::*};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::collections::HashSet;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///

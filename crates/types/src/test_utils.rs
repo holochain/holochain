@@ -56,7 +56,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
-pub fn fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+pub fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
     path.push("dna");
