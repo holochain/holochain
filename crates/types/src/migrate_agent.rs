@@ -4,7 +4,7 @@
 use crate::nucleus::ZomeName;
 
 /// the aggregate result of all zome callbacks for migrating an agent between dnas
-pub enum MigrateAgentResult {
+pub enum MigrateAgentDnaResult {
     /// all implemented migrate agent callbacks in all zomes passed
     Pass,
     /// some migrate agent callback failed

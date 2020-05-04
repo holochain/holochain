@@ -1,7 +1,10 @@
+use holochain_serialized_bytes::prelude::*;
+use holo_hash_core::EntryHash;
+
 #[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum ValidationCallbackResult {
+pub enum ValidateCallbackResult {
     Valid,
-    Invalid(FailString),
+    Invalid(String),
     /// subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have
     UnresolvedDependencies(Vec<EntryHash>),
@@ -13,5 +16,5 @@ pub struct ValidationPackage;
 #[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
-    Fail(FailString),
+    Fail(String),
 }

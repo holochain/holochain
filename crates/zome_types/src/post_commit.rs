@@ -1,5 +1,8 @@
+use holochain_serialized_bytes::prelude::*;
+use holo_hash_core::HeaderHash;
+
 #[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum PostCommitCallbackResult {
-    Success(HeaderAddress),
-    Fail(HeaderAddress, FailString),
+    Success(HeaderHash),
+    Fail(HeaderHash, String),
 }

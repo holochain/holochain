@@ -1,7 +1,12 @@
+//! init a dna via the ribosome
+//! @see the ribosome docs for more info
+
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::{RibosomeT, WasmRibosome};
-use holochain_types::{dna::Dna, entry::Entry, shims::*};
+use holochain_types::{dna::Dna};
+use holochain_types::init::InitDnaResult;
 
+/// init a dna
 pub async fn init_dna(
     dna: Dna,
 ) -> RibosomeResult<InitDnaResult> {
