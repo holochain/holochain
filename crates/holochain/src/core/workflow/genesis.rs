@@ -7,7 +7,7 @@
 /// FIXME: creating entries in the config db
 use super::{
     error::{WorkflowError, WorkflowResult},
-    WorkflowCaller, WorkflowEffects, WorkflowTriggers,
+    Workflow, WorkflowEffects, WorkflowTriggers,
 };
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
 use futures::future::FutureExt;
@@ -21,9 +21,7 @@ pub struct GenesisWorkflow<Api: CellConductorApiT> {
     agent_pubkey: AgentPubKey,
 }
 
-impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
-    for GenesisWorkflow<Api>
-{
+impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for GenesisWorkflow<Api> {
     type Output = ();
     type Workspace = GenesisWorkspace<'env>;
     type Triggers = ();
@@ -69,13 +67,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
                 .put(agent_header, Some(Entry::Agent(agent_pubkey)))
                 .await?;
 
-            let fx = WorkflowEffects {
-                workspace,
-                signals: Default::default(),
-                callbacks: Default::default(),
-                triggers: (),
-                __lifetime: Default::default(),
-            };
+            let fx = WorkflowEffects::new(workspace, Default::default(), Default::default(), ());
             let result = ();
 
             Ok((result, fx))
@@ -89,14 +81,11 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> WorkflowCaller<'env>
 mod tests {
 
     use super::GenesisWorkflow;
-    use crate::core::workflow::caller::{run_workflow, WorkflowCaller};
+    use crate::core::workflow::run_workflow;
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{
-            state::{
-                source_chain::SourceChain,
-                workspace::{GenesisWorkspace, Workspace},
-            },
+            state::{source_chain::SourceChain, workspace::GenesisWorkspace},
             workflow::error::WorkflowError,
         },
     };

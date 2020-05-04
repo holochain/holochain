@@ -1,6 +1,5 @@
 use super::{
-    error::WorkflowResult, error::WorkflowRunResult, WorkflowCaller, WorkflowEffects,
-    WorkflowTriggers,
+    error::WorkflowResult, error::WorkflowRunResult, Workflow, WorkflowEffects, WorkflowTriggers,
 };
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
 use futures::future::FutureExt;
@@ -15,9 +14,7 @@ pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     invocation: ZomeInvocation,
 }
 
-impl<'env, Ribosome: RibosomeT + Send + Sync> WorkflowCaller<'env>
-    for InvokeZomeWorkflow<Ribosome>
-{
+impl<'env, Ribosome: RibosomeT + Send + Sync> Workflow<'env> for InvokeZomeWorkflow<Ribosome> {
     type Output = ZomeInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = ();

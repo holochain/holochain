@@ -27,7 +27,7 @@ pub enum WorkflowError {
 
 /// The `Result::Ok` of any workflow function is
 /// a tuple of the function output and a `WorkflowEffects` struct.
-pub type WorkflowResult<'env, O, WC> = Result<(O, WorkflowEffects<'env, WC>), WorkflowError>;
+pub type WorkflowResult<'env, O, Wf> = Result<(O, WorkflowEffects<'env, Wf>), WorkflowError>;
 
 #[derive(Error, Debug)]
 pub enum WorkflowRunError {

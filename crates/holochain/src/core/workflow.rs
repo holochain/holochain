@@ -1,90 +1,82 @@
-pub mod caller;
+mod effects;
 pub mod error;
 mod genesis;
 mod invoke_zome;
 
-use crate::core::state::workspace::Workspace;
-use caller::{run_workflow, WorkflowCaller};
-use error::WorkflowRunResult;
-use futures::{
-    future::{BoxFuture, FutureExt},
-    Future,
-};
-use holochain_state::env::EnvironmentRo;
-use holochain_state::env::{EnvironmentRw, ReadManager};
-use holochain_types::prelude::*;
-use must_future::MustBoxFuture;
-use std::time::Duration;
-use thiserror::Error;
+pub use effects::*;
 
-/// A WorkflowEffects is returned from each Workspace function.
-/// It's just a data structure with no methods of its own, hence the public fields
-pub struct WorkflowEffects<'env, WC: WorkflowCaller<'env>> {
-    pub(super) workspace: WC::Workspace,
-    pub(super) callbacks: Vec<WorkflowCallback>,
-    pub(super) signals: Vec<WorkflowSignal>,
-    pub(super) triggers: WC::Triggers,
-    __lifetime: std::marker::PhantomData<&'env ()>,
+use crate::core::state::workspace::{Workspace, WorkspaceError};
+use error::*;
+use holochain_state::env::EnvironmentRw;
+use holochain_state::env::WriteManager;
+use must_future::MustBoxFuture;
+
+pub trait Workflow<'env>: Sized + Send {
+    type Output: Send;
+    type Workspace: Workspace<'env> + 'env;
+    type Triggers: WorkflowTriggers<'env>;
+
+    fn workflow(
+        self,
+        workspace: Self::Workspace,
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
 }
 
-impl<'env, WC: WorkflowCaller<'env>> WorkflowEffects<'env, WC> {
-    pub fn new(
-        workspace: WC::Workspace,
-        callbacks: Vec<WorkflowCallback>,
-        signals: Vec<WorkflowSignal>,
-        triggers: WC::Triggers,
-    ) -> Self {
-        Self {
-            workspace,
-            triggers,
-            callbacks,
-            signals,
-            __lifetime: std::marker::PhantomData,
+pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
+    wc: Wf,
+    arc: EnvironmentRw,
+    workspace: Wf::Workspace,
+) -> WorkflowRunResult<O> {
+    let (output, effects) = wc.workflow(workspace).await?;
+    finish(arc, effects).await?;
+    Ok(output)
+}
+
+/// Apply the WorkflowEffects to finalize the Workflow.
+/// 1. Persist DB changes via `Workspace::commit_txn`
+/// 2. Call any Wasm callbacks
+/// 3. Emit any Signals
+/// 4. Trigger any subsequent Workflows
+async fn finish<'env, Wf: Workflow<'env>>(
+    arc: EnvironmentRw,
+    effects: WorkflowEffects<'env, Wf>,
+) -> WorkflowRunResult<()> {
+    let WorkflowEffects {
+        workspace,
+        triggers,
+        callbacks,
+        signals,
+        ..
+    } = effects;
+
+    // finish workspace
+    {
+        // let arc = cell.state_env();
+        let env = arc.guard().await;
+        let writer = env
+            .writer_unmanaged()
+            .map_err(Into::<WorkspaceError>::into)?;
+        workspace
+            .commit_txn(writer)
+            .map_err(Into::<WorkspaceError>::into)?;
+    }
+
+    // finish callbacks
+    {
+        for _callback in callbacks {
+            // TODO
         }
     }
-}
 
-pub type WorkflowCallback = Todo;
-pub type WorkflowSignal = Todo;
-
-type TriggerOutput = tokio::task::JoinHandle<WorkflowRunResult<()>>;
-
-/// Trait which defines additional workflows to be run after this one.
-/// TODO: B-01567: this can't be implemented as such until we find out how to
-/// dynamically create a Workspace via the trait-defined Workspace::new(),
-/// and to have the lifetimes match up.
-pub trait WorkflowTriggers<'env>: Send {
-    fn run(self, env: EnvironmentRw) -> TriggerOutput;
-}
-
-impl<'env> WorkflowTriggers<'env> for () {
-    fn run(self, _env: EnvironmentRw) -> TriggerOutput {
-        tokio::spawn(async { Ok(()) })
+    // finish signals
+    {
+        for _signal in signals {
+            // TODO
+        }
     }
-}
 
-impl<'env, W1> WorkflowTriggers<'env> for W1
-where
-    W1: 'static + WorkflowCaller<'static, Output = ()>,
-{
-    fn run(self, env: EnvironmentRw) -> TriggerOutput {
-        tokio::spawn(async {
-            let _handle = run_workflow(self, env, todo!("get workspace"));
-            Ok(())
-        })
-    }
-}
+    // finish triggers
+    let handle = triggers.run(arc);
 
-impl<'env, W1, W2> WorkflowTriggers<'env> for (W1, W2)
-where
-    W1: 'static + WorkflowCaller<'static, Output = ()>,
-    W2: 'static + WorkflowCaller<'static, Output = ()>,
-{
-    fn run(self, env: EnvironmentRw) -> TriggerOutput {
-        tokio::spawn(async {
-            let _handle = run_workflow(self.0, env, todo!("get workspace"));
-            let _handle = run_workflow(self.1, env, todo!("get workspace"));
-            Ok(())
-        })
-    }
+    Ok(())
 }
