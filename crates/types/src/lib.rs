@@ -11,13 +11,13 @@ pub mod db;
 pub mod dna;
 pub mod entry;
 pub mod header;
+pub mod init;
 pub mod link;
+pub mod migrate_agent;
 pub mod nucleus;
 pub mod observability;
 pub mod persistence;
 pub mod prelude;
-pub mod init;
-pub mod migrate_agent;
 pub mod validate;
 
 /// Placeholders to allow other things to compile

@@ -9,6 +9,7 @@ pub mod net;
 pub mod nucleus;
 // FIXME: remove these allows when entire lib is documented
 //      (these can be peeled off one by one to make iterative work easier)
+pub mod init;
 #[allow(missing_docs)]
 pub mod ribosome;
 #[allow(missing_docs)]
@@ -16,6 +17,5 @@ pub mod signal;
 #[allow(missing_docs)]
 pub mod state;
 pub mod validate;
-pub mod init;
 #[allow(missing_docs)]
 pub mod workflow;
