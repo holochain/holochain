@@ -42,7 +42,7 @@ use self::{
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 
-use super::state::source_chain::UnsafeSourceChain;
+use super::state::source_chain::raw::UnsafeSourceChain;
 use super::state::cascade::raw::UnsafeCascade;
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
@@ -236,7 +236,7 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::{ribosome::HostContext, state::{source_chain::UnsafeSourceChain, cascade::raw::UnsafeCascade}};
+    use crate::core::{ribosome::HostContext, state::{source_chain::raw::UnsafeSourceChain, cascade::raw::UnsafeCascade}};
     use holochain_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
@@ -320,7 +320,7 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        $crate::core::state::source_chain::UnsafeSourceChain::test(),
+                        $crate::core::state::source_chain::raw::UnsafeSourceChain::test(),
                         $crate::core::state::cascade::raw::UnsafeCascade::test(),
                         invocation,
                     )

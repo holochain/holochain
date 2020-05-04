@@ -1,7 +1,7 @@
 use super::{WorkflowCall, WorkflowEffects, WorkflowError, WorkflowResult, WorkflowTrigger};
 use crate::core::{
     ribosome::RibosomeT,
-    state::{source_chain::UnsafeSourceChain, workspace::InvokeZomeWorkspace, cascade::raw::UnsafeCascade},
+    state::{source_chain::raw::UnsafeSourceChain, workspace::InvokeZomeWorkspace, cascade::raw::UnsafeCascade},
 };
 use fallible_iterator::FallibleIterator;
 use holochain_types::nucleus::ZomeInvocation;
@@ -144,7 +144,7 @@ pub mod tests {
     // 1.  Check if there is a Capability token secret in the parameters.
     // If there isn't and the function to be called isn't public,
     // we stop the process and return an error. MVT
-    // TODO: Finish this test when capabilities land
+    // TODO: B-01553: Finish this test when capabilities land
     #[ignore]
     #[allow(unused_variables, unreachable_code)]
     #[tokio::test]
@@ -165,7 +165,7 @@ pub mod tests {
         assert_matches!(error, WorkflowError::CapabilityMissing);
     }
 
-    // TODO: Finish these tests when capabilities land
+    // TODO: B-01553: Finish these tests when capabilities land
     // 1.1 If there is a secret, we look up our private CAS and see if it matches any secret for a
     // Capability Grant entry that we have stored. If it does, check that this Capability Grant is
     //not revoked and actually grants permissions to call the ZomeFn that is being called. (MVI)
@@ -180,7 +180,7 @@ pub mod tests {
     // TODO: TODAY: (turn into PR question) What is pre-flight chain extention?
     // 2. Set Context (Cascading Cursor w/ Pre-flight chain extension) MVT
 
-    // TODO: TODAY: How is the Cursor (I guess the cascade?) passed to the wasm invokation?
+    // TODO: How is the Cursor (I guess the cascade?) passed to the wasm invokation?
     // 3. Invoke WASM (w/ Cursor) MVM
     // WASM receives external call handles:
     // (gets & commits via cascading cursor, crypto functions & bridge calls via conductor,
@@ -197,7 +197,7 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-    // TODO: SYSTEM_VALIDATION: Finish when sys val lands
+    // TODO: B-01092: SYSTEM_VALIDATION: Finish when sys val lands
     #[ignore]
     #[tokio::test]
     async fn calls_system_validation() {
@@ -248,7 +248,7 @@ pub mod tests {
     // 4.2. Call app validation of list of entries and headers: (MVI)
     // - Call validate_set_of_entries_and_headers (any necessary get
     //   results where we receive None / Timeout on retrieving validation dependencies, should produce error/fail)
-    // TODO: APP_VALIDATION: Finish when app val lands
+    // TODO: B-01093: Finish when app val lands
     #[ignore]
     #[tokio::test]
     async fn calls_app_validation() {
@@ -260,8 +260,8 @@ pub mod tests {
         let ribosome = MockRibosomeT::new();
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
-        // TODO: Mock the app validation and check it's called
-        // TODO: How can I pass a app validation into this?
+        // TODO: B-01093: Mock the app validation and check it's called
+        // TODO: B-01093: How can I pass a app validation into this?
         // These are just static calls
         let effects = invoke_zome(workspace, ribosome, invocation).await.unwrap();
         assert!(effects.triggers.is_empty());
