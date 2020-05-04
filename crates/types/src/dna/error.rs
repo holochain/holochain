@@ -33,6 +33,10 @@ pub enum DnaError {
     /// std::io::Error
     #[error("std::io::Error: {0}")]
     StdIoError(String),
+
+    /// InvalidWasmHash
+    #[error("InvalidWasmHash")]
+    InvalidWasmHash,
 }
 
 // WHY THE F*$&# do we have all those derives on an ERROR TYPE
