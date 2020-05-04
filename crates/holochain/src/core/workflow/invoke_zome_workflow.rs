@@ -1,10 +1,9 @@
 use super::Workspace;
-use super::{error::WorkflowResult, Workflow, WorkflowEffects, WorkflowTriggers};
+use super::{error::WorkflowResult, Workflow, WorkflowEffects};
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
-use holochain_state::{env::EnvironmentRo, prelude::*};
 use holochain_types::{nucleus::ZomeInvocation, prelude::Todo};
 use must_future::MustBoxFuture;
 
@@ -20,10 +19,12 @@ impl<'env, Ribosome: RibosomeT + Send + Sync> Workflow<'env> for InvokeZomeWorkf
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = ();
 
+    // TODO: remove when implemented
+    #[allow(unreachable_code, unused_variables)]
     fn workflow(
         self,
         // environment: &'env EnvironmentRo,
-        mut workspace: Self::Workspace,
+        workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
         async {
             // let env = environment.guard().await;

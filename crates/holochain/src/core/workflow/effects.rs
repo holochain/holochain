@@ -62,6 +62,7 @@ impl<'env, W1> WorkflowTriggers<'env> for W1
 where
     W1: 'static + Workflow<'static, Output = ()>,
 {
+    #[allow(unreachable_code)]
     fn run(self, env: EnvironmentRw) -> TriggerOutput {
         tokio::spawn(async {
             let _handle = run_workflow(self, env, todo!("get workspace"));
@@ -75,6 +76,7 @@ where
     W1: 'static + Workflow<'static, Output = ()>,
     W2: 'static + Workflow<'static, Output = ()>,
 {
+    #[allow(unreachable_code)]
     fn run(self, env: EnvironmentRw) -> TriggerOutput {
         tokio::spawn(async {
             let _handle = run_workflow(self.0, env, todo!("get workspace"));

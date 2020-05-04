@@ -114,7 +114,7 @@ async fn finish<'env, Wf: Workflow<'env>>(
     }
 
     // finish triggers
-    let handle = triggers.run(arc);
+    let _handle = triggers.run(arc);
 
     Ok(())
 }

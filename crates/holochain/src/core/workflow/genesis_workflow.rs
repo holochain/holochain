@@ -8,13 +8,12 @@ use super::Workspace;
 /// FIXME: creating entries in the config db
 use super::{
     error::{WorkflowError, WorkflowResult},
-    Workflow, WorkflowEffects, WorkflowTriggers,
+    Workflow, WorkflowEffects,
 };
 use crate::conductor::api::CellConductorApiT;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
-use holochain_state::{env::EnvironmentRo, prelude::*};
 use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
 use must_future::MustBoxFuture;
 
