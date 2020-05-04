@@ -11,7 +11,7 @@ use holochain_types::{
     dna::{DnaFile, Properties},
     observability,
     prelude::*,
-    test_utils::{fake_dna, fake_dna_file},
+    test_utils::{fake_dna_file, write_fake_dna_file},
 };
 use holochain_websocket::*;
 use matches::assert_matches;
@@ -143,7 +143,7 @@ async fn call_admin() {
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
     let uuid = Uuid::new_v4();
-    let dna = fake_dna(&uuid.to_string());
+    let dna = fake_dna_file(&uuid.to_string());
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
@@ -154,7 +154,7 @@ async fn call_admin() {
     let properties = Some(json.clone());
 
     // Install Dna
-    let (fake_dna_path, _tmpdir) = fake_dna_file(dna.clone()).unwrap();
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).unwrap();
     let request = AdminRequest::InstallDna(fake_dna_path, properties.clone());
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -187,7 +187,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).with_admin().await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
-    let (fake_dna_path, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).unwrap();
     let request = AdminRequest::InstallDna(fake_dna_path, None);
     let response = client.request(request).await;
     assert_matches!(response, Ok(AdminResponse::DnaInstalled));
@@ -233,7 +233,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     info!("About to make failing request");
 
-    let (fake_dna, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
+    let (fake_dna, _tmpdir) = write_fake_dna_file(fake_dna_file("")).unwrap();
     let request = AdminRequest::InstallDna(fake_dna, None);
 
     // send a request after the conductor has shutdown

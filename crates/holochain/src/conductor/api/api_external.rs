@@ -320,7 +320,7 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_types::test_utils::{fake_dna, fake_dna_file};
+    use holochain_types::test_utils::{fake_dna_file, write_fake_dna_file};
     use matches::assert_matches;
     use uuid::Uuid;
 
@@ -329,8 +329,8 @@ mod test {
         let handle = Conductor::builder().test().await?.into_handle();
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
-        let (dna_path, _tempdir) = fake_dna_file(dna.clone()).unwrap();
+        let dna = fake_dna_file(&uuid.to_string());
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).unwrap();
         let dna_hash = dna.dna_hash().clone();
         admin_api
             .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
@@ -344,8 +344,8 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
-        let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
+        let dna = fake_dna_file(&uuid.to_string());
+        let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone())?;
         let json = serde_json::json!({
             "test": "example",
             "how_many": 42,
