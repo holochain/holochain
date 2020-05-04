@@ -199,7 +199,7 @@ pub mod tests {
         entry::Entry,
         header,
         prelude::*,
-        test_utils::{fake_agent_pubkey_1, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file},
     };
 
     fn fixtures() -> (
@@ -210,7 +210,7 @@ pub mod tests {
         Option<Entry>,
     ) {
         let _ = holochain_crypto::crypto_init_sodium();
-        let dna = fake_dna("a");
+        let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());

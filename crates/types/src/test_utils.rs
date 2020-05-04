@@ -28,7 +28,7 @@ pub fn fake_zome() -> Zome {
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna(uuid: &str) -> DnaFile {
+pub fn fake_dna_file(uuid: &str) -> DnaFile {
     fake_dna_zomes(uuid, vec![("test".into(), vec![].into())])
 }
 
