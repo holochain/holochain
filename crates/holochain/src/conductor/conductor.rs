@@ -39,7 +39,7 @@ use holochain_keystore::{
 };
 use holochain_state::{
     db,
-    env::{EnvironmentRw, ReadManager},
+    env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
     prelude::*,
     typed::{Kv, UnitDbKey},
@@ -81,7 +81,7 @@ where
     cells: HashMap<CellId, CellItem>,
 
     /// The LMDB environment for persisting state related to this Conductor
-    env: EnvironmentRw,
+    env: EnvironmentWrite,
 
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
@@ -334,7 +334,7 @@ where
     DS: DnaStore + 'static,
 {
     async fn new(
-        env: EnvironmentRw,
+        env: EnvironmentWrite,
         dna_store: DS,
         keystore: KeystoreSender,
     ) -> ConductorResult<Self> {
@@ -444,7 +444,7 @@ mod builder {
             let keystore = delete_me_create_test_keystore().await;
             let env_path = self.config.environment_path;
 
-            let environment = EnvironmentRw::new(
+            let environment = EnvironmentWrite::new(
                 env_path.as_ref(),
                 EnvironmentKind::Conductor,
                 keystore.clone(),
