@@ -1,9 +1,10 @@
+//! Workspaces are a simple abstraction used to stage changes during Workflow
+//! execution to be persisted later
+//!
+//! Every Workflow has an associated Workspace type.
+
 use super::source_chain::SourceChainError;
-use holochain_state::{
-    db::GetDb,
-    error::DatabaseError,
-    prelude::{Reader, Writer},
-};
+use holochain_state::{error::DatabaseError, prelude::Writer};
 use thiserror::Error;
 
 mod app_validation;
@@ -14,6 +15,7 @@ pub use genesis::GenesisWorkspace;
 pub use invoke_zome::InvokeZomeWorkspace;
 
 #[derive(Debug, Error)]
+#[allow(missing_docs)]
 pub enum WorkspaceError {
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
@@ -22,10 +24,17 @@ pub enum WorkspaceError {
     SourceChainError(#[from] SourceChainError),
 }
 
+#[allow(missing_docs)]
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
+/// Defines a Workspace
 pub trait Workspace<'env>: Send + Sized {
+    // TODO: if we can have a generic way to create a Workspace, we can have
+    // `run_workflow` automatically create one and pass it into the workflow
+    // function -- this is also the case for the WorkflowTriggers
     // fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self>;
+
+    /// Flush accumulated changes to the database. This consumes a Writer.
     fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
 }
 

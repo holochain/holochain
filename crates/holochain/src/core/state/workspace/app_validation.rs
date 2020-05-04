@@ -1,3 +1,6 @@
+// Remove this one implemented
+#![allow(missing_docs)]
+
 use super::Workspace;
 
 use crate::core::state::workspace::WorkspaceResult;
