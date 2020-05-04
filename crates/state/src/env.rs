@@ -102,11 +102,6 @@ impl EnvironmentRo {
     pub async fn dbs(&self) -> EnvironmentRefRo<'_> {
         self.guard().await
     }
-
-    /// Transform this Environment into its read-only counterpart
-    pub fn as_readonly(self) -> EnvironmentRo {
-        self.into()
-    }
 }
 
 impl GetDb for EnvironmentRw {

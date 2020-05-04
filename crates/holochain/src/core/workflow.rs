@@ -4,7 +4,7 @@ mod genesis;
 mod invoke_zome;
 
 use crate::core::state::workspace::Workspace;
-use caller::{run_workflow_5, WorkflowCaller};
+use caller::{run_workflow, WorkflowCaller};
 use error::WorkflowRunResult;
 use futures::{
     future::{BoxFuture, FutureExt},
@@ -47,38 +47,44 @@ impl<'env, WC: WorkflowCaller<'env>> WorkflowEffects<'env, WC> {
 pub type WorkflowCallback = Todo;
 pub type WorkflowSignal = Todo;
 
-// pub type TriggerOutput = Box<dyn Future<Output=WorkflowRunResult<()>> + 'env>;
-pub type TriggerOutput = tokio::task::JoinHandle<WorkflowRunResult<()>>;
+type TriggerOutput = tokio::task::JoinHandle<WorkflowRunResult<()>>;
 
+/// Trait which defines additional workflows to be run after this one.
+/// TODO: B-01567: this can't be implemented as such until we find out how to
+/// dynamically create a Workspace via the trait-defined Workspace::new(),
+/// and to have the lifetimes match up.
 pub trait WorkflowTriggers<'env>: Send {
     fn run(self, env: EnvironmentRw) -> TriggerOutput;
 }
 
 impl<'env> WorkflowTriggers<'env> for () {
-    fn run(self, env: EnvironmentRw) -> TriggerOutput {
+    fn run(self, _env: EnvironmentRw) -> TriggerOutput {
         tokio::spawn(async { Ok(()) })
     }
 }
 
-impl<'env, W1: 'static + WorkflowCaller<'static, Output = ()>> WorkflowTriggers<'env> for W1 {
+impl<'env, W1> WorkflowTriggers<'env> for W1
+where
+    W1: 'static + WorkflowCaller<'static, Output = ()>,
+{
     fn run(self, env: EnvironmentRw) -> TriggerOutput {
-        // Box::new(
         tokio::spawn(async {
-            let _handle = run_workflow_5(self, env, todo!("workspace"));
+            let _handle = run_workflow(self, env, todo!("get workspace"));
             Ok(())
         })
-        // )
     }
 }
 
-// impl<'env, W1: WorkflowCaller<'env> + 'env> WorkflowTriggers for W1 {
-//     fn run(self, env: EnvironmentRo) -> Box<dyn Future<Output=WorkflowRunResult<W1::Output>> + 'env> {
-//         Box::new(async {
-//             let e = env.guard().await;
-//             let reader = e.reader()?;
-//             let dbs = env.dbs().await?;
-//             let workspace = W1::Workspace::new(&reader, &dbs)?;
-//             run_workflow_5(self, workspace, env).await
-//         })
-//     }
-// }
+impl<'env, W1, W2> WorkflowTriggers<'env> for (W1, W2)
+where
+    W1: 'static + WorkflowCaller<'static, Output = ()>,
+    W2: 'static + WorkflowCaller<'static, Output = ()>,
+{
+    fn run(self, env: EnvironmentRw) -> TriggerOutput {
+        tokio::spawn(async {
+            let _handle = run_workflow(self.0, env, todo!("get workspace"));
+            let _handle = run_workflow(self.1, env, todo!("get workspace"));
+            Ok(())
+        })
+    }
+}
