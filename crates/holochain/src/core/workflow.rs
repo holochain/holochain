@@ -25,6 +25,8 @@ mod effects;
 pub mod error;
 mod genesis_workflow;
 mod invoke_zome_workflow;
+pub use genesis_workflow::*;
+pub use invoke_zome_workflow::*;
 
 pub use effects::*;
 
@@ -61,8 +63,8 @@ pub trait Workflow<'env>: Sized + Send {
 /// Workspace, this runs the Workflow and executes the `finish` function on
 /// the WorkflowEffects, returning the Output value of the workflow
 pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
-    wc: Wf,
     arc: EnvironmentRw,
+    wc: Wf,
     workspace: Wf::Workspace,
 ) -> WorkflowRunResult<O> {
     let (output, effects) = wc.workflow(workspace).await?;

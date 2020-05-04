@@ -65,7 +65,7 @@ where
     #[allow(unreachable_code)]
     fn run(self, env: EnvironmentRw) -> TriggerOutput {
         tokio::spawn(async {
-            let _handle = run_workflow(self, env, todo!("get workspace"));
+            let _handle = run_workflow(env, self, todo!("get workspace"));
             Ok(())
         })
     }
@@ -79,8 +79,8 @@ where
     #[allow(unreachable_code)]
     fn run(self, env: EnvironmentRw) -> TriggerOutput {
         tokio::spawn(async {
-            let _handle = run_workflow(self.0, env, todo!("get workspace"));
-            let _handle = run_workflow(self.1, env, todo!("get workspace"));
+            let _handle = run_workflow(env, self.0, todo!("get workspace"));
+            let _handle = run_workflow(env, self.1, todo!("get workspace"));
             Ok(())
         })
     }

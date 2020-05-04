@@ -1,14 +1,11 @@
 //! The CellConductorApi allows Cells to talk to their Conductor
 
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::ConductorHandle;
+use crate::{conductor::ConductorHandle, core::workflow::ZomeInvocationResult};
 use async_trait::async_trait;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{
-    autonomic::AutonomicCue,
-    cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::Todo,
+    autonomic::AutonomicCue, cell::CellId, nucleus::ZomeInvocation, prelude::Todo,
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -36,10 +33,10 @@ impl CellConductorApiT for CellConductorApi {
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
+    ) -> ConductorApiResult<ZomeInvocationResult> {
         if *cell_id == invocation.cell_id {
             self.conductor_handle
-                .invoke_zome(self.clone(), invocation)
+                .invoke_zome(invocation)
                 .await
                 .map_err(Into::into)
         } else {
@@ -82,7 +79,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse>;
+    ) -> ConductorApiResult<ZomeInvocationResult>;
 
     /// Make a request to the DPKI service running for this Conductor.
     /// TODO: decide on actual signature

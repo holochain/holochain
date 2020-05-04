@@ -1,20 +1,29 @@
 use super::Workspace;
 use super::{error::WorkflowResult, Workflow, WorkflowEffects};
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult},
+};
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::{nucleus::ZomeInvocation, prelude::Todo};
 use must_future::MustBoxFuture;
 
+/// Placeholder for the return value of a zome invocation
 pub type ZomeInvocationResult = Todo;
 
-pub struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
-    ribosome: Ribosome,
-    invocation: ZomeInvocation,
+pub(crate) struct InvokeZomeWorkflow<Api: CellConductorApiT, Ribosome: RibosomeT> {
+    pub api: Api,
+    pub ribosome: Ribosome,
+    pub invocation: ZomeInvocation,
 }
 
-impl<'env, Ribosome: RibosomeT + Send + Sync> Workflow<'env> for InvokeZomeWorkflow<Ribosome> {
+impl<'env, Api, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Api, Ribosome>
+where
+    Api: CellConductorApiT,
+    Ribosome: RibosomeT + Send + Sync,
+{
     type Output = ZomeInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = ();
@@ -38,11 +47,13 @@ impl<'env, Ribosome: RibosomeT + Send + Sync> Workflow<'env> for InvokeZomeWorkf
     }
 }
 
+/// The workspace for the InvokeZomeWorkflow
 pub struct InvokeZomeWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
+    /// constructor
     pub fn new(_reader: &Reader<'env>, _dbs: &impl GetDb) -> WorkspaceResult<Self> {
         unimplemented!()
     }

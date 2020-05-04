@@ -3,15 +3,15 @@ use crate::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    core::ribosome::WasmRibosome,
+    core::{
+        ribosome::WasmRibosome,
+        workflow::{run_workflow, InvokeZomeWorkflow, InvokeZomeWorkspace, ZomeInvocationResult},
+    },
 };
 use holo_hash::*;
-use holochain_state::env::EnvironmentRw;
+use holochain_state::{env::EnvironmentRw, prelude::*};
 use holochain_types::{
-    autonomic::AutonomicProcess,
-    cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*,
+    autonomic::AutonomicProcess, cell::CellId, nucleus::ZomeInvocation, shims::*,
 };
 use std::hash::{Hash, Hasher};
 
@@ -78,25 +78,29 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
-        _conductor_api: CellConductorApi,
-        _invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResult> {
+        let arc = self.state_env();
+        let env = arc.guard().await;
+        let workflow = InvokeZomeWorkflow {
+            api: self.conductor_api.clone(),
+            ribosome: self.get_ribosome(),
+            invocation,
+        };
+        let workspace = InvokeZomeWorkspace::new(&env.reader()?, &env)?;
+        Ok(run_workflow(self.state_env().into(), workflow, workspace)
+            .await
+            .map_err(Box::new)?)
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn get_ribosome(&self) -> WasmRibosome {
         unimplemented!()
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn state_env(&self) -> EnvironmentRw {
         self.state_env.clone()
-    }
-
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn get_conductor_api(&self) -> CellConductorApi {
-        self.conductor_api.clone()
     }
 }
 

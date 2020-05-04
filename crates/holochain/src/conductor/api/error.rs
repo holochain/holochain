@@ -1,7 +1,11 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::conductor::error::ConductorError;
+use crate::{
+    conductor::error::ConductorError,
+    core::{state::workspace::WorkspaceError, workflow::error::WorkflowRunError},
+};
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
 use thiserror::Error;
 
@@ -36,6 +40,20 @@ pub enum ConductorApiError {
     /// Serialization error
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
+
+    /// Database error
+    #[error(transparent)]
+    DatabaseError(#[from] DatabaseError),
+
+    /// Workspace error.
+    // TODO: Can be avoided if we can move workspace creation into the workflow
+    #[error(transparent)]
+    WorkspaceError(#[from] WorkspaceError),
+
+    /// Workflow error.
+    // TODO: perhaps this Box can be avoided with further reorganization
+    #[error(transparent)]
+    WorkflowRunError(#[from] Box<WorkflowRunError>),
 
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]

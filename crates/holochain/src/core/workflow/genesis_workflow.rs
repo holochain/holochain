@@ -17,6 +17,7 @@ use holochain_state::prelude::*;
 use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
 use must_future::MustBoxFuture;
 
+/// The struct with implements Workflow
 pub struct GenesisWorkflow<Api: CellConductorApiT> {
     api: Api,
     dna: Dna,
@@ -79,11 +80,13 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
     }
 }
 
+/// The workspace for Genesis
 pub struct GenesisWorkspace<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
 }
 
 impl<'env> GenesisWorkspace<'env> {
+    /// Constructor
     pub fn new(reader: &'env Reader<'env>, dbs: &'env impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self {
             source_chain: SourceChainBuf::<'env>::new(reader, dbs)?,
@@ -136,7 +139,7 @@ mod tests {
                 dna: dna.clone(),
                 agent_pubkey: agent_pubkey.clone(),
             };
-            let _: () = run_workflow(workflow, arc.clone(), workspace).await?;
+            let _: () = run_workflow(arc.clone(), workflow, workspace).await?;
         }
 
         env.with_reader(|reader| {
