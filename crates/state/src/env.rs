@@ -105,7 +105,7 @@ impl Environment {
     /// to get a lock in order to create a read-only transaction. The lock guard
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
-    pub async fn guard<'e>(&'e self) -> EnvironmentRef<'e> {
+    pub async fn guard(&self) -> EnvironmentRef<'_> {
         EnvironmentRef {
             rkv: self.arc.read().await,
             keystore: self.keystore.clone(),
@@ -128,7 +128,7 @@ impl Environment {
     }
 
     /// Return a `GetDb`, which can synchronously get databases from this environment
-    pub async fn dbs<'e>(&'e self) -> impl GetDb + 'e {
+    pub async fn dbs(&self) -> impl GetDb + '_ {
         self.guard().await
     }
 }
@@ -231,7 +231,7 @@ impl<'e> WriteManager<'e> for EnvironmentRef<'e> {
 
 impl<'e> GetDb for EnvironmentRef<'e> {
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        let path = self.inner().path().clone();
+        let path = self.inner().path();
         get_db(path, key)
     }
 
