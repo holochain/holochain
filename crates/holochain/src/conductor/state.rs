@@ -1,16 +1,11 @@
-use crate::conductor::{error::ConductorError, interface::InterfaceDriver};
+use crate::conductor::interface::InterfaceDriver;
 
 use holochain_types::{
     dna::{error::DnaError, Dna},
     prelude::*,
 };
-use petgraph::{algo::toposort, graph::DiGraph, prelude::NodeIndex};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///
@@ -30,10 +25,6 @@ pub struct ConductorState {
     /// List of interfaces any UI can use to access zome functions. Optional.
     #[serde(default)]
     pub interfaces: Vec<InterfaceConfig>,
-
-    /// List of bridges between cells. Optional.
-    #[serde(default)]
-    pub bridges: Vec<Bridge>,
 }
 
 /// Check for duplicate items in a list of strings
@@ -74,10 +65,10 @@ impl ConductorState {
     }
 
     /// Returns the agent configuration with the given ID if present
-    pub fn update_agent_address_by_id(&mut self, id: &str, agent_hash: &AgentHash) {
+    pub fn update_agent_address_by_id(&mut self, id: &str, agent_pubkey: &AgentPubKey) {
         self.agents.iter_mut().for_each(|ac| {
             if ac.id == *id {
-                ac.hash = agent_hash.clone()
+                ac.hash = agent_pubkey.clone()
             }
         })
     }
@@ -111,80 +102,6 @@ impl ConductorState {
         self.cells.iter().map(|cell| cell.id.clone()).collect()
     }
 
-    /// This function uses the petgraph crate to model the bridge connections in this config
-    /// as a graph and then create a topological sorting of the nodes, which are cells.
-    /// The sorting gets reversed to get those cells first that do NOT depend on others
-    /// such that this ordering of cells can be used to spawn them and simultaneously create
-    /// initialize the bridges and be able to assert that any callee already exists (which makes
-    /// this task much easier).
-    pub fn cell_ids_sorted_by_bridge_dependencies(&self) -> Result<Vec<String>, ConductorError> {
-        let mut graph = DiGraph::<&str, &str>::new();
-
-        // Add cell ids to the graph which returns the indices the graph is using.
-        // Storing those in a map from ids to create edges from bridges below.
-        let index_map: HashMap<_, _> = self
-            .cells
-            .iter()
-            .map(|cell| (cell.id.clone(), graph.add_node(&cell.id)))
-            .collect();
-
-        // Reverse of graph indices to cell ids to create the return vector below.
-        let reverse_map: HashMap<_, _> = self
-            .cells
-            .iter()
-            .map(|cell| (index_map.get(&cell.id).unwrap(), cell.id.clone()))
-            .collect();
-
-        // Create vector of edges (with node indices) from bridges:
-        let edges: Vec<(&NodeIndex<u32>, &NodeIndex<u32>)> = self
-            .bridges
-            .iter()
-            .map(
-                |bridge| -> Result<(&NodeIndex<u32>, &NodeIndex<u32>), ConductorError> {
-                    let start = index_map.get(&bridge.caller_id);
-                    let end = index_map.get(&bridge.callee_id);
-                    if let (Some(start_inner), Some(end_inner)) = (start, end) {
-                        Ok((start_inner, end_inner))
-                    } else {
-                        Err(ConductorError::ConfigError(format!(
-                        "cell configuration not found, mentioned in bridge configuration: {} -> {}",
-                        bridge.caller_id, bridge.callee_id,
-                    )))
-                    }
-                },
-            )
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Add edges to graph:
-        for &(node_a, node_b) in edges.iter() {
-            graph.add_edge(node_a.clone(), node_b.clone(), "");
-        }
-
-        // Sort with petgraph::algo::toposort
-        let mut sorted_nodes = toposort(&graph, None).map_err(|_cycle_error| {
-            ConductorError::ConfigError("Cyclic dependency in bridge configuration".to_string())
-        })?;
-
-        // REVERSE order because we want to get the cell with NO dependencies first
-        // since that is the cell we should spawn first.
-        sorted_nodes.reverse();
-
-        // Map sorted vector of node indices back to cell ids
-        Ok(sorted_nodes
-            .iter()
-            .map(|node_index| reverse_map.get(node_index).unwrap())
-            .cloned()
-            .collect())
-    }
-
-    pub fn bridge_dependencies(&self, caller_cell_id: String) -> Vec<Bridge> {
-        self.bridges
-            .iter()
-            .filter(|bridge| bridge.caller_id == caller_cell_id)
-            .cloned()
-            .collect()
-    }
-
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &str) -> Self {
@@ -216,7 +133,7 @@ impl ConductorState {
 pub struct AgentConfig {
     pub id: String,
     pub name: String,
-    pub hash: AgentHash,
+    pub hash: AgentPubKey,
     pub keystore_file: String,
     /// If set to true conductor will ignore keystore_file and instead use the remote signer
     /// accessible through signing_service_uri to request signatures.

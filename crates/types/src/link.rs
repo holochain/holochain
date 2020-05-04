@@ -1,6 +1,6 @@
 //! Links interrelate entries in a source chain.
 
-use crate::entry::EntryAddress;
+use crate::address::EntryAddress;
 use holochain_serialized_bytes::prelude::*;
 use regex::Regex;
 

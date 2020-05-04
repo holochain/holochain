@@ -33,6 +33,10 @@ use crate::conductor::{
     error::ConductorResult,
     handle::ConductorHandle,
 };
+use holochain_keystore::{
+    test_keystore::{spawn_test_keystore, MockKeypair},
+    KeystoreSender,
+};
 use holochain_state::{
     db,
     env::{Environment, ReadManager},
@@ -40,11 +44,7 @@ use holochain_state::{
     prelude::WriteManager,
     typed::{Kv, UnitDbKey},
 };
-use holochain_types::{
-    cell::{CellHandle, CellId},
-    prelude::*,
-    shims::Keystore,
-};
+use holochain_types::cell::{CellHandle, CellId};
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
@@ -98,9 +98,6 @@ where
     /// Placeholder. A way to look up a Cell from its app-specific handle.
     _handle_map: HashMap<CellHandle, CellId>,
 
-    /// Placeholder. A way to get a Keystore from an AgentHash.
-    _agent_keys: HashMap<AgentHash, Keystore>,
-
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
 
@@ -113,6 +110,9 @@ where
 
     /// Placeholder for what will be the real DNA/Wasm cache
     dna_store: DS,
+
+    /// Access to private keys for signing and encryption.
+    keystore: KeystoreSender,
 }
 
 impl Conductor {
@@ -138,7 +138,8 @@ where
     /// This signals the completion of Conductor initialization and the beginning of its lifecycle
     /// as the driver of its various interface handling loops
     pub fn into_handle(self) -> ConductorHandle {
-        Arc::new(ConductorHandleImpl::from(RwLock::new(self)))
+        let keystore = self.keystore.clone();
+        Arc::new(ConductorHandleImpl::from((RwLock::new(self), keystore)))
     }
 
     /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
@@ -275,14 +276,68 @@ where
     }
 }
 
+// -- TODO - delete this helper when we have a real keystore -- //
+
+async fn delete_me_create_test_keystore() -> KeystoreSender {
+    use std::convert::TryFrom;
+    let _ = holochain_crypto::crypto_init_sodium();
+    let mut keystore = spawn_test_keystore(vec![
+        MockKeypair {
+            pub_key: holo_hash::AgentPubKey::try_from(
+                "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
+            )
+            .unwrap(),
+            sec_key: vec![
+                220, 218, 15, 212, 178, 51, 204, 96, 121, 97, 6, 205, 179, 84, 80, 159, 84, 163,
+                193, 46, 127, 15, 47, 91, 134, 106, 72, 72, 51, 76, 26, 16, 195, 236, 235, 182,
+                216, 152, 165, 215, 192, 97, 126, 31, 71, 165, 188, 12, 245, 29, 133, 230, 73, 251,
+                84, 44, 68, 14, 28, 76, 137, 166, 205, 54,
+            ],
+        },
+        MockKeypair {
+            pub_key: holo_hash::AgentPubKey::try_from(
+                "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
+            )
+            .unwrap(),
+            sec_key: vec![
+                170, 205, 134, 46, 233, 225, 100, 162, 101, 124, 207, 157, 12, 131, 239, 244, 216,
+                190, 244, 161, 209, 56, 159, 135, 240, 134, 88, 28, 48, 75, 227, 244, 162, 97, 243,
+                122, 69, 52, 251, 30, 233, 235, 101, 166, 174, 235, 29, 196, 61, 176, 247, 7, 35,
+                117, 168, 194, 243, 206, 188, 240, 145, 146, 76, 74,
+            ],
+        },
+    ])
+    .await
+    .unwrap();
+
+    // pre-populate with our two fixture agent keypairs
+    keystore
+        .generate_sign_keypair_from_pure_entropy()
+        .await
+        .unwrap();
+    keystore
+        .generate_sign_keypair_from_pure_entropy()
+        .await
+        .unwrap();
+
+    keystore
+}
+
+// -- TODO - end -- //
+
 //-----------------------------------------------------------------------------
-/// Private methods
+// Private methods
 //-----------------------------------------------------------------------------
+
 impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    async fn new(env: Environment, dna_store: DS) -> ConductorResult<Self> {
+    async fn new(
+        env: Environment,
+        dna_store: DS,
+        keystore: KeystoreSender,
+    ) -> ConductorResult<Self> {
         let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
@@ -292,13 +347,13 @@ where
             state_db: Kv::new(db)?,
             cells: HashMap::new(),
             _handle_map: HashMap::new(),
-            _agent_keys: HashMap::new(),
             shutting_down: false,
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,
             admin_websocket_ports: Vec::new(),
             dna_store,
+            keystore,
         })
     }
 
@@ -352,6 +407,8 @@ mod builder {
     pub struct ConductorBuilder<DS = RealDnaStore> {
         config: ConductorConfig,
         dna_store: DS,
+        #[cfg(test)]
+        state: Option<ConductorState>,
     }
 
     impl ConductorBuilder<RealDnaStore> {
@@ -383,9 +440,38 @@ mod builder {
 
         /// Initialize a "production" Conductor
         pub async fn build(self) -> ConductorResult<Conductor<DS>> {
+            let keystore = delete_me_create_test_keystore().await;
             let env_path = self.config.environment_path;
-            let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            let conductor = Conductor::new(environment, self.dna_store).await?;
+
+            let environment = Environment::new(
+                env_path.as_ref(),
+                EnvironmentKind::Conductor,
+                keystore.clone(),
+            )?;
+
+            let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+
+            #[cfg(test)]
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
+
+            Ok(conductor)
+        }
+
+        #[cfg(test)]
+        /// Sets some fake conductor state for tests
+        pub fn fake_state(mut self, state: ConductorState) -> Self {
+            self.state = Some(state);
+            self
+        }
+
+        #[cfg(test)]
+        async fn update_fake_state(
+            state: Option<ConductorState>,
+            conductor: Conductor<DS>,
+        ) -> ConductorResult<Conductor<DS>> {
+            if let Some(state) = state {
+                conductor.update_state(move |_| Ok(state)).await?;
+            }
             Ok(conductor)
         }
 
@@ -409,7 +495,12 @@ mod builder {
         /// Build a Conductor with a test environment
         pub async fn test(self) -> ConductorResult<Conductor<DS>> {
             let environment = test_conductor_env();
-            let conductor = Conductor::new(environment, self.dna_store).await?;
+            let keystore = environment.keystore().clone();
+            let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+
+            #[cfg(test)]
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
+
             Ok(conductor)
         }
     }
@@ -417,16 +508,19 @@ mod builder {
 
 #[cfg(test)]
 pub mod tests {
-
+    use super::*;
     use super::{Conductor, ConductorState};
     use crate::conductor::{dna_store::MockDnaStore, state::CellConfig};
     use holochain_state::test_utils::test_conductor_env;
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn can_update_state() {
         let environment = test_conductor_env();
         let dna_store = MockDnaStore::new();
-        let conductor = Conductor::new(environment, dna_store).await.unwrap();
+        let keystore = environment.keystore().clone();
+        let conductor = Conductor::new(environment, dna_store, keystore)
+            .await
+            .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state, ConductorState::default());
 
@@ -445,5 +539,16 @@ pub mod tests {
             .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state.cells, [cell_config]);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn can_set_fake_state() {
+        let state = ConductorState::default();
+        let conductor = ConductorBuilder::new()
+            .fake_state(state.clone())
+            .test()
+            .await
+            .unwrap();
+        assert_eq!(state, conductor.get_state().await.unwrap());
     }
 }

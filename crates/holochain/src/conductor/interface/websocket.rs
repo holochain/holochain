@@ -261,7 +261,7 @@ mod test {
         RealAppInterfaceApi::new(conductor_handle)
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
         let admin_api = setup_admin().await;
         let msg = AdmonRequest::InstallsDna("".into());
@@ -279,7 +279,7 @@ mod test {
         handle_incoming_message(msg, admin_api).await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn invalid_request() {
         observability::test_run().ok();
         let admin_api = setup_admin().await;
@@ -298,7 +298,7 @@ mod test {
         handle_incoming_message(msg, admin_api).await.unwrap()
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn cache_failure() {
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
@@ -332,7 +332,7 @@ mod test {
     }
 
     #[ignore]
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn deserialization_failure() {
         // TODO: B-01440: this can't be done easily yet
         // because we can't serialize something that

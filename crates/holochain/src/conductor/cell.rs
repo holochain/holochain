@@ -63,8 +63,8 @@ impl Cell {
     }
 
     #[allow(dead_code)]
-    fn agent_hash(&self) -> &AgentHash {
-        &self.id.agent_hash()
+    fn agent_pubkey(&self) -> &AgentPubKey {
+        &self.id.agent_pubkey()
     }
 
     /// Entry point for incoming messages from the network that need to be handled

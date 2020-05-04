@@ -13,7 +13,6 @@ use holochain_types::{dna::Dna, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
 use thiserror::Error;
 
-#[cfg(test)]
 use super::state::source_chain::SourceChainError;
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
@@ -21,7 +20,7 @@ use super::state::source_chain::SourceChainError;
 #[derive(Debug)]
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
-    Genesis(Box<Dna>, AgentHash),
+    Genesis(Box<Dna>, AgentPubKey),
     // AppValidation(Vec<DhtOp>),
     // {
     //     invocation: ZomeInvocation,
@@ -69,7 +68,7 @@ impl WorkflowTrigger {
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
-    AgentInvalid(AgentHash),
+    AgentInvalid(AgentPubKey),
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] Box<ConductorApiError>),
@@ -80,7 +79,6 @@ pub enum WorkflowError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),
 
-    #[cfg(test)]
     #[error("Source chain error: {0}")]
     SourceChainError(#[from] SourceChainError),
 }

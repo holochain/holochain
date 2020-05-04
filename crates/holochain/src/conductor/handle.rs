@@ -104,6 +104,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Send a signal to all managed tasks asking them to end ASAP.
     async fn shutdown(&self);
+
+    /// Request access to this conductor's keystore
+    fn keystore(&self) -> &KeystoreSender;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -114,7 +117,7 @@ pub trait ConductorHandleT: Send + Sync {
 /// this could be swapped out with, e.g. a channel Sender/Receiver pair
 /// using an actor model.
 #[derive(From)]
-pub struct ConductorHandleImpl<DS: DnaStore + 'static>(RwLock<Conductor<DS>>);
+pub struct ConductorHandleImpl<DS: DnaStore + 'static>(RwLock<Conductor<DS>>, KeystoreSender);
 
 #[async_trait::async_trait]
 impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
@@ -168,5 +171,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn shutdown(&self) {
         self.0.write().await.shutdown()
+    }
+
+    fn keystore(&self) -> &KeystoreSender {
+        &self.1
     }
 }

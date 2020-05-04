@@ -3,11 +3,12 @@
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::ConductorHandle;
 use async_trait::async_trait;
+use holochain_keystore::KeystoreSender;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::{Signature, Todo},
+    prelude::Todo,
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -67,16 +68,8 @@ impl CellConductorApiT for CellConductorApi {
             .await
     }
 
-    async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature> {
-        unimplemented!()
-    }
-
-    async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String> {
-        unimplemented!()
-    }
-
-    async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String> {
-        unimplemented!()
+    fn keystore(&self) -> &KeystoreSender {
+        self.conductor_handle.keystore()
     }
 }
 
@@ -105,15 +98,6 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// This is basically a heuristic designed to help things run more smoothly.
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
-    /// Request the crypto system to sign some payload
-    /// TODO: decide on actual signature
-    async fn crypto_sign(&self, _payload: String) -> ConductorApiResult<Signature>;
-
-    /// Request the crypto system to encrypt some payload
-    /// TODO: decide on actual signature
-    async fn crypto_encrypt(&self, _payload: String) -> ConductorApiResult<String>;
-
-    /// Request the crypto system to decrypt some payload
-    /// TODO: decide on actual signature
-    async fn crypto_decrypt(&self, _payload: String) -> ConductorApiResult<String>;
+    /// Request access to this conductor's keystore
+    fn keystore(&self) -> &KeystoreSender;
 }

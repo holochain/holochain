@@ -284,7 +284,7 @@ pub mod tests {
         Ok(vec)
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvvbuf_basics() {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -346,7 +346,7 @@ pub mod tests {
         .unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn delete_all() {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
@@ -415,7 +415,7 @@ pub mod tests {
         .unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn idempotent_inserts() {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -454,7 +454,7 @@ pub mod tests {
         .unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
@@ -471,7 +471,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
@@ -492,7 +492,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_deleted_persisted() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
@@ -522,7 +522,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_deleted_buffer() -> DatabaseResult<()> {
         use Op::*;
         holochain_types::observability::test_run().ok();
@@ -567,7 +567,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_get_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
@@ -587,7 +587,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_get_persisted() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
@@ -613,7 +613,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_get_del_buffer() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
@@ -633,7 +633,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kvv_get_del_persisted() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
