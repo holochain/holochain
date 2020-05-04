@@ -50,7 +50,6 @@ fn _detect_dupes<'a, I: Iterator<Item = &'a String>>(
     }
 }
 
-
 impl ConductorState {
     pub fn check_consistency(&self) -> Result<(), DnaError> {
         // TODO: A huge amount of legacy code for checking the consistency of Dna was ripped out here
