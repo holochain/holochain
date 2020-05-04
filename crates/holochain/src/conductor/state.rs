@@ -50,7 +50,6 @@ fn _detect_dupes<'a, I: Iterator<Item = &'a String>>(
     }
 }
 
-pub type DnaLoader = Arc<Box<dyn FnMut(&PathBuf) -> Result<DnaFile, DnaError> + Send + Sync>>;
 
 impl ConductorState {
     pub fn check_consistency(&self) -> Result<(), DnaError> {
