@@ -78,7 +78,7 @@ pub mod tests {
         header,
         nucleus::ZomeInvocationResponse,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file},
     };
     use holochain_zome_types::ZomeExternGuestOutput;
 
@@ -93,11 +93,11 @@ pub mod tests {
     async fn fake_genesis(workspace: &mut InvokeZomeWorkspace<'_>) -> ChainHeader {
         let agent_pubkey = fake_agent_pubkey_1();
         let agent_entry = Entry::Agent(agent_pubkey.clone());
-        let dna = fake_dna("cool dna");
+        let dna = fake_dna_file("cool dna");
         let dna_header = ChainHeader::Dna(header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_pubkey.clone(),
-            hash: dna.dna_hash(),
+            hash: dna.dna_hash().clone(),
         });
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),

@@ -37,6 +37,10 @@ pub enum ConductorApiError {
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
 
+    /// DnaError
+    #[error("DnaError: {0}")]
+    DnaError(#[from] holochain_types::dna::DnaError),
+
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]
     DnaReadError(String),

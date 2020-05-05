@@ -44,9 +44,10 @@ use self::{
 
 use super::state::workspace::UnsafeInvokeZomeWorkspace;
 use error::RibosomeResult;
+use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    dna::Dna,
+    dna::{DnaError, DnaFile},
     entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
@@ -88,7 +89,11 @@ pub trait RibosomeT: Sized {
 /// The only WasmRibosome is a Wasm ribosome.
 #[derive(Clone)]
 pub struct WasmRibosome {
-    dna: Dna,
+    // NOTE - Currently taking a full DnaFile here.
+    //      - It would be an optimization to pre-ensure the WASM bytecode
+    //      - is already in the wasm cache, and only include the DnaDef portion
+    //      - here in the ribosome.
+    dna_file: DnaFile,
 }
 
 pub struct HostContext {
@@ -98,22 +103,20 @@ pub struct HostContext {
 
 impl WasmRibosome {
     /// Create a new instance
-    pub fn new(dna: Dna) -> Self {
-        Self { dna }
+    pub fn new(dna_file: DnaFile) -> Self {
+        Self { dna_file }
     }
 
-    pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
-        // TODO: make this actually the hash of the wasm once we can do that
-        format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
+    pub fn wasm_cache_key(&self, zome_name: &str) -> Result<&[u8], DnaError> {
+        Ok(self.dna_file.dna().get_zome(zome_name)?.wasm_hash.get_raw())
     }
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
         let zome_name = host_context.zome_name.clone();
-        let zome = self.dna.get_zome(&zome_name)?;
-        let wasm: Arc<Vec<u8>> = zome.code.code();
+        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = WasmRibosome::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
-            &self.wasm_cache_key(&zome_name),
+            self.wasm_cache_key(&zome_name)?,
             &wasm,
             &imports,
         )?)
@@ -233,23 +236,7 @@ pub mod wasm_test {
     use test_wasm_common::TestString;
 
     use crate::core::{ribosome::HostContext, state::workspace::UnsafeInvokeZomeWorkspace};
-    use holochain_types::{
-        dna::{wasm::DnaWasm, zome::Zome, Dna},
-        test_utils::{fake_dna, fake_header_hash, fake_zome},
-    };
-    use std::collections::BTreeMap;
-
-    fn zome_from_code(code: DnaWasm) -> Zome {
-        let mut zome = fake_zome();
-        zome.code = code;
-        zome
-    }
-
-    fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
-        let mut dna = fake_dna("uuid");
-        dna.zomes = zomes;
-        dna
-    }
+    use holochain_types::test_utils::{fake_dna_zomes, fake_header_hash};
 
     pub fn zome_invocation_from_names(
         zome_name: &str,
@@ -278,19 +265,15 @@ pub mod wasm_test {
                 })
                 .unwrap();
         }
-        WasmRibosome::new(dna_from_zomes({
-            let mut v = std::collections::BTreeMap::new();
-            v.insert(String::from("foo"), zome_from_code(TestWasm::Foo.into()));
-            v.insert(
-                String::from("imports"),
-                zome_from_code(TestWasm::Imports.into()),
-            );
-            v.insert(
-                String::from("debug"),
-                zome_from_code(TestWasm::Debug.into()),
-            );
-            v
-        }))
+        let dna_file = fake_dna_zomes(
+            "uuid",
+            vec![
+                (String::from("foo"), TestWasm::Foo.into()),
+                (String::from("imports"), TestWasm::Imports.into()),
+                (String::from("debug"), TestWasm::Debug.into()),
+            ],
+        );
+        WasmRibosome::new(dna_file)
     }
 
     pub fn now() -> Duration {
@@ -343,8 +326,8 @@ pub mod wasm_test {
         };
     }
 
-    #[test]
-    fn invoke_foo_test() {
+    #[tokio::test(threaded_scheduler)]
+    async fn invoke_foo_test() {
         let ribosome = test_ribosome(Some("foo"));
 
         let invocation =
