@@ -108,6 +108,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
+
+    /// Create the cells from the database
+    async fn create_cells(&self, cells: Vec<CellId>, handle: ConductorHandle) -> ConductorResult<()>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -177,5 +180,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     fn keystore(&self) -> &KeystoreSender {
         &self.1
+    }
+
+    async fn create_cells(&self, cells: Vec<CellId>, handle: ConductorHandle) -> ConductorResult<()> {
+        let mut lock = self.0.write().await;
+        lock.create_cells(cells, handle).await?;
+        Ok(())
     }
 }

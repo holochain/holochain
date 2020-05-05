@@ -230,15 +230,17 @@ mod test {
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
-        state::{CellConfig, ConductorState},
+        state::ConductorState,
         Conductor,
     };
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use futures::future::FutureExt;
+    use holo_hash::{AgentPubKey, DnaHash};
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
+        cell::CellId,
         observability,
-        test_utils::{fake_dna, fake_dna_file, fake_cell_id},
+        test_utils::{fake_cell_id, fake_dna, fake_dna_file, fake_dna_hash, fake_agent_pubkey_1},
     };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
@@ -253,25 +255,26 @@ mod test {
     }
 
     async fn setup_admin() -> RealAdminInterfaceApi {
-        let conductor_handle = Conductor::builder().test().await.unwrap().into_handle();
+        let conductor_handle = Conductor::builder()
+            .test()
+            .await
+            .unwrap()
+            .into_handle()
+            .await;
         RealAdminInterfaceApi::new(conductor_handle)
     }
 
-    async fn setup_app(id: String) -> RealAppInterfaceApi {
-        let cell = CellConfig {
-            id,
-            dna: "".into(),
-            agent: "".into(),
-        };
+    async fn setup_app(cell_id: CellId) -> RealAppInterfaceApi {
         let mut state = ConductorState::default();
-        state.cells.push(cell);
+        state.cells.push(cell_id);
 
         let conductor_handle = Conductor::builder()
             .fake_state(state)
             .test()
             .await
             .unwrap()
-            .into_handle();
+            .into_handle()
+            .await;
         RealAppInterfaceApi::new(conductor_handle)
     }
 
@@ -328,7 +331,8 @@ mod test {
             .test()
             .await
             .unwrap()
-            .into_handle();
+            .into_handle()
+            .await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
         let msg = AdminRequest::InstallDna(fake_dna_path, None);
         let msg = msg.try_into().unwrap();
@@ -362,7 +366,12 @@ mod test {
         }
         let payload = Payload { a: 1 };
         // TODO: Create the Mock for the cell-dna-api to provide a fake zome response
-        let app_api = setup_app(fake_cell_id("bob").to_string()).await;
+        let cell_id = CellId::from((
+            fake_dna_hash("bob"),
+            fake_agent_pubkey_1(),
+        ));
+
+        let app_api = setup_app(cell_id).await;
         let request = Box::new(zome_invocation_from_names(
             "zomey",
             "fun_times",

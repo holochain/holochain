@@ -18,10 +18,12 @@ use holochain_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
+use holochain_keystore::KeystoreSender;
 
 use std::{
     convert::TryInto,
     hash::{Hash, Hasher},
+    path::Path,
 };
 
 pub mod error;
@@ -57,12 +59,17 @@ pub struct Cell {
 }
 
 impl Cell {
-    pub fn create(id: CellId, conductor_handle: ConductorHandle) -> CellResult<Self> {
-        let conductor_api = CellConductorApi::new(conductor_handle, id);
+    pub fn create<P: AsRef<Path>>(
+        id: CellId,
+        conductor_handle: ConductorHandle,
+        env_path: P,
+        keystore: KeystoreSender,
+    ) -> CellResult<Self> {
+        let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
         let state_env = Environment::new(
-            todo!("Get env path"),
-            EnvironmentKind::Cell(id),
-            todo!("get keystore"),
+            env_path.as_ref(),
+            EnvironmentKind::Cell(id.clone()),
+            keystore,
         )?;
         Ok(Self {
             id,

@@ -321,7 +321,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn install_list_dna() -> Result<()> {
-        let handle = Conductor::builder().test().await?.into_handle();
+        let handle = Conductor::builder().test().await?.into_handle().await;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
