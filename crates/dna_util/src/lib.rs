@@ -97,6 +97,8 @@ pub async fn extract(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResu
         tokio::fs::write(wasm_filename, &*wasm.code()).await?;
     }
 
+    // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
+    // then pass by value here.
     let dna_json = DnaDefJson::from_dna_def(dna_file.dna())?;
     let dna_json = serde_json::to_string_pretty(&dna_json)?;
 
