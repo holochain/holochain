@@ -48,7 +48,7 @@ fn dna_file_path_convert(
             )));
         }
     } else {
-        if !tmp_lossy.ends_with(".dna_work_dir") {
+        if !tmp_lossy.ends_with(".dna.workdir") {
             return Err(DnaUtilError::InvalidInput(format!(
                 "bad compile path, work dirs must end with '.dna_work_dir': {}",
                 dna_file_path.display()
@@ -68,9 +68,9 @@ fn dna_file_path_convert(
 
     let new_name = if to_work_dir {
         let filename_base = &filename[..filename.len() - 7];
-        format!("{}.dna_work_dir", filename_base)
+        format!("{}.dna.workdir", filename_base)
     } else {
-        let filename_base = &filename[..filename.len() - 13];
+        let filename_base = &filename[..filename.len() - 12];
         format!("{}.dna.gz", filename_base)
     };
 
@@ -244,7 +244,7 @@ mod tests {
 
         tokio::fs::remove_file(&dna_filename).await.unwrap();
 
-        compile(&tmp_dir.path().join("test-dna.dna_work_dir"))
+        compile(&tmp_dir.path().join("test-dna.dna.workdir"))
             .await
             .unwrap();
 
