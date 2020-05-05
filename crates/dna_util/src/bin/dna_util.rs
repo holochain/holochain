@@ -1,4 +1,4 @@
-#![deny(missing_docs)]
+#![forbid(missing_docs)]
 //! Binary `dna_util` command executable.
 
 use structopt::StructOpt;

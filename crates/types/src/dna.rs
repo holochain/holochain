@@ -113,7 +113,7 @@ impl DnaFile {
             Ok(dna_file)
         })
         .await
-        .expect("blocking thread panic!d - panicing here too")
+        .expect("blocking thread panicked - panicking here too")
     }
 
     /// Transform this DnaFile into a new DnaFile with different properties

@@ -34,7 +34,7 @@ pub type DnaUtilResult<T> = Result<T, DnaUtilError>;
 
 /// internal convert between dna_file_path and dna_work_dir
 fn dna_file_path_convert(
-    dna_file_path: impl AsRef<std::path::Path>,
+    dna_file_path: &impl AsRef<std::path::Path>,
     to_work_dir: bool,
 ) -> DnaUtilResult<std::path::PathBuf> {
     let dna_file_path = dna_file_path.as_ref();
@@ -82,7 +82,7 @@ fn dna_file_path_convert(
 }
 
 /// Extract a DnaFile into a Dna Working Directory
-pub async fn extract(dna_file_path: impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
+pub async fn extract(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
     let dna_file_path = dna_file_path.as_ref().canonicalize()?;
     let dir = dna_file_path_convert(&dna_file_path, true)?;
     tokio::fs::create_dir_all(&dir).await?;
@@ -108,7 +108,7 @@ pub async fn extract(dna_file_path: impl AsRef<std::path::Path>) -> DnaUtilResul
 }
 
 /// Compile a Dna Working Directory into a DnaFile
-pub async fn compile(dna_work_dir: impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
+pub async fn compile(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
     let dna_work_dir = dna_work_dir.as_ref().canonicalize()?;
     let dna_file_path = dna_file_path_convert(&dna_work_dir, false)?;
 
@@ -171,7 +171,7 @@ impl DnaDefJson {
 
     pub async fn compile_dna_file(
         &self,
-        work_dir: impl AsRef<std::path::Path>,
+        work_dir: &impl AsRef<std::path::Path>,
     ) -> DnaUtilResult<DnaFile> {
         let mut work_dir_z = std::path::PathBuf::new();
         work_dir_z.push(work_dir.as_ref());
