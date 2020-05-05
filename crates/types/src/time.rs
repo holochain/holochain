@@ -1,4 +1,4 @@
-//! The Iso8601 type is defined here. It is used in particular within ChainHeader to enforce that
+//! The Iso8601 type is defined here. It is used in particular within Header to enforce that
 //! their timestamps are defined in a useful and consistent way.
 
 #![allow(clippy::identity_op)] // see https://github.com/rust-lang/rust-clippy/issues/3866

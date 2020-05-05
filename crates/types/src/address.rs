@@ -1,6 +1,6 @@
 //! wraps holo_hashes for the use of those hashes as storage addresses, either CAS or DHT
 
-use crate::{entry::Entry, ChainHeader};
+use crate::{entry::Entry, Header};
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
@@ -31,10 +31,10 @@ impl From<HeaderHash> for HeaderAddress {
     }
 }
 
-impl std::convert::TryFrom<&ChainHeader> for HeaderAddress {
+impl std::convert::TryFrom<&Header> for HeaderAddress {
     type Error = SerializedBytesError;
-    fn try_from(chain_header: &ChainHeader) -> Result<Self, Self::Error> {
-        Ok(HeaderAddress::Header(HeaderHash::try_from(chain_header)?))
+    fn try_from(header: &Header) -> Result<Self, Self::Error> {
+        Ok(HeaderAddress::Header(HeaderHash::try_from(header)?))
     }
 }
 
@@ -110,9 +110,9 @@ impl TryFrom<&Entry> for DhtAddress {
     }
 }
 
-impl TryFrom<&ChainHeader> for DhtAddress {
+impl TryFrom<&Header> for DhtAddress {
     type Error = SerializedBytesError;
-    fn try_from(header: &ChainHeader) -> Result<Self, Self::Error> {
+    fn try_from(header: &Header) -> Result<Self, Self::Error> {
         Ok(DhtAddress::Header(HeaderHash::try_from(header)?))
     }
 }
