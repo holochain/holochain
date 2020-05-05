@@ -147,8 +147,12 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
     key: &'static DbKey<V>,
 ) -> DatabaseResult<V> {
     let dbmap = DB_MAP_MAP.read();
-    let um: &DbMap = dbmap.get(path).expect("TODO");
-    let db = *um.get(key).expect("TODO");
+    let um: &DbMap = dbmap
+        .get(path)
+        .ok_or_else(|| DatabaseError::EnvironmentMissing(path.into()))?;
+    let db = *um
+        .get(key)
+        .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().clone()))?;
     Ok(db)
 }
 
