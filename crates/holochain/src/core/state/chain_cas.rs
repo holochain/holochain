@@ -15,9 +15,8 @@ use holochain_state::{
 };
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
-    chain_header::ChainHeader,
     entry::Entry,
-    header,
+    header, ChainHeader,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;

@@ -44,6 +44,10 @@ pub enum ConductorApiError {
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]
     DnaReadError(String),
+
+    /// KeystoreError
+    #[error("KeystoreError: {0}")]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 }
 
 /// All the serialization errors that can occur
