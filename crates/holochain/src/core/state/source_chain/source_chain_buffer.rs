@@ -11,9 +11,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::{
-    address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
-};
+use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, ChainHeader};
 
 use tracing::*;
 
@@ -195,11 +193,11 @@ pub mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
-        chain_header::ChainHeader,
         entry::Entry,
         header,
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
+        ChainHeader,
     };
 
     fn fixtures() -> (
