@@ -605,8 +605,9 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::commit::CommitEntryResult;
     use holochain_zome_types::*;
-    // use holochain_zome_types::validate::ValidateCallbackResult;
+    use holochain_zome_types::validate::ValidateEntryResult;
     use test_wasm_common::TestString;
+    use holo_hash::holo_hash_core::HeaderHash;
 
     use crate::core::ribosome::HostContext;
     use holochain_types::{
@@ -744,14 +745,14 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_test() {
-        let always_validates: CommitEntryResult =
-            call_test_ribosome!("validate", "always_validates", ());
+        assert_eq!(
+            CommitEntryResult::Success(HeaderHash::new(vec![0xdb; 36])),
+            call_test_ribosome!("validate", "always_validates", ()),
+        );
 
-        println!("{:?}", always_validates);
-
-        let never_validates: CommitEntryResult =
-            call_test_ribosome!("validate", "never_validates", ());
-
-        println!("{:?}", never_validates);
+        assert_eq!(
+            CommitEntryResult::ValidateFailed(ValidateEntryResult::Invalid("NeverValidates never validates".to_string())),
+            call_test_ribosome!("validate", "never_validates", ()),
+        );
     }
 }
