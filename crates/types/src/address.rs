@@ -33,8 +33,8 @@ impl From<HeaderHash> for HeaderAddress {
 
 impl std::convert::TryFrom<&Header> for HeaderAddress {
     type Error = SerializedBytesError;
-    fn try_from(chain_header: &Header) -> Result<Self, Self::Error> {
-        Ok(HeaderAddress::Header(HeaderHash::try_from(chain_header)?))
+    fn try_from(header: &Header) -> Result<Self, Self::Error> {
+        Ok(HeaderAddress::Header(HeaderHash::try_from(header)?))
     }
 }
 
