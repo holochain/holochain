@@ -50,7 +50,7 @@ use super::{
 use crate::core::workflow::ZomeInvocationResult;
 use derive_more::From;
 use holochain_types::{
-    autonomic::AutonomicCue, cell::CellId, dna::Dna, nucleus::ZomeInvocation, prelude::*,
+    autonomic::AutonomicCue, cell::CellId, dna::DnaFile, nucleus::ZomeInvocation, prelude::*,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -78,7 +78,7 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<()>;
 
     /// Install a [Dna] in this Conductor
-    async fn install_dna(&self, dna: Dna) -> ConductorResult<()>;
+    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
@@ -132,7 +132,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         lock.add_admin_interfaces_via_handle(handle, configs).await
     }
 
-    async fn install_dna(&self, dna: Dna) -> ConductorResult<()> {
+    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         Ok(self.0.write().await.dna_store_mut().add(dna)?)
     }
 

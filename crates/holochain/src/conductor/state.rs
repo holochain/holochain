@@ -1,11 +1,8 @@
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::{
-    dna::{error::DnaError, Dna},
-    prelude::*,
-};
+use holochain_types::{dna::error::DnaError, prelude::*};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::collections::HashSet;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///
@@ -49,8 +46,6 @@ fn _detect_dupes<'a, I: Iterator<Item = &'a String>>(
         Ok(())
     }
 }
-
-pub type DnaLoader = Arc<Box<dyn FnMut(&PathBuf) -> Result<Dna, DnaError> + Send + Sync>>;
 
 impl ConductorState {
     pub fn check_consistency(&self) -> Result<(), DnaError> {

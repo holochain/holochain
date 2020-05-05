@@ -50,6 +50,7 @@ derive_more = "0.99.3"
 directories = "2.0.2"
 human-panic = "1.0.3"
 num_cpus = "1.8"
+holo_hash_core = { path = "../holo_hash_core" }
 holo_hash = { path = "../holo_hash" }
 uuid = { version = "0.7", features = ["serde", "v4"] }
 predicates = "1.0.4"

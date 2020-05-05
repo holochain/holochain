@@ -6,10 +6,7 @@ use crate::core::state::{
 
 use fallible_iterator::FallibleIterator;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
-use holochain_types::{
-    address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
-};
-
+use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, ChainHeader};
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -190,11 +187,11 @@ pub mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
-        chain_header::ChainHeader,
         entry::Entry,
         header,
         prelude::*,
-        test_utils::{fake_agent_pubkey_1, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file},
+        ChainHeader,
     };
 
     fn fixtures() -> (
@@ -205,7 +202,7 @@ pub mod tests {
         Option<Entry>,
     ) {
         let _ = holochain_crypto::crypto_init_sodium();
-        let dna = fake_dna("a");
+        let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());
@@ -213,7 +210,7 @@ pub mod tests {
         let dna_header = ChainHeader::Dna(header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_pubkey.clone(),
-            hash: dna.dna_hash(),
+            hash: dna.dna_hash().clone(),
         });
 
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {

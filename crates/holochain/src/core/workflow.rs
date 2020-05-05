@@ -4,7 +4,7 @@
 //!
 //! Workflows are **transactional**, so that if any workflow fails to run to
 //! completion, nothing will happen.
-
+//!
 //! In order to achieve this, workflow functions are **free of any side-effects
 //! which modify cryptographic state**: they will not modify the source chain
 //! nor send network messages which could cause other agents to update their own

@@ -6,9 +6,7 @@
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{error::DatabaseResult, prelude::*};
-use holochain_types::{
-    address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
-};
+use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, ChainHeader};
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
