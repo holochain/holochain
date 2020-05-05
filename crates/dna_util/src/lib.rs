@@ -1,4 +1,4 @@
-#![deny(missing_docs)]
+#![forbid(missing_docs)]
 //! DnaFile Utilities
 
 use holochain_serialized_bytes::prelude::*;
@@ -242,7 +242,7 @@ mod tests {
 
         tokio::fs::remove_file(&dna_filename).await.unwrap();
 
-        compile(tmp_dir.path().join("test-dna.dna_work_dir"))
+        compile(&tmp_dir.path().join("test-dna.dna_work_dir"))
             .await
             .unwrap();
 

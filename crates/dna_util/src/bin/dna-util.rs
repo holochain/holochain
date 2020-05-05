@@ -8,18 +8,18 @@ use structopt::StructOpt;
 struct Opt {
     /// Extract a DnaFile into a Dna Working Directory.
     ///
-    /// (`dna_util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
+    /// (`dna-util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
     #[structopt(short = "e", long)]
     extract: Option<std::path::PathBuf>,
 
     /// Compile a Dna Working Directory into a DnaFile.
     ///
-    /// (`dna_util -c my-dna.dna_work_dir` creates file `my-dna.dna.gz`)
+    /// (`dna-util -c my-dna.dna_work_dir` creates file `my-dna.dna.gz`)
     #[structopt(short = "c", long)]
     compile: Option<std::path::PathBuf>,
 }
 
-/// Main `dna_util` executable entrypoint.
+/// Main `dna-util` executable entrypoint.
 #[tokio::main(threaded_scheduler)]
 pub async fn main() {
     let opt = Opt::from_args();
@@ -47,10 +47,10 @@ pub async fn main() {
     }
 
     if let Some(extract) = opt.extract {
-        dna_util::extract(extract).await.unwrap();
+        dna_util::extract(&extract).await.unwrap();
     }
 
     if let Some(compile) = opt.compile {
-        dna_util::compile(compile).await.unwrap();
+        dna_util::compile(&compile).await.unwrap();
     }
 }
