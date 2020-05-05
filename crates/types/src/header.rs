@@ -14,50 +14,6 @@ pub type ZomeId = u8;
 
 use crate::prelude::*;
 
-/// defines a timestamp as used in a header
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Timestamp(pub String);
-
-impl Default for Timestamp {
-    fn default() -> Self {
-        chrono::offset::Utc::now().into()
-    }
-}
-
-impl std::fmt::Display for Timestamp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
-    fn from(t: chrono::DateTime<chrono::Utc>) -> Self {
-        Timestamp(t.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true))
-    }
-}
-
-impl From<chrono::DateTime<chrono::FixedOffset>> for Timestamp {
-    fn from(t: chrono::DateTime<chrono::FixedOffset>) -> Self {
-        Timestamp(t.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true))
-    }
-}
-
-impl std::convert::TryFrom<Timestamp> for chrono::DateTime<chrono::FixedOffset> {
-    type Error = chrono::ParseError;
-
-    fn try_from(t: Timestamp) -> Result<Self, Self::Error> {
-        std::convert::TryFrom::try_from(&t)
-    }
-}
-
-impl std::convert::TryFrom<&Timestamp> for chrono::DateTime<chrono::FixedOffset> {
-    type Error = chrono::ParseError;
-
-    fn try_from(t: &Timestamp) -> Result<Self, Self::Error> {
-        chrono::DateTime::parse_from_rfc3339(&t.0)
-    }
-}
-
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {

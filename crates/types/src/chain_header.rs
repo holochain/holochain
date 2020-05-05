@@ -41,8 +41,17 @@ impl ChainHeader {
     }
 
     /// returns the timestamp of when the header was created
-    pub fn timestamp(&self) -> header::Timestamp {
-        unimplemented!()
+    pub fn timestamp(&self) -> &Timestamp {
+        match self {
+            ChainHeader::Dna(i) => &i.timestamp,
+            ChainHeader::LinkAdd(i) => &i.timestamp,
+            ChainHeader::LinkRemove(i) => &i.timestamp,
+            ChainHeader::ChainOpen(i) => &i.timestamp,
+            ChainHeader::ChainClose(i) => &i.timestamp,
+            ChainHeader::EntryCreate(i) => &i.timestamp,
+            ChainHeader::EntryUpdate(i) => &i.timestamp,
+            ChainHeader::EntryDelete(i) => &i.timestamp,
+        }
     }
 
     // FIXME: use async with_data, or consider wrapper type

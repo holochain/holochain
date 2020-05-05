@@ -3,6 +3,9 @@
 #![allow(clippy::cognitive_complexity)]
 #![deny(missing_docs)]
 
+mod timestamp;
+pub use timestamp::Timestamp;
+
 pub mod address;
 pub mod autonomic;
 pub mod cell;
