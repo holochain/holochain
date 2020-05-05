@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{chain_header::ChainHeader, dna::DnaFile, entry::Entry, header, prelude::*};
+use holochain_types::{dna::DnaFile, entry::Entry, header, prelude::*, ChainHeader};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -70,9 +70,9 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        chain_header::ChainHeader,
         header, observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
+        ChainHeader,
     };
 
     #[tokio::test(threaded_scheduler)]

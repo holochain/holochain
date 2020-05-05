@@ -1,10 +1,11 @@
-//! This module contains definitions of the ChainHeader struct, constructor, and getters. This struct really defines a local source chain,
-//! in the sense that it implements the pointers between hashes that a hash chain relies on, which
-//! are then used to check the integrity of data using cryptographic hash functions.
-
 use crate::{address::HeaderAddress, header, prelude::*};
 
 /// ChainHeader contains variants for each type of header.
+///
+/// This struct really defines a local source chain, in the sense that it
+/// implements the pointers between hashes that a hash chain relies on, which
+/// are then used to check the integrity of data using cryptographic hash
+/// functions.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[serde(tag = "type")]
