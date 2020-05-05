@@ -32,15 +32,14 @@ pub mod tests {
     use holochain_state::{
         buffer::{BufferedStore, KvBuf},
         db::{GetDb, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
-        env::{ReadManager, WriteManager},
-        prelude::{Reader, Writer},
+        prelude::*,
         test_utils::test_cell_env,
     };
     use holochain_types::prelude::*;
 
     pub struct TestWorkspace<'env> {
-        one: KvBuf<'env, EntryHash, u32>,
-        two: KvBuf<'env, String, bool>,
+        one: KvBuf<'env, EntryHash, u32, Reader<'env>>,
+        two: KvBuf<'env, String, bool, Reader<'env>>,
     }
 
     impl<'env> TestWorkspace<'env> {
@@ -62,7 +61,7 @@ pub mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn workspace_sanity_check() -> WorkspaceResult<()> {
+    async fn workspace_sanity_check() -> anyhow::Result<()> {
         let arc = test_cell_env().await;
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
@@ -70,6 +69,7 @@ pub mod tests {
         let addr2 = "hi".to_string();
         {
             let reader = env.reader()?;
+            let writer = env.writer_unmanaged()?;
             let mut workspace = TestWorkspace::new(&reader, &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, None);
 
@@ -77,7 +77,7 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true);
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
             assert_eq!(workspace.two.get(&addr2)?, Some(true));
-            workspace.commit_txn(env.writer()?)?;
+            workspace.commit_txn(writer)?;
         }
 
         // Ensure that the data was persisted

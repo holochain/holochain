@@ -39,7 +39,7 @@ use holochain_keystore::{
 };
 use holochain_state::{
     db,
-    env::{Environment, ReadManager},
+    env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
     prelude::*,
     typed::{Kv, UnitDbKey},
@@ -81,7 +81,7 @@ where
     cells: HashMap<CellId, CellItem>,
 
     /// The LMDB environment for persisting state related to this Conductor
-    env: Environment,
+    env: EnvironmentWrite,
 
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
@@ -334,7 +334,7 @@ where
     DS: DnaStore + 'static,
 {
     async fn new(
-        env: Environment,
+        env: EnvironmentWrite,
         dna_store: DS,
         keystore: KeystoreSender,
     ) -> ConductorResult<Self> {
@@ -373,11 +373,12 @@ where
     {
         self.check_running()?;
         let guard = self.env.guard().await;
-        let mut writer = guard.writer()?;
-        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
-        let new_state = f(state)?;
-        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
-        writer.commit()?;
+        let new_state = guard.with_commit(|txn| {
+            let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
+            let new_state = f(state)?;
+            self.state_db.put(txn, &UnitDbKey, &new_state)?;
+            Result::<_, ConductorError>::Ok(new_state)
+        })?;
         Ok(new_state)
     }
 
@@ -443,7 +444,7 @@ mod builder {
             let keystore = delete_me_create_test_keystore().await;
             let env_path = self.config.environment_path;
 
-            let environment = Environment::new(
+            let environment = EnvironmentWrite::new(
                 env_path.as_ref(),
                 EnvironmentKind::Conductor,
                 keystore.clone(),
@@ -496,7 +497,7 @@ mod builder {
         /// Build a Conductor with a test environment
         pub async fn test(self) -> ConductorResult<Conductor<DS>> {
             let environment = test_conductor_env().await;
-            let keystore = environment.keystore().clone();
+            let keystore = environment.keystore();
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
 
             #[cfg(test)]

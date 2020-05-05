@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use futures::future::{join_all, BoxFuture, FutureExt};
-use holochain_state::{env::WriteManager, prelude::*};
+use holochain_state::prelude::*;
 use std::sync::Arc;
 use workflow::{WorkflowCallback, WorkflowSignal};
 
@@ -78,7 +78,10 @@ impl WorkflowRunner {
     async fn finish_workspace<W: Workspace>(&self, workspace: W) -> WorkflowRunResult<()> {
         let arc = self.0.state_env();
         let env = arc.guard().await;
-        let writer = env.writer().map_err(Into::<WorkspaceError>::into)?;
+        let writer = env
+            .writer_unmanaged()
+            .map_err(Into::<WorkspaceError>::into)?;
+        // FIXME: B-01566: implement write failure detection
         workspace
             .commit_txn(writer)
             .map_err(Into::<WorkspaceError>::into)?;
@@ -106,7 +109,7 @@ impl WorkflowRunner {
     /// triggers, this will be a problem, and we will have to actually spawn
     /// a new task for each. The difficulty with that is that tokio::spawn
     /// requires the future to be 'static, which is currently not the case due
-    /// to our LMDB Environment lifetimes.
+    /// to our LMDB EnvironmentWrite lifetimes.
     async fn finish_triggers(&self, triggers: Vec<WorkflowTrigger>) -> WorkflowRunResult<()> {
         let calls: Vec<_> = triggers
             .into_iter()
