@@ -17,6 +17,8 @@ pub mod observability;
 pub mod persistence;
 pub mod prelude;
 
+pub use chain_header::ChainHeader;
+
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]
 pub mod shims;
