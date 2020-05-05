@@ -206,7 +206,7 @@ async fn register_db<'env, V: 'static + Send + Sync>(
 /// GetDb allows access to the UniversalMap which stores the heterogeneously typed
 /// LMDB Database references.
 pub trait GetDb {
-    /// TODO
+    /// Access an LMDB database environment stored in our static registrar.
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V>;
     /// Get a KeystoreSender to communicate with the Keystore task for this environment
     fn keystore(&self) -> KeystoreSender;
