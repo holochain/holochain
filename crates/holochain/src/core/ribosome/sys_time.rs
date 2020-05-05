@@ -1,5 +1,6 @@
 use super::HostContext;
 use super::WasmRibosome;
+use crate::core::ribosome::error::RibosomeResult;
 use holochain_zome_types::SysTimeInput;
 use holochain_zome_types::SysTimeOutput;
 use std::sync::Arc;
@@ -8,12 +9,12 @@ pub async fn sys_time(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: SysTimeInput,
-) -> SysTimeOutput {
+) -> RibosomeResult<SysTimeOutput> {
     let start = std::time::SystemTime::now();
     let since_the_epoch = start
         .duration_since(std::time::UNIX_EPOCH)
         .expect("Time went backwards");
-    SysTimeOutput::new(since_the_epoch)
+    Ok(SysTimeOutput::new(since_the_epoch))
 }
 
 #[cfg(test)]

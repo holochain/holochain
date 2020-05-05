@@ -9,7 +9,6 @@ pub mod cell;
 pub mod chain_header;
 pub mod db;
 pub mod dna;
-pub mod entry;
 pub mod header;
 pub mod init;
 pub mod link;
@@ -75,9 +74,6 @@ enum EntryHash {}
 enum HeaderHash {}
 
 serial_hash!(
-    crate::entry::Entry,
-    EntryHash
-
     crate::chain_header::ChainHeader,
     HeaderHash
 

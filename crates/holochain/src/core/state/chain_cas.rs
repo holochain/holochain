@@ -16,9 +16,10 @@ use holochain_state::{
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
     chain_header::ChainHeader,
-    entry::Entry,
     header,
 };
+use holochain_zome_types::entry::Entry;
+use std::convert::TryFrom;
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
 pub type HeaderCas<'env, R> = CasBuf<'env, SignedHeader, R>;
@@ -123,7 +124,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         maybe_entry: Option<Entry>,
     ) -> DatabaseResult<()> {
         if let Some(entry) = maybe_entry {
-            self.entries.put(entry.entry_address().into(), entry);
+            self.entries
+                .put(EntryAddress::try_from(&entry)?.into(), entry);
         }
         self.headers
             .put(signed_header.header().hash().into(), signed_header);

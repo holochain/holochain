@@ -38,9 +38,9 @@ wasm_io_types!(
     // @TODO
     pub struct CapabilityInput(());
     pub struct CapabilityOutput(());
-    // @TODO
-    pub struct CommitEntryInput(());
-    pub struct CommitEntryOutput(());
+    // the SerializedBytes will be stuffed into an Entry::App(SB) host side
+    pub struct CommitEntryInput(crate::entry::Entry);
+    pub struct CommitEntryOutput(crate::commit::CommitEntryResult);
     // @TODO
     pub struct DecryptInput(());
     pub struct DecryptOutput(());

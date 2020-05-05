@@ -1,5 +1,6 @@
 use super::HostContext;
 use super::WasmRibosome;
+use crate::core::ribosome::error::RibosomeResult;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::globals::ZomeGlobals;
 use holochain_zome_types::GlobalsInput;
@@ -11,8 +12,8 @@ pub async fn globals(
     ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: GlobalsInput,
-) -> GlobalsOutput {
-    GlobalsOutput::new(ZomeGlobals {
+) -> RibosomeResult<GlobalsOutput> {
+    Ok(GlobalsOutput::new(ZomeGlobals {
         dna_name: ribosome.dna.name.clone(),
         agent_address: "".into(),                           // @TODO
         agent_id_str: "".into(),                            // @TODO
@@ -21,7 +22,7 @@ pub async fn globals(
         dna_address: "".into(),                             // @TODO
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
         public_token: "".into(),                            // @TODO
-    })
+    }))
 }
 
 #[cfg(test)]

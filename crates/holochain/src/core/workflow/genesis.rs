@@ -1,6 +1,7 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
+use holochain_types::{chain_header::ChainHeader, dna::Dna, header, prelude::*};
+use holochain_zome_types::entry::Entry;
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -42,7 +43,7 @@ pub async fn genesis(
     });
     workspace
         .source_chain
-        .put(agent_header, Some(Entry::Agent(agent_pubkey)))
+        .put(agent_header, Some(Entry::Agent(agent_pubkey.into())))
         .await?;
 
     Ok(WorkflowEffects {

@@ -5,12 +5,13 @@ use holochain_2020::core::state::{
 };
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
+    address::EntryAddress,
     chain_header::ChainHeader,
-    entry::Entry,
     header,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
 };
+use holochain_zome_types::entry::Entry;
 
 fn fixtures() -> (
     AgentPubKey,
@@ -23,16 +24,16 @@ fn fixtures() -> (
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();
-    let jimbo_entry = Entry::Agent(jimbo_id.clone());
+    let jimbo_entry = Entry::Agent(jimbo_id.clone().into());
     let jessy_id = fake_agent_pubkey_2();
-    let jessy_entry = Entry::Agent(jessy_id.clone());
+    let jessy_entry = Entry::Agent(jessy_id.clone().into());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jimbo_entry.entry_address(),
+        entry_address: (&jimbo_entry).try_into().unwrap(),
     });
 
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
@@ -40,7 +41,7 @@ fn fixtures() -> (
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jessy_entry.entry_address(),
+        entry_address: (&jessy_entry).try_into().unwrap(),
     });
     (
         jimbo_id,
@@ -68,7 +69,7 @@ async fn get_links() -> SourceChainResult<()> {
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
-    let base = jimbo_entry.entry_address();
+    let base = EntryAddress::try_from(&jimbo_entry)?;
     source_chain.put(jimbo_header, Some(jimbo_entry)).await?;
     source_chain.put(jessy_header, Some(jessy_entry)).await?;
 

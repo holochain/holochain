@@ -10,11 +10,11 @@ use holochain_state::{
 use holochain_types::{
     address::EntryAddress,
     chain_header::ChainHeader,
-    entry::Entry,
     header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
 };
+use holochain_zome_types::entry::Entry;
 use maplit::hashset;
 use mockall::*;
 use std::collections::HashSet;
@@ -40,16 +40,16 @@ fn setup_env<'env>(
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();
-    let jimbo_entry = Entry::Agent(jimbo_id.clone());
+    let jimbo_entry = Entry::Agent(jimbo_id.clone().into());
     let jessy_id = fake_agent_pubkey_2();
-    let jessy_entry = Entry::Agent(jessy_id.clone());
+    let jessy_entry = Entry::Agent(jessy_id.clone().into());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jimbo_entry.entry_address(),
+        entry_address: EntryAddress::try_from(&jimbo_entry)?,
     });
 
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
@@ -57,7 +57,7 @@ fn setup_env<'env>(
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jessy_entry.entry_address(),
+        entry_address: EntryAddress::try_from(&jessy_entry)?,
     });
 
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
@@ -97,7 +97,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     source_chain
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
-    let address = jimbo_entry.entry_address();
+    let address = EntryAddress::try_from(&jimbo_entry)?;
 
     // set it's metadata to LIVE
     mock_primary_meta
@@ -141,7 +141,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     source_chain
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
-    let address = jimbo_entry.entry_address();
+    let address = EntryAddress::try_from(&jimbo_entry)?;
 
     // set it's metadata to Dead
     mock_primary_meta
@@ -185,7 +185,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     cache
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
-    let address = jimbo_entry.entry_address();
+    let address = EntryAddress::try_from(&jimbo_entry)?;
 
     // set it's metadata to Live
     mock_cache_meta
@@ -227,7 +227,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    let address = jimbo_entry.entry_address();
+    let address = EntryAddress::try_from(&jimbo_entry)?;
 
     // call dht_get with above address
     let cascade = Cascade::new(
@@ -271,8 +271,8 @@ async fn links_local_return() -> SourceChainResult<()> {
     source_chain
         .put(jessy_header.clone(), Some(jessy_entry.clone()))
         .await?;
-    let base = jimbo_entry.entry_address();
-    let target = jessy_entry.entry_address();
+    let base = EntryAddress::try_from(&jimbo_entry)?;
+    let target = EntryAddress::try_from(&jessy_entry)?;
     let result = target.clone();
 
     // Return a link between entries
@@ -325,8 +325,8 @@ async fn links_cache_return() -> SourceChainResult<()> {
     source_chain
         .put(jessy_header.clone(), Some(jessy_entry.clone()))
         .await?;
-    let base = jimbo_entry.entry_address();
-    let target = jessy_entry.entry_address();
+    let base = EntryAddress::try_from(&jimbo_entry)?;
+    let target = EntryAddress::try_from(&jessy_entry)?;
     let result = target.clone();
 
     // Return empty links
@@ -374,8 +374,8 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
 
-    let base = jimbo_entry.entry_address();
-    let target = jessy_entry.entry_address();
+    let base = EntryAddress::try_from(&jimbo_entry)?;
+    let target = EntryAddress::try_from(&jessy_entry)?;
     let result = target.clone();
 
     // Return empty links

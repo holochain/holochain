@@ -1,5 +1,6 @@
 use super::HostContext;
 use super::WasmRibosome;
+use crate::core::ribosome::error::RibosomeResult;
 use holochain_zome_types::debug::DebugMsg;
 use holochain_zome_types::DebugInput;
 use holochain_zome_types::DebugOutput;
@@ -10,7 +11,7 @@ pub async fn debug(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     input: DebugInput,
-) -> DebugOutput {
+) -> RibosomeResult<DebugOutput> {
     let msg: DebugMsg = input.into_inner();
     trace!(
         "{}:{}:{} {}",
@@ -19,7 +20,7 @@ pub async fn debug(
         msg.line(),
         msg.msg()
     );
-    DebugOutput::new(())
+    Ok(DebugOutput::new(()))
 }
 
 #[cfg(test)]

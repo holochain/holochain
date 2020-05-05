@@ -11,9 +11,8 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::{
-    address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
-};
+use holochain_types::{address::HeaderAddress, chain_header::ChainHeader, prelude::*};
+use holochain_zome_types::entry::Entry;
 
 use tracing::*;
 
@@ -98,7 +97,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 Entry::Agent(agent_pubkey) => Some(agent_pubkey),
                 _ => None,
             })
-            .next())
+            .next()
+            .map(|h| h.into()))
     }
 
     pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env, R> {
@@ -196,11 +196,11 @@ pub mod tests {
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
         chain_header::ChainHeader,
-        entry::Entry,
         header,
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna},
     };
+    use holochain_zome_types::entry::Entry;
 
     fn fixtures() -> (
         AgentPubKey,
@@ -213,7 +213,7 @@ pub mod tests {
         let dna = fake_dna("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
-        let agent_entry = Entry::Agent(agent_pubkey.clone());
+        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
 
         let dna_header = ChainHeader::Dna(header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),

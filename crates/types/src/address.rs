@@ -1,8 +1,9 @@
 //! wraps holo_hashes for the use of those hashes as storage addresses, either CAS or DHT
 
-use crate::{chain_header::ChainHeader, entry::Entry};
+use crate::chain_header::ChainHeader;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::entry::Entry;
 
 /// address type for header hash to promote it to an "address" e.g. for use in a CAS
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -69,7 +70,20 @@ impl From<EntryAddress> for HoloHash {
 impl TryFrom<&Entry> for EntryAddress {
     type Error = SerializedBytesError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(EntryAddress::Entry(EntryHash::try_from(entry)?))
+        Ok(match entry {
+            Entry::Agent(key) => EntryAddress::Agent(key.to_owned().into()),
+            _ => {
+                let serialized_bytes: SerializedBytes = entry.try_into()?;
+                EntryAddress::Entry(EntryHash::with_data_sync(serialized_bytes.bytes()))
+            }
+        })
+    }
+}
+
+impl TryFrom<Entry> for EntryAddress {
+    type Error = SerializedBytesError;
+    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
+        Self::try_from(&entry)
     }
 }
 
@@ -106,7 +120,10 @@ impl From<DhtAddress> for HoloHash {
 impl TryFrom<&Entry> for DhtAddress {
     type Error = SerializedBytesError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(DhtAddress::Entry(EntryHash::try_from(entry)?))
+        Ok(match EntryAddress::try_from(entry)? {
+            EntryAddress::Entry(entry_hash) => DhtAddress::Entry(entry_hash),
+            EntryAddress::Agent(agent_pub_key) => DhtAddress::Agent(agent_pub_key),
+        })
     }
 }
 

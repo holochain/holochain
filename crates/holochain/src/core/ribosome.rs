@@ -46,11 +46,11 @@ use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     dna::Dna,
-    entry::Entry,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
 use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::entry::Entry;
 // use holochain_wasmer_host::prelude::__imports_internal;
 use holo_hash::holo_hash_core::HeaderHash;
 use holochain_types::header::AppEntryType;
@@ -61,6 +61,7 @@ use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::migrate_agent::MigrateAgentDirection;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
+use holochain_zome_types::validate::ValidateEntryResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::*;
 use mockall::automock;
@@ -305,7 +306,7 @@ pub trait RibosomeT: Sized {
         &self,
         zome_name: String,
         entry: &Entry,
-    ) -> RibosomeResult<ValidateCallbackResult> {
+    ) -> RibosomeResult<ValidateEntryResult> {
         let callback_invocation = CallbackInvocation {
             components: vec![
                 "validate_entry".into(),
@@ -339,14 +340,14 @@ pub trait RibosomeT: Sized {
                 None => ValidateCallbackResult::Valid,
             })
             // folded into a single validation result
-            .fold(ValidateCallbackResult::Valid, |acc, x| {
+            .fold(ValidateEntryResult::Valid, |acc, x| {
                 match x {
                     // validation is invalid if any x is invalid
-                    ValidateCallbackResult::Invalid(_) => x,
+                    ValidateCallbackResult::Invalid(i) => ValidateEntryResult::Invalid(i),
                     // return unresolved dependencies if it's otherwise valid
-                    ValidateCallbackResult::UnresolvedDependencies(_) => match acc {
-                        ValidateCallbackResult::Invalid(_) => acc,
-                        _ => x,
+                    ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
+                        ValidateEntryResult::Invalid(_) => acc,
+                        _ => ValidateEntryResult::UnresolvedDependencies(ud),
                     },
                     // valid x allows validation to continue
                     ValidateCallbackResult::Valid => acc,
@@ -462,6 +463,7 @@ impl WasmRibosome {
                             std::time::Duration::from_secs(60),
                         )
                         .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
+                        .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
                     let output_allocation_ptr: AllocationPtr = output_sb.into();
                     Ok(output_allocation_ptr.as_remote_ptr())

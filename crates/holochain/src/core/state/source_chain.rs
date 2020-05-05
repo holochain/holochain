@@ -6,9 +6,8 @@
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
-use holochain_types::{
-    address::HeaderAddress, chain_header::ChainHeader, entry::Entry, prelude::*,
-};
+use holochain_types::{address::HeaderAddress, chain_header::ChainHeader, prelude::*};
+use holochain_zome_types::entry::Entry;
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
