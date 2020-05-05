@@ -1,3 +1,4 @@
+use crate::conductor::CellError;
 use crate::core::{state::workspace::WorkspaceError, workflow::WorkflowError};
 use holochain_state::error::DatabaseError;
 use thiserror::Error;
@@ -12,6 +13,9 @@ pub enum WorkflowRunError {
 
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+
+    #[error(transparent)]
+    CellError(#[from] CellError),
 }
 
 /// Internal type to handle running workflows

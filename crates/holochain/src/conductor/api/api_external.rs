@@ -315,13 +315,20 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
+    use holochain_state::test_utils::test_conductor_env;
     use holochain_types::test_utils::{fake_dna, fake_dna_file};
     use matches::assert_matches;
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
     async fn install_list_dna() -> Result<()> {
-        let handle = Conductor::builder().test().await?.into_handle().await;
+        let test_env = test_conductor_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder()
+            .test(test_env)
+            .await?
+            .into_handle()
+            .await;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());

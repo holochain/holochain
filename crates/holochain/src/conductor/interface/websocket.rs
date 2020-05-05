@@ -237,15 +237,17 @@ mod test {
     use futures::future::FutureExt;
     use holo_hash::{AgentPubKey, DnaHash};
     use holochain_serialized_bytes::prelude::*;
+    use holochain_state::test_utils::test_conductor_env;
     use holochain_types::{
         cell::CellId,
         observability,
-        test_utils::{fake_cell_id, fake_dna, fake_dna_file, fake_dna_hash, fake_agent_pubkey_1},
+        test_utils::{fake_agent_pubkey_1, fake_cell_id, fake_dna, fake_dna_file, fake_dna_hash},
     };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
     use mockall::predicate;
     use std::convert::TryInto;
+    use tempdir::TempDir;
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -255,8 +257,10 @@ mod test {
     }
 
     async fn setup_admin() -> RealAdminInterfaceApi {
+        let test_env = test_conductor_env();
+        let _tmpdir = test_env.tmpdir.clone();
         let conductor_handle = Conductor::builder()
-            .test()
+            .test(test_env)
             .await
             .unwrap()
             .into_handle()
@@ -264,18 +268,23 @@ mod test {
         RealAdminInterfaceApi::new(conductor_handle)
     }
 
-    async fn setup_app(cell_id: CellId) -> RealAppInterfaceApi {
+    async fn setup_app(
+        cell_id: CellId,
+        dna_store: MockDnaStore,
+    ) -> (Arc<TempDir>, RealAppInterfaceApi) {
+        let test_env = test_conductor_env();
+        let tmpdir = test_env.tmpdir.clone();
         let mut state = ConductorState::default();
         state.cells.push(cell_id);
 
-        let conductor_handle = Conductor::builder()
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
-            .test()
+            .test(test_env)
             .await
             .unwrap()
             .into_handle()
             .await;
-        RealAppInterfaceApi::new(conductor_handle)
+        (tmpdir, RealAppInterfaceApi::new(conductor_handle))
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -317,6 +326,9 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn cache_failure() {
+        let test_env = test_conductor_env();
+        let _tmpdir = test_env.tmpdir.clone();
+
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
 
@@ -328,7 +340,7 @@ mod test {
             .returning(|_| Err(DnaStoreError::WriteFail));
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
-            .test()
+            .test(test_env)
             .await
             .unwrap()
             .into_handle()
@@ -364,14 +376,21 @@ mod test {
         struct Payload {
             a: u32,
         }
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna(&uuid.to_string());
         let payload = Payload { a: 1 };
+        let dna_hash = fake_dna_hash("bob");
         // TODO: Create the Mock for the cell-dna-api to provide a fake zome response
-        let cell_id = CellId::from((
-            fake_dna_hash("bob"),
-            fake_agent_pubkey_1(),
-        ));
+        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
 
-        let app_api = setup_app(cell_id).await;
+        let mut dna_store = MockDnaStore::new();
+
+        dna_store
+            .expect_get()
+            .with(predicate::eq(dna_hash))
+            .returning(move |_| Some(dna.clone()));
+
+        let (_tmpdir, app_api) = setup_app(cell_id, dna_store).await;
         let request = Box::new(zome_invocation_from_names(
             "zomey",
             "fun_times",

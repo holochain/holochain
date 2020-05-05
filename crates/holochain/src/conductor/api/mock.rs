@@ -4,10 +4,12 @@
 use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
 use async_trait::async_trait;
+use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
+    dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
 };
@@ -39,6 +41,7 @@ mock! {
         fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
         fn mock_keystore(&self) -> &KeystoreSender;
+        fn sync_get_dna(&self, dna_hash: DnaHash) -> Option<Dna>;
     }
 
     trait Clone {
@@ -74,5 +77,8 @@ impl CellConductorApiT for MockCellConductorApi {
 
     fn keystore(&self) -> &KeystoreSender {
         self.mock_keystore()
+    }
+    async fn get_dna(&self, dna_hash: DnaHash) -> Option<Dna> {
+        self.sync_get_dna(dna_hash)
     }
 }

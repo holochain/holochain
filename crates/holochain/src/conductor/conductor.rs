@@ -545,11 +545,11 @@ mod builder {
         }
 
         /// Build a Conductor with a test environment
-        pub async fn test(self) -> ConductorResult<Conductor<DS>> {
+        pub async fn test(self, test_env: TestEnvironment) -> ConductorResult<Conductor<DS>> {
             let TestEnvironment {
                 env: environment,
                 tmpdir,
-            } = test_conductor_env();
+            } = test_env;
             let keystore = environment.keystore().clone();
             let conductor = Conductor::new(
                 environment,
@@ -613,10 +613,12 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn can_set_fake_state() {
+        let test_env = test_conductor_env();
+        let _tmpdir = test_env.tmpdir.clone();
         let state = ConductorState::default();
         let conductor = ConductorBuilder::new()
             .fake_state(state.clone())
-            .test()
+            .test(test_env)
             .await
             .unwrap();
         assert_eq!(state, conductor.get_state().await.unwrap());

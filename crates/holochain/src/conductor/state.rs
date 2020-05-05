@@ -1,8 +1,9 @@
 use crate::conductor::interface::InterfaceDriver;
 
 use holochain_types::{
+    cell::CellId,
     dna::{error::DnaError, Dna},
-    prelude::*, cell::CellId,
+    prelude::*,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
@@ -107,11 +108,7 @@ impl ConductorState {
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &CellId) -> Self {
-        self.cells = self
-            .cells
-            .into_iter()
-            .filter(|cell| cell != id)
-            .collect();
+        self.cells = self.cells.into_iter().filter(|cell| cell != id).collect();
 
         self.interfaces = self
             .interfaces

@@ -87,6 +87,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
+    /// Get a [Dna] from the [DnaStore]
+    async fn get_dna(&self, hash: DnaHash) -> Option<Dna>;
+
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
         &self,
@@ -110,7 +113,11 @@ pub trait ConductorHandleT: Send + Sync {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Create the cells from the database
-    async fn create_cells(&self, cells: Vec<CellId>, handle: ConductorHandle) -> ConductorResult<()>;
+    async fn create_cells(
+        &self,
+        cells: Vec<CellId>,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -145,6 +152,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
         Ok(self.0.read().await.dna_store().list())
+    }
+
+    async fn get_dna(&self, hash: DnaHash) -> Option<Dna> {
+        self.0.read().await.dna_store().get(hash)
     }
 
     async fn invoke_zome(
@@ -182,7 +193,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.1
     }
 
-    async fn create_cells(&self, cells: Vec<CellId>, handle: ConductorHandle) -> ConductorResult<()> {
+    async fn create_cells(
+        &self,
+        cells: Vec<CellId>,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()> {
         let mut lock = self.0.write().await;
         lock.create_cells(cells, handle).await?;
         Ok(())

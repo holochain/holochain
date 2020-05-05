@@ -15,8 +15,6 @@ pub struct WasmBuf<'env, R: Readable = Reader<'env>> {
 }
 
 impl<'env, R: Readable> WasmBuf<'env, R> {
-    // @TODO use this code so it isn't dead
-    #[allow(dead_code)]
     fn new(reader: &'env R, wasm_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
             wasm: CasBuf::new(reader, wasm_store)?,

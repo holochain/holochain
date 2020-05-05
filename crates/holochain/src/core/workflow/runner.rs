@@ -40,7 +40,7 @@ impl<'b> WorkflowRunner<'b> {
                     .map_err(|e| WorkflowRunError::from(e))?;
                 let effects = workflow::invoke_zome::invoke_zome(
                     workspace,
-                    self.0.get_ribosome(),
+                    self.0.get_ribosome().await?,
                     *invocation,
                 )
                 .await

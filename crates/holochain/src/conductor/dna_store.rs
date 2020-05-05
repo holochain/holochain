@@ -12,6 +12,7 @@ pub trait DnaStore: Default + Send + Sync {
     fn add(&mut self, dna: Dna) -> DnaStoreResult<()>;
     // TODO: FAST: Make this return an iterator to avoid allocating
     fn list(&self) -> Vec<DnaHash>;
+    fn get(&self, hash: DnaHash) -> Option<Dna>;
 }
 
 impl DnaStore for RealDnaStore {
@@ -21,6 +22,9 @@ impl DnaStore for RealDnaStore {
     }
     fn list(&self) -> Vec<DnaHash> {
         self.0.keys().cloned().collect()
+    }
+    fn get(&self, hash: DnaHash) -> Option<Dna> {
+        self.0.get(&hash).cloned()
     }
 }
 

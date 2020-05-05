@@ -1,4 +1,7 @@
-use super::{api::error::SerializationError, ConductorHandle};
+use super::{
+    api::{error::SerializationError, CellConductorApiT},
+    ConductorHandle,
+};
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
@@ -10,7 +13,7 @@ use crate::{
     },
 };
 use holo_hash::*;
-use holochain_serialized_bytes::SerializedBytes;
+use holochain_keystore::KeystoreSender;
 use holochain_state::env::{Environment, EnvironmentKind};
 use holochain_types::{
     autonomic::AutonomicProcess,
@@ -18,10 +21,10 @@ use holochain_types::{
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use holochain_keystore::KeystoreSender;
+use holochain_zome_types::ZomeExternGuestOutput;
 
+use error::CellError;
 use std::{
-    convert::TryInto,
     hash::{Hash, Hasher},
     path::Path,
 };
@@ -115,16 +118,25 @@ impl Cell {
         let call = WorkflowCall::InvokeZome(invocation.into());
         // call the workflow
         // FIXME this result isn't actualy returned
-        let result = runner.run_workflow(call).await?;
+        let _result = runner.run_workflow(call).await?;
+        use holochain_serialized_bytes::prelude::*;
+        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+        struct Payload {
+            a: u32,
+        }
+        let result = Payload { a: 1 };
         let result: SerializedBytes = result.try_into().map_err(|e| SerializationError::from(e))?;
         Ok(ZomeInvocationResponse::ZomeApiFn(
-            result.try_into().map_err(|e| SerializationError::from(e))?,
+            ZomeExternGuestOutput::new(result),
         ))
     }
 
     // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn get_ribosome(&self) -> WasmRibosome {
-        unimplemented!()
+    pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
+        match self.conductor_api.get_dna(self.dna_hash().clone()).await {
+            Some(dna) => Ok(WasmRibosome::new(dna)),
+            None => Err(CellError::DnaMissing),
+        }
     }
 
     // TODO: tighten up visibility: only WorkflowRunner needs to access this

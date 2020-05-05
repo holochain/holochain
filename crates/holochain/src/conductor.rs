@@ -19,6 +19,6 @@ pub mod manager;
 pub mod paths;
 pub mod state;
 
-pub use cell::Cell;
+pub use cell::{error::CellError, Cell};
 pub use conductor::{Conductor, ConductorBuilder};
 pub use handle::ConductorHandle;
