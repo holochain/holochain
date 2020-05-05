@@ -216,13 +216,13 @@ pub mod tests {
         let agent_entry = Entry::Agent(agent_pubkey.clone());
 
         let dna_header = ChainHeader::Dna(header::Dna {
-            timestamp: chrono::Utc::now().timestamp().into(),
+            timestamp: Default::default(),
             author: agent_pubkey.clone(),
             hash: dna.dna_hash().clone(),
         });
 
         let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
-            timestamp: chrono::Utc::now().timestamp().into(),
+            timestamp: Default::default(),
             author: agent_pubkey.clone(),
             prev_header: dna_header.hash().into(),
             entry_type: header::EntryType::AgentPubKey,

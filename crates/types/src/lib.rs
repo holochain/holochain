@@ -21,7 +21,6 @@ pub mod prelude;
 #[allow(missing_docs)]
 pub mod shims;
 
-pub mod time;
 pub mod universal_map;
 
 // #[cfg(test)]

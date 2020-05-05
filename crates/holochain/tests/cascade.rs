@@ -28,7 +28,7 @@ fn fixtures() -> (
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
     let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+        timestamp: Default::default(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
@@ -36,7 +36,7 @@ fn fixtures() -> (
     });
 
     let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+        timestamp: Default::default(),
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
