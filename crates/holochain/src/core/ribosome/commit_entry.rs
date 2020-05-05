@@ -17,7 +17,6 @@ pub async fn commit_entry<'a>(
     // Example of mutating source chain
 
     let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<()>> {
-        // FIXME: Same lifetime issue as get_entry
         async move {
             let source_chain = &mut workspace.source_chain;
             let agent_pubkey = fake_agent_pubkey_1();
