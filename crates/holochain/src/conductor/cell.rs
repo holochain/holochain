@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use holo_hash::*;
-use holochain_state::{env::EnvironmentRw, prelude::*};
+use holochain_state::{env::EnvironmentWrite, prelude::*};
 use holochain_types::{
     autonomic::AutonomicProcess, cell::CellId, nucleus::ZomeInvocation, shims::*,
 };
@@ -44,7 +44,7 @@ impl PartialEq for Cell {
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorApi,
-    state_env: EnvironmentRw,
+    state_env: EnvironmentWrite,
 }
 
 impl Cell {
@@ -99,7 +99,7 @@ impl Cell {
     }
 
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn state_env(&self) -> EnvironmentRw {
+    pub(crate) fn state_env(&self) -> EnvironmentWrite {
         self.state_env.clone()
     }
 }

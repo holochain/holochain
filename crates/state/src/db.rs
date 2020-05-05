@@ -147,8 +147,12 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
     key: &'static DbKey<V>,
 ) -> DatabaseResult<V> {
     let dbmap = DB_MAP_MAP.read();
-    let um: &DbMap = dbmap.get(path).expect("TODO");
-    let db = *um.get(key).expect("TODO");
+    let um: &DbMap = dbmap
+        .get(path)
+        .ok_or_else(|| DatabaseError::EnvironmentMissing(path.into()))?;
+    let db = *um
+        .get(key)
+        .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().clone()))?;
     Ok(db)
 }
 
@@ -206,7 +210,7 @@ async fn register_db<'env, V: 'static + Send + Sync>(
 /// GetDb allows access to the UniversalMap which stores the heterogeneously typed
 /// LMDB Database references.
 pub trait GetDb {
-    /// TODO
+    /// Access an LMDB database environment stored in our static registrar.
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V>;
     /// Get a KeystoreSender to communicate with the Keystore task for this environment
     fn keystore(&self) -> KeystoreSender;

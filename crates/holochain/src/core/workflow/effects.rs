@@ -1,5 +1,5 @@
 use super::{error::WorkflowRunResult, run_workflow, Workflow};
-use holochain_state::env::EnvironmentRw;
+use holochain_state::env::EnvironmentWrite;
 use holochain_types::prelude::*;
 
 /// A WorkflowEffects is returned from each Workspace function to declaratively
@@ -49,11 +49,11 @@ type TriggerOutput = tokio::task::JoinHandle<WorkflowRunResult<()>>;
 // and to have the lifetimes match up.
 pub trait WorkflowTriggers<'env>: Send {
     /// Execute the triggers, causing other workflow tasks to be spawned
-    fn run(self, env: EnvironmentRw) -> TriggerOutput;
+    fn run(self, env: EnvironmentWrite) -> TriggerOutput;
 }
 
 impl<'env> WorkflowTriggers<'env> for () {
-    fn run(self, _env: EnvironmentRw) -> TriggerOutput {
+    fn run(self, _env: EnvironmentWrite) -> TriggerOutput {
         tokio::spawn(async { Ok(()) })
     }
 }
@@ -63,7 +63,7 @@ where
     W1: 'static + Workflow<'static, Output = ()>,
 {
     #[allow(unreachable_code)]
-    fn run(self, env: EnvironmentRw) -> TriggerOutput {
+    fn run(self, env: EnvironmentWrite) -> TriggerOutput {
         tokio::spawn(async {
             let _handle = run_workflow(env, self, todo!("get workspace"));
             Ok(())
@@ -77,7 +77,7 @@ where
     W2: 'static + Workflow<'static, Output = ()>,
 {
     #[allow(unreachable_code)]
-    fn run(self, env: EnvironmentRw) -> TriggerOutput {
+    fn run(self, env: EnvironmentWrite) -> TriggerOutput {
         tokio::spawn(async {
             let _handle = run_workflow(env, self.0, todo!("get workspace"));
             let _handle = run_workflow(env, self.1, todo!("get workspace"));

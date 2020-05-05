@@ -23,7 +23,7 @@ const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
 lazy_static! {
-    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, EnvironmentRw>> =
+    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, EnvironmentWrite>> =
         RwLockSync::new(HashMap::new());
 }
 
@@ -61,18 +61,18 @@ fn rkv_builder(
     }
 }
 
-/// A read-only version of [EnvironmentRw].
+/// A read-only version of [EnvironmentWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
-pub struct EnvironmentRo {
+pub struct EnvironmentRead {
     arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
     path: PathBuf,
     keystore: KeystoreSender,
 }
 
-impl EnvironmentRo {
-    /// Get a read-only lock on the EnvironmentRw. The most typical use case is
+impl EnvironmentRead {
+    /// Get a read-only lock on the EnvironmentWrite. The most typical use case is
     /// to get a lock in order to create a read-only transaction. The lock guard
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
@@ -84,7 +84,7 @@ impl EnvironmentRo {
         }
     }
 
-    /// Accessor for the [EnvironmentKind] of the EnvironmentRw
+    /// Accessor for the [EnvironmentKind] of the EnvironmentWrite
     pub fn kind(&self) -> &EnvironmentKind {
         &self.kind
     }
@@ -104,7 +104,7 @@ impl EnvironmentRo {
     }
 }
 
-impl GetDb for EnvironmentRw {
+impl GetDb for EnvironmentWrite {
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
         get_db(&self.path, key)
     }
@@ -118,28 +118,28 @@ impl GetDb for EnvironmentRw {
 /// The wrapper contains methods for managing transactions
 /// and database connections,
 #[derive(Clone, Shrinkwrap, Into)]
-pub struct EnvironmentRw(EnvironmentRo);
+pub struct EnvironmentWrite(EnvironmentRead);
 
-impl EnvironmentRw {
+impl EnvironmentWrite {
     /// Create an environment,
     pub async fn new(
         path_prefix: &Path,
         kind: EnvironmentKind,
         keystore: KeystoreSender,
-    ) -> DatabaseResult<EnvironmentRw> {
+    ) -> DatabaseResult<EnvironmentWrite> {
         let mut map = ENVIRONMENTS.write();
         let path = path_prefix.join(kind.path());
         if !path.is_dir() {
             std::fs::create_dir(path.clone())
                 .map_err(|_e| DatabaseError::EnvironmentMissing(path.clone()))?;
         }
-        let env: EnvironmentRw = match map.entry(path.clone()) {
+        let env: EnvironmentWrite = match map.entry(path.clone()) {
             hash_map::Entry::Occupied(e) => e.get().clone(),
             hash_map::Entry::Vacant(e) => e
                 .insert({
                     let rkv = rkv_builder(None, None)(&path)?;
                     initialize_databases(&rkv, &kind).await?;
-                    EnvironmentRw(EnvironmentRo {
+                    EnvironmentWrite(EnvironmentRead {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
                         keystore,
@@ -179,7 +179,7 @@ impl EnvironmentKind {
         }
     }
 }
-/// A reference to a read-only EnvironmentRo.
+/// A reference to a read-only EnvironmentRead.
 /// This has the distinction of being unable to create a read-write transaction,
 /// because unlike [EnvironmentRefRw], this does not implement WriteManager
 pub struct EnvironmentRefRo<'e> {
@@ -276,7 +276,7 @@ impl<'e> EnvironmentRefRw<'e> {
     }
 }
 
-/// A reference to a EnvironmentRw
+/// A reference to a EnvironmentWrite
 #[derive(Shrinkwrap, Into)]
 pub struct EnvironmentRefRw<'e>(EnvironmentRefRo<'e>);
 

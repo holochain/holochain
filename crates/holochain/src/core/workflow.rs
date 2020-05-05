@@ -32,7 +32,7 @@ pub use effects::*;
 
 use crate::core::state::workspace::Workspace;
 use error::*;
-use holochain_state::env::EnvironmentRw;
+use holochain_state::env::EnvironmentWrite;
 use must_future::MustBoxFuture;
 use tracing::*;
 
@@ -64,7 +64,7 @@ pub trait Workflow<'env>: Sized + Send {
 /// Workspace, this runs the Workflow and executes the `finish` function on
 /// the WorkflowEffects, returning the Output value of the workflow
 pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
-    arc: EnvironmentRw,
+    arc: EnvironmentWrite,
     wc: Wf,
     workspace: Wf::Workspace,
 ) -> WorkflowRunResult<O> {
@@ -79,7 +79,7 @@ pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
 /// 3. Emit any Signals
 /// 4. Trigger any subsequent Workflows
 async fn finish<'env, Wf: Workflow<'env>>(
-    arc: EnvironmentRw,
+    arc: EnvironmentWrite,
     effects: WorkflowEffects<'env, Wf>,
 ) -> WorkflowRunResult<()> {
     let WorkflowEffects {
