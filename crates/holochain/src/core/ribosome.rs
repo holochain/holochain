@@ -42,8 +42,7 @@ use self::{
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 
-use super::state::source_chain::raw::UnsafeSourceChain;
-use super::state::cascade::raw::UnsafeCascade;
+use super::state::workspace::UnsafeInvokeZomeWorkspace;
 use error::RibosomeResult;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
@@ -79,8 +78,7 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         self,
-        source_chain: UnsafeSourceChain,
-        cascade: UnsafeCascade,
+        workspace: UnsafeInvokeZomeWorkspace,
         // TODO NetworkRequest,
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
@@ -94,8 +92,7 @@ pub struct WasmRibosome {
 }
 
 pub struct HostContext {
-    source_chain: UnsafeSourceChain,
-    cascade: UnsafeCascade,
+    workspace: UnsafeInvokeZomeWorkspace,
     zome_name: String,
 }
 
@@ -204,13 +201,12 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         self,
-        source_chain: UnsafeSourceChain,
-        cascade: UnsafeCascade,
+        workspace: UnsafeInvokeZomeWorkspace,
+        // TODO: ConductorHandle
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse> {
         let host_context = HostContext {
-            cascade,
-            source_chain,
+            workspace,
             zome_name: invocation.zome_name.clone(),
         };
         let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
@@ -236,7 +232,7 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::{ribosome::HostContext, state::{source_chain::raw::UnsafeSourceChain, cascade::raw::UnsafeCascade}};
+    use crate::core::{ribosome::HostContext, state::workspace::UnsafeInvokeZomeWorkspace};
     use holochain_types::{
         dna::{wasm::DnaWasm, zome::Zome, Dna},
         test_utils::{fake_dna, fake_header_hash, fake_zome},
@@ -278,8 +274,7 @@ pub mod wasm_test {
             let _ = ribosome
                 .instance(HostContext {
                     zome_name: zome_name.to_string(),
-                    source_chain: UnsafeSourceChain::test(),
-                    cascade: UnsafeCascade::test(),
+                    workspace: UnsafeInvokeZomeWorkspace::test(),
                 })
                 .unwrap();
         }
@@ -320,8 +315,7 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        $crate::core::state::source_chain::raw::UnsafeSourceChain::test(),
-                        $crate::core::state::cascade::raw::UnsafeCascade::test(),
+                        $crate::core::state::workspace::UnsafeInvokeZomeWorkspace::test(),
                         invocation,
                     )
                     .unwrap();
@@ -361,7 +355,7 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(UnsafeSourceChain::test(), UnsafeCascade::test(), invocation)
+                .call_zome_function(UnsafeInvokeZomeWorkspace::test(), invocation)
                 .unwrap()
         );
     }

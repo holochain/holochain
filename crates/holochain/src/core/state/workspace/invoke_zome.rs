@@ -1,38 +1,40 @@
 use super::Workspace;
 use crate::core::state::{
-    source_chain::{SourceChain},
+    cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
     workspace::WorkspaceResult,
 };
 use holochain_state::{db::DbManager, prelude::*};
 
-pub struct InvokeZomeWorkspace<'env>
-{
+pub struct InvokeZomeWorkspace<'env> {
     pub source_chain: SourceChain<'env, Reader<'env>>,
+    pub meta: ChainMetaBuf<'env, ()>,
+    pub cache_cas: ChainCasBuf<'env, Reader<'env>>,
+    pub cache_meta: ChainMetaBuf<'env, ()>,
 }
 
-impl<'env> InvokeZomeWorkspace<'env>
-{
+impl<'env> InvokeZomeWorkspace<'env> {
     pub fn new(reader: &'env Reader<'env>, dbs: &'env DbManager) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(reader, dbs)?;
 
-        /* FIXME: How do we create the cascade without creating a conflict
-        with the source_chain mut borrow that happens in the ribosom `invoke_zome` call?
-        // Create the cascade
-        let cache = SourceChainBuf::cache(reader, dbs)?;
-        // Create a cache and a cas for store and meta
-        let primary_meta = ChainMetaBuf::primary(reader, dbs)?;
+        let cache_cas = ChainCasBuf::cache(reader, dbs)?;
+        let meta = ChainMetaBuf::primary(reader, dbs)?;
         let cache_meta = ChainMetaBuf::cache(reader, dbs)?;
-        let cascade = Cascade::new(
-            &source_chain.cas(),
-            &primary_meta,
-            &cache.cas(),
-            &cache_meta,
-        );
-        */
 
         Ok(InvokeZomeWorkspace {
             source_chain,
+            meta,
+            cache_cas,
+            cache_meta,
         })
+    }
+
+    pub fn cascade(&self) -> Cascade {
+        Cascade::new(
+            &self.source_chain.cas(),
+            &self.meta,
+            &self.cache_cas,
+            &self.cache_meta,
+        )
     }
 }
 
@@ -41,5 +43,138 @@ impl<'env> Workspace for InvokeZomeWorkspace<'env> {
         self.source_chain.into_inner().flush_to_txn(&mut writer)?;
         writer.commit()?;
         Ok(())
+    }
+}
+
+pub mod raw {
+    use super::*;
+    use futures::Future;
+    // TODO write tests to varify the invariant.
+    /// This is needed to use the database where
+    /// the lifetimes cannot be verified by
+    /// the compiler (e.g. with wasmer).
+    /// The checks are moved to runtime.
+    /// The api is non-blocking because this
+    /// should never be contested if the invariant is held.
+    /// This type cannot write to the db.
+    /// It only takes a [Reader].
+    pub struct UnsafeInvokeZomeWorkspace {
+        workspace: std::sync::Weak<std::sync::RwLock<*mut std::ffi::c_void>>,
+    }
+
+    // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
+    /// If this guard is dropped the underlying
+    /// ptr cannot be used.
+    /// ## Safety
+    /// Don't use `mem::forget` on this type as it will
+    /// break the checks.
+    pub struct UnsafeInvokeZomeWorkspaceGuard {
+        workspace: Option<std::sync::Arc<std::sync::RwLock<*mut std::ffi::c_void>>>,
+    }
+
+    impl UnsafeInvokeZomeWorkspace {
+        pub fn from_mut(
+            workspace: &mut InvokeZomeWorkspace,
+        ) -> (UnsafeInvokeZomeWorkspaceGuard, Self) {
+            let raw_ptr = workspace as *mut InvokeZomeWorkspace as *mut std::ffi::c_void;
+            let guard = std::sync::Arc::new(std::sync::RwLock::new(raw_ptr));
+            let workspace = std::sync::Arc::downgrade(&guard);
+            let guard = UnsafeInvokeZomeWorkspaceGuard {
+                workspace: Some(guard),
+            };
+            let workspace = Self { workspace };
+            (guard, workspace)
+        }
+
+        #[cfg(test)]
+        /// Useful when we need this type for tests where we don't want to use it.
+        /// It will always return None.
+        pub fn test() -> Self {
+            let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
+            let guard = std::sync::Arc::new(std::sync::RwLock::new(fake_ptr));
+            let workspace = std::sync::Arc::downgrade(&guard);
+            // Make sure the weak Arc cannot be upgraded
+            std::mem::drop(guard);
+            Self { workspace }
+        }
+
+        pub async unsafe fn apply_ref<
+            'a,
+            R,
+            Fut: Future<Output = R> + 'a,
+            F: FnOnce(&'a InvokeZomeWorkspace) -> Fut,
+        >(
+            &self,
+            f: F,
+        ) -> Option<R> {
+            // Check it exists
+            /*
+            self.workspace
+                .upgrade()
+                // Check that no-one else can write
+                .and_then(|lock| {
+                    lock.try_read().ok().and_then(|guard| {
+                        let sc = *guard as *const InvokeZomeWorkspace;
+                        sc.as_ref().map(|s| f(s))
+                    })
+                })
+                */
+            match self.workspace.upgrade() {
+                Some(lock) => match lock.try_read().ok() {
+                    Some(guard) => {
+                        let sc = *guard as *const InvokeZomeWorkspace;
+                        match sc.as_ref() {
+                            Some(s) => Some(f(s).await),
+                            None => None,
+                        }
+                    }
+                    None => None,
+                },
+                None => None,
+            }
+        }
+
+        pub async unsafe fn apply_mut<
+            'a,
+            R,
+            Fut: Future<Output = R> + 'a,
+            F: FnOnce(&'a mut InvokeZomeWorkspace) -> Fut,
+        >(
+            &self,
+            f: F,
+        ) -> Option<R> {
+            /*
+            // Check it exists
+            self.workspace
+                .upgrade()
+                // Check that no-one else can read or write
+                .and_then(|lock| {
+                    lock.try_write().ok().and_then(|guard| {
+                        let sc = *guard as *mut InvokeZomeWorkspace;
+                        sc.as_mut().map(|s| f(s))
+                    })
+                })
+            */
+            match self.workspace.upgrade() {
+                Some(lock) => match lock.try_write().ok() {
+                    Some(guard) => {
+                        let sc = *guard as *mut InvokeZomeWorkspace;
+                        match sc.as_mut() {
+                            Some(s) => Some(f(s).await),
+                            None => None,
+                        }
+                    }
+                    None => None,
+                },
+                None => None,
+            }
+        }
+    }
+
+    impl Drop for UnsafeInvokeZomeWorkspaceGuard {
+        fn drop(&mut self) {
+            std::sync::Arc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"))
+                .expect("BUG: Invariant broken, strong reference active while guard is dropped");
+        }
     }
 }

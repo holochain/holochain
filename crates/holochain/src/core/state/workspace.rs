@@ -8,6 +8,7 @@ mod invoke_zome;
 pub use app_validation::AppValidationWorkspace;
 pub use genesis::GenesisWorkspace;
 pub use invoke_zome::InvokeZomeWorkspace;
+pub use invoke_zome::raw::UnsafeInvokeZomeWorkspace;
 
 #[derive(Debug, Error)]
 pub enum WorkspaceError {

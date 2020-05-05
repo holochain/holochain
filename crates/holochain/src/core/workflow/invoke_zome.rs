@@ -1,10 +1,7 @@
 use super::{WorkflowCall, WorkflowEffects, WorkflowError, WorkflowResult, WorkflowTrigger};
 use crate::core::{
     ribosome::RibosomeT,
-    state::{
-        cascade::raw::UnsafeCascade, source_chain::raw::UnsafeSourceChain,
-        workspace::InvokeZomeWorkspace,
-    },
+    state::workspace::{InvokeZomeWorkspace, UnsafeInvokeZomeWorkspace},
 };
 use fallible_iterator::FallibleIterator;
 use holochain_types::nucleus::ZomeInvocation;
@@ -18,9 +15,7 @@ pub async fn invoke_zome<'env>(
     let mut triggers = Vec::new();
 
     // Check if the initialize workflow has been successfully run
-    // TODO: PERF: Backwards iterator is a slow way to get length as it's
-    // calling get for each item
-    if workspace.source_chain.iter_back().count()? < 4 {
+    if workspace.source_chain.len() < 4 {
         triggers.push(WorkflowTrigger::immediate(WorkflowCall::InitializeZome));
     }
 
@@ -29,11 +24,9 @@ pub async fn invoke_zome<'env>(
 
     // Create the unsafe sourcechain for use with wasm closure
     {
-        // FIXME: Figure out how to create this without aiasing the mut borrow of the sourcechain
-        let cascade = UnsafeCascade::test();
-        let (_g, source_chain) = UnsafeSourceChain::from_mut(&mut workspace.source_chain);
         // TODO: TK-01564: Return this result
-        let _result = ribosome.call_zome_function(source_chain, cascade, invocation)?;
+        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let _result = ribosome.call_zome_function(raw_workspace, invocation)?;
     }
 
     // Get the new head
@@ -76,12 +69,9 @@ pub mod tests {
     use super::*;
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use crate::core::ribosome::MockRibosomeT;
-    use crate::core::{
-        state::source_chain::SourceChain,
-        workflow::{WorkflowCall, WorkflowError},
-    };
+    use crate::core::workflow::{WorkflowCall, WorkflowError};
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::{env::ReadManager, prelude::Reader, test_utils::test_cell_env};
+    use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{
         chain_header::ChainHeader,
         entry::Entry,
@@ -92,6 +82,7 @@ pub mod tests {
     };
     use holochain_zome_types::ZomeExternGuestOutput;
 
+    use futures::{future::BoxFuture, FutureExt};
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -99,7 +90,7 @@ pub mod tests {
         a: u32,
     }
 
-    async fn fake_genesis(workspace: &mut InvokeZomeWorkspace<'_>) {
+    async fn fake_genesis(workspace: &mut InvokeZomeWorkspace<'_>) -> ChainHeader {
         let agent_pubkey = fake_agent_pubkey_1();
         let agent_entry = Entry::Agent(agent_pubkey.clone());
         let dna = fake_dna("cool dna");
@@ -118,9 +109,10 @@ pub mod tests {
         workspace.source_chain.put(dna_header, None).await.unwrap();
         workspace
             .source_chain
-            .put(agent_header, Some(agent_entry))
+            .put(agent_header.clone(), Some(agent_entry))
             .await
             .unwrap();
+        agent_header
     }
 
     // 0.5. Initialization Complete?
@@ -140,14 +132,14 @@ pub mod tests {
         fake_genesis(&mut workspace).await;
 
         // Setup the ribosome mock
-        ribosome.expect_call_zome_function().returning(
-            move |_source_chain, _cascade, _invocation| {
+        ribosome
+            .expect_call_zome_function()
+            .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
                 Ok(ZomeInvocationResponse::ZomeApiFn(
                     ZomeExternGuestOutput::new(x),
                 ))
-            },
-        );
+            });
 
         // Call the zome function
         let invocation =
@@ -198,10 +190,8 @@ pub mod tests {
     // 1.3 If the CapabiltyGrant has pre-filled parameters, check that the ui is passing exactly the
     // parameters needed and no more to complete the call. (MVI)
 
-    // TODO: TODAY: (turn into PR question) What is pre-flight chain extention?
     // 2. Set Context (Cascading Cursor w/ Pre-flight chain extension) MVT
 
-    // TODO: How is the Cursor (I guess the cascade?) passed to the wasm invokation?
     // 3. Invoke WASM (w/ Cursor) MVM
     // WASM receives external call handles:
     // (gets & commits via cascading cursor, crypto functions & bridge calls via conductor,
@@ -221,7 +211,7 @@ pub mod tests {
     // TODO: B-01092: SYSTEM_VALIDATION: Finish when sys val lands
     #[ignore]
     #[tokio::test]
-    async fn calls_system_validation() {
+    async fn calls_system_validation<'a>() {
         observability::test_run().ok();
         let env = test_cell_env();
         let dbs = env.dbs().await.unwrap();
@@ -230,26 +220,35 @@ pub mod tests {
         let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         // Genesis
-        fake_genesis(&mut workspace).await;
+        let agent_header = fake_genesis(&mut workspace).await;
 
-        let agent_hash = fake_agent_pubkey_1();
+        let agent_pubkey = fake_agent_pubkey_1();
+        let agent_entry = Entry::Agent(agent_pubkey.clone());
         let mut ribosome = MockRibosomeT::new();
         // Call zome mock that it writes to source chain
-        /* FIXME: Broken by the same async issue
-        ribosome.expect_call_zome_function().returning(
-            move |source_chain, _cascade, _invocation| {
-                let agent_entry = Entry::Agent(agent_hash.clone());
-                let call = |source_chain: &mut SourceChain<Reader>| {
-                    source_chain.put(agent_entry, &agent_hash).await.unwrap()
+        ribosome
+            .expect_call_zome_function()
+            .returning(move |_unsafe_workspace, _invocation| {
+                let agent_header = agent_header.clone();
+                let agent_entry = agent_entry.clone();
+                let _call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, ()> {
+                    async move {
+                        workspace
+                            .source_chain
+                            .put(agent_header.clone(), Some(agent_entry))
+                            .await
+                            .unwrap();
+                    }
+                    .boxed()
                 };
-                unsafe { source_chain.apply_mut(call) };
+                /* FIXME: Mockall doesn't seem to work with async?
+                unsafe { unsafe_workspace.apply_mut(call).await };
+                */
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
                 Ok(ZomeInvocationResponse::ZomeApiFn(
                     ZomeExternGuestOutput::new(x),
                 ))
-            },
-        );
-        */
+            });
 
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
