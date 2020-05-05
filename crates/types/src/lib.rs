@@ -6,7 +6,6 @@
 pub mod address;
 pub mod autonomic;
 pub mod cell;
-pub mod chain_header;
 pub mod db;
 pub mod dna;
 pub mod entry;
@@ -16,6 +15,9 @@ pub mod nucleus;
 pub mod observability;
 pub mod persistence;
 pub mod prelude;
+
+mod chain_header;
+pub use chain_header::ChainHeader;
 
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]
@@ -75,7 +77,7 @@ serial_hash!(
     crate::entry::Entry,
     EntryHash
 
-    crate::chain_header::ChainHeader,
+    crate::ChainHeader,
     HeaderHash
 
     crate::dna::wasm::DnaWasm,
