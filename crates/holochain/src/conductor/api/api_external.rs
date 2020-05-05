@@ -133,6 +133,24 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 Ok(AdminResponse::ListDnas(dna_list))
             }
+            GenerateAgentPubKey => {
+                let agent_pub_key = self
+                    .conductor_handle
+                    .keystore()
+                    .clone()
+                    .generate_sign_keypair_from_pure_entropy()
+                    .await?;
+                Ok(AdminResponse::GenerateAgentPubKey(agent_pub_key))
+            }
+            ListAgentPubKeys => {
+                let pub_key_list = self
+                    .conductor_handle
+                    .keystore()
+                    .clone()
+                    .list_sign_keys()
+                    .await?;
+                Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
+            }
         }
     }
 }
@@ -256,6 +274,10 @@ pub enum AdminResponse {
     AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
     ListDnas(Vec<DnaHash>),
+    /// Keystore generated a new AgentPubKey
+    GenerateAgentPubKey(AgentPubKey),
+    /// Listing all the AgentPubKeys in the Keystore
+    ListAgentPubKeys(Vec<AgentPubKey>),
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
 }
@@ -290,6 +312,10 @@ pub enum AdminRequest {
     InstallDna(PathBuf, Option<serde_json::Value>),
     /// List all installed [Dna]s
     ListDnas,
+    /// Generate a new AgentPubKey
+    GenerateAgentPubKey,
+    /// List all AgentPubKeys in Keystore
+    ListAgentPubKeys,
 }
 
 #[allow(missing_docs)]
@@ -338,6 +364,44 @@ mod test {
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn generate_and_list_pub_keys() -> Result<()> {
+        let handle = Conductor::builder().test().await?.into_handle();
+        let admin_api = RealAdminInterfaceApi::new(handle);
+
+        let agent_pub_key = admin_api
+            .handle_admin_request(AdminRequest::GenerateAgentPubKey)
+            .await;
+
+        let agent_pub_key = match agent_pub_key {
+            AdminResponse::GenerateAgentPubKey(key) => key,
+            _ => panic!("bad type: {:?}", agent_pub_key),
+        };
+
+        let pub_key_list = admin_api
+            .handle_admin_request(AdminRequest::ListAgentPubKeys)
+            .await;
+
+        let mut pub_key_list = match pub_key_list {
+            AdminResponse::ListAgentPubKeys(list) => list,
+            _ => panic!("bad type: {:?}", pub_key_list),
+        };
+
+        // includes our two pre-generated test keys
+        let mut expects = vec![
+            AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4").unwrap(),
+            AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK").unwrap(),
+            agent_pub_key,
+        ];
+
+        pub_key_list.sort();
+        expects.sort();
+
+        assert_eq!(expects, pub_key_list);
+
         Ok(())
     }
 
