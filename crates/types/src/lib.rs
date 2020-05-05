@@ -66,12 +66,6 @@ macro_rules! serial_hash {
     };
 }
 
-/// hack to make serial_hash macro work
-#[allow(dead_code)]
-enum EntryHash {}
-#[allow(dead_code)]
-enum HeaderHash {}
-
 serial_hash!(
     crate::entry::Entry,
     EntryHash
