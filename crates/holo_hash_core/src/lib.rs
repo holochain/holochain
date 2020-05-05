@@ -170,11 +170,14 @@ core_holo_hash! {
     "Represents a Holo/Holochain DnaHash - The hash of a specific hApp DNA. (uhC0k...)",
     DnaHash,
 
+    "Represents a Holo/Holochain WasmHash - The hash of the wasm bytes. (uhCok...)",
+    WasmHash,
+
     "Represents a Holo/Holochain NetIdHash - Network Ids let you create hard dht network divisions. (uhCIk...)",
     NetIdHash,
 
-    "Represents a Holo/Holochain AgentHash - A libsodium signature public key. (uhCAk...)",
-    AgentHash,
+    "Represents a Holo/Holochain AgentPubKey - A libsodium signature public key. (uhCAk...)",
+    AgentPubKey,
 
     "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
     EntryHash,
@@ -209,7 +212,7 @@ mod tests {
     fn test_enum_types() {
         assert_type("DnaHash", DnaHash::new(vec![0xdb; 36]).into());
         assert_type("NetIdHash", NetIdHash::new(vec![0xdb; 36]).into());
-        assert_type("AgentHash", AgentHash::new(vec![0xdb; 36]).into());
+        assert_type("AgentPubKey", AgentPubKey::new(vec![0xdb; 36]).into());
         assert_type("EntryHash", EntryHash::new(vec![0xdb; 36]).into());
         assert_type("DhtOpHash", DhtOpHash::new(vec![0xdb; 36]).into());
     }

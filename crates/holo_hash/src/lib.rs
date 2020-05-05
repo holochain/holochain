@@ -4,9 +4,10 @@
 //! Note that not all HoloHashes are simple hashes of the full content as you
 //! might expect in a "content-addressable" application.
 //!
-//! For example, the content of an AgentHash is simply the key itself to
-//! enable self-proving signatures. DhtOps sometimes hash either entry content
-//! or header content to produce their hashes, depending on which type
+//! The main exception is AgentPubKey, which is simply the key itself to
+//! enable self-proving signatures. As an exception it is also named exceptionally, i.e.
+//! it doesn't end in "Hash". Another exception is DhtOps which sometimes hash either entry
+//! content or header content to produce their hashes, depending on which type
 //! of operation it is.
 //!
 //! HoloHash implements `Display` providing a `to_string()` function accessing
@@ -72,13 +73,13 @@
 //! // pretend our pub key is all 0xdb bytes
 //! let agent_pub_key = vec![0xdb; 32];
 //!
-//! let agent_id: HoloHash = AgentHash::with_pre_hashed_sync(agent_pub_key).into();
+//! let agent_id: HoloHash = AgentPubKey::with_pre_hashed_sync(agent_pub_key).into();
 //!
 //! // if in a futures context you should await instead to not block executor:
-//! // let agent_id = AgentHash::with_pre_hashed(agent_pub_key).await;
+//! // let agent_id = AgentPubKey::with_pre_hashed(agent_pub_key).await;
 //!
 //! assert_eq!(
-//!     "AgentHash(uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv)",
+//!     "AgentPubKey(uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv)",
 //!     &format!("{:?}", agent_id),
 //! );
 //!
@@ -152,7 +153,7 @@ hCYk 4868 <Buffer 84 26 24>
 hCck 4996 <Buffer 84 27 24>
 hCgk 5124 <Buffer 84 28 24>
 hCkk 5252 <Buffer 84 29 24> // entry header
-hCok 5380 <Buffer 84 2a 24>
+hCok 5380 <Buffer 84 2a 24> // wasm
 hCsk 5508 <Buffer 84 2b 24>
 hCwk 5636 <Buffer 84 2c 24>
 hC0k 5764 <Buffer 84 2d 24> // dna
@@ -161,6 +162,7 @@ hC8k 6020 <Buffer 84 2f 24>
 */
 
 const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k
+const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok
 const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
 const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
 const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
@@ -232,11 +234,12 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
     }
     match &s[1..5] {
         "hC0k" => Ok(HoloHash::DnaHash(DnaHash::try_from(s)?)),
+        "hCok" => Ok(HoloHash::WasmHash(WasmHash::try_from(s)?)),
         "hCIk" => Ok(HoloHash::NetIdHash(NetIdHash::try_from(s)?)),
-        "hCAk" => Ok(HoloHash::AgentHash(AgentHash::try_from(s)?)),
+        "hCAk" => Ok(HoloHash::AgentPubKey(AgentPubKey::try_from(s)?)),
         "hCEk" => Ok(HoloHash::EntryHash(EntryHash::try_from(s)?)),
         "hCQk" => Ok(HoloHash::DhtOpHash(DhtOpHash::try_from(s)?)),
-        "uhCkk" => Ok(HoloHash::HeaderHash(HeaderHash::try_from(s)?)),
+        "hCkk" => Ok(HoloHash::HeaderHash(HeaderHash::try_from(s)?)),
         _ => Err(HoloHashError::BadPrefix),
     }
 }
@@ -477,12 +480,16 @@ new_holo_hash! {
     DnaHash,
     DNA_PREFIX,
 
+    "Represents a Holo/Holochain WasmHash - The hash of the wasm bytes. (uhCok...)",
+    WasmHash,
+    WASM_PREFIX,
+
     "Represents a Holo/Holochain NetIdHash - Network Ids let you create hard dht network divisions. (uhCIk...)",
     NetIdHash,
     NET_ID_PREFIX,
 
-    "Represents a Holo/Holochain AgentHash - A libsodium signature public key. (uhCAk...)",
-    AgentHash,
+    "Represents a Holo/Holochain AgentPubKey - A libsodium signature public key. (uhCAk...)",
+    AgentPubKey,
     AGENT_PREFIX,
 
     "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
@@ -512,14 +519,14 @@ mod tests {
         let h: holochain_serialized_bytes::SerializedBytes = h.try_into().unwrap();
 
         assert_eq!(
-            "{\"type\":\"AgentHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
+            "{\"type\":\"AgentPubKey\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
             &format!("{:?}", h),
         );
 
         let h: HoloHash = h.try_into().unwrap();
 
         assert_eq!(
-            "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+            "AgentPubKey(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
         );
     }
@@ -549,7 +556,7 @@ mod tests {
             .unwrap();
         assert_eq!(3_860_645_936, h.get_loc());
         assert_eq!(
-            "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+            "AgentPubKey(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
         );
 
@@ -576,7 +583,7 @@ mod tests {
     fn agent_id_as_bytes_sync() {
         let hash = vec![0xdb; 32];
         let hash: &[u8] = &hash;
-        let agent_id = AgentHash::with_pre_hashed_sync(hash.to_vec());
+        let agent_id = AgentPubKey::with_pre_hashed_sync(hash.to_vec());
         assert_eq!(hash, agent_id.get_bytes());
     }
 
@@ -586,7 +593,7 @@ mod tests {
         tokio::task::spawn(async move {
             let hash = vec![0xdb; 32];
             let hash: &[u8] = &hash;
-            let agent_id = AgentHash::with_pre_hashed(hash.to_vec()).await;
+            let agent_id = AgentPubKey::with_pre_hashed(hash.to_vec()).await;
             assert_eq!(hash, agent_id.get_bytes());
         })
         .await
@@ -595,7 +602,7 @@ mod tests {
 
     #[test]
     fn agent_id_prehash_sync_display() {
-        let agent_id = AgentHash::with_pre_hashed_sync(vec![0xdb; 32]);
+        let agent_id = AgentPubKey::with_pre_hashed_sync(vec![0xdb; 32]);
         assert_eq!(
             "uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv",
             &format!("{}", agent_id),
@@ -606,7 +613,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_prehash_display() {
         tokio::task::spawn(async move {
-            let agent_id = AgentHash::with_pre_hashed(vec![0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_pre_hashed(vec![0xdb; 32]).await;
             assert_eq!(
                 "uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv",
                 &format!("{}", agent_id),
@@ -618,7 +625,7 @@ mod tests {
 
     #[test]
     fn agent_id_try_parse() {
-        let agent_id: AgentHash = "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
+        let agent_id: AgentPubKey = "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm"
             .try_into()
             .unwrap();
         assert_eq!(3_860_645_936, agent_id.get_loc());
@@ -626,9 +633,9 @@ mod tests {
 
     #[test]
     fn agent_id_sync_debug() {
-        let agent_id = AgentHash::with_data_sync(&[0xdb; 32]);
+        let agent_id = AgentPubKey::with_data_sync(&[0xdb; 32]);
         assert_eq!(
-            "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+            "AgentPubKey(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", agent_id),
         );
     }
@@ -637,9 +644,9 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_debug() {
         tokio::task::spawn(async move {
-            let agent_id = AgentHash::with_data(&[0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_data(&[0xdb; 32]).await;
             assert_eq!(
-                "AgentHash(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+                "AgentPubKey(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
                 &format!("{:?}", agent_id),
             );
         })
@@ -649,7 +656,7 @@ mod tests {
 
     #[test]
     fn agent_id_sync_display() {
-        let agent_id = AgentHash::with_data_sync(&[0xdb; 32]);
+        let agent_id = AgentPubKey::with_data_sync(&[0xdb; 32]);
         assert_eq!(
             "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm",
             &format!("{}", agent_id),
@@ -660,7 +667,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_display() {
         tokio::task::spawn(async move {
-            let agent_id = AgentHash::with_data(&[0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_data(&[0xdb; 32]).await;
             assert_eq!(
                 "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm",
                 &format!("{}", agent_id),
@@ -672,7 +679,7 @@ mod tests {
 
     #[test]
     fn agent_id_sync_loc() {
-        let agent_id = AgentHash::with_data_sync(&[0xdb; 32]);
+        let agent_id = AgentPubKey::with_data_sync(&[0xdb; 32]);
         assert_eq!(3_860_645_936, agent_id.get_loc());
     }
 
@@ -680,7 +687,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_loc() {
         tokio::task::spawn(async move {
-            let agent_id = AgentHash::with_data(&[0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_data(&[0xdb; 32]).await;
             assert_eq!(3_860_645_936, agent_id.get_loc());
         })
         .await

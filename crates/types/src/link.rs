@@ -1,6 +1,6 @@
 //! Links interrelate entries in a source chain.
 
-use holo_hash::EntryHash;
+use crate::address::EntryAddress;
 use holochain_serialized_bytes::prelude::*;
 use regex::Regex;
 
@@ -10,15 +10,15 @@ type LinkTag = String;
 /// Links interrelate entries in a source chain.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, SerializedBytes)]
 pub struct Link {
-    base: EntryHash,
-    target: EntryHash,
+    base: EntryAddress,
+    target: EntryAddress,
     link_type: LinkType,
     tag: LinkTag,
 }
 
 impl Link {
     /// Construct a new link.
-    pub fn new(base: &EntryHash, target: &EntryHash, link_type: &str, tag: &str) -> Self {
+    pub fn new(base: &EntryAddress, target: &EntryAddress, link_type: &str, tag: &str) -> Self {
         Link {
             base: base.to_owned(),
             target: target.to_owned(),
@@ -28,12 +28,12 @@ impl Link {
     }
 
     /// Get the base address of this link.
-    pub fn base(&self) -> &EntryHash {
+    pub fn base(&self) -> &EntryAddress {
         &self.base
     }
 
     /// Get the target address of this link.
-    pub fn target(&self) -> &EntryHash {
+    pub fn target(&self) -> &EntryAddress {
         &self.target
     }
 
@@ -74,29 +74,5 @@ impl<S: Into<String>> LinkMatch<S> {
             Ok(_) => Ok(re_string),
             Err(_) => Err("Invalid regex passed to get_links".into()),
         }
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use crate::entry::test_entry_hash;
-    use crate::entry::test_entry_hash_b;
-
-    pub fn example_link() -> Link {
-        Link::new(
-            &test_entry_hash(),
-            &test_entry_hash_b(),
-            &example_link_type(),
-            &example_link_tag(),
-        )
-    }
-
-    pub fn example_link_type() -> LinkType {
-        LinkType::from("foo-link-type")
-    }
-
-    pub fn example_link_tag() -> LinkTag {
-        LinkTag::from("foo-link-tag")
     }
 }

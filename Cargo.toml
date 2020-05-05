@@ -1,15 +1,15 @@
 [workspace]
 
 members = [
-  # "crates/lib3h_protocol",
-  # "crates/keystore",
-  # "crates/legacy",
+  "crates/crypto",
+  "crates/fixt",
+  "crates/fixt/test",
+  "crates/keystore",
   "crates/holochain",
   "crates/holo_hash",
   "crates/holo_hash_core",
   "crates/state",
   "crates/types",
-  "crates/crypto",
   "crates/websocket",
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
@@ -23,7 +23,7 @@ exclude = [
 
 # holochain_serialized_bytes = { version = "=0.0.38", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 holochain_wasmer_common = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
-holochain_wasmer_guest = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
+# holochain_wasmer_guest = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 holochain_wasmer_host = { version = "=0.0.24", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 
 lib3h_crypto_api = { version = "0.0.38", git = "https://github.com/holochain/lib3h.git", branch = "unpinned" }

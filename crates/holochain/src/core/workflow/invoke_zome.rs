@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowResult};
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
-use sx_types::nucleus::ZomeInvocation;
+use holochain_types::nucleus::ZomeInvocation;
 
 pub async fn invoke_zome<'env>(
     workspace: InvokeZomeWorkspace<'_>,
@@ -24,13 +24,13 @@ pub mod tests {
         ribosome::MockRibosomeT,
         test_utils::fake_cell_id,
     };
-    use sx_types::{entry::Entry, error::SkunkResult};
+    use holochain_types::{entry::Entry, error::SkunkResult};
     use tempdir::TempDir;
 
     #[tokio::test]
     async fn can_invoke_zome_with_mock() {
         let cell_id = fake_cell_id("mario");
-        let tmpdir = TempDir::new("skunkworx").unwrap();
+        let tmpdir = TempDir::new("holochain_2020").unwrap();
         let persistence = SourceChainPersistence::test(tmpdir.path());
         let chain = test_initialized_chain("mario", &persistence);
         let invocation = ZomeInvocation {

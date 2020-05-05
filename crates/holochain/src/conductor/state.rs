@@ -1,24 +1,8 @@
-use crate::conductor::{error::ConductorError, interface::InterfaceDriver};
-use boolinator::Boolinator;
-use petgraph::{algo::toposort, graph::DiGraph, prelude::NodeIndex};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-    sync::Arc,
-};
-use sx_types::{
-    agent::{AgentId, Base32},
-    dna::{
-        bridges::{BridgePresence, BridgeReference},
-        Dna,
-    },
-    error::SkunkError,
-    prelude::*,
-};
+use crate::conductor::interface::InterfaceDriver;
 
-#[cfg(test)]
-mod tests;
+use holochain_types::{dna::error::DnaError, prelude::*};
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///
@@ -38,14 +22,10 @@ pub struct ConductorState {
     /// List of interfaces any UI can use to access zome functions. Optional.
     #[serde(default)]
     pub interfaces: Vec<InterfaceConfig>,
-
-    /// List of bridges between cells. Optional.
-    #[serde(default)]
-    pub bridges: Vec<Bridge>,
 }
 
 /// Check for duplicate items in a list of strings
-fn detect_dupes<'a, I: Iterator<Item = &'a String>>(
+fn _detect_dupes<'a, I: Iterator<Item = &'a String>>(
     name: &'static str,
     items: I,
 ) -> Result<(), String> {
@@ -67,212 +47,10 @@ fn detect_dupes<'a, I: Iterator<Item = &'a String>>(
     }
 }
 
-pub type DnaLoader = Arc<Box<dyn FnMut(&PathBuf) -> Result<Dna, SkunkError> + Send + Sync>>;
-
 impl ConductorState {
-    /// This function basically checks if self is a semantically valid configuration.
-    /// This mainly means checking for consistency between config structs that reference others.
-    /// FIXME: this function was ported over from legacy code, and then parts were ripped out until it compiled.
-    ///     this is because we need the ConductorConfig to do some of these consistency checks.
-    ///     If we keep using this representation of ConductorState, then add them back in.
-    pub fn check_consistency(&self, mut dna_loader: &mut DnaLoader) -> Result<(), ConductorError> {
-        detect_dupes("agent", self.agents.iter().map(|c| &c.id))?;
-        detect_dupes("dna", self.dnas.iter().map(|c| &c.id))?;
-
-        detect_dupes("cell", self.cells.iter().map(|c| &c.id))?;
-
-        detect_dupes("interface", self.interfaces.iter().map(|c| &c.id))?;
-
-        for cell in self.cells.iter() {
-            self.agent_by_id(&cell.agent).is_some().ok_or_else(|| {
-                format!(
-                    "Agent configuration {} not found, mentioned in cell {}",
-                    cell.agent, cell.id
-                )
-            })?;
-            let dna_config = self.dna_by_id(&cell.dna);
-            dna_config.is_some().ok_or_else(|| {
-                format!(
-                    "DNA configuration \"{}\" not found, mentioned in cell \"{}\"",
-                    cell.dna, cell.id
-                )
-            })?;
-            let dna_config = dna_config.unwrap();
-            let dna =
-                Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(dna_config.file.clone()))
-                    .map_err(|_| format!("Could not load DNA file \"{}\"", dna_config.file))?;
-
-            for zome in dna.zomes.values() {
-                for bridge in zome.bridges.iter() {
-                    if bridge.presence == BridgePresence::Required {
-                        let handle = bridge.handle.clone();
-                        let _ = self
-                            .bridges
-                            .iter()
-                            .find(|b| b.handle == handle)
-                            .ok_or_else(|| {
-                                format!(
-                                    "Required bridge '{}' for cell '{}' missing",
-                                    handle, cell.id
-                                )
-                            })?;
-                    }
-                }
-            }
-        }
-
-        for interface in self.interfaces.iter() {
-            for cell in interface.cells.iter() {
-                self.cell_by_id(&cell.id).is_some().ok_or_else(|| {
-                    format!(
-                        "cell configuration \"{}\" not found, mentioned in interface",
-                        cell.id
-                    )
-                })?;
-            }
-        }
-
-        for bridge in self.bridges.iter() {
-            self.check_bridge_requirements(bridge, dna_loader)?;
-        }
-
-        let _ = self.cell_ids_sorted_by_bridge_dependencies()?;
-
-        Ok(())
-    }
-
-    fn check_bridge_requirements(
-        &self,
-        bridge_config: &Bridge,
-        mut dna_loader: &mut DnaLoader,
-    ) -> Result<(), String> {
-        //
-        // Get caller's config. DNA config, and DNA:
-        //
-        let caller_config = self.cell_by_id(&bridge_config.caller_id).ok_or_else(|| {
-            format!(
-                "cell configuration \"{}\" not found, mentioned in bridge",
-                bridge_config.caller_id
-            )
-        })?;
-
-        let caller_dna_config = self.dna_by_id(&caller_config.dna).ok_or_else(|| {
-            format!(
-                "DNA configuration \"{}\" not found, mentioned in cell \"{}\"",
-                caller_config.dna, caller_config.id
-            )
-        })?;
-
-        let caller_dna_file = caller_dna_config.file;
-        let caller_dna =
-            Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(caller_dna_file.clone()))
-                .map_err(|err| {
-                    format!(
-                        "Could not load DNA file \"{}\"; error was: {}",
-                        caller_dna_file, err
-                    )
-                })?;
-
-        //
-        // Get callee's config. DNA config, and DNA:
-        //
-        let callee_config = self.cell_by_id(&bridge_config.callee_id).ok_or_else(|| {
-            format!(
-                "cell configuration \"{}\" not found, mentioned in bridge",
-                bridge_config.callee_id
-            )
-        })?;
-
-        let callee_dna_config = self.dna_by_id(&callee_config.dna).ok_or_else(|| {
-            format!(
-                "DNA configuration \"{}\" not found, mentioned in cell \"{}\"",
-                callee_config.dna, callee_config.id
-            )
-        })?;
-
-        let callee_dna_file = callee_dna_config.file;
-        let callee_dna =
-            Arc::get_mut(&mut dna_loader).unwrap()(&PathBuf::from(callee_dna_file.clone()))
-                .map_err(|err| {
-                    format!(
-                        "Could not load DNA file \"{}\"; error was: {}",
-                        callee_dna_file, err
-                    )
-                })?;
-
-        //
-        // Get matching bridge definition from caller's DNA:
-        //
-        let mut maybe_bridge = None;
-        for zome in caller_dna.zomes.values() {
-            for bridge_def in zome.bridges.iter() {
-                if bridge_def.handle == bridge_config.handle {
-                    maybe_bridge = Some(bridge_def.clone());
-                }
-            }
-        }
-
-        let bridge = maybe_bridge.ok_or_else(|| {
-            format!(
-                "No bridge definition with handle '{}' found in {}'s DNA",
-                bridge_config.handle, bridge_config.caller_id,
-            )
-        })?;
-
-        match bridge.reference {
-            BridgeReference::Address { ref dna_address } => {
-                if *dna_address != callee_dna.address() {
-                    return Err(format!(
-                        "Bridge '{}' of caller cell '{}' requires callee to be DNA with hash '{}', but the configured cell '{}' runs DNA with hash '{}'.",
-                        bridge.handle,
-                        bridge_config.caller_id,
-                        dna_address,
-                        callee_config.id,
-                        callee_dna.address(),
-                    ));
-                }
-            }
-            BridgeReference::Trait { ref traits } => {
-                for (expected_trait_name, expected_trait) in traits {
-                    let mut found = false;
-                    for (_zome_name, zome) in callee_dna.zomes.iter() {
-                        for (zome_trait_name, zome_trait_functions) in zome.traits.iter() {
-                            if zome_trait_name == expected_trait_name {
-                                let mut has_all_fns_exported = true;
-                                for fn_def in expected_trait.functions.iter() {
-                                    if !zome_trait_functions.functions.contains(&fn_def.name) {
-                                        has_all_fns_exported = false;
-                                    }
-                                }
-
-                                let mut has_matching_signatures = true;
-                                if has_all_fns_exported {
-                                    for fn_def in expected_trait.functions.iter() {
-                                        if !zome.fn_declarations.contains(&fn_def) {
-                                            has_matching_signatures = false;
-                                        }
-                                    }
-                                }
-
-                                if has_all_fns_exported && has_matching_signatures {
-                                    found = true;
-                                }
-                            }
-                        }
-                    }
-
-                    if !found {
-                        return Err(format!(
-                            "Bridge '{}' of cell '{}' requires callee to to implement trait '{}' with functions: {:?}",
-                            bridge.handle,
-                            bridge_config.caller_id,
-                            expected_trait_name,
-                            expected_trait.functions,
-                        ));
-                    }
-                }
-            }
-        };
+    pub fn check_consistency(&self) -> Result<(), DnaError> {
+        // TODO: A huge amount of legacy code for checking the consistency of Dna was ripped out here
+        // let's make sure we get that back in once we land the Dna and Zome structure.
         Ok(())
     }
 
@@ -282,10 +60,10 @@ impl ConductorState {
     }
 
     /// Returns the agent configuration with the given ID if present
-    pub fn update_agent_address_by_id(&mut self, id: &str, agent_id: &AgentId) {
+    pub fn update_agent_address_by_id(&mut self, id: &str, agent_pubkey: &AgentPubKey) {
         self.agents.iter_mut().for_each(|ac| {
             if ac.id == *id {
-                ac.public_address = agent_id.pub_sign_key().clone()
+                ac.hash = agent_pubkey.clone()
             }
         })
     }
@@ -319,80 +97,6 @@ impl ConductorState {
         self.cells.iter().map(|cell| cell.id.clone()).collect()
     }
 
-    /// This function uses the petgraph crate to model the bridge connections in this config
-    /// as a graph and then create a topological sorting of the nodes, which are cells.
-    /// The sorting gets reversed to get those cells first that do NOT depend on others
-    /// such that this ordering of cells can be used to spawn them and simultaneously create
-    /// initialize the bridges and be able to assert that any callee already exists (which makes
-    /// this task much easier).
-    pub fn cell_ids_sorted_by_bridge_dependencies(&self) -> Result<Vec<String>, ConductorError> {
-        let mut graph = DiGraph::<&str, &str>::new();
-
-        // Add cell ids to the graph which returns the indices the graph is using.
-        // Storing those in a map from ids to create edges from bridges below.
-        let index_map: HashMap<_, _> = self
-            .cells
-            .iter()
-            .map(|cell| (cell.id.clone(), graph.add_node(&cell.id)))
-            .collect();
-
-        // Reverse of graph indices to cell ids to create the return vector below.
-        let reverse_map: HashMap<_, _> = self
-            .cells
-            .iter()
-            .map(|cell| (index_map.get(&cell.id).unwrap(), cell.id.clone()))
-            .collect();
-
-        // Create vector of edges (with node indices) from bridges:
-        let edges: Vec<(&NodeIndex<u32>, &NodeIndex<u32>)> = self
-            .bridges
-            .iter()
-            .map(
-                |bridge| -> Result<(&NodeIndex<u32>, &NodeIndex<u32>), ConductorError> {
-                    let start = index_map.get(&bridge.caller_id);
-                    let end = index_map.get(&bridge.callee_id);
-                    if let (Some(start_inner), Some(end_inner)) = (start, end) {
-                        Ok((start_inner, end_inner))
-                    } else {
-                        Err(ConductorError::ConfigError(format!(
-                        "cell configuration not found, mentioned in bridge configuration: {} -> {}",
-                        bridge.caller_id, bridge.callee_id,
-                    )))
-                    }
-                },
-            )
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Add edges to graph:
-        for &(node_a, node_b) in edges.iter() {
-            graph.add_edge(node_a.clone(), node_b.clone(), "");
-        }
-
-        // Sort with petgraph::algo::toposort
-        let mut sorted_nodes = toposort(&graph, None).map_err(|_cycle_error| {
-            ConductorError::ConfigError("Cyclic dependency in bridge configuration".to_string())
-        })?;
-
-        // REVERSE order because we want to get the cell with NO dependencies first
-        // since that is the cell we should spawn first.
-        sorted_nodes.reverse();
-
-        // Map sorted vector of node indices back to cell ids
-        Ok(sorted_nodes
-            .iter()
-            .map(|node_index| reverse_map.get(node_index).unwrap())
-            .cloned()
-            .collect())
-    }
-
-    pub fn bridge_dependencies(&self, caller_cell_id: String) -> Vec<Bridge> {
-        self.bridges
-            .iter()
-            .filter(|bridge| bridge.caller_id == caller_cell_id)
-            .cloned()
-            .collect()
-    }
-
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &str) -> Self {
@@ -424,7 +128,7 @@ impl ConductorState {
 pub struct AgentConfig {
     pub id: String,
     pub name: String,
-    pub public_address: Base32,
+    pub hash: AgentPubKey,
     pub keystore_file: String,
     /// If set to true conductor will ignore keystore_file and instead use the remote signer
     /// accessible through signing_service_uri to request signatures.
@@ -518,3 +222,8 @@ pub struct Bridge {
     /// Callers reference callees by this arbitrary but unique local name.
     pub handle: String,
 }
+
+// TODO: Tons of consistency check tests were ripped out in the great legacy code cleanup
+// We need to add these back in when we've landed the new Dna format
+// See https://github.com/Holo-Host/holochain-2020/blob/7750a0291e549be006529e4153b3b6cf0d686462/crates/holochain/src/conductor/state/tests.rs#L1
+// for all old tests

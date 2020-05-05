@@ -3,7 +3,7 @@
 
 #![allow(clippy::identity_op)] // see https://github.com/rust-lang/rust-clippy/issues/3866
 
-use crate::{error::SkunkError, prelude::*};
+use crate::prelude::*;
 use chrono::{offset::FixedOffset, DateTime, TimeZone};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -15,6 +15,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
+use thiserror::Error;
 
 /// Represents a timeout for an HDK function. The usize interface defaults to ms.  Also convertible
 /// to/from a std::time::Duration (which is also unsigned) at full precision.
@@ -50,6 +51,28 @@ impl From<&Timeout> for Duration {
 impl From<usize> for Timeout {
     fn from(millis: usize) -> Timeout {
         Timeout::new(millis)
+    }
+}
+/// Errors that may occur when working with [Iso8601]
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum Iso8601Error {
+    /// Error when serializing/deserializing Iso8601 time
+    #[error("Error when serializing/deserializing Iso8601 time: {0}")]
+    SerializedBytesError(#[from] SerializedBytesError),
+
+    /// An error when parsing a string
+    #[error("Error when parsing a string: {0}")]
+    ParseError(String),
+
+    /// A generic, string-based error
+    #[error("Generic Iso8601 time Error: {0}")]
+    Generic(String),
+}
+
+impl Iso8601Error {
+    /// Creates a generic string-based error
+    pub fn generic<S: ToString>(reason: S) -> Self {
+        Iso8601Error::Generic(reason.to_string())
     }
 }
 
@@ -168,7 +191,7 @@ impl fmt::Display for Period {
 }
 
 impl FromStr for Period {
-    type Err = SkunkError;
+    type Err = Iso8601Error;
 
     fn from_str(period_str: &str) -> Result<Self, Self::Err> {
         lazy_static! {
@@ -201,7 +224,7 @@ impl FromStr for Period {
         Ok(Period({
             PERIOD_RE.captures(period_str).map_or_else(
                 || {
-                    Err(SkunkError::new(format!(
+                    Err(Iso8601Error::generic(format!(
                         "Failed to find Period specification in {:?}",
                         period_str
                     )))
@@ -213,7 +236,7 @@ impl FromStr for Period {
                             .map_or("0", |y| y.as_str())
                             .parse::<u64>()
                             .map_err(|e| {
-                                SkunkError::new(format!(
+                                Iso8601Error::generic(format!(
                                     "Invalid year(s) in period {:?}: {:?}",
                                     period_str, e
                                 ))
@@ -223,7 +246,7 @@ impl FromStr for Period {
                             .map_or("0", |w| w.as_str())
                             .parse::<u64>()
                             .map_err(|e| {
-                                SkunkError::new(format!(
+                                Iso8601Error::generic(format!(
                                     "Invalid week(s) in period {:?}: {:?}",
                                     period_str, e
                                 ))
@@ -233,7 +256,7 @@ impl FromStr for Period {
                             .map_or("0", |d| d.as_str())
                             .parse::<u64>()
                             .map_err(|e| {
-                                SkunkError::new(format!(
+                                Iso8601Error::generic(format!(
                                     "Invalid days(s) in period {:?}: {:?}",
                                     period_str, e
                                 ))
@@ -243,7 +266,7 @@ impl FromStr for Period {
                             .map_or("0", |w| w.as_str())
                             .parse::<u64>()
                             .map_err(|e| {
-                                SkunkError::new(format!(
+                                Iso8601Error::generic(format!(
                                     "Invalid hour(s) in period {:?}: {:?}",
                                     period_str, e
                                 ))
@@ -253,7 +276,7 @@ impl FromStr for Period {
                             .map_or("0", |m| m.as_str())
                             .parse::<u64>()
                             .map_err(|e| {
-                                SkunkError::new(format!(
+                                Iso8601Error::generic(format!(
                                     "Invalid minute(s) in period {:?}: {:?}",
                                     period_str, e
                                 ))
@@ -266,7 +289,7 @@ impl FromStr for Period {
                             )
                             .parse::<u64>()
                             .map_err(|e| {
-                                SkunkError::new(format!(
+                                Iso8601Error::generic(format!(
                                     "Invalid seconds in period {:?}: {:?}",
                                     period_str, e
                                 ))
@@ -278,7 +301,7 @@ impl FromStr for Period {
                             format!("{:0<9.9}", s_fra.as_str()).parse::<u64>()
                         })
                         .map_err(|e| {
-                            SkunkError::new(format!(
+                            Iso8601Error::generic(format!(
                                 "Invalid fractional seconds in period {:?}: {:?}",
                                 period_str, e
                             ))
@@ -289,7 +312,7 @@ impl FromStr for Period {
                                 .map_or("0", |ms| ms.as_str())
                                 .parse::<u64>()
                                 .map_err(|e| {
-                                    SkunkError::new(format!(
+                                    Iso8601Error::generic(format!(
                                         "Invalid milliseconds in period {:?}: {:?}",
                                         period_str, e
                                     ))
@@ -300,7 +323,7 @@ impl FromStr for Period {
                                 .map_or("0", |us| us.as_str())
                                 .parse::<u64>()
                                 .map_err(|e| {
-                                    SkunkError::new(format!(
+                                    Iso8601Error::generic(format!(
                                         "Invalid microseconds in period {:?}: {:?}",
                                         period_str, e
                                     ))
@@ -310,7 +333,7 @@ impl FromStr for Period {
                             .map_or("0", |ns| ns.as_str())
                             .parse::<u64>()
                             .map_err(|e| {
-                                SkunkError::new(format!(
+                                Iso8601Error::generic(format!(
                                     "Invalid nanoseconds in period {:?}: {:?}",
                                     period_str, e
                                 ))
@@ -328,14 +351,14 @@ impl FromStr for Period {
 }
 
 impl TryFrom<String> for Period {
-    type Error = SkunkError;
+    type Error = Iso8601Error;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         Period::from_str(&s)
     }
 }
 
 impl TryFrom<&str> for Period {
-    type Error = SkunkError;
+    type Error = Iso8601Error;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         Period::from_str(s)
     }
@@ -388,7 +411,7 @@ impl From<&Duration> for Period {
 
 /// This struct represents datetime data recovered from a string in the ISO 8601 and RFC 3339 (more
 /// restrictive) format.  Invalid try_from conversions fails w/ Result<DateTime<FixedOffset>,
-/// SkunkError>.
+/// Iso8601Error>.
 ///
 /// Iso8601 wraps a DateTime<FixedOffset>, and its Display/Debug formats default to the ISO 8601 /
 /// RFC 3339 format, respectively:
@@ -465,19 +488,19 @@ impl From<&DateTime<FixedOffset>> for Iso8601 {
 /// example, a Timeout or a Period.  On Err, always represents the std::time::Duration as a Period
 /// for ease of interpretation.
 impl<D: Into<Duration>> Add<D> for Iso8601 {
-    type Output = Result<Iso8601, SkunkError>;
+    type Output = Result<Iso8601, Iso8601Error>;
     fn add(self, rhs: D) -> Self::Output {
         let dur: Duration = rhs.into();
         Ok(DateTime::<FixedOffset>::from(&self)
             .checked_add_signed(chrono::Duration::from_std(dur).or_else(|e| {
-                Err(SkunkError::new(format!(
+                Err(Iso8601Error::generic(format!(
                     "Overflow computing chrono::Duration from {}: {}",
                     Period::from(dur),
                     e
                 )))
             })?)
             .ok_or_else(|| {
-                SkunkError::new(format!(
+                Iso8601Error::generic(format!(
                     "Overflow computing {} + {}",
                     &self,
                     Period::from(dur)
@@ -488,26 +511,26 @@ impl<D: Into<Duration>> Add<D> for Iso8601 {
 }
 
 impl<D: Into<Duration>> Add<D> for &Iso8601 {
-    type Output = Result<Iso8601, SkunkError>;
+    type Output = Result<Iso8601, Iso8601Error>;
     fn add(self, rhs: D) -> Self::Output {
         self.to_owned() + rhs
     }
 }
 
 impl<D: Into<Duration>> Sub<D> for Iso8601 {
-    type Output = Result<Iso8601, SkunkError>;
+    type Output = Result<Iso8601, Iso8601Error>;
     fn sub(self, rhs: D) -> Self::Output {
         let dur: Duration = rhs.into();
         Ok(DateTime::<FixedOffset>::from(&self)
             .checked_sub_signed(chrono::Duration::from_std(dur).or_else(|e| {
-                Err(SkunkError::new(format!(
+                Err(Iso8601Error::generic(format!(
                     "Overflow computing chrono::Duration from {}: {}",
                     Period::from(dur),
                     e
                 )))
             })?)
             .ok_or_else(|| {
-                SkunkError::new(format!(
+                Iso8601Error::generic(format!(
                     "Overflow computing {} - {}",
                     &self,
                     Period::from(dur)
@@ -518,7 +541,7 @@ impl<D: Into<Duration>> Sub<D> for Iso8601 {
 }
 
 impl<D: Into<Duration>> Sub<D> for &Iso8601 {
-    type Output = Result<Iso8601, SkunkError>;
+    type Output = Result<Iso8601, Iso8601Error>;
     fn sub(self, rhs: D) -> Self::Output {
         self.to_owned() - rhs
     }
@@ -576,7 +599,7 @@ impl fmt::Display for Iso8601 {
 }
 
 /// Conversions try_from on String/&str on an Iso8601 are fallible conversions, which may produce a
-/// SkunkError if the timestamp is not valid ISO 8601 / RFC 3339.  We will allow some
+/// Iso8601Error if the timestamp is not valid ISO 8601 / RFC 3339.  We will allow some
 /// flexibilty; strip surrounding whitespace, a bare timestamp missing any timezone specifier will
 /// be assumed to be UTC "Zulu", make internal separators optional if unambiguous.  If you keep to
 /// straight RFC 3339 timestamps, then parsing will be quick, otherwise we'll employ a regular
@@ -585,21 +608,21 @@ impl fmt::Display for Iso8601 {
 /// creation of an Iso8601 from a String/&str.  There are some years that can be encoded as a
 /// DateTime but not parsed, such as negative (BC/BCE) years.
 impl TryFrom<String> for Iso8601 {
-    type Error = SkunkError;
+    type Error = Iso8601Error;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         Iso8601::from_str(&s)
     }
 }
 
 impl TryFrom<&str> for Iso8601 {
-    type Error = SkunkError;
+    type Error = Iso8601Error;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         Iso8601::from_str(s)
     }
 }
 
 impl FromStr for Iso8601 {
-    type Err = SkunkError;
+    type Err = Iso8601Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         lazy_static! {
@@ -676,7 +699,7 @@ impl FromStr for Iso8601 {
                 .or_else(
                     |_| ISO8601_RE.captures(s)
                         .map_or_else(
-                            || Err(SkunkError::new(
+                            || Err(Iso8601Error::ParseError(
                                 format!("Failed to find ISO 3339 or RFC 8601 timestamp in {:?}", s))),
                             |cap| {
                                 let timestamp = &format!(
@@ -698,7 +721,7 @@ impl FromStr for Iso8601 {
                                     }));
 
                                 DateTime::parse_from_rfc3339(timestamp)
-                                    .map_err(|_| SkunkError::new(
+                                    .map_err(|_| Iso8601Error::generic(
                                         format!("Attempting to convert RFC 3339 timestamp {:?} from ISO 8601 {:?} to a DateTime",
                                                 timestamp, s)))
                             }
@@ -722,6 +745,7 @@ pub fn test_iso_8601() -> Iso8601 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use matches::assert_matches;
     use std::convert::TryInto;
 
     #[test]
@@ -759,14 +783,14 @@ pub mod tests {
         // Errors; cannot mix fractional seconds and ms/ns/us
         assert_eq!(
             Period::from_str("1.23s456ns"),
-            Err(SkunkError::new(
+            Err(Iso8601Error::generic(
                 "Failed to find Period specification in \"1.23s456ns\"".to_string()
             ))
         );
         // time scale ordering cannot be mixed up
         assert_eq!(
             Period::from_str("456ns123us"),
-            Err(SkunkError::new(
+            Err(Iso8601Error::generic(
                 "Failed to find Period specification in \"456ns123us\"".to_string()
             ))
         );
@@ -876,7 +900,7 @@ pub mod tests {
 
             Ok(())
         })
-        .collect::<Result<(), SkunkError>>()
+        .collect::<Result<(), anyhow::Error>>()
         .map_err(|e| panic!("Unexpected failure of checked Period::try_from: {:?}", e))
         .unwrap();
     }
@@ -896,21 +920,21 @@ pub mod tests {
         // Too big; std::time::Duration (unsigned) --> chrono::Duration (signed) overflow
         assert_eq!(Iso8601::try_from("2019-05-05 00:00:00").unwrap()
                    + Duration::new(u64::max_value(), 0),
-                   Err(SkunkError::new(
+                   Err(Iso8601Error::generic(
                        "Overflow computing chrono::Duration from 584542046090y32w4d19h15s: Source duration value is out of range for the target type".to_string()
                    )));
         // Too big; result not a valid DateTime
         assert_eq!(
             Iso8601::try_from("2019-05-05 00:00:00").unwrap()
                 + Period::try_from("1000000y").unwrap(),
-            Err(SkunkError::new(
+            Err(Iso8601Error::generic(
                 "Overflow computing 2019-05-05T00:00:00+00:00 + 1000000y".to_string()
             ))
         );
         assert_eq!(
             Iso8601::try_from("2019-05-05 00:00:00").unwrap()
                 - Period::try_from("1234567y").unwrap(),
-            Err(SkunkError::new(
+            Err(Iso8601Error::generic(
                 "Overflow computing 2019-05-05T00:00:00+00:00 - 1234567y".to_string()
             ))
         );
@@ -926,7 +950,7 @@ pub mod tests {
         );
         assert_eq!(
             Iso8601::try_from("-7981-02-19T00:00:00+00:00"),
-            Err(SkunkError::new(
+            Err(Iso8601Error::generic(
                 "Attempting to convert RFC 3339 timestamp \"-7981-02-19T00:00:00+00:00\" from ISO 8601 \"-7981-02-19T00:00:00+00:00\" to a DateTime".to_string()
             ))
         );
@@ -1041,6 +1065,7 @@ pub mod tests {
             // / ISO 8601 timestamp, via its DateTime<FixedOffset>, its fmt::Display, to_string()
             // and JSON round-trip.
             Iso8601::try_from(*ts)
+                .map_err(Into::<anyhow::Error>::into)
                 .and_then(|iso| {
                     assert_eq!(iso.to_string(), "2018-10-11T03:23:38+00:00");
                     Ok(iso)
@@ -1086,7 +1111,7 @@ pub mod tests {
                     Ok(())
                 })
         })
-        .collect::<Result<(), SkunkError>>()
+        .collect::<Result<(), anyhow::Error>>()
         .map_err(|e| {
             panic!(
                 "Unexpected failure of checked DateTime<FixedOffset> try_from: {:?}",
@@ -1112,7 +1137,7 @@ pub mod tests {
             Iso8601::try_from(*ts)
                 .map(|iso| assert_eq!(iso.to_string(), "2018-01-01T03:23:00+00:00"))
         })
-        .collect::<Result<(), SkunkError>>()
+        .collect::<Result<(), Iso8601Error>>()
         .map_err(|e| {
             panic!(
                 "Unexpected failure of checked DateTime<FixedOffset> try_from: {:?}",
@@ -1139,7 +1164,7 @@ pub mod tests {
             assert_eq!(dt.to_rfc3339(), "2015-02-18T23:59:60.234567-05:00");
             Ok(())
         })
-        .collect::<Result<(), SkunkError>>()
+        .collect::<Result<(), Iso8601Error>>()
         .map_err(|e| {
             panic!(
                 "Unexpected failure of checked DateTime<FixedOffset> try_from: {:?}",
@@ -1158,13 +1183,13 @@ pub mod tests {
         ]
         .iter()
         .map(|ts| match Iso8601::try_from(*ts) {
-            Ok(iso) => Err(SkunkError::new(format!(
+            Ok(iso) => Err(Iso8601Error::generic(format!(
                 "Should not have succeeded in parsing {:?} into {:?}",
                 ts, iso
             ))),
             Err(_) => Ok(()),
         })
-        .collect::<Result<(), SkunkError>>()
+        .collect::<Result<(), Iso8601Error>>()
         .map_err(|e| {
             panic!(
                 "Unexpected success of invalid checked DateTime<FixedOffset> try_from: {:?}",
@@ -1206,10 +1231,7 @@ pub mod tests {
                 "Unexpected success of checked DateTime<FixedOffset> try_from: {:?}",
                 iso
             ),
-            Err(e) => assert_eq!(
-                e.to_string(),
-                "Failed to find ISO 3339 or RFC 8601 timestamp in \"boo\""
-            ),
+            Err(e) => assert_matches!(e, Iso8601Error::ParseError(_)),
         }
     }
 

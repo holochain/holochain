@@ -10,37 +10,49 @@
 //! users in a testing environment.
 
 use super::{
-    api::{AdminInterfaceApi, AppInterfaceApi},
+    api::RealAdminInterfaceApi,
+    config::{AdminInterfaceConfig, InterfaceDriver},
+    dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
-    manager::{spawn_task_manager, ManagedTaskAdd, TaskManagerRunHandle},
+    handle::ConductorHandleImpl,
+    interface::{
+        error::InterfaceResult,
+        websocket::{spawn_admin_interface_task, spawn_websocket_listener},
+    },
+    manager::{
+        keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
+        TaskManagerRunHandle,
+    },
     state::ConductorState,
 };
 use crate::conductor::{
     api::error::{ConductorApiError, ConductorApiResult},
-    cell::{Cell, NetSender},
+    cell::Cell,
     config::ConductorConfig,
+    dna_store::MockDnaStore,
     error::ConductorResult,
+    handle::ConductorHandle,
 };
-pub use builder::*;
-use derive_more::{AsRef, Deref, From};
-use std::collections::HashMap;
-use std::{error::Error, sync::Arc};
-use sx_state::{
+use holochain_keystore::{
+    test_keystore::{spawn_test_keystore, MockKeypair},
+    KeystoreSender,
+};
+use holochain_state::{
     db,
     env::{Environment, ReadManager},
     exports::SingleStore,
     prelude::WriteManager,
     typed::{Kv, UnitDbKey},
 };
-use sx_types::{
-    agent::AgentId,
-    cell::{CellHandle, CellId},
-    dna::Dna,
-    prelude::Address,
-    shims::Keystore,
-};
+use holochain_types::cell::{CellHandle, CellId};
+use std::collections::HashMap;
+use std::error::Error;
+use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
+
+pub use builder::*;
+use futures::future;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -51,7 +63,7 @@ pub struct CellState {
     _active: bool,
 }
 
-///
+/// An [Cell] tracked by a Conductor, along with some [CellState]
 struct CellItem {
     cell: Cell,
     _state: CellState,
@@ -60,45 +72,11 @@ struct CellItem {
 pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
-/// A handle to the conductor that can easily be passed
-/// around and cheaply cloned
-#[derive(Clone, From, AsRef, Deref)]
-pub struct ConductorHandle(Arc<RwLock<Conductor>>);
-
-impl ConductorHandle {
-    /// End all tasks run by the Conductor.
-    pub async fn shutdown(self) {
-        let mut conductor = self.0.write().await;
-        conductor.shutdown();
-    }
-
-    /// Wait on the main running tasks
-    /// This will not be `Ready` until everything is done
-    /// Useful as a main point to keep the program alive.
-    pub async fn wait(&self) -> Result<(), tokio::task::JoinError> {
-        let task_manager_run_handle = {
-            let mut conductor = self.0.write().await;
-            conductor.wait()
-        };
-        if let Some(handle) = task_manager_run_handle {
-            handle.await?;
-        } else {
-            warn!("Tried to await the task manager run handle but there was none");
-        }
-        Ok(())
-    }
-
-    /// Check that shutdown has not been called
-    pub async fn check_running(&self) -> ConductorResult<()> {
-        self.0.read().await.check_running()
-    }
-}
-
-/// Placeholder for real store
-pub type FakeDnaStore = HashMap<Address, Dna>;
-
-/// A Conductor manages communication to and between a collection of [Cell]s and system services
-pub struct Conductor {
+/// A Conductor is a group of [Cell]s
+pub struct Conductor<DS = RealDnaStore>
+where
+    DS: DnaStore,
+{
     /// The collection of cells associated with this Conductor
     cells: HashMap<CellId, CellItem>,
 
@@ -120,50 +98,65 @@ pub struct Conductor {
     /// Placeholder. A way to look up a Cell from its app-specific handle.
     _handle_map: HashMap<CellHandle, CellId>,
 
-    /// Placeholder. A way to get a Keystore from an AgentId.
-    _agent_keys: HashMap<AgentId, Keystore>,
-
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
 
-    /// broadcast channel sender, used to end all managed tasks
+    /// By sending on this channel,
     managed_task_stop_broadcaster: StopBroadcaster,
 
     /// The main task join handle to await on.
     /// The conductor is intended to live as long as this task does.
     task_manager_run_handle: Option<TaskManagerRunHandle>,
 
-    /// Placeholder for what will be the real DNA/Wasm store
-    pub(super) fake_dna_cache: FakeDnaStore,
+    /// Placeholder for what will be the real DNA/Wasm cache
+    dna_store: DS,
+
+    /// Access to private keys for signing and encryption.
+    keystore: KeystoreSender,
 }
 
 impl Conductor {
-    async fn new(env: Environment) -> ConductorResult<Conductor> {
-        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
-        let (task_tx, task_manager_run_handle) = spawn_task_manager();
-        let task_manager_run_handle = Some(task_manager_run_handle);
-        let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
-        Ok(Conductor {
-            env,
-            state_db: Kv::new(db)?,
-            cells: HashMap::new(),
-            _handle_map: HashMap::new(),
-            _agent_keys: HashMap::new(),
-            shutting_down: false,
-            managed_task_add_sender: task_tx,
-            managed_task_stop_broadcaster: stop_tx,
-            task_manager_run_handle,
-            admin_websocket_ports: Vec::new(),
-            fake_dna_cache: HashMap::new(),
-        })
-    }
-
     /// Create a conductor builder
-    pub fn build() -> ConductorBuilder {
+    pub fn builder() -> ConductorBuilder {
         ConductorBuilder::new()
     }
+}
 
-    pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+//-----------------------------------------------------------------------------
+// Public methods
+//-----------------------------------------------------------------------------
+impl<DS> Conductor<DS>
+where
+    DS: DnaStore + 'static,
+{
+    /// Move this [Conductor] into a shared [ConductorHandle].
+    ///
+    /// After this happens, direct mutable access to the Conductor becomes impossible,
+    /// and you must interact with it through the ConductorHandle, a limited cloneable interface
+    /// for which all mutation is synchronized across all shared copies by a RwLock.
+    ///
+    /// This signals the completion of Conductor initialization and the beginning of its lifecycle
+    /// as the driver of its various interface handling loops
+    pub fn into_handle(self) -> ConductorHandle {
+        let keystore = self.keystore.clone();
+        Arc::new(ConductorHandleImpl::from((RwLock::new(self), keystore)))
+    }
+
+    /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
+    /// on it. Useful for specifying port 0 and letting the OS choose a free port.
+    pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+        self.admin_websocket_ports.get(0).copied()
+    }
+}
+
+//-----------------------------------------------------------------------------
+/// Methods used by the [ConductorHandle]
+//-----------------------------------------------------------------------------
+impl<DS> Conductor<DS>
+where
+    DS: DnaStore + 'static,
+{
+    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
         let item = self
             .cells
             .get(cell_id)
@@ -171,21 +164,9 @@ impl Conductor {
         Ok(&item.cell)
     }
 
-    pub(crate) fn tx_network(&self) -> &NetSender {
-        unimplemented!()
-    }
-
-    /// Sends a JoinHandle to the TaskManager task to be managed
-    pub(crate) async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
-        self.managed_task_add_sender
-            .send(handle)
-            .await
-            .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
-    }
-
     /// A gate to put at the top of public functions to ensure that work is not
     /// attempted after a shutdown has been issued
-    pub(crate) fn check_running(&self) -> ConductorResult<()> {
+    pub(super) fn check_running(&self) -> ConductorResult<()> {
         if self.shutting_down {
             Err(ConductorError::ShuttingDown)
         } else {
@@ -193,12 +174,15 @@ impl Conductor {
         }
     }
 
-    /// Returns a port that was chosen by the OS
-    pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
-        self.admin_websocket_ports.get(0).copied()
+    pub(super) fn dna_store(&self) -> &DS {
+        &self.dna_store
     }
 
-    fn shutdown(&mut self) {
+    pub(super) fn dna_store_mut(&mut self) -> &mut DS {
+        &mut self.dna_store
+    }
+
+    pub(super) fn shutdown(&mut self) {
         self.shutting_down = true;
         self.managed_task_stop_broadcaster
             .send(())
@@ -208,121 +192,22 @@ impl Conductor {
             })
     }
 
-    fn wait(&mut self) -> Option<TaskManagerRunHandle> {
+    pub(super) fn get_wait_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
-    }
-
-    // FIXME: remove allow once we actually use this function
-    #[allow(dead_code)]
-    async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
-    where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
-    {
-        self.check_running()?;
-        let guard = self.env.guard().await;
-        let mut writer = guard.writer()?;
-        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
-        let new_state = f(state)?;
-        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
-        writer.commit()?;
-        Ok(new_state)
-    }
-
-    #[allow(dead_code)]
-    async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let guard = self.env.guard().await;
-        let reader = guard.reader()?;
-        Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
-    }
-
-    // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
-    // the Conductor handle (from where this could be called)
-    #[allow(dead_code)]
-    async fn spawn_admin_interface<Api: AdminInterfaceApi>(
-        &mut self,
-        _api: Api,
-    ) -> ConductorResult<()> {
-        self.check_running()?;
-        unimplemented!()
-    }
-
-    // NOTE: This could lead to a potential deadlock because AdminInterfaceApi contains
-    // the Conductor handle (from where this could be called)
-    /// The common way to spawn a new app interface, whether read from
-    /// ConductorState on startup, or generated on-the-fly by an admin method
-    #[allow(dead_code)]
-    async fn spawn_app_interface<Api: AppInterfaceApi>(
-        &mut self,
-        _api: Api,
-    ) -> ConductorResult<()> {
-        self.check_running()?;
-        unimplemented!()
-    }
-}
-
-type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
-
-mod builder {
-
-    use super::*;
-    use crate::conductor::{
-        api::RealAdminInterfaceApi,
-        config::AdminInterfaceConfig,
-        interface::{
-            error::InterfaceResult,
-            websocket::{spawn_admin_interface_task, spawn_websocket_listener},
-            InterfaceDriver,
-        },
-        manager::{keep_alive_task, ManagedTaskHandle},
-    };
-    use futures::future;
-    use std::sync::Arc;
-    use sx_state::{env::EnvironmentKind, test_utils::test_conductor_env};
-    use tokio::sync::RwLock;
-
-    #[derive(Default)]
-    pub struct ConductorBuilder {}
-
-    impl ConductorBuilder {
-        pub fn new() -> Self {
-            Self {}
-        }
-
-        pub async fn with_config(
-            self,
-            config: ConductorConfig,
-        ) -> ConductorResult<ConductorHandle> {
-            let env_path = config.environment_path;
-            let environment = Environment::new(env_path.as_ref(), EnvironmentKind::Conductor)?;
-            let conductor = Conductor::new(environment).await?;
-            let stop_tx = conductor.managed_task_stop_broadcaster.clone();
-            let conductor_mutex = Arc::new(RwLock::new(conductor));
-
-            setup_admin_interfaces_from_config(
-                conductor_mutex.clone(),
-                stop_tx,
-                config.admin_interfaces.unwrap_or_default(),
-            )
-            .await?;
-
-            Ok(conductor_mutex.into())
-        }
-
-        pub async fn test(self) -> ConductorResult<ConductorHandle> {
-            let environment = test_conductor_env();
-            let conductor = Conductor::new(environment).await?;
-            Ok(Arc::new(RwLock::new(conductor)).into())
-        }
     }
 
     /// Spawn all admin interface tasks, register them with the TaskManager,
     /// and modify the conductor accordingly, based on the config passed in
-    async fn setup_admin_interfaces_from_config(
-        conductor_mutex: Arc<RwLock<Conductor>>,
-        stop_tx: StopBroadcaster,
+    pub(super) async fn add_admin_interfaces_via_handle(
+        &mut self,
+        handle: ConductorHandle,
         configs: Vec<AdminInterfaceConfig>,
-    ) -> ConductorResult<()> {
-        let admin_api = RealAdminInterfaceApi::new(conductor_mutex.clone().into());
+    ) -> ConductorResult<()>
+    where
+        DS: DnaStore + 'static,
+    {
+        let admin_api = RealAdminInterfaceApi::new(handle);
+        let stop_tx = self.managed_task_stop_broadcaster.clone();
 
         // Closure to process each admin config item
         let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
@@ -360,48 +245,282 @@ mod builder {
             .collect();
 
         {
-            let mut conductor = conductor_mutex.write().await;
             let mut ports = Vec::new();
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
-            conductor
-                .manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
-                    stop_tx.subscribe(),
-                ))))
-                .await?;
+            self.manage_task(ManagedTaskAdd::dont_handle(tokio::spawn(keep_alive_task(
+                stop_tx.subscribe(),
+            ))))
+            .await?;
 
             // Now that tasks are spawned, register them with the TaskManager
             for (port, handle) in handles {
                 ports.push(port);
-                conductor
-                    .manage_task(ManagedTaskAdd::new(
-                        handle,
-                        Box::new(|result| {
-                            result.unwrap_or_else(|e| {
-                                error!(error = &e as &dyn std::error::Error, "Interface died")
-                            });
-                            None
-                        }),
-                    ))
-                    .await?
+                self.manage_task(ManagedTaskAdd::new(
+                    handle,
+                    Box::new(|result| {
+                        result.unwrap_or_else(|e| {
+                            error!(error = &e as &dyn std::error::Error, "Interface died")
+                        });
+                        None
+                    }),
+                ))
+                .await?
             }
-            conductor.admin_websocket_ports = ports;
+            for p in ports {
+                self.add_admin_port(p);
+            }
         }
         Ok(())
     }
 }
 
+// -- TODO - delete this helper when we have a real keystore -- //
+
+async fn delete_me_create_test_keystore() -> KeystoreSender {
+    use std::convert::TryFrom;
+    let _ = holochain_crypto::crypto_init_sodium();
+    let mut keystore = spawn_test_keystore(vec![
+        MockKeypair {
+            pub_key: holo_hash::AgentPubKey::try_from(
+                "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
+            )
+            .unwrap(),
+            sec_key: vec![
+                220, 218, 15, 212, 178, 51, 204, 96, 121, 97, 6, 205, 179, 84, 80, 159, 84, 163,
+                193, 46, 127, 15, 47, 91, 134, 106, 72, 72, 51, 76, 26, 16, 195, 236, 235, 182,
+                216, 152, 165, 215, 192, 97, 126, 31, 71, 165, 188, 12, 245, 29, 133, 230, 73, 251,
+                84, 44, 68, 14, 28, 76, 137, 166, 205, 54,
+            ],
+        },
+        MockKeypair {
+            pub_key: holo_hash::AgentPubKey::try_from(
+                "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
+            )
+            .unwrap(),
+            sec_key: vec![
+                170, 205, 134, 46, 233, 225, 100, 162, 101, 124, 207, 157, 12, 131, 239, 244, 216,
+                190, 244, 161, 209, 56, 159, 135, 240, 134, 88, 28, 48, 75, 227, 244, 162, 97, 243,
+                122, 69, 52, 251, 30, 233, 235, 101, 166, 174, 235, 29, 196, 61, 176, 247, 7, 35,
+                117, 168, 194, 243, 206, 188, 240, 145, 146, 76, 74,
+            ],
+        },
+    ])
+    .await
+    .unwrap();
+
+    // pre-populate with our two fixture agent keypairs
+    keystore
+        .generate_sign_keypair_from_pure_entropy()
+        .await
+        .unwrap();
+    keystore
+        .generate_sign_keypair_from_pure_entropy()
+        .await
+        .unwrap();
+
+    keystore
+}
+
+// -- TODO - end -- //
+
+//-----------------------------------------------------------------------------
+// Private methods
+//-----------------------------------------------------------------------------
+
+impl<DS> Conductor<DS>
+where
+    DS: DnaStore + 'static,
+{
+    async fn new(
+        env: Environment,
+        dna_store: DS,
+        keystore: KeystoreSender,
+    ) -> ConductorResult<Self> {
+        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
+        let (task_tx, task_manager_run_handle) = spawn_task_manager();
+        let task_manager_run_handle = Some(task_manager_run_handle);
+        let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
+        Ok(Self {
+            env,
+            state_db: Kv::new(db)?,
+            cells: HashMap::new(),
+            _handle_map: HashMap::new(),
+            shutting_down: false,
+            managed_task_add_sender: task_tx,
+            managed_task_stop_broadcaster: stop_tx,
+            task_manager_run_handle,
+            admin_websocket_ports: Vec::new(),
+            dna_store,
+            keystore,
+        })
+    }
+
+    // FIXME: remove allow once we actually use this function
+    #[allow(dead_code)]
+    async fn get_state(&self) -> ConductorResult<ConductorState> {
+        let guard = self.env.guard().await;
+        let reader = guard.reader()?;
+        Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
+    }
+
+    // FIXME: remove allow once we actually use this function
+    #[allow(dead_code)]
+    async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
+    {
+        self.check_running()?;
+        let guard = self.env.guard().await;
+        let mut writer = guard.writer()?;
+        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
+        let new_state = f(state)?;
+        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
+        writer.commit()?;
+        Ok(new_state)
+    }
+
+    /// Sends a JoinHandle to the TaskManager task to be managed
+    async fn manage_task(&mut self, handle: ManagedTaskAdd) -> ConductorResult<()> {
+        self.managed_task_add_sender
+            .send(handle)
+            .await
+            .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
+    }
+
+    fn add_admin_port(&mut self, port: u16) {
+        self.admin_websocket_ports.push(port);
+    }
+}
+
+type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
+
+mod builder {
+
+    use super::*;
+    use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
+    use holochain_state::{env::EnvironmentKind, test_utils::test_conductor_env};
+
+    /// A configurable Builder for Conductor and sometimes ConductorHandle
+    #[derive(Default)]
+    pub struct ConductorBuilder<DS = RealDnaStore> {
+        config: ConductorConfig,
+        dna_store: DS,
+        #[cfg(test)]
+        state: Option<ConductorState>,
+    }
+
+    impl ConductorBuilder<RealDnaStore> {
+        /// Default ConductorBuilder
+        pub fn new() -> Self {
+            Self::default()
+        }
+    }
+
+    impl ConductorBuilder<MockDnaStore> {
+        /// ConductorBuilder using mocked DnaStore, for testing
+        pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
+            ConductorBuilder {
+                dna_store,
+                ..Default::default()
+            }
+        }
+    }
+
+    impl<DS> ConductorBuilder<DS>
+    where
+        DS: DnaStore + 'static,
+    {
+        /// Set the ConductorConfig used to build this Conductor
+        pub fn config(mut self, config: ConductorConfig) -> Self {
+            self.config = config;
+            self
+        }
+
+        /// Initialize a "production" Conductor
+        pub async fn build(self) -> ConductorResult<Conductor<DS>> {
+            let keystore = delete_me_create_test_keystore().await;
+            let env_path = self.config.environment_path;
+
+            let environment = Environment::new(
+                env_path.as_ref(),
+                EnvironmentKind::Conductor,
+                keystore.clone(),
+            )?;
+
+            let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+
+            #[cfg(test)]
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
+
+            Ok(conductor)
+        }
+
+        #[cfg(test)]
+        /// Sets some fake conductor state for tests
+        pub fn fake_state(mut self, state: ConductorState) -> Self {
+            self.state = Some(state);
+            self
+        }
+
+        #[cfg(test)]
+        async fn update_fake_state(
+            state: Option<ConductorState>,
+            conductor: Conductor<DS>,
+        ) -> ConductorResult<Conductor<DS>> {
+            if let Some(state) = state {
+                conductor.update_state(move |_| Ok(state)).await?;
+            }
+            Ok(conductor)
+        }
+
+        /// Create a ConductorHandle to a Conductor with admin interfaces started.
+        ///
+        /// The reason that a ConductorHandle is returned instead of a Conductor is because
+        /// the admin interfaces need a handle to the conductor themselves, so we must
+        /// move the Conductor into a handle to proceed
+        pub async fn with_admin(self) -> ConductorResult<ConductorHandle> {
+            let conductor_config = self.config.clone();
+            let conductor_handle: ConductorHandle = self.build().await?.into_handle();
+            if let Some(configs) = conductor_config.admin_interfaces {
+                conductor_handle
+                    .add_admin_interfaces_via_handle(conductor_handle.clone(), configs)
+                    .await?;
+            }
+
+            Ok(conductor_handle)
+        }
+
+        /// Build a Conductor with a test environment
+        pub async fn test(self) -> ConductorResult<Conductor<DS>> {
+            let environment = test_conductor_env();
+            let keystore = environment.keystore().clone();
+            let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+
+            #[cfg(test)]
+            let conductor = Self::update_fake_state(self.state, conductor).await?;
+
+            Ok(conductor)
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
-
+    use super::*;
     use super::{Conductor, ConductorState};
-    use crate::conductor::state::CellConfig;
+    use crate::conductor::{dna_store::MockDnaStore, state::CellConfig};
+    use holochain_state::test_utils::test_conductor_env;
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn can_update_state() {
-        let conductor = Conductor::build().test().await.unwrap();
-        let conductor = conductor.read().await;
+        let environment = test_conductor_env();
+        let dna_store = MockDnaStore::new();
+        let keystore = environment.keystore().clone();
+        let conductor = Conductor::new(environment, dna_store, keystore)
+            .await
+            .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state, ConductorState::default());
 
@@ -420,5 +539,16 @@ pub mod tests {
             .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state.cells, [cell_config]);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn can_set_fake_state() {
+        let state = ConductorState::default();
+        let conductor = ConductorBuilder::new()
+            .fake_state(state.clone())
+            .test()
+            .await
+            .unwrap();
+        assert_eq!(state, conductor.get_state().await.unwrap());
     }
 }

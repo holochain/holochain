@@ -42,10 +42,10 @@ use super::{
     chain_cas::ChainCasBuf,
     chain_meta::{ChainMetaBufT, EntryDhtStatus},
 };
-use holo_hash::EntryHash;
+use holochain_state::{error::DatabaseResult, prelude::Reader};
+use holochain_types::address::EntryAddress;
+use holochain_types::entry::Entry;
 use std::collections::HashSet;
-use sx_state::{error::DatabaseResult, prelude::Reader};
-use sx_types::entry::Entry;
 use tracing::*;
 
 #[cfg(test)]
@@ -102,14 +102,14 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub async fn dht_get(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
             .primary
-            .get_entry(entry_hash.clone())?
+            .get_entry(entry_address.clone())?
             .and_then(|entry| {
                 self.primary_meta
-                    .get_crud(entry_hash.clone())
+                    .get_crud(entry_address.clone())
                     .ok()
                     .map(|crud| {
                         if let EntryDhtStatus::Live = crud {
@@ -123,15 +123,20 @@ where
 
         // Cache
         match search {
-            Search::Continue => Ok(self.cache.get_entry(entry_hash.clone())?.and_then(|entry| {
-                self.cache_meta
-                    .get_crud(entry_hash)
-                    .ok()
-                    .and_then(|crud| match crud {
-                        EntryDhtStatus::Live => Some(entry),
-                        _ => None,
-                    })
-            })),
+            Search::Continue => {
+                Ok(self
+                    .cache
+                    .get_entry(entry_address.clone())?
+                    .and_then(|entry| {
+                        self.cache_meta
+                            .get_crud(entry_address)
+                            .ok()
+                            .and_then(|crud| match crud {
+                                EntryDhtStatus::Live => Some(entry),
+                                _ => None,
+                            })
+                    }))
+            }
             Search::Found(entry) => Ok(Some(entry)),
             Search::NotInCascade => Ok(None),
         }
@@ -143,9 +148,9 @@ where
     // TODO: Implement customization of this behavior with an options/builder struct
     pub async fn dht_get_links<S: Into<String>>(
         &self,
-        base: EntryHash,
+        base: EntryAddress,
         tag: S,
-    ) -> DatabaseResult<HashSet<EntryHash>> {
+    ) -> DatabaseResult<HashSet<EntryAddress>> {
         // Am I an authority?
         let authority = self.primary.contains(base.clone())?;
         let tag = tag.into();

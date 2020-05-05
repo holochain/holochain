@@ -1,49 +1,18 @@
 //! Some common testing helpers.
 
 use crate::{
-    agent::AgentId,
     cell::CellId,
-    dna::{
-        bridges::Bridge,
-        capabilities::CapabilityRequest,
-        entry_types::EntryTypeDef,
-        fn_declarations::{FnDeclaration, TraitFns},
-        wasm::DnaWasm,
-        zome::{Config, Zome, ZomeFnDeclarations},
-        Dna,
-    },
+    dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile},
     prelude::*,
-    signature::{Provenance, Signature},
+    shims::CapToken,
 };
+use holo_hash::AgentPubKey;
+use holochain_zome_types::ZomeExternHostInput;
 use std::{collections::BTreeMap, path::PathBuf};
-use sx_zome_types::ZomeExternHostInput;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {
     test: String,
-}
-
-/// simple EntryTypeDef fixture
-pub fn fake_entry_type() -> EntryTypeDef {
-    EntryTypeDef {
-        ..Default::default()
-    }
-}
-
-/// simple TraitFns fixture
-pub fn fake_traits() -> TraitFns {
-    TraitFns {
-        functions: vec![String::from("test")],
-    }
-}
-
-/// simple ZomeFnDeclarations fixture
-pub fn fake_fn_declarations() -> ZomeFnDeclarations {
-    vec![FnDeclaration {
-        name: "test".into(),
-        inputs: vec![],
-        outputs: vec![],
-    }]
 }
 
 /// simple DnaWasm fixture
@@ -51,55 +20,43 @@ pub fn fake_dna_wasm() -> DnaWasm {
     DnaWasm::from(vec![0_u8])
 }
 
-/// simple Bridges fixture
-pub fn fake_bridges() -> Vec<Bridge> {
-    vec![]
-}
-
 /// simple Zome fixture
 pub fn fake_zome() -> Zome {
     Zome {
-        description: "test".into(),
-        config: Config::default(),
-        entry_types: {
-            let mut v = BTreeMap::new();
-            v.insert("test".into(), fake_entry_type());
-            v
-        },
-        traits: {
-            let mut v = BTreeMap::new();
-            v.insert("hc_public".into(), fake_traits());
-            v
-        },
-        fn_declarations: fake_fn_declarations(),
-        code: fake_dna_wasm(),
-        bridges: fake_bridges(),
+        wasm_hash: holo_hash_core::WasmHash::new(vec![0; 36]),
     }
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna(uuid: &str) -> Dna {
-    Dna {
-        name: "test".into(),
-        description: "test".into(),
-        version: "test".into(),
-        uuid: uuid.into(),
-        properties: FakeProperties {
-            test: "test".into(),
-        }
-        .try_into()
-        .unwrap(),
-        zomes: {
-            let mut v = BTreeMap::new();
-            v.insert("test".into(), fake_zome());
-            v
-        },
-        dna_spec_version: Default::default(),
+pub fn fake_dna_file(uuid: &str) -> DnaFile {
+    fake_dna_zomes(uuid, vec![("test".into(), vec![].into())])
+}
+
+/// A fixture example dna for unit testing.
+pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
+    let mut dna = DnaDef {
+        name: "test".to_string(),
+        properties: ().try_into().unwrap(),
+        uuid: uuid.to_string(),
+        zomes: BTreeMap::new(),
+    };
+    let mut wasm_code = Vec::new();
+    for (zome_name, wasm) in zomes {
+        let wasm_hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
+        let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+        dna.zomes.insert(zome_name, Zome { wasm_hash });
+        wasm_code.push(wasm);
     }
+    tokio_safe_block_on::tokio_safe_block_on(
+        DnaFile::new(dna, wasm_code),
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap()
+    .unwrap()
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
-pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
+pub fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
     path.push("dna");
@@ -109,33 +66,38 @@ pub fn fake_dna_file(dna: Dna) -> anyhow::Result<(PathBuf, tempdir::TempDir)> {
 
 /// A fixture example CellId for unit testing.
 pub fn fake_cell_id(name: &str) -> CellId {
-    (name.to_string().into(), fake_agent_id(name)).into()
+    (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }
 
-/// A fixture example AgentId for unit testing.
-pub fn fake_agent_id(name: &str) -> AgentId {
-    AgentId::generate_fake(name)
+/// A fixture example DnaHash for unit testing.
+pub fn fake_dna_hash(name: &str) -> DnaHash {
+    DnaHash::with_data_sync(name.as_bytes())
+}
+
+/// A fixture example AgentPubKey for unit testing.
+pub fn fake_agent_pubkey_1() -> AgentPubKey {
+    holo_hash::AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4")
+        .unwrap()
+}
+
+/// Another fixture example AgentPubKey for unit testing.
+pub fn fake_agent_pubkey_2() -> AgentPubKey {
+    holo_hash::AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK")
+        .unwrap()
+}
+
+/// A fixture example HeaderHash for unit testing.
+pub fn fake_header_hash(name: &str) -> HeaderHash {
+    HeaderHash::with_data_sync(name.as_bytes())
 }
 
 /// A fixture example CapabilityRequest for unit testing.
-pub fn fake_capability_request() -> CapabilityRequest {
-    CapabilityRequest {
-        cap_token: Address::from("fake"),
-        provenance: fake_provenance(),
-    }
+pub fn fake_cap_token() -> CapToken {
+    // TODO: real fake CapToken
+    CapToken
 }
 
 /// A fixture example ZomeInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
     ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
-}
-
-/// A fixture example Signature for unit testing.
-pub fn fake_signature() -> Signature {
-    Signature::from("fake")
-}
-
-/// A fixture example Provenance for unit testing.
-pub fn fake_provenance() -> Provenance {
-    Provenance::new("fake".into(), fake_signature())
 }

@@ -190,7 +190,7 @@ pub mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_iterators() -> DatabaseResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -221,7 +221,7 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_empty_iterators() -> DatabaseResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -243,7 +243,7 @@ pub mod tests {
     }
 
     /// TODO break up into smaller tests
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_store_sanity_check() -> DatabaseResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
@@ -292,9 +292,9 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
@@ -309,10 +309,10 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_deleted_persisted() -> DatabaseResult<()> {
         use tracing::*;
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
@@ -343,9 +343,9 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_deleted_buffer() -> DatabaseResult<()> {
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
@@ -381,9 +381,9 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_buffer() -> DatabaseResult<()> {
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
@@ -401,9 +401,9 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_persisted() -> DatabaseResult<()> {
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
@@ -427,9 +427,9 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_del_buffer() -> DatabaseResult<()> {
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;
@@ -447,9 +447,9 @@ pub mod tests {
         })
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn kv_get_del_persisted() -> DatabaseResult<()> {
-        sx_types::observability::test_run().ok();
+        holochain_types::observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
         let db = env.inner().open_single("kv", StoreOptions::create())?;

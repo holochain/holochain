@@ -5,6 +5,8 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     transaction::{Reader, ThreadsafeRkvReader, Writer},
 };
+use holochain_keystore::KeystoreSender;
+use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock as RwLockSync;
 use rkv::{EnvironmentFlags, Rkv};
@@ -13,7 +15,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use sx_types::cell::CellId;
 use tokio::sync::{RwLock, RwLockReadGuard};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
@@ -66,11 +67,16 @@ fn rkv_builder(
 pub struct Environment {
     arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
+    keystore: KeystoreSender,
 }
 
 impl Environment {
     /// Create an environment,
-    pub fn new(path_prefix: &Path, kind: EnvironmentKind) -> DatabaseResult<Environment> {
+    pub fn new(
+        path_prefix: &Path,
+        kind: EnvironmentKind,
+        keystore: KeystoreSender,
+    ) -> DatabaseResult<Environment> {
         let mut map = ENVIRONMENTS.write();
         let path = path_prefix.join(kind.path());
         if !path.is_dir() {
@@ -85,6 +91,7 @@ impl Environment {
                     Environment {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
+                        keystore,
                     }
                 })
                 .clone(),
@@ -122,6 +129,11 @@ impl Environment {
         };
         Ok(dbs)
     }
+
+    /// Request access to this conductor's keystore
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
+    }
 }
 
 /// The various types of LMDB environment, used to specify the list of databases to initialize in the DbManager
@@ -131,6 +143,8 @@ pub enum EnvironmentKind {
     Cell(CellId),
     /// Specifies the environment used by a Conductor
     Conductor,
+    /// Specifies the environment used to save wasm
+    Wasm,
 }
 
 impl EnvironmentKind {
@@ -139,6 +153,7 @@ impl EnvironmentKind {
         match self {
             EnvironmentKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
             EnvironmentKind::Conductor => PathBuf::from("conductor"),
+            EnvironmentKind::Wasm => PathBuf::from("wasm"),
         }
     }
 }

@@ -1,6 +1,6 @@
 //! # Persisted State building blocks
 //!
-//! This crate provides a few types for working with LMDB databases. The types build upon those found in [sx_state::buffer].
+//! This crate provides a few types for working with LMDB databases. The types build upon those found in [holochain_state::buffer].
 //!
 //! - [ChainCasBuffer]: the union of two CasBuffers, one for Entries, one for Headers
 //! - [ChainSequenceBuffer]: database representing the chain sequence DB, which provides a special method for accessing the chain head
@@ -37,4 +37,5 @@ pub mod chain_cas;
 pub mod chain_meta;
 pub mod chain_sequence;
 pub mod source_chain;
+pub mod wasm;
 pub mod workspace;

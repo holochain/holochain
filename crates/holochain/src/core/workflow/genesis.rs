@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
+use holochain_types::{chain_header::ChainHeader, dna::DnaFile, entry::Entry, header, prelude::*};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -12,23 +12,38 @@ use sx_types::{agent::AgentId, dna::Dna, entry::Entry};
 pub async fn genesis(
     mut workspace: GenesisWorkspace<'_>,
     api: impl CellConductorApiT,
-    dna: Dna,
-    agent_id: AgentId,
+    dna: DnaFile,
+    agent_pubkey: AgentPubKey,
 ) -> WorkflowResult<GenesisWorkspace<'_>> {
+    // TODO: this is a placeholder for a real DPKI request to show intent
     if api
-        .dpki_request("is_agent_id_valid".into(), agent_id.pub_sign_key().into())
+        .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
         .await?
         == "INVALID"
     {
-        return Err(WorkflowError::AgentIdInvalid(agent_id.clone()));
+        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
 
+    // create a DNA chain element and add it directly to the store
+    let dna_header = ChainHeader::Dna(header::Dna {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: agent_pubkey.clone(),
+        hash: dna.dna_hash().clone(),
+    });
+    workspace.source_chain.put(dna_header.clone(), None).await?;
+
+    // create a agent chain element and add it directly to the store
+    let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
+        timestamp: chrono::Utc::now().timestamp().into(),
+        author: agent_pubkey.clone(),
+        prev_header: dna_header.hash().into(),
+        entry_type: header::EntryType::AgentPubKey,
+        entry_address: agent_pubkey.clone().into(),
+    });
     workspace
         .source_chain
-        .put_entry(Entry::Dna(Box::new(dna)), &agent_id)?;
-    workspace
-        .source_chain
-        .put_entry(Entry::AgentId(agent_id.clone()), &agent_id)?;
+        .put(agent_header, Some(Entry::Agent(agent_pubkey)))
+        .await?;
 
     Ok(WorkflowEffects {
         workspace,
@@ -53,23 +68,21 @@ mod tests {
         },
     };
     use fallible_iterator::FallibleIterator;
-    use sx_state::{env::*, test_utils::test_cell_env};
-    use sx_types::{
-        entry::Entry,
-        observability,
-        prelude::*,
-        test_utils::{fake_agent_id, fake_dna},
+    use holochain_state::{env::*, test_utils::test_cell_env};
+    use holochain_types::{
+        chain_header::ChainHeader,
+        header, observability,
+        test_utils::{fake_agent_pubkey_1, fake_dna_file},
     };
-    use tracing::*;
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
         let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
-        let dna = fake_dna("a");
-        let agent_id = fake_agent_id("a");
+        let dna = fake_dna_file("a");
+        let agent_pubkey = fake_agent_pubkey_1();
 
         {
             let reader = env.reader()?;
@@ -77,34 +90,32 @@ mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let fx = genesis(workspace, api, dna.clone(), agent_id.clone()).await?;
+            let fx = genesis(workspace, api, dna, agent_pubkey.clone()).await?;
             let writer = env.writer()?;
             fx.workspace.commit_txn(writer)?;
         }
 
         env.with_reader(|reader| {
             let source_chain = SourceChain::new(&reader, &dbs)?;
-            assert_eq!(source_chain.agent_id()?, agent_id);
+            assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
             let hashes: Vec<_> = source_chain
                 .iter_back()
                 .map(|h| {
-                    debug!("header: {:?}", h);
-                    Ok(h.entry_hash().clone())
+                    Ok(match h.header() {
+                        ChainHeader::Dna(header::Dna { .. }) => "Dna",
+                        ChainHeader::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
+                        ChainHeader::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
+                        ChainHeader::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
+                        ChainHeader::ChainClose(header::ChainClose { .. }) => "ChainClose",
+                        ChainHeader::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
+                        ChainHeader::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
+                        ChainHeader::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
+                    })
                 })
                 .collect()
                 .unwrap();
-            assert_eq!(
-                hashes,
-                vec![
-                    holo_hash::EntryHash::try_from(Entry::AgentId(agent_id))
-                        .unwrap()
-                        .into(),
-                    holo_hash::EntryHash::try_from(Entry::Dna(Box::new(dna)))
-                        .unwrap()
-                        .into(),
-                ]
-            );
+            assert_eq!(hashes, vec!["EntryCreate", "Dna"]);
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())

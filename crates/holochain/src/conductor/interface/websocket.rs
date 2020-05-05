@@ -15,6 +15,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use tokio::stream::StreamExt;
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tracing::*;
 use url2::url2;
 
@@ -45,14 +46,18 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 _ = stop_rx.recv() => { break; },
 
                 // establish a new connection to a client
-                maybe_con = listener.next() => if let Some(conn) = maybe_con {
-                    // TODO: TK-01260: this could take some time and should be spawned
-                    if let Ok((send_socket, recv_socket)) = conn.await {
-                        send_sockets.push(send_socket);
-                        listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
-                            api.clone(),
-                            recv_socket,
-                        )));
+                maybe_con = listener.next() => if let Some(connection) = maybe_con {
+                    match connection {
+                        Ok((send_socket, recv_socket)) => {
+                            send_sockets.push(send_socket);
+                            listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                                api.clone(),
+                                recv_socket,
+                            )));
+                        }
+                        Err(err) => {
+                            warn!("Admin socket connection failed: {}", err);
+                        }
                     }
                 } else {
                     warn!(line = line!(), "Listener has returned none");
@@ -114,15 +119,29 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         tokio::select! {
             // break if we receive on the stop channel
             _ = stop_rx.recv() => { break; },
+
+            // establish a new connection to a client
             maybe_con = listener.next() => if let Some(connection) = maybe_con {
-                let (send_socket, recv_socket) = connection.await?;
-                handle_connection(send_socket, recv_socket);
+                match connection {
+                    Ok((send_socket, recv_socket)) => {
+                        handle_connection(send_socket, recv_socket);
+                    }
+                    Err(err) => {
+                        warn!("Admin socket connection failed: {}", err);
+                    }
+                }
             } else {
                 break;
             }
         }
     }
 
+    handle_shutdown(listener_handles).await
+}
+
+async fn handle_shutdown(
+    listener_handles: Vec<JoinHandle<InterfaceResult<()>>>,
+) -> InterfaceResult<()> {
     for h in listener_handles {
         // Show if these are actually finishing
         match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
@@ -207,17 +226,23 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::interface::error::AdminInterfaceErrorKind;
     use crate::conductor::{
-        api::{AdminRequest, AdminResponse, RealAdminInterfaceApi},
+        api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
+        conductor::ConductorBuilder,
+        dna_store::{error::DnaStoreError, MockDnaStore},
         Conductor,
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::{
+        observability,
+        test_utils::{fake_dna_file, write_fake_dna_file},
+    };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
+    use mockall::predicate;
     use std::convert::TryInto;
-    use sx_types::observability;
+    use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     #[serde(rename = "snake-case", tag = "type", content = "data")]
@@ -226,18 +251,21 @@ mod test {
     }
 
     async fn setup() -> RealAdminInterfaceApi {
-        let conductor = Conductor::build().test().await.unwrap();
-        RealAdminInterfaceApi::new(conductor)
+        let conductor_handle = Conductor::builder().test().await.unwrap().into_handle();
+        RealAdminInterfaceApi::new(conductor_handle)
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
         let admin_api = setup().await;
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Serialization, ..});
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::Deserialization(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -245,15 +273,51 @@ mod test {
         handle_incoming_message(msg, admin_api).await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn invalid_request() {
         observability::test_run().ok();
         let admin_api = setup().await;
-        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into());
+        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::Error{ error_type: AdminInterfaceErrorKind::Io, ..});
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
+            );
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap()
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn cache_failure() {
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_file(&uuid.to_string());
+
+        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).unwrap();
+        let mut dna_cache = MockDnaStore::new();
+        dna_cache
+            .expect_add()
+            .with(predicate::eq(dna))
+            .returning(|_| Err(DnaStoreError::WriteFail));
+
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
+            .test()
+            .await
+            .unwrap()
+            .into_handle();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
+        let msg = AdminRequest::InstallDna(fake_dna_path, None);
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::InternalError(_))
+            );
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -262,14 +326,7 @@ mod test {
     }
 
     #[ignore]
-    #[tokio::test]
-    async fn cache_failure() {
-        // TODO: B-01440: this can't be done easily yet
-        // because we can't cause the cache to fail from an input
-    }
-
-    #[ignore]
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn deserialization_failure() {
         // TODO: B-01440: this can't be done easily yet
         // because we can't serialize something that

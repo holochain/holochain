@@ -3,14 +3,14 @@
 #![allow(clippy::cognitive_complexity)]
 #![deny(missing_docs)]
 
-pub mod agent;
+pub mod address;
 pub mod autonomic;
 pub mod cell;
 pub mod chain_header;
 pub mod db;
 pub mod dna;
 pub mod entry;
-pub mod error;
+pub mod header;
 pub mod link;
 pub mod nucleus;
 pub mod observability;
@@ -21,14 +21,13 @@ pub mod prelude;
 #[allow(missing_docs)]
 pub mod shims;
 
-pub mod signature;
 pub mod time;
 pub mod universal_map;
 
 // #[cfg(test)]
 pub mod test_utils;
 
-use sx_zome_types;
+use holochain_zome_types;
 
 macro_rules! serial_hash {
     ( $( $input:ty, $output:ident )* ) => {
@@ -72,4 +71,7 @@ serial_hash!(
 
     crate::chain_header::ChainHeader,
     HeaderHash
+
+    crate::dna::wasm::DnaWasm,
+    WasmHash
 );

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 // FIXME: Does this work? I don't think 'tag' has any meaning for message pack
 #[serde(tag = "type")]

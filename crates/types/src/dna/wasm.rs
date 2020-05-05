@@ -1,4 +1,4 @@
-//! sx_types::dna::wasm is a module for managing webassembly code
+//! holochain_types::dna::wasm is a module for managing webassembly code
 //!  - within the in-memory dna struct
 //!  - and serialized to json
 use backtrace::Backtrace;
@@ -13,18 +13,24 @@ use std::{
 use tracing::*;
 
 /// Represents web assembly code.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Eq)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
     code: Arc<Vec<u8>>,
 }
 
-impl TryFrom<DnaWasm> for SerializedBytes {
+impl TryFrom<&DnaWasm> for SerializedBytes {
     type Error = SerializedBytesError;
-    fn try_from(dna_wasm: DnaWasm) -> Result<Self, Self::Error> {
+    fn try_from(dna_wasm: &DnaWasm) -> Result<Self, Self::Error> {
         Ok(SerializedBytes::from(UnsafeBytes::from(
             (*dna_wasm.code).to_owned(),
         )))
+    }
+}
+impl TryFrom<DnaWasm> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(dna_wasm: DnaWasm) -> Result<Self, Self::Error> {
+        Self::try_from(&dna_wasm)
     }
 }
 

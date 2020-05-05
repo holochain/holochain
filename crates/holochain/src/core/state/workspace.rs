@@ -1,5 +1,5 @@
 use super::source_chain::SourceChainError;
-use sx_state::{error::DatabaseError, prelude::Writer};
+use holochain_state::{error::DatabaseError, prelude::Writer};
 use thiserror::Error;
 
 mod app_validation;
@@ -29,18 +29,18 @@ pub mod tests {
 
     use super::Workspace;
     use crate::core::state::workspace::WorkspaceResult;
-    use sx_state::{
+    use holochain_state::{
         buffer::{BufferedStore, KvBuf},
         db::{DbManager, PRIMARY_CHAIN_ENTRIES, PRIMARY_CHAIN_HEADERS},
         env::{ReadManager, WriteManager},
         prelude::{Reader, Writer},
         test_utils::test_cell_env,
     };
-    use sx_types::prelude::*;
+    use holochain_types::prelude::*;
 
     pub struct TestWorkspace<'env> {
-        one: KvBuf<'env, Address, u32>,
-        two: KvBuf<'env, Address, bool>,
+        one: KvBuf<'env, EntryHash, u32>,
+        two: KvBuf<'env, String, bool>,
     }
 
     impl<'env> TestWorkspace<'env> {
@@ -61,13 +61,13 @@ pub mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn workspace_sanity_check() -> WorkspaceResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
-        let addr1 = Address::from("hi".to_owned());
-        let addr2 = Address::from("hi".to_owned());
+        let addr1 = EntryHash::with_data_sync("hello".as_bytes());
+        let addr2 = "hi".to_string();
         {
             let reader = env.reader()?;
             let mut workspace = TestWorkspace::new(&reader, &dbs)?;

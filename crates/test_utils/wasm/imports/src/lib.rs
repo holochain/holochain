@@ -3,8 +3,8 @@ extern crate wee_alloc;
 extern crate lazy_static;
 
 use holochain_wasmer_guest::*;
-use sx_zome_types::*;
-use sx_zome_types::globals::ZomeGlobals;
+use holochain_zome_types::*;
+use holochain_zome_types::globals::ZomeGlobals;
 
 // Use `wee_alloc` as the global allocator.
 #[global_allocator]

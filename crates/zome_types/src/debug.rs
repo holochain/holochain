@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 pub struct DebugMsg {
     // TODO: Consider either replacing with `Cow<'static, str>` or with
     // `&'a str` and using `#[serde(borrow)]`
@@ -53,7 +53,7 @@ impl DebugMsg {
 /// assert_eq!(message.msg(), "info: operation complete");
 /// assert_eq!(message.file(), "src/debug.rs");
 /// assert_eq!(message.line(), 5);
-/// # use sx_zome_types::{debug::DebugMsg, debug_msg};
+/// # use holochain_zome_types::{debug::DebugMsg, debug_msg};
 /// ```
 ///
 /// Advanced formatting
@@ -70,7 +70,7 @@ impl DebugMsg {
 /// assert_eq!(message.msg(), "info: operation complete: frobnicate");
 /// assert_eq!(message.file(), "src/debug.rs");
 /// assert_eq!(message.line(), 7);
-/// # use sx_zome_types::{debug::DebugMsg, debug_msg};
+/// # use holochain_zome_types::{debug::DebugMsg, debug_msg};
 /// ```
 ///
 /// [`DebugMsg`]: struct.DebugMsg.html

@@ -4,8 +4,8 @@ use crate::{
     env::{Environment, EnvironmentKind},
     error::{DatabaseError, DatabaseResult},
 };
+use holochain_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
-use sx_types::universal_map::{Key as UmKey, UniversalMap};
 
 use rkv::{IntegerStore, MultiStore, SingleStore, StoreOptions};
 
@@ -31,6 +31,8 @@ pub enum DbName {
     /// database which stores a single key-value pair, encoding the
     /// mutable state for the entire Conductor
     ConductorState,
+    /// database that stores wasm bytecode
+    Wasm,
 }
 
 impl std::fmt::Display for DbName {
@@ -45,6 +47,7 @@ impl std::fmt::Display for DbName {
             CacheChainHeaders => write!(f, "CacheChainHeaders"),
             CacheChainMeta => write!(f, "CacheChainMeta"),
             ConductorState => write!(f, "ConductorState"),
+            Wasm => write!(f, "Wasm"),
         }
     }
 }
@@ -63,6 +66,7 @@ impl DbName {
             CacheChainHeaders => Single,
             CacheChainMeta => Multi,
             ConductorState => Single,
+            Wasm => Single,
         }
     }
 }
@@ -107,6 +111,8 @@ lazy_static! {
     pub static ref CACHE_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
     /// The key to access the ConductorState database
     pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
+    /// The key to access the Wasm database
+    pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
 }
 
 /// DbManager is intended to be used as a singleton store for LMDB Database references,
@@ -199,7 +205,15 @@ impl DbManager {
             EnvironmentKind::Conductor => {
                 self.create(&*CONDUCTOR_STATE).await?;
             }
+            EnvironmentKind::Wasm => {
+                self.create(&*WASM).await?;
+            }
         }
         Ok(())
+    }
+
+    /// Request access to this conductor's keystore
+    pub fn keystore(&self) -> &holochain_keystore::KeystoreSender {
+        self.env.keystore()
     }
 }

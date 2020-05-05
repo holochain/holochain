@@ -1,30 +1,36 @@
 //! Holochain DnaError type.
 
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fmt};
+use thiserror::Error;
 
 /// Holochain DnaError type.
-#[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Clone, Debug, Error, PartialEq, Hash, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum DnaError {
     /// ZomeNotFound
+    #[error("Zome not found: {0}")]
     ZomeNotFound(String),
 
+    /// EmptyZome
+    #[error("Zome has no code: {0}")]
+    EmptyZome(String),
+
+    /// Invalid
+    #[error("DNA is invalid: {0}")]
+    Invalid(String),
+
     /// TraitNotFound
+    #[error("Trait not found: {0}")]
     TraitNotFound(String),
 
     /// ZomeFunctionNotFound
+    #[error("Zome function not found: {0}")]
     ZomeFunctionNotFound(String),
-}
 
-impl Error for DnaError {}
+    /// SerializedBytesError
+    #[error("SerializedBytesError: {0}")]
+    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
-impl fmt::Display for DnaError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let msg = match self {
-            DnaError::ZomeNotFound(err_msg) => err_msg,
-            DnaError::TraitNotFound(err_msg) => err_msg,
-            DnaError::ZomeFunctionNotFound(err_msg) => err_msg,
-        };
-        write!(f, "{}", msg)
-    }
+    /// InvalidWasmHash
+    #[error("InvalidWasmHash")]
+    InvalidWasmHash,
 }

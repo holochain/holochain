@@ -1,14 +1,16 @@
 #![allow(clippy::ptr_arg)]
-use holo_hash::EntryHash;
-use mockall::mock;
-use std::collections::HashSet;
-use std::fmt::Debug;
-use sx_state::{
+use holochain_serialized_bytes::prelude::*;
+use holochain_state::{
     buffer::{BufMultiVal, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::DatabaseResult,
     prelude::*,
 };
+use holochain_types::address::EntryAddress;
+use mockall::mock;
+use std::collections::HashSet;
+use std::convert::TryInto;
+use std::fmt::Debug;
 
 type Tag = String;
 
@@ -32,14 +34,19 @@ enum Op {
 
 #[allow(dead_code)]
 struct LinkKey<'a> {
-    base: &'a EntryHash,
+    base: &'a EntryAddress,
     op: Op,
     tag: Tag,
 }
 
 impl<'a> LinkKey<'a> {
     fn to_key(&self) -> Vec<u8> {
-        let mut vec: Vec<u8> = self.base.as_ref().to_vec();
+        // Possibly FIXME if this expect is actually not true
+        let sb: SerializedBytes = self
+            .base
+            .try_into()
+            .expect("entry addresses don't have the unserialize problem");
+        let mut vec: Vec<u8> = sb.bytes().to_vec();
         vec.extend_from_slice(self.tag.as_ref());
         vec
     }
@@ -70,8 +77,8 @@ pub trait ChainMetaBufT<'env, R = Reader<'env>>
 where
     R: Readable,
 {
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
-    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
+    fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>>;
+    fn get_crud(&self, entry_address: EntryAddress) -> DatabaseResult<EntryDhtStatus>;
 }
 pub struct ChainMetaBuf<'env, V, R = Reader<'env>>
 where
@@ -115,7 +122,7 @@ where
     R: Readable,
 {
     // TODO find out whether we need link_type.
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
+    fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>> {
         // TODO get removes
         // TODO get adds
         let key = LinkKey {
@@ -126,7 +133,7 @@ where
         let _values = self.links_meta.get(&key.to_key());
         Ok(HashSet::new())
     }
-    fn get_crud(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn get_crud(&self, _entry_address: EntryAddress) -> DatabaseResult<EntryDhtStatus> {
         unimplemented!()
     }
 }
@@ -134,8 +141,8 @@ where
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
-        fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
+        fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>>;
+        fn get_crud(&self, entry_address: EntryAddress) -> DatabaseResult<EntryDhtStatus>;
     }
 }
 
@@ -143,10 +150,10 @@ impl<'env, R> ChainMetaBufT<'env, R> for MockChainMetaBuf
 where
     R: Readable,
 {
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
+    fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>> {
         self.get_links(base, tag)
     }
-    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        self.get_crud(entry_hash)
+    fn get_crud(&self, entry_address: EntryAddress) -> DatabaseResult<EntryDhtStatus> {
+        self.get_crud(entry_address)
     }
 }

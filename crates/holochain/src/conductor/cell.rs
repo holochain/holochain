@@ -5,17 +5,15 @@ use crate::{
     },
     core::ribosome::WasmRibosome,
 };
-use std::hash::{Hash, Hasher};
-use sx_state::env::Environment;
-use sx_types::{
-    agent::AgentId,
+use holo_hash::*;
+use holochain_state::env::Environment;
+use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
-    dna::DnaAddress,
-    error::SkunkResult,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
+use std::hash::{Hash, Hasher};
 
 pub mod error;
 
@@ -24,7 +22,7 @@ impl Hash for Cell {
     where
         H: Hasher,
     {
-        (self.dna_address(), self.agent_id()).hash(state);
+        self.id.hash(state);
     }
 }
 
@@ -50,12 +48,14 @@ pub struct Cell {
 }
 
 impl Cell {
-    fn dna_address(&self) -> &DnaAddress {
-        &self.id.dna_address()
+    #[allow(dead_code)]
+    fn dna_hash(&self) -> &DnaHash {
+        &self.id.dna_hash()
     }
 
-    fn agent_id(&self) -> &AgentId {
-        &self.id.agent_id()
+    #[allow(dead_code)]
+    fn agent_pubkey(&self) -> &AgentPubKey {
+        &self.id.agent_pubkey()
     }
 
     /// Entry point for incoming messages from the network that need to be handled
@@ -107,13 +107,9 @@ impl Cell {
 // so instead of explicitly building resources, we can downcast a Cell to exactly
 // the right set of resource getter traits
 trait NetSend {
-    fn network_send(&self, msg: Lib3hClientProtocol) -> SkunkResult<()>;
+    fn network_send(&self, msg: Lib3hClientProtocol) -> Result<(), NetError>;
 }
 
-/// Simplification of holochain_net::connection::NetSend
-/// Could use the trait instead, but we will want an impl of it
-/// for just a basic crossbeam_channel::Sender, so I'm simplifying
-/// to avoid making a change to holochain_net
-///
-/// This is just a "sketch", can be removed.
-pub type NetSender = tokio::sync::mpsc::Sender<Lib3hClientProtocol>;
+#[allow(dead_code)]
+/// TODO - this is a shim until we need a real NetError
+enum NetError {}

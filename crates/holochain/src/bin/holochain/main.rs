@@ -2,10 +2,10 @@ use holochain_2020::conductor::{
     config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
     ConductorHandle,
 };
+use holochain_types::observability::{self, Output};
 use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use sx_types::observability::{self, Output};
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
@@ -113,15 +113,20 @@ async fn async_main() {
     }
 
     // Initialize the Conductor
-    let conductor: ConductorHandle = Conductor::build()
-        .with_config(config)
+    let conductor: ConductorHandle = Conductor::builder()
+        .config(config)
+        .with_admin()
         .await
         .expect("Could not initialize Conductor from configuration");
 
     info!("Conductor successfully initialized.");
     // kick off actual conductor task here
-    conductor
-        .wait()
+    let waiting_handle = conductor
+        .get_wait_handle()
+        .await
+        .expect("No wait handle in conductor");
+
+    waiting_handle
         .await
         .map_err(|e| {
             error!(error = &e as &dyn Error, "Failed to join the main task");
