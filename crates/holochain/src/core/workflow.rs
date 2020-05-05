@@ -30,10 +30,11 @@ pub use invoke_zome_workflow::*;
 
 pub use effects::*;
 
-use crate::core::state::workspace::{Workspace, WorkspaceError};
+use crate::core::state::workspace::Workspace;
 use error::*;
 use holochain_state::env::EnvironmentRw;
 use must_future::MustBoxFuture;
+use tracing::*;
 
 /// Definition of a Workflow.
 ///
@@ -91,18 +92,14 @@ async fn finish<'env, Wf: Workflow<'env>>(
 
     // finish workspace
     {
-        // let arc = cell.state_env();
         let env = arc.guard().await;
-        let writer = env
-            .writer_unmanaged()
-            .map_err(Into::<WorkspaceError>::into)?;
-        workspace
-            .commit_txn(writer)
-            .map_err(Into::<WorkspaceError>::into)?;
+        let writer = env.writer_unmanaged()?;
+        workspace.commit_txn(writer)?;
     }
 
     // finish callbacks
     {
+        warn!("Workflow-generated callbacks are unimplemented");
         for _callback in callbacks {
             // TODO
         }
@@ -110,12 +107,14 @@ async fn finish<'env, Wf: Workflow<'env>>(
 
     // finish signals
     {
+        warn!("Workflow-generated signals are unimplemented");
         for _signal in signals {
             // TODO
         }
     }
 
     // finish triggers
+    warn!("Workflow-generated triggers are unimplemented");
     let _handle = triggers.run(arc);
 
     Ok(())
