@@ -1,4 +1,4 @@
-//! Holochain's [`ChainHeader`] and its variations.
+//! Holochain's [`Header`] and its variations.
 //!
 //! All header variations contain the fields `author` and `timestamp`.
 //! Furthermore, all variations besides pub struct `Dna` (which is the first header
@@ -8,7 +8,7 @@
 
 use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
 
-/// ChainHeader contains variants for each type of header.
+/// Header contains variants for each type of header.
 ///
 /// This struct really defines a local source chain, in the sense that it
 /// implements the pointers between hashes that a hash chain relies on, which
@@ -17,7 +17,7 @@ use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[serde(tag = "type")]
-pub enum ChainHeader {
+pub enum Header {
     // The first header in a chain (for the DNA) doesn't have a previous header
     Dna(Dna),
     LinkAdd(LinkAdd),
@@ -29,7 +29,7 @@ pub enum ChainHeader {
     EntryDelete(EntryDelete),
 }
 
-impl ChainHeader {
+impl Header {
     /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
     pub fn is_public(&self) -> bool {
         unimplemented!()
@@ -38,14 +38,14 @@ impl ChainHeader {
     /// Returns the public key of the agent who signed this header.
     pub fn author(&self) -> &AgentPubKey {
         match self {
-            ChainHeader::Dna(i) => &i.author,
-            ChainHeader::LinkAdd(i) => &i.author,
-            ChainHeader::LinkRemove(i) => &i.author,
-            ChainHeader::ChainOpen(i) => &i.author,
-            ChainHeader::ChainClose(i) => &i.author,
-            ChainHeader::EntryCreate(i) => &i.author,
-            ChainHeader::EntryUpdate(i) => &i.author,
-            ChainHeader::EntryDelete(i) => &i.author,
+            Header::Dna(i) => &i.author,
+            Header::LinkAdd(i) => &i.author,
+            Header::LinkRemove(i) => &i.author,
+            Header::ChainOpen(i) => &i.author,
+            Header::ChainClose(i) => &i.author,
+            Header::EntryCreate(i) => &i.author,
+            Header::EntryUpdate(i) => &i.author,
+            Header::EntryDelete(i) => &i.author,
         }
     }
 

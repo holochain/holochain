@@ -6,7 +6,7 @@
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, ChainHeader};
+use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
@@ -53,7 +53,7 @@ pub struct ChainElement {
 
 impl ChainElement {
     /// Raw element constructor.  Used only when we know that the values are valid.
-    pub fn new(signature: Signature, header: ChainHeader, maybe_entry: Option<Entry>) -> Self {
+    pub fn new(signature: Signature, header: Header, maybe_entry: Option<Entry>) -> Self {
         Self {
             signed_header: SignedHeader { signature, header },
             maybe_entry,
@@ -74,8 +74,8 @@ impl ChainElement {
         self.signed_header.signature()
     }
 
-    /// Access the ChainHeader portion of this triple.
-    pub fn header(&self) -> &ChainHeader {
+    /// Access the Header portion of this triple.
+    pub fn header(&self) -> &Header {
         self.signed_header.header()
     }
 
@@ -88,19 +88,19 @@ impl ChainElement {
 /// the header and the signature that signed it
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SignedHeader {
-    header: ChainHeader,
+    header: Header,
     signature: Signature,
 }
 
 impl SignedHeader {
     /// SignedHeader constructor
-    pub async fn new(keystore: &KeystoreSender, header: ChainHeader) -> SourceChainResult<Self> {
+    pub async fn new(keystore: &KeystoreSender, header: Header) -> SourceChainResult<Self> {
         let signature = header.author().sign(keystore, &header).await?;
         Ok(Self { signature, header })
     }
 
-    /// Access the ChainHeader portion.
-    pub fn header(&self) -> &ChainHeader {
+    /// Access the Header portion.
+    pub fn header(&self) -> &Header {
         &self.header
     }
     /// Access the signature portion.

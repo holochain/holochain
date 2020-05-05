@@ -27,7 +27,7 @@ pub mod universal_map;
 pub mod test_utils;
 
 #[doc(inline)]
-pub use header::ChainHeader;
+pub use header::Header;
 
 use holochain_zome_types;
 
@@ -71,7 +71,7 @@ serial_hash!(
     crate::entry::Entry,
     EntryHash
 
-    crate::ChainHeader,
+    crate::Header,
     HeaderHash
 
     crate::dna::wasm::DnaWasm,
