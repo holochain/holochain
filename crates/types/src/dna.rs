@@ -149,7 +149,7 @@ impl DnaFile {
     }
 
     /// Render this dna_file as bytecode to send over the wire, or store in a file.
-    pub async fn as_file_content(&self) -> Result<Vec<u8>, DnaError> {
+    pub async fn to_file_content(&self) -> Result<Vec<u8>, DnaError> {
         // Not super efficient memory-wise, but doesn't block any threads
         let dna_file = self.clone();
         tokio::task::spawn_blocking(move || {

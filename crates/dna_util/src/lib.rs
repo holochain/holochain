@@ -81,8 +81,8 @@ fn dna_file_path_convert(
     Ok(dir)
 }
 
-/// Extract a DnaFile into a Dna Working Directory
-pub async fn extract(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
+/// Expand a DnaFile into a Dna Working Directory
+pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
     let dna_file_path = dna_file_path.as_ref().canonicalize()?;
     let dir = dna_file_path_convert(&dna_file_path, true)?;
     tokio::fs::create_dir_all(&dir).await?;
@@ -99,7 +99,7 @@ pub async fn extract(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResu
 
     // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
     // then pass by value here.
-    let dna_json = DnaDefJson::from_dna_def(dna_file.dna())?;
+    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone())?;
     let dna_json = serde_json::to_string_pretty(&dna_json)?;
 
     let mut json_filename = dir.clone();
@@ -109,8 +109,8 @@ pub async fn extract(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResu
     Ok(())
 }
 
-/// Compile a Dna Working Directory into a DnaFile
-pub async fn compile(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
+/// Compress a Dna Working Directory into a DnaFile
+pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResult<()> {
     let dna_work_dir = dna_work_dir.as_ref().canonicalize()?;
     let dna_file_path = dna_file_path_convert(&dna_work_dir, false)?;
 
@@ -122,7 +122,7 @@ pub async fn compile(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResul
     let json_file: DnaDefJson = serde_json::from_slice(&json_data)?;
 
     let dna_file_content = json_file.compile_dna_file(&dna_work_dir).await?;
-    let dna_file_content = dna_file_content.as_file_content().await?;
+    let dna_file_content = dna_file_content.to_file_content().await?;
 
     tokio::fs::write(dna_file_path, &dna_file_content).await?;
 
@@ -151,8 +151,8 @@ struct DnaDefJson {
 }
 
 impl DnaDefJson {
-    pub fn from_dna_def(dna: &DnaDef) -> DnaUtilResult<DnaDefJson> {
-        let properties: JsonValueDecodeHelper = dna.properties.clone().try_into()?;
+    pub fn from_dna_def(dna: DnaDef) -> DnaUtilResult<DnaDefJson> {
+        let properties: JsonValueDecodeHelper = dna.properties.try_into()?;
         let mut zomes = BTreeMap::new();
         for zome_name in dna.zomes.keys() {
             let zome_file = format!("./{}.wasm", zome_name);
@@ -164,8 +164,8 @@ impl DnaDefJson {
             );
         }
         Ok(Self {
-            name: dna.name.clone(),
-            uuid: dna.uuid.clone(),
+            name: dna.name,
+            uuid: dna.uuid,
             properties: properties.0,
             zomes,
         })
@@ -236,15 +236,15 @@ mod tests {
 
         let dna_filename = tmp_dir.path().join("test-dna.dna.gz");
 
-        tokio::fs::write(&dna_filename, dna_file.as_file_content().await.unwrap())
+        tokio::fs::write(&dna_filename, dna_file.to_file_content().await.unwrap())
             .await
             .unwrap();
 
-        extract(&dna_filename).await.unwrap();
+        expand(&dna_filename).await.unwrap();
 
         tokio::fs::remove_file(&dna_filename).await.unwrap();
 
-        compile(&tmp_dir.path().join("test-dna.dna.workdir"))
+        compress(&tmp_dir.path().join("test-dna.dna.workdir"))
             .await
             .unwrap();
 

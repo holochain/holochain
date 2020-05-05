@@ -60,7 +60,7 @@ pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempd
     let tmp_dir = tempdir::TempDir::new("fake_dna")?;
     let mut path: PathBuf = tmp_dir.path().into();
     path.push("test-dna.dna.gz");
-    tokio::fs::write(path.clone(), dna.as_file_content().await?).await?;
+    tokio::fs::write(path.clone(), dna.to_file_content().await?).await?;
     Ok((path, tmp_dir))
 }
 

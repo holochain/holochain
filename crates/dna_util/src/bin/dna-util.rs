@@ -6,17 +6,17 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "dna_util", about = "Holochain DnaFile Utility.")]
 struct Opt {
-    /// Extract a DnaFile into a Dna Working Directory.
+    /// Expand a DnaFile into a Dna Working Directory.
     ///
     /// (`dna-util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
     #[structopt(short = "e", long)]
-    extract: Option<std::path::PathBuf>,
+    expand: Option<std::path::PathBuf>,
 
-    /// Compile a Dna Working Directory into a DnaFile.
+    /// Compress a Dna Working Directory into a DnaFile.
     ///
     /// (`dna-util -c my-dna.dna_work_dir` creates file `my-dna.dna.gz`)
     #[structopt(short = "c", long)]
-    compile: Option<std::path::PathBuf>,
+    compress: Option<std::path::PathBuf>,
 }
 
 /// Main `dna-util` executable entrypoint.
@@ -24,7 +24,7 @@ struct Opt {
 pub async fn main() {
     let opt = Opt::from_args();
 
-    if opt.extract.is_none() && opt.compile.is_none() {
+    if opt.expand.is_none() && opt.compress.is_none() {
         eprintln!("INPUT ERROR: no command selected.\n");
         Opt::clap().print_long_help().unwrap();
         return;
@@ -32,11 +32,11 @@ pub async fn main() {
 
     let mut exclusive = 0;
 
-    if opt.extract.is_some() {
+    if opt.expand.is_some() {
         exclusive += 1;
     }
 
-    if opt.compile.is_some() {
+    if opt.compress.is_some() {
         exclusive += 1;
     }
 
@@ -46,11 +46,11 @@ pub async fn main() {
         return;
     }
 
-    if let Some(extract) = opt.extract {
-        dna_util::extract(&extract).await.unwrap();
+    if let Some(expand) = opt.expand {
+        dna_util::expand(&expand).await.unwrap();
     }
 
-    if let Some(compile) = opt.compile {
-        dna_util::compile(&compile).await.unwrap();
+    if let Some(compress) = opt.compress {
+        dna_util::compress(&compress).await.unwrap();
     }
 }
