@@ -309,10 +309,10 @@ pub trait RibosomeT: Sized {
     ) -> RibosomeResult<ValidateEntryResult> {
         let callback_invocation = CallbackInvocation {
             components: vec![
-                "validate_entry".into(),
+                "validate".into(),
                 match entry {
                     Entry::Agent(_) => "agent",
-                    Entry::App(_) => "app",
+                    Entry::App(_) => "entry",
                     Entry::CapTokenClaim(_) => "cap_token_claim",
                     Entry::CapTokenGrant(_) => "cap_token_grant",
                 }
@@ -323,7 +323,11 @@ pub trait RibosomeT: Sized {
         };
         let callback_outputs: Vec<Option<CallbackGuestOutput>> =
             self.run_callback(callback_invocation, false)?;
-        assert_eq!(callback_outputs.len(), 2);
+        assert_eq!(
+            callback_outputs.len(),
+            2,
+            "validate had wrong number of callbacks"
+        );
 
         Ok(callback_outputs
             .into_iter()
@@ -422,8 +426,8 @@ impl WasmRibosome {
     ) -> RibosomeResult<Instance> {
         let zome_name = host_context.zome_name.clone();
         let zome = self.dna.get_zome(&zome_name)?;
-        let wasm: Arc<Vec<u8>> = zome.code.code();
-        let imports: ImportObject = WasmRibosome::imports(self, host_context, allow_side_effects);
+        let wasm: Arc<Vec<u8>> = Arc::clone(&zome.code.code());
+        let imports: ImportObject = self.imports(host_context, allow_side_effects);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             &self.wasm_cache_key(&zome_name),
             &wasm,
@@ -431,7 +435,7 @@ impl WasmRibosome {
         )?)
     }
 
-    fn imports(&self, host_context: HostContext, allow_side_effects: bool) -> ImportObject {
+    fn imports(&self, host_context: HostContext, _allow_side_effects: bool) -> ImportObject {
         // it is important that WasmRibosome and ZomeInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
         let host_context_arc = std::sync::Arc::new(host_context);
@@ -507,17 +511,17 @@ impl WasmRibosome {
         ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         ns.insert("__capability", func!(invoke_host_function!(capability)));
 
-        if allow_side_effects {
-            ns.insert("__call", func!(invoke_host_function!(call)));
-            ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
-            ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
-            ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
-            ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
-            ns.insert("__send", func!(invoke_host_function!(send)));
-            ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
-            ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
-            imports.register("env", ns);
-        }
+        // if allow_side_effects {
+        ns.insert("__call", func!(invoke_host_function!(call)));
+        ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
+        ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
+        ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
+        ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
+        ns.insert("__send", func!(invoke_host_function!(send)));
+        ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
+        ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
+        // }
+        imports.register("env", ns);
         imports
     }
 }
@@ -541,7 +545,6 @@ impl RibosomeT for WasmRibosome {
     ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>> {
         let mut fn_components = invocation.components.clone();
         let mut results: Vec<Option<CallbackGuestOutput>> = vec![];
-
         loop {
             if fn_components.len() > 0 {
                 let mut instance =
@@ -557,9 +560,7 @@ impl RibosomeT for WasmRibosome {
                             )?;
                         results.push(Some(wasm_callback_response));
                     }
-                    Err(_) => {
-                        results.push(None);
-                    }
+                    Err(_) => results.push(None),
                 }
                 fn_components.pop();
             } else {
@@ -602,7 +603,9 @@ pub mod wasm_test {
         test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id},
     };
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::commit::CommitEntryResult;
     use holochain_zome_types::*;
+    // use holochain_zome_types::validate::ValidateCallbackResult;
     use test_wasm_common::TestString;
 
     use crate::core::ribosome::HostContext;
@@ -663,6 +666,10 @@ pub mod wasm_test {
             v.insert(
                 String::from("debug"),
                 zome_from_code(TestWasm::Debug.into()),
+            );
+            v.insert(
+                String::from("validate"),
+                zome_from_code(TestWasm::Validate.into()),
             );
             v
         }))
@@ -733,5 +740,18 @@ pub mod wasm_test {
                 .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
                 .unwrap()
         );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validate_test() {
+        let always_validates: CommitEntryResult =
+            call_test_ribosome!("validate", "always_validates", ());
+
+        println!("{:?}", always_validates);
+
+        let never_validates: CommitEntryResult =
+            call_test_ribosome!("validate", "never_validates", ());
+
+        println!("{:?}", never_validates);
     }
 }

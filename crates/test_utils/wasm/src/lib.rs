@@ -4,6 +4,7 @@ pub enum TestWasm {
     Debug,
     Foo,
     Imports,
+    Validate,
 }
 
 impl From<TestWasm> for DnaWasm {
@@ -22,6 +23,11 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Imports => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_imports.wasm"
+            ))
+            .to_vec(),
+            TestWasm::Validate => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_validate.wasm"
             ))
             .to_vec(),
         })

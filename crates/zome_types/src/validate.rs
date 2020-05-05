@@ -10,7 +10,7 @@ pub enum ValidateEntryResult {
     UnresolvedDependencies(Vec<EntryHash>),
 }
 
-#[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateCallbackResult {
     Valid,
     Invalid(String),

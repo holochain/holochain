@@ -11,7 +11,32 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 // define the host functions we require in order to pull/push data across the host/guest boundary
 memory_externs!();
 
-host_externs!(__commit_entry);
+host_externs!(
+    __globals,
+    __call,
+    __capability,
+    __commit_entry,
+    __decrypt,
+    __encrypt,
+    __show_env,
+    __property,
+    __query,
+    __remove_link,
+    __send,
+    __sign,
+    __schedule,
+    __update_entry,
+    __emit_signal,
+    __remove_entry,
+    __link_entries,
+    __keystore,
+    __get_links,
+    __get_entry,
+    __entry_type_properties,
+    __entry_address,
+    __sys_time,
+    __debug
+);
 
 /// an example inner value that can be serialized into the contents of Entry::App()
 #[derive(Deserialize, Serialize, SerializedBytes)]
@@ -20,6 +45,7 @@ enum ThisWasmEntry {
     NeverValidates,
 }
 
+#[no_mangle]
 pub extern "C" fn validate(host_allocation_ptr: RemotePtr) -> RemotePtr {
     // load host args
     let input: CallbackHostInput = host_args!(host_allocation_ptr);
