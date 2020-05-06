@@ -160,20 +160,14 @@ async fn read_parse_dna(
     dna_path: PathBuf,
     properties: Option<serde_json::Value>,
 ) -> ConductorApiResult<DnaFile> {
-    let dna: UnsafeBytes = tokio::fs::read(dna_path)
+    let dna_content = tokio::fs::read(dna_path)
         .await
-        .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?
-        .into();
-    let dna = SerializedBytes::from(dna);
-    let mut dna: DnaFile = dna.try_into().map_err(SerializationError::from)?;
+        .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?;
+    let mut dna = DnaFile::from_file_content(&dna_content).await?;
     if let Some(properties) = properties {
-        let properties = Properties::new(properties);
-        let (mut tmp_dna, tmp_wasm): (
-            holochain_types::dna::DnaDef,
-            Vec<holochain_types::dna::wasm::DnaWasm>,
-        ) = dna.into();
-        tmp_dna.properties = properties.try_into().map_err(SerializationError::from)?;
-        dna = DnaFile::new(tmp_dna, tmp_wasm).await?;
+        let properties = SerializedBytes::try_from(Properties::new(properties))
+            .map_err(SerializationError::from)?;
+        dna = dna.with_properties(properties).await?;
     }
     Ok(dna)
 }
@@ -371,7 +365,7 @@ mod test {
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
-        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).unwrap();
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_hash = dna.dna_hash().clone();
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
@@ -436,7 +430,7 @@ mod test {
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
-        let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone())?;
+        let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
         let json = serde_json::json!({
             "test": "example",
             "how_many": 42,
