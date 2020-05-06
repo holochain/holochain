@@ -13,7 +13,7 @@ pub async fn globals(
     _input: GlobalsInput,
 ) -> GlobalsOutput {
     GlobalsOutput::new(ZomeGlobals {
-        dna_name: ribosome.dna.name.clone(),
+        dna_name: ribosome.dna_file.dna().name.clone(),
         agent_address: "".into(),                           // @TODO
         agent_id_str: "".into(),                            // @TODO
         agent_initial_hash: "".into(),                      // @TODO

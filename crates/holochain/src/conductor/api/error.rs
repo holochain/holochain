@@ -37,6 +37,10 @@ pub enum ConductorApiError {
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
 
+    /// DnaError
+    #[error("DnaError: {0}")]
+    DnaError(#[from] holochain_types::dna::DnaError),
+
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]
     DnaReadError(String),
@@ -44,6 +48,10 @@ pub enum ConductorApiError {
     /// Error in the workflow
     #[error("An error occurred while running the workflow: {0:?}")]
     WorkflowRunError(#[from] WorkflowRunError),
+
+    /// KeystoreError
+    #[error("KeystoreError: {0}")]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 }
 
 /// All the serialization errors that can occur

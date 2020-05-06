@@ -54,6 +54,9 @@ pub enum ConductorError {
     #[error("Error while trying to send a task to the task manager: {0}")]
     SubmitTaskError(String),
 
+    #[error("DnaError: {0}")]
+    DnaError(#[from] holochain_types::dna::DnaError),
+
     #[error("DNA store error: {0:?}")]
     DnaStoreError(#[from] DnaStoreError),
 

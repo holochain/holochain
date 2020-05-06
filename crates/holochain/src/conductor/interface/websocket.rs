@@ -240,7 +240,7 @@ mod test {
     use holochain_types::{
         cell::CellId,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna, fake_dna_file, fake_dna_hash},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_hash, write_fake_dna_file},
     };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
@@ -331,9 +331,9 @@ mod test {
         let _tmpdir = test_env.tmpdir.clone();
 
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
+        let dna = fake_dna_file(&uuid.to_string());
 
-        let (fake_dna_path, _tmpdir) = fake_dna_file(dna.clone()).unwrap();
+        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).unwrap();
         let mut dna_cache = MockDnaStore::new();
         dna_cache
             .expect_add()
@@ -379,7 +379,7 @@ mod test {
             a: u32,
         }
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
+        let dna = fake_dna_file(&uuid.to_string());
         let payload = Payload { a: 1 };
         let dna_hash = fake_dna_hash("bob");
         // TODO: Create the Mock for the cell-dna-api to provide a fake zome response

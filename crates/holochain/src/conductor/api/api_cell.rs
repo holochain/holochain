@@ -8,7 +8,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
-    dna::Dna,
+    dna::DnaFile,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
 };
@@ -74,7 +74,7 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    async fn get_dna(&self, dna_hash: DnaHash) -> Option<Dna> {
+    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile> {
         self.conductor_handle.get_dna(dna_hash).await
     }
 }
@@ -108,5 +108,5 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna(&self, dna_hash: DnaHash) -> Option<Dna>;
+    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile>;
 }

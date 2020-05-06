@@ -51,7 +51,7 @@ use holochain_state::{
 };
 use holochain_types::{
     cell::{CellHandle, CellId},
-    dna::Dna,
+    dna::DnaFile,
 };
 use std::collections::HashMap;
 use std::error::Error;
@@ -318,7 +318,7 @@ where
         Ok(())
     }
 
-    pub(super) async fn put_wasm(&mut self, dna: Dna) -> ConductorResult<()> {
+    pub(super) async fn put_wasm(&mut self, dna: DnaFile) -> ConductorResult<()> {
         let environ = &self.env;
         //let environ = Arc::clone(&self.0).state_env();
         let env = environ.guard().await;
@@ -328,7 +328,7 @@ where
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
         // TODO: PERF: This loop might be slow
-        for dna_wasm in dna.zomes.values().map(|zome| zome.code.clone()) {
+        for dna_wasm in dna.code().values().cloned() {
             wasm_buf.put(dna_wasm)?;
         }
 

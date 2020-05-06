@@ -51,7 +51,7 @@ use derive_more::From;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
-    dna::Dna,
+    dna::DnaFile,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,
 };
@@ -82,13 +82,13 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<()>;
 
     /// Install a [Dna] in this Conductor
-    async fn install_dna(&self, dna: Dna) -> ConductorResult<()>;
+    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna(&self, hash: DnaHash) -> Option<Dna>;
+    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile>;
 
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
@@ -146,7 +146,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         lock.add_admin_interfaces_via_handle(handle, configs).await
     }
 
-    async fn install_dna(&self, dna: Dna) -> ConductorResult<()> {
+    async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         self.0.write().await.put_wasm(dna.clone()).await?;
         Ok(self.0.write().await.dna_store_mut().add(dna)?)
     }
@@ -155,7 +155,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(self.0.read().await.dna_store().list())
     }
 
-    async fn get_dna(&self, hash: DnaHash) -> Option<Dna> {
+    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile> {
         self.0.read().await.dna_store().get(hash)
     }
 

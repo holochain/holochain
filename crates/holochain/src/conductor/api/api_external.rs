@@ -10,7 +10,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     cell::CellHandle,
-    dna::{Dna, Properties},
+    dna::{DnaFile, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
 use std::path::PathBuf;
@@ -133,6 +133,24 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 Ok(AdminResponse::ListDnas(dna_list))
             }
+            GenerateAgentPubKey => {
+                let agent_pub_key = self
+                    .conductor_handle
+                    .keystore()
+                    .clone()
+                    .generate_sign_keypair_from_pure_entropy()
+                    .await?;
+                Ok(AdminResponse::GenerateAgentPubKey(agent_pub_key))
+            }
+            ListAgentPubKeys => {
+                let pub_key_list = self
+                    .conductor_handle
+                    .keystore()
+                    .clone()
+                    .list_sign_keys()
+                    .await?;
+                Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
+            }
         }
     }
 }
@@ -141,16 +159,21 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 async fn read_parse_dna(
     dna_path: PathBuf,
     properties: Option<serde_json::Value>,
-) -> ConductorApiResult<Dna> {
+) -> ConductorApiResult<DnaFile> {
     let dna: UnsafeBytes = tokio::fs::read(dna_path)
         .await
         .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?
         .into();
     let dna = SerializedBytes::from(dna);
-    let mut dna: Dna = dna.try_into().map_err(SerializationError::from)?;
+    let mut dna: DnaFile = dna.try_into().map_err(SerializationError::from)?;
     if let Some(properties) = properties {
         let properties = Properties::new(properties);
-        dna.properties = (properties).try_into().map_err(SerializationError::from)?;
+        let (mut tmp_dna, tmp_wasm): (
+            holochain_types::dna::DnaDef,
+            Vec<holochain_types::dna::wasm::DnaWasm>,
+        ) = dna.into();
+        tmp_dna.properties = properties.try_into().map_err(SerializationError::from)?;
+        dna = DnaFile::new(tmp_dna, tmp_wasm).await?;
     }
     Ok(dna)
 }
@@ -251,6 +274,10 @@ pub enum AdminResponse {
     AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
     ListDnas(Vec<DnaHash>),
+    /// Keystore generated a new AgentPubKey
+    GenerateAgentPubKey(AgentPubKey),
+    /// Listing all the AgentPubKeys in the Keystore
+    ListAgentPubKeys(Vec<AgentPubKey>),
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
 }
@@ -285,6 +312,10 @@ pub enum AdminRequest {
     InstallDna(PathBuf, Option<serde_json::Value>),
     /// List all installed [Dna]s
     ListDnas,
+    /// Generate a new AgentPubKey
+    GenerateAgentPubKey,
+    /// List all AgentPubKeys in Keystore
+    ListAgentPubKeys,
 }
 
 #[allow(missing_docs)]
@@ -316,7 +347,8 @@ mod test {
     use crate::conductor::Conductor;
     use anyhow::Result;
     use holochain_state::test_utils::test_conductor_env;
-    use holochain_types::test_utils::{fake_dna, fake_dna_file};
+    use holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::write_fake_dna_file;
     use matches::assert_matches;
     use uuid::Uuid;
 
@@ -327,9 +359,9 @@ mod test {
         let handle = Conductor::builder().test(test_env).await?.run().await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
-        let (dna_path, _tempdir) = fake_dna_file(dna.clone()).unwrap();
-        let dna_hash = dna.dna_hash();
+        let dna = fake_dna_file(&uuid.to_string());
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).unwrap();
+        let dna_hash = dna.dna_hash().clone();
         admin_api
             .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
             .await;
@@ -340,10 +372,55 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn generate_and_list_pub_keys() -> Result<()> {
+        let test_env = test_conductor_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder()
+            .test(test_env)
+            .await?
+            .run()
+            .await
+            .unwrap();
+        let admin_api = RealAdminInterfaceApi::new(handle);
+
+        let agent_pub_key = admin_api
+            .handle_admin_request(AdminRequest::GenerateAgentPubKey)
+            .await;
+
+        let agent_pub_key = match agent_pub_key {
+            AdminResponse::GenerateAgentPubKey(key) => key,
+            _ => panic!("bad type: {:?}", agent_pub_key),
+        };
+
+        let pub_key_list = admin_api
+            .handle_admin_request(AdminRequest::ListAgentPubKeys)
+            .await;
+
+        let mut pub_key_list = match pub_key_list {
+            AdminResponse::ListAgentPubKeys(list) => list,
+            _ => panic!("bad type: {:?}", pub_key_list),
+        };
+
+        // includes our two pre-generated test keys
+        let mut expects = vec![
+            AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4").unwrap(),
+            AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK").unwrap(),
+            agent_pub_key,
+        ];
+
+        pub_key_list.sort();
+        expects.sort();
+
+        assert_eq!(expects, pub_key_list);
+
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
-        let mut dna = fake_dna(&uuid.to_string());
-        let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
+        let dna = fake_dna_file(&uuid.to_string());
+        let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone())?;
         let json = serde_json::json!({
             "test": "example",
             "how_many": 42,
@@ -351,8 +428,9 @@ mod test {
         let properties = Some(json.clone());
         let result = read_parse_dna(dna_path, properties).await?;
         let properties = Properties::new(json);
+        let mut dna = dna.dna().clone();
         dna.properties = properties.try_into().unwrap();
-        assert_eq!(dna, result);
+        assert_eq!(&dna, result.dna());
         Ok(())
     }
 }
