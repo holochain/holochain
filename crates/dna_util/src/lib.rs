@@ -175,7 +175,7 @@ impl DnaDefJson {
         &self,
         work_dir: impl Into<std::path::PathBuf>,
     ) -> DnaUtilResult<DnaFile> {
-        let mut work_dir_z = work_dir.into();
+        let work_dir = work_dir.into();
 
         let properties: SerializedBytes =
             JsonValueDecodeHelper(self.properties.clone()).try_into()?;
@@ -184,7 +184,7 @@ impl DnaDefJson {
         let mut wasm_list = Vec::new();
 
         for (zome_name, zome) in self.zomes.iter() {
-            let mut zome_file_path = work_dir_z.clone();
+            let mut zome_file_path = work_dir.clone();
             zome_file_path.push(&zome.wasm_path);
 
             let zome_content = tokio::fs::read(zome_file_path).await?;
