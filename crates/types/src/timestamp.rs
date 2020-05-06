@@ -1,13 +1,15 @@
 /// A UTC timestamp for use in Holochain's headers.
 ///
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings.
+/// - Field 0: i64 - Seconds since UNIX epoch UTC (midnight 1970-01-01).
+/// - Field 1: u32 - Nanoseconds in addition to above seconds.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct Timestamp(
-    /// Seconds since UNIX epoch UTC (midnight 1970-01-01).
+    // sec
     pub i64,
-    /// Nanoseconds in addition to above seconds.
+    // nsec
     pub u32,
 );
 
