@@ -1,7 +1,8 @@
 use std::convert::TryInto;
 
-/// A UTC Timestamp. Used in Holochain Headers.
-/// Timestamp implements Serialize and Display as rfc3339 time strings.
+/// A UTC timestamp for use in Holochain's headers.
+///
+/// Timestamp implements `Serialize` and `Display` as rfc3339 time strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Timestamp {
     /// Seconds since UNIX epoch UTC (midnight 1970-01-01).
