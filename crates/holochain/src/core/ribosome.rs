@@ -527,7 +527,7 @@ impl WasmRibosome {
         // }
         imports.register("env", ns);
 
-        crate::end_hard_timeout!(timeout, 2000000);
+        crate::end_hard_timeout!(timeout, 200000);
         imports
     }
 }
