@@ -559,6 +559,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "dna_util"
+version = "0.0.1"
+dependencies = [
+ "holo_hash",
+ "holo_hash_core",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "structopt",
+ "tempdir",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -616,7 +633,7 @@ dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
  "syn 1.0.18",
- "synstructure 0.12.3",
+ "synstructure",
 ]
 
 [[package]]
@@ -1090,6 +1107,7 @@ dependencies = [
  "base64 0.10.1",
  "chrono",
  "derive_more",
+ "flate2",
  "futures",
  "hcid",
  "holo_hash",
@@ -1101,7 +1119,6 @@ dependencies = [
  "holochain_wasmer_common",
  "holochain_zome_types",
  "lazy_static",
- "lib3h_crypto_api",
  "maplit",
  "matches",
  "multihash",
@@ -1324,16 +1341,6 @@ dependencies = [
  "rustc_version",
  "ryu",
  "static_assertions",
-]
-
-[[package]]
-name = "lib3h_crypto_api"
-version = "0.0.38"
-source = "git+https://github.com/holochain/lib3h.git?branch=unpinned#e70fae0187d52b8a3b882624d70a1845987e52e8"
-dependencies = [
- "serde",
- "serde_derive",
- "zeroize",
 ]
 
 [[package]]
@@ -2814,18 +2821,6 @@ dependencies = [
 
 [[package]]
 name = "synstructure"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02353edf96d6e4dc81aea2d8490a7e9db177bf8acb0e951c24940bf866cb313f"
-dependencies = [
- "proc-macro2 0.4.30",
- "quote 0.6.11",
- "syn 0.15.31",
- "unicode-xid 0.1.0",
-]
-
-[[package]]
-name = "synstructure"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67656ea1dc1b41b1451851562ea232ec2e5a80242139f7e679ceccfb5d61f545"
@@ -3483,27 +3478,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "244c3741f4240ef46274860397c7c74e50eb23624996930e484c16679633a54c"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "zeroize"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45af6a010d13e4cf5b54c94ba5a2b2eba5596b9e46bf5875612d332a1f2b3f86"
-dependencies = [
- "zeroize_derive",
-]
-
-[[package]]
-name = "zeroize_derive"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "080616bd0e31f36095288bb0acdf1f78ef02c2fa15527d7e993f2a6c7591643e"
-dependencies = [
- "proc-macro2 0.4.30",
- "quote 0.6.11",
- "syn 0.15.31",
- "synstructure 0.10.2",
 ]
 
 [[package]]

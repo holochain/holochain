@@ -99,6 +99,31 @@ impl DnaFile {
         })
     }
 
+    /// Load dna_file bytecode into this rust struct.
+    pub async fn from_file_content(data: &[u8]) -> Result<Self, DnaError> {
+        // Not super efficient memory-wise, but doesn't block any threads
+        let data = data.to_vec();
+        tokio::task::spawn_blocking(move || {
+            let mut gz = flate2::read::GzDecoder::new(&data[..]);
+            let mut bytes = Vec::new();
+            use std::io::Read;
+            gz.read_to_end(&mut bytes)?;
+            let sb: SerializedBytes = UnsafeBytes::from(bytes).into();
+            let dna_file: DnaFile = sb.try_into()?;
+            Ok(dna_file)
+        })
+        .await
+        .expect("blocking thread panicked - panicking here too")
+    }
+
+    /// Transform this DnaFile into a new DnaFile with different properties
+    /// and, hence, a different DnaHash.
+    pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
+        let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
+        dna.properties = properties;
+        DnaFile::new(dna, wasm).await
+    }
+
     /// The hashable portion that can be shared with hApp code.
     pub fn dna(&self) -> &DnaDef {
         &self.dna
@@ -121,5 +146,20 @@ impl DnaFile {
         self.code
             .get(wasm_hash)
             .ok_or_else(|| DnaError::InvalidWasmHash)
+    }
+
+    /// Render this dna_file as bytecode to send over the wire, or store in a file.
+    pub async fn to_file_content(&self) -> Result<Vec<u8>, DnaError> {
+        // Not super efficient memory-wise, but doesn't block any threads
+        let dna_file = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let data: SerializedBytes = dna_file.try_into()?;
+            let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+            use std::io::Write;
+            enc.write_all(data.bytes())?;
+            Ok(enc.finish()?)
+        })
+        .await
+        .expect("blocking thread panic!d - panicing here too")
     }
 }
