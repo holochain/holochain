@@ -52,7 +52,7 @@ pub mod raw {
     use futures::Future;
     use std::{marker::PhantomData, rc::Rc};
 
-    // TODO write tests to varify the invariant.
+    // TODO write tests to verify the invariant.
     /// This is needed to use the database where
     /// the lifetimes cannot be verified by
     /// the compiler (e.g. with wasmer).
