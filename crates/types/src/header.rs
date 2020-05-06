@@ -82,10 +82,7 @@ impl Header {
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 pub type ZomeId = u8;
 
-use crate::{prelude::*, time::Iso8601};
-
-/// defines a timestamp as used in a header
-pub type Timestamp = Iso8601;
+use crate::prelude::*;
 
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

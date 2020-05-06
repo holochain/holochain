@@ -15,12 +15,12 @@ pub mod nucleus;
 pub mod observability;
 pub mod persistence;
 pub mod prelude;
+mod timestamp;
 
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]
 pub mod shims;
 
-pub mod time;
 pub mod universal_map;
 
 // #[cfg(test)]
@@ -28,6 +28,8 @@ pub mod test_utils;
 
 #[doc(inline)]
 pub use header::Header;
+
+pub use timestamp::Timestamp;
 
 use holochain_zome_types;
 
