@@ -45,7 +45,7 @@ fn setup_env<'env>(
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
     let jimbo_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Default::default(),
+        timestamp: Timestamp::now(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
@@ -53,7 +53,7 @@ fn setup_env<'env>(
     });
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Default::default(),
+        timestamp: Timestamp::now(),
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,

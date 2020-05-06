@@ -3,9 +3,6 @@
 #![allow(clippy::cognitive_complexity)]
 #![deny(missing_docs)]
 
-mod timestamp;
-pub use timestamp::Timestamp;
-
 pub mod address;
 pub mod autonomic;
 pub mod cell;
@@ -18,6 +15,7 @@ pub mod nucleus;
 pub mod observability;
 pub mod persistence;
 pub mod prelude;
+mod timestamp;
 
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]
@@ -30,6 +28,8 @@ pub mod test_utils;
 
 #[doc(inline)]
 pub use header::Header;
+
+pub use timestamp::Timestamp;
 
 use holochain_zome_types;
 

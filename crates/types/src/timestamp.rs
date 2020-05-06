@@ -1,53 +1,19 @@
-use std::convert::TryInto;
-
 /// A UTC timestamp for use in Holochain's headers.
 ///
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Timestamp {
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct Timestamp(
     /// Seconds since UNIX epoch UTC (midnight 1970-01-01).
-    pub sec: i64,
+    pub i64,
     /// Nanoseconds in addition to above seconds.
-    pub nsec: u32,
-}
+    pub u32,
+);
 
-impl serde::Serialize for Timestamp {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Timestamp {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct V;
-
-        impl<'de> serde::de::Visitor<'de> for V {
-            type Value = Timestamp;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "expected rfc3339 time string")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.try_into().map_err(|e| E::custom(e))
-            }
-        }
-
-        deserializer.deserialize_str(V)
-    }
-}
-
-impl Default for Timestamp {
-    fn default() -> Self {
+impl Timestamp {
+    /// Create a new Timestamp instance from current system time.
+    pub fn now() -> Self {
         chrono::offset::Utc::now().into()
     }
 }
@@ -72,10 +38,7 @@ impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
 impl From<&chrono::DateTime<chrono::Utc>> for Timestamp {
     fn from(t: &chrono::DateTime<chrono::Utc>) -> Self {
         let t = t.naive_utc();
-        Timestamp {
-            sec: t.timestamp(),
-            nsec: t.timestamp_subsec_nanos(),
-        }
+        Timestamp(t.timestamp(), t.timestamp_subsec_nanos())
     }
 }
 
@@ -87,7 +50,7 @@ impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
 
 impl From<&Timestamp> for chrono::DateTime<chrono::Utc> {
     fn from(t: &Timestamp) -> Self {
-        let t = chrono::naive::NaiveDateTime::from_timestamp(t.sec, t.nsec);
+        let t = chrono::naive::NaiveDateTime::from_timestamp(t.0, t.1);
         chrono::DateTime::from_utc(t, chrono::Utc)
     }
 }
@@ -123,15 +86,27 @@ impl std::convert::TryFrom<&str> for Timestamp {
 mod tests {
     use super::*;
 
-    const TEST_TS: &'static str = "\"2020-05-05T19:16:04.266431045Z\"";
+    const TEST_TS: &'static str = "2020-05-05T19:16:04.266431045Z";
+    const TEST_EN: &'static [u8] = b"\x92\xce\x5e\xb1\xbb\x74\xce\x0f\xe1\x6a\x45";
 
     #[test]
     fn test_timestamp_serialization() {
-        let t: Timestamp = serde_json::from_str(TEST_TS).unwrap();
-        assert_eq!(t.sec, 1588706164);
-        assert_eq!(t.nsec, 266431045);
-        assert_eq!(&TEST_TS[1..31], &t.to_string());
-        let s = serde_json::to_string(&t).unwrap();
-        assert_eq!(s, TEST_TS);
+        use holochain_serialized_bytes::prelude::*;
+        use std::convert::TryInto;
+
+        let t: Timestamp = TEST_TS.try_into().unwrap();
+        assert_eq!(t.0, 1588706164);
+        assert_eq!(t.1, 266431045);
+        assert_eq!(TEST_TS, &t.to_string());
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+        struct S(Timestamp);
+        let s = S(t);
+        let sb = SerializedBytes::try_from(s).unwrap();
+        assert_eq!(&TEST_EN[..], sb.bytes().as_slice());
+
+        let s: S = sb.try_into().unwrap();
+        let t = s.0;
+        assert_eq!(TEST_TS, &t.to_string());
     }
 }
