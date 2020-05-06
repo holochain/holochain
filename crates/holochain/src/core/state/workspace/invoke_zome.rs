@@ -49,6 +49,8 @@ impl<'env> Workspace for InvokeZomeWorkspace<'env> {
 pub mod raw {
     use super::*;
     use futures::Future;
+    use std::{marker::PhantomData, rc::Rc};
+
     // TODO write tests to varify the invariant.
     /// This is needed to use the database where
     /// the lifetimes cannot be verified by
@@ -58,8 +60,17 @@ pub mod raw {
     /// should never be contested if the invariant is held.
     /// This type cannot write to the db.
     /// It only takes a [Reader].
+    /// ## Thread Safety
+    /// This type is not `Send` or `Sync` and cannot be
+    /// shared between threads.
+    /// It's best to imagine it like a regular `&` except that it
+    /// is enforced at runtime.
+    /// ### Mutex
+    /// A mutex is used to guarantee that no one else is reading or
+    /// writing to the data the data but this is never contested
+    /// because of the single threaded nature.
     pub struct UnsafeInvokeZomeWorkspace {
-        workspace: std::sync::Weak<std::sync::RwLock<*mut std::ffi::c_void>>,
+        workspace: std::rc::Weak<std::sync::Mutex<*mut std::ffi::c_void>>,
     }
 
     // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
@@ -68,19 +79,21 @@ pub mod raw {
     /// ## Safety
     /// Don't use `mem::forget` on this type as it will
     /// break the checks.
-    pub struct UnsafeInvokeZomeWorkspaceGuard {
-        workspace: Option<std::sync::Arc<std::sync::RwLock<*mut std::ffi::c_void>>>,
+    pub struct UnsafeInvokeZomeWorkspaceGuard<'env> {
+        workspace: Option<Rc<std::sync::Mutex<*mut std::ffi::c_void>>>,
+        phantom: PhantomData<&'env ()>,
     }
 
     impl UnsafeInvokeZomeWorkspace {
-        pub fn from_mut(
-            workspace: &mut InvokeZomeWorkspace,
-        ) -> (UnsafeInvokeZomeWorkspaceGuard, Self) {
+        pub fn from_mut<'env>(
+            workspace: &'env mut InvokeZomeWorkspace,
+        ) -> (UnsafeInvokeZomeWorkspaceGuard<'env>, Self) {
             let raw_ptr = workspace as *mut InvokeZomeWorkspace as *mut std::ffi::c_void;
-            let guard = std::sync::Arc::new(std::sync::RwLock::new(raw_ptr));
-            let workspace = std::sync::Arc::downgrade(&guard);
+            let guard = Rc::new(std::sync::Mutex::new(raw_ptr));
+            let workspace = Rc::downgrade(&guard);
             let guard = UnsafeInvokeZomeWorkspaceGuard {
                 workspace: Some(guard),
+                phantom: PhantomData,
             };
             let workspace = Self { workspace };
             (guard, workspace)
@@ -89,10 +102,10 @@ pub mod raw {
         #[cfg(test)]
         /// Useful when we need this type for tests where we don't want to use it.
         /// It will always return None.
-        pub fn test() -> Self {
+        pub fn test_dropped_guard() -> Self {
             let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
-            let guard = std::sync::Arc::new(std::sync::RwLock::new(fake_ptr));
-            let workspace = std::sync::Arc::downgrade(&guard);
+            let guard = Rc::new(std::sync::Mutex::new(fake_ptr));
+            let workspace = Rc::downgrade(&guard);
             // Make sure the weak Arc cannot be upgraded
             std::mem::drop(guard);
             Self { workspace }
@@ -108,19 +121,9 @@ pub mod raw {
             f: F,
         ) -> Option<R> {
             // Check it exists
-            /*
-            self.workspace
-                .upgrade()
-                // Check that no-one else can write
-                .and_then(|lock| {
-                    lock.try_read().ok().and_then(|guard| {
-                        let sc = *guard as *const InvokeZomeWorkspace;
-                        sc.as_ref().map(|s| f(s))
-                    })
-                })
-                */
             match self.workspace.upgrade() {
-                Some(lock) => match lock.try_read().ok() {
+                // Check that no-one else can write
+                Some(lock) => match lock.try_lock().ok() {
                     Some(guard) => {
                         let sc = *guard as *const InvokeZomeWorkspace;
                         match sc.as_ref() {
@@ -143,20 +146,10 @@ pub mod raw {
             &self,
             f: F,
         ) -> Option<R> {
-            /*
             // Check it exists
-            self.workspace
-                .upgrade()
-                // Check that no-one else can read or write
-                .and_then(|lock| {
-                    lock.try_write().ok().and_then(|guard| {
-                        let sc = *guard as *mut InvokeZomeWorkspace;
-                        sc.as_mut().map(|s| f(s))
-                    })
-                })
-            */
             match self.workspace.upgrade() {
-                Some(lock) => match lock.try_write().ok() {
+                // Check that no-one else can write
+                Some(lock) => match lock.try_lock().ok() {
                     Some(guard) => {
                         let sc = *guard as *mut InvokeZomeWorkspace;
                         match sc.as_mut() {
@@ -171,9 +164,9 @@ pub mod raw {
         }
     }
 
-    impl Drop for UnsafeInvokeZomeWorkspaceGuard {
+    impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
         fn drop(&mut self) {
-            std::sync::Arc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"))
+            Rc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"))
                 .expect("BUG: Invariant broken, strong reference active while guard is dropped");
         }
     }

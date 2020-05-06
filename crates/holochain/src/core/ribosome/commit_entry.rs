@@ -2,9 +2,7 @@ use super::HostContext;
 use super::WasmRibosome;
 use crate::core::state::{source_chain::SourceChainResult, workspace::InvokeZomeWorkspace};
 use futures::{future::BoxFuture, FutureExt};
-use holochain_types::{
-    chain_header::ChainHeader, entry::Entry, header, test_utils::fake_agent_pubkey_1,
-};
+use holochain_types::{entry::Entry, header, header::Header, test_utils::fake_agent_pubkey_1};
 use holochain_zome_types::CommitEntryInput;
 use holochain_zome_types::CommitEntryOutput;
 use std::sync::Arc;
@@ -21,7 +19,7 @@ pub async fn commit_entry<'a>(
             let source_chain = &mut workspace.source_chain;
             let agent_pubkey = fake_agent_pubkey_1();
             let agent_entry = Entry::Agent(agent_pubkey.clone());
-            let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
+            let agent_header = Header::EntryCreate(header::EntryCreate {
                 timestamp: chrono::Utc::now().timestamp().into(),
                 author: agent_pubkey.clone(),
                 prev_header: source_chain.chain_head().unwrap().clone(),

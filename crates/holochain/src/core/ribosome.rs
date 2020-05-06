@@ -261,7 +261,7 @@ pub mod wasm_test {
             let _ = ribosome
                 .instance(HostContext {
                     zome_name: zome_name.to_string(),
-                    workspace: UnsafeInvokeZomeWorkspace::test(),
+                    workspace: UnsafeInvokeZomeWorkspace::test_dropped_guard(),
                 })
                 .unwrap();
         }
@@ -298,7 +298,7 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        $crate::core::state::workspace::UnsafeInvokeZomeWorkspace::test(),
+                        $crate::core::state::workspace::UnsafeInvokeZomeWorkspace::test_dropped_guard(),
                         invocation,
                     )
                     .unwrap();
@@ -338,7 +338,7 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(UnsafeInvokeZomeWorkspace::test(), invocation)
+                .call_zome_function(UnsafeInvokeZomeWorkspace::test_dropped_guard(), invocation)
                 .unwrap()
         );
     }

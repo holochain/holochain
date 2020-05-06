@@ -73,9 +73,9 @@ pub mod tests {
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{
-        chain_header::ChainHeader,
         entry::Entry,
         header,
+        header::Header,
         nucleus::ZomeInvocationResponse,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
@@ -90,16 +90,16 @@ pub mod tests {
         a: u32,
     }
 
-    async fn fake_genesis(workspace: &mut InvokeZomeWorkspace<'_>) -> ChainHeader {
+    async fn fake_genesis(workspace: &mut InvokeZomeWorkspace<'_>) -> Header {
         let agent_pubkey = fake_agent_pubkey_1();
         let agent_entry = Entry::Agent(agent_pubkey.clone());
         let dna = fake_dna_file("cool dna");
-        let dna_header = ChainHeader::Dna(header::Dna {
+        let dna_header = Header::Dna(header::Dna {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_pubkey.clone(),
             hash: dna.dna_hash().clone(),
         });
-        let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
+        let agent_header = Header::EntryCreate(header::EntryCreate {
             timestamp: chrono::Utc::now().timestamp().into(),
             author: agent_pubkey.clone(),
             prev_header: dna_header.hash().into(),
