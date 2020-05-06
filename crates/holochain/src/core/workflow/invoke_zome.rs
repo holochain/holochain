@@ -79,6 +79,7 @@ pub mod tests {
         nucleus::ZomeInvocationResponse,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
+        Timestamp,
     };
     use holochain_zome_types::ZomeExternGuestOutput;
 
