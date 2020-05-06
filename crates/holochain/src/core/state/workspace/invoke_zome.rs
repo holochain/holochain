@@ -68,7 +68,7 @@ pub mod raw {
     /// is enforced at runtime.
     /// ### Mutex
     /// A mutex is used to guarantee that no one else is reading or
-    /// writing to the data the data but this is never contested
+    /// writing to the data but this is never contested
     /// because of the single threaded nature.
     pub struct UnsafeInvokeZomeWorkspace {
         workspace: std::rc::Weak<std::sync::Mutex<*mut std::ffi::c_void>>,
