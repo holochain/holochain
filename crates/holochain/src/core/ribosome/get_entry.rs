@@ -13,6 +13,8 @@ pub async fn get_entry<'a>(
     host_context: Arc<HostContext>,
     _input: GetEntryInput,
 ) -> GetEntryOutput {
+    // TODO: EXAMPLE: This is only an example of how to use the workspace 
+    // and should be removed when this is implemented.
     let agent_pubkey = fake_agent_pubkey_1();
     let call =
         |workspace: &'a InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Option<Entry>>> {
@@ -23,5 +25,5 @@ pub async fn get_entry<'a>(
             .boxed()
         };
     let _entry = unsafe { host_context.workspace.apply_ref(call).await };
-    unimplemented!();
+    todo!("Remove the above and implement get_entry")
 }
