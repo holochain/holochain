@@ -75,6 +75,11 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
         self.current_head.as_ref()
     }
 
+    /// The length is just the next index
+    pub fn len(&self) -> usize {
+        self.next_index as usize
+    }
+
     /// Add a header to the chain, setting all other values automatically.
     /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
