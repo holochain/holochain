@@ -173,10 +173,9 @@ impl DnaDefJson {
 
     pub async fn compile_dna_file(
         &self,
-        work_dir: &impl AsRef<std::path::Path>,
+        work_dir: impl Into<std::path::PathBuf>,
     ) -> DnaUtilResult<DnaFile> {
-        let mut work_dir_z = std::path::PathBuf::new();
-        work_dir_z.push(work_dir.as_ref());
+        let mut work_dir_z = work_dir.into();
 
         let properties: SerializedBytes =
             JsonValueDecodeHelper(self.properties.clone()).try_into()?;

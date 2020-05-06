@@ -4,7 +4,8 @@
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "dna_util", about = "Holochain DnaFile Utility.")]
+#[structopt(name = "dna-util")]
+/// Holochain DnaFile Utility.
 struct Opt {
     /// Expand a DnaFile into a Dna Working Directory.
     ///
