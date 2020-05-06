@@ -236,7 +236,7 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
         observability,
-        test_utils::{fake_dna, fake_dna_file},
+        test_utils::{fake_dna_file, write_fake_dna_file},
     };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
@@ -295,9 +295,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn cache_failure() {
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
+        let dna = fake_dna_file(&uuid.to_string());
 
-        let (fake_dna_path, _tmpdir) = fake_dna_file(dna.clone()).unwrap();
+        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).unwrap();
         let mut dna_cache = MockDnaStore::new();
         dna_cache
             .expect_add()

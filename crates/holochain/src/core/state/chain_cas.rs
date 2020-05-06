@@ -15,9 +15,8 @@ use holochain_state::{
 };
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
-    chain_header::ChainHeader,
     entry::Entry,
-    header,
+    header, Header,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -75,12 +74,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         signed_header: SignedHeader,
     ) -> SourceChainResult<Option<ChainElement>> {
         let maybe_entry_address = match signed_header.header().clone() {
-            ChainHeader::EntryCreate(header::EntryCreate { entry_address, .. }) => {
-                Some(entry_address)
-            }
-            ChainHeader::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
-                Some(entry_address)
-            }
+            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => Some(entry_address),
+            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => Some(entry_address),
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {

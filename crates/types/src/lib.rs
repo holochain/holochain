@@ -6,7 +6,6 @@
 pub mod address;
 pub mod autonomic;
 pub mod cell;
-pub mod chain_header;
 pub mod db;
 pub mod dna;
 pub mod entry;
@@ -26,6 +25,9 @@ pub mod universal_map;
 
 // #[cfg(test)]
 pub mod test_utils;
+
+#[doc(inline)]
+pub use header::Header;
 
 use holochain_zome_types;
 
@@ -65,17 +67,11 @@ macro_rules! serial_hash {
     };
 }
 
-/// hack to make serial_hash macro work
-#[allow(dead_code)]
-enum EntryHash {}
-#[allow(dead_code)]
-enum HeaderHash {}
-
 serial_hash!(
     crate::entry::Entry,
     EntryHash
 
-    crate::chain_header::ChainHeader,
+    crate::Header,
     HeaderHash
 
     crate::dna::wasm::DnaWasm,

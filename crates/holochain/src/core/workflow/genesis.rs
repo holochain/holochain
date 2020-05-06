@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header, prelude::*};
+use holochain_types::{dna::DnaFile, entry::Entry, header, prelude::*, Header};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -12,7 +12,7 @@ use holochain_types::{chain_header::ChainHeader, dna::Dna, entry::Entry, header,
 pub async fn genesis(
     mut workspace: GenesisWorkspace<'_>,
     api: impl CellConductorApiT,
-    dna: Dna,
+    dna: DnaFile,
     agent_pubkey: AgentPubKey,
 ) -> WorkflowResult<GenesisWorkspace<'_>> {
     // TODO: this is a placeholder for a real DPKI request to show intent
@@ -25,15 +25,15 @@ pub async fn genesis(
     }
 
     // create a DNA chain element and add it directly to the store
-    let dna_header = ChainHeader::Dna(header::Dna {
+    let dna_header = Header::Dna(header::Dna {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: agent_pubkey.clone(),
-        hash: dna.dna_hash(),
+        hash: dna.dna_hash().clone(),
     });
     workspace.source_chain.put(dna_header.clone(), None).await?;
 
     // create a agent chain element and add it directly to the store
-    let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
+    let agent_header = Header::EntryCreate(header::EntryCreate {
         timestamp: chrono::Utc::now().timestamp().into(),
         author: agent_pubkey.clone(),
         prev_header: dna_header.hash().into(),
@@ -70,9 +70,9 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        chain_header::ChainHeader,
         header, observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file},
+        Header,
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -81,7 +81,7 @@ mod tests {
         let arc = test_cell_env().await;
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
-        let dna = fake_dna("a");
+        let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
@@ -103,14 +103,14 @@ mod tests {
                 .iter_back()
                 .map(|h| {
                     Ok(match h.header() {
-                        ChainHeader::Dna(header::Dna { .. }) => "Dna",
-                        ChainHeader::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
-                        ChainHeader::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
-                        ChainHeader::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
-                        ChainHeader::ChainClose(header::ChainClose { .. }) => "ChainClose",
-                        ChainHeader::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
-                        ChainHeader::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
-                        ChainHeader::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
+                        Header::Dna(header::Dna { .. }) => "Dna",
+                        Header::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
+                        Header::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
+                        Header::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
+                        Header::ChainClose(header::ChainClose { .. }) => "ChainClose",
+                        Header::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
+                        Header::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
+                        Header::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
                     })
                 })
                 .collect()

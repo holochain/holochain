@@ -25,4 +25,12 @@ pub enum DnaError {
     /// ZomeFunctionNotFound
     #[error("Zome function not found: {0}")]
     ZomeFunctionNotFound(String),
+
+    /// SerializedBytesError
+    #[error("SerializedBytesError: {0}")]
+    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+
+    /// InvalidWasmHash
+    #[error("InvalidWasmHash")]
+    InvalidWasmHash,
 }
