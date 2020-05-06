@@ -45,6 +45,10 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.chain_head()
     }
 
+    pub fn len(&self) -> usize {
+        self.sequence.len()
+    }
+
     /*pub fn get_entry(&self, k: EntryAddress) -> DatabaseResult<Option<Entry>> {
         self.cas.get_entry(k)
     }*/

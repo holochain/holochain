@@ -44,6 +44,9 @@ impl WorkflowRunner {
                 let effects = workflow::genesis(workspace, api, *dna, agent_id).await?;
                 self.finish(effects).await?;
             }
+            WorkflowCall::InitializeZome => {
+                todo!("Make initialize zome workflow");
+            }
         }
         Ok(())
     }

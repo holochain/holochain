@@ -42,6 +42,7 @@ use self::{
     send::send, show_env::show_env, sign::sign, sys_time::sys_time, update_entry::update_entry,
 };
 
+use super::state::workspace::UnsafeInvokeZomeWorkspace;
 use error::RibosomeResult;
 use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
@@ -76,10 +77,10 @@ pub trait RibosomeT: Sized {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
-        // FIXME: Use [SourceChain] instead
-        _bundle: &mut SourceChainCommitBundle<'env>,
+        workspace: UnsafeInvokeZomeWorkspace,
+        // TODO NetworkRequest,
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
 }
@@ -96,17 +97,8 @@ pub struct WasmRibosome {
 }
 
 pub struct HostContext {
+    workspace: UnsafeInvokeZomeWorkspace,
     zome_name: String,
-}
-
-/// build the HostContext from a _reference_ to ZomeInvocation to avoid cloning potentially huge
-/// serialized bytes
-impl From<&ZomeInvocation> for HostContext {
-    fn from(zome_invocation: &ZomeInvocation) -> HostContext {
-        HostContext {
-            zome_name: zome_invocation.zome_name.clone(),
-        }
-    }
 }
 
 impl WasmRibosome {
@@ -210,16 +202,18 @@ impl RibosomeT for WasmRibosome {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
-        // FIXME: Use [SourceChain] instead
-        _bundle: &mut SourceChainCommitBundle<'env>,
+        workspace: UnsafeInvokeZomeWorkspace,
+        // TODO: ConductorHandle
         invocation: ZomeInvocation,
-        // cell_conductor_api: CellConductorApi,
-        // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeInvocationResponse> {
+        let host_context = HostContext {
+            workspace,
+            zome_name: invocation.zome_name.clone(),
+        };
         let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
-            &mut self.instance(HostContext::from(&invocation))?,
+            &mut self.instance(host_context)?,
             &invocation.fn_name,
             invocation.payload,
         )?;
@@ -235,14 +229,13 @@ pub mod wasm_test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
-        shims::SourceChainCommitBundle,
         test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::ribosome::HostContext;
+    use crate::core::{ribosome::HostContext, state::workspace::UnsafeInvokeZomeWorkspace};
     use holochain_types::test_utils::{fake_dna_zomes, fake_header_hash};
 
     pub fn zome_invocation_from_names(
@@ -268,6 +261,7 @@ pub mod wasm_test {
             let _ = ribosome
                 .instance(HostContext {
                     zome_name: zome_name.to_string(),
+                    workspace: UnsafeInvokeZomeWorkspace::test_dropped_guard(),
                 })
                 .unwrap();
         }
@@ -304,7 +298,7 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        &mut holochain_types::shims::SourceChainCommitBundle::default(),
+                        $crate::core::state::workspace::UnsafeInvokeZomeWorkspace::test_dropped_guard(),
                         invocation,
                     )
                     .unwrap();
@@ -344,7 +338,7 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+                .call_zome_function(UnsafeInvokeZomeWorkspace::test_dropped_guard(), invocation)
                 .unwrap()
         );
     }
