@@ -6,10 +6,10 @@ use crate::core::state::{
 use holochain_state::{db::DbManager, prelude::*};
 
 pub struct InvokeZomeWorkspace<'env> {
-    pub source_chain: SourceChain<'env, Reader<'env>>,
-    pub meta: ChainMetaBuf<'env, ()>,
-    pub cache_cas: ChainCasBuf<'env, Reader<'env>>,
-    pub cache_meta: ChainMetaBuf<'env, ()>,
+    pub source_chain: SourceChain<'env>,
+    pub meta: ChainMetaBuf<'env>,
+    pub cache_cas: ChainCasBuf<'env>,
+    pub cache_meta: ChainMetaBuf<'env>,
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {

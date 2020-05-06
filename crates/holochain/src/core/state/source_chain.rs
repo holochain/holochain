@@ -5,7 +5,11 @@
 
 use holo_hash::*;
 use holochain_keystore::Signature;
-use holochain_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
+use holochain_state::{
+    db::DbManager,
+    error::DatabaseResult,
+    prelude::{Readable, Reader},
+};
 use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
 use shrinkwraprs::Shrinkwrap;
 
@@ -19,7 +23,7 @@ mod source_chain_buffer;
 /// i.e. has undergone Genesis.
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
-pub struct SourceChain<'env, R: Readable>(pub SourceChainBuf<'env, R>);
+pub struct SourceChain<'env, R: Readable = Reader<'env>>(pub SourceChainBuf<'env, R>);
 
 impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {

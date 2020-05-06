@@ -51,7 +51,7 @@ use tracing::*;
 #[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, C = ChainMetaBuf<'env, ()>>
+pub struct Cascade<'env, C = ChainMetaBuf<'env>>
 where
     C: ChainMetaBufT<'env>,
 {
