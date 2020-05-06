@@ -1,10 +1,9 @@
 //! Holochain DnaError type.
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Holochain DnaError type.
-#[derive(Clone, Debug, Error, PartialEq, Hash, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Error)]
 pub enum DnaError {
     /// ZomeNotFound
     #[error("Zome not found: {0}")]
@@ -29,6 +28,10 @@ pub enum DnaError {
     /// SerializedBytesError
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+
+    /// std::io::Error
+    #[error("std::io::Error: {0}")]
+    StdIoError(#[from] std::io::Error),
 
     /// InvalidWasmHash
     #[error("InvalidWasmHash")]
