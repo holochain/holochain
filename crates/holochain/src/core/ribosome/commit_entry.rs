@@ -12,9 +12,8 @@ pub async fn commit_entry<'a>(
     host_context: Arc<HostContext>,
     _input: CommitEntryInput,
 ) -> CommitEntryOutput {
-    
     // Example of mutating source chain
-    // TODO: EXAMPLE: This is only an example of how to use the workspace 
+    // TODO: EXAMPLE: This is only an example of how to use the workspace
     // and should be removed when this is implemented.
     let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<()>> {
         async move {

@@ -13,7 +13,7 @@ pub async fn get_entry<'a>(
     host_context: Arc<HostContext>,
     _input: GetEntryInput,
 ) -> GetEntryOutput {
-    // TODO: EXAMPLE: This is only an example of how to use the workspace 
+    // TODO: EXAMPLE: This is only an example of how to use the workspace
     // and should be removed when this is implemented.
     let agent_pubkey = fake_agent_pubkey_1();
     let call =
