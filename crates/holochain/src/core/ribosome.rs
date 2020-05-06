@@ -527,7 +527,8 @@ impl WasmRibosome {
         // }
         imports.register("env", ns);
 
-        crate::end_hard_timeout!(timeout, 200000);
+        // this is quite fast, indicative times are about 40_000 nanos
+        crate::end_hard_timeout!(timeout, 100_000);
         imports
     }
 }
@@ -590,13 +591,15 @@ impl RibosomeT for WasmRibosome {
     ) -> RibosomeResult<ZomeInvocationResponse> {
         let timeout = crate::start_hard_timeout!();
         let mut instance = self.instance(HostContext::from(&invocation), true)?;
+        // instance building is slow 1s+ on a cold cache but should be ~0.8-1 millis on a cache hit
+        // tests should be warming the instance cache before calling zome functions
+        crate::end_hard_timeout!(timeout, 2_000_000);
 
         let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
             &mut instance,
             &invocation.fn_name,
             invocation.payload,
         )?;
-        crate::end_hard_timeout!(timeout, 2000000);
         Ok(ZomeInvocationResponse::ZomeApiFn(wasm_extern_response))
     }
 }
@@ -715,7 +718,10 @@ pub mod wasm_test {
                     )
                     .unwrap();
 
-                $crate::end_hard_timeout!(timeout, 5000000);
+                // instance building off a warm module should be the slowest part of a wasm test
+                // so if each instance (including inner callbacks) takes ~1ms this gives us
+                // headroom on 4 call(back)s
+                $crate::end_hard_timeout!(timeout, 5_000_000);
 
                 let output = match zome_invocation_response {
                     holochain_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
