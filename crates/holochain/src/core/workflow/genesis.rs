@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{dna::DnaFile, entry::Entry, header, prelude::*, ChainHeader};
+use holochain_types::{dna::DnaFile, entry::Entry, header, prelude::*, Header};
 
 /// Initialize the source chain with the initial entries:
 /// - Dna
@@ -25,7 +25,7 @@ pub async fn genesis(
     }
 
     // create a DNA chain element and add it directly to the store
-    let dna_header = ChainHeader::Dna(header::Dna {
+    let dna_header = Header::Dna(header::Dna {
         timestamp: Default::default(),
         author: agent_pubkey.clone(),
         hash: dna.dna_hash().clone(),
@@ -33,7 +33,7 @@ pub async fn genesis(
     workspace.source_chain.put(dna_header.clone(), None).await?;
 
     // create a agent chain element and add it directly to the store
-    let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
+    let agent_header = Header::EntryCreate(header::EntryCreate {
         timestamp: Default::default(),
         author: agent_pubkey.clone(),
         prev_header: dna_header.hash().into(),
@@ -72,7 +72,7 @@ mod tests {
     use holochain_types::{
         header, observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        ChainHeader,
+        Header,
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -103,14 +103,14 @@ mod tests {
                 .iter_back()
                 .map(|h| {
                     Ok(match h.header() {
-                        ChainHeader::Dna(header::Dna { .. }) => "Dna",
-                        ChainHeader::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
-                        ChainHeader::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
-                        ChainHeader::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
-                        ChainHeader::ChainClose(header::ChainClose { .. }) => "ChainClose",
-                        ChainHeader::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
-                        ChainHeader::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
-                        ChainHeader::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
+                        Header::Dna(header::Dna { .. }) => "Dna",
+                        Header::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
+                        Header::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
+                        Header::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
+                        Header::ChainClose(header::ChainClose { .. }) => "ChainClose",
+                        Header::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
+                        Header::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
+                        Header::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
                     })
                 })
                 .collect()

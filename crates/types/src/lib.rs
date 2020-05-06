@@ -19,9 +19,6 @@ pub mod observability;
 pub mod persistence;
 pub mod prelude;
 
-mod chain_header;
-pub use chain_header::ChainHeader;
-
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]
 pub mod shims;
@@ -30,6 +27,9 @@ pub mod universal_map;
 
 // #[cfg(test)]
 pub mod test_utils;
+
+#[doc(inline)]
+pub use header::Header;
 
 use holochain_zome_types;
 
@@ -73,7 +73,7 @@ serial_hash!(
     crate::entry::Entry,
     EntryHash
 
-    crate::ChainHeader,
+    crate::Header,
     HeaderHash
 
     crate::dna::wasm::DnaWasm,

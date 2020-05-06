@@ -1,4 +1,4 @@
-//! Holochain's header variations
+//! Holochain's [`Header`] and its variations.
 //!
 //! All header variations contain the fields `author` and `timestamp`.
 //! Furthermore, all variations besides pub struct `Dna` (which is the first header
@@ -7,6 +7,76 @@
 #![allow(missing_docs)]
 
 use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
+
+/// Header contains variants for each type of header.
+///
+/// This struct really defines a local source chain, in the sense that it
+/// implements the pointers between hashes that a hash chain relies on, which
+/// are then used to check the integrity of data using cryptographic hash
+/// functions.
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[serde(tag = "type")]
+pub enum Header {
+    // The first header in a chain (for the DNA) doesn't have a previous header
+    Dna(Dna),
+    LinkAdd(LinkAdd),
+    LinkRemove(LinkRemove),
+    ChainOpen(ChainOpen),
+    ChainClose(ChainClose),
+    EntryCreate(EntryCreate),
+    EntryUpdate(EntryUpdate),
+    EntryDelete(EntryDelete),
+}
+
+impl Header {
+    /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
+    pub fn is_public(&self) -> bool {
+        unimplemented!()
+    }
+
+    /// Returns the public key of the agent who signed this header.
+    pub fn author(&self) -> &AgentPubKey {
+        match self {
+            Header::Dna(i) => &i.author,
+            Header::LinkAdd(i) => &i.author,
+            Header::LinkRemove(i) => &i.author,
+            Header::ChainOpen(i) => &i.author,
+            Header::ChainClose(i) => &i.author,
+            Header::EntryCreate(i) => &i.author,
+            Header::EntryUpdate(i) => &i.author,
+            Header::EntryDelete(i) => &i.author,
+        }
+    }
+
+    /// returns the timestamp of when the header was created
+    pub fn timestamp(&self) -> Timestamp {
+        unimplemented!()
+    }
+
+    // FIXME: use async with_data, or consider wrapper type
+    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
+    /// Computes the hash of this header.
+    pub fn hash(&self) -> HeaderHash {
+        // hash the header enum variant struct
+        let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
+        HeaderHash::with_data_sync(&sb.bytes())
+    }
+
+    /// returns the previous header except for the DNA header which doesn't have a previous
+    pub fn prev_header(&self) -> Option<&HeaderAddress> {
+        Some(match self {
+            Self::Dna(Dna { .. }) => return None,
+            Self::LinkAdd(LinkAdd { prev_header, .. }) => prev_header,
+            Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
+            Self::EntryDelete(EntryDelete { prev_header, .. }) => prev_header,
+            Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
+            Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
+            Self::EntryCreate(EntryCreate { prev_header, .. }) => prev_header,
+            Self::EntryUpdate(EntryUpdate { prev_header, .. }) => prev_header,
+        })
+    }
+}
 
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
