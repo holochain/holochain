@@ -126,7 +126,7 @@ lazy_static! {
 
 /// Get access to the singleton database manager ([GetDb]),
 /// in order to access individual LMDB databases
-pub(super) async fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> DatabaseResult<()> {
+pub(super) fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> DatabaseResult<()> {
     let mut dbmap = DB_MAP_MAP.write();
     let path = rkv.path().to_owned();
     match dbmap.entry(path.clone()) {
@@ -135,7 +135,7 @@ pub(super) async fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> D
         }
         hash_map::Entry::Vacant(e) => e.insert({
             let mut um = UniversalMap::new();
-            register_databases(&rkv, kind, &mut um).await?;
+            register_databases(&rkv, kind, &mut um)?;
             um
         }),
     };
@@ -156,34 +156,34 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
     Ok(db)
 }
 
-async fn register_databases<'env>(
+fn register_databases<'env>(
     env: &Rkv,
     kind: &EnvironmentKind,
     um: &mut DbMap,
 ) -> DatabaseResult<()> {
     match kind {
         EnvironmentKind::Cell(_) => {
-            register_db(env, um, &*PRIMARY_CHAIN_ENTRIES).await?;
-            register_db(env, um, &*PRIMARY_CHAIN_HEADERS).await?;
-            register_db(env, um, &*PRIMARY_SYSTEM_META).await?;
-            register_db(env, um, &*PRIMARY_LINKS_META).await?;
-            register_db(env, um, &*CHAIN_SEQUENCE).await?;
-            register_db(env, um, &*CACHE_CHAIN_ENTRIES).await?;
-            register_db(env, um, &*CACHE_CHAIN_HEADERS).await?;
-            register_db(env, um, &*CACHE_SYSTEM_META).await?;
-            register_db(env, um, &*CACHE_LINKS_META).await?;
+            register_db(env, um, &*PRIMARY_CHAIN_ENTRIES)?;
+            register_db(env, um, &*PRIMARY_CHAIN_HEADERS)?;
+            register_db(env, um, &*PRIMARY_SYSTEM_META)?;
+            register_db(env, um, &*PRIMARY_LINKS_META)?;
+            register_db(env, um, &*CHAIN_SEQUENCE)?;
+            register_db(env, um, &*CACHE_CHAIN_ENTRIES)?;
+            register_db(env, um, &*CACHE_CHAIN_HEADERS)?;
+            register_db(env, um, &*CACHE_SYSTEM_META)?;
+            register_db(env, um, &*CACHE_LINKS_META)?;
         }
         EnvironmentKind::Conductor => {
-            register_db(env, um, &*CONDUCTOR_STATE).await?;
+            register_db(env, um, &*CONDUCTOR_STATE)?;
         }
         EnvironmentKind::Wasm => {
-            register_db(env, um, &*WASM).await?;
+            register_db(env, um, &*WASM)?;
         }
     }
     Ok(())
 }
 
-async fn register_db<'env, V: 'static + Send + Sync>(
+fn register_db<'env, V: 'static + Send + Sync>(
     env: &Rkv,
     um: &mut DbMap,
     key: &DbKey<V>,

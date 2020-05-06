@@ -118,7 +118,7 @@ pub struct EnvironmentWrite(EnvironmentRead);
 
 impl EnvironmentWrite {
     /// Create an environment,
-    pub async fn new(
+    pub fn new(
         path_prefix: &Path,
         kind: EnvironmentKind,
         keystore: KeystoreSender,
@@ -134,7 +134,7 @@ impl EnvironmentWrite {
             hash_map::Entry::Vacant(e) => e
                 .insert({
                     let rkv = rkv_builder(None, None)(&path)?;
-                    initialize_databases(&rkv, &kind).await?;
+                    initialize_databases(&rkv, &kind)?;
                     EnvironmentWrite(EnvironmentRead {
                         arc: Arc::new(RwLock::new(rkv)),
                         kind,
