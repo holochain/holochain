@@ -26,26 +26,33 @@ use super::{
     paths::EnvironmentRootPath,
     state::ConductorState,
 };
-use crate::conductor::{
-    api::error::{ConductorApiError, ConductorApiResult},
-    cell::Cell,
-    config::ConductorConfig,
-    dna_store::MockDnaStore,
-    error::ConductorResult,
-    handle::ConductorHandle,
+use crate::{
+    conductor::{
+        api::error::{ConductorApiError, ConductorApiResult},
+        cell::Cell,
+        config::ConductorConfig,
+        dna_store::MockDnaStore,
+        error::ConductorResult,
+        handle::ConductorHandle,
+    },
+    core::state::wasm::WasmBuf,
 };
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
     KeystoreSender,
 };
 use holochain_state::{
+    buffer::BufferedStore,
     db,
     env::{Environment, ReadManager},
     exports::SingleStore,
     prelude::WriteManager,
     typed::{Kv, UnitDbKey},
 };
-use holochain_types::cell::{CellHandle, CellId};
+use holochain_types::{
+    cell::{CellHandle, CellId},
+    dna::Dna,
+};
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
@@ -141,21 +148,14 @@ where
     ///
     /// This signals the completion of Conductor initialization and the beginning of its lifecycle
     /// as the driver of its various interface handling loops
-    pub async fn into_handle(self) -> ConductorHandle {
+    pub async fn run(self) -> ConductorResult<ConductorHandle> {
         let keystore = self.keystore.clone();
         // FIXME: Refactor this out of this funciton
-        let cells = self
-            .get_state()
-            .await
-            .expect("This should be handled")
-            .cells;
+        let cells = self.get_state().await?.cells;
         let handle: ConductorHandle =
             Arc::new(ConductorHandleImpl::from((RwLock::new(self), keystore)));
-        handle
-            .create_cells(cells, handle.clone())
-            .await
-            .expect("This should be handled");
-        handle
+        handle.create_cells(cells, handle.clone()).await?;
+        Ok(handle)
     }
 
     /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
@@ -293,7 +293,7 @@ where
     }
 
     /// Create the cells from the db
-    pub async fn create_cells(
+    pub(super) async fn create_cells(
         &mut self,
         cells: Vec<CellId>,
         conductor_handle: ConductorHandle,
@@ -315,6 +315,27 @@ where
                 );
             }
         }
+        Ok(())
+    }
+
+    pub(super) async fn put_wasm(&mut self, dna: Dna) -> ConductorResult<()> {
+        let environ = &self.env;
+        //let environ = Arc::clone(&self.0).state_env();
+        let env = environ.guard().await;
+        let dbs = environ.dbs().await?;
+        let wasm = *dbs.get(&*holochain_state::db::WASM)?;
+        let reader = env.reader()?;
+
+        let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
+        // TODO: PERF: This loop might be slow
+        for dna_wasm in dna.zomes.values().map(|zome| zome.code.clone()) {
+            wasm_buf.put(dna_wasm)?;
+        }
+
+        // write the db
+        let mut writer = env.writer()?;
+        wasm_buf.flush_to_txn(&mut writer)?;
+
         Ok(())
     }
 }
@@ -445,10 +466,7 @@ mod builder {
 
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{
-        env::EnvironmentKind,
-        test_utils::{test_conductor_env, TestEnvironment},
-    };
+    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironment};
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -534,7 +552,7 @@ mod builder {
         /// move the Conductor into a handle to proceed
         pub async fn with_admin(self) -> ConductorResult<ConductorHandle> {
             let conductor_config = self.config.clone();
-            let conductor_handle: ConductorHandle = self.build().await?.into_handle().await;
+            let conductor_handle: ConductorHandle = self.build().await?.run().await?;
             if let Some(configs) = conductor_config.admin_interfaces {
                 conductor_handle
                     .add_admin_interfaces_via_handle(conductor_handle.clone(), configs)

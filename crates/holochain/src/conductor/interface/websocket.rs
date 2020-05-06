@@ -235,13 +235,12 @@ mod test {
     };
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use futures::future::FutureExt;
-    use holo_hash::{AgentPubKey, DnaHash};
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::test_utils::test_conductor_env;
     use holochain_types::{
         cell::CellId,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_cell_id, fake_dna, fake_dna_file, fake_dna_hash},
+        test_utils::{fake_agent_pubkey_1, fake_dna, fake_dna_file, fake_dna_hash},
     };
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
@@ -263,8 +262,9 @@ mod test {
             .test(test_env)
             .await
             .unwrap()
-            .into_handle()
-            .await;
+            .run()
+            .await
+            .unwrap();
         RealAdminInterfaceApi::new(conductor_handle)
     }
 
@@ -282,8 +282,9 @@ mod test {
             .test(test_env)
             .await
             .unwrap()
-            .into_handle()
-            .await;
+            .run()
+            .await
+            .unwrap();
         (tmpdir, RealAppInterfaceApi::new(conductor_handle))
     }
 
@@ -343,8 +344,9 @@ mod test {
             .test(test_env)
             .await
             .unwrap()
-            .into_handle()
-            .await;
+            .run()
+            .await
+            .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
         let msg = AdminRequest::InstallDna(fake_dna_path, None);
         let msg = msg.try_into().unwrap();

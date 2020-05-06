@@ -1,9 +1,9 @@
 use holo_hash::WasmHash;
-use holochain_state::buffer::CasBuf;
-use holochain_state::error::DatabaseResult;
+use holochain_state::buffer::{BufferedStore, CasBuf};
+use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
 use holochain_state::transaction::Readable;
-use holochain_state::transaction::Reader;
+use holochain_state::transaction::{Reader, Writer};
 use holochain_types::dna::wasm::DnaWasm;
 use std::convert::TryInto;
 
@@ -15,7 +15,7 @@ pub struct WasmBuf<'env, R: Readable = Reader<'env>> {
 }
 
 impl<'env, R: Readable> WasmBuf<'env, R> {
-    fn new(reader: &'env R, wasm_store: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, wasm_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
             wasm: CasBuf::new(reader, wasm_store)?,
         })
@@ -27,6 +27,18 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
 
     pub fn put(&mut self, v: DnaWasm) -> DatabaseResult<()> {
         self.wasm.put((&v).try_into()?, v);
+        Ok(())
+    }
+}
+
+impl<'env, R> BufferedStore<'env> for WasmBuf<'env, R>
+where
+    R: Readable,
+{
+    type Error = DatabaseError;
+
+    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+        self.wasm.flush_to_txn(writer)?;
         Ok(())
     }
 }

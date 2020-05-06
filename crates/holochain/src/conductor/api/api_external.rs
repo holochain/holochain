@@ -324,11 +324,7 @@ mod test {
     async fn install_list_dna() -> Result<()> {
         let test_env = test_conductor_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder()
-            .test(test_env)
-            .await?
-            .into_handle()
-            .await;
+        let handle = Conductor::builder().test(test_env).await?.run().await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna(&uuid.to_string());
