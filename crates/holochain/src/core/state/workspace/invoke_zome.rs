@@ -47,6 +47,7 @@ impl<'env> Workspace for InvokeZomeWorkspace<'env> {
 }
 
 pub mod raw {
+    #![allow(clippy::mutex_atomic)]
     use super::*;
     use futures::Future;
     use std::{marker::PhantomData, rc::Rc};
