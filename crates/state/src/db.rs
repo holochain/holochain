@@ -156,11 +156,7 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
     Ok(db)
 }
 
-fn register_databases<'env>(
-    env: &Rkv,
-    kind: &EnvironmentKind,
-    um: &mut DbMap,
-) -> DatabaseResult<()> {
+fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> DatabaseResult<()> {
     match kind {
         EnvironmentKind::Cell(_) => {
             register_db(env, um, &*PRIMARY_CHAIN_ENTRIES)?;
@@ -183,7 +179,7 @@ fn register_databases<'env>(
     Ok(())
 }
 
-fn register_db<'env, V: 'static + Send + Sync>(
+fn register_db<V: 'static + Send + Sync>(
     env: &Rkv,
     um: &mut DbMap,
     key: &DbKey<V>,
