@@ -25,21 +25,21 @@ pub async fn genesis(
     }
 
     // create a DNA chain element and add it directly to the store
-    let dna_header = Header::Dna(header::Dna {
+    let dna_header = Header::new(header::Dna {
         timestamp: Timestamp::now(),
         author: agent_pubkey.clone(),
         hash: dna.dna_hash().clone(),
-    });
+    }.into()).await?;
     workspace.source_chain.put(dna_header.clone(), None).await?;
 
     // create a agent chain element and add it directly to the store
-    let agent_header = Header::EntryCreate(header::EntryCreate {
+    let agent_header = Header::new(header::EntryCreate {
         timestamp: Timestamp::now(),
         author: agent_pubkey.clone(),
-        prev_header: dna_header.hash().into(),
+        prev_header: dna_header.hash().clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_address: agent_pubkey.clone().into(),
-    });
+    }.into()).await?;
     workspace
         .source_chain
         .put(agent_header, Some(Entry::Agent(agent_pubkey)))

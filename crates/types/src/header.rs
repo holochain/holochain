@@ -8,6 +8,28 @@
 
 use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
 
+#[derive(Clone, Debug, shrinkwraprs::Shrinkwrap, PartialEq)]
+pub struct Header {
+    #[shrinkwrap(main_field)]
+    header_type: HeaderType,
+    header_hash: HeaderHash,
+}
+
+impl Header {
+    pub async fn new(header_type: HeaderType) -> Result<Self, SerializedBytesError> {
+        let sb: SerializedBytes = header_type.clone().try_into()?;
+        let header_hash = HeaderHash::with_data(&sb.bytes()).await;
+        Ok(Self {
+            header_type,
+            header_hash,
+        })
+    }
+
+    pub fn hash(&self) -> &HeaderHash {
+        &self.header_hash
+    }
+}
+
 /// Header contains variants for each type of header.
 ///
 /// This struct really defines a local source chain, in the sense that it
@@ -17,7 +39,7 @@ use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[serde(tag = "type")]
-pub enum Header {
+pub enum HeaderType {
     // The first header in a chain (for the DNA) doesn't have a previous header
     Dna(Dna),
     LinkAdd(LinkAdd),
@@ -29,7 +51,30 @@ pub enum Header {
     EntryDelete(EntryDelete),
 }
 
-impl Header {
+macro_rules! from_data_struct {
+    ($($n:ident),*,) => {
+        $(
+            impl From<$n> for HeaderType {
+                fn from(i: $n) -> Self {
+                    Self::$n(i)
+                }
+            }
+        )*
+    };
+}
+
+from_data_struct! {
+    Dna,
+    LinkAdd,
+    LinkRemove,
+    ChainOpen,
+    ChainClose,
+    EntryCreate,
+    EntryUpdate,
+    EntryDelete,
+}
+
+impl HeaderType {
     /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
     pub fn is_public(&self) -> bool {
         unimplemented!()
@@ -38,29 +83,20 @@ impl Header {
     /// Returns the public key of the agent who signed this header.
     pub fn author(&self) -> &AgentPubKey {
         match self {
-            Header::Dna(i) => &i.author,
-            Header::LinkAdd(i) => &i.author,
-            Header::LinkRemove(i) => &i.author,
-            Header::ChainOpen(i) => &i.author,
-            Header::ChainClose(i) => &i.author,
-            Header::EntryCreate(i) => &i.author,
-            Header::EntryUpdate(i) => &i.author,
-            Header::EntryDelete(i) => &i.author,
+            Self::Dna(i) => &i.author,
+            Self::LinkAdd(i) => &i.author,
+            Self::LinkRemove(i) => &i.author,
+            Self::ChainOpen(i) => &i.author,
+            Self::ChainClose(i) => &i.author,
+            Self::EntryCreate(i) => &i.author,
+            Self::EntryUpdate(i) => &i.author,
+            Self::EntryDelete(i) => &i.author,
         }
     }
 
     /// returns the timestamp of when the header was created
     pub fn timestamp(&self) -> Timestamp {
         unimplemented!()
-    }
-
-    // FIXME: use async with_data, or consider wrapper type
-    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
-    /// Computes the hash of this header.
-    pub fn hash(&self) -> HeaderHash {
-        // hash the header enum variant struct
-        let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
-        HeaderHash::with_data_sync(&sb.bytes())
     }
 
     /// returns the previous header except for the DNA header which doesn't have a previous

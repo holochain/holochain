@@ -6,7 +6,7 @@
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{db::DbManager, error::DatabaseResult, prelude::Readable};
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
+use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header, header::HeaderType};
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
@@ -48,16 +48,22 @@ impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChainElement {
     signed_header: SignedHeader,
+    header: Header,
     maybe_entry: Option<Entry>,
 }
 
 impl ChainElement {
     /// Raw element constructor.  Used only when we know that the values are valid.
-    pub fn new(signature: Signature, header: Header, maybe_entry: Option<Entry>) -> Self {
+    pub fn new(signed_header: SignedHeader, header: Header, maybe_entry: Option<Entry>) -> Self {
         Self {
-            signed_header: SignedHeader { signature, header },
+            signed_header,
+            header,
             maybe_entry,
         }
+    }
+
+    pub fn into_inner(self) ->(SignedHeader, Header, Option<Entry>) {
+        (self.signed_header, self.header, self.maybe_entry)
     }
 
     /// Validates a chain element
@@ -76,7 +82,7 @@ impl ChainElement {
 
     /// Access the Header portion of this triple.
     pub fn header(&self) -> &Header {
-        self.signed_header.header()
+        &self.header
     }
 
     /// Access the Entry portion of this triple.
@@ -88,19 +94,19 @@ impl ChainElement {
 /// the header and the signature that signed it
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SignedHeader {
-    header: Header,
+    header: HeaderType,
     signature: Signature,
 }
 
 impl SignedHeader {
     /// SignedHeader constructor
-    pub async fn new(keystore: &KeystoreSender, header: Header) -> SourceChainResult<Self> {
+    pub async fn new(keystore: &KeystoreSender, header: HeaderType) -> SourceChainResult<Self> {
         let signature = header.author().sign(keystore, &header).await?;
         Ok(Self { signature, header })
     }
 
     /// Access the Header portion.
-    pub fn header(&self) -> &Header {
+    pub fn header(&self) -> &HeaderType {
         &self.header
     }
     /// Access the signature portion.

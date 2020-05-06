@@ -33,6 +33,7 @@ pub use timestamp::Timestamp;
 
 use holochain_zome_types;
 
+/*
 macro_rules! serial_hash {
     ( $( $input:ty, $output:ident )* ) => {
         $(
@@ -79,3 +80,4 @@ serial_hash!(
     crate::dna::wasm::DnaWasm,
     WasmHash
 );
+*/

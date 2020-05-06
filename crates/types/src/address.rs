@@ -34,7 +34,7 @@ impl From<HeaderHash> for HeaderAddress {
 impl std::convert::TryFrom<&Header> for HeaderAddress {
     type Error = SerializedBytesError;
     fn try_from(header: &Header) -> Result<Self, Self::Error> {
-        Ok(HeaderAddress::Header(HeaderHash::try_from(header)?))
+        Ok(HeaderAddress::Header(header.hash().clone()))
     }
 }
 
@@ -69,7 +69,7 @@ impl From<EntryAddress> for HoloHash {
 impl TryFrom<&Entry> for EntryAddress {
     type Error = SerializedBytesError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(EntryAddress::Entry(EntryHash::try_from(entry)?))
+        Ok(entry.entry_address())
     }
 }
 
@@ -106,14 +106,17 @@ impl From<DhtAddress> for HoloHash {
 impl TryFrom<&Entry> for DhtAddress {
     type Error = SerializedBytesError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(DhtAddress::Entry(EntryHash::try_from(entry)?))
+        Ok(match entry.entry_address() {
+            EntryAddress::Entry(hash) => DhtAddress::Entry(hash),
+            EntryAddress::Agent(hash) => DhtAddress::Agent(hash),
+        })
     }
 }
 
 impl TryFrom<&Header> for DhtAddress {
     type Error = SerializedBytesError;
     fn try_from(header: &Header) -> Result<Self, Self::Error> {
-        Ok(DhtAddress::Header(HeaderHash::try_from(header)?))
+        Ok(DhtAddress::Header(header.hash().clone()))
     }
 }
 

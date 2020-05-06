@@ -16,7 +16,11 @@ use holochain_state::{
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
     entry::Entry,
-    header, Header,
+    header,
+    header::{
+        Header,
+        HeaderType,
+    },
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -69,13 +73,13 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
     // local helper function which given a SignedHeader, looks for an entry in the cas
     // and builds a ChainElement struct
-    fn chain_element(
+    async fn chain_element(
         &self,
         signed_header: SignedHeader,
     ) -> SourceChainResult<Option<ChainElement>> {
         let maybe_entry_address = match signed_header.header().clone() {
-            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => Some(entry_address),
-            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => Some(entry_address),
+            HeaderType::EntryCreate(header::EntryCreate { entry_address, .. }) => Some(entry_address),
+            HeaderType::EntryUpdate(header::EntryUpdate { entry_address, .. }) => Some(entry_address),
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {
@@ -91,20 +95,21 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                 maybe_cas_entry
             }
         };
+        let header = Header::new(signed_header.header().clone().into()).await?;
         Ok(Some(ChainElement::new(
-            signed_header.signature().to_owned(),
-            signed_header.header().to_owned(),
+            signed_header,
+            header,
             maybe_entry,
         )))
     }
 
     /// given a header address return the full chain element for that address
-    pub fn get_element(
+    pub async fn get_element(
         &self,
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
         if let Some(signed_header) = self.get_header(header_address)? {
-            self.chain_element(signed_header)
+            self.chain_element(signed_header).await
         } else {
             Ok(None)
         }
@@ -114,14 +119,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     /// N.B. this code assumes that the header and entry have been validated
     pub fn put(
         &mut self,
-        signed_header: SignedHeader,
-        maybe_entry: Option<Entry>,
+        element: ChainElement,
     ) -> DatabaseResult<()> {
+        let (signed_header, header, maybe_entry) = element.into_inner();
+
         if let Some(entry) = maybe_entry {
             self.entries.put(entry.entry_address().into(), entry);
         }
         self.headers
-            .put(signed_header.header().hash().into(), signed_header);
+            .put(header.hash().clone().into(), signed_header);
         Ok(())
     }
 

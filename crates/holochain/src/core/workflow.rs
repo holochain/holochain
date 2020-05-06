@@ -81,6 +81,9 @@ pub enum WorkflowError {
 
     #[error("Source chain error: {0}")]
     SourceChainError(#[from] SourceChainError),
+
+    #[error("SerializedBytesError: {0}")]
+    SerializedBytesError(#[from] SerializedBytesError),
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.

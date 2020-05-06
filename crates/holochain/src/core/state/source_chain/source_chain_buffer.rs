@@ -49,9 +49,9 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_entry(k)
     }*/
 
-    pub fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
+    pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
         debug!("GET {:?}", k);
-        self.cas.get_element(k)
+        self.cas.get_element(k).await
     }
 
     pub fn get_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<SignedHeader>> {
@@ -67,7 +67,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         header: Header,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<()> {
-        let signed_header = SignedHeader::new(&self.keystore, header.to_owned()).await?;
+        let signed_header = SignedHeader::new(&self.keystore, (*header).to_owned()).await?;
+        let chain_element = ChainElement::new(signed_header, header, maybe_entry);
 
         /*
         FIXME: this needs to happen here.
@@ -76,8 +77,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         }
         */
 
-        self.sequence.put_header(header.hash().into());
-        self.cas.put(signed_header, maybe_entry)?;
+        self.sequence.put_header(header.hash().clone().into());
+        self.cas.put(chain_element)?;
         Ok(())
     }
 
@@ -123,7 +124,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             &self
                 .iter_back()
                 .map(|h| {
-                    let maybe_element = self.get_element(&h.header().hash().into())?;
+                    let maybe_element = self.get_element(&h.header().hash().clone().into())?;
                     match maybe_element {
                         None => Ok(JsonChainDump { element: None }),
                         Some(element) => Ok(JsonChainDump {
