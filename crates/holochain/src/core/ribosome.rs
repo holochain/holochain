@@ -416,7 +416,9 @@ impl WasmRibosome {
 
     pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
         // TODO: make this actually the hash of the wasm once we can do that
-        format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
+        // watch out for cache misses in the tests that make things slooow if you change this!
+        // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
+        zome_name.to_string().into_bytes()
     }
 
     pub fn instance(
@@ -436,6 +438,8 @@ impl WasmRibosome {
     }
 
     fn imports(&self, host_context: HostContext, _allow_side_effects: bool) -> ImportObject {
+        let timeout = crate::start_hard_timeout!();
+
         // it is important that WasmRibosome and ZomeInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
         let host_context_arc = std::sync::Arc::new(host_context);
@@ -522,6 +526,8 @@ impl WasmRibosome {
         ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
         // }
         imports.register("env", ns);
+
+        crate::end_hard_timeout!(timeout, 2000000);
         imports
     }
 }
@@ -582,11 +588,15 @@ impl RibosomeT for WasmRibosome {
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeInvocationResponse> {
+        let timeout = crate::start_hard_timeout!();
+        let mut instance = self.instance(HostContext::from(&invocation), true)?;
+
         let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
-            &mut self.instance(HostContext::from(&invocation), true)?,
+            &mut instance,
             &invocation.fn_name,
             invocation.payload,
         )?;
+        crate::end_hard_timeout!(timeout, 2000000);
         Ok(ZomeInvocationResponse::ZomeApiFn(wasm_extern_response))
     }
 }
@@ -596,6 +606,7 @@ pub mod wasm_test {
     use super::WasmRibosome;
     use crate::core::ribosome::RibosomeT;
     use core::time::Duration;
+    use holo_hash::holo_hash_core::HeaderHash;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
         nucleus::{ZomeInvocation, ZomeInvocationResponse},
@@ -604,10 +615,9 @@ pub mod wasm_test {
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::commit::CommitEntryResult;
-    use holochain_zome_types::*;
     use holochain_zome_types::validate::ValidateEntryResult;
+    use holochain_zome_types::*;
     use test_wasm_common::TestString;
-    use holo_hash::holo_hash_core::HeaderHash;
 
     use crate::core::ribosome::HostContext;
     use holochain_types::{
@@ -690,7 +700,9 @@ pub mod wasm_test {
                 use std::convert::TryFrom;
                 use std::convert::TryInto;
                 let ribosome = $crate::core::ribosome::wasm_test::test_ribosome(Some($zome));
-                let t0 = $crate::core::ribosome::wasm_test::now();
+
+                let timeout = $crate::start_hard_timeout!();
+
                 let invocation = $crate::core::ribosome::wasm_test::zome_invocation_from_names(
                     $zome,
                     $fn_name,
@@ -702,14 +714,8 @@ pub mod wasm_test {
                         invocation,
                     )
                     .unwrap();
-                let t1 = $crate::core::ribosome::wasm_test::now();
 
-                // display the function call timings
-                // all imported host functions are critical path performance as they are all exposed
-                // directly to happ developers
-                let ribosome_call_duration_nanos =
-                    i128::try_from(t1.as_nanos()).unwrap() - i128::try_from(t0.as_nanos()).unwrap();
-                dbg!(ribosome_call_duration_nanos);
+                $crate::end_hard_timeout!(timeout, 5000000);
 
                 let output = match zome_invocation_response {
                     holochain_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
@@ -751,7 +757,9 @@ pub mod wasm_test {
         );
 
         assert_eq!(
-            CommitEntryResult::ValidateFailed(ValidateEntryResult::Invalid("NeverValidates never validates".to_string())),
+            CommitEntryResult::ValidateFailed(ValidateEntryResult::Invalid(
+                "NeverValidates never validates".to_string()
+            )),
             call_test_ribosome!("validate", "never_validates", ()),
         );
     }
