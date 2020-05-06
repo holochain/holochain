@@ -12,7 +12,7 @@ use holochain_types::{
     header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
-    ChainHeader,
+    Header,
 };
 use maplit::hashset;
 use mockall::*;
@@ -23,10 +23,10 @@ struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
     jimbo_id: AgentPubKey,
-    jimbo_header: ChainHeader,
+    jimbo_header: Header,
     jimbo_entry: Entry,
     jessy_id: AgentPubKey,
-    jessy_header: ChainHeader,
+    jessy_header: Header,
     jessy_entry: Entry,
     mock_primary_meta: MockChainMetaBuf,
     mock_cache_meta: MockChainMetaBuf,
@@ -43,16 +43,16 @@ fn setup_env<'env>(
     let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
-    let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+    let jimbo_header = Header::EntryCreate(header::EntryCreate {
+        timestamp: Timestamp::now(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_address: jimbo_entry.entry_address(),
     });
 
-    let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+    let jessy_header = Header::EntryCreate(header::EntryCreate {
+        timestamp: Timestamp::now(),
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,

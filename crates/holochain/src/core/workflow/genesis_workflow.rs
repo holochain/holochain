@@ -1,10 +1,12 @@
-/// Genesis Workflow: Initialize the source chain with the initial entries:
-/// - Dna
-/// - AgentValidationPkg
-/// - AgentId
-///
-/// FIXME: understand the details of actually getting the DNA
-/// FIXME: creating entries in the config db
+//! Genesis Workflow: Initialize the source chain with the initial entries:
+//! - Dna
+//! - AgentValidationPkg
+//! - AgentId
+//!
+
+// FIXME: understand the details of actually getting the DNA
+// FIXME: creating entries in the config db
+
 use super::Workspace;
 use super::{Workflow, WorkflowEffects, WorkflowError, WorkflowResult};
 use crate::conductor::api::CellConductorApiT;
@@ -12,10 +14,10 @@ use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResul
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use holochain_types::{dna::DnaFile, entry::Entry, header, ChainHeader};
+use holochain_types::{dna::DnaFile, entry::Entry, header, Header};
 use must_future::MustBoxFuture;
 
-/// The struct with implements Workflow
+/// The struct which implements the genesis Workflow
 pub struct GenesisWorkflow<Api: CellConductorApiT> {
     api: Api,
     dna_file: DnaFile,
@@ -48,16 +50,16 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             }
 
             // create a DNA chain element and add it directly to the store
-            let dna_header = ChainHeader::Dna(header::Dna {
-                timestamp: chrono::Utc::now().timestamp().into(),
+            let dna_header = Header::Dna(header::Dna {
+                timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
                 hash: dna_file.dna_hash().clone(),
             });
             workspace.source_chain.put(dna_header.clone(), None).await?;
 
             // create a agent chain element and add it directly to the store
-            let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
-                timestamp: chrono::Utc::now().timestamp().into(),
+            let agent_header = Header::EntryCreate(header::EntryCreate {
+                timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
                 prev_header: dna_header.hash().into(),
                 entry_type: header::EntryType::AgentPubKey,
@@ -114,7 +116,7 @@ mod tests {
     use holochain_types::{
         header, observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        ChainHeader,
+        Header,
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -148,14 +150,14 @@ mod tests {
                 .iter_back()
                 .map(|h| {
                     Ok(match h.header() {
-                        ChainHeader::Dna(header::Dna { .. }) => "Dna",
-                        ChainHeader::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
-                        ChainHeader::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
-                        ChainHeader::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
-                        ChainHeader::ChainClose(header::ChainClose { .. }) => "ChainClose",
-                        ChainHeader::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
-                        ChainHeader::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
-                        ChainHeader::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
+                        Header::Dna(header::Dna { .. }) => "Dna",
+                        Header::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
+                        Header::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
+                        Header::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
+                        Header::ChainClose(header::ChainClose { .. }) => "ChainClose",
+                        Header::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
+                        Header::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
+                        Header::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
                     })
                 })
                 .collect()

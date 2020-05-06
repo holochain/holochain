@@ -3,10 +3,9 @@ use crate::core::state::{
     chain_sequence::ChainSequenceBuf,
     source_chain::{ChainElement, SignedHeader, SourceChainError, SourceChainResult},
 };
-
 use fallible_iterator::FallibleIterator;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, ChainHeader};
+use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -58,7 +57,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     pub async fn put(
         &mut self,
-        header: ChainHeader,
+        header: Header,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<()> {
         let signed_header = SignedHeader::new(&self.keystore, header.to_owned()).await?;
@@ -102,7 +101,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         #[derive(Serialize, Deserialize)]
         struct JsonChainElement {
             pub signature: Signature,
-            pub header: ChainHeader,
+            pub header: Header,
             pub entry: Option<Entry>,
         }
 
@@ -158,7 +157,7 @@ impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
     }
 }
 
-/// Follows ChainHeader.link through every previous Entry (of any EntryType) in the chain
+/// Follows Header.link through every previous Entry (of any EntryType) in the chain
 // #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
 impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
     type Item = SignedHeader;
@@ -191,30 +190,24 @@ pub mod tests {
         header,
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        ChainHeader,
+        Header,
     };
 
-    fn fixtures() -> (
-        AgentPubKey,
-        ChainHeader,
-        Option<Entry>,
-        ChainHeader,
-        Option<Entry>,
-    ) {
+    fn fixtures() -> (AgentPubKey, Header, Option<Entry>, Header, Option<Entry>) {
         let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());
 
-        let dna_header = ChainHeader::Dna(header::Dna {
-            timestamp: chrono::Utc::now().timestamp().into(),
+        let dna_header = Header::Dna(header::Dna {
+            timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
             hash: dna.dna_hash().clone(),
         });
 
-        let agent_header = ChainHeader::EntryCreate(header::EntryCreate {
-            timestamp: chrono::Utc::now().timestamp().into(),
+        let agent_header = Header::EntryCreate(header::EntryCreate {
+            timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
             prev_header: dna_header.hash().into(),
             entry_type: header::EntryType::AgentPubKey,

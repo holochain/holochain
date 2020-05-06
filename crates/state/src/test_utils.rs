@@ -78,7 +78,6 @@ async fn test_env(kind: EnvironmentKind) -> TestEnvironment {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     // TODO: Wrap EnvironmentWrite along with the TempDir so that it lives longer
     EnvironmentWrite::new(tmpdir.path(), kind, test_keystore())
-        .await
         .expect("Couldn't create test LMDB environment")
 }
 

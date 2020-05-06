@@ -448,8 +448,7 @@ mod builder {
                 env_path.as_ref(),
                 EnvironmentKind::Conductor,
                 keystore.clone(),
-            )
-            .await?;
+            )?;
 
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
 
