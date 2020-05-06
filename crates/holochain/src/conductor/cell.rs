@@ -80,7 +80,7 @@ impl Cell {
             state_env,
         })
     }
-    #[allow(dead_code)]
+
     fn dna_hash(&self) -> &DnaHash {
         &self.id.dna_hash()
     }
@@ -117,7 +117,7 @@ impl Cell {
         // create the work flow call
         let call = WorkflowCall::InvokeZome(invocation.into());
         // call the workflow
-        // FIXME this result isn't actualy returned
+        // FIXME: TK-01564: this result isn't actualy returned
         let _result = runner.run_workflow(call).await?;
         use holochain_serialized_bytes::prelude::*;
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

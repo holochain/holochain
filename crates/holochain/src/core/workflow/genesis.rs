@@ -22,7 +22,7 @@ pub async fn genesis(
         .map_err(|e| WorkflowError::from(Box::new(e)))?
         == "INVALID"
     {
-        return Err(WorkflowError::from(WorkflowError::AgentInvalid(agent_pubkey.clone())).into());
+        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
 
     // create a DNA chain element and add it directly to the store

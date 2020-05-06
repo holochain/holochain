@@ -7,15 +7,20 @@
 //!
 //! ```rust, no_run
 //! # async fn async_main () {
-//!
+//! # use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 //! use holochain_2020::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! let conductor: Conductor = ConductorBuilder::new().test().await.unwrap();
+//! # let env = test_conductor_env();
+//! #   let TestEnvironment {
+//! #       env: wasm_env,
+//! #      tmpdir: _tmpdir,
+//! # } = test_wasm_env();
+//! let conductor: Conductor = ConductorBuilder::new().test(env, wasm_env).await.unwrap();
 //!
 //! // Do direct manipulation of the Conductor here
 //!
 //! // move the Conductor into a ConductorHandle,
 //! // making the original Conductor inaccessible
-//! let handle: ConductorHandle = conductor.into_handle();
+//! let handle: ConductorHandle = conductor.run().await.unwrap();
 //!
 //! // handles are cloneable
 //! let handle2 = handle.clone();
@@ -147,7 +152,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        self.0.write().await.put_wasm(dna.clone()).await?;
+        {
+            self.0.write().await.put_wasm(dna.clone()).await?;
+        }
         Ok(self.0.write().await.dna_store_mut().add(dna)?)
     }
 

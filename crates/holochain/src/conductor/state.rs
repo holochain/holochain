@@ -82,13 +82,6 @@ impl ConductorState {
             .is_some()
     }
 
-    /*
-    /// Returns the cell configuration with the given ID if present
-    pub fn cell_by_id(&self, id: &str) -> Option<CellConfig> {
-        self.cells.iter().find(|ic| ic.id == *id).cloned()
-    }
-    */
-
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfig> {
         self.interfaces.iter().find(|ic| ic.id == *id).cloned()
@@ -146,22 +139,6 @@ pub struct DnaConfig {
     #[serde(default)]
     pub uuid: Option<String>,
 }
-
-// TODO replace with cell id
-/*
-/// An cell combines a DNA with an agent.
-/// Each cell has its own storage configuration.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct CellConfig {
-    // FIXME: The id is a combination of the DnaHash and
-    // the AgentPubKey so should this be removed?
-    pub id: String,
-    // FIXME: Should this be DnaHash instead of string?
-    pub dna: String,
-    // FIXME: Should this be AgentPubKey instead of string?
-    pub agent: String,
-}
-*/
 
 /// Here, interfaces are user facing and make available zome functions to
 /// GUIs, browser based web UIs, local native UIs, other local applications and scripts.

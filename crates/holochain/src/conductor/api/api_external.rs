@@ -346,25 +346,37 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_state::test_utils::test_conductor_env;
-    use holochain_types::test_utils::fake_dna_file;
-    use holochain_types::test_utils::write_fake_dna_file;
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_types::{
+        observability,
+        test_utils::{fake_dna_file, write_fake_dna_file},
+    };
     use matches::assert_matches;
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
     async fn install_list_dna() -> Result<()> {
+        observability::test_run().ok();
         let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder().test(test_env).await?.run().await?;
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env)
+            .await?
+            .run()
+            .await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).unwrap();
         let dna_hash = dna.dna_hash().clone();
-        admin_api
+        let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
             .await;
+        assert_matches!(install_response, AdminResponse::DnaInstalled);
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
@@ -374,9 +386,13 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn generate_and_list_pub_keys() -> Result<()> {
         let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
         let handle = Conductor::builder()
-            .test(test_env)
+            .test(test_env, wasm_env)
             .await?
             .run()
             .await

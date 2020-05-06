@@ -236,7 +236,7 @@ mod test {
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::test_utils::test_conductor_env;
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
     use holochain_types::{
         cell::CellId,
         observability,
@@ -257,9 +257,13 @@ mod test {
 
     async fn setup_admin() -> RealAdminInterfaceApi {
         let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
         let conductor_handle = Conductor::builder()
-            .test(test_env)
+            .test(test_env, wasm_env)
             .await
             .unwrap()
             .run()
@@ -273,13 +277,17 @@ mod test {
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi) {
         let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let mut state = ConductorState::default();
         state.cells.push(cell_id);
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
-            .test(test_env)
+            .test(test_env, wasm_env)
             .await
             .unwrap()
             .run()
@@ -328,6 +336,10 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn cache_failure() {
         let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
 
         let uuid = Uuid::new_v4();
@@ -341,7 +353,7 @@ mod test {
             .returning(|_| Err(DnaStoreError::WriteFail));
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
-            .test(test_env)
+            .test(test_env, wasm_env)
             .await
             .unwrap()
             .run()
@@ -382,7 +394,6 @@ mod test {
         let dna = fake_dna_file(&uuid.to_string());
         let payload = Payload { a: 1 };
         let dna_hash = fake_dna_hash("bob");
-        // TODO: Create the Mock for the cell-dna-api to provide a fake zome response
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
 
         let mut dna_store = MockDnaStore::new();
@@ -402,7 +413,6 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            // FIXME: Test the inner of below is correct
             assert_matches!(response, AppResponse::ZomeInvocationResponse{ .. });
             async { Ok(()) }.boxed()
         };
