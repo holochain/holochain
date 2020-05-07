@@ -40,7 +40,7 @@ async fn wasm_store_round_trip() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
 
     // all the stuff needed to have a WasmBuf
-    let env = holochain_state::test_utils::test_wasm_env().await;
+    let env = holochain_state::test_utils::test_wasm_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
