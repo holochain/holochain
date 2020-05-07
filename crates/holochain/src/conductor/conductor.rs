@@ -229,7 +229,7 @@ where
         };
 
         // spawn interface tasks, collect their JoinHandles,
-        // and throw away the errors after logging them
+        // panic on errors.
         let handles: Result<Vec<_>, _> =
             future::join_all(configs.into_iter().map(spawn_from_config))
                 .await
