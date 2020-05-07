@@ -3,7 +3,7 @@ use super::{
     error::{WorkflowError, WorkflowResult},
     InitializeZomesWorkflow, Workflow, WorkflowEffects,
 };
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::{
     conductor::api::CellConductorApiT,
     core::state::{
@@ -15,16 +15,17 @@ use crate::{
     },
 };
 use fallible_iterator::FallibleIterator;
-use futures::future::FutureExt;
+use futures::future::{BoxFuture, FutureExt};
 use holochain_state::prelude::*;
-use holochain_types::{nucleus::ZomeInvocation, prelude::Todo};
+use holochain_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
 use must_future::MustBoxFuture;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 pub mod unsafe_invoke_zome_workspace;
 
 /// Placeholder for the return value of a zome invocation
-pub type ZomeInvocationResult = Todo;
+/// TODO: do we want this to be the same as ZomeInvocationRESPONSE?
+pub type ZomeInvocationResult = RibosomeResult<ZomeInvocationResponse>;
 
 pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     pub ribosome: Ribosome,
@@ -62,11 +63,11 @@ where
             let chain_head_start = workspace.source_chain.chain_head()?.clone();
 
             // Create the unsafe sourcechain for use with wasm closure
-            {
+            let result = {
                 // TODO: TK-01564: Return this result
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let _result = ribosome.call_zome_function(raw_workspace, invocation)?;
-            }
+                ribosome.call_zome_function(raw_workspace, invocation)
+            };
 
             // Get the new head
             let chain_head_end = workspace.source_chain.chain_head()?;
@@ -98,7 +99,6 @@ where
             let fx =
                 WorkflowEffects::new(workspace, Default::default(), Default::default(), triggers);
 
-            let result = todo!("this will be the actual zome function return value");
             Ok((result, fx))
         }
         .boxed()
@@ -204,8 +204,7 @@ pub mod tests {
         workspace: InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
         invocation: ZomeInvocation,
-    ) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<Ribosome>>
-    {
+    ) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<Ribosome>> {
         let workflow = InvokeZomeWorkflow {
             invocation,
             ribosome,

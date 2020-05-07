@@ -960,6 +960,7 @@ dependencies = [
  "crossbeam-channel",
  "derive_more",
  "directories 2.0.2",
+ "either",
  "fallible-iterator",
  "futures",
  "hcid",
