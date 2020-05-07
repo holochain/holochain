@@ -1,4 +1,4 @@
-use super::dna_store::error::DnaStoreError;
+use super::{dna_store::error::DnaStoreError, interface::error::InterfaceError};
 use crate::conductor::cell::error::CellError;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::{CellHandle, CellId};
@@ -59,6 +59,10 @@ pub enum ConductorError {
 
     #[error("DNA store error: {0:?}")]
     DnaStoreError(#[from] DnaStoreError),
+
+    // Box is to avoid cycle in error definition
+    #[error(transparent)]
+    InterfaceError(#[from] Box<InterfaceError>),
 }
 
 // TODO: can this be removed?

@@ -46,7 +46,6 @@ use holochain_state::{
 };
 use holochain_types::cell::{CellHandle, CellId};
 use std::collections::HashMap;
-use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
@@ -230,19 +229,14 @@ where
         };
 
         // spawn interface tasks, collect their JoinHandles,
-        // and throw away the errors after logging them
-        let handles: Vec<_> = future::join_all(configs.into_iter().map(spawn_from_config))
-            .await
-            .into_iter()
-            // Log errors
-            .inspect(|result| {
-                if let Err(ref e) = result {
-                    error!(error = e as &dyn Error, "Admin interface failed to parse");
-                }
-            })
-            // Throw away errors
-            .filter_map(Result::ok)
-            .collect();
+        // panic on errors.
+        let handles: Result<Vec<_>, _> =
+            future::join_all(configs.into_iter().map(spawn_from_config))
+                .await
+                .into_iter()
+                .collect();
+        // Exit if the admin interfaces fail to be created
+        let handles = handles.map_err(|e| Box::new(e))?;
 
         {
             let mut ports = Vec::new();
