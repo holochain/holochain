@@ -219,8 +219,9 @@ pub mod tests {
 
         let dna_header = Header::new(
             header::Dna {
-                timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
+                timestamp: Timestamp::now(),
+                header_seq: 0,
                 hash: dna.dna_hash().clone(),
             }
             .into(),
@@ -230,8 +231,9 @@ pub mod tests {
 
         let agent_header = Header::new(
             header::EntryCreate {
-                timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
+                timestamp: Timestamp::now(),
+                header_seq: 0,
                 prev_header: dna_header.hash().clone().into(),
                 entry_type: header::EntryType::AgentPubKey,
                 entry_address: agent_pubkey.clone().into(),

@@ -26,6 +26,7 @@ pub async fn commit_entry<'a>(
                 header::EntryCreate {
                     timestamp: Timestamp::now(),
                     author: agent_pubkey.clone(),
+                    header_seq: 0,
                     prev_header: source_chain.chain_head().unwrap().clone(),
                     entry_type: header::EntryType::AgentPubKey,
                     entry_address: agent_pubkey.clone().into(),

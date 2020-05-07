@@ -22,8 +22,9 @@ async fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) 
 
     let jimbo_header = Header::new(
         header::EntryCreate {
-            timestamp: Timestamp::now(),
             author: jimbo_id.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 0,
             prev_header: previous_header.clone().into(),
             entry_type: header::EntryType::AgentPubKey,
             entry_address: jimbo_entry.entry_address(),
@@ -35,8 +36,9 @@ async fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) 
 
     let jessy_header = Header::new(
         header::EntryCreate {
-            timestamp: Timestamp::now(),
             author: jessy_id.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 0,
             prev_header: previous_header.clone().into(),
             entry_type: header::EntryType::AgentPubKey,
             entry_address: jessy_entry.entry_address(),
