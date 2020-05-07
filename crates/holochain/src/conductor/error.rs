@@ -1,4 +1,4 @@
-use super::dna_store::error::DnaStoreError;
+use super::{dna_store::error::DnaStoreError, interface::error::InterfaceError};
 use crate::{conductor::cell::error::CellError, core::workflow::runner::error::WorkflowRunError};
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::{CellHandle, CellId};
@@ -62,6 +62,10 @@ pub enum ConductorError {
 
     #[error("Workflow error: {0:?}")]
     WorkflowRunError(#[from] WorkflowRunError),
+
+    // Box is to avoid cycle in error definition
+    #[error(transparent)]
+    InterfaceError(#[from] Box<InterfaceError>),
 }
 
 // TODO: can this be removed?
