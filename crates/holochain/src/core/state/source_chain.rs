@@ -10,7 +10,9 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Reader},
 };
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header, header::HeaderType};
+use holochain_types::{
+    address::HeaderAddress, entry::Entry, header::HeaderType, prelude::*, Header,
+};
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
@@ -71,7 +73,7 @@ impl ChainElement {
         }
     }
 
-    pub fn into_inner(self) ->(SignedHeader, Header, Option<Entry>) {
+    pub fn into_inner(self) -> (SignedHeader, Header, Option<Entry>) {
         (self.signed_header, self.header, self.maybe_entry)
     }
 

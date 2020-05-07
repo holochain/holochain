@@ -12,7 +12,7 @@ use holochain_types::{
     Header,
 };
 
-fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) {
+async fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) {
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();
@@ -20,21 +20,31 @@ fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) {
     let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
-    let jimbo_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
-        author: jimbo_id.clone(),
-        prev_header: previous_header.clone().into(),
-        entry_type: header::EntryType::AgentPubKey,
-        entry_address: jimbo_entry.entry_address(),
-    });
+    let jimbo_header = Header::new(
+        header::EntryCreate {
+            timestamp: Timestamp::now(),
+            author: jimbo_id.clone(),
+            prev_header: previous_header.clone().into(),
+            entry_type: header::EntryType::AgentPubKey,
+            entry_address: jimbo_entry.entry_address(),
+        }
+        .into(),
+    )
+    .await
+    .unwrap();
 
-    let jessy_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
-        author: jessy_id.clone(),
-        prev_header: previous_header.clone().into(),
-        entry_type: header::EntryType::AgentPubKey,
-        entry_address: jessy_entry.entry_address(),
-    });
+    let jessy_header = Header::new(
+        header::EntryCreate {
+            timestamp: Timestamp::now(),
+            author: jessy_id.clone(),
+            prev_header: previous_header.clone().into(),
+            entry_type: header::EntryType::AgentPubKey,
+            entry_address: jessy_entry.entry_address(),
+        }
+        .into(),
+    )
+    .await
+    .unwrap();
     (
         jimbo_id,
         jimbo_header,
@@ -59,7 +69,8 @@ async fn get_links() -> SourceChainResult<()> {
     let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
     let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
 
-    let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
+    let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) =
+        fixtures().await;
 
     let base = jimbo_entry.entry_address();
     source_chain.put(jimbo_header, Some(jimbo_entry)).await?;

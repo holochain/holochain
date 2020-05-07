@@ -25,21 +25,29 @@ pub async fn genesis(
     }
 
     // create a DNA chain element and add it directly to the store
-    let dna_header = Header::new(header::Dna {
-        timestamp: Timestamp::now(),
-        author: agent_pubkey.clone(),
-        hash: dna.dna_hash().clone(),
-    }.into()).await?;
+    let dna_header = Header::new(
+        header::Dna {
+            timestamp: Timestamp::now(),
+            author: agent_pubkey.clone(),
+            hash: dna.dna_hash().clone(),
+        }
+        .into(),
+    )
+    .await?;
     workspace.source_chain.put(dna_header.clone(), None).await?;
 
     // create a agent chain element and add it directly to the store
-    let agent_header = Header::new(header::EntryCreate {
-        timestamp: Timestamp::now(),
-        author: agent_pubkey.clone(),
-        prev_header: dna_header.hash().clone().into(),
-        entry_type: header::EntryType::AgentPubKey,
-        entry_address: agent_pubkey.clone().into(),
-    }.into()).await?;
+    let agent_header = Header::new(
+        header::EntryCreate {
+            timestamp: Timestamp::now(),
+            author: agent_pubkey.clone(),
+            prev_header: dna_header.hash().clone().into(),
+            entry_type: header::EntryType::AgentPubKey,
+            entry_address: agent_pubkey.clone().into(),
+        }
+        .into(),
+    )
+    .await?;
     workspace
         .source_chain
         .put(agent_header, Some(Entry::Agent(agent_pubkey)))
@@ -70,9 +78,10 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        header, observability,
+        header,
+        header::HeaderType,
+        observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        Header,
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -101,16 +110,16 @@ mod tests {
             source_chain.chain_head().expect("chain head should be set");
             let hashes: Vec<_> = source_chain
                 .iter_back()
-                .map(|h| {
-                    Ok(match h.header() {
-                        Header::Dna(header::Dna { .. }) => "Dna",
-                        Header::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
-                        Header::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
-                        Header::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
-                        Header::ChainClose(header::ChainClose { .. }) => "ChainClose",
-                        Header::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
-                        Header::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
-                        Header::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
+                .map(|(_, h)| {
+                    Ok(match *h.header() {
+                        HeaderType::Dna(header::Dna { .. }) => "Dna",
+                        HeaderType::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
+                        HeaderType::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
+                        HeaderType::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
+                        HeaderType::ChainClose(header::ChainClose { .. }) => "ChainClose",
+                        HeaderType::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
+                        HeaderType::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
+                        HeaderType::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
                     })
                 })
                 .collect()

@@ -17,10 +17,7 @@ use holochain_types::{
     address::{EntryAddress, HeaderAddress},
     entry::Entry,
     header,
-    header::{
-        Header,
-        HeaderType,
-    },
+    header::{Header, HeaderType},
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -78,8 +75,12 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         signed_header: SignedHeader,
     ) -> SourceChainResult<Option<ChainElement>> {
         let maybe_entry_address = match signed_header.header().clone() {
-            HeaderType::EntryCreate(header::EntryCreate { entry_address, .. }) => Some(entry_address),
-            HeaderType::EntryUpdate(header::EntryUpdate { entry_address, .. }) => Some(entry_address),
+            HeaderType::EntryCreate(header::EntryCreate { entry_address, .. }) => {
+                Some(entry_address)
+            }
+            HeaderType::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
+                Some(entry_address)
+            }
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {
@@ -95,12 +96,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                 maybe_cas_entry
             }
         };
-        let header = Header::new(signed_header.header().clone().into()).await?;
-        Ok(Some(ChainElement::new(
-            signed_header,
-            header,
-            maybe_entry,
-        )))
+        let header = Header::new(signed_header.header().clone()).await?;
+        Ok(Some(ChainElement::new(signed_header, header, maybe_entry)))
     }
 
     /// given a header address return the full chain element for that address
@@ -117,10 +114,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
     /// Puts a signed header and optional entry onto the CAS.
     /// N.B. this code assumes that the header and entry have been validated
-    pub fn put(
-        &mut self,
-        element: ChainElement,
-    ) -> DatabaseResult<()> {
+    pub fn put(&mut self, element: ChainElement) -> DatabaseResult<()> {
         let (signed_header, header, maybe_entry) = element.into_inner();
 
         if let Some(entry) = maybe_entry {

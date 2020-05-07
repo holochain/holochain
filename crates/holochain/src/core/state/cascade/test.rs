@@ -33,7 +33,7 @@ struct Chains<'env> {
     mock_cache_meta: MockChainMetaBuf,
 }
 
-fn setup_env<'env>(
+async fn setup_env<'env>(
     reader: &'env Reader<'env>,
     dbs: &'env DbManager,
 ) -> DatabaseResult<Chains<'env>> {
@@ -44,21 +44,31 @@ fn setup_env<'env>(
     let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone());
 
-    let jimbo_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
-        author: jimbo_id.clone(),
-        prev_header: previous_header.clone().into(),
-        entry_type: header::EntryType::AgentPubKey,
-        entry_address: jimbo_entry.entry_address(),
-    });
+    let jimbo_header = Header::new(
+        header::EntryCreate {
+            timestamp: Timestamp::now(),
+            author: jimbo_id.clone(),
+            prev_header: previous_header.clone().into(),
+            entry_type: header::EntryType::AgentPubKey,
+            entry_address: jimbo_entry.entry_address(),
+        }
+        .into(),
+    )
+    .await
+    .unwrap();
 
-    let jessy_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
-        author: jessy_id.clone(),
-        prev_header: previous_header.clone().into(),
-        entry_type: header::EntryType::AgentPubKey,
-        entry_address: jessy_entry.entry_address(),
-    });
+    let jessy_header = Header::new(
+        header::EntryCreate {
+            timestamp: Timestamp::now(),
+            author: jessy_id.clone(),
+            prev_header: previous_header.clone().into(),
+            entry_type: header::EntryType::AgentPubKey,
+            entry_address: jessy_entry.entry_address(),
+        }
+        .into(),
+    )
+    .await
+    .unwrap();
 
     let source_chain = SourceChainBuf::new(reader, &dbs)?;
     let cache = SourceChainBuf::cache(reader, &dbs)?;
@@ -93,7 +103,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         mut mock_primary_meta,
         mock_cache_meta,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(&reader, &dbs).await?;
     source_chain
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
@@ -137,7 +147,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         mut mock_primary_meta,
         mock_cache_meta,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(&reader, &dbs).await?;
     source_chain
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
@@ -181,7 +191,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mock_primary_meta,
         mut mock_cache_meta,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(&reader, &dbs).await?;
     cache
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
@@ -226,7 +236,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_primary_meta,
         mock_cache_meta,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(&reader, &dbs).await?;
     let address = jimbo_entry.entry_address();
 
     // call dht_get with above address
@@ -264,7 +274,7 @@ async fn links_local_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_primary_meta,
         mock_cache_meta,
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(&reader, &dbs).await?;
     source_chain
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
@@ -318,7 +328,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_primary_meta,
         mut mock_cache_meta,
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(&reader, &dbs).await?;
     source_chain
         .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
         .await?;
@@ -372,7 +382,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         mock_primary_meta,
         mut mock_cache_meta,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(&reader, &dbs).await?;
 
     let base = jimbo_entry.entry_address();
     let target = jessy_entry.entry_address();

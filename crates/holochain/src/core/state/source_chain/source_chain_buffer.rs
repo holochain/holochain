@@ -11,7 +11,9 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
+use holochain_types::{
+    address::HeaderAddress, entry::Entry, header::HeaderType, prelude::*, Header,
+};
 
 use tracing::*;
 
@@ -71,6 +73,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         header: Header,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<()> {
+        let header_hash = header.hash().clone();
         let signed_header = SignedHeader::new(&self.keystore, (*header).to_owned()).await?;
         let chain_element = ChainElement::new(signed_header, header, maybe_entry);
 
@@ -81,7 +84,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         }
         */
 
-        self.sequence.put_header(header.hash().clone().into());
+        self.sequence.put_header(header_hash.into());
         self.cas.put(chain_element)?;
         Ok(())
     }
@@ -109,11 +112,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     }
 
     /// dump the entire source chain as a pretty-printed json string
-    pub fn dump_as_json(&self) -> Result<String, SourceChainError> {
+    pub async fn dump_as_json(&self) -> Result<String, SourceChainError> {
         #[derive(Serialize, Deserialize)]
         struct JsonChainElement {
             pub signature: Signature,
-            pub header: Header,
+            pub header_hash: String,
+            pub header: HeaderType,
             pub entry: Option<Entry>,
         }
 
@@ -124,24 +128,24 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             element: Option<JsonChainElement>,
         }
 
-        Ok(serde_json::to_string_pretty(
-            &self
-                .iter_back()
-                .map(|h| {
-                    let maybe_element = self.get_element(&h.header().hash().clone().into())?;
-                    match maybe_element {
-                        None => Ok(JsonChainDump { element: None }),
-                        Some(element) => Ok(JsonChainDump {
-                            element: Some(JsonChainElement {
-                                signature: element.signature().to_owned(),
-                                header: element.header().to_owned(),
-                                entry: element.entry().to_owned(),
-                            }),
-                        }),
-                    }
-                })
-                .collect::<Vec<_>>()?,
-        )?)
+        let mut out = Vec::new();
+        let mut iter = self.iter_back();
+        while let Some((addr, _)) = iter.next()? {
+            let maybe_element = self.get_element(&addr).await?;
+            match maybe_element {
+                None => out.push(JsonChainDump { element: None }),
+                Some(element) => out.push(JsonChainDump {
+                    element: Some(JsonChainElement {
+                        signature: element.signature().to_owned(),
+                        header_hash: element.header().hash().to_string(),
+                        header: (**element.header()).to_owned(),
+                        entry: element.entry().to_owned(),
+                    }),
+                }),
+            }
+        }
+
+        Ok(serde_json::to_string_pretty(&out)?)
     }
 }
 
@@ -172,7 +176,7 @@ impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
 /// Follows Header.link through every previous Entry (of any EntryType) in the chain
 // #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
 impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
-    type Item = SignedHeader;
+    type Item = (HeaderAddress, SignedHeader);
     type Error = SourceChainError;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
@@ -180,8 +184,9 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 if let Some(signed_header) = self.store.get_header(top)? {
+                    let top = top.clone();
                     self.current = signed_header.header().prev_header().map(|h| h.to_owned());
-                    Ok(Some(signed_header))
+                    Ok(Some((top, signed_header)))
                 } else {
                     Ok(None)
                 }
@@ -205,26 +210,36 @@ pub mod tests {
         Header,
     };
 
-    fn fixtures() -> (AgentPubKey, Header, Option<Entry>, Header, Option<Entry>) {
+    async fn fixtures() -> (AgentPubKey, Header, Option<Entry>, Header, Option<Entry>) {
         let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());
 
-        let dna_header = Header::Dna(header::Dna {
-            timestamp: Timestamp::now(),
-            author: agent_pubkey.clone(),
-            hash: dna.dna_hash().clone(),
-        });
+        let dna_header = Header::new(
+            header::Dna {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                hash: dna.dna_hash().clone(),
+            }
+            .into(),
+        )
+        .await
+        .unwrap();
 
-        let agent_header = Header::EntryCreate(header::EntryCreate {
-            timestamp: Timestamp::now(),
-            author: agent_pubkey.clone(),
-            prev_header: dna_header.hash().into(),
-            entry_type: header::EntryType::AgentPubKey,
-            entry_address: agent_pubkey.clone().into(),
-        });
+        let agent_header = Header::new(
+            header::EntryCreate {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                prev_header: dna_header.hash().clone().into(),
+                entry_type: header::EntryType::AgentPubKey,
+                entry_address: agent_pubkey.clone().into(),
+            }
+            .into(),
+        )
+        .await
+        .unwrap();
 
         (
             agent_pubkey,
@@ -241,7 +256,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
-        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures().await;
 
         {
             let reader = env.reader()?;
@@ -261,11 +276,13 @@ pub mod tests {
 
             // get the full element
             let dna_element_fetched = store
-                .get_element(&dna_header.hash().into())
+                .get_element(&dna_header.hash().clone().into())
+                .await
                 .expect("error retrieving")
                 .expect("entry not found");
             let agent_element_fetched = store
-                .get_element(&agent_header.hash().into())
+                .get_element(&agent_header.hash().clone().into())
+                .await
                 .expect("error retrieving")
                 .expect("entry not found");
             assert_eq!(dna_header, *dna_element_fetched.header());
@@ -274,18 +291,13 @@ pub mod tests {
             assert_eq!(agent_entry, *agent_element_fetched.entry());
 
             // check that you can iterate on the chain
-            assert_eq!(
-                store
-                    .iter_back()
-                    .map(|h| Ok(store
-                        .get_element(&h.header().hash().into())?
-                        .unwrap()
-                        .header()
-                        .clone()))
-                    .collect::<Vec<_>>()
-                    .unwrap(),
-                vec![agent_header, dna_header]
-            );
+            let mut iter = store.iter_back();
+            let mut chain = Vec::new();
+            while let Some((addr, _)) = iter.next().unwrap() {
+                let e = store.get_element(&addr).await.unwrap().unwrap();
+                chain.push(e.header().clone());
+            }
+            assert_eq!(chain, vec![agent_header, dna_header],);
         }
 
         Ok(())
@@ -297,7 +309,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await?;
 
-        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
+        let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures().await;
 
         {
             let reader = env.reader()?;
@@ -312,7 +324,7 @@ pub mod tests {
             let reader = env.reader()?;
 
             let store = SourceChainBuf::new(&reader, &dbs)?;
-            let json = store.dump_as_json()?;
+            let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
             let parsed = parsed
                 .as_array()

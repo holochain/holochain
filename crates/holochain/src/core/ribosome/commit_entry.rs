@@ -22,13 +22,17 @@ pub async fn commit_entry<'a>(
             let source_chain = &mut workspace.source_chain;
             let agent_pubkey = fake_agent_pubkey_1();
             let agent_entry = Entry::Agent(agent_pubkey.clone());
-            let agent_header = Header::EntryCreate(header::EntryCreate {
-                timestamp: Timestamp::now(),
-                author: agent_pubkey.clone(),
-                prev_header: source_chain.chain_head().unwrap().clone(),
-                entry_type: header::EntryType::AgentPubKey,
-                entry_address: agent_pubkey.clone().into(),
-            });
+            let agent_header = Header::new(
+                header::EntryCreate {
+                    timestamp: Timestamp::now(),
+                    author: agent_pubkey.clone(),
+                    prev_header: source_chain.chain_head().unwrap().clone(),
+                    entry_type: header::EntryType::AgentPubKey,
+                    entry_address: agent_pubkey.clone().into(),
+                }
+                .into(),
+            )
+            .await?;
             source_chain.put(agent_header, Some(agent_entry)).await
         }
         .boxed()

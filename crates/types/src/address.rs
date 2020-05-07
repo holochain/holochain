@@ -25,6 +25,12 @@ impl From<holo_hash::holo_hash_core::HeaderHash> for HeaderAddress {
     }
 }
 
+impl From<&holo_hash::holo_hash_core::HeaderHash> for HeaderAddress {
+    fn from(header_hash: &holo_hash::holo_hash_core::HeaderHash) -> HeaderAddress {
+        header_hash.clone().into()
+    }
+}
+
 impl From<HeaderHash> for HeaderAddress {
     fn from(header_hash: HeaderHash) -> HeaderAddress {
         HeaderAddress::Header(header_hash)
