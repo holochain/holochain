@@ -14,6 +14,9 @@ use thiserror::Error;
 
 use super::{ribosome::error::RibosomeError, state::source_chain::SourceChainError};
 
+#[cfg(test)]
+pub use genesis::tests::fake_genesis;
+
 /// Specify the workflow-specific arguments to the functions that make the workflow go
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
 #[derive(Debug)]

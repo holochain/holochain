@@ -69,17 +69,12 @@ pub mod tests {
     use super::*;
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use crate::core::ribosome::MockRibosomeT;
-    use crate::core::workflow::{WorkflowCall, WorkflowError};
+    use crate::core::workflow::{fake_genesis, WorkflowCall, WorkflowError};
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{
-        entry::Entry,
-        header,
-        header::Header,
-        nucleus::ZomeInvocationResponse,
-        observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        Timestamp,
+        entry::Entry, nucleus::ZomeInvocationResponse, observability,
+        test_utils::fake_agent_pubkey_1,
     };
     use holochain_zome_types::ZomeExternGuestOutput;
 
@@ -89,31 +84,6 @@ pub mod tests {
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     struct Payload {
         a: u32,
-    }
-
-    async fn fake_genesis(workspace: &mut InvokeZomeWorkspace<'_>) -> Header {
-        let agent_pubkey = fake_agent_pubkey_1();
-        let agent_entry = Entry::Agent(agent_pubkey.clone());
-        let dna = fake_dna_file("cool dna");
-        let dna_header = Header::Dna(header::Dna {
-            timestamp: Timestamp::now(),
-            author: agent_pubkey.clone(),
-            hash: dna.dna_hash().clone(),
-        });
-        let agent_header = Header::EntryCreate(header::EntryCreate {
-            timestamp: Timestamp::now(),
-            author: agent_pubkey.clone(),
-            prev_header: dna_header.hash().into(),
-            entry_type: header::EntryType::AgentPubKey,
-            entry_address: agent_pubkey.clone().into(),
-        });
-        workspace.source_chain.put(dna_header, None).await.unwrap();
-        workspace
-            .source_chain
-            .put(agent_header.clone(), Some(agent_entry))
-            .await
-            .unwrap();
-        agent_header
     }
 
     // 0.5. Initialization Complete?
@@ -130,7 +100,7 @@ pub mod tests {
         let mut ribosome = MockRibosomeT::new();
 
         // Genesis
-        fake_genesis(&mut workspace).await;
+        fake_genesis(&mut workspace.source_chain).await;
 
         // Setup the ribosome mock
         ribosome
@@ -221,7 +191,7 @@ pub mod tests {
         let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         // Genesis
-        let agent_header = fake_genesis(&mut workspace).await;
+        let agent_header = fake_genesis(&mut workspace.source_chain).await;
 
         let agent_pubkey = fake_agent_pubkey_1();
         let agent_entry = Entry::Agent(agent_pubkey.clone());

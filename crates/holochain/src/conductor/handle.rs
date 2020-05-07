@@ -64,6 +64,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
+#[cfg(test)]
+use holochain_state::env::Environment;
+
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
 
@@ -123,6 +126,10 @@ pub trait ConductorHandleT: Send + Sync {
         cells: Vec<CellId>,
         handle: ConductorHandle,
     ) -> ConductorResult<()>;
+
+    // HACK: remove when B-01593 lands
+    #[cfg(test)]
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<Environment>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -209,5 +216,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let mut lock = self.0.write().await;
         lock.create_cells(cells, handle).await?;
         Ok(())
+    }
+
+    #[cfg(test)]
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<Environment> {
+        let lock = self.0.read().await;
+        let cell = lock.cell_by_id(cell_id)?;
+        Ok(cell.state_env())
     }
 }

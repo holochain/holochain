@@ -233,15 +233,24 @@ mod test {
         state::ConductorState,
         Conductor,
     };
-    use crate::core::ribosome::wasm_test::zome_invocation_from_names;
+    use crate::core::{
+        ribosome::wasm_test::zome_invocation_from_names, state::source_chain::SourceChain,
+    };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_state::{
+        buffer::BufferedStore,
+        env::{Environment, ReadManager, WriteManager},
+        test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
+    };
     use holochain_types::{
         cell::CellId,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_hash, write_fake_dna_file},
+        test_utils::{
+            fake_agent_pubkey_1, fake_dna_file, fake_dna_hash, fake_dna_zomes, write_fake_dna_file,
+        },
     };
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
     use mockall::predicate;
@@ -253,6 +262,20 @@ mod test {
     #[serde(rename = "snake-case", tag = "type", content = "data")]
     enum AdmonRequest {
         InstallsDna(String),
+    }
+
+    async fn fake_genesis(env: Environment) {
+        let dbs = env.dbs().await.unwrap();
+        let env_ref = env.guard().await;
+        let reader = env_ref.reader().unwrap();
+
+        let mut source_chain = SourceChain::new(&reader, &dbs).unwrap();
+        crate::core::workflow::fake_genesis(&mut source_chain).await;
+
+        // Flush the db
+        let mut writer = env_ref.writer().unwrap();
+        source_chain.0.flush_to_txn(&mut writer).unwrap();
+        writer.commit().unwrap();
     }
 
     async fn setup_admin() -> RealAdminInterfaceApi {
@@ -283,7 +306,7 @@ mod test {
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let mut state = ConductorState::default();
-        state.cells.push(cell_id);
+        state.cells.push(cell_id.clone());
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
@@ -293,6 +316,10 @@ mod test {
             .run()
             .await
             .unwrap();
+
+        let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
+        fake_genesis(cell_env).await;
+
         (tmpdir, RealAppInterfaceApi::new(conductor_handle))
     }
 
@@ -391,7 +418,10 @@ mod test {
             a: u32,
         }
         let uuid = Uuid::new_v4();
-        let dna = fake_dna_file(&uuid.to_string());
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![("zomey".into(), TestWasm::Foo.into())],
+        );
         let payload = Payload { a: 1 };
         let dna_hash = fake_dna_hash("bob");
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
@@ -406,7 +436,7 @@ mod test {
         let (_tmpdir, app_api) = setup_app(cell_id, dna_store).await;
         let request = Box::new(zome_invocation_from_names(
             "zomey",
-            "fun_times",
+            "foo",
             payload.try_into().unwrap(),
         ));
         let msg = AppRequest::ZomeInvocationRequest { request };

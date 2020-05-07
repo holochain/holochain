@@ -55,7 +55,7 @@ impl<'b> WorkflowRunner<'b> {
                 self.finish(effects).await?;
             }
             WorkflowCall::InitializeZome => {
-                todo!("Make initialize zome workflow");
+                // TODO: Make initialize zome workflow"
             }
         }
         Ok(())

@@ -338,6 +338,7 @@ where
         // write the db
         let mut writer = env.writer()?;
         wasm_buf.flush_to_txn(&mut writer)?;
+        writer.commit()?;
 
         Ok(())
     }
