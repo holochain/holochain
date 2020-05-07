@@ -3,7 +3,7 @@ use crate::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    core::ribosome::WasmRibosome,
+    core::ribosome::wasm_ribosome::WasmRibosome,
 };
 use holo_hash::*;
 use holochain_state::env::Environment;

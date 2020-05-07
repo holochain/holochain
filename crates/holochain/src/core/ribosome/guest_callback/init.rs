@@ -1,11 +1,18 @@
-//! the _host_ types used to track the status/result of the initialization process
-//! c.f. _guest_ types that co-ordinate the init callbacks across the wasm boudary in zome_types
+use crate::core::ribosome::guest_callback::CallbackInvocation;
+use holochain_types::dna::Dna;
 
-use crate::nucleus::ZomeName;
-use holo_hash::EntryHash;
+pub struct InitInvocation<'a> {
+    dna: &'a Dna,
+}
+
+impl From<InitInvocation<'_>> for CallbackInvocation<'_> {
+    fn from(init_invocation: InitInvocation<'_>) -> Self {
+        Self::Init(init_invocation)
+    }
+}
 
 /// the aggregate result of _all_ init callbacks
-pub enum InitDnaResult {
+pub enum InitResult {
     /// all init callbacks passed
     Pass,
     /// some init failed

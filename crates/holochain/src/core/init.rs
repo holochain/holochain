@@ -2,7 +2,7 @@
 //! @see the ribosome docs for more info
 
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::{RibosomeT, WasmRibosome};
+use crate::core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT};
 use holochain_types::dna::Dna;
 use holochain_types::init::InitDnaResult;
 
