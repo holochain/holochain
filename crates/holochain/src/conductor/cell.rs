@@ -84,7 +84,6 @@ impl Cell {
         let env = arc.guard().await;
         let reader = env.reader()?;
         let workflow = InvokeZomeWorkflow {
-            api: self.conductor_api.clone(),
             ribosome: self.get_ribosome(),
             invocation,
         };

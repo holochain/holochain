@@ -26,15 +26,13 @@ pub mod unsafe_invoke_zome_workspace;
 /// Placeholder for the return value of a zome invocation
 pub type ZomeInvocationResult = Todo;
 
-pub(crate) struct InvokeZomeWorkflow<Api: CellConductorApiT, Ribosome: RibosomeT> {
-    pub api: Api,
+pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     pub ribosome: Ribosome,
     pub invocation: ZomeInvocation,
 }
 
-impl<'env, Api, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Api, Ribosome>
+impl<'env, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
 where
-    Api: CellConductorApiT + 'env,
     Ribosome: RibosomeT + Send + Sync + 'env,
 {
     type Output = ZomeInvocationResult;
@@ -50,7 +48,6 @@ where
             let Self {
                 ribosome,
                 invocation,
-                api: _api, // NB: unused currently, but I think the ribosome may need an api to make subsequent zome calls
             } = self;
 
             // Check if the initialize workflow has been successfully run
@@ -207,11 +204,10 @@ pub mod tests {
         workspace: InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
         invocation: ZomeInvocation,
-    ) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<CellConductorApi, Ribosome>>
+    ) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<Ribosome>>
     {
         let workflow = InvokeZomeWorkflow {
             invocation,
-            api: unimplemented!(),
             ribosome,
         };
         workflow.workflow(workspace).await
@@ -246,10 +242,8 @@ pub mod tests {
         // Call the zome function
         let invocation =
             zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
-        let api: CellConductorApi = unimplemented!();
         let workflow = InvokeZomeWorkflow {
             invocation,
-            api,
             ribosome,
         };
         let (_, effects) = workflow.workflow(workspace).await.unwrap();
