@@ -69,7 +69,4 @@ macro_rules! serial_hash {
     };
 }
 
-serial_hash!(
-    crate::dna::wasm::DnaWasm,
-    WasmHash
-);
+serial_hash!(crate::dna::wasm::DnaWasm, WasmHash);
