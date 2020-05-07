@@ -489,7 +489,7 @@ mod builder {
 
         /// Build a Conductor with a test environment
         pub async fn test(self) -> ConductorResult<Conductor<DS>> {
-            let environment = test_conductor_env().await;
+            let environment = test_conductor_env();
             let keystore = environment.keystore();
             let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
 
@@ -510,7 +510,7 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn can_update_state() {
-        let environment = test_conductor_env().await;
+        let environment = test_conductor_env();
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
         let conductor = Conductor::new(environment, dna_store, keystore)

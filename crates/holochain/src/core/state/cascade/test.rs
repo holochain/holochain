@@ -77,7 +77,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
 #[tokio::test(threaded_scheduler)]
 async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
@@ -120,7 +120,7 @@ async fn live_local_return() -> SourceChainResult<()> {
 async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
@@ -164,7 +164,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
 async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
@@ -210,7 +210,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
 async fn notfound_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
@@ -245,7 +245,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
@@ -299,7 +299,7 @@ async fn links_local_return() -> SourceChainResult<()> {
 async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
@@ -353,7 +353,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
 async fn links_notauth_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;

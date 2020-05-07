@@ -5,19 +5,19 @@ use holochain_types::test_utils::fake_cell_id;
 use tempdir::TempDir;
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory
-pub async fn test_cell_env() -> TestEnvironment {
+pub fn test_cell_env() -> TestEnvironment {
     let cell_id = fake_cell_id(&nanoid::nanoid!());
-    test_env(EnvironmentKind::Cell(cell_id)).await
+    test_env(EnvironmentKind::Cell(cell_id))
 }
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Conductor], backed by a temp directory
-pub async fn test_conductor_env() -> TestEnvironment {
-    test_env(EnvironmentKind::Conductor).await
+pub fn test_conductor_env() -> TestEnvironment {
+    test_env(EnvironmentKind::Conductor)
 }
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Wasm], backed by a temp directory
-pub async fn test_wasm_env() -> TestEnvironment {
-    test_env(EnvironmentKind::Wasm).await
+pub fn test_wasm_env() -> TestEnvironment {
+    test_env(EnvironmentKind::Wasm)
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
@@ -74,7 +74,7 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
     .unwrap()
 }
 
-async fn test_env(kind: EnvironmentKind) -> TestEnvironment {
+fn test_env(kind: EnvironmentKind) -> TestEnvironment {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
     // TODO: Wrap EnvironmentWrite along with the TempDir so that it lives longer
     EnvironmentWrite::new(tmpdir.path(), kind, test_keystore())

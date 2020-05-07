@@ -47,7 +47,7 @@ fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) {
 
 #[tokio::test(threaded_scheduler)]
 async fn get_links() -> SourceChainResult<()> {
-    let env = test_cell_env().await;
+    let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
