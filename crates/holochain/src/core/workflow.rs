@@ -124,7 +124,9 @@ async fn finish<'env, Wf: Workflow<'env>>(
     Ok(())
 }
 
-impl<'env, Ws: Workspace<'env>, Tr: WorkflowTriggers<'env>> std::fmt::Debug for WorkflowEffects<Ws, Tr> {
+impl<'env, Ws: Workspace<'env>, Tr: WorkflowTriggers<'env>> std::fmt::Debug
+    for WorkflowEffects<Ws, Tr>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WorkflowEffects")
             // TODO: Debug repr for triggers

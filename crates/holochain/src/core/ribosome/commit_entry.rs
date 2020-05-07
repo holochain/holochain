@@ -1,6 +1,6 @@
 use super::HostContext;
 use super::WasmRibosome;
-use crate::core::state::{source_chain::SourceChainResult};
+use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::{future::BoxFuture, FutureExt};
 use holochain_types::{

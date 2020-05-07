@@ -32,10 +32,7 @@ struct Chains<'env> {
     mock_cache_meta: MockChainMetaBuf,
 }
 
-fn setup_env<'env>(
-    reader: &'env Reader<'env>,
-    dbs: &impl GetDb,
-) -> DatabaseResult<Chains<'env>> {
+fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Chains<'env>> {
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();

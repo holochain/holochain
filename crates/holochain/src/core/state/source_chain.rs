@@ -6,8 +6,9 @@
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{
+    db::GetDb,
     error::DatabaseResult,
-    prelude::{Readable, Reader}, db::GetDb,
+    prelude::{Readable, Reader},
 };
 use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
 use shrinkwraprs::Shrinkwrap;

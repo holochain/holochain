@@ -235,7 +235,9 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::{ribosome::HostContext, workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace};
+    use crate::core::{
+        ribosome::HostContext, workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
+    };
     use holochain_types::test_utils::{fake_dna_zomes, fake_header_hash};
 
     pub fn zome_invocation_from_names(

@@ -1,7 +1,6 @@
-
 mod triggers;
-pub use triggers::*;
 use holochain_types::prelude::Todo;
+pub use triggers::*;
 
 /// A WorkflowEffects is returned from each Workspace function to declaratively
 /// specify the side effects of the Workflow. It is taken by the `finish`

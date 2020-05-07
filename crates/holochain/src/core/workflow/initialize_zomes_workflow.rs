@@ -1,16 +1,13 @@
-
 use super::{error::WorkflowResult, Workflow};
 use crate::core::state::workspace::{Workspace, WorkspaceError};
+use futures::FutureExt;
 use holochain_state::prelude::Writer;
 use must_future::MustBoxFuture;
-use futures::FutureExt;
 
 #[derive(Debug)]
-pub(crate) struct InitializeZomesWorkflow { }
+pub(crate) struct InitializeZomesWorkflow {}
 
-
-impl<'env> Workflow<'env> for InitializeZomesWorkflow
-{
+impl<'env> Workflow<'env> for InitializeZomesWorkflow {
     type Output = ();
     type Workspace = InitializeZomesWorkspace;
     type Triggers = ();
@@ -19,12 +16,9 @@ impl<'env> Workflow<'env> for InitializeZomesWorkflow
         self,
         _workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
-        async {
-            unimplemented!()
-        }.boxed().into()
+        async { unimplemented!() }.boxed().into()
     }
 }
-
 
 pub(crate) struct InitializeZomesWorkspace;
 

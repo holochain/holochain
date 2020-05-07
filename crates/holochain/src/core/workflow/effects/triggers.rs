@@ -1,6 +1,6 @@
 //! Workflow trigger types
 //!
-//! Workflow triggers can be specified by a Workflow -- that is, other Workflows 
+//! Workflow triggers can be specified by a Workflow -- that is, other Workflows
 //! to run after the current workflow has completed. Since each Workflow has its
 //! own type, we need a trait to specify a heterogenous collection of Workflows.
 //! It's a little unwieldy, but it'll do for now.
@@ -80,20 +80,19 @@ where
 //-------------- BEGIN HETEROGENOUS LIST BOILERPLATE ----------------------
 // Context:
 // We want any number of `Workflow` structs to be considered a valid set of
-// WorkflowTriggers. We can't use a simple Vec because Workflows have 
-// different types by design. Ergonomic options include: 
-// 
-// - using a heterogeneous list type like `frunk`, or 
+// WorkflowTriggers. We can't use a simple Vec because Workflows have
+// different types by design. Ergonomic options include:
+//
+// - using a heterogeneous list type like `frunk`, or
 // - creating a `Triggerable` trait with no generics, which can be used in
 //   a `Vec<Box<dyn Triggerable>>`
-// 
+//
 // For now, the most straightforward option is to manually implement a faux
 // list type with tuples. The consequence is that each tuple arity needs an
 // explicit definition, and if you run out of arity, you need to add an
-// implementation here. The boilerplate is simple. 
+// implementation here. The boilerplate is simple.
 //
 // Arity up to 3 is currently provided.
-
 
 impl<'env, W0> WorkflowTriggers<'env> for W0
 where
