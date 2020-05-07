@@ -9,6 +9,7 @@ use crate::{
     },
     core::workflow::ZomeInvocationResult,
 };
+use futures::StreamExt;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
@@ -155,6 +156,32 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
+            AdminRequest::ActivateApps {
+                dna_hashes,
+                agent_key,
+            } => {
+                let len = dna_hashes.len();
+                let results = futures::stream::iter(dna_hashes.into_iter().map(|dna_hash| {
+                    let agent_key = agent_key.clone();
+                    async move {
+                        (
+                            dna_hash.clone(),
+                            self.conductor_handle.genesis(dna_hash, agent_key).await,
+                        )
+                    }
+                }))
+                .buffer_unordered(len)
+                .collect::<Vec<_>>()
+                .await;
+                let (success, errors): (Vec<_>, Vec<_>) =
+                    results.into_iter().partition(|(_, r)| r.is_ok());
+                let success: Vec<_> = success.into_iter().map(|(d, _)| d).collect();
+                let errors: Vec<_> = errors
+                    .into_iter()
+                    .map(|(d, e)| (d, e.unwrap_err().into()))
+                    .collect();
+                Ok(AdminResponse::AppsActivated { success, errors })
+            }
         }
     }
 }
@@ -272,6 +299,13 @@ pub enum AdminResponse {
     ListAgentPubKeys(Vec<AgentPubKey>),
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
+    /// List of apps that activated or failed
+    AppsActivated {
+        /// Apps that activated successfully
+        success: Vec<DnaHash>,
+        /// Apps that failed to activate
+        errors: Vec<(DnaHash, ExternalApiWireError)>,
+    },
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
@@ -308,6 +342,13 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
+    /// Activate a list of apps
+    ActivateApps {
+        /// Hash for each dna to be activated
+        dna_hashes: Vec<DnaHash>,
+        /// The agent who is activating them
+        agent_key: AgentPubKey,
+    },
 }
 
 #[allow(missing_docs)]
@@ -355,11 +396,7 @@ mod test {
             tmpdir: _tmpdir,
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder()
-            .test(test_env, wasm_env)
-            .await?
-            .run()
-            .await?;
+        let handle = Conductor::builder().test(test_env, wasm_env).await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
@@ -383,12 +420,7 @@ mod test {
             tmpdir: _tmpdir,
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder()
-            .test(test_env, wasm_env)
-            .await?
-            .run()
-            .await
-            .unwrap();
+        let handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle);
 
         let agent_pub_key = admin_api

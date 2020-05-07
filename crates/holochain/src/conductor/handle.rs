@@ -50,7 +50,7 @@
 
 use super::{
     api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
-    error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
+    error::ConductorResult, manager::TaskManagerRunHandle, Cell, CellError, Conductor,
 };
 use crate::core::workflow::ZomeInvocationResult;
 use derive_more::From;
@@ -61,6 +61,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
+#[cfg(test)]
+use super::state::ConductorState;
 #[cfg(test)]
 use holochain_state::env::EnvironmentWrite;
 
@@ -93,13 +95,16 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile>;
+    async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
         &self,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResult>;
+
+    /// Invoke a zome function on a Cell
+    async fn genesis(&self, dna_hash: DnaHash, agent_key: AgentPubKey) -> ConductorApiResult<()>;
 
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
@@ -121,12 +126,16 @@ pub trait ConductorHandleT: Send + Sync {
     async fn create_cells(
         &self,
         cells: Vec<CellId>,
-        handle: ConductorHandle,
+        cell_api: ConductorHandle,
     ) -> ConductorResult<()>;
 
     // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+
+    // HACK: remove when B-01593 lands
+    #[cfg(test)]
+    async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -166,7 +175,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(self.0.read().await.dna_store().list())
     }
 
-    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile> {
+    async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.0.read().await.dna_store().get(hash)
     }
 
@@ -181,6 +190,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
         cell.invoke_zome(invocation).await.map_err(Into::into)
+    }
+
+    async fn genesis(&self, dna_hash: DnaHash, agent_key: AgentPubKey) -> ConductorApiResult<()> {
+        let dna_file = self.get_dna(&dna_hash).await.ok_or(CellError::DnaMissing)?;
+        let lock = self.0.read().await;
+        let cell_id = CellId::from((dna_hash, agent_key));
+        debug!(?cell_id);
+        let cell: &Cell = lock.cell_by_id(&cell_id)?;
+        cell.genesis(dna_file).await.map_err(Into::into)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
@@ -221,5 +239,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.0.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.state_env())
+    }
+
+    #[cfg(test)]
+    async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
+        let lock = self.0.read().await;
+        Ok(lock.get_state_from_handle().await?)
     }
 }
