@@ -74,14 +74,14 @@ where
                     .iter_back()
                     .scan(None, |current_header, entry| {
                         let my_header = current_header.clone();
-                        *current_header = entry.header().prev_header().map(|h| h.clone());
+                        *current_header = entry.header().prev_header().cloned();
                         let r = match my_header {
                             Some(current_header) if current_header == chain_head_start => None,
                             _ => Some(entry),
                         };
                         Ok(r)
                     })
-                    .map_err(|e| WorkflowError::from(e))
+                    .map_err(WorkflowError::from)
                     // call the sys validation on the changes etc.
                     .map(|chain_head| {
                         // check_entry_hash(&chain_head.entry_address.into())?
