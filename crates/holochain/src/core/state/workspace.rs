@@ -7,6 +7,7 @@ mod genesis;
 mod invoke_zome;
 pub use app_validation::AppValidationWorkspace;
 pub use genesis::GenesisWorkspace;
+pub use invoke_zome::raw::UnsafeInvokeZomeWorkspace;
 pub use invoke_zome::InvokeZomeWorkspace;
 
 #[derive(Debug, Error)]

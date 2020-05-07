@@ -13,13 +13,14 @@ use holochain_types::{dna::DnaFile, nucleus::ZomeInvocation, prelude::*};
 use std::time::Duration;
 use thiserror::Error;
 
-use super::state::source_chain::SourceChainError;
+use super::{ribosome::error::RibosomeError, state::source_chain::SourceChainError};
 
 /// Specify the workflow-specific arguments to the functions that make the workflow go
 /// It's intended that resources like Workspaces and Conductor APIs don't go here.
 #[derive(Debug)]
 pub enum WorkflowCall {
     InvokeZome(Box<ZomeInvocation>),
+    InitializeZome,
     Genesis(Box<DnaFile>, AgentPubKey),
     // AppValidation(Vec<DhtOp>),
     // {
@@ -65,6 +66,16 @@ impl WorkflowTrigger {
     }
 }
 
+impl<W: Workspace> std::fmt::Debug for WorkflowEffects<W> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WorkflowEffects")
+            .field("triggers", &self.triggers)
+            .field("callbacks", &self.callbacks)
+            .field("signals", &self.signals)
+            .finish()
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
@@ -79,11 +90,17 @@ pub enum WorkflowError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),
 
+    #[error(transparent)]
+    RibosomeError(#[from] RibosomeError),
+
     #[error("Source chain error: {0}")]
     SourceChainError(#[from] SourceChainError),
 
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
+
+    #[error("Capability token missing")]
+    CapabilityMissing,
 }
 
 /// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.

@@ -40,7 +40,7 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    chain_meta::{ChainMetaBufT, EntryDhtStatus},
+    chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus},
 };
 use holochain_state::{error::DatabaseResult, prelude::Reader};
 use holochain_types::address::EntryAddress;
@@ -51,7 +51,7 @@ use tracing::*;
 #[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, C>
+pub struct Cascade<'env, C = ChainMetaBuf<'env>>
 where
     C: ChainMetaBufT<'env>,
 {
