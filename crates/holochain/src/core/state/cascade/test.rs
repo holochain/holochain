@@ -34,7 +34,7 @@ struct Chains<'env> {
 
 fn setup_env<'env>(
     reader: &'env Reader<'env>,
-    dbs: &'env impl GetDb,
+    dbs: &impl GetDb,
 ) -> DatabaseResult<Chains<'env>> {
     let previous_header = fake_header_hash("previous");
 

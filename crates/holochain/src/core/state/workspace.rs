@@ -50,7 +50,7 @@ pub mod tests {
     }
 
     impl<'env> TestWorkspace<'env> {
-        pub fn new(reader: &'env Reader<'env>, dbs: &'env impl GetDb) -> WorkspaceResult<Self> {
+        pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_ENTRIES)?)?,
                 two: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?)?,

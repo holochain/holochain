@@ -15,7 +15,7 @@ pub struct SourceChainBuf<'env, R: Readable> {
 }
 
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
-    pub fn new(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
@@ -26,7 +26,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
@@ -36,6 +36,10 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     pub fn chain_head(&self) -> Option<&HeaderAddress> {
         self.sequence.chain_head()
+    }
+
+    pub fn len(&self) -> usize {
+        self.sequence.len()
     }
 
     /*pub fn get_entry(&self, k: EntryAddress) -> DatabaseResult<Option<Entry>> {

@@ -5,7 +5,10 @@
 
 use holo_hash::*;
 use holochain_keystore::Signature;
-use holochain_state::{error::DatabaseResult, prelude::*};
+use holochain_state::{
+    error::DatabaseResult,
+    prelude::{Readable, Reader}, db::GetDb,
+};
 use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
 use shrinkwraprs::Shrinkwrap;
 
@@ -18,7 +21,8 @@ mod source_chain_buffer;
 /// A wrapper around [SourceChainBuf] with the assumption that the source chain has been initialized,
 /// i.e. has undergone Genesis.
 #[derive(Shrinkwrap)]
-pub struct SourceChain<'env, R: Readable>(SourceChainBuf<'env, R>);
+#[shrinkwrap(mutable)]
+pub struct SourceChain<'env, R: Readable = Reader<'env>>(pub SourceChainBuf<'env, R>);
 
 impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
@@ -32,8 +36,12 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
-    pub fn new(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
+    }
+
+    pub fn into_inner(self) -> SourceChainBuf<'env, R> {
+        self.0
     }
 }
 

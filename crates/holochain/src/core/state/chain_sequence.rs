@@ -39,7 +39,7 @@ pub struct ChainSequenceBuf<'env, R: Readable> {
 
 impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
     /// Create a new instance from a read-only transaction and a database reference
-    pub fn new(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db: Store<'env, R> = IntKvBuf::new(reader, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
@@ -73,6 +73,11 @@ impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
     /// Get the chain head, AKA top chain header. None if the chain is empty.
     pub fn chain_head(&self) -> Option<&HeaderAddress> {
         self.current_head.as_ref()
+    }
+
+    /// The length is just the next index
+    pub fn len(&self) -> usize {
+        self.next_index as usize
     }
 
     /// Add a header to the chain, setting all other values automatically.

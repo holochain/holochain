@@ -4,7 +4,7 @@
 use super::WorkflowEffects;
 use crate::{
     conductor::api::error::ConductorApiError,
-    core::state::{source_chain::SourceChainError, workspace::WorkspaceError},
+    core::{ribosome::error::RibosomeError, state::{source_chain::SourceChainError, workspace::WorkspaceError}},
 };
 use holochain_state::error::DatabaseError;
 use holochain_types::prelude::*;
@@ -24,8 +24,14 @@ pub enum WorkflowError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),
 
+    #[error(transparent)]
+    RibosomeError(#[from] RibosomeError),
+
     #[error("Source chain error: {0}")]
     SourceChainError(#[from] SourceChainError),
+
+    #[error("Capability token missing")]
+    CapabilityMissing,
 }
 
 /// The `Result::Ok` of any workflow function is

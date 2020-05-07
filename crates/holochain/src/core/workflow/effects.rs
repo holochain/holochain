@@ -47,9 +47,16 @@ type TriggerOutput = tokio::task::JoinHandle<WorkflowRunResult<()>>;
 // TODO: B-01567: this can't be implemented as such until we find out how to
 // dynamically create a Workspace via the trait-defined Workspace::new(),
 // and to have the lifetimes match up.
+// TODO: look into heterogeneous lists (frunk)
+
 pub trait WorkflowTriggers<'env>: Send {
     /// Execute the triggers, causing other workflow tasks to be spawned
     fn run(self, env: EnvironmentWrite) -> TriggerOutput;
+
+    /// FIXME: Placeholder
+    fn is_empty(&self) -> bool {
+        todo!("implement with hlist")
+    }
 }
 
 impl<'env> WorkflowTriggers<'env> for () {
@@ -60,7 +67,7 @@ impl<'env> WorkflowTriggers<'env> for () {
 
 impl<'env, W1> WorkflowTriggers<'env> for W1
 where
-    W1: 'static + Workflow<'static, Output = ()>,
+    W1: 'static + Workflow<'env, Output = ()>,
 {
     #[allow(unreachable_code)]
     fn run(self, env: EnvironmentWrite) -> TriggerOutput {
@@ -71,10 +78,24 @@ where
     }
 }
 
+impl<'env, T> WorkflowTriggers<'env> for Option<T>
+where
+    T: WorkflowTriggers<'env>,
+{
+    #[allow(unreachable_code)]
+    fn run(self, env: EnvironmentWrite) -> TriggerOutput {
+        if let Some(w) = self {
+            w.run(env)
+        } else {
+            ().run(env)
+        }
+    }
+}
+
 impl<'env, W1, W2> WorkflowTriggers<'env> for (W1, W2)
 where
-    W1: 'static + Workflow<'static, Output = ()>,
-    W2: 'static + Workflow<'static, Output = ()>,
+    W1: 'static + Workflow<'env, Output = ()>,
+    W2: 'static + Workflow<'env, Output = ()>,
 {
     #[allow(unreachable_code)]
     fn run(self, env: EnvironmentWrite) -> TriggerOutput {

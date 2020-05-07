@@ -40,13 +40,13 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         })
     }
 
-    pub fn primary(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn primary(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let entries = dbs.get_db(&*PRIMARY_CHAIN_ENTRIES)?;
         let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 
-    pub fn cache(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let entries = dbs.get_db(&*CACHE_CHAIN_ENTRIES)?;
         let headers = dbs.get_db(&*CACHE_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)

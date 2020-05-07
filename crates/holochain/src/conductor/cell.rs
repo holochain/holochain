@@ -82,12 +82,13 @@ impl Cell {
     ) -> ConductorApiResult<ZomeInvocationResult> {
         let arc = self.state_env();
         let env = arc.guard().await;
+        let reader = env.reader()?;
         let workflow = InvokeZomeWorkflow {
             api: self.conductor_api.clone(),
             ribosome: self.get_ribosome(),
             invocation,
         };
-        let workspace = InvokeZomeWorkspace::new(&env.reader()?, &env)?;
+        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
         Ok(run_workflow(self.state_env(), workflow, workspace)
             .await
             .map_err(Box::new)?)

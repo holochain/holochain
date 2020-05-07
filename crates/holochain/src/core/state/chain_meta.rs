@@ -1,12 +1,12 @@
 #![allow(clippy::ptr_arg)]
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{BufMultiVal, KvvBuf},
+    buffer::KvvBuf,
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::DatabaseResult,
     prelude::*,
 };
-use holochain_types::address::EntryAddress;
+use holochain_types::{address::EntryAddress, shims::*};
 use mockall::mock;
 use std::collections::HashSet;
 use std::convert::TryInto;
@@ -80,18 +80,16 @@ where
     fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>>;
     fn get_crud(&self, entry_address: EntryAddress) -> DatabaseResult<EntryDhtStatus>;
 }
-pub struct ChainMetaBuf<'env, V, R = Reader<'env>>
+pub struct ChainMetaBuf<'env, R = Reader<'env>>
 where
-    V: BufMultiVal,
     R: Readable,
 {
-    _system_meta: KvvBuf<'env, Vec<u8>, V, R>,
-    links_meta: KvvBuf<'env, Vec<u8>, V, R>,
+    _system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, R>,
+    links_meta: KvvBuf<'env, Vec<u8>, LinkMetaVal, R>,
 }
 
-impl<'env, V, R> ChainMetaBuf<'env, V, R>
+impl<'env, R> ChainMetaBuf<'env, R>
 where
-    V: BufMultiVal + Debug,
     R: Readable,
 {
     pub(crate) fn new(
@@ -104,20 +102,20 @@ where
             links_meta: KvvBuf::new(reader, links_meta)?,
         })
     }
-    pub fn primary(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn primary(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*PRIMARY_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*PRIMARY_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 
-    pub fn cache(reader: &'env R, dbs: &'env impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 }
 
-impl<'env, R> ChainMetaBufT<'env, R> for ChainMetaBuf<'env, (), R>
+impl<'env, R> ChainMetaBufT<'env, R> for ChainMetaBuf<'env, R>
 where
     R: Readable,
 {

@@ -24,9 +24,12 @@
 mod effects;
 pub mod error;
 mod genesis_workflow;
+mod initialize_zomes_workflow;
 mod invoke_zome_workflow;
-pub use genesis_workflow::*;
-pub use invoke_zome_workflow::*;
+pub(crate) use genesis_workflow::*;
+pub(crate) use initialize_zomes_workflow::*;
+pub(crate) use invoke_zome_workflow::unsafe_invoke_zome_workspace;
+pub(crate) use invoke_zome_workflow::*;
 
 pub use effects::*;
 
@@ -118,4 +121,14 @@ async fn finish<'env, Wf: Workflow<'env>>(
     let _handle = triggers.run(arc);
 
     Ok(())
+}
+
+impl<'env, Wf: Workflow<'env>> std::fmt::Debug for WorkflowEffects<'env, Wf> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WorkflowEffects")
+            // .field("triggers", &self.triggers)
+            .field("callbacks", &self.callbacks)
+            .field("signals", &self.signals)
+            .finish()
+    }
 }
