@@ -43,7 +43,7 @@ impl PartialEq for Cell {
 /// [CellConductorApi] or an [AppInterfaceApi])
 pub struct Cell {
     id: CellId,
-    conductor_api: CellConductorApi,
+    _conductor_api: CellConductorApi,
     state_env: EnvironmentWrite,
 }
 

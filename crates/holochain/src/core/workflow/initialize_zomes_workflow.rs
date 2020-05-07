@@ -17,8 +17,8 @@ impl<'env> Workflow<'env> for InitializeZomesWorkflow
 
     fn workflow(
         self,
-        workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
+        _workspace: Self::Workspace,
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
         async {
             unimplemented!()
         }.boxed().into()
@@ -30,6 +30,6 @@ pub(crate) struct InitializeZomesWorkspace;
 
 impl<'env> Workspace<'env> for InitializeZomesWorkspace {
     fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError> {
-        unimplemented!()
+        Ok(writer.commit()?)
     }
 }

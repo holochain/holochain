@@ -26,6 +26,7 @@ pub mod error;
 mod genesis_workflow;
 mod initialize_zomes_workflow;
 mod invoke_zome_workflow;
+#[allow(unused_imports)]
 pub(crate) use genesis_workflow::*;
 pub(crate) use initialize_zomes_workflow::*;
 pub(crate) use invoke_zome_workflow::unsafe_invoke_zome_workspace;
@@ -60,7 +61,7 @@ pub trait Workflow<'env>: Sized + Send {
     fn workflow(
         self,
         workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>>;
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>>;
 }
 
 /// This is the main way to run a Workflow. By constructing a Workflow and
@@ -72,7 +73,7 @@ pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
     workspace: Wf::Workspace,
 ) -> WorkflowRunResult<O> {
     let (output, effects) = wc.workflow(workspace).await?;
-    finish(arc, effects).await?;
+    finish::<Wf>(arc, effects).await?;
     Ok(output)
 }
 
@@ -83,7 +84,7 @@ pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
 /// 4. Trigger any subsequent Workflows
 async fn finish<'env, Wf: Workflow<'env>>(
     arc: EnvironmentWrite,
-    effects: WorkflowEffects<'env, Wf>,
+    effects: WorkflowEffects<Wf::Workspace, Wf::Triggers>,
 ) -> WorkflowRunResult<()> {
     let WorkflowEffects {
         workspace,
@@ -123,9 +124,10 @@ async fn finish<'env, Wf: Workflow<'env>>(
     Ok(())
 }
 
-impl<'env, Wf: Workflow<'env>> std::fmt::Debug for WorkflowEffects<'env, Wf> {
+impl<'env, Ws: Workspace<'env>, Tr: WorkflowTriggers<'env>> std::fmt::Debug for WorkflowEffects<Ws, Tr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WorkflowEffects")
+            // TODO: Debug repr for triggers
             // .field("triggers", &self.triggers)
             .field("callbacks", &self.callbacks)
             .field("signals", &self.signals)

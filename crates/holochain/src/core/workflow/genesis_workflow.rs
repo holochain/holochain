@@ -32,7 +32,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
     fn workflow(
         self,
         mut workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
         async {
             let Self {
                 api,
@@ -70,7 +70,12 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 .put(agent_header, Some(Entry::Agent(agent_pubkey)))
                 .await?;
 
-            let fx = WorkflowEffects::new(workspace, Default::default(), Default::default(), ());
+            let fx = WorkflowEffects {
+                workspace,
+                callbacks: Default::default(),
+                signals: Default::default(),
+                triggers: (),
+            };
             let result = ();
 
             Ok((result, fx))
@@ -87,6 +92,7 @@ pub struct GenesisWorkspace<'env> {
 
 impl<'env> GenesisWorkspace<'env> {
     /// Constructor
+    #[allow(dead_code)]
     pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self {
             source_chain: SourceChainBuf::<'env>::new(reader, dbs)?,

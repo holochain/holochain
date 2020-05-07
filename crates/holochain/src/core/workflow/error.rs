@@ -1,10 +1,13 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
-use super::WorkflowEffects;
+use super::{Workflow, WorkflowEffects};
 use crate::{
     conductor::api::error::ConductorApiError,
-    core::{ribosome::error::RibosomeError, state::{source_chain::SourceChainError, workspace::WorkspaceError}},
+    core::{
+        ribosome::error::RibosomeError,
+        state::{source_chain::SourceChainError, workspace::WorkspaceError},
+    },
 };
 use holochain_state::error::DatabaseError;
 use holochain_types::prelude::*;
@@ -36,7 +39,13 @@ pub enum WorkflowError {
 
 /// The `Result::Ok` of any workflow function is
 /// a tuple of the function output and a `WorkflowEffects` struct.
-pub type WorkflowResult<'env, O, Wf> = Result<(O, WorkflowEffects<'env, Wf>), WorkflowError>;
+pub type WorkflowResult<'env, Wf> = Result<
+    (
+        <Wf as Workflow<'env>>::Output,
+        WorkflowEffects<<Wf as Workflow<'env>>::Workspace, <Wf as Workflow<'env>>::Triggers>,
+    ),
+    WorkflowError,
+>;
 
 #[derive(Error, Debug)]
 pub enum WorkflowRunError {

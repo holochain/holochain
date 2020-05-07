@@ -4,18 +4,12 @@ use super::{
     InitializeZomesWorkflow, Workflow, WorkflowEffects,
 };
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
-use crate::{
-    conductor::api::CellConductorApiT,
-    core::state::{
-        cascade::Cascade,
-        chain_cas::ChainCasBuf,
-        chain_meta::ChainMetaBuf,
-        source_chain::{SourceChain, SourceChainBuf},
-        workspace::WorkspaceResult,
-    },
+use crate::core::state::{
+    cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
+    workspace::WorkspaceResult,
 };
 use fallible_iterator::FallibleIterator;
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
 use must_future::MustBoxFuture;
@@ -44,7 +38,7 @@ where
     fn workflow(
         self,
         mut workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self::Output, Self>> {
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
         async {
             let Self {
                 ribosome,
@@ -96,8 +90,12 @@ where
                     .collect::<Vec<_>>()?;
             }
 
-            let fx =
-                WorkflowEffects::new(workspace, Default::default(), Default::default(), triggers);
+            let fx = WorkflowEffects {
+                workspace,
+                callbacks: Default::default(),
+                signals: Default::default(),
+                triggers,
+            };
 
             Ok((result, fx))
         }
@@ -153,7 +151,7 @@ pub mod tests {
     use crate::core::ribosome::wasm_test::zome_invocation_from_names;
     use crate::core::ribosome::MockRibosomeT;
     use crate::core::workflow::effects::WorkflowTriggers;
-    use crate::{conductor::api::CellConductorApi, core::workflow::WorkflowError};
+    use crate::core::workflow::WorkflowError;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{
@@ -204,7 +202,7 @@ pub mod tests {
         workspace: InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
         invocation: ZomeInvocation,
-    ) -> WorkflowResult<'env, ZomeInvocationResult, InvokeZomeWorkflow<Ribosome>> {
+    ) -> WorkflowResult<'env, InvokeZomeWorkflow<Ribosome>> {
         let workflow = InvokeZomeWorkflow {
             invocation,
             ribosome,

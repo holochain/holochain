@@ -8,7 +8,6 @@
 use crate::core::workflow::{error::WorkflowRunResult, run_workflow, Workflow};
 use either::Either;
 use holochain_state::env::EnvironmentWrite;
-use holochain_types::prelude::*;
 
 type TriggerOutput = tokio::task::JoinHandle<WorkflowRunResult<()>>;
 
