@@ -32,10 +32,16 @@
 //! source: https://textik.com/#d7907793784e17e9
 //! ```
 
+#[allow(missing_docs)]
 pub mod cascade;
+#[allow(missing_docs)]
 pub mod chain_cas;
+#[allow(missing_docs)]
 pub mod chain_meta;
+#[allow(missing_docs)]
 pub mod chain_sequence;
+#[allow(missing_docs)]
 pub mod source_chain;
+#[allow(missing_docs)]
 pub mod wasm;
 pub mod workspace;

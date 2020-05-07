@@ -1,6 +1,6 @@
 use super::HostContext;
 use super::WasmRibosome;
-use crate::core::state::workspace::InvokeZomeWorkspace;
+use crate::core::workflow::InvokeZomeWorkspace;
 use futures::{future::BoxFuture, FutureExt};
 use holochain_state::error::DatabaseResult;
 use holochain_types::{entry::Entry, test_utils::fake_agent_pubkey_1};

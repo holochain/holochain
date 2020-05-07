@@ -35,6 +35,7 @@ async-trait = "0.1.24"
 nanoid = "0.3.0"
 either = "1.5.0"
 holo_hash = { path = "../holo_hash" }
+must_future = "0.1.1"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "0.0.46-alpha1" }

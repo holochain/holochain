@@ -1,7 +1,7 @@
 use crate::{
     buffer::{BufKey, BufVal},
     error::{DatabaseError, DatabaseResult},
-    prelude::{Readable, Writer},
+    prelude::*,
 };
 use rkv::SingleStore;
 

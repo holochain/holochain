@@ -44,20 +44,13 @@
 //! code which interacted with the Conductor would also have to be highly generic.
 
 use super::{
-    api::{error::ConductorApiResult, CellConductorApi},
-    config::AdminInterfaceConfig,
-    dna_store::DnaStore,
-    error::ConductorResult,
-    manager::TaskManagerRunHandle,
-    Cell, Conductor,
+    api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
+    error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
 };
+use crate::core::workflow::ZomeInvocationResult;
 use derive_more::From;
 use holochain_types::{
-    autonomic::AutonomicCue,
-    cell::CellId,
-    dna::DnaFile,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*,
+    autonomic::AutonomicCue, cell::CellId, dna::DnaFile, nucleus::ZomeInvocation, prelude::*,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -93,9 +86,8 @@ pub trait ConductorHandleT: Send + Sync {
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
         &self,
-        api: CellConductorApi,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse>;
+    ) -> ConductorApiResult<ZomeInvocationResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
@@ -150,12 +142,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn invoke_zome(
         &self,
-        api: CellConductorApi,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
+    ) -> ConductorApiResult<ZomeInvocationResult> {
         let lock = self.0.read().await;
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        cell.invoke_zome(api, invocation).await.map_err(Into::into)
+        cell.invoke_zome(invocation).await.map_err(Into::into)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {

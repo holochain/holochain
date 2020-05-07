@@ -54,6 +54,8 @@ holo_hash_core = { path = "../holo_hash_core" }
 holo_hash = { path = "../holo_hash" }
 uuid = { version = "0.7", features = ["serde", "v4"] }
 predicates = "1.0.4"
+must_future = "0.1.1"
+either = "1.5.0"
 
 [dev-dependencies]
 anyhow = "1.0.26"

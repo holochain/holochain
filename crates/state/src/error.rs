@@ -17,6 +17,9 @@ pub enum DatabaseError {
     #[error("An LMDB store was not created/initialized: {0}")]
     StoreNotInitialized(DbName),
 
+    #[error("An LMDB environment's database map was initialized more than once: {0}")]
+    EnvironmentDoubleInitialized(PathBuf),
+
     #[error("LMDB environment directory does not exist at configured path: {0}")]
     EnvironmentMissing(PathBuf),
 

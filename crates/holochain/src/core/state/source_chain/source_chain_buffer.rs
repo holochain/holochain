@@ -3,16 +3,9 @@ use crate::core::state::{
     chain_sequence::ChainSequenceBuf,
     source_chain::{ChainElement, SignedHeader, SourceChainError, SourceChainResult},
 };
-
 use fallible_iterator::FallibleIterator;
-use holochain_state::{
-    buffer::BufferedStore,
-    db::DbManager,
-    error::DatabaseResult,
-    prelude::{Readable, Writer},
-};
+use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
 use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
-
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -22,22 +15,22 @@ pub struct SourceChainBuf<'env, R: Readable> {
 }
 
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
-    pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
-            keystore: dbs.keystore().clone(),
+            keystore: dbs.keystore(),
         })
     }
 
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
-            keystore: dbs.keystore().clone(),
+            keystore: dbs.keystore(),
         })
     }
 
@@ -238,7 +231,7 @@ pub mod tests {
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
@@ -294,7 +287,7 @@ pub mod tests {
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 

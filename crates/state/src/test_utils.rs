@@ -1,6 +1,6 @@
 //! Helpers for unit tests
 
-use crate::env::{Environment, EnvironmentKind};
+use crate::env::{EnvironmentKind, EnvironmentWrite};
 use holochain_types::test_utils::fake_cell_id;
 use tempdir::TempDir;
 
@@ -76,20 +76,20 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
 
 fn test_env(kind: EnvironmentKind) -> TestEnvironment {
     let tmpdir = TempDir::new("holochain-test-environments").unwrap();
-    // TODO: Wrap Environment along with the TempDir so that it lives longer
-    Environment::new(tmpdir.path(), kind, test_keystore())
+    // TODO: Wrap EnvironmentWrite along with the TempDir so that it lives longer
+    EnvironmentWrite::new(tmpdir.path(), kind, test_keystore())
         .expect("Couldn't create test LMDB environment")
 }
 
-type TestEnvironment = Environment;
+type TestEnvironment = EnvironmentWrite;
 
 // FIXME: Currently the test environments using TempDirs above immediately
 // delete the temp dirs after installation. If we ever have cases where we
 // want to flush to disk, this will probably fail. In that case we want to
 // use something like this, which owns the TempDir so it lives long enough
 //
-// /// A wrapper around an Environment which includes a reference to a TempDir,
+// /// A wrapper around an EnvironmentWrite which includes a reference to a TempDir,
 // /// so that when the TestEnvironment goes out of scope, the tempdir is deleted
 // /// from the filesystem
 // #[derive(Shrinkwrap)]
-// pub struct TestEnvironment(#[shrinkwrap(main_field)] Environment, TempDir);
+// pub struct TestEnvironment(#[shrinkwrap(main_field)] EnvironmentWrite, TempDir);

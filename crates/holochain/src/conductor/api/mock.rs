@@ -3,13 +3,11 @@
 
 use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
+use crate::core::workflow::ZomeInvocationResult;
 use async_trait::async_trait;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{
-    autonomic::AutonomicCue,
-    cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::Todo,
+    autonomic::AutonomicCue, cell::CellId, nucleus::ZomeInvocation, prelude::Todo,
 };
 use mockall::mock;
 
@@ -25,7 +23,7 @@ mock! {
             &self,
             cell_id: &CellId,
             invocation: ZomeInvocation,
-        ) -> ConductorApiResult<ZomeInvocationResponse>;
+        ) -> ConductorApiResult<ZomeInvocationResult>;
 
         fn sync_network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
@@ -52,7 +50,7 @@ impl CellConductorApiT for MockCellConductorApi {
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
+    ) -> ConductorApiResult<ZomeInvocationResult> {
         self.sync_invoke_zome(cell_id, invocation)
     }
 

@@ -1,104 +1,138 @@
-mod genesis;
-mod invoke_zome;
-pub mod runner;
-pub(crate) use genesis::genesis;
-pub(crate) use invoke_zome::invoke_zome;
+//! Workflows are the core building block of Holochain functionality.
+//!
+//! ## Properties
+//!
+//! Workflows are **transactional**, so that if any workflow fails to run to
+//! completion, nothing will happen.
+//!
+//! In order to achieve this, workflow functions are **free of any side-effects
+//! which modify cryptographic state**: they will not modify the source chain
+//! nor send network messages which could cause other agents to update their own
+//! source chain.
+//!
+//! Workflows are **never nested**. A workflow cannot call another workflow.
+//! However, a workflow can specify that any number of other workflows should
+//! be triggered after this one completes.
+//!
+//! Side effects and triggering of other workflows is specified declaratively
+//! rather than imperatively. Each workflow returns a `WorkflowEffects` value
+//! representing the side effects that should be run. The `finish` function
+//! processes this value and performs the necessary actions, including
+//! committing changes to the associated Workspace and triggering other
+//! workflows.
 
-use crate::{
-    conductor::api::error::ConductorApiError,
-    core::state::workspace::{Workspace, WorkspaceError},
-};
-use holochain_state::error::DatabaseError;
-use holochain_types::{dna::DnaFile, nucleus::ZomeInvocation, prelude::*};
-use std::time::Duration;
-use thiserror::Error;
+mod effects;
+pub mod error;
+mod genesis_workflow;
+mod initialize_zomes_workflow;
+mod invoke_zome_workflow;
+#[allow(unused_imports)]
+pub(crate) use genesis_workflow::*;
+pub(crate) use initialize_zomes_workflow::*;
+pub(crate) use invoke_zome_workflow::unsafe_invoke_zome_workspace;
+pub(crate) use invoke_zome_workflow::*;
 
-use super::{ribosome::error::RibosomeError, state::source_chain::SourceChainError};
+pub use effects::*;
 
-/// Specify the workflow-specific arguments to the functions that make the workflow go
-/// It's intended that resources like Workspaces and Conductor APIs don't go here.
-#[derive(Debug)]
-pub enum WorkflowCall {
-    InvokeZome(Box<ZomeInvocation>),
-    InitializeZome,
-    Genesis(Box<DnaFile>, AgentPubKey),
-    // AppValidation(Vec<DhtOp>),
-    // {
-    //     invocation: ZomeInvocation,
-    //     source_chain: SourceChain<'_>,
-    //     ribosome: Ribo,
-    //     conductor_api: Api,
-    // }
+use crate::core::state::workspace::Workspace;
+use error::*;
+use holochain_state::env::EnvironmentWrite;
+use must_future::MustBoxFuture;
+use tracing::*;
+
+/// Definition of a Workflow.
+///
+/// The workflow logic is defined in the `workflow` function. Additional
+/// parameters can be specified as struct fields on the impls.
+///
+/// There are three associated types:
+/// - Output, the return value of the function
+/// - Workspace, the bundle of Buffered Stores used to stage changes to be persisted later
+/// - Triggers, a type representing workflows to be triggered upon completion
+pub trait Workflow<'env>: Sized + Send {
+    /// The return value of the workflow function
+    type Output: Send;
+    /// The Workspace associated with this Workflow
+    type Workspace: Workspace<'env> + 'env;
+    /// Represents Workflows to be triggered upon completion
+    type Triggers: WorkflowTriggers<'env>;
+
+    /// Defines the actual logic for this Workflow
+    fn workflow(
+        self,
+        workspace: Self::Workspace,
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>>;
 }
 
-/// A WorkflowEffects is returned from each Workspace function.
-/// It's just a data structure with no methods of its own, hence the public fields
-pub struct WorkflowEffects<W: Workspace> {
-    pub workspace: W,
-    pub triggers: Vec<WorkflowTrigger>,
-    pub callbacks: Vec<WorkflowCallback>,
-    pub signals: Vec<WorkflowSignal>,
+/// This is the main way to run a Workflow. By constructing a Workflow and
+/// Workspace, this runs the Workflow and executes the `finish` function on
+/// the WorkflowEffects, returning the Output value of the workflow
+pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
+    arc: EnvironmentWrite,
+    wc: Wf,
+    workspace: Wf::Workspace,
+) -> WorkflowRunResult<O> {
+    let (output, effects) = wc.workflow(workspace).await?;
+    finish::<Wf>(arc, effects).await?;
+    Ok(output)
 }
 
-pub type WorkflowCallback = ();
-pub type WorkflowSignal = ();
+/// Apply the WorkflowEffects to finalize the Workflow.
+/// 1. Persist DB changes via `Workspace::commit_txn`
+/// 2. Call any Wasm callbacks
+/// 3. Emit any Signals
+/// 4. Trigger any subsequent Workflows
+async fn finish<'env, Wf: Workflow<'env>>(
+    arc: EnvironmentWrite,
+    effects: WorkflowEffects<Wf::Workspace, Wf::Triggers>,
+) -> WorkflowRunResult<()> {
+    let WorkflowEffects {
+        workspace,
+        triggers,
+        callbacks,
+        signals,
+        ..
+    } = effects;
 
-#[derive(Debug)]
-pub struct WorkflowTrigger {
-    pub(crate) call: WorkflowCall,
-    pub(crate) interval: Option<Duration>,
-}
+    // finish workspace
+    {
+        let env = arc.guard().await;
+        let writer = env.writer_unmanaged()?;
+        workspace.commit_txn(writer)?;
+    }
 
-#[allow(dead_code)]
-impl WorkflowTrigger {
-    pub fn immediate(call: WorkflowCall) -> Self {
-        Self {
-            call,
-            interval: None,
+    // finish callbacks
+    {
+        warn!("Workflow-generated callbacks are unimplemented");
+        for _callback in callbacks {
+            // TODO
         }
     }
 
-    pub fn delayed(call: WorkflowCall, interval: Duration) -> Self {
-        Self {
-            call,
-            interval: Some(interval),
+    // finish signals
+    {
+        warn!("Workflow-generated signals are unimplemented");
+        for _signal in signals {
+            // TODO
         }
     }
+
+    // finish triggers
+    warn!("Workflow-generated triggers are unimplemented");
+    let _handle = triggers.run(arc);
+
+    Ok(())
 }
 
-impl<W: Workspace> std::fmt::Debug for WorkflowEffects<W> {
+impl<'env, Ws: Workspace<'env>, Tr: WorkflowTriggers<'env>> std::fmt::Debug
+    for WorkflowEffects<Ws, Tr>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WorkflowEffects")
-            .field("triggers", &self.triggers)
+            // TODO: Debug repr for triggers
+            // .field("triggers", &self.triggers)
             .field("callbacks", &self.callbacks)
             .field("signals", &self.signals)
             .finish()
     }
 }
-
-#[derive(Error, Debug)]
-pub enum WorkflowError {
-    #[error("Agent is invalid: {0:?}")]
-    AgentInvalid(AgentPubKey),
-
-    #[error("Conductor API error: {0}")]
-    ConductorApi(#[from] ConductorApiError),
-
-    #[error("Workspace error: {0}")]
-    WorkspaceError(#[from] WorkspaceError),
-
-    #[error("Database error: {0}")]
-    DatabaseError(#[from] DatabaseError),
-
-    #[error(transparent)]
-    RibosomeError(#[from] RibosomeError),
-
-    #[error("Source chain error: {0}")]
-    SourceChainError(#[from] SourceChainError),
-
-    #[error("Capability token missing")]
-    CapabilityMissing,
-}
-
-/// The `Result::Ok` of any workflow function is a `WorkflowEffects` struct.
-pub type WorkflowResult<W> = Result<WorkflowEffects<W>, WorkflowError>;

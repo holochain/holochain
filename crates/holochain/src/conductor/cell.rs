@@ -3,15 +3,15 @@ use crate::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    core::ribosome::WasmRibosome,
+    core::{
+        ribosome::WasmRibosome,
+        workflow::{run_workflow, InvokeZomeWorkflow, InvokeZomeWorkspace, ZomeInvocationResult},
+    },
 };
 use holo_hash::*;
-use holochain_state::env::Environment;
+use holochain_state::{env::EnvironmentWrite, prelude::*};
 use holochain_types::{
-    autonomic::AutonomicProcess,
-    cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*,
+    autonomic::AutonomicProcess, cell::CellId, nucleus::ZomeInvocation, shims::*,
 };
 use std::hash::{Hash, Hasher};
 
@@ -43,8 +43,8 @@ impl PartialEq for Cell {
 /// [CellConductorApi] or an [AppInterfaceApi])
 pub struct Cell {
     id: CellId,
-    conductor_api: CellConductorApi,
-    state_env: Environment,
+    _conductor_api: CellConductorApi,
+    state_env: EnvironmentWrite,
 }
 
 impl Cell {
@@ -78,25 +78,29 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
-        _conductor_api: CellConductorApi,
-        _invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResult> {
+        let arc = self.state_env();
+        let env = arc.guard().await;
+        let reader = env.reader()?;
+        let workflow = InvokeZomeWorkflow {
+            ribosome: self.get_ribosome(),
+            invocation,
+        };
+        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
+        Ok(run_workflow(self.state_env(), workflow, workspace)
+            .await
+            .map_err(Box::new)?)
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn get_ribosome(&self) -> WasmRibosome {
         unimplemented!()
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn state_env(&self) -> Environment {
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
+    pub(crate) fn state_env(&self) -> EnvironmentWrite {
         self.state_env.clone()
-    }
-
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn get_conductor_api(&self) -> CellConductorApi {
-        self.conductor_api.clone()
     }
 }
 
