@@ -73,6 +73,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     async fn chain_element(
         &self,
         signed_header: SignedHeader,
+        header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
         let maybe_entry_address = match signed_header.header().clone() {
             HeaderType::EntryCreate(header::EntryCreate { entry_address, .. }) => {
@@ -97,6 +98,18 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
             }
         };
         let header = Header::new(signed_header.header().clone()).await?;
+        match header_address {
+            HeaderAddress::Header(given_hash) => {
+                // hashes should always match - unless our store is corrupted
+                if given_hash != header.hash() {
+                    panic!(
+                        "header hash mismatch - store corrupted? given: {} calculated: {}",
+                        given_hash.to_string(),
+                        header.hash().to_string()
+                    );
+                }
+            }
+        }
         Ok(Some(ChainElement::new(signed_header, header, maybe_entry)))
     }
 
@@ -106,7 +119,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
         if let Some(signed_header) = self.get_header(header_address)? {
-            self.chain_element(signed_header).await
+            self.chain_element(signed_header, header_address).await
         } else {
             Ok(None)
         }
