@@ -95,17 +95,13 @@ impl ConductorState {
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &CellId) -> Self {
-        self.cells = self.cells.into_iter().filter(|cell| cell != id).collect();
+        self.cells.retain(|cell| cell != id);
 
         self.interfaces = self
             .interfaces
             .into_iter()
             .map(|mut interface| {
-                interface.cells = interface
-                    .cells
-                    .into_iter()
-                    .filter(|cell| &cell.id != id)
-                    .collect();
+                interface.cells.retain(|cell| &cell.id != id);
                 interface
             })
             .collect();

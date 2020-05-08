@@ -21,8 +21,8 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
         })
     }
 
-    pub fn get(&self, wasm_hash: WasmHash) -> DatabaseResult<Option<DnaWasm>> {
-        self.wasm.get(&wasm_hash.into())
+    pub fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasm>> {
+        self.wasm.get(&wasm_hash.clone().into())
     }
 
     pub fn put(&mut self, v: DnaWasm) -> DatabaseResult<()> {
@@ -63,7 +63,7 @@ async fn wasm_store_round_trip() -> DatabaseResult<()> {
     // a wasm in the WasmBuf
     wasm_buf.put(wasm.clone()).unwrap();
     // a wasm from the WasmBuf
-    let ret = wasm_buf.get(hash).unwrap().unwrap();
+    let ret = wasm_buf.get(&hash).unwrap().unwrap();
 
     // assert the round trip
     assert_eq!(ret, wasm);

@@ -297,20 +297,18 @@ where
     ) -> ConductorResult<()> {
         for cell_id in cells {
             // If the cell is already loaded then do nothing
-            if let None = self.cells.get(&cell_id) {
+            if let std::collections::hash_map::Entry::Vacant(v) = self.cells.entry(cell_id.clone())
+            {
                 let cell = Cell::create(
-                    cell_id.clone(),
+                    cell_id,
                     conductor_handle.clone(),
                     &(self.root_env_dir.as_ref()),
                     self.keystore.clone(),
                 )?;
-                self.cells.insert(
-                    cell_id.clone(),
-                    CellItem {
-                        cell,
-                        _state: CellState { _active: false },
-                    },
-                );
+                v.insert(CellItem {
+                    cell,
+                    _state: CellState { _active: false },
+                });
             }
         }
         Ok(())
@@ -325,8 +323,10 @@ where
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
         // TODO: PERF: This loop might be slow
-        for dna_wasm in dna.code().values().cloned() {
-            wasm_buf.put(dna_wasm)?;
+        for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
+            if let None = wasm_buf.get(&wasm_hash.into())? {
+                wasm_buf.put(dna_wasm)?;
+            }
         }
 
         // write the db

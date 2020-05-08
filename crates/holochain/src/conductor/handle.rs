@@ -177,8 +177,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResponse> {
-        // FIXME: Are we holding this read lock for
-        // the entire call to invoke_zome ?
+        // FIXME: D-01058: We are holding this read lock for
+        // the entire call to invoke_zome and blocking
+        // any writes to the conductor
         let lock = self.0.read().await;
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
