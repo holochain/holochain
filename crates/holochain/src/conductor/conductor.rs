@@ -23,28 +23,36 @@ use super::{
         keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
         TaskManagerRunHandle,
     },
+    paths::EnvironmentRootPath,
     state::ConductorState,
 };
-use crate::conductor::{
-    api::error::{ConductorApiError, ConductorApiResult},
-    cell::Cell,
-    config::ConductorConfig,
-    dna_store::MockDnaStore,
-    error::ConductorResult,
-    handle::ConductorHandle,
+use crate::{
+    conductor::{
+        api::error::{ConductorApiError, ConductorApiResult},
+        cell::Cell,
+        config::ConductorConfig,
+        dna_store::MockDnaStore,
+        error::ConductorResult,
+        handle::ConductorHandle,
+    },
+    core::state::wasm::WasmBuf,
 };
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
     KeystoreSender,
 };
 use holochain_state::{
+    buffer::BufferedStore,
     db,
     env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
     prelude::*,
     typed::{Kv, UnitDbKey},
 };
-use holochain_types::cell::{CellHandle, CellId};
+use holochain_types::{
+    cell::{CellHandle, CellId},
+    dna::DnaFile,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
@@ -82,6 +90,9 @@ where
     /// The LMDB environment for persisting state related to this Conductor
     env: EnvironmentWrite,
 
+    /// An LMDB environment for storing wasm
+    wasm_env: EnvironmentWrite,
+
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
 
@@ -112,6 +123,9 @@ where
 
     /// Access to private keys for signing and encryption.
     keystore: KeystoreSender,
+
+    /// The root environment directory where all environments are created
+    root_env_dir: EnvironmentRootPath,
 }
 
 impl Conductor {
@@ -135,10 +149,15 @@ where
     /// for which all mutation is synchronized across all shared copies by a RwLock.
     ///
     /// This signals the completion of Conductor initialization and the beginning of its lifecycle
-    /// as the driver of its various interface handling loops
-    pub fn into_handle(self) -> ConductorHandle {
+    /// as the driver of its various interface handling loops.
+    /// The [Cell]s are also created at this point.
+    pub async fn run(self) -> ConductorResult<ConductorHandle> {
         let keystore = self.keystore.clone();
-        Arc::new(ConductorHandleImpl::from((RwLock::new(self), keystore)))
+        let cells = self.get_state().await?.cells;
+        let handle: ConductorHandle =
+            Arc::new(ConductorHandleImpl::from((RwLock::new(self), keystore)));
+        handle.create_cells(cells, handle.clone()).await?;
+        Ok(handle)
     }
 
     /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
@@ -156,6 +175,7 @@ where
     DS: DnaStore + 'static,
 {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+        debug!(cells_map = ?self.cells.keys().collect::<Vec<_>>());
         let item = self
             .cells
             .get(cell_id)
@@ -268,6 +288,51 @@ where
         }
         Ok(())
     }
+
+    /// Create the cells from the db
+    pub(super) async fn create_cells(
+        &mut self,
+        cells: Vec<CellId>,
+        conductor_handle: ConductorHandle,
+    ) -> ConductorResult<()> {
+        for cell_id in cells {
+            // If the cell is already loaded then do nothing
+            if let std::collections::hash_map::Entry::Vacant(v) = self.cells.entry(cell_id.clone())
+            {
+                let cell = Cell::create(
+                    cell_id,
+                    conductor_handle.clone(),
+                    &(self.root_env_dir.as_ref()),
+                    self.keystore.clone(),
+                )?;
+                v.insert(CellItem {
+                    cell,
+                    _state: CellState { _active: false },
+                });
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) async fn put_wasm(&mut self, dna: DnaFile) -> ConductorResult<()> {
+        let environ = &self.wasm_env;
+        let env = environ.guard().await;
+        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
+        let reader = env.reader()?;
+
+        let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
+        // TODO: PERF: This loop might be slow
+        for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
+            if let None = wasm_buf.get(&wasm_hash.into())? {
+                wasm_buf.put(dna_wasm)?;
+            }
+        }
+
+        // write the db
+        env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
+
+        Ok(())
+    }
 }
 
 // -- TODO - delete this helper when we have a real keystore -- //
@@ -329,8 +394,10 @@ where
 {
     async fn new(
         env: EnvironmentWrite,
+        wasm_env: EnvironmentWrite,
         dna_store: DS,
         keystore: KeystoreSender,
+        root_env_dir: EnvironmentRootPath,
     ) -> ConductorResult<Self> {
         let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
@@ -338,6 +405,7 @@ where
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
         Ok(Self {
             env,
+            wasm_env,
             state_db: Kv::new(db)?,
             cells: HashMap::new(),
             _handle_map: HashMap::new(),
@@ -348,6 +416,7 @@ where
             admin_websocket_ports: Vec::new(),
             dna_store,
             keystore,
+            root_env_dir,
         })
     }
 
@@ -395,7 +464,7 @@ mod builder {
 
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{env::EnvironmentKind, test_utils::test_conductor_env};
+    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironment};
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -444,7 +513,17 @@ mod builder {
                 keystore.clone(),
             )?;
 
-            let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+            let wasm_environment =
+                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
+
+            let conductor = Conductor::new(
+                environment,
+                wasm_environment,
+                self.dna_store,
+                keystore,
+                env_path,
+            )
+            .await?;
 
             #[cfg(test)]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
@@ -477,7 +556,7 @@ mod builder {
         /// move the Conductor into a handle to proceed
         pub async fn with_admin(self) -> ConductorResult<ConductorHandle> {
             let conductor_config = self.config.clone();
-            let conductor_handle: ConductorHandle = self.build().await?.into_handle();
+            let conductor_handle: ConductorHandle = self.build().await?.run().await?;
             if let Some(configs) = conductor_config.admin_interfaces {
                 conductor_handle
                     .add_admin_interfaces_via_handle(conductor_handle.clone(), configs)
@@ -488,10 +567,24 @@ mod builder {
         }
 
         /// Build a Conductor with a test environment
-        pub async fn test(self) -> ConductorResult<Conductor<DS>> {
-            let environment = test_conductor_env();
+        pub async fn test(
+            self,
+            test_env: TestEnvironment,
+            test_wasm_env: EnvironmentWrite,
+        ) -> ConductorResult<Conductor<DS>> {
+            let TestEnvironment {
+                env: environment,
+                tmpdir,
+            } = test_env;
             let keystore = environment.keystore();
-            let conductor = Conductor::new(environment, self.dna_store, keystore).await?;
+            let conductor = Conductor::new(
+                environment,
+                test_wasm_env,
+                self.dna_store,
+                keystore,
+                tmpdir.path().to_path_buf().into(),
+            )
+            .await?;
 
             #[cfg(test)]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
@@ -505,43 +598,59 @@ mod builder {
 pub mod tests {
     use super::*;
     use super::{Conductor, ConductorState};
-    use crate::conductor::{dna_store::MockDnaStore, state::CellConfig};
-    use holochain_state::test_utils::test_conductor_env;
+    use crate::conductor::dna_store::MockDnaStore;
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_types::test_utils::fake_cell_id;
 
     #[tokio::test(threaded_scheduler)]
     async fn can_update_state() {
-        let environment = test_conductor_env();
+        let TestEnvironment {
+            env: environment,
+            tmpdir,
+        } = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
-        let conductor = Conductor::new(environment, dna_store, keystore)
-            .await
-            .unwrap();
+        let conductor = Conductor::new(
+            environment,
+            wasm_env,
+            dna_store,
+            keystore,
+            tmpdir.path().to_path_buf().into(),
+        )
+        .await
+        .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state, ConductorState::default());
 
-        let cell_config = CellConfig {
-            id: "".to_string(),
-            agent: "".to_string(),
-            dna: "".to_string(),
-        };
+        let cell_id = fake_cell_id("dr. cell");
 
         conductor
             .update_state(|mut state| {
-                state.cells.push(cell_config.clone());
+                state.cells.push(cell_id.clone());
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
-        assert_eq!(state.cells, [cell_config]);
+        assert_eq!(state.cells, [cell_id]);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn can_set_fake_state() {
+        let test_env = test_conductor_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
         let state = ConductorState::default();
         let conductor = ConductorBuilder::new()
             .fake_state(state.clone())
-            .test()
+            .test(test_env, wasm_env)
             .await
             .unwrap();
         assert_eq!(state, conductor.get_state().await.unwrap());

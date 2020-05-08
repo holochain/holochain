@@ -2,6 +2,8 @@
 
 use crate::env::{EnvironmentKind, EnvironmentWrite};
 use holochain_types::test_utils::fake_cell_id;
+use shrinkwraprs::Shrinkwrap;
+use std::sync::Arc;
 use tempdir::TempDir;
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory
@@ -75,13 +77,23 @@ pub fn test_keystore() -> holochain_keystore::KeystoreSender {
 }
 
 fn test_env(kind: EnvironmentKind) -> TestEnvironment {
-    let tmpdir = TempDir::new("holochain-test-environments").unwrap();
-    // TODO: Wrap EnvironmentWrite along with the TempDir so that it lives longer
-    EnvironmentWrite::new(tmpdir.path(), kind, test_keystore())
-        .expect("Couldn't create test LMDB environment")
+    let tmpdir = Arc::new(TempDir::new("holochain-test-environments").unwrap());
+    TestEnvironment {
+        env: EnvironmentWrite::new(tmpdir.path(), kind, test_keystore())
+            .expect("Couldn't create test LMDB environment"),
+        tmpdir,
+    }
 }
 
-type TestEnvironment = EnvironmentWrite;
+/// A test lmdb environment with test directory
+#[derive(Shrinkwrap)]
+pub struct TestEnvironment {
+    #[shrinkwrap(main_field)]
+    /// lmdb environment
+    pub env: EnvironmentWrite,
+    /// temp directory for this environment
+    pub tmpdir: Arc<TempDir>,
+}
 
 // FIXME: Currently the test environments using TempDirs above immediately
 // delete the temp dirs after installation. If we ever have cases where we

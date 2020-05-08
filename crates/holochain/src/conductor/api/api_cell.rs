@@ -3,9 +3,10 @@
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::{conductor::ConductorHandle, core::workflow::ZomeInvocationResult};
 use async_trait::async_trait;
+use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{
-    autonomic::AutonomicCue, cell::CellId, nucleus::ZomeInvocation, prelude::Todo,
+    autonomic::AutonomicCue, cell::CellId, dna::DnaFile, nucleus::ZomeInvocation, prelude::Todo,
 };
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -68,6 +69,10 @@ impl CellConductorApiT for CellConductorApi {
     fn keystore(&self) -> &KeystoreSender {
         self.conductor_handle.keystore()
     }
+
+    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile> {
+        self.conductor_handle.get_dna(dna_hash).await
+    }
 }
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
@@ -97,4 +102,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
+
+    /// Get a [Dna] from the [DnaStore]
+    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile>;
 }

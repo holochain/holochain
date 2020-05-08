@@ -2,7 +2,8 @@
 
 use crate::{
     cell::CellId,
-    dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile},
+    dna::{wasm::DnaWasm, zome::Zome, Properties},
+    dna::{DnaDef, DnaFile},
     prelude::*,
     shims::CapToken,
 };
@@ -36,7 +37,9 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
-        properties: ().try_into().unwrap(),
+        properties: Properties::new(serde_json::json!({"p": "hi"}))
+            .try_into()
+            .unwrap(),
         uuid: uuid.to_string(),
         zomes: BTreeMap::new(),
     };

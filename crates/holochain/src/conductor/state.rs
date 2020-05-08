@@ -1,6 +1,6 @@
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::{dna::error::DnaError, prelude::*};
+use holochain_types::{cell::CellId, dna::error::DnaError, prelude::*};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -18,7 +18,7 @@ pub struct ConductorState {
     pub dnas: Vec<DnaConfig>,
     /// List of cells, includes references to an agent and a DNA. Optional.
     #[serde(default)]
-    pub cells: Vec<CellConfig>,
+    pub cells: Vec<CellId>,
     /// List of interfaces any UI can use to access zome functions. Optional.
     #[serde(default)]
     pub interfaces: Vec<InterfaceConfig>,
@@ -82,39 +82,26 @@ impl ConductorState {
             .is_some()
     }
 
-    /// Returns the cell configuration with the given ID if present
-    pub fn cell_by_id(&self, id: &str) -> Option<CellConfig> {
-        self.cells.iter().find(|ic| ic.id == *id).cloned()
-    }
-
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfig> {
         self.interfaces.iter().find(|ic| ic.id == *id).cloned()
     }
 
     /// Returns all defined cell IDs
-    pub fn cell_ids(&self) -> Vec<String> {
-        self.cells.iter().map(|cell| cell.id.clone()).collect()
+    pub fn cell_ids(&self) -> &Vec<CellId> {
+        &self.cells
     }
 
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
-    pub fn save_remove_cell(mut self, id: &str) -> Self {
-        self.cells = self
-            .cells
-            .into_iter()
-            .filter(|cell| cell.id != *id)
-            .collect();
+    pub fn save_remove_cell(mut self, id: &CellId) -> Self {
+        self.cells.retain(|cell| cell != id);
 
         self.interfaces = self
             .interfaces
             .into_iter()
             .map(|mut interface| {
-                interface.cells = interface
-                    .cells
-                    .into_iter()
-                    .filter(|cell| cell.id != *id)
-                    .collect();
+                interface.cells.retain(|cell| &cell.id != id);
                 interface
             })
             .collect();
@@ -147,15 +134,6 @@ pub struct DnaConfig {
     pub hash: String,
     #[serde(default)]
     pub uuid: Option<String>,
-}
-
-/// An cell combines a DNA with an agent.
-/// Each cell has its own storage configuration.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct CellConfig {
-    pub id: String,
-    pub dna: String,
-    pub agent: String,
 }
 
 /// Here, interfaces are user facing and make available zome functions to
@@ -197,7 +175,7 @@ pub struct InterfaceConfig {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct CellReferenceConfig {
     /// ID of the cell that is made available in the interface
-    pub id: String,
+    pub id: CellId,
 
     /// A local name under which the cell gets mounted in the
     /// interface's scope

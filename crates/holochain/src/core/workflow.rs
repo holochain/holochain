@@ -40,6 +40,9 @@ use holochain_state::env::EnvironmentWrite;
 use must_future::MustBoxFuture;
 use tracing::*;
 
+#[cfg(test)]
+pub use genesis_workflow::tests::fake_genesis;
+
 /// Definition of a Workflow.
 ///
 /// The workflow logic is defined in the `workflow` function. Additional

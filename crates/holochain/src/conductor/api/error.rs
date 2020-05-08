@@ -1,8 +1,11 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::{
-    conductor::error::ConductorError,
-    core::{state::workspace::WorkspaceError, workflow::error::WorkflowRunError},
+    conductor::{error::ConductorError, CellError},
+    core::{
+        ribosome::error::RibosomeError, state::workspace::WorkspaceError,
+        workflow::error::WorkflowRunError,
+    },
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
@@ -66,6 +69,10 @@ pub enum ConductorApiError {
     /// KeystoreError
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    /// Cell Error
+    #[error(transparent)]
+    CellError(#[from] CellError),
 }
 
 /// All the serialization errors that can occur
@@ -98,6 +105,8 @@ pub enum ExternalApiWireError {
     Deserialization(String),
     /// The dna path provided was invalid
     DnaReadError(String),
+    /// There was an error in the ribosome
+    RibosomeError(String),
 }
 
 impl ExternalApiWireError {
@@ -121,5 +130,11 @@ impl From<ConductorApiError> for ExternalApiWireError {
 impl From<SerializationError> for ExternalApiWireError {
     fn from(e: SerializationError) -> Self {
         ExternalApiWireError::Deserialization(format!("{:?}", e))
+    }
+}
+
+impl From<RibosomeError> for ExternalApiWireError {
+    fn from(e: RibosomeError) -> Self {
+        ExternalApiWireError::RibosomeError(e.to_string())
     }
 }

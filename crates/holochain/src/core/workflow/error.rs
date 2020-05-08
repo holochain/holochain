@@ -3,7 +3,7 @@
 
 use super::{Workflow, WorkflowEffects};
 use crate::{
-    conductor::api::error::ConductorApiError,
+    conductor::{api::error::ConductorApiError, CellError},
     core::{
         ribosome::error::RibosomeError,
         state::{source_chain::SourceChainError, workspace::WorkspaceError},
@@ -19,7 +19,7 @@ pub enum WorkflowError {
     AgentInvalid(AgentPubKey),
 
     #[error("Conductor API error: {0}")]
-    ConductorApi(#[from] ConductorApiError),
+    ConductorApi(#[from] Box<ConductorApiError>),
 
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
@@ -57,6 +57,9 @@ pub enum WorkflowRunError {
 
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+
+    #[error(transparent)]
+    CellError(#[from] CellError),
 }
 
 /// Internal type to handle running workflows

@@ -1,5 +1,5 @@
 use super::{dna_store::error::DnaStoreError, interface::error::InterfaceError};
-use crate::conductor::cell::error::CellError;
+use crate::{conductor::cell::error::CellError, core::workflow::error::WorkflowRunError};
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::{CellHandle, CellId};
 use std::path::PathBuf;
@@ -59,6 +59,9 @@ pub enum ConductorError {
 
     #[error("DNA store error: {0:?}")]
     DnaStoreError(#[from] DnaStoreError),
+
+    #[error("Workflow error: {0:?}")]
+    WorkflowRunError(#[from] WorkflowRunError),
 
     // Box is to avoid cycle in error definition
     #[error(transparent)]

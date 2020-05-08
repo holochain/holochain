@@ -1,10 +1,13 @@
 use super::error::{
     ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
 };
-use crate::conductor::{
-    config::AdminInterfaceConfig,
-    interface::error::{InterfaceError, InterfaceResult},
-    ConductorHandle,
+use crate::{
+    conductor::{
+        config::AdminInterfaceConfig,
+        interface::error::{InterfaceError, InterfaceResult},
+        ConductorHandle,
+    },
+    core::workflow::ZomeInvocationResult,
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -59,7 +62,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     async fn invoke_zome(
         &self,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse>;
+    ) -> ConductorApiResult<ZomeInvocationResult>;
 
     // -- provided -- //
 
@@ -68,9 +71,12 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
                 AppRequest::ZomeInvocationRequest { request } => {
-                    Ok(AppResponse::ZomeInvocationResponse {
-                        response: Box::new(self.invoke_zome(*request).await?),
-                    })
+                    match self.invoke_zome(*request).await? {
+                        Ok(response) => Ok(AppResponse::ZomeInvocationResponse {
+                            response: Box::new(response),
+                        }),
+                        Err(e) => Ok(AppResponse::Error(e.into())),
+                    }
                 }
                 _ => unimplemented!(),
             }
@@ -79,9 +85,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 
         match res {
             Ok(response) => response,
-            Err(e) => AppResponse::Error {
-                debug: format!("{:?}", e),
-            },
+            Err(e) => AppResponse::Error(e.into()),
         }
     }
 }
@@ -213,9 +217,9 @@ impl RealAppInterfaceApi {
 impl AppInterfaceApi for RealAppInterfaceApi {
     async fn invoke_zome(
         &self,
-        _invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResult> {
+        self.conductor_handle.invoke_zome(invocation).await
     }
 }
 
@@ -233,9 +237,7 @@ impl InterfaceApi for RealAppInterfaceApi {
             .map_err(InterfaceError::RequestHandler)?;
         match request {
             Ok(request) => Ok(AppInterfaceApi::handle_request(self, request).await),
-            Err(e) => Ok(AppResponse::Error {
-                debug: e.to_string(),
-            }),
+            Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
         }
     }
 }
@@ -244,11 +246,7 @@ impl InterfaceApi for RealAppInterfaceApi {
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppResponse {
     /// There has been an error in the request
-    Error {
-        // TODO maybe this could be serialized instead of stringified?
-        /// Stringified version of the error
-        debug: String,
-    },
+    Error(ExternalApiWireError),
     /// The response to a zome call
     ZomeInvocationResponse {
         /// The data that was returned by this call
@@ -340,21 +338,37 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_types::test_utils::{fake_dna_file, write_fake_dna_file};
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_types::{
+        observability,
+        test_utils::{fake_dna_file, write_fake_dna_file},
+    };
     use matches::assert_matches;
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
     async fn install_list_dna() -> Result<()> {
-        let handle = Conductor::builder().test().await?.into_handle();
+        observability::test_run().ok();
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env)
+            .await?
+            .run()
+            .await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_hash = dna.dna_hash().clone();
-        admin_api
+        let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
             .await;
+        assert_matches!(install_response, AdminResponse::DnaInstalled);
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
@@ -363,7 +377,18 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn generate_and_list_pub_keys() -> Result<()> {
-        let handle = Conductor::builder().test().await?.into_handle();
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env)
+            .await?
+            .run()
+            .await
+            .unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle);
 
         let agent_pub_key = admin_api

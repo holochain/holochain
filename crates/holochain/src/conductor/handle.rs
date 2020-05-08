@@ -7,15 +7,20 @@
 //!
 //! ```rust, no_run
 //! # async fn async_main () {
-//!
+//! # use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 //! use holochain_2020::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! let conductor: Conductor = ConductorBuilder::new().test().await.unwrap();
+//! # let env = test_conductor_env();
+//! #   let TestEnvironment {
+//! #       env: wasm_env,
+//! #      tmpdir: _tmpdir,
+//! # } = test_wasm_env();
+//! let conductor: Conductor = ConductorBuilder::new().test(env, wasm_env).await.unwrap();
 //!
 //! // Do direct manipulation of the Conductor here
 //!
 //! // move the Conductor into a ConductorHandle,
 //! // making the original Conductor inaccessible
-//! let handle: ConductorHandle = conductor.into_handle();
+//! let handle: ConductorHandle = conductor.run().await.unwrap();
 //!
 //! // handles are cloneable
 //! let handle2 = handle.clone();
@@ -54,6 +59,10 @@ use holochain_types::{
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::*;
+
+#[cfg(test)]
+use holochain_state::env::EnvironmentWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -83,6 +92,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get the list of hashes of installed Dnas in this Conductor
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
+    /// Get a [Dna] from the [DnaStore]
+    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile>;
+
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
         &self,
@@ -104,6 +116,17 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
+
+    /// Create the cells from the database
+    async fn create_cells(
+        &self,
+        cells: Vec<CellId>,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()>;
+
+    // HACK: remove when B-01593 lands
+    #[cfg(test)]
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -133,6 +156,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+        {
+            self.0.write().await.put_wasm(dna.clone()).await?;
+        }
         Ok(self.0.write().await.dna_store_mut().add(dna)?)
     }
 
@@ -140,11 +166,19 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(self.0.read().await.dna_store().list())
     }
 
+    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile> {
+        self.0.read().await.dna_store().get(hash)
+    }
+
     async fn invoke_zome(
         &self,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResult> {
+        // FIXME: D-01058: We are holding this read lock for
+        // the entire call to invoke_zome and blocking
+        // any writes to the conductor
         let lock = self.0.read().await;
+        debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
         cell.invoke_zome(invocation).await.map_err(Into::into)
     }
@@ -170,5 +204,22 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     fn keystore(&self) -> &KeystoreSender {
         &self.1
+    }
+
+    async fn create_cells(
+        &self,
+        cells: Vec<CellId>,
+        handle: ConductorHandle,
+    ) -> ConductorResult<()> {
+        let mut lock = self.0.write().await;
+        lock.create_cells(cells, handle).await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
+        let lock = self.0.read().await;
+        let cell = lock.cell_by_id(cell_id)?;
+        Ok(cell.state_env())
     }
 }

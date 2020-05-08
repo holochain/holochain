@@ -230,18 +230,32 @@ mod test {
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
+        state::ConductorState,
         Conductor,
+    };
+    use crate::core::{
+        ribosome::wasm_test::zome_invocation_from_names, state::source_chain::SourceChain,
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{
-        observability,
-        test_utils::{fake_dna_file, write_fake_dna_file},
+    use holochain_state::{
+        buffer::BufferedStore,
+        env::{EnvironmentWrite, ReadManager, WriteManager},
+        test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
+    use holochain_types::{
+        cell::CellId,
+        observability,
+        test_utils::{
+            fake_agent_pubkey_1, fake_dna_file, fake_dna_hash, fake_dna_zomes, write_fake_dna_file,
+        },
+    };
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
     use mockall::predicate;
     use std::convert::TryInto;
+    use tempdir::TempDir;
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -250,14 +264,67 @@ mod test {
         InstallsDna(String),
     }
 
-    async fn setup() -> RealAdminInterfaceApi {
-        let conductor_handle = Conductor::builder().test().await.unwrap().into_handle();
+    async fn fake_genesis(env: EnvironmentWrite) {
+        let env_ref = env.guard().await;
+        let reader = env_ref.reader().unwrap();
+
+        let mut source_chain = SourceChain::new(&reader, &env).unwrap();
+        crate::core::workflow::fake_genesis(&mut source_chain).await;
+
+        // Flush the db
+        env_ref
+            .with_commit(|writer| source_chain.0.flush_to_txn(writer))
+            .unwrap();
+    }
+
+    async fn setup_admin() -> RealAdminInterfaceApi {
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let conductor_handle = Conductor::builder()
+            .test(test_env, wasm_env)
+            .await
+            .unwrap()
+            .run()
+            .await
+            .unwrap();
         RealAdminInterfaceApi::new(conductor_handle)
+    }
+
+    async fn setup_app(
+        cell_id: CellId,
+        dna_store: MockDnaStore,
+    ) -> (Arc<TempDir>, RealAppInterfaceApi) {
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let tmpdir = test_env.tmpdir.clone();
+        let mut state = ConductorState::default();
+        state.cells.push(cell_id.clone());
+
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+            .fake_state(state)
+            .test(test_env, wasm_env)
+            .await
+            .unwrap()
+            .run()
+            .await
+            .unwrap();
+
+        let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
+        fake_genesis(cell_env).await;
+
+        (tmpdir, RealAppInterfaceApi::new(conductor_handle))
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
-        let admin_api = setup().await;
+        let admin_api = setup_admin().await;
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -276,7 +343,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn invalid_request() {
         observability::test_run().ok();
-        let admin_api = setup().await;
+        let admin_api = setup_admin().await;
         let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -294,6 +361,13 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn cache_failure() {
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
 
@@ -305,10 +379,12 @@ mod test {
             .returning(|_| Err(DnaStoreError::WriteFail));
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
-            .test()
+            .test(test_env, wasm_env)
             .await
             .unwrap()
-            .into_handle();
+            .run()
+            .await
+            .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
         let msg = AdminRequest::InstallDna(fake_dna_path, None);
         let msg = msg.try_into().unwrap();
@@ -331,5 +407,46 @@ mod test {
         // TODO: B-01440: this can't be done easily yet
         // because we can't serialize something that
         // doesn't deserialize
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn call_zome_function() {
+        observability::test_run().ok();
+        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+        struct Payload {
+            a: u32,
+        }
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![("zomey".into(), TestWasm::Foo.into())],
+        );
+        let payload = Payload { a: 1 };
+        let dna_hash = fake_dna_hash("bob");
+        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+
+        let mut dna_store = MockDnaStore::new();
+
+        dna_store
+            .expect_get()
+            .with(predicate::eq(dna_hash))
+            .returning(move |_| Some(dna.clone()));
+
+        let (_tmpdir, app_api) = setup_app(cell_id, dna_store).await;
+        let request = Box::new(zome_invocation_from_names(
+            "zomey",
+            "foo",
+            payload.try_into().unwrap(),
+        ));
+        let msg = AppRequest::ZomeInvocationRequest { request };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AppResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AppResponse::ZomeInvocationResponse{ .. });
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, app_api).await.unwrap();
     }
 }

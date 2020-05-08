@@ -43,7 +43,8 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             // TODO: this is a placeholder for a real DPKI request to show intent
             if api
                 .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
-                .await?
+                .await
+                .map_err(Box::new)?
                 == "INVALID"
             {
                 return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
@@ -109,7 +110,7 @@ impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
 
     use super::{GenesisWorkflow, GenesisWorkspace};
     use crate::core::workflow::run_workflow;
@@ -118,12 +119,37 @@ mod tests {
         core::{state::source_chain::SourceChain, workflow::error::WorkflowError},
     };
     use fallible_iterator::FallibleIterator;
-    use holochain_state::{env::*, test_utils::test_cell_env};
+    use holochain_state::{env::*, prelude::Readable, test_utils::test_cell_env};
     use holochain_types::{
+        entry::Entry,
         header, observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        Header,
+        Header, Timestamp,
     };
+
+    pub async fn fake_genesis<R: Readable>(source_chain: &mut SourceChain<'_, R>) -> Header {
+        let agent_pubkey = fake_agent_pubkey_1();
+        let agent_entry = Entry::Agent(agent_pubkey.clone());
+        let dna = fake_dna_file("cool dna");
+        let dna_header = Header::Dna(header::Dna {
+            timestamp: Timestamp::now(),
+            author: agent_pubkey.clone(),
+            hash: dna.dna_hash().clone(),
+        });
+        let agent_header = Header::EntryCreate(header::EntryCreate {
+            timestamp: Timestamp::now(),
+            author: agent_pubkey.clone(),
+            prev_header: dna_header.hash().into(),
+            entry_type: header::EntryType::AgentPubKey,
+            entry_address: agent_pubkey.clone().into(),
+        });
+        source_chain.put(dna_header, None).await.unwrap();
+        source_chain
+            .put(agent_header.clone(), Some(agent_entry))
+            .await
+            .unwrap();
+        agent_header
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
