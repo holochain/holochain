@@ -44,9 +44,9 @@ use holochain_keystore::{
 use holochain_state::{
     buffer::BufferedStore,
     db,
-    env::{Environment, ReadManager},
+    env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
-    prelude::WriteManager,
+    prelude::*,
     typed::{Kv, UnitDbKey},
 };
 use holochain_types::{
@@ -88,10 +88,10 @@ where
     cells: HashMap<CellId, CellItem>,
 
     /// The LMDB environment for persisting state related to this Conductor
-    env: Environment,
+    env: EnvironmentWrite,
 
     /// An LMDB environment for storing wasm
-    wasm_env: Environment,
+    wasm_env: EnvironmentWrite,
 
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
@@ -317,8 +317,7 @@ where
     pub(super) async fn put_wasm(&mut self, dna: DnaFile) -> ConductorResult<()> {
         let environ = &self.wasm_env;
         let env = environ.guard().await;
-        let dbs = environ.dbs().await?;
-        let wasm = *dbs.get(&*holochain_state::db::WASM)?;
+        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let reader = env.reader()?;
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
@@ -330,9 +329,7 @@ where
         }
 
         // write the db
-        let mut writer = env.writer()?;
-        wasm_buf.flush_to_txn(&mut writer)?;
-        writer.commit()?;
+        env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
 
         Ok(())
     }
@@ -396,13 +393,13 @@ where
     DS: DnaStore + 'static,
 {
     async fn new(
-        env: Environment,
-        wasm_env: Environment,
+        env: EnvironmentWrite,
+        wasm_env: EnvironmentWrite,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
     ) -> ConductorResult<Self> {
-        let db: SingleStore = *env.dbs().await?.get(&db::CONDUCTOR_STATE)?;
+        let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
         let task_manager_run_handle = Some(task_manager_run_handle);
         let (stop_tx, _) = tokio::sync::broadcast::channel::<()>(1);
@@ -439,11 +436,12 @@ where
     {
         self.check_running()?;
         let guard = self.env.guard().await;
-        let mut writer = guard.writer()?;
-        let state: ConductorState = self.state_db.get(&writer, &UnitDbKey)?.unwrap_or_default();
-        let new_state = f(state)?;
-        self.state_db.put(&mut writer, &UnitDbKey, &new_state)?;
-        writer.commit()?;
+        let new_state = guard.with_commit(|txn| {
+            let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
+            let new_state = f(state)?;
+            self.state_db.put(txn, &UnitDbKey, &new_state)?;
+            Result::<_, ConductorError>::Ok(new_state)
+        })?;
         Ok(new_state)
     }
 
@@ -509,14 +507,14 @@ mod builder {
             let keystore = delete_me_create_test_keystore().await;
             let env_path = self.config.environment_path;
 
-            let environment = Environment::new(
+            let environment = EnvironmentWrite::new(
                 env_path.as_ref(),
                 EnvironmentKind::Conductor,
                 keystore.clone(),
             )?;
 
             let wasm_environment =
-                Environment::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
+                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
 
             let conductor = Conductor::new(
                 environment,
@@ -572,13 +570,13 @@ mod builder {
         pub async fn test(
             self,
             test_env: TestEnvironment,
-            test_wasm_env: Environment,
+            test_wasm_env: EnvironmentWrite,
         ) -> ConductorResult<Conductor<DS>> {
             let TestEnvironment {
                 env: environment,
                 tmpdir,
             } = test_env;
-            let keystore = environment.keystore().clone();
+            let keystore = environment.keystore();
             let conductor = Conductor::new(
                 environment,
                 test_wasm_env,

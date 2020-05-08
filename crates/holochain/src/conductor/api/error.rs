@@ -1,7 +1,14 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::{conductor::error::ConductorError, core::workflow::runner::error::WorkflowRunError};
+use crate::{
+    conductor::{error::ConductorError, CellError},
+    core::{
+        ribosome::error::RibosomeError, state::workspace::WorkspaceError,
+        workflow::error::WorkflowRunError,
+    },
+};
 use holochain_serialized_bytes::prelude::*;
+use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
 use thiserror::Error;
 
@@ -37,6 +44,20 @@ pub enum ConductorApiError {
     #[error("Serialization error while using a InterfaceApi: {0:?}")]
     SerializationError(#[from] SerializationError),
 
+    /// Database error
+    #[error(transparent)]
+    DatabaseError(#[from] DatabaseError),
+
+    /// Workspace error.
+    // TODO: Can be avoided if we can move workspace creation into the workflow
+    #[error(transparent)]
+    WorkspaceError(#[from] WorkspaceError),
+
+    /// Workflow error.
+    // TODO: perhaps this Box can be avoided with further reorganization
+    #[error(transparent)]
+    WorkflowRunError(#[from] Box<WorkflowRunError>),
+
     /// DnaError
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
@@ -45,13 +66,13 @@ pub enum ConductorApiError {
     #[error("The Dna file path provided was invalid")]
     DnaReadError(String),
 
-    /// Error in the workflow
-    #[error("An error occurred while running the workflow: {0:?}")]
-    WorkflowRunError(#[from] WorkflowRunError),
-
     /// KeystoreError
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    /// Cell Error
+    #[error(transparent)]
+    CellError(#[from] CellError),
 }
 
 /// All the serialization errors that can occur
@@ -84,6 +105,8 @@ pub enum ExternalApiWireError {
     Deserialization(String),
     /// The dna path provided was invalid
     DnaReadError(String),
+    /// There was an error in the ribosome
+    RibosomeError(String),
 }
 
 impl ExternalApiWireError {
@@ -107,5 +130,11 @@ impl From<ConductorApiError> for ExternalApiWireError {
 impl From<SerializationError> for ExternalApiWireError {
     fn from(e: SerializationError) -> Self {
         ExternalApiWireError::Deserialization(format!("{:?}", e))
+    }
+}
+
+impl From<RibosomeError> for ExternalApiWireError {
+    fn from(e: RibosomeError) -> Self {
+        ExternalApiWireError::RibosomeError(e.to_string())
     }
 }

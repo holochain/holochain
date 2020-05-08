@@ -10,7 +10,7 @@
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 use holochain_state::{
     buffer::{BufferedStore, IntKvBuf},
-    db::{DbManager, CHAIN_SEQUENCE},
+    db::{GetDb, CHAIN_SEQUENCE},
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
@@ -26,21 +26,21 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'e, R> = IntKvBuf<'e, u32, ChainSequenceItem, R>;
+type Store<'env, R> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
 
 /// A BufferedStore for interacting with the ChainSequence database
-pub struct ChainSequenceBuf<'e, R: Readable> {
-    db: Store<'e, R>,
+pub struct ChainSequenceBuf<'env, R: Readable> {
+    db: Store<'env, R>,
     next_index: u32,
     tx_seq: u32,
     current_head: Option<HeaderAddress>,
     persisted_head: Option<HeaderAddress>,
 }
 
-impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
+impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
     /// Create a new instance from a read-only transaction and a database reference
-    pub fn new(reader: &'e R, dbs: &'e DbManager) -> DatabaseResult<Self> {
-        let db: Store<'e, R> = IntKvBuf::new(reader, *dbs.get(&*CHAIN_SEQUENCE)?)?;
+    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let db: Store<'env, R> = IntKvBuf::new(reader, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 
@@ -48,12 +48,12 @@ impl<'e, R: Readable> ChainSequenceBuf<'e, R> {
     /// as an existing instance. Useful for getting a fresh read-only snapshot of a database.
     pub fn with_reader<RR: Readable>(
         &self,
-        reader: &'e RR,
-    ) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
+        reader: &'env RR,
+    ) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
         Self::from_db(self.db.with_reader(reader))
     }
 
-    fn from_db<RR: Readable>(db: Store<'e, RR>) -> DatabaseResult<ChainSequenceBuf<'e, RR>> {
+    fn from_db<RR: Readable>(db: Store<'env, RR>) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
         let latest = db.iter_raw_reverse()?.next();
         debug!("{:?}", latest);
         let (next_index, tx_seq, current_head) = latest
@@ -132,7 +132,7 @@ pub mod tests {
         observability::test_run().ok();
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
         env.with_reader(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
@@ -195,7 +195,7 @@ pub mod tests {
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
@@ -307,7 +307,7 @@ pub mod tests {
 
         let task1 = tokio::spawn(async move {
             let env = arc1.guard().await;
-            let dbs = arc1.clone().dbs().await?;
+            let dbs = arc1.dbs().await;
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(
@@ -343,7 +343,7 @@ pub mod tests {
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
             let env = arc2.guard().await;
-            let dbs = arc2.clone().dbs().await?;
+            let dbs = arc2.dbs().await;
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(

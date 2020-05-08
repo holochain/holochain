@@ -13,9 +13,7 @@ pub mod nucleus;
 pub mod ribosome;
 #[allow(missing_docs)]
 pub mod signal;
-#[allow(missing_docs)]
 pub mod state;
 #[allow(missing_docs)]
 pub mod validation;
-#[allow(missing_docs)]
 pub mod workflow;

@@ -52,20 +52,17 @@ use super::{
     api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
     error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
 };
+use crate::core::workflow::ZomeInvocationResult;
 use derive_more::From;
 use holochain_types::{
-    autonomic::AutonomicCue,
-    cell::CellId,
-    dna::DnaFile,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    prelude::*,
+    autonomic::AutonomicCue, cell::CellId, dna::DnaFile, nucleus::ZomeInvocation, prelude::*,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
 #[cfg(test)]
-use holochain_state::env::Environment;
+use holochain_state::env::EnvironmentWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -102,7 +99,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn invoke_zome(
         &self,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse>;
+    ) -> ConductorApiResult<ZomeInvocationResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
@@ -129,7 +126,7 @@ pub trait ConductorHandleT: Send + Sync {
 
     // HACK: remove when B-01593 lands
     #[cfg(test)]
-    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<Environment>;
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -176,7 +173,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn invoke_zome(
         &self,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
+    ) -> ConductorApiResult<ZomeInvocationResult> {
         // FIXME: D-01058: We are holding this read lock for
         // the entire call to invoke_zome and blocking
         // any writes to the conductor
@@ -220,7 +217,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[cfg(test)]
-    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<Environment> {
+    async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.0.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.state_env())

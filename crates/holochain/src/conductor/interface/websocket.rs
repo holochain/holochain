@@ -240,7 +240,7 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{
         buffer::BufferedStore,
-        env::{Environment, ReadManager, WriteManager},
+        env::{EnvironmentWrite, ReadManager, WriteManager},
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
@@ -264,18 +264,17 @@ mod test {
         InstallsDna(String),
     }
 
-    async fn fake_genesis(env: Environment) {
-        let dbs = env.dbs().await.unwrap();
+    async fn fake_genesis(env: EnvironmentWrite) {
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
 
-        let mut source_chain = SourceChain::new(&reader, &dbs).unwrap();
+        let mut source_chain = SourceChain::new(&reader, &env).unwrap();
         crate::core::workflow::fake_genesis(&mut source_chain).await;
 
         // Flush the db
-        let mut writer = env_ref.writer().unwrap();
-        source_chain.0.flush_to_txn(&mut writer).unwrap();
-        writer.commit().unwrap();
+        env_ref
+            .with_commit(|writer| source_chain.0.flush_to_txn(writer))
+            .unwrap();
     }
 
     async fn setup_admin() -> RealAdminInterfaceApi {

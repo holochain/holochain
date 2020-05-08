@@ -1,5 +1,5 @@
 use super::{dna_store::error::DnaStoreError, interface::error::InterfaceError};
-use crate::{conductor::cell::error::CellError, core::workflow::runner::error::WorkflowRunError};
+use crate::{conductor::cell::error::CellError, core::workflow::error::WorkflowRunError};
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::{CellHandle, CellId};
 use std::path::PathBuf;

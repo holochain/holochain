@@ -1,72 +1,122 @@
-use super::{WorkflowEffects, WorkflowError, WorkflowResult};
-use crate::{conductor::api::CellConductorApiT, core::state::workspace::GenesisWorkspace};
-use holochain_types::{dna::DnaFile, entry::Entry, header, prelude::*, Header};
+//! Genesis Workflow: Initialize the source chain with the initial entries:
+//! - Dna
+//! - AgentValidationPkg
+//! - AgentId
+//!
 
-/// Initialize the source chain with the initial entries:
-/// - Dna
-/// - AgentId
-/// - CapTokenGrant
-///
-/// FIXME: understand the details of actually getting the DNA
-/// FIXME: creating entries in the config db
-pub async fn genesis(
-    mut workspace: GenesisWorkspace<'_>,
-    api: impl CellConductorApiT,
-    dna: DnaFile,
+// FIXME: understand the details of actually getting the DNA
+// FIXME: creating entries in the config db
+
+use super::Workspace;
+use super::{Workflow, WorkflowEffects, WorkflowError, WorkflowResult};
+use crate::conductor::api::CellConductorApiT;
+use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
+use futures::future::FutureExt;
+use holochain_state::prelude::*;
+use holochain_types::prelude::*;
+use holochain_types::{dna::DnaFile, entry::Entry, header, Header};
+use must_future::MustBoxFuture;
+
+/// The struct which implements the genesis Workflow
+pub struct GenesisWorkflow<Api: CellConductorApiT> {
+    api: Api,
+    dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
-) -> WorkflowResult<GenesisWorkspace<'_>> {
-    // TODO: this is a placeholder for a real DPKI request to show intent
-    if api
-        .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
-        .await
-        .map_err(|e| WorkflowError::from(Box::new(e)))?
-        == "INVALID"
-    {
-        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
+}
+
+impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for GenesisWorkflow<Api> {
+    type Output = ();
+    type Workspace = GenesisWorkspace<'env>;
+    type Triggers = ();
+
+    fn workflow(
+        self,
+        mut workspace: Self::Workspace,
+    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
+        async {
+            let Self {
+                api,
+                dna_file,
+                agent_pubkey,
+            } = self;
+
+            // TODO: this is a placeholder for a real DPKI request to show intent
+            if api
+                .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
+                .await
+                .map_err(Box::new)?
+                == "INVALID"
+            {
+                return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
+            }
+
+            // create a DNA chain element and add it directly to the store
+            let dna_header = Header::Dna(header::Dna {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                hash: dna_file.dna_hash().clone(),
+            });
+            workspace.source_chain.put(dna_header.clone(), None).await?;
+
+            // create a agent chain element and add it directly to the store
+            let agent_header = Header::EntryCreate(header::EntryCreate {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                prev_header: dna_header.hash().into(),
+                entry_type: header::EntryType::AgentPubKey,
+                entry_address: agent_pubkey.clone().into(),
+            });
+            workspace
+                .source_chain
+                .put(agent_header, Some(Entry::Agent(agent_pubkey)))
+                .await?;
+
+            let fx = WorkflowEffects {
+                workspace,
+                callbacks: Default::default(),
+                signals: Default::default(),
+                triggers: (),
+            };
+            let result = ();
+
+            Ok((result, fx))
+        }
+        .boxed()
+        .into()
     }
+}
 
-    // create a DNA chain element and add it directly to the store
-    let dna_header = Header::Dna(header::Dna {
-        timestamp: Timestamp::now(),
-        author: agent_pubkey.clone(),
-        hash: dna.dna_hash().clone(),
-    });
-    workspace.source_chain.put(dna_header.clone(), None).await?;
+/// The workspace for Genesis
+pub struct GenesisWorkspace<'env> {
+    source_chain: SourceChainBuf<'env, Reader<'env>>,
+}
 
-    // create a agent chain element and add it directly to the store
-    let agent_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
-        author: agent_pubkey.clone(),
-        prev_header: dna_header.hash().into(),
-        entry_type: header::EntryType::AgentPubKey,
-        entry_address: agent_pubkey.clone().into(),
-    });
-    workspace
-        .source_chain
-        .put(agent_header, Some(Entry::Agent(agent_pubkey)))
-        .await?;
+impl<'env> GenesisWorkspace<'env> {
+    /// Constructor
+    #[allow(dead_code)]
+    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        Ok(Self {
+            source_chain: SourceChainBuf::<'env>::new(reader, dbs)?,
+        })
+    }
+}
 
-    Ok(WorkflowEffects {
-        workspace,
-        triggers: Default::default(),
-        signals: Default::default(),
-        callbacks: Default::default(),
-    })
+impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
+    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn(&mut writer)?;
+        writer.commit()?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
 
-    use super::genesis;
+    use super::{GenesisWorkflow, GenesisWorkspace};
+    use crate::core::workflow::run_workflow;
     use crate::{
         conductor::api::MockCellConductorApi,
-        core::{
-            state::{
-                source_chain::SourceChain,
-                workspace::{GenesisWorkspace, Workspace},
-            },
-            workflow::WorkflowError,
-        },
+        core::{state::source_chain::SourceChain, workflow::error::WorkflowError},
     };
     use fallible_iterator::FallibleIterator;
     use holochain_state::{env::*, prelude::Readable, test_utils::test_cell_env};
@@ -106,7 +156,7 @@ pub mod tests {
         observability::test_run()?;
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let dbs = arc.dbs().await?;
+        let dbs = arc.dbs().await;
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
@@ -116,9 +166,12 @@ pub mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let fx = genesis(workspace, api, dna, agent_pubkey.clone()).await?;
-            let writer = env.writer()?;
-            fx.workspace.commit_txn(writer)?;
+            let workflow = GenesisWorkflow {
+                api,
+                dna_file: dna.clone(),
+                agent_pubkey: agent_pubkey.clone(),
+            };
+            let _: () = run_workflow(arc.clone(), workflow, workspace).await?;
         }
 
         env.with_reader(|reader| {

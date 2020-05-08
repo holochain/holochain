@@ -8,4 +8,5 @@ pub use holochain_types_derive::SerializedBytesAddress;
 pub use std::convert::{TryFrom, TryInto};
 
 /// Represents a type which has not been decided upon yet
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Todo {}

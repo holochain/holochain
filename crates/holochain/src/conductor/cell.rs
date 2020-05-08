@@ -1,7 +1,4 @@
-use super::{
-    api::{error::SerializationError, CellConductorApiT},
-    ConductorHandle,
-};
+use super::{api::CellConductorApiT, ConductorHandle};
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
@@ -9,21 +6,19 @@ use crate::{
     },
     core::{
         ribosome::WasmRibosome,
-        workflow::{runner::WorkflowRunner, WorkflowCall},
+        workflow::{run_workflow, InvokeZomeWorkflow, InvokeZomeWorkspace, ZomeInvocationResult},
     },
 };
+use error::CellError;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
-use holochain_state::env::{Environment, EnvironmentKind};
-use holochain_types::{
-    autonomic::AutonomicProcess,
-    cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
-    shims::*,
+use holochain_state::{
+    env::{EnvironmentKind, EnvironmentWrite},
+    prelude::*,
 };
-use holochain_zome_types::ZomeExternGuestOutput;
-
-use error::CellError;
+use holochain_types::{
+    autonomic::AutonomicProcess, cell::CellId, nucleus::ZomeInvocation, shims::*,
+};
 use std::{
     hash::{Hash, Hasher},
     path::Path,
@@ -58,7 +53,7 @@ impl PartialEq for Cell {
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorApi,
-    state_env: Environment,
+    state_env: EnvironmentWrite,
 }
 
 impl Cell {
@@ -69,7 +64,7 @@ impl Cell {
         keystore: KeystoreSender,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
-        let state_env = Environment::new(
+        let state_env = EnvironmentWrite::new(
             env_path.as_ref(),
             EnvironmentKind::Cell(id.clone()),
             keystore,
@@ -111,27 +106,21 @@ impl Cell {
     pub async fn invoke_zome(
         &self,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        // create the workflow runner
-        let runner = WorkflowRunner::new(&self);
-        // create the work flow call
-        let call = WorkflowCall::InvokeZome(invocation.into());
-        // call the workflow
-        // FIXME: TK-01564: this result isn't actualy returned
-        let _result = runner.run_workflow(call).await?;
-        use holochain_serialized_bytes::prelude::*;
-        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-        struct Payload {
-            a: u32,
-        }
-        let result = Payload { a: 1 };
-        let result: SerializedBytes = result.try_into().map_err(|e| SerializationError::from(e))?;
-        Ok(ZomeInvocationResponse::ZomeApiFn(
-            ZomeExternGuestOutput::new(result),
-        ))
+    ) -> ConductorApiResult<ZomeInvocationResult> {
+        let arc = self.state_env();
+        let env = arc.guard().await;
+        let reader = env.reader()?;
+        let workflow = InvokeZomeWorkflow {
+            ribosome: self.get_ribosome().await?,
+            invocation,
+        };
+        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
+        Ok(run_workflow(self.state_env(), workflow, workspace)
+            .await
+            .map_err(Box::new)?)
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
         match self.conductor_api.get_dna(self.dna_hash().clone()).await {
             Some(dna) => Ok(WasmRibosome::new(dna)),
@@ -139,14 +128,9 @@ impl Cell {
         }
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn state_env(&self) -> Environment {
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
+    pub(crate) fn state_env(&self) -> EnvironmentWrite {
         self.state_env.clone()
-    }
-
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn get_conductor_api(&self) -> CellConductorApi {
-        self.conductor_api.clone()
     }
 }
 
