@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub async fn remove_link(
     _ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<HostContext<'_>>,
     _input: RemoveLinkInput,
 ) -> RibosomeResult<RemoveLinkOutput> {
     unimplemented!();

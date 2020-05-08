@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub async fn keystore(
     _ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<HostContext<'_>>,
     _input: KeystoreInput,
 ) -> RibosomeResult<KeystoreOutput> {
     unimplemented!();

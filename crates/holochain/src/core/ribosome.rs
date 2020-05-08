@@ -12,26 +12,24 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod wasm_ribosome;
 
-use crate::core::ribosome::guest_callback::CallbackInvocation;
+use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
+use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::CallbackIterator;
-
 use error::RibosomeResult;
 use holochain_types::{
     dna::Dna,
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use holochain_types::init::InitDnaResult;
-use holochain_types::migrate_agent::MigrateAgentDnaResult;
 use holochain_zome_types::validate::ValidateEntryResult;
-use holochain_zome_types::*;
+use holochain_zome_types::validate::ValidationPackage;
 use mockall::automock;
 use std::iter::Iterator;
-use std::sync::Arc;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
@@ -56,28 +54,31 @@ pub trait RibosomeT: Sized {
 
     fn run_init(&self) -> RibosomeResult<InitResult>;
 
-    fn run_migrate_agent(
+    fn run_migrate_agent<'a>(
         &self,
-        invocation: MigrateAgentInvocation,
+        invocation: MigrateAgentInvocation<'a>,
     ) -> RibosomeResult<MigrateAgentResult>;
 
-    fn run_custom_validation_package(
+    fn run_custom_validation_package<'a>(
         &self,
-        invocation: ValidationPackageInvocation,
+        invocation: ValidationPackageInvocation<'a>,
     ) -> RibosomeResult<ValidationPackage>;
 
-    fn run_post_commit(
+    fn run_post_commit<'a>(
         &self,
-        invocation: PostCommitInvocation,
+        invocation: PostCommitInvocation<'a>,
     ) -> RibosomeResult<Vec<Option<PostCommitResult>>>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateEntryResult>;
+    fn run_validate<'a>(
+        &self,
+        invocation: ValidateInvocation<'a>,
+    ) -> RibosomeResult<ValidateEntryResult>;
 
     // fn callback_iterator(&self, callback: CallbackInvocation, allow_side_effects: bool) -> (dyn Iterator<Item = RibosomeResult<Option<CallbackGuestOutput>>> + Send + Sized);
-    fn callback_iterator<'a>(&self, invocation: CallbackInvocation<'a>) -> CallbackIterator<Self>;
+    fn callback_iterator<I: 'static + crate::core::ribosome::guest_callback::Invocation>(&self, invocation: I) -> CallbackIterator<Self, I>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub async fn send(
     _ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<HostContext<'_>>,
     _input: SendInput,
 ) -> RibosomeResult<SendOutput> {
     unimplemented!();

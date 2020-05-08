@@ -7,8 +7,9 @@ use holochain_zome_types::*;
 /// The ZomeId is a pair of CellId and ZomeName.
 pub type ZomeId = (CellId, ZomeName);
 
-/// ZomeName as a String (should this be a newtype?)
-pub type ZomeName = String;
+/// ZomeName as a String
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ZomeName(String);
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface

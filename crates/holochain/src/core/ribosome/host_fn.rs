@@ -22,28 +22,30 @@ pub mod show_env;
 pub mod sign;
 pub mod sys_time;
 pub mod update_entry;
-
-use crate::core::ribosome::guest_callback::CallbackInvocation;
+use crate::core::ribosome::guest_callback::Invocation as CallbackInvocation;
 use holochain_types::nucleus::ZomeInvocation;
+use holochain_types::nucleus::ZomeName;
+use holochain_serialized_bytes::prelude::*;
 
-pub struct HostContext {
-    zome_name: String,
+
+pub struct HostContext<'a> {
+    zome_name: &'a ZomeName,
 }
 
 /// build the HostContext from a _reference_ to ZomeInvocation to avoid cloning potentially huge
 /// serialized bytes
-impl From<&ZomeInvocation> for HostContext {
-    fn from(zome_invocation: &ZomeInvocation) -> HostContext {
-        HostContext {
-            zome_name: zome_invocation.zome_name.clone(),
+impl From<&ZomeInvocation> for HostContext<'_> {
+    fn from(zome_invocation: &ZomeInvocation) -> Self {
+        Self {
+            zome_name: (&zome_invocation).into(),
         }
     }
 }
 
-impl From<&CallbackInvocation<'_>> for HostContext {
-    fn from(callback_invocation: &CallbackInvocation) -> HostContext {
-        HostContext {
-            zome_name: callback_invocation.zome_name.clone(),
+impl <I: CallbackInvocation<Error = SerializedBytesError>>From<&I> for HostContext<'_> {
+    fn from(callback_invocation: &I) -> Self {
+        Self {
+            zome_name: (&callback_invocation).into(),
         }
     }
 }
