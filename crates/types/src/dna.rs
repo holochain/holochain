@@ -10,6 +10,8 @@ use crate::prelude::*;
 use error::DnaError;
 pub use holo_hash::*;
 use std::collections::BTreeMap;
+use holochain_zome_types::zome::ZomeName;
+
 /// A type to allow json values to be used as [SerializedBtyes]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct Properties {
@@ -30,7 +32,7 @@ pub struct Dna {
     pub properties: SerializedBytes,
 
     /// An array of zomes associated with your holochain application.
-    pub zomes: BTreeMap<String, zome::Zome>,
+    pub zomes: BTreeMap<ZomeName, zome::Zome>,
 }
 
 impl Dna {
@@ -43,7 +45,7 @@ impl Dna {
     }
 
     /// Return a Zome
-    pub fn get_zome(&self, zome_name: &str) -> Result<&zome::Zome, DnaError> {
+    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<&zome::Zome, DnaError> {
         self.zomes
             .get(zome_name)
             .ok_or_else(|| DnaError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))

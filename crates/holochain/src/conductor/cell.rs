@@ -10,9 +10,9 @@ use holochain_state::env::Environment;
 use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
+use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use std::hash::{Hash, Hasher};
 
 pub mod error;

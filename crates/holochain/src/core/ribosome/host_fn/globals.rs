@@ -10,8 +10,8 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 pub async fn globals(
-    ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext<'_>>,
+    ribosome: Arc<WasmRibosome>,
+    _host_context: Arc<HostContext>,
     _input: GlobalsInput,
 ) -> RibosomeResult<GlobalsOutput> {
     Ok(GlobalsOutput::new(ZomeGlobals {

@@ -23,13 +23,55 @@ use crate::core::ribosome::guest_callback::CallbackIterator;
 use error::RibosomeResult;
 use holochain_types::{
     dna::Dna,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     shims::*,
 };
-use holochain_zome_types::validate::ValidateEntryResult;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use holochain_zome_types::validate::ValidationPackage;
 use mockall::automock;
 use std::iter::Iterator;
+use holochain_types::cell::CellId;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ZomeExternHostInput;
+use holo_hash::AgentPubKey;
+use holo_hash::HeaderHash;
+use crate::core::ribosome::host_fn::AllowSideEffects;
+use holochain_zome_types::ZomeExternGuestOutput;
+
+/// A top-level call into a zome function,
+/// i.e. coming from outside the Cell from an external Interface
+#[allow(missing_docs)] // members are self-explanitory
+// DO NOT CLONE THIS because payload can be huge
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ZomeInvocation {
+    /// The ID of the [Cell] in which this Zome-call would be invoked
+    pub cell_id: CellId,
+    /// The name of the Zome containing the function that would be invoked
+    pub zome_name: ZomeName,
+    /// The capability request authorization this [ZomeInvocation]
+    pub cap: CapToken,
+    /// The name of the Zome function to call
+    pub fn_name: String,
+    /// The serialized data to pass an an argument to the Zome call
+    pub payload: ZomeExternHostInput,
+    /// the provenance of the call
+    pub provenance: AgentPubKey,
+    /// the hash of the top header at the time of call
+    pub as_at: HeaderHash,
+}
+
+impl From<&ZomeInvocation> for AllowSideEffects {
+    fn from(zome_invocation: &ZomeInvocation) -> Self {
+        Self::Yes
+    }
+}
+
+/// Response to a zome invocation
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub enum ZomeInvocationResponse {
+    /// arbitrary functions exposed by zome devs to the outside world
+    ZomeApiFn(ZomeExternGuestOutput),
+}
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
@@ -52,33 +94,33 @@ pub trait RibosomeT: Sized {
         // self.instance().exports().filter(|e| !e.is_callback())
     }
 
-    fn run_init(&self) -> RibosomeResult<InitResult>;
+    fn run_init(&self, invocation: InitInvocation) -> RibosomeResult<InitResult>;
 
-    fn run_migrate_agent<'a>(
+    fn run_migrate_agent(
         &self,
-        invocation: MigrateAgentInvocation<'a>,
+        invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
 
-    fn run_custom_validation_package<'a>(
+    fn run_custom_validation_package(
         &self,
-        invocation: ValidationPackageInvocation<'a>,
+        invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackage>;
 
-    fn run_post_commit<'a>(
+    fn run_post_commit(
         &self,
-        invocation: PostCommitInvocation<'a>,
+        invocation: PostCommitInvocation,
     ) -> RibosomeResult<Vec<Option<PostCommitResult>>>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validate<'a>(
+    fn run_validate(
         &self,
-        invocation: ValidateInvocation<'a>,
-    ) -> RibosomeResult<ValidateEntryResult>;
+        invocation: ValidateInvocation,
+    ) -> RibosomeResult<ValidateResult>;
 
     // fn callback_iterator(&self, callback: CallbackInvocation, allow_side_effects: bool) -> (dyn Iterator<Item = RibosomeResult<Option<CallbackGuestOutput>>> + Send + Sized);
-    fn callback_iterator<I: 'static + crate::core::ribosome::guest_callback::Invocation>(&self, invocation: I) -> CallbackIterator<Self, I>;
+    fn callback_iterator<R: 'static + RibosomeT, I: 'static + crate::core::ribosome::guest_callback::Invocation>(&self, ribosome: R, invocation: I) -> CallbackIterator<R, I>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -86,7 +128,7 @@ pub trait RibosomeT: Sized {
         self,
         // FIXME: Use [SourceChain] instead
         _bundle: &mut SourceChainCommitBundle<'env>,
-        invocation: ZomeInvocation,
+        invocation: &ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
 }
 

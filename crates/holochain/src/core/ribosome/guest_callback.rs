@@ -7,16 +7,12 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::RibosomeT;
 use holochain_zome_types::CallbackGuestOutput;
 use holochain_zome_types::CallbackHostInput;
-use std::sync::Arc;
 use crate::core::ribosome::error::RibosomeError;
 use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::nucleus::ZomeName;
-
-pub enum AllowSideEffects {
-    Yes,
-    No,
-}
+use holochain_zome_types::zome::ZomeName;
+use crate::core::ribosome::host_fn::AllowSideEffects;
+use crate::core::ribosome::host_fn::HostContext;
 
 pub struct CallbackFnComponents(Vec<String>);
 
@@ -33,7 +29,7 @@ pub struct CallbackFnComponents(Vec<String>);
 
 /// simple trait allows &CallbackInvocation to delegate for data efficiently
 /// impl this trait on &Foo rather than Foo so we can easily avoid cloning at call time
-pub trait Invocation: Into<CallbackFnComponents> + TryInto<CallbackHostInput> + Into<ZomeName> {}
+pub trait Invocation: Into<CallbackFnComponents> + TryInto<CallbackHostInput> + Into<Vec<ZomeName>> + Into<AllowSideEffects> {}
 
 // impl From<&CallbackInvocation<'_>> for CallbackFnComponents {
 //     fn from(callback_invocation: &CallbackInvocation) -> Self {
@@ -45,9 +41,21 @@ pub trait Invocation: Into<CallbackFnComponents> + TryInto<CallbackHostInput> + 
 // }
 
 pub struct CallbackIterator<R: RibosomeT, I: Invocation> {
-    ribosome: Arc<R>,
+    ribosome: R,
     invocation: I,
+    remaining_zomes: Vec<ZomeName>,
     remaining_components: CallbackFnComponents,
+}
+
+impl <R: RibosomeT, I: Invocation>CallbackIterator<R, I> {
+    pub fn new(ribosome: R, invocation: I) -> Self {
+        Self {
+            ribosome,
+            invocation,
+            remaining_zomes: invocation.into(),
+            remaining_components: invocation.into()
+        }
+    }
 }
 
 impl Iterator for CallbackFnComponents {
@@ -64,32 +72,46 @@ impl Iterator for CallbackFnComponents {
     }
 }
 
-impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackIterator<WasmRibosome<'_>, I> {
+impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackIterator<WasmRibosome, I> {
     type Item = CallbackGuestOutput;
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        Ok(match self.remaining_components.next() {
-            Some(to_call) => {
-                let mut instance = self.ribosome.instance((&self.invocation).into())?;
-                match instance.resolve_func(&to_call) {
-                    // there is a callback to_call and it is implemented in the wasm
-                    Ok(_) => {
-                        let payload: CallbackHostInput = self.invocation.try_into()?;
-                        let result: Self::Item = holochain_wasmer_host::guest::call(
-                            &mut instance,
-                            &to_call,
-                            payload
-                        )?;
-                        Some(result)
+        Ok(match self.remaining_zomes.first() {
+            // there are no zomes left, we are finished
+            None => None,
+            Some(zome_name) => {
+                match self.remaining_components.next() {
+                    Some(to_call) => {
+                        let mut instance = self.ribosome.instance(HostContext {
+                            zome_name: zome_name.clone(),
+                            allow_side_effects: self.invocation.into(),
+                        })?;
+                        match instance.resolve_func(&to_call) {
+                            // there is a callback to_call and it is implemented in the wasm
+                            Ok(_) => {
+                                let payload: CallbackHostInput = self.invocation.try_into()?;
+                                let result: Self::Item = holochain_wasmer_host::guest::call(
+                                    &mut instance,
+                                    &to_call,
+                                    payload
+                                )?;
+                                Some(result)
+                            },
+                            // the func doesn't exist
+                            // the callback is not implemented
+                            // skip this attempt
+                            Err(_) => self.next()?,
+                        }
                     },
-                    // the func doesn't exist
-                    // the callback is not implemented
-                    // skip this attempt
-                    Err(_) => self.next()?,
+                    // there are no more callbacks to call in this zome
+                    // reset fn components and move to the next zome
+                    None => {
+                        self.remaining_components = self.invocation.into();
+                        self.remaining_zomes.remove(0);
+                        self.next()?
+                    },
                 }
             }
-            // there are no more callbacks to call
-            None => None,
         })
     }
 }

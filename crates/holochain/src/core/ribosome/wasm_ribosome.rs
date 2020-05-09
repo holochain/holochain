@@ -5,6 +5,7 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::CallbackIterator;
@@ -35,34 +36,35 @@ use crate::core::ribosome::host_fn::update_entry::update_entry;
 use crate::core::ribosome::host_fn::HostContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::dna::Dna;
-use holochain_types::nucleus::ZomeInvocation;
-use holochain_types::nucleus::ZomeInvocationResponse;
+use crate::core::ribosome::ZomeInvocation;
+use crate::core::ribosome::ZomeInvocationResponse;
 use holochain_types::shims::SourceChainCommitBundle;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::validate::ValidateEntryResult;
-use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::CallbackGuestOutput;
 use holochain_zome_types::ZomeExternGuestOutput;
 use std::sync::Arc;
+use holochain_zome_types::zome::ZomeName;
+use fallible_iterator::FallibleIterator;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 
 /// The only WasmRibosome is a Wasm ribosome.
 #[derive(Clone)]
-pub struct WasmRibosome<'a> {
-    dna: &'a Dna,
+pub struct WasmRibosome {
+    dna: Dna,
 }
 
-impl WasmRibosome<'_> {
+impl WasmRibosome {
     /// Create a new instance
     pub fn new(dna: Dna) -> Self {
         Self { dna }
     }
 
-    pub fn wasm_cache_key(&self, zome_name: &str) -> Vec<u8> {
+    pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Vec<u8> {
         // TODO: make this actually the hash of the wasm once we can do that
         // watch out for cache misses in the tests that make things slooow if you change this!
         // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
@@ -73,7 +75,7 @@ impl WasmRibosome<'_> {
         &self,
         host_context: HostContext,
     ) -> RibosomeResult<Instance> {
-        let zome_name = host_context.zome_name.clone();
+        let zome_name: ZomeName = (&host_context).into();
         let zome = self.dna.get_zome(&zome_name)?;
         let wasm: Arc<Vec<u8>> = Arc::clone(&zome.code.code());
         let imports: ImportObject = self.imports(host_context);
@@ -84,7 +86,7 @@ impl WasmRibosome<'_> {
         )?)
     }
 
-    fn imports(&self, host_context: HostContext, _allow_side_effects: bool) -> ImportObject {
+    fn imports<'a>(&self, host_context: HostContext) -> ImportObject {
         let timeout = crate::start_hard_timeout!();
 
         // it is important that WasmRibosome and ZomeInvocation are cheap to clone here
@@ -180,15 +182,13 @@ impl WasmRibosome<'_> {
     }
 }
 
-impl RibosomeT for WasmRibosome<'_> {
+impl RibosomeT for WasmRibosome {
     fn dna(&self) -> &Dna {
         &self.dna
     }
 
-    fn callback_iterator<I: crate::core::ribosome::guest_callback::Invocation>(&self, invocation: I) -> CallbackIterator<Self, I> {
-        CallbackIterator::<WasmRibosome> {
-            ribosome: std::marker::PhantomData,
-        }
+    fn callback_iterator<R: RibosomeT, I: crate::core::ribosome::guest_callback::Invocation>(&self, ribosome: R, invocation: I) -> CallbackIterator<R, I> {
+        CallbackIterator::new(ribosome, invocation)
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
@@ -197,12 +197,12 @@ impl RibosomeT for WasmRibosome<'_> {
         self,
         // FIXME: Use [SourceChain] instead
         _bundle: &mut SourceChainCommitBundle<'env>,
-        invocation: ZomeInvocation,
+        invocation: &ZomeInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeInvocationResponse> {
         let timeout = crate::start_hard_timeout!();
-        let mut instance = self.instance(HostContext::from(&invocation), true)?;
+        let mut instance = self.instance(HostContext::from(invocation))?;
         // instance building is slow 1s+ on a cold cache but should be ~0.8-1 millis on a cache hit
         // tests should be warming the instance cache before calling zome functions
         crate::end_hard_timeout!(timeout, 2_000_000);
@@ -215,17 +215,17 @@ impl RibosomeT for WasmRibosome<'_> {
         Ok(ZomeInvocationResponse::ZomeApiFn(wasm_extern_response))
     }
 
-    fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateEntryResult> {
-        let callback_outputs: Vec<CallbackGuestOutput> = self.callback_iterator(invocation.into());
+    fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateResult> {
+        let callback_outputs: Vec<CallbackGuestOutput> = self.callback_iterator(self.clone(), &invocation).collect()?;
         let validate_callback_results: Vec<ValidateCallbackResult> =
-            callback_outputs.map(|c| c.into());
+            callback_outputs.into_iter().map(|c| c.into()).collect();
         Ok(validate_callback_results.into())
     }
 
-    fn run_init(&self) -> RibosomeResult<InitResult> {
+    fn run_init(&self, invocation: InitInvocation) -> RibosomeResult<InitResult> {
         let callback_outputs: Vec<CallbackGuestOutput> =
-            self.callback_iterator(InitInvocation { dna: self.dna() }.into());
-        let init_callback_results: Vec<InitCallbackResult> = callback_outputs.map(|c| c.into());
+            self.callback_iterator(self.clone(), &invocation).collect()?;
+        let init_callback_results: Vec<InitCallbackResult> = callback_outputs.into_iter().map(|c| c.into()).collect();
         Ok(init_callback_results.into())
     }
 
@@ -242,7 +242,7 @@ impl RibosomeT for WasmRibosome<'_> {
     fn run_custom_validation_package(
         &self,
         invocation: ValidationPackageInvocation,
-    ) -> RibosomeResult<ValidationPackage> {
+    ) -> RibosomeResult<ValidationPackageResult> {
         let callback_outputs: Vec<CallbackGuestOutput> = self.callback_iterator(invocation.into());
         let validation_package_results: Vec<ValidationPackageCallbackResult> =
             callback_outputs.map(|c| c.into());

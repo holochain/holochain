@@ -1,8 +1,17 @@
 use holochain_types::header::AppEntryType;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::validate::ValidationPackage;
+use holo_hash::EntryHash;
 
-pub struct ValidationPackageInvocation<'a> {
-    zome_name: &'a str,
-    app_entry_type: &'a AppEntryType,
+pub struct ValidationPackageInvocation {
+    zome_name: ZomeName,
+    app_entry_type: AppEntryType,
+}
+
+pub enum ValidationPackageResult {
+    Success(ValidationPackage),
+    Fail(ZomeName, String),
+    UnresolvedDependencies(ZomeName, Vec<EntryHash>),
 }
 
 // // let callback_invocation = CallbackInvocation {

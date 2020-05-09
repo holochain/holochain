@@ -1,16 +1,28 @@
 use holo_hash::EntryHash;
-use holochain_types::nucleus::ZomeName;
+use holochain_zome_types::zome::ZomeName;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::CallbackHostInput;
 use crate::core::ribosome::guest_callback::CallbackFnComponents;
+use holochain_types::dna::Dna;
+use crate::core::ribosome::guest_callback::Invocation;
+use crate::core::ribosome::host_fn::AllowSideEffects;
+use holochain_zome_types::init::InitCallbackResult;
 
 pub struct InitInvocation {
-    zome_name: ZomeName,
+    dna: Dna
 }
 
-impl From<&InitInvocation> for ZomeName {
-    fn from(invocation: &InitInvocation) -> ZomeName {
-        invocation.zome_name
+impl Invocation for &InitInvocation { }
+
+impl From<&InitInvocation> for AllowSideEffects {
+    fn from(invocation: &InitInvocation) -> Self {
+        Self::Yes
+    }
+}
+
+impl From<&InitInvocation> for Vec<ZomeName> {
+    fn from(invocation: &InitInvocation) -> Self {
+        invocation.dna.zomes.keys().cloned().collect()
     }
 }
 
@@ -39,6 +51,21 @@ pub enum InitResult {
     /// ZomeName is the first zome that has unresolved dependencies
     /// Vec<EntryHash> is the list of all missing dependency addresses
     UnresolvedDependencies(ZomeName, Vec<EntryHash>),
+}
+
+impl From<Vec<InitCallbackResult>> for InitResult {
+    fn from(callback_results: Vec<InitCallbackResult>) -> Self {
+        callback_results.into_iter().fold(Self::Pass, |acc, x| {
+            match x {
+                InitCallbackResult::Fail(zome_name, fail_string) => Self::Fail(zome_name, fail_string),
+                InitCallbackResult::UnresolvedDependencies(ud) => match acc {
+                    Self::Invalid(_) => acc,
+                    _ => Self::UnresolvedDependencies(ud),
+                },
+                InitCallbackResult::Pass => Self::Pass,
+            }
+        })
+    }
 }
 
 // let mut init_dna_result = InitDnaResult::Pass;

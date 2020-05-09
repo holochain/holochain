@@ -8,9 +8,9 @@ use holochain_keystore::KeystoreSender;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
 };
+use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.

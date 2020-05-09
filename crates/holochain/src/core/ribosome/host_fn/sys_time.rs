@@ -6,8 +6,8 @@ use holochain_zome_types::SysTimeOutput;
 use std::sync::Arc;
 
 pub async fn sys_time(
-    _ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext<'_>>,
+    _ribosome: Arc<WasmRibosome>,
+    _host_context: Arc<HostContext>,
     _input: SysTimeInput,
 ) -> RibosomeResult<SysTimeOutput> {
     let start = std::time::SystemTime::now();

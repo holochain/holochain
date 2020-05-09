@@ -1,6 +1,6 @@
 use super::{WorkflowEffects, WorkflowResult};
 use crate::core::{ribosome::RibosomeT, state::workspace::InvokeZomeWorkspace};
-use holochain_types::nucleus::ZomeInvocation;
+use crate::core::ribosome::ZomeInvocation;
 
 pub async fn invoke_zome<'env>(
     workspace: InvokeZomeWorkspace<'_>,

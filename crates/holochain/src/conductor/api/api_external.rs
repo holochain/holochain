@@ -11,8 +11,8 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     cell::CellHandle,
     dna::{Dna, Properties},
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
+use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use std::path::PathBuf;
 use tracing::*;
 

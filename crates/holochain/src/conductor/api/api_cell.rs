@@ -7,9 +7,10 @@ use holochain_keystore::KeystoreSender;
 use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::Todo,
 };
+use crate::core::ribosome::ZomeInvocation;
+use crate::core::ribosome::ZomeInvocationResponse;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].

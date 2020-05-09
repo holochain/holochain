@@ -1,36 +1,46 @@
-use crate::core::ribosome::guest_callback::AllowSideEffects;
+use crate::core::ribosome::host_fn::AllowSideEffects;
 use crate::core::ribosome::guest_callback::CallbackFnComponents;
 use holochain_zome_types::entry::Entry;
 use crate::core::ribosome::guest_callback::Invocation;
-use holochain_types::nucleus::ZomeName;
+use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackHostInput;
+use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_serialized_bytes::prelude::*;
+use std::sync::Arc;
+use holo_hash::EntryHash;
 
-pub struct ValidateInvocation<'a> {
+pub struct ValidateInvocation {
     zome_name: ZomeName,
-    entry: &'a Entry,
+    // Arc here as entry may be very large
+    // don't want to clone the Entry just to validate it
+    // we can SerializedBytes off an Entry reference
+    // lifetimes on invocations are a pain
+    entry: Arc<Entry>,
 }
 
-impl Invocation for &ValidateInvocation<'_> { }
+impl Invocation for &ValidateInvocation { }
 
-impl From<&ValidateInvocation<'_>> for ZomeName {
-    fn from(validate_invocation: &ValidateInvocation) -> ZomeName {
-        validate_invocation.zome_name.clone()
+impl From<&ValidateInvocation> for Vec<ZomeName> {
+    fn from(validate_invocation: &ValidateInvocation) -> Self {
+        // entries are specific to zomes so only validate in the zome the entry is defined in
+        // note that here it is possible there is a zome/entry mismatch
+        // we rely on the invocation to be built correctly
+        vec![validate_invocation.zome_name.clone()]
     }
 }
 
-impl TryFrom<&ValidateInvocation<'_>> for CallbackHostInput {
+impl TryFrom<&ValidateInvocation> for CallbackHostInput {
     type Error = SerializedBytesError;
     fn try_from(validate_invocation: &ValidateInvocation) -> Result<Self, Self::Error> {
-        Ok(CallbackHostInput::new(validate_invocation.entry.try_into()?))
+        Ok(CallbackHostInput::new((&*validate_invocation.entry).try_into()?))
     }
 }
 
-impl From<&ValidateInvocation<'_>> for CallbackFnComponents {
+impl From<&ValidateInvocation> for CallbackFnComponents {
     fn from(validate_invocation: &ValidateInvocation) -> CallbackFnComponents {
         CallbackFnComponents(vec![
             "validate".into(),
-            match validate_invocation.entry {
+            match *validate_invocation.entry {
                 Entry::Agent(_) => "agent",
                 Entry::App(_) => "entry",
                 Entry::CapTokenClaim(_) => "cap_token_claim",
@@ -40,9 +50,36 @@ impl From<&ValidateInvocation<'_>> for CallbackFnComponents {
     }
 }
 
-impl From<&ValidateInvocation<'_>> for AllowSideEffects {
+impl From<&ValidateInvocation> for AllowSideEffects {
     fn from(_: &ValidateInvocation) -> AllowSideEffects {
         AllowSideEffects::No
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub enum ValidateResult {
+    Valid,
+    Invalid(String),
+    /// subconscious needs to map this to either pending or abandoned based on context that the
+    /// wasm can't possibly have
+    UnresolvedDependencies(Vec<EntryHash>),
+}
+
+impl From<Vec<ValidateCallbackResult>> for ValidateResult {
+    fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
+        callback_results.into_iter().fold(Self::Valid, |acc, x| {
+            match x {
+                // validation is invalid if any x is invalid
+                ValidateCallbackResult::Invalid(i) => Self::Invalid(i),
+                // return unresolved dependencies if it's otherwise valid
+                ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
+                    Self::Invalid(_) => acc,
+                    _ => Self::UnresolvedDependencies(ud),
+                },
+                // valid x allows validation to continue
+                ValidateCallbackResult::Valid => acc,
+            }
+        })
     }
 }
 

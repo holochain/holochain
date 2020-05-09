@@ -6,8 +6,8 @@ use holochain_zome_types::EncryptOutput;
 use std::sync::Arc;
 
 pub async fn encrypt(
-    _ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext<'_>>,
+    _ribosome: Arc<WasmRibosome>,
+    _host_context: Arc<HostContext>,
     _input: EncryptInput,
 ) -> RibosomeResult<EncryptOutput> {
     unimplemented!();

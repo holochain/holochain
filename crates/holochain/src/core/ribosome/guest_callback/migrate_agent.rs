@@ -1,38 +1,42 @@
-use holochain_types::nucleus::ZomeName;
+use holochain_zome_types::zome::ZomeName;
 use crate::core::ribosome::guest_callback::Invocation;
 use crate::core::ribosome::guest_callback::CallbackFnComponents;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use core::convert::TryFrom;
 use holochain_zome_types::CallbackHostInput;
 use holochain_serialized_bytes::prelude::*;
+use crate::core::ribosome::host_fn::AllowSideEffects;
+use holochain_types::dna::Dna;
 
-pub struct MigrateAgentInvocation<'a> {
-    zome_name: ZomeName,
-    migrate_agent: &'a MigrateAgent,
+pub struct MigrateAgentInvocation {
+    dna: Dna,
+    migrate_agent: MigrateAgent,
 }
 
-impl Invocation for &MigrateAgentInvocation<'_> { }
+impl Invocation for &MigrateAgentInvocation { }
 
-impl From<&MigrateAgentInvocation<'_>> for ZomeName {
-    fn from(migrate_agent_invocation: &MigrateAgentInvocation) -> ZomeName {
-        migrate_agent_invocation.zome_name
+impl From<&MigrateAgentInvocation> for AllowSideEffects {
+    fn from(migrate_agent_invocation: &MigrateAgentInvocation) -> AllowSideEffects {
+        AllowSideEffects::No
     }
 }
 
-impl From<&MigrateAgentInvocation<'_>> for CallbackFnComponents {
+impl From<&MigrateAgentInvocation> for Vec<ZomeName> {
+    fn from(migrate_agent_invocation: &MigrateAgentInvocation) -> Self {
+        migrate_agent_invocation.dna.zomes.keys().cloned().collect()
+    }
+}
+
+impl From<&MigrateAgentInvocation> for CallbackFnComponents {
     fn from(migrate_agent_invocation: &MigrateAgentInvocation) -> CallbackFnComponents {
         CallbackFnComponents(vec!["migrate_agent".into(), match migrate_agent_invocation.migrate_agent {
-            MigrateAgent::Open(_) => "open",
-            MigrateAgent::Close(_) => "close",
-        }.into(),
-        format!("{}", holo_hash::DnaHash::from(match migrate_agent_invocation.migrate_agent {
-            MigrateAgent::Open(dna_hash) => dna_hash,
-            MigrateAgent::Close(dna_hash) => dna_hash,
-        }.to_owned()))])
+            MigrateAgent::Open => "open",
+            MigrateAgent::Close => "close",
+        }.into()])
     }
 }
 
-impl TryFrom<&MigrateAgentInvocation<'_>> for CallbackHostInput {
+impl TryFrom<&MigrateAgentInvocation> for CallbackHostInput {
     type Error = SerializedBytesError;
     fn try_from(migrate_agent_invocation: &MigrateAgentInvocation) -> Result<Self, Self::Error> {
         Ok(CallbackHostInput::new(migrate_agent_invocation.migrate_agent.try_into()?))

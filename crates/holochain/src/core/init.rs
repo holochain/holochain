@@ -5,9 +5,10 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT};
 use holochain_types::dna::Dna;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
 
 /// init a dna
-pub async fn init_dna(dna: Dna) -> RibosomeResult<InitResult> {
+pub async fn init_dna(dna: Dna, invocation: InitInvocation) -> RibosomeResult<InitResult> {
     let ribosome = WasmRibosome::new(dna);
     // at the end of all the zomes succeeding to init i want to commit an initialization complete
     // entry, this is the only way we can treat it as transactional is if all the zomes do their
@@ -16,5 +17,5 @@ pub async fn init_dna(dna: Dna) -> RibosomeResult<InitResult> {
     // @todo if any of these fail, fail the whole thing
     // NOTE: the InitDnaResult already aggregates InitCallbackResult values in the ribosome
     // any fail already = total fail
-    ribosome.run_init()
+    ribosome.run_init(invocation)
 }

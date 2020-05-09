@@ -6,8 +6,8 @@ use holochain_zome_types::UpdateEntryOutput;
 use std::sync::Arc;
 
 pub async fn update_entry(
-    _ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext<'_>>,
+    _ribosome: Arc<WasmRibosome>,
+    _host_context: Arc<HostContext>,
     _input: UpdateEntryInput,
 ) -> RibosomeResult<UpdateEntryOutput> {
     unimplemented!();

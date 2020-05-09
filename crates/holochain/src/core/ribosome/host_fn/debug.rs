@@ -8,8 +8,8 @@ use std::sync::Arc;
 use tracing::*;
 
 pub async fn debug(
-    _ribosome: Arc<WasmRibosome<'_>>,
-    _host_context: Arc<HostContext<'_>>,
+    _ribosome: Arc<WasmRibosome>,
+    _host_context: Arc<HostContext>,
     input: DebugInput,
 ) -> RibosomeResult<DebugOutput> {
     let msg: DebugMsg = input.into_inner();

@@ -1,8 +1,9 @@
 use holo_hash::HeaderHash;
+use holochain_zome_types::zome::ZomeName;
 
-pub struct PostCommitInvocation<'a> {
-    zome_name: &'a str,
-    header: &'a HeaderHash,
+pub struct PostCommitInvocation {
+    zome_name: ZomeName,
+    header: HeaderHash,
 }
 
 pub struct PostCommitResult;

@@ -56,9 +56,9 @@ use holochain_types::{
     autonomic::AutonomicCue,
     cell::CellId,
     dna::Dna,
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     prelude::*,
 };
+use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

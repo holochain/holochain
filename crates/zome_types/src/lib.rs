@@ -8,6 +8,7 @@ pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
 mod zome_io;
+pub mod zome;
 
 pub use entry::Entry;
 use holochain_serialized_bytes::prelude::*;
