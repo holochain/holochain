@@ -4,6 +4,7 @@ pub mod api;
 mod cell;
 #[allow(clippy::module_inception)]
 mod conductor;
+pub mod compat;
 #[deny(missing_docs)]
 pub mod config;
 pub mod dna_store;

@@ -120,7 +120,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// Create the cells from the database
     async fn create_cells(
         &self,
-        cells: Vec<CellId>,
+        cell_ids: Vec<CellId>,
         handle: ConductorHandle,
     ) -> ConductorResult<()>;
 
@@ -208,11 +208,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn create_cells(
         &self,
-        cells: Vec<CellId>,
+        cell_ids: Vec<CellId>,
         handle: ConductorHandle,
     ) -> ConductorResult<()> {
         let mut lock = self.0.write().await;
-        lock.create_cells(cells, handle).await?;
+        lock.create_cells(cell_ids, handle).await?;
         Ok(())
     }
 

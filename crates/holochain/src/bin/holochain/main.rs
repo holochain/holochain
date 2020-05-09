@@ -1,9 +1,10 @@
 use holochain_2020::conductor::{
-    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
-    ConductorHandle,
+    compat::load_conductor_from_legacy_config, config::ConductorConfig, error::ConductorError,
+    interactive, paths::ConfigFilePath, Conductor, ConductorHandle,
 };
 use holochain_types::observability::{self, Output};
 use std::error::Error;
+use std::fs;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
@@ -31,6 +32,12 @@ struct Opt {
         help = "Path to a TOML file containing conductor configuration"
     )]
     config_path: Option<PathBuf>,
+
+    #[structopt(
+        long,
+        help = "For backwards compatibility with Tryorama only: Path to a TOML file containing legacy conductor configuration"
+    )]
+    legacy_tryorama_config_path: Option<PathBuf>,
 
     #[structopt(
         short = "i",
@@ -74,50 +81,61 @@ async fn async_main() {
     let config_path: ConfigFilePath = opt.config_path.map(Into::into).unwrap_or_default();
     debug!("config_path: {}", config_path);
 
-    let config: ConductorConfig = if opt.interactive {
-        // Load config, offer to create default config if missing
-        interactive::load_config_or_prompt_for_default(config_path)
-            .expect("Could not load conductor config")
-            .unwrap_or_else(|| {
-                println!("Cannot continue without configuration");
-                std::process::exit(ERROR_CODE);
-            })
+    let conductor = if let Some(legacy_config_path) = opt.legacy_tryorama_config_path {
+        let toml =
+            fs::read_to_string(legacy_config_path).expect("Couldn't read legacy config from file");
+        let legacy_config = toml::from_str(&toml).expect("Couldn't deserialize legacy config");
+        load_conductor_from_legacy_config(legacy_config)
+            .await
+            .expect("Couldn't initialize conductor from legacy config")
     } else {
-        // Load config, throw friendly error on failure
-        match ConductorConfig::load_toml(config_path.as_ref()) {
-            Err(ConductorError::ConfigMissing(_)) => {
-                display_friendly_missing_config_message(config_path, config_path_default);
-                std::process::exit(ERROR_CODE);
+        let config: ConductorConfig = if opt.interactive {
+            // Load config, offer to create default config if missing
+            interactive::load_config_or_prompt_for_default(config_path)
+                .expect("Could not load conductor config")
+                .unwrap_or_else(|| {
+                    println!("Cannot continue without configuration");
+                    std::process::exit(ERROR_CODE);
+                })
+        } else {
+            // Load config, throw friendly error on failure
+            match ConductorConfig::load_toml(config_path.as_ref()) {
+                Err(ConductorError::ConfigMissing(_)) => {
+                    display_friendly_missing_config_message(config_path, config_path_default);
+                    std::process::exit(ERROR_CODE);
+                }
+                Err(ConductorError::DeserializationError(err)) => {
+                    display_friendly_malformed_config_message(config_path, err);
+                    std::process::exit(ERROR_CODE);
+                }
+                result => result.expect("Could not load conductor config"),
             }
-            Err(ConductorError::DeserializationError(err)) => {
-                display_friendly_malformed_config_message(config_path, err);
-                std::process::exit(ERROR_CODE);
+        };
+
+        // If interactive mode, give the user a chance to create LMDB env if missing
+        let env_path = PathBuf::from(config.environment_path.clone());
+        if opt.interactive && !env_path.is_dir() {
+            match interactive::prompt_for_environment_dir(&env_path) {
+                Ok(true) => println!("LMDB environment created."),
+                Ok(false) => {
+                    println!("Cannot continue without LMDB environment set.");
+                    std::process::exit(ERROR_CODE);
+                }
+                result => {
+                    result.expect("Couldn't auto-create environment dir");
+                }
             }
-            result => result.expect("Could not load conductor config"),
         }
+
+        // Initialize the Conductor
+        let conductor: ConductorHandle = Conductor::builder()
+            .config(config)
+            .with_admin()
+            .await
+            .expect("Could not initialize Conductor from configuration");
+
+        conductor
     };
-
-    // If interactive mode, give the user a chance to create LMDB env if missing
-    let env_path = PathBuf::from(config.environment_path.clone());
-    if opt.interactive && !env_path.is_dir() {
-        match interactive::prompt_for_environment_dir(&env_path) {
-            Ok(true) => println!("LMDB environment created."),
-            Ok(false) => {
-                println!("Cannot continue without LMDB environment set.");
-                std::process::exit(ERROR_CODE);
-            }
-            result => {
-                result.expect("Couldn't auto-create environment dir");
-            }
-        }
-    }
-
-    // Initialize the Conductor
-    let conductor: ConductorHandle = Conductor::builder()
-        .config(config)
-        .with_admin()
-        .await
-        .expect("Could not initialize Conductor from configuration");
 
     info!("Conductor successfully initialized.");
     // kick off actual conductor task here
@@ -136,6 +154,21 @@ async fn async_main() {
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await
 }
+
+// /// Load config, throw friendly error on failure
+// fn load_config(config_path: &Path) -> ConductorConfig {
+//     match ConductorConfig::load_toml(config_path.as_ref()) {
+//         Err(ConductorError::ConfigMissing(_)) => {
+//             display_friendly_missing_config_message(config_path, config_path_default);
+//             std::process::exit(ERROR_CODE);
+//         }
+//         Err(ConductorError::DeserializationError(err)) => {
+//             display_friendly_malformed_config_message(config_path, err);
+//             std::process::exit(ERROR_CODE);
+//         }
+//         result => result.expect("Could not load conductor config"),
+//     }
+// }
 
 fn display_friendly_missing_config_message(config_path: ConfigFilePath, config_path_default: bool) {
     if config_path_default {

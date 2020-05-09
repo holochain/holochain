@@ -99,6 +99,7 @@ pub struct RealAdminInterfaceApi {
     conductor_handle: ConductorHandle,
 
     /// Needed to spawn an App interface
+    // TODO: is this needed? it's not currently being used.
     app_api: RealAppInterfaceApi,
 }
 
