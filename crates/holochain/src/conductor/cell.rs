@@ -1,3 +1,4 @@
+use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
@@ -7,12 +8,7 @@ use crate::{
 };
 use holo_hash::*;
 use holochain_state::env::Environment;
-use holochain_types::{
-    autonomic::AutonomicProcess,
-    cell::CellId,
-    shims::*,
-};
-use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
+use holochain_types::{autonomic::AutonomicProcess, cell::CellId, shims::*};
 use std::hash::{Hash, Hasher};
 
 pub mod error;

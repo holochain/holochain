@@ -4,8 +4,8 @@
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
 use holochain_wasmer_host::prelude::WasmError;
-use thiserror::Error;
 use holochain_zome_types::zome::ZomeName;
+use thiserror::Error;
 
 /// Errors occurring during a [Ribosome] call
 #[derive(Error, Debug)]

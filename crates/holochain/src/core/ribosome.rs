@@ -12,32 +12,30 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod wasm_ribosome;
 
-use holochain_serialized_bytes::prelude::*;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use error::RibosomeResult;
-use holochain_types::{
-    dna::Dna,
-    shims::*,
-};
-use crate::core::ribosome::guest_callback::init::InitInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use mockall::automock;
-use std::iter::Iterator;
-use holochain_types::cell::CellId;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
+use holochain_serialized_bytes::prelude::*;
+use holochain_types::cell::CellId;
+use holochain_types::{dna::Dna, shims::*};
+use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use holochain_zome_types::HostInput;
+use mockall::automock;
+use std::iter::Iterator;
 
+#[derive(Clone)]
 pub struct HostContext {
     zome_name: ZomeName,
     allow_side_effects: AllowSideEffects,
@@ -58,6 +56,7 @@ pub enum AllowSideEffects {
     No,
 }
 
+#[derive(Debug)]
 pub struct FnComponents(Vec<String>);
 
 /// iterating over FnComponents isn't as simple as returning the inner Vec iterator
@@ -88,8 +87,7 @@ impl From<Vec<String>> for FnComponents {
     }
 }
 
-pub trait Invocation: Clone
-// + TryInto<HostInput, Error=SerializedBytesError>
+pub trait Invocation: Clone // + TryInto<HostInput, Error=SerializedBytesError>
 {
     fn allow_side_effects(&self) -> AllowSideEffects;
     fn zome_names(&self) -> Vec<ZomeName>;
@@ -183,20 +181,19 @@ pub trait RibosomeT: Sized {
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult>;
 
-    fn run_post_commit(
-        &self,
-        invocation: PostCommitInvocation,
-    ) -> RibosomeResult<PostCommitResult>;
+    fn run_post_commit(&self, invocation: PostCommitInvocation)
+        -> RibosomeResult<PostCommitResult>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validate(
-        &self,
-        invocation: ValidateInvocation,
-    ) -> RibosomeResult<ValidateResult>;
+    fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateResult>;
 
-    fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(&self, ribosome: R, invocation: I) -> CallIterator<R, I>;
+    fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
+        &self,
+        ribosome: R,
+        invocation: I,
+    ) -> CallIterator<R, I>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -210,23 +207,23 @@ pub trait RibosomeT: Sized {
 
 #[cfg(test)]
 pub mod wasm_test {
-    use holochain_zome_types::zome::ZomeName;
     use super::wasm_ribosome::WasmRibosome;
+    use super::AllowSideEffects;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomeInvocation;
+    use crate::core::ribosome::ZomeInvocationResponse;
     use core::time::Duration;
     use holo_hash::holo_hash_core::HeaderHash;
     use holochain_serialized_bytes::prelude::*;
-    use crate::core::ribosome::ZomeInvocation;
-    use crate::core::ribosome::ZomeInvocationResponse;
     use holochain_types::{
         shims::SourceChainCommitBundle,
         test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::commit::CommitEntryResult;
+    use holochain_zome_types::zome::ZomeName;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
-    use super::AllowSideEffects;
 
     use crate::core::ribosome::HostContext;
     use holochain_types::{
@@ -268,29 +265,18 @@ pub mod wasm_test {
         if let Some(zome_name) = warm {
             let ribosome = test_ribosome(None);
             let _ = ribosome
-                .instance(
-                    HostContext {
-                        zome_name: zome_name.into(),
-                        allow_side_effects: AllowSideEffects::No,
-                    },
-                )
+                .instance(HostContext {
+                    zome_name: zome_name.into(),
+                    allow_side_effects: AllowSideEffects::No,
+                })
                 .unwrap();
         }
         WasmRibosome::new(dna_from_zomes({
             let mut v: BTreeMap<ZomeName, Zome> = std::collections::BTreeMap::new();
             v.insert("foo".into(), zome_from_code(TestWasm::Foo.into()));
-            v.insert(
-                "imports".into(),
-                zome_from_code(TestWasm::Imports.into()),
-            );
-            v.insert(
-                "debug".into(),
-                zome_from_code(TestWasm::Debug.into()),
-            );
-            v.insert(
-                "validate".into(),
-                zome_from_code(TestWasm::Validate.into()),
-            );
+            v.insert("imports".into(), zome_from_code(TestWasm::Imports.into()));
+            v.insert("debug".into(), zome_from_code(TestWasm::Debug.into()));
+            v.insert("validate".into(), zome_from_code(TestWasm::Validate.into()));
             v
         }))
     }
@@ -369,9 +355,7 @@ pub mod wasm_test {
         );
 
         assert_eq!(
-            CommitEntryResult::Fail(
-                "NeverValidates never validates".to_string()
-            ),
+            CommitEntryResult::Fail("Invalid(\"NeverValidates never validates\")".to_string()),
             call_test_ribosome!("validate", "never_validates", ()),
         );
     }

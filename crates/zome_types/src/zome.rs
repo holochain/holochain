@@ -17,7 +17,7 @@ impl std::fmt::Display for ZomeName {
 }
 
 impl From<&str> for ZomeName {
-    fn from (s: &str) -> Self {
+    fn from(s: &str) -> Self {
         Self(s.to_string())
     }
 }

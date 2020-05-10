@@ -1132,7 +1132,7 @@ dependencies = [
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types_derive",
- "holochain_wasmer_common 0.0.28",
+ "holochain_wasmer_common",
  "holochain_zome_types",
  "lazy_static",
  "lib3h_crypto_api",
@@ -1173,21 +1173,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.28"
+version = "0.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1eb1e3812b631bae029d9972d25a714f2de1c03da83c861c1f297b0835e4cdd5"
-dependencies = [
- "byte-slice-cast",
- "holochain_serialized_bytes",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "holochain_wasmer_common"
-version = "0.0.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a462b2388ee685f5ed94de01526ecc26114fc3a403dc03b4db852dc614f12637"
+checksum = "d5945fe2aa2abe2b5b05953ec613ed2256cf6bd1567a2426bd79814c4b9e6d61"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -1197,13 +1185,13 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.29"
+version = "0.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df8e78523ed4e25b2253cf5aec15413e2560cb84c8b4d108fe0cea1bc0f61db2"
+checksum = "3731dc11e82e997fc29a7e4a6c996fb7001ca2591fba08e9e039057c97d3f2aa"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
- "holochain_wasmer_common 0.0.29",
+ "holochain_wasmer_common",
  "lazy_static",
  "serde",
  "wasmer-runtime",
@@ -2940,7 +2928,7 @@ name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common 0.0.28",
+ "holochain_wasmer_common",
  "serde",
 ]
 

@@ -9,8 +9,8 @@ pub mod zome;
 use crate::prelude::*;
 use error::DnaError;
 pub use holo_hash::*;
-use std::collections::BTreeMap;
 use holochain_zome_types::zome::ZomeName;
+use std::collections::BTreeMap;
 
 /// A type to allow json values to be used as [SerializedBtyes]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]

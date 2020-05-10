@@ -1,16 +1,16 @@
-use holo_hash::EntryHash;
-use holochain_zome_types::zome::ZomeName;
-use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::HostInput;
-use crate::core::ribosome::FnComponents;
-use holochain_types::dna::Dna;
-use crate::core::ribosome::Invocation;
 use crate::core::ribosome::AllowSideEffects;
+use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::Invocation;
+use holo_hash::EntryHash;
+use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::Dna;
 use holochain_zome_types::init::InitCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::HostInput;
 
 #[derive(Clone)]
 pub struct InitInvocation {
-    dna: Dna
+    dna: Dna,
 }
 
 impl Invocation for InitInvocation {
@@ -51,16 +51,21 @@ pub enum InitResult {
 
 impl From<Vec<InitCallbackResult>> for InitResult {
     fn from(callback_results: Vec<InitCallbackResult>) -> Self {
-        callback_results.into_iter().fold(Self::Pass, |acc, x| {
-            match x {
-                InitCallbackResult::Fail(zome_name, fail_string) => Self::Fail(zome_name, fail_string),
+        callback_results
+            .into_iter()
+            .fold(Self::Pass, |acc, x| match x {
+                InitCallbackResult::Fail(zome_name, fail_string) => {
+                    Self::Fail(zome_name, fail_string)
+                }
                 InitCallbackResult::UnresolvedDependencies(zome_name, ud) => match acc {
                     Self::Fail(_, _) => acc,
-                    _ => Self::UnresolvedDependencies(zome_name, ud.into_iter().map(|h| h.into()).collect()),
+                    _ => Self::UnresolvedDependencies(
+                        zome_name,
+                        ud.into_iter().map(|h| h.into()).collect(),
+                    ),
                 },
                 InitCallbackResult::Pass => Self::Pass,
-            }
-        })
+            })
     }
 }
 

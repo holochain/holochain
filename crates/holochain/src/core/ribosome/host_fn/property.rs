@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::HostContext;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::HostContext;
 use holochain_zome_types::PropertyInput;
 use holochain_zome_types::PropertyOutput;
 use std::sync::Arc;

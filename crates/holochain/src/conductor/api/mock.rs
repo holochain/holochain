@@ -3,14 +3,10 @@
 
 use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
+use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use async_trait::async_trait;
 use holochain_keystore::KeystoreSender;
-use holochain_types::{
-    autonomic::AutonomicCue,
-    cell::CellId,
-    prelude::Todo,
-};
-use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
+use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::Todo};
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.

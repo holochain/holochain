@@ -2,10 +2,10 @@
 //! @see the ribosome docs for more info
 
 use crate::core::ribosome::error::RibosomeResult;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT};
 use holochain_types::dna::Dna;
-use crate::core::ribosome::guest_callback::init::InitInvocation;
 
 /// init a dna
 pub async fn init_dna(dna: Dna, invocation: InitInvocation) -> RibosomeResult<InitResult> {

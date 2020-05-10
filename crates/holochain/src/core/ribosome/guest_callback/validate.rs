@@ -1,13 +1,13 @@
 use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::FnComponents;
-use holochain_zome_types::entry::Entry;
 use crate::core::ribosome::Invocation;
+use holo_hash::EntryHash;
+use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::entry::Entry;
+use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
-use holo_hash::EntryHash;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {
@@ -37,8 +37,10 @@ impl Invocation for ValidateInvocation {
                 Entry::App(_) => "entry",
                 Entry::CapTokenClaim(_) => "cap_token_claim",
                 Entry::CapTokenGrant(_) => "cap_token_grant",
-            }.into(),
-            ].into()
+            }
+            .into(),
+        ]
+        .into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&*self.entry).try_into()?))
@@ -51,7 +53,6 @@ impl TryFrom<ValidateInvocation> for HostInput {
         Ok(Self::new((&*validate_invocation.entry).try_into()?))
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateResult {

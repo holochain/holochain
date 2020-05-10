@@ -2,15 +2,11 @@
 
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::ConductorHandle;
-use async_trait::async_trait;
-use holochain_keystore::KeystoreSender;
-use holochain_types::{
-    autonomic::AutonomicCue,
-    cell::CellId,
-    prelude::Todo,
-};
 use crate::core::ribosome::ZomeInvocation;
 use crate::core::ribosome::ZomeInvocationResponse;
+use async_trait::async_trait;
+use holochain_keystore::KeystoreSender;
+use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::Todo};
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].
