@@ -9,6 +9,7 @@ pub mod post_commit;
 pub mod validate;
 mod zome_io;
 pub mod zome;
+pub mod header;
 
 pub use entry::Entry;
 use holochain_serialized_bytes::prelude::*;

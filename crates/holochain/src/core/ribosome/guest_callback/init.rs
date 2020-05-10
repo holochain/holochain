@@ -1,41 +1,37 @@
 use holo_hash::EntryHash;
 use holochain_zome_types::zome::ZomeName;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::CallbackHostInput;
-use crate::core::ribosome::guest_callback::CallbackFnComponents;
+use holochain_zome_types::HostInput;
+use crate::core::ribosome::FnComponents;
 use holochain_types::dna::Dna;
-use crate::core::ribosome::guest_callback::Invocation;
-use crate::core::ribosome::host_fn::AllowSideEffects;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::AllowSideEffects;
 use holochain_zome_types::init::InitCallbackResult;
 
+#[derive(Clone)]
 pub struct InitInvocation {
     dna: Dna
 }
 
-impl Invocation for &InitInvocation { }
-
-impl From<&InitInvocation> for AllowSideEffects {
-    fn from(invocation: &InitInvocation) -> Self {
-        Self::Yes
+impl Invocation for InitInvocation {
+    fn allow_side_effects(&self) -> AllowSideEffects {
+        AllowSideEffects::Yes
+    }
+    fn zome_names(&self) -> Vec<ZomeName> {
+        self.dna.zomes.keys().cloned().collect()
+    }
+    fn fn_components(&self) -> FnComponents {
+        vec!["init".into()].into()
+    }
+    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
+        Ok(HostInput::new(().try_into()?))
     }
 }
 
-impl From<&InitInvocation> for Vec<ZomeName> {
-    fn from(invocation: &InitInvocation) -> Self {
-        invocation.dna.zomes.keys().cloned().collect()
-    }
-}
-
-impl TryFrom<&InitInvocation> for CallbackHostInput {
+impl TryFrom<InitInvocation> for HostInput {
     type Error = SerializedBytesError;
-    fn try_from (_: &InitInvocation) -> Result<Self, Self::Error> {
-        Ok(CallbackHostInput::new(().try_into()?))
-    }
-}
-
-impl From<&InitInvocation> for CallbackFnComponents {
-    fn from(_: &InitInvocation) -> Self {
-        Self(vec!["init".into()])
+    fn try_from(_: InitInvocation) -> Result<Self, Self::Error> {
+        Ok(Self::new(().try_into()?))
     }
 }
 
@@ -58,9 +54,9 @@ impl From<Vec<InitCallbackResult>> for InitResult {
         callback_results.into_iter().fold(Self::Pass, |acc, x| {
             match x {
                 InitCallbackResult::Fail(zome_name, fail_string) => Self::Fail(zome_name, fail_string),
-                InitCallbackResult::UnresolvedDependencies(ud) => match acc {
-                    Self::Invalid(_) => acc,
-                    _ => Self::UnresolvedDependencies(ud),
+                InitCallbackResult::UnresolvedDependencies(zome_name, ud) => match acc {
+                    Self::Fail(_, _) => acc,
+                    _ => Self::UnresolvedDependencies(zome_name, ud.into_iter().map(|h| h.into()).collect()),
                 },
                 InitCallbackResult::Pass => Self::Pass,
             }
@@ -76,11 +72,11 @@ impl From<Vec<InitCallbackResult>> for InitResult {
 //     let init_invocation = InitInvocation {
 //         dna: self.dna()
 //     };
-//     let callback_iterator: CallbackIterator<Self> =
-//         self.callback_iterator(init_invocation.into());
+//     let call_iterator: CallIterator<Self> =
+//         self.call_iterator(init_invocation.into());
 //
-//     let callback_result: Option<CallbackGuestOutput> =
-//         match callback_iterator.nth(0) {
+//     let callback_result: Option<GuestOutput> =
+//         match call_iterator.nth(0) {
 //             Some(v) => v,
 //             None => unreachable!(),
 //         };

@@ -5,16 +5,13 @@ pub mod validate;
 pub mod validation_package;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::CallbackGuestOutput;
-use holochain_zome_types::CallbackHostInput;
+use holochain_zome_types::GuestOutput;
 use crate::core::ribosome::error::RibosomeError;
 use fallible_iterator::FallibleIterator;
-use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::zome::ZomeName;
-use crate::core::ribosome::host_fn::AllowSideEffects;
-use crate::core::ribosome::host_fn::HostContext;
-
-pub struct CallbackFnComponents(Vec<String>);
+use crate::core::ribosome::HostContext;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::FnComponents;
 
 // pub enum CallbackInvocation<'a> {
 //     Validate(ValidateInvocation<'a>),
@@ -27,11 +24,7 @@ pub struct CallbackFnComponents(Vec<String>);
 //     }
 // }
 
-/// simple trait allows &CallbackInvocation to delegate for data efficiently
-/// impl this trait on &Foo rather than Foo so we can easily avoid cloning at call time
-pub trait Invocation: Into<CallbackFnComponents> + TryInto<CallbackHostInput> + Into<Vec<ZomeName>> + Into<AllowSideEffects> {}
-
-// impl From<&CallbackInvocation<'_>> for CallbackFnComponents {
+// impl From<&CallbackInvocation<'_>> for FnComponents {
 //     fn from(callback_invocation: &CallbackInvocation) -> Self {
 //         match callback_invocation {
 //             CallbackInvocation::Validate(invocation) => invocation.into(),
@@ -40,40 +33,26 @@ pub trait Invocation: Into<CallbackFnComponents> + TryInto<CallbackHostInput> + 
 //     }
 // }
 
-pub struct CallbackIterator<R: RibosomeT, I: Invocation> {
+pub struct CallIterator<R: RibosomeT, I: Invocation> {
     ribosome: R,
     invocation: I,
     remaining_zomes: Vec<ZomeName>,
-    remaining_components: CallbackFnComponents,
+    remaining_components: FnComponents,
 }
 
-impl <R: RibosomeT, I: Invocation>CallbackIterator<R, I> {
+impl <R: RibosomeT, I: Invocation>CallIterator<R, I> {
     pub fn new(ribosome: R, invocation: I) -> Self {
         Self {
             ribosome,
+            remaining_zomes: invocation.zome_names(),
+            remaining_components: invocation.fn_components(),
             invocation,
-            remaining_zomes: invocation.into(),
-            remaining_components: invocation.into()
         }
     }
 }
 
-impl Iterator for CallbackFnComponents {
-    type Item = String;
-    fn next(&mut self) -> Option<String> {
-        match self.0.len() {
-            0 => None,
-            _ => {
-                let ret = self.0.join("_");
-                self.0.pop();
-                Some(ret)
-            }
-        }
-    }
-}
-
-impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackIterator<WasmRibosome, I> {
-    type Item = CallbackGuestOutput;
+impl <I: Invocation>FallibleIterator for CallIterator<WasmRibosome, I> {
+    type Item = GuestOutput;
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         Ok(match self.remaining_zomes.first() {
@@ -84,16 +63,18 @@ impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackI
                     Some(to_call) => {
                         let mut instance = self.ribosome.instance(HostContext {
                             zome_name: zome_name.clone(),
-                            allow_side_effects: self.invocation.into(),
+                            allow_side_effects: self.invocation.allow_side_effects(),
                         })?;
                         match instance.resolve_func(&to_call) {
                             // there is a callback to_call and it is implemented in the wasm
                             Ok(_) => {
-                                let payload: CallbackHostInput = self.invocation.try_into()?;
                                 let result: Self::Item = holochain_wasmer_host::guest::call(
                                     &mut instance,
                                     &to_call,
-                                    payload
+                                    // be aware of this clone!
+                                    // the whole invocation is cloned!
+                                    // @todo - is this a problem for large payloads like entries?
+                                    self.invocation.clone().host_input()?
                                 )?;
                                 Some(result)
                             },
@@ -106,7 +87,7 @@ impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackI
                     // there are no more callbacks to call in this zome
                     // reset fn components and move to the next zome
                     None => {
-                        self.remaining_components = self.invocation.into();
+                        self.remaining_components = self.invocation.fn_components();
                         self.remaining_zomes.remove(0);
                         self.next()?
                     },
@@ -120,9 +101,9 @@ impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackI
 //     &self,
 //     invocation: CallbackInvocation,
 //     allow_side_effects: bool,
-// ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>> {
+// ) -> RibosomeResult<Vec<Option<GuestOutput>>> {
 //     let mut fn_components = invocation.components.clone();
-//     let mut results: Vec<Option<CallbackGuestOutput>> = vec![];
+//     let mut results: Vec<Option<GuestOutput>> = vec![];
 //     loop {
 //         if fn_components.len() > 0 {
 //             let mut instance =
@@ -130,7 +111,7 @@ impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackI
 //             let fn_name = fn_components.join("_");
 //             match instance.resolve_func(&fn_name) {
 //                 Ok(_) => {
-//                     let wasm_callback_response: CallbackGuestOutput =
+//                     let wasm_callback_response: GuestOutput =
 //                         holochain_wasmer_host::guest::call(
 //                             &mut instance,
 //                             &fn_name,
@@ -154,9 +135,9 @@ impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackI
 //     &self,
 //     invocation: CallbackInvocation,
 //     allow_side_effects: bool,
-// ) -> RibosomeResult<Vec<Option<CallbackGuestOutput>>> {
+// ) -> RibosomeResult<Vec<Option<GuestOutput>>> {
 //     let mut fn_components = invocation.components.clone();
-//     let mut results: Vec<Option<CallbackGuestOutput>> = vec![];
+//     let mut results: Vec<Option<GuestOutput>> = vec![];
 //     loop {
 //         if fn_components.len() > 0 {
 //             let mut instance =
@@ -164,7 +145,7 @@ impl <I: Invocation<Error = SerializedBytesError>>FallibleIterator for CallbackI
 //             let fn_name = fn_components.join("_");
 //             match instance.resolve_func(&fn_name) {
 //                 Ok(_) => {
-//                     let wasm_callback_response: CallbackGuestOutput =
+//                     let wasm_callback_response: GuestOutput =
 //                         holochain_wasmer_host::guest::call(
 //                             &mut instance,
 //                             &fn_name,

@@ -1,12 +1,59 @@
-use holo_hash::HeaderHash;
 use holochain_zome_types::zome::ZomeName;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::AllowSideEffects;
+use crate::core::ribosome::FnComponents;
+use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::header::HeaderHashes;
+use holochain_zome_types::HostInput;
+use holochain_zome_types::post_commit::PostCommitCallbackResult;
 
+#[derive(Clone)]
 pub struct PostCommitInvocation {
     zome_name: ZomeName,
-    header: HeaderHash,
+    headers: HeaderHashes,
 }
 
-pub struct PostCommitResult;
+impl Invocation for PostCommitInvocation {
+    fn allow_side_effects(&self) -> AllowSideEffects {
+        AllowSideEffects::Yes
+    }
+    fn zome_names(&self) -> Vec<ZomeName> {
+        vec![self.zome_name.to_owned()]
+    }
+    fn fn_components(&self) -> FnComponents {
+        vec!["post_commit".into()
+        ].into()
+    }
+    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
+        Ok(HostInput::new((&self.headers).try_into()?))
+    }
+}
+
+impl TryFrom<PostCommitInvocation> for HostInput {
+    type Error = SerializedBytesError;
+    fn try_from(post_commit_invocation: PostCommitInvocation) -> Result<Self, Self::Error> {
+        Ok(Self::new((&post_commit_invocation.headers).try_into()?))
+    }
+}
+
+pub enum PostCommitResult {
+    Success,
+    Fail(HeaderHashes, String),
+}
+
+impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
+    fn from(callback_results: Vec<PostCommitCallbackResult>) -> Self {
+        // this is an optional callback so defaults to success
+        callback_results.into_iter().fold(Self::Success, |acc, x| {
+            match x {
+                // fail overrides everything
+                PostCommitCallbackResult::Fail(header_hashes, fail_string) => Self::Fail(header_hashes, fail_string),
+                // success allows acc to continue
+                PostCommitCallbackResult::Success => acc,
+            }
+        })
+    }
+}
 
 
         // let mut callback_results: Vec<Option<PostCommitCallbackResult>> = vec![];
@@ -16,7 +63,7 @@ pub struct PostCommitResult;
         //         zome_name: &zome_name,
         //         header: &header,
         //     };
-        //     for callback_output in self.callback_iterator(CallbackInvocation::from(post_commit_invocation)) {
+        //     for callback_output in self.call_iterator(CallbackInvocation::from(post_commit_invocation)) {
         //         callback_results.push(match callback_output {
         //             Some(implemented) => {
         //                 match PostCommitCallbackResult::try_from(implemented.into_inner()) {
@@ -48,9 +95,9 @@ pub struct PostCommitResult;
         // //             // header.entry_type,
         // //         ],
         // //         zome_name: zome_name.clone(),
-        // //         payload: CallbackHostInput::new((&header).try_into()?),
+        // //         payload: HostInput::new((&header).try_into()?),
         // //     };
-        // //     let callback_outputs: Vec<Option<CallbackGuestOutput>> =
+        // //     let callback_outputs: Vec<Option<GuestOutput>> =
         // //         self.run_callback(callback_invocation, true)?;
         // //     assert_eq!(callback_outputs.len(), 2);
         // //

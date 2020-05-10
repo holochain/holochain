@@ -12,6 +12,7 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod wasm_ribosome;
 
+use holochain_serialized_bytes::prelude::*;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
@@ -19,7 +20,7 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::CallbackIterator;
+use crate::core::ribosome::guest_callback::CallIterator;
 use error::RibosomeResult;
 use holochain_types::{
     dna::Dna,
@@ -27,21 +28,81 @@ use holochain_types::{
 };
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use holochain_zome_types::validate::ValidationPackage;
 use mockall::automock;
 use std::iter::Iterator;
 use holochain_types::cell::CellId;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ZomeExternHostInput;
+use holochain_zome_types::HostInput;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
-use crate::core::ribosome::host_fn::AllowSideEffects;
-use holochain_zome_types::ZomeExternGuestOutput;
+use holochain_zome_types::GuestOutput;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+
+pub struct HostContext {
+    zome_name: ZomeName,
+    allow_side_effects: AllowSideEffects,
+}
+
+impl HostContext {
+    pub fn zome_name(&self) -> ZomeName {
+        self.zome_name.clone()
+    }
+    pub fn allow_side_effects(&self) -> AllowSideEffects {
+        self.allow_side_effects
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum AllowSideEffects {
+    Yes,
+    No,
+}
+
+pub struct FnComponents(Vec<String>);
+
+/// iterating over FnComponents isn't as simple as returning the inner Vec iterator
+/// we return the fully joined vector in specificity order
+/// specificity is defined as consisting of more components
+/// e.g. FnComponents(Vec("foo", "bar", "baz")) would return:
+/// - Some("foo_bar_baz")
+/// - Some("foo_bar")
+/// - Some("foo")
+/// - None
+impl Iterator for FnComponents {
+    type Item = String;
+    fn next(&mut self) -> Option<String> {
+        match self.0.len() {
+            0 => None,
+            _ => {
+                let ret = self.0.join("_");
+                self.0.pop();
+                Some(ret)
+            }
+        }
+    }
+}
+
+impl From<Vec<String>> for FnComponents {
+    fn from(vs: Vec<String>) -> Self {
+        Self(vs)
+    }
+}
+
+pub trait Invocation: Clone
+// + TryInto<HostInput, Error=SerializedBytesError>
+{
+    fn allow_side_effects(&self) -> AllowSideEffects;
+    fn zome_names(&self) -> Vec<ZomeName>;
+    fn fn_components(&self) -> FnComponents;
+    /// the serialized input from the host for the wasm call
+    /// this is intentionally NOT a reference to self because HostInput may be huge we want to be
+    /// careful about cloning invocations
+    fn host_input(self) -> Result<HostInput, SerializedBytesError>;
+}
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[allow(missing_docs)] // members are self-explanitory
-// DO NOT CLONE THIS because payload can be huge
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocation {
     /// The ID of the [Cell] in which this Zome-call would be invoked
@@ -53,24 +114,40 @@ pub struct ZomeInvocation {
     /// The name of the Zome function to call
     pub fn_name: String,
     /// The serialized data to pass an an argument to the Zome call
-    pub payload: ZomeExternHostInput,
+    pub payload: HostInput,
     /// the provenance of the call
     pub provenance: AgentPubKey,
     /// the hash of the top header at the time of call
     pub as_at: HeaderHash,
 }
 
-impl From<&ZomeInvocation> for AllowSideEffects {
-    fn from(zome_invocation: &ZomeInvocation) -> Self {
-        Self::Yes
+impl Invocation for ZomeInvocation {
+    fn allow_side_effects(&self) -> AllowSideEffects {
+        AllowSideEffects::Yes
+    }
+    fn zome_names(&self) -> Vec<ZomeName> {
+        vec![self.zome_name.to_owned()]
+    }
+    fn fn_components(&self) -> FnComponents {
+        vec![self.fn_name.to_owned()].into()
+    }
+    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
+        Ok(self.payload)
     }
 }
+
+// impl TryFrom<ZomeInvocation> for HostInput {
+//     type Error = SerializedBytesError;
+//     fn try_from(zome_invocation: ZomeInvocation) -> Result<Self, Self::Error> {
+//         Ok(zome_invocation.payload)
+//     }
+// }
 
 /// Response to a zome invocation
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum ZomeInvocationResponse {
     /// arbitrary functions exposed by zome devs to the outside world
-    ZomeApiFn(ZomeExternGuestOutput),
+    ZomeApiFn(GuestOutput),
 }
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
@@ -104,12 +181,12 @@ pub trait RibosomeT: Sized {
     fn run_custom_validation_package(
         &self,
         invocation: ValidationPackageInvocation,
-    ) -> RibosomeResult<ValidationPackage>;
+    ) -> RibosomeResult<ValidationPackageResult>;
 
     fn run_post_commit(
         &self,
         invocation: PostCommitInvocation,
-    ) -> RibosomeResult<Vec<Option<PostCommitResult>>>;
+    ) -> RibosomeResult<PostCommitResult>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
@@ -119,8 +196,7 @@ pub trait RibosomeT: Sized {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
 
-    // fn callback_iterator(&self, callback: CallbackInvocation, allow_side_effects: bool) -> (dyn Iterator<Item = RibosomeResult<Option<CallbackGuestOutput>>> + Send + Sized);
-    fn callback_iterator<R: 'static + RibosomeT, I: 'static + crate::core::ribosome::guest_callback::Invocation>(&self, ribosome: R, invocation: I) -> CallbackIterator<R, I>;
+    fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(&self, ribosome: R, invocation: I) -> CallIterator<R, I>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -128,27 +204,29 @@ pub trait RibosomeT: Sized {
         self,
         // FIXME: Use [SourceChain] instead
         _bundle: &mut SourceChainCommitBundle<'env>,
-        invocation: &ZomeInvocation,
+        invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
 }
 
 #[cfg(test)]
 pub mod wasm_test {
-    use super::WasmRibosome;
+    use holochain_zome_types::zome::ZomeName;
+    use super::wasm_ribosome::WasmRibosome;
     use crate::core::ribosome::RibosomeT;
     use core::time::Duration;
     use holo_hash::holo_hash_core::HeaderHash;
     use holochain_serialized_bytes::prelude::*;
+    use crate::core::ribosome::ZomeInvocation;
+    use crate::core::ribosome::ZomeInvocationResponse;
     use holochain_types::{
-        nucleus::{ZomeInvocation, ZomeInvocationResponse},
         shims::SourceChainCommitBundle,
         test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::commit::CommitEntryResult;
-    use holochain_zome_types::validate::ValidateEntryResult;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
+    use super::AllowSideEffects;
 
     use crate::core::ribosome::HostContext;
     use holochain_types::{
@@ -163,7 +241,7 @@ pub mod wasm_test {
         zome
     }
 
-    fn dna_from_zomes(zomes: BTreeMap<String, Zome>) -> Dna {
+    fn dna_from_zomes(zomes: BTreeMap<ZomeName, Zome>) -> Dna {
         let mut dna = fake_dna("uuid");
         dna.zomes = zomes;
         dna
@@ -179,7 +257,7 @@ pub mod wasm_test {
             fn_name: fn_name.into(),
             cell_id: fake_cell_id("bob"),
             cap: fake_cap_token(),
-            payload: ZomeExternHostInput::new(payload),
+            payload: HostInput::new(payload),
             provenance: fake_agent_pubkey_1(),
             as_at: fake_header_hash("fake"),
         }
@@ -192,25 +270,25 @@ pub mod wasm_test {
             let _ = ribosome
                 .instance(
                     HostContext {
-                        zome_name: zome_name.to_string(),
+                        zome_name: zome_name.into(),
+                        allow_side_effects: AllowSideEffects::No,
                     },
-                    true,
                 )
                 .unwrap();
         }
         WasmRibosome::new(dna_from_zomes({
-            let mut v = std::collections::BTreeMap::new();
-            v.insert(String::from("foo"), zome_from_code(TestWasm::Foo.into()));
+            let mut v: BTreeMap<ZomeName, Zome> = std::collections::BTreeMap::new();
+            v.insert("foo".into(), zome_from_code(TestWasm::Foo.into()));
             v.insert(
-                String::from("imports"),
+                "imports".into(),
                 zome_from_code(TestWasm::Imports.into()),
             );
             v.insert(
-                String::from("debug"),
+                "debug".into(),
                 zome_from_code(TestWasm::Debug.into()),
             );
             v.insert(
-                String::from("validate"),
+                "validate".into(),
                 zome_from_code(TestWasm::Validate.into()),
             );
             v
@@ -252,7 +330,7 @@ pub mod wasm_test {
                 $crate::end_hard_timeout!(timeout, 5_000_000);
 
                 let output = match zome_invocation_response {
-                    holochain_types::nucleus::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
+                    crate::core::ribosome::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
                         guest_output.into_inner().try_into().unwrap()
                     }
                 };
@@ -274,7 +352,7 @@ pub mod wasm_test {
             zome_invocation_from_names("foo", "foo", SerializedBytes::try_from(()).unwrap());
 
         assert_eq!(
-            ZomeInvocationResponse::ZomeApiFn(ZomeExternGuestOutput::new(
+            ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
@@ -291,9 +369,9 @@ pub mod wasm_test {
         );
 
         assert_eq!(
-            CommitEntryResult::ValidateFailed(ValidateEntryResult::Invalid(
+            CommitEntryResult::Fail(
                 "NeverValidates never validates".to_string()
-            )),
+            ),
             call_test_ribosome!("validate", "never_validates", ()),
         );
     }

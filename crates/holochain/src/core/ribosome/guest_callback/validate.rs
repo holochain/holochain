@@ -1,60 +1,57 @@
-use crate::core::ribosome::host_fn::AllowSideEffects;
-use crate::core::ribosome::guest_callback::CallbackFnComponents;
+use crate::core::ribosome::AllowSideEffects;
+use crate::core::ribosome::FnComponents;
 use holochain_zome_types::entry::Entry;
-use crate::core::ribosome::guest_callback::Invocation;
+use crate::core::ribosome::Invocation;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::CallbackHostInput;
+use holochain_zome_types::HostInput;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
 use holo_hash::EntryHash;
 
+#[derive(Clone)]
 pub struct ValidateInvocation {
-    zome_name: ZomeName,
+    pub zome_name: ZomeName,
     // Arc here as entry may be very large
     // don't want to clone the Entry just to validate it
     // we can SerializedBytes off an Entry reference
     // lifetimes on invocations are a pain
-    entry: Arc<Entry>,
+    pub entry: Arc<Entry>,
 }
 
-impl Invocation for &ValidateInvocation { }
-
-impl From<&ValidateInvocation> for Vec<ZomeName> {
-    fn from(validate_invocation: &ValidateInvocation) -> Self {
+impl Invocation for ValidateInvocation {
+    fn allow_side_effects(&self) -> AllowSideEffects {
+        AllowSideEffects::No
+    }
+    fn zome_names(&self) -> Vec<ZomeName> {
         // entries are specific to zomes so only validate in the zome the entry is defined in
         // note that here it is possible there is a zome/entry mismatch
         // we rely on the invocation to be built correctly
-        vec![validate_invocation.zome_name.clone()]
+        vec![self.zome_name.clone()]
     }
-}
-
-impl TryFrom<&ValidateInvocation> for CallbackHostInput {
-    type Error = SerializedBytesError;
-    fn try_from(validate_invocation: &ValidateInvocation) -> Result<Self, Self::Error> {
-        Ok(CallbackHostInput::new((&*validate_invocation.entry).try_into()?))
-    }
-}
-
-impl From<&ValidateInvocation> for CallbackFnComponents {
-    fn from(validate_invocation: &ValidateInvocation) -> CallbackFnComponents {
-        CallbackFnComponents(vec![
+    fn fn_components(&self) -> FnComponents {
+        vec![
             "validate".into(),
-            match *validate_invocation.entry {
+            match *self.entry {
                 Entry::Agent(_) => "agent",
                 Entry::App(_) => "entry",
                 Entry::CapTokenClaim(_) => "cap_token_claim",
                 Entry::CapTokenGrant(_) => "cap_token_grant",
             }.into(),
-        ])
+            ].into()
+    }
+    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
+        Ok(HostInput::new((&*self.entry).try_into()?))
     }
 }
 
-impl From<&ValidateInvocation> for AllowSideEffects {
-    fn from(_: &ValidateInvocation) -> AllowSideEffects {
-        AllowSideEffects::No
+impl TryFrom<ValidateInvocation> for HostInput {
+    type Error = SerializedBytesError;
+    fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
+        Ok(Self::new((&*validate_invocation.entry).try_into()?))
     }
 }
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateResult {
@@ -74,7 +71,7 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
                 // return unresolved dependencies if it's otherwise valid
                 ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Invalid(_) => acc,
-                    _ => Self::UnresolvedDependencies(ud),
+                    _ => Self::UnresolvedDependencies(ud.into_iter().map(|h| h.into()).collect()),
                 },
                 // valid x allows validation to continue
                 ValidateCallbackResult::Valid => acc,
@@ -95,9 +92,9 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 //         .into(),
 //     ],
 //     zome_name,
-//     payload: CallbackHostInput::new(entry.try_into()?),
+//     payload: HostInput::new(entry.try_into()?),
 // };
-// let callback_outputs: Vec<Option<CallbackGuestOutput>> =
+// let callback_outputs: Vec<Option<GuestOutput>> =
 //     self.run_callback(callback_invocation, false)?;
 // assert_eq!(
 //     callback_outputs.len(),
@@ -105,7 +102,7 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 //     "validate had wrong number of callbacks"
 // );
 
-// for callback_outputs in self.callback_iterator(CallbackInvocation::from(ValidateInvocation {
+// for callback_outputs in self.call_iterator(CallbackInvocation::from(ValidateInvocation {
 //     zome_name: &zome_name,
 //     entry,
 // })) {

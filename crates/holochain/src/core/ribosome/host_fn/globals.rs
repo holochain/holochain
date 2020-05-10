@@ -1,5 +1,5 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::host_fn::HostContext;
+use crate::core::ribosome::HostContext;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::RibosomeT;
 use holochain_serialized_bytes::SerializedBytes;

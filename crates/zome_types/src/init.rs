@@ -1,6 +1,6 @@
 use holo_hash_core::EntryHash;
 use holochain_serialized_bytes::prelude::*;
-use crate::zome_io::CallbackGuestOutput;
+use crate::zome_io::GuestOutput;
 use crate::zome::ZomeName;
 
 #[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -10,8 +10,8 @@ pub enum InitCallbackResult {
     UnresolvedDependencies(ZomeName, Vec<EntryHash>),
 }
 
-impl From<CallbackGuestOutput> for InitCallbackResult {
-    fn from(callback_guest_output: CallbackGuestOutput) -> Self {
+impl From<GuestOutput> for InitCallbackResult {
+    fn from(callback_guest_output: GuestOutput) -> Self {
         match callback_guest_output.try_into() {
             Ok(v) => v,
             Err(e) => Self::Fail(ZomeName::unknown(), format!("{:?}", e)),

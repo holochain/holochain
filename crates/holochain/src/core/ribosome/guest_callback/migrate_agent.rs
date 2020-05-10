@@ -1,47 +1,44 @@
 use holochain_zome_types::zome::ZomeName;
-use crate::core::ribosome::guest_callback::Invocation;
-use crate::core::ribosome::guest_callback::CallbackFnComponents;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::FnComponents;
 use holochain_zome_types::migrate_agent::MigrateAgent;
-use core::convert::TryFrom;
-use holochain_zome_types::CallbackHostInput;
+use holochain_zome_types::HostInput;
 use holochain_serialized_bytes::prelude::*;
-use crate::core::ribosome::host_fn::AllowSideEffects;
+use crate::core::ribosome::AllowSideEffects;
 use holochain_types::dna::Dna;
+use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 
+#[derive(Clone)]
 pub struct MigrateAgentInvocation {
     dna: Dna,
     migrate_agent: MigrateAgent,
 }
 
-impl Invocation for &MigrateAgentInvocation { }
-
-impl From<&MigrateAgentInvocation> for AllowSideEffects {
-    fn from(migrate_agent_invocation: &MigrateAgentInvocation) -> AllowSideEffects {
+impl Invocation for MigrateAgentInvocation {
+    fn allow_side_effects(&self) -> AllowSideEffects {
         AllowSideEffects::No
     }
-}
-
-impl From<&MigrateAgentInvocation> for Vec<ZomeName> {
-    fn from(migrate_agent_invocation: &MigrateAgentInvocation) -> Self {
-        migrate_agent_invocation.dna.zomes.keys().cloned().collect()
+    fn zome_names(&self) -> Vec<ZomeName> {
+        self.dna.zomes.keys().cloned().collect()
     }
-}
-
-impl From<&MigrateAgentInvocation> for CallbackFnComponents {
-    fn from(migrate_agent_invocation: &MigrateAgentInvocation) -> CallbackFnComponents {
-        CallbackFnComponents(vec!["migrate_agent".into(), match migrate_agent_invocation.migrate_agent {
+    fn fn_components(&self) -> FnComponents {
+        vec!["migrate_agent".into(), match self.migrate_agent {
             MigrateAgent::Open => "open",
             MigrateAgent::Close => "close",
-        }.into()])
+        }.into()].into()
+    }
+    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
+        Ok(HostInput::new((&self.migrate_agent).try_into()?))
     }
 }
 
-impl TryFrom<&MigrateAgentInvocation> for CallbackHostInput {
+impl TryFrom<MigrateAgentInvocation> for HostInput {
     type Error = SerializedBytesError;
-    fn try_from(migrate_agent_invocation: &MigrateAgentInvocation) -> Result<Self, Self::Error> {
-        Ok(CallbackHostInput::new(migrate_agent_invocation.migrate_agent.try_into()?))
+    fn try_from(migrate_agent_invocation: MigrateAgentInvocation) -> Result<Self, Self::Error> {
+        Ok(Self::new((&migrate_agent_invocation.migrate_agent).try_into()?))
     }
 }
+
 
 /// the aggregate result of all zome callbacks for migrating an agent between dnas
 pub enum MigrateAgentResult {
@@ -51,6 +48,19 @@ pub enum MigrateAgentResult {
     /// ZomeName is the first zome that failed
     /// String is some human readable string explaining the failure
     Fail(ZomeName, String),
+}
+
+impl From<Vec<MigrateAgentCallbackResult>> for MigrateAgentResult {
+    fn from(callback_results: Vec<MigrateAgentCallbackResult>) -> Self {
+        callback_results.into_iter().fold(Self::Pass, |acc, x| {
+            match x {
+                // fail always overrides the acc
+                MigrateAgentCallbackResult::Fail(zome_name, fail_string) => Self::Fail(zome_name, fail_string),
+                // pass allows the acc to continue
+                MigrateAgentCallbackResult::Pass => acc,
+            }
+        })
+    }
 }
 
 
@@ -73,13 +83,13 @@ pub enum MigrateAgentResult {
         //     //         .into(),
         //     //     ],
         //     //     zome_name: zome_name.to_string(),
-        //     //     payload: CallbackHostInput::new(self.dna().try_into()?),
+        //     //     payload: HostInput::new(self.dna().try_into()?),
         //     // };
-        //     // let callback_outputs: Vec<Option<CallbackGuestOutput>> =
+        //     // let callback_outputs: Vec<Option<GuestOutput>> =
         //     //     self.run_callback(callback_invocation, false)?;
         //     // assert_eq!(callback_outputs.len(), 2);
         //
-        //     for callback_output in self.callback_iterator(migrate_agent_invocation.into()) {
+        //     for callback_output in self.call_iterator(migrate_agent_invocation.into()) {
         //         agent_migrate_dna_result = match callback_output {
         //             // if a callback is implemented try to deserialize the result
         //             Some(implemented) => {

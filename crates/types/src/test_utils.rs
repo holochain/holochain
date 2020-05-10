@@ -7,7 +7,7 @@ use crate::{
     shims::CapToken,
 };
 use holo_hash::AgentPubKey;
-use holochain_zome_types::ZomeExternHostInput;
+use holochain_zome_types::HostInput;
 use std::{collections::BTreeMap, path::PathBuf};
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
@@ -84,6 +84,6 @@ pub fn fake_cap_token() -> CapToken {
 }
 
 /// A fixture example ZomeInvocationPayload for unit testing.
-pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
-    ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
+pub fn fake_zome_invocation_payload() -> HostInput {
+    HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }
