@@ -3,6 +3,7 @@
 use crate::*;
 use task_dispatch_incoming::{ToDispatchIncoming, ToDispatchIncomingSender};
 use task_socket_sink::ToSocketSinkSender;
+use tracing_futures::Instrument;
 
 /// The Sender/Write half of a split websocket. Use this to make
 /// outgoing requests to the remote end of this websocket connection.
@@ -91,17 +92,17 @@ impl WebsocketSender {
     #[must_use]
     pub fn request<SB1, SB2>(&mut self, msg: SB1) -> BoxFuture<'static, Result<SB2>>
     where
-        SB1: 'static + std::convert::TryInto<SerializedBytes> + Send,
+        SB1: 'static + std::convert::TryInto<SerializedBytes> + Send +std::fmt::Debug,
         <SB1 as std::convert::TryInto<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
         SB2: 'static + std::convert::TryFrom<SerializedBytes> + Send,
         <SB2 as std::convert::TryFrom<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
     {
-        //let span = tracing::debug_span!("sender_request");
         let mut send_sink = self.send_sink.clone();
         let mut send_dispatch = self.send_dispatch.clone();
         async move {
+            tracing::trace!(request_msg = ?msg);
             let bytes: SerializedBytes = msg
                 .try_into()
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
@@ -142,6 +143,7 @@ impl WebsocketSender {
             let bytes: SerializedBytes = UnsafeBytes::from(bytes).into();
             Ok(SB2::try_from(bytes).map_err(|e| Error::new(ErrorKind::Other, e))?)
         }
+        .instrument(tracing::debug_span!("sender_request"))
         .boxed()
     }
 }

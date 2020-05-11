@@ -1197,6 +1197,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tracing",
+ "tracing-futures",
  "tungstenite",
  "url2",
 ]
