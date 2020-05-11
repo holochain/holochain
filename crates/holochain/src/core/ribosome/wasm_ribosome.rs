@@ -40,7 +40,6 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeInvocation;
 use crate::core::ribosome::ZomeInvocationResponse;
 use fallible_iterator::FallibleIterator;
-use holochain_types::shims::SourceChainCommitBundle;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
@@ -52,6 +51,8 @@ use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::DnaError;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use holo_hash_core::HoloHashCoreHash;
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -72,10 +73,10 @@ impl WasmRibosome {
 
     pub fn module(&self, host_context: HostContext) -> RibosomeResult<Module> {
         let zome_name: ZomeName = host_context.zome_name();
-        let zome = self.dna.get_zome(&zome_name)?;
-        let wasm: Arc<Vec<u8>> = Arc::clone(&zome.code.code());
+        let zome = self.dna_file.dna().get_zome(&zome_name)?;
+        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         Ok(holochain_wasmer_host::instantiate::module(
-            &self.wasm_cache_key(&zome_name),
+            &self.wasm_cache_key(&zome_name)?,
             &wasm,
         )?)
     }
@@ -89,11 +90,11 @@ impl WasmRibosome {
 
     pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
         let zome_name: ZomeName = host_context.zome_name();
-        let zome = self.dna.get_zome(&zome_name)?;
+        let zome = self.dna_file.dna().get_zome(&zome_name)?;
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = self.imports(host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
-            self.wasm_cache_key(&zome_name),
+            self.wasm_cache_key(&zome_name)?,
             &wasm,
             &imports,
         )?)
@@ -213,8 +214,7 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function<'env>(
         self,
-        // FIXME: Use [SourceChain] instead
-        _bundle: &mut SourceChainCommitBundle<'env>,
+        workspace: UnsafeInvokeZomeWorkspace,
         invocation: ZomeInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,

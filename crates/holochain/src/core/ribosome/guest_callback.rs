@@ -12,8 +12,10 @@ use crate::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
+    workspace: UnsafeInvokeZomeWorkspace,
     ribosome: R,
     invocation: I,
     remaining_zomes: Vec<ZomeName>,
@@ -21,8 +23,9 @@ pub struct CallIterator<R: RibosomeT, I: Invocation> {
 }
 
 impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
-    pub fn new(ribosome: R, invocation: I) -> Self {
+    pub fn new(workspace: UnsafeInvokeZomeWorkspace, ribosome: R, invocation: I) -> Self {
         Self {
+            workspace,
             ribosome,
             remaining_zomes: invocation.zome_names(),
             remaining_components: invocation.fn_components(),
@@ -44,6 +47,7 @@ impl<I: Invocation> FallibleIterator for CallIterator<WasmRibosome, I> {
                         let host_context = HostContext {
                             zome_name: zome_name.clone(),
                             allow_side_effects: self.invocation.allow_side_effects(),
+                            workspace: self.workspace
                         };
                         let module = self.ribosome.module(host_context.clone())?;
                         if module.info().exports.contains_key(&to_call) {

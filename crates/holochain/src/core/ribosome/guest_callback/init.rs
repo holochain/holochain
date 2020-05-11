@@ -18,7 +18,7 @@ impl Invocation for InitInvocation {
         AllowSideEffects::Yes
     }
     fn zome_names(&self) -> Vec<ZomeName> {
-        self.dna.zomes.keys().cloned().collect()
+        self.dna_def.zomes.keys().cloned().collect()
     }
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()

@@ -148,9 +148,7 @@ pub enum ZomeInvocationResponse {
 /// real concrete type is [WasmRibosome]
 #[automock]
 pub trait RibosomeT: Sized {
-    fn dna_file(&self) -> &DnaFile {
-        &self.dna_file
-    }
+    fn dna_file(&self) -> &DnaFile;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
