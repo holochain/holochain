@@ -8,6 +8,7 @@ use crate::{
     shims::CapToken,
 };
 use holo_hash::AgentPubKey;
+use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -34,7 +35,7 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
+pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
         properties: Properties::new(serde_json::json!({"p": "hi"}))

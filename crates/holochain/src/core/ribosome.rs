@@ -195,13 +195,6 @@ impl Invocation for ZomeInvocation {
     }
 }
 
-// impl TryFrom<ZomeInvocation> for HostInput {
-//     type Error = SerializedBytesError;
-//     fn try_from(zome_invocation: ZomeInvocation) -> Result<Self, Self::Error> {
-//         Ok(zome_invocation.payload)
-//     }
-// }
-
 /// Response to a zome invocation
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum ZomeInvocationResponse {

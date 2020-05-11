@@ -13,26 +13,6 @@ use fallible_iterator::FallibleIterator;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 
-// pub enum CallbackInvocation<'a> {
-//     Validate(ValidateInvocation<'a>),
-//     Init(InitInvocation<'a>),
-// }
-//
-// impl <'a>From<InitInvocation<'a>> for CallbackInvocation<'a> {
-//     fn from(init_invocation: InitInvocation<'a>) -> Self {
-//         Self::Init(init_invocation)
-//     }
-// }
-
-// impl From<&CallbackInvocation<'_>> for FnComponents {
-//     fn from(callback_invocation: &CallbackInvocation) -> Self {
-//         match callback_invocation {
-//             CallbackInvocation::Validate(invocation) => invocation.into(),
-//             CallbackInvocation::Init(invocation) => invocation.into(),
-//         }
-//     }
-// }
-
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
     ribosome: R,
     invocation: I,
@@ -97,71 +77,3 @@ impl<I: Invocation> FallibleIterator for CallIterator<WasmRibosome, I> {
         })
     }
 }
-
-// fn run_callback(
-//     &self,
-//     invocation: CallbackInvocation,
-//     allow_side_effects: bool,
-// ) -> RibosomeResult<Vec<Option<GuestOutput>>> {
-//     let mut fn_components = invocation.components.clone();
-//     let mut results: Vec<Option<GuestOutput>> = vec![];
-//     loop {
-//         if fn_components.len() > 0 {
-//             let mut instance =
-//                 self.instance(HostContext::from(&invocation), allow_side_effects)?;
-//             let fn_name = fn_components.join("_");
-//             match instance.resolve_func(&fn_name) {
-//                 Ok(_) => {
-//                     let wasm_callback_response: GuestOutput =
-//                         holochain_wasmer_host::guest::call(
-//                             &mut instance,
-//                             &fn_name,
-//                             invocation.payload.clone(),
-//                         )?;
-//                     results.push(Some(wasm_callback_response));
-//                 }
-//                 Err(_) => results.push(None),
-//             }
-//             fn_components.pop();
-//         } else {
-//             break;
-//         }
-//     }
-//
-//     // reverse the vector so that most specific results are first
-//     Ok(results.into_iter().rev().collect())
-// }
-
-// fn run_callback(
-//     &self,
-//     invocation: CallbackInvocation,
-//     allow_side_effects: bool,
-// ) -> RibosomeResult<Vec<Option<GuestOutput>>> {
-//     let mut fn_components = invocation.components.clone();
-//     let mut results: Vec<Option<GuestOutput>> = vec![];
-//     loop {
-//         if fn_components.len() > 0 {
-//             let mut instance =
-//                 self.instance(HostContext::from(&invocation), allow_side_effects)?;
-//             let fn_name = fn_components.join("_");
-//             match instance.resolve_func(&fn_name) {
-//                 Ok(_) => {
-//                     let wasm_callback_response: GuestOutput =
-//                         holochain_wasmer_host::guest::call(
-//                             &mut instance,
-//                             &fn_name,
-//                             invocation.payload.clone(),
-//                         )?;
-//                     results.push(Some(wasm_callback_response));
-//                 }
-//                 Err(_) => results.push(None),
-//             }
-//             fn_components.pop();
-//         } else {
-//             break;
-//         }
-//     }
-//
-//     // reverse the vector so that most specific results are first
-//     Ok(results.into_iter().rev().collect())
-// }

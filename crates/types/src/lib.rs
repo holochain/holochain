@@ -70,10 +70,6 @@ macro_rules! serial_hash {
 }
 
 serial_hash!(
-    crate::chain_header::ChainHeader,
-    crate::entry::Entry,
-    EntryHash
-
     crate::Header,
     HeaderHash
 

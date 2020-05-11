@@ -1,6 +1,5 @@
 //! wraps holo_hashes for the use of those hashes as storage addresses, either CAS or DHT
-
-use crate::chain_header::ChainHeader;
+use crate::header::Header;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::Entry;

@@ -15,19 +15,13 @@ backtrace = "0.3.27"
 base64 = "0.10.1"
 chrono = "0.4.6"
 flate2 = "1.0.14"
-futures = "0.3"
 hcid = "0.0.6"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 # holochain_locksmith = "0.0.43-alpha3"
-holochain_serialized_bytes = "=0.0.38"
-holochain_types_derive = { version = "=0.0.1", path = "../types_derive" }
-holochain_wasmer_common = "=0.0.24"
-holochain_zome_types = { path = "../zome_types" }
 lazy_static = "1.4.0"
-must_future = "0.1.1"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = ["derive", "rc"] }
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
@@ -39,9 +33,6 @@ tracing = "=0.1.13"
 tracing-core = "=0.1.10"
 tracing-subscriber = "=0.2.3"
 tracing-serde = "=0.1.1"
-holo_hash = { version = "0.0.1", path = "../holo_hash" }
-holochain_crypto = { version = "0.0.1", path = "../crypto" }
-holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_serialized_bytes = "=0.0.39"
 holochain_types_derive = { version = "=0.0.1", path = "../types_derive" }
 holochain_wasmer_common = "=0.0.30"
