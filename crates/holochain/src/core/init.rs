@@ -5,11 +5,11 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT};
-use holochain_types::dna::Dna;
+use holochain_types::dna::DnaFile;
 
 /// init a dna
-pub async fn init_dna(dna: Dna, invocation: InitInvocation) -> RibosomeResult<InitResult> {
-    let ribosome = WasmRibosome::new(dna);
+pub async fn init_dna(dna_file: DnaFile, invocation: InitInvocation) -> RibosomeResult<InitResult> {
+    let ribosome = WasmRibosome::new(dna_file);
     // at the end of all the zomes succeeding to init i want to commit an initialization complete
     // entry, this is the only way we can treat it as transactional is if all the zomes do their
     // thing and at the end of which we can say init complete

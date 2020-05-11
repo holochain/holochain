@@ -2,15 +2,15 @@ use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::Dna;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
+use holochain_types::dna::DnaDef;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
-    dna: Dna,
+    dna_def: DnaDef,
     migrate_agent: MigrateAgent,
 }
 

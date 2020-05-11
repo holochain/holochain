@@ -3,14 +3,14 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::Dna;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
+use holochain_types::dna::DnaDef;
 
 #[derive(Clone)]
 pub struct InitInvocation {
-    dna: Dna,
+    dna_def: DnaDef,
 }
 
 impl Invocation for InitInvocation {

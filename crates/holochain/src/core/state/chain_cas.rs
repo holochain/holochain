@@ -15,8 +15,8 @@ use holochain_state::{
 };
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
-    chain_header::ChainHeader,
     header,
+    header::Header,
 };
 use holochain_zome_types::entry::Entry;
 use std::convert::TryFrom;

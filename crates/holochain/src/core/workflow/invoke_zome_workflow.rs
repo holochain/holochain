@@ -11,9 +11,10 @@ use crate::core::state::{
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
-use holochain_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
 use must_future::MustBoxFuture;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use crate::core::ribosome::ZomeInvocationResponse;
+use crate::core::ribosome::ZomeInvocation;
 
 pub mod unsafe_invoke_zome_workspace;
 

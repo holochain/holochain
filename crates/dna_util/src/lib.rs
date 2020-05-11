@@ -4,6 +4,7 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
 use std::collections::BTreeMap;
+use holochain_zome_types::zome::ZomeName;
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]
@@ -147,7 +148,7 @@ struct DnaDefJson {
     pub name: String,
     pub uuid: String,
     pub properties: serde_json::Value,
-    pub zomes: BTreeMap<String, ZomeJson>,
+    pub zomes: BTreeMap<ZomeName, ZomeJson>,
 }
 
 impl DnaDefJson {

@@ -14,7 +14,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     cell::CellHandle,
-    dna::{Dna, Properties},
+    dna::{DnaFile, Properties},
 };
 use std::path::PathBuf;
 use tracing::*;

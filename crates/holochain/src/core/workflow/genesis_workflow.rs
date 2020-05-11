@@ -14,8 +14,9 @@ use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResul
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use holochain_types::{dna::DnaFile, entry::Entry, header, Header};
+use holochain_types::{dna::DnaFile, header, Header};
 use must_future::MustBoxFuture;
+use holochain_zome_types::entry::Entry;
 
 /// The struct which implements the genesis Workflow
 pub struct GenesisWorkflow<Api: CellConductorApiT> {
@@ -68,7 +69,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             });
             workspace
                 .source_chain
-                .put(agent_header, Some(Entry::Agent(agent_pubkey)))
+                .put(agent_header, Some(Entry::Agent(agent_pubkey.into())))
                 .await?;
 
             let fx = WorkflowEffects {

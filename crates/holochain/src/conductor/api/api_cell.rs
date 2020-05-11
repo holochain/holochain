@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::Todo};
+use holochain_types::dna::DnaFile;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].
@@ -34,7 +35,7 @@ impl CellConductorApiT for CellConductorApi {
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+    ) -> ConductorApiResult<ZomeInvocationResponse> {
         if *cell_id == invocation.cell_id {
             self.conductor_handle
                 .invoke_zome(invocation)
@@ -84,7 +85,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult>;
+    ) -> ConductorApiResult<ZomeInvocationResponse>;
 
     /// Make a request to the DPKI service running for this Conductor.
     /// TODO: decide on actual signature

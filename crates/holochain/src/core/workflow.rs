@@ -21,17 +21,9 @@
 //! committing changes to the associated Workspace and triggering other
 //! workflows.
 
-<<<<<<< HEAD
-use crate::core::ribosome::ZomeInvocation;
 use crate::{
-    conductor::api::error::ConductorApiError,
-    core::state::workspace::{Workspace, WorkspaceError},
+    core::state::workspace::{Workspace},
 };
-use holochain_state::error::DatabaseError;
-use holochain_types::{dna::Dna, prelude::*};
-use std::time::Duration;
-use thiserror::Error;
-=======
 mod effects;
 pub mod error;
 mod genesis_workflow;
@@ -42,11 +34,9 @@ pub(crate) use genesis_workflow::*;
 pub(crate) use initialize_zomes_workflow::*;
 pub(crate) use invoke_zome_workflow::unsafe_invoke_zome_workspace;
 pub(crate) use invoke_zome_workflow::*;
->>>>>>> e545362605818464396720aba087798d8a6d5985
 
 pub use effects::*;
 
-use crate::core::state::workspace::Workspace;
 use error::*;
 use holochain_state::env::EnvironmentWrite;
 use must_future::MustBoxFuture;

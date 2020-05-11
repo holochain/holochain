@@ -1,13 +1,13 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
-use crate::core::ribosome::RibosomeT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::globals::ZomeGlobals;
 use holochain_zome_types::GlobalsInput;
 use holochain_zome_types::GlobalsOutput;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use crate::core::ribosome::RibosomeT;
 
 pub async fn globals(
     ribosome: Arc<WasmRibosome>,
@@ -15,10 +15,7 @@ pub async fn globals(
     _input: GlobalsInput,
 ) -> RibosomeResult<GlobalsOutput> {
     Ok(GlobalsOutput::new(ZomeGlobals {
-        dna_name: ribosome.dna().name.clone(),
-) -> GlobalsOutput {
-    GlobalsOutput::new(ZomeGlobals {
-        dna_name: ribosome.dna_file.dna().name.clone(),
+        dna_name: ribosome.dna_file().dna().name.clone(),
         agent_address: "".into(),                           // @TODO
         agent_id_str: "".into(),                            // @TODO
         agent_initial_hash: "".into(),                      // @TODO

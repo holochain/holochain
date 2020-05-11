@@ -6,11 +6,12 @@ use crate::core::state::{
 use fallible_iterator::FallibleIterator;
 use holochain_state::{
     buffer::BufferedStore,
-    db::DbManager,
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::{address::HeaderAddress, chain_header::ChainHeader, prelude::*};
+use holochain_state::db::GetDb;
+use holochain_types::Header;
+use holochain_types::{address::HeaderAddress, prelude::*};
 use holochain_zome_types::entry::Entry;
 
 use tracing::*;
