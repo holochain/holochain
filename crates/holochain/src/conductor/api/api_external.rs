@@ -160,6 +160,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 dna_hashes,
                 agent_key,
             } => {
+                // Create cells
+                let cell_ids = dna_hashes
+                    .iter()
+                    .cloned()
+                    .map(|dna_hash| CellId::from((dna_hash, agent_key.clone())))
+                    .collect();
+                self.conductor_handle
+                    .create_cells(cell_ids, self.conductor_handle.clone())
+                    .await?;
+
+                // Call genesis
                 let len = dna_hashes.len();
                 let results = futures::stream::iter(dna_hashes.into_iter().map(|dna_hash| {
                     let agent_key = agent_key.clone();
@@ -182,15 +193,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .map(|(d, e)| (d, e.unwrap_err().into()))
                     .collect();
 
-                // Create cells
-                let cell_ids = success
-                    .iter()
-                    .cloned()
-                    .map(|dna_hash| CellId::from((dna_hash, agent_key.clone())))
-                    .collect();
-                self.conductor_handle
-                    .create_cells(cell_ids, self.conductor_handle.clone())
-                    .await?;
+                // FIXME: What if genesis fails but we have created the cells?
 
                 Ok(AdminResponse::AppsActivated { success, errors })
             }

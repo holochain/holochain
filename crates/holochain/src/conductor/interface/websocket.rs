@@ -277,37 +277,29 @@ mod test {
             .unwrap();
     }
 
-    async fn setup_admin_cells(
-        cell_ids: &[CellId],
-        dna_store: MockDnaStore,
-    ) -> RealAdminInterfaceApi {
+    async fn setup_admin_cells(dna_store: MockDnaStore) -> (Arc<TempDir>, RealAdminInterfaceApi) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
-        let _tmpdir = test_env.tmpdir.clone();
-        let mut state = ConductorState::default();
-        for cell_id in cell_ids {
-            state.cells.push(cell_id.clone());
-        }
+        let tmpdir = test_env.tmpdir.clone();
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .fake_state(state)
             .test(test_env, wasm_env)
             .await
             .unwrap();
-        RealAdminInterfaceApi::new(conductor_handle)
+        (tmpdir, RealAdminInterfaceApi::new(conductor_handle))
     }
 
-    async fn setup_admin() -> RealAdminInterfaceApi {
+    async fn setup_admin() -> (Arc<TempDir>, RealAdminInterfaceApi) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
-        let _tmpdir = test_env.tmpdir.clone();
+        let tmpdir = test_env.tmpdir.clone();
         let conductor_handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
-        RealAdminInterfaceApi::new(conductor_handle)
+        (tmpdir, RealAdminInterfaceApi::new(conductor_handle))
     }
 
     async fn setup_app(
@@ -337,7 +329,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
-        let admin_api = setup_admin().await;
+        let (_tmpdir, admin_api) = setup_admin().await;
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -356,7 +348,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn invalid_request() {
         observability::test_run().ok();
-        let admin_api = setup_admin().await;
+        let (_tmpdir, admin_api) = setup_admin().await;
         let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -468,11 +460,7 @@ mod test {
         let mut dna_store = MockDnaStore::new();
         dna_store.expect_get().returning(move |_| Some(dna.clone()));
         let dna_hashes = vec![fake_dna_hash("lasers"), fake_dna_hash("cool things")];
-        let cell_ids = dna_hashes
-            .iter()
-            .map(|dna_hash| CellId::from((dna_hash.clone(), fake_agent_pubkey_1())))
-            .collect::<Vec<_>>();
-        let admin_api = setup_admin_cells(&cell_ids[..], dna_store).await;
+        let (_tmpdir, admin_api) = setup_admin_cells(dna_store).await;
 
         let agent_key = fake_agent_pubkey_1();
         let msg = AdminRequest::ActivateApps {
