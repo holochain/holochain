@@ -92,7 +92,7 @@ impl WasmRibosome {
         let zome_name: ZomeName = host_context.zome_name();
         let zome = self.dna_file.dna().get_zome(&zome_name)?;
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
-        let imports: ImportObject = self.imports(host_context);
+        let imports: ImportObject = Self::imports(self, host_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             self.wasm_cache_key(&zome_name)?,
             &wasm,
