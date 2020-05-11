@@ -35,18 +35,18 @@ pub enum Entry {
     CapTokenGrant(CapTokenGrant),
 }
 
-impl Entry {
-    /// Get the EntryAddress of this entry
-    // FIXME: use async with_data, or consider wrapper type
-    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
-    pub fn entry_address(&self) -> EntryAddress {
-        match self {
+make_hashed_base!( (pub) EntryHashed, Entry, EntryAddress );
+
+impl EntryHashed {
+    /// Construct (and hash) a new EntryHashed with given Entry.
+    pub async fn with_data(entry: Entry) -> Result<Self, SerializedBytesError> {
+        let hash = match &entry {
             Entry::Agent(key) => EntryAddress::Agent(key.to_owned()),
             entry => {
-                // TODO fix unwrap
-                let serialized_bytes: SerializedBytes = entry.try_into().unwrap();
-                EntryAddress::Entry(EntryHash::with_data_sync(serialized_bytes.bytes()))
+                let sb = SerializedBytes::try_from(entry)?;
+                EntryAddress::Entry(EntryHash::with_data(sb.bytes()).await)
             }
-        }
+        };
+        Ok(EntryHashed::with_pre_hashed(entry, hash))
     }
 }

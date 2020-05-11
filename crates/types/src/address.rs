@@ -1,6 +1,5 @@
 //! wraps holo_hashes for the use of those hashes as storage addresses, either CAS or DHT
 
-use crate::{entry::Entry, Header};
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
@@ -31,13 +30,6 @@ impl From<HeaderHash> for HeaderAddress {
     }
 }
 
-impl std::convert::TryFrom<&Header> for HeaderAddress {
-    type Error = SerializedBytesError;
-    fn try_from(header: &Header) -> Result<Self, Self::Error> {
-        Ok(HeaderAddress::Header(HeaderHash::try_from(header)?))
-    }
-}
-
 impl std::fmt::Display for HeaderAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -48,7 +40,17 @@ impl std::fmt::Display for HeaderAddress {
 
 /// address type for entry hashes that can be used to retrieve entries from the cas or dht
 #[derive(
-    Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes,
+    Debug,
+    Clone,
+    derive_more::From,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
 )]
 pub enum EntryAddress {
     /// standard entry hash
@@ -57,8 +59,26 @@ pub enum EntryAddress {
     Agent(AgentPubKey),
 }
 
-impl From<EntryAddress> for HoloHash {
-    fn from(entry_address: EntryAddress) -> HoloHash {
+impl holo_hash_core::HoloHashCoreHash for EntryAddress {
+    fn get_raw(&self) -> &[u8] {
+        unimplemented!()
+    }
+
+    fn get_bytes(&self) -> &[u8] {
+        unimplemented!()
+    }
+
+    fn get_loc(&self) -> u32 {
+        unimplemented!()
+    }
+
+    fn into_inner(self) -> std::vec::Vec<u8> {
+        unimplemented!()
+    }
+}
+
+impl From<EntryAddress> for holo_hash_core::HoloHashCore {
+    fn from(entry_address: EntryAddress) -> holo_hash_core::HoloHashCore {
         match entry_address {
             EntryAddress::Entry(entry_hash) => entry_hash.into(),
             EntryAddress::Agent(agent_pubkey) => agent_pubkey.into(),
@@ -66,10 +86,12 @@ impl From<EntryAddress> for HoloHash {
     }
 }
 
-impl TryFrom<&Entry> for EntryAddress {
-    type Error = SerializedBytesError;
-    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(EntryAddress::Entry(EntryHash::try_from(entry)?))
+impl From<EntryAddress> for HoloHash {
+    fn from(entry_address: EntryAddress) -> HoloHash {
+        match entry_address {
+            EntryAddress::Entry(entry_hash) => entry_hash.into(),
+            EntryAddress::Agent(agent_pubkey) => agent_pubkey.into(),
+        }
     }
 }
 
@@ -100,20 +122,6 @@ impl From<DhtAddress> for HoloHash {
             DhtAddress::Agent(agent_pubkey) => agent_pubkey.into(),
             DhtAddress::Header(header_hash) => header_hash.into(),
         }
-    }
-}
-
-impl TryFrom<&Entry> for DhtAddress {
-    type Error = SerializedBytesError;
-    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(DhtAddress::Entry(EntryHash::try_from(entry)?))
-    }
-}
-
-impl TryFrom<&Header> for DhtAddress {
-    type Error = SerializedBytesError;
-    fn try_from(header: &Header) -> Result<Self, Self::Error> {
-        Ok(DhtAddress::Header(HeaderHash::try_from(header)?))
     }
 }
 
