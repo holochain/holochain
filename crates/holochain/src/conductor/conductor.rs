@@ -146,24 +146,6 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    /// Move this [Conductor] into a shared [ConductorHandle].
-    ///
-    /// After this happens, direct mutable access to the Conductor becomes impossible,
-    /// and you must interact with it through the ConductorHandle, a limited cloneable interface
-    /// for which all mutation is synchronized across all shared copies by a RwLock.
-    ///
-    /// This signals the completion of Conductor initialization and the beginning of its lifecycle
-    /// as the driver of its various interface handling loops.
-    /// The [Cell]s are also created at this point.
-    pub async fn run(self) -> ConductorResult<ConductorHandle> {
-        let keystore = self.keystore.clone();
-        let cells = self.get_state().await?.cells;
-        let handle: ConductorHandle =
-            Arc::new(ConductorHandleImpl::from((RwLock::new(self), keystore)));
-        handle.create_cells(cells, handle.clone()).await?;
-        Ok(handle)
-    }
-
     /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
     /// on it. Useful for specifying port 0 and letting the OS choose a free port.
     pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {

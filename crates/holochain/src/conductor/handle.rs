@@ -14,13 +14,10 @@
 //! #       env: wasm_env,
 //! #      tmpdir: _tmpdir,
 //! # } = test_wasm_env();
-//! let conductor: Conductor = ConductorBuilder::new().test(env, wasm_env).await.unwrap();
-//!
-//! // Do direct manipulation of the Conductor here
-//!
-//! // move the Conductor into a ConductorHandle,
-//! // making the original Conductor inaccessible
-//! let handle: ConductorHandle = conductor.run().await.unwrap();
+//! let handle: ConductorHandle = ConductorBuilder::new()
+//!    .test(env, wasm_env)
+//!    .await
+//!    .unwrap();
 //!
 //! // handles are cloneable
 //! let handle2 = handle.clone();
