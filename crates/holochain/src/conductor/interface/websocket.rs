@@ -494,6 +494,7 @@ mod test {
         let admin_api = setup_admin_cells(cell_id, dna_store).await;
 
         let agent_key = fake_agent_pubkey_1();
+        // TODO: add another dna
         let dna_hashes = vec![dna_hash];
         let msg = AdminRequest::ActivateApps {
             dna_hashes,
