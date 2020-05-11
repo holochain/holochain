@@ -6,7 +6,7 @@ use holo_hash::HeaderHash;
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
-        DbManager, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
+        GetDb, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
         PRIMARY_CHAIN_HEADERS,
     },
     error::{DatabaseError, DatabaseResult},
@@ -42,15 +42,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         })
     }
 
-    pub fn primary(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
-        let entries = *dbs.get(&*PRIMARY_CHAIN_ENTRIES)?;
-        let headers = *dbs.get(&*PRIMARY_CHAIN_HEADERS)?;
+    pub fn primary(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let entries = dbs.get_db(&*PRIMARY_CHAIN_ENTRIES)?;
+        let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 
-    pub fn cache(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
-        let entries = *dbs.get(&*CACHE_CHAIN_ENTRIES)?;
-        let headers = *dbs.get(&*CACHE_CHAIN_HEADERS)?;
+    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let entries = dbs.get_db(&*CACHE_CHAIN_ENTRIES)?;
+        let headers = dbs.get_db(&*CACHE_CHAIN_HEADERS)?;
         Self::new(reader, entries, headers)
     }
 
@@ -76,12 +76,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         signed_header: SignedHeader,
     ) -> SourceChainResult<Option<ChainElement>> {
         let maybe_entry_address = match signed_header.header().clone() {
-            ChainHeader::EntryCreate(header::EntryCreate { entry_address, .. }) => {
-                Some(entry_address)
-            }
-            ChainHeader::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
-                Some(entry_address)
-            }
+            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => Some(entry_address),
+            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => Some(entry_address),
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {

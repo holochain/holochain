@@ -148,7 +148,7 @@ where
     #[instrument(skip(self))]
     fn get_persisted(&self, k: &K) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>> + '_> {
         let s = trace_span!("persisted");
-        let _ = s.enter();
+        let _g = s.enter();
         trace!("test");
         let iter = self.db.get(self.reader, k)?;
         Ok(iter.filter_map(|v| match v {

@@ -8,10 +8,10 @@ use holochain_2020::conductor::{
     Conductor, ConductorHandle,
 };
 use holochain_types::{
-    dna::Properties,
+    dna::{DnaFile, Properties},
     observability,
     prelude::*,
-    test_utils::{fake_dna, fake_dna_file},
+    test_utils::{fake_dna_file, write_fake_dna_file},
 };
 use holochain_websocket::*;
 use matches::assert_matches;
@@ -112,7 +112,7 @@ async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Websock
     .await?)
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn call_admin() {
     observability::test_run().ok();
     // NOTE: This is a full integration test that
@@ -143,8 +143,8 @@ async fn call_admin() {
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
     let uuid = Uuid::new_v4();
-    let mut dna = fake_dna(&uuid.to_string());
-    let original_dna_hash = dna.dna_hash();
+    let dna = fake_dna_file(&uuid.to_string());
+    let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
     let json = serde_json::json!({
@@ -154,7 +154,7 @@ async fn call_admin() {
     let properties = Some(json.clone());
 
     // Install Dna
-    let (fake_dna_path, _tmpdir) = fake_dna_file(dna.clone()).unwrap();
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let request = AdminRequest::InstallDna(fake_dna_path, properties.clone());
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -165,15 +165,20 @@ async fn call_admin() {
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
 
-    dna.properties = Properties::new(properties.unwrap()).try_into().unwrap();
-    assert_ne!(original_dna_hash, dna.dna_hash());
-    let expects = vec![dna.dna_hash()];
+    let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
+    let mut tmp_dna = dna.dna().clone();
+    tmp_dna.properties = Properties::new(properties.unwrap()).try_into().unwrap();
+    let dna = DnaFile::new(tmp_dna, tmp_wasm).await.unwrap();
+
+    assert_ne!(&original_dna_hash, dna.dna_hash());
+
+    let expects = vec![dna.dna_hash().clone()];
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
     holochain.kill().expect("Failed to kill holochain");
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     observability::test_run().ok();
     let tmp_dir = TempDir::new("conductor_cfg").unwrap();
@@ -182,7 +187,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).with_admin().await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
-    let (fake_dna_path, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
     let request = AdminRequest::InstallDna(fake_dna_path, None);
     let response = client.request(request).await;
     assert_matches!(response, Ok(AdminResponse::DnaInstalled));
@@ -191,7 +196,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(threaded_scheduler)]
 async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     observability::test_run().ok();
 
@@ -228,7 +233,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     info!("About to make failing request");
 
-    let (fake_dna, _tmpdir) = fake_dna_file(fake_dna("")).unwrap();
+    let (fake_dna, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
     let request = AdminRequest::InstallDna(fake_dna, None);
 
     // send a request after the conductor has shutdown

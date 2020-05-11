@@ -4,8 +4,7 @@ use crate::core::state::{
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain_state::{
-    db::DbManager, env::ReadManager, error::DatabaseResult, prelude::Reader,
-    test_utils::test_cell_env,
+    env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
 use holochain_types::{
     address::EntryAddress,
@@ -13,6 +12,7 @@ use holochain_types::{
     header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
+    Header,
 };
 use holochain_zome_types::entry::Entry;
 use maplit::hashset;
@@ -24,19 +24,16 @@ struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
     jimbo_id: AgentPubKey,
-    jimbo_header: ChainHeader,
+    jimbo_header: Header,
     jimbo_entry: Entry,
     jessy_id: AgentPubKey,
-    jessy_header: ChainHeader,
+    jessy_header: Header,
     jessy_entry: Entry,
     mock_primary_meta: MockChainMetaBuf,
     mock_cache_meta: MockChainMetaBuf,
 }
 
-fn setup_env<'env>(
-    reader: &'env Reader<'env>,
-    dbs: &'env DbManager,
-) -> DatabaseResult<Chains<'env>> {
+fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Chains<'env>> {
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();
@@ -44,24 +41,24 @@ fn setup_env<'env>(
     let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone().into());
 
-    let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+    let jimbo_header = Header::EntryCreate(header::EntryCreate {
+        timestamp: Timestamp::now(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_address: EntryAddress::try_from(&jimbo_entry)?,
     });
 
-    let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+    let jessy_header = Header::EntryCreate(header::EntryCreate {
+        timestamp: Timestamp::now(),
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_address: EntryAddress::try_from(&jessy_entry)?,
     });
 
-    let source_chain = SourceChainBuf::new(reader, &dbs)?;
-    let cache = SourceChainBuf::cache(reader, &dbs)?;
+    let source_chain = SourceChainBuf::new(reader, dbs)?;
+    let cache = SourceChainBuf::cache(reader, dbs)?;
     let mock_primary_meta = MockChainMetaBuf::new();
     let mock_cache_meta = MockChainMetaBuf::new();
     Ok(Chains {
@@ -82,7 +79,7 @@ fn setup_env<'env>(
 async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -125,7 +122,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -169,7 +166,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -215,7 +212,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -250,7 +247,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
 async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -304,7 +301,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {
@@ -358,7 +355,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
     let Chains {

@@ -5,6 +5,7 @@ use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use async_trait::async_trait;
+use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::Todo};
 use mockall::mock;
@@ -21,7 +22,7 @@ mock! {
             &self,
             cell_id: &CellId,
             invocation: ZomeInvocation,
-        ) -> ConductorApiResult<ZomeInvocationResponse>;
+        ) -> ConductorApiResult<ZomeInvocationResult>;
 
         fn sync_network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
@@ -35,6 +36,7 @@ mock! {
         fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
         fn mock_keystore(&self) -> &KeystoreSender;
+        fn sync_get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile>;
     }
 
     trait Clone {
@@ -48,7 +50,7 @@ impl CellConductorApiT for MockCellConductorApi {
         &self,
         cell_id: &CellId,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
+    ) -> ConductorApiResult<ZomeInvocationResult> {
         self.sync_invoke_zome(cell_id, invocation)
     }
 
@@ -70,5 +72,8 @@ impl CellConductorApiT for MockCellConductorApi {
 
     fn keystore(&self) -> &KeystoreSender {
         self.mock_keystore()
+    }
+    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile> {
+        self.sync_get_dna(dna_hash)
     }
 }

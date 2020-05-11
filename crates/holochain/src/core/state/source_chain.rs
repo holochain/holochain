@@ -19,7 +19,8 @@ mod source_chain_buffer;
 /// A wrapper around [SourceChainBuf] with the assumption that the source chain has been initialized,
 /// i.e. has undergone Genesis.
 #[derive(Shrinkwrap)]
-pub struct SourceChain<'env, R: Readable>(SourceChainBuf<'env, R>);
+#[shrinkwrap(mutable)]
+pub struct SourceChain<'env, R: Readable = Reader<'env>>(pub SourceChainBuf<'env, R>);
 
 impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
@@ -33,8 +34,12 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
-    pub fn new(reader: &'env R, dbs: &'env DbManager) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
+    }
+
+    pub fn into_inner(self) -> SourceChainBuf<'env, R> {
+        self.0
     }
 }
 
@@ -54,7 +59,7 @@ pub struct ChainElement {
 
 impl ChainElement {
     /// Raw element constructor.  Used only when we know that the values are valid.
-    pub fn new(signature: Signature, header: ChainHeader, maybe_entry: Option<Entry>) -> Self {
+    pub fn new(signature: Signature, header: Header, maybe_entry: Option<Entry>) -> Self {
         Self {
             signed_header: SignedHeader { signature, header },
             maybe_entry,
@@ -75,8 +80,8 @@ impl ChainElement {
         self.signed_header.signature()
     }
 
-    /// Access the ChainHeader portion of this triple.
-    pub fn header(&self) -> &ChainHeader {
+    /// Access the Header portion of this triple.
+    pub fn header(&self) -> &Header {
         self.signed_header.header()
     }
 
@@ -89,19 +94,19 @@ impl ChainElement {
 /// the header and the signature that signed it
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SignedHeader {
-    header: ChainHeader,
+    header: Header,
     signature: Signature,
 }
 
 impl SignedHeader {
     /// SignedHeader constructor
-    pub async fn new(keystore: &KeystoreSender, header: ChainHeader) -> SourceChainResult<Self> {
+    pub async fn new(keystore: &KeystoreSender, header: Header) -> SourceChainResult<Self> {
         let signature = header.author().sign(keystore, &header).await?;
         Ok(Self { signature, header })
     }
 
-    /// Access the ChainHeader portion.
-    pub fn header(&self) -> &ChainHeader {
+    /// Access the Header portion.
+    pub fn header(&self) -> &Header {
         &self.header
     }
     /// Access the signature portion.

@@ -84,6 +84,53 @@ impl Iterator for FnComponents {
 impl From<Vec<String>> for FnComponents {
     fn from(vs: Vec<String>) -> Self {
         Self(vs)
+/// Interface for a Ribosome. Currently used only for mocking, as our only
+/// real concrete type is [WasmRibosome]
+#[automock]
+pub trait RibosomeT: Sized {
+    /// Helper function for running a validation callback. Just calls
+    /// [`run_callback`][] under the hood.
+    /// [`run_callback`]: #method.run_callback
+    fn run_validation(self, _entry: Entry) -> ValidationResult {
+        unimplemented!()
+    }
+
+    /// Runs a callback function defined in a zome.
+    ///
+    /// This is differentiated from calling a zome function, even though in both
+    /// cases it amounts to a FFI call of a guest function.
+    fn run_callback(self, data: ()) -> Todo;
+
+    /// Runs the specified zome fn. Returns the cursor used by HDK,
+    /// so that it can be passed on to source chain manager for transactional writes
+    fn call_zome_function(
+        self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        // TODO NetworkRequest,
+        invocation: ZomeInvocation,
+    ) -> RibosomeResult<ZomeInvocationResponse>;
+}
+
+/// Total hack just to have something to look at
+/// The only WasmRibosome is a Wasm ribosome.
+#[derive(Clone)]
+pub struct WasmRibosome {
+    // NOTE - Currently taking a full DnaFile here.
+    //      - It would be an optimization to pre-ensure the WASM bytecode
+    //      - is already in the wasm cache, and only include the DnaDef portion
+    //      - here in the ribosome.
+    dna_file: DnaFile,
+}
+
+pub struct HostContext {
+    workspace: UnsafeInvokeZomeWorkspace,
+    zome_name: String,
+}
+
+impl WasmRibosome {
+    /// Create a new instance
+    pub fn new(dna_file: DnaFile) -> Self {
+        Self { dna_file }
     }
 }
 
@@ -118,6 +165,20 @@ pub struct ZomeInvocation {
     /// the hash of the top header at the time of call
     pub as_at: HeaderHash,
 }
+    pub fn wasm_cache_key(&self, zome_name: &str) -> Result<&[u8], DnaError> {
+        Ok(self.dna_file.dna().get_zome(zome_name)?.wasm_hash.get_raw())
+    }
+
+    pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
+        let zome_name = host_context.zome_name.clone();
+        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
+        let imports: ImportObject = WasmRibosome::imports(self, host_context);
+        Ok(holochain_wasmer_host::instantiate::instantiate(
+            self.wasm_cache_key(&zome_name)?,
+            &wasm,
+            &imports,
+        )?)
+    }
 
 impl Invocation for ZomeInvocation {
     fn allow_side_effects(&self) -> AllowSideEffects {
@@ -197,12 +258,24 @@ pub trait RibosomeT: Sized {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
-        // FIXME: Use [SourceChain] instead
-        _bundle: &mut SourceChainCommitBundle<'env>,
+        workspace: UnsafeInvokeZomeWorkspace,
+        // TODO: ConductorHandle
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
+    ) -> RibosomeResult<ZomeInvocationResponse> {
+        let host_context = HostContext {
+            workspace,
+            zome_name: invocation.zome_name.clone(),
+        };
+        let wasm_extern_response: ZomeExternGuestOutput = holochain_wasmer_host::guest::call(
+            &mut self.instance(host_context)?,
+            &invocation.fn_name,
+            invocation.payload,
+        )?;
+        Ok(ZomeInvocationResponse::ZomeApiFn(wasm_extern_response))
+    }
 }
 
 #[cfg(test)]
@@ -225,10 +298,8 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::ribosome::HostContext;
-    use holochain_types::{
-        dna::{wasm::DnaWasm, zome::Zome, Dna},
-        test_utils::{fake_dna, fake_header_hash, fake_zome},
+    use crate::core::{
+        ribosome::HostContext, workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
     };
     use std::collections::BTreeMap;
 
@@ -279,6 +350,20 @@ pub mod wasm_test {
             v.insert("validate".into(), zome_from_code(TestWasm::Validate.into()));
             v
         }))
+                    zome_name: zome_name.to_string(),
+                    workspace: UnsafeInvokeZomeWorkspace::test_dropped_guard(),
+                })
+                .unwrap();
+        }
+        let dna_file = fake_dna_zomes(
+            "uuid",
+            vec![
+                (String::from("foo"), TestWasm::Foo.into()),
+                (String::from("imports"), TestWasm::Imports.into()),
+                (String::from("debug"), TestWasm::Debug.into()),
+            ],
+        );
+        WasmRibosome::new(dna_file)
     }
 
     pub fn now() -> Duration {
@@ -305,7 +390,8 @@ pub mod wasm_test {
                 );
                 let zome_invocation_response = ribosome
                     .call_zome_function(
-                        &mut holochain_types::shims::SourceChainCommitBundle::default(),
+                        $crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::test_dropped_guard(
+                        ),
                         invocation,
                     )
                     .unwrap();
@@ -330,8 +416,8 @@ pub mod wasm_test {
         };
     }
 
-    #[test]
-    fn invoke_foo_test() {
+    #[tokio::test(threaded_scheduler)]
+    async fn invoke_foo_test() {
         let ribosome = test_ribosome(Some("foo"));
 
         let invocation =
@@ -342,7 +428,7 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(&mut SourceChainCommitBundle::default(), invocation)
+                .call_zome_function(UnsafeInvokeZomeWorkspace::test_dropped_guard(), invocation)
                 .unwrap()
         );
     }

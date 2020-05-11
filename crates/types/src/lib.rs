@@ -6,7 +6,6 @@
 pub mod address;
 pub mod autonomic;
 pub mod cell;
-pub mod chain_header;
 pub mod db;
 pub mod dna;
 pub mod header;
@@ -16,16 +15,21 @@ pub mod observability;
 pub mod persistence;
 pub mod prelude;
 pub mod validate;
+mod timestamp;
 
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]
 pub mod shims;
 
-pub mod time;
 pub mod universal_map;
 
 // #[cfg(test)]
 pub mod test_utils;
+
+#[doc(inline)]
+pub use header::Header;
+
+pub use timestamp::Timestamp;
 
 use holochain_zome_types;
 
@@ -65,14 +69,12 @@ macro_rules! serial_hash {
     };
 }
 
-/// hack to make serial_hash macro work
-#[allow(dead_code)]
-enum EntryHash {}
-#[allow(dead_code)]
-enum HeaderHash {}
-
 serial_hash!(
     crate::chain_header::ChainHeader,
+    crate::entry::Entry,
+    EntryHash
+
+    crate::Header,
     HeaderHash
 
     crate::dna::wasm::DnaWasm,

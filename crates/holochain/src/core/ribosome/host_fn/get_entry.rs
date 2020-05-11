@@ -5,10 +5,24 @@ use holochain_zome_types::GetEntryInput;
 use holochain_zome_types::GetEntryOutput;
 use std::sync::Arc;
 
-pub async fn get_entry(
+pub async fn get_entry<'a>(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
+    host_context: Arc<HostContext>,
     _input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
     unimplemented!();
+) -> GetEntryOutput {
+    // TODO: EXAMPLE: This is only an example of how to use the workspace
+    // and should be removed when this is implemented.
+    let agent_pubkey = fake_agent_pubkey_1();
+    let call =
+        |workspace: &'a InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Option<Entry>>> {
+            async move {
+                let cascade = workspace.cascade();
+                cascade.dht_get(agent_pubkey.into()).await
+            }
+            .boxed()
+        };
+    let _entry = unsafe { host_context.workspace.apply_ref(call).await };
+    todo!("Remove the above and implement get_entry")
 }

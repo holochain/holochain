@@ -1,10 +1,13 @@
 use super::error::{
     ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
 };
-use crate::conductor::{
-    config::AdminInterfaceConfig,
-    interface::error::{InterfaceError, InterfaceResult},
-    ConductorHandle,
+use crate::{
+    conductor::{
+        config::AdminInterfaceConfig,
+        interface::error::{InterfaceError, InterfaceResult},
+        ConductorHandle,
+    },
+    core::workflow::ZomeInvocationResult,
 };
 use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
 use holo_hash::*;
@@ -59,7 +62,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     async fn invoke_zome(
         &self,
         invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse>;
+    ) -> ConductorApiResult<ZomeInvocationResult>;
 
     // -- provided -- //
 
@@ -68,9 +71,12 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
                 AppRequest::ZomeInvocationRequest { request } => {
-                    Ok(AppResponse::ZomeInvocationResponse {
-                        response: Box::new(self.invoke_zome(*request).await?),
-                    })
+                    match self.invoke_zome(*request).await? {
+                        Ok(response) => Ok(AppResponse::ZomeInvocationResponse {
+                            response: Box::new(response),
+                        }),
+                        Err(e) => Ok(AppResponse::Error(e.into())),
+                    }
                 }
                 _ => unimplemented!(),
             }
@@ -79,9 +85,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 
         match res {
             Ok(response) => response,
-            Err(e) => AppResponse::Error {
-                debug: format!("{:?}", e),
-            },
+            Err(e) => AppResponse::Error(e.into()),
         }
     }
 }
@@ -133,6 +137,24 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dna_list = self.conductor_handle.list_dnas().await?;
                 Ok(AdminResponse::ListDnas(dna_list))
             }
+            GenerateAgentPubKey => {
+                let agent_pub_key = self
+                    .conductor_handle
+                    .keystore()
+                    .clone()
+                    .generate_sign_keypair_from_pure_entropy()
+                    .await?;
+                Ok(AdminResponse::GenerateAgentPubKey(agent_pub_key))
+            }
+            ListAgentPubKeys => {
+                let pub_key_list = self
+                    .conductor_handle
+                    .keystore()
+                    .clone()
+                    .list_sign_keys()
+                    .await?;
+                Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
+            }
         }
     }
 }
@@ -141,16 +163,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 async fn read_parse_dna(
     dna_path: PathBuf,
     properties: Option<serde_json::Value>,
-) -> ConductorApiResult<Dna> {
-    let dna: UnsafeBytes = tokio::fs::read(dna_path)
+) -> ConductorApiResult<DnaFile> {
+    let dna_content = tokio::fs::read(dna_path)
         .await
-        .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?
-        .into();
-    let dna = SerializedBytes::from(dna);
-    let mut dna: Dna = dna.try_into().map_err(SerializationError::from)?;
+        .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?;
+    let mut dna = DnaFile::from_file_content(&dna_content).await?;
     if let Some(properties) = properties {
-        let properties = Properties::new(properties);
-        dna.properties = (properties).try_into().map_err(SerializationError::from)?;
+        let properties = SerializedBytes::try_from(Properties::new(properties))
+            .map_err(SerializationError::from)?;
+        dna = dna.with_properties(properties).await?;
     }
     Ok(dna)
 }
@@ -196,9 +217,9 @@ impl RealAppInterfaceApi {
 impl AppInterfaceApi for RealAppInterfaceApi {
     async fn invoke_zome(
         &self,
-        _invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResult> {
+        self.conductor_handle.invoke_zome(invocation).await
     }
 }
 
@@ -216,9 +237,7 @@ impl InterfaceApi for RealAppInterfaceApi {
             .map_err(InterfaceError::RequestHandler)?;
         match request {
             Ok(request) => Ok(AppInterfaceApi::handle_request(self, request).await),
-            Err(e) => Ok(AppResponse::Error {
-                debug: e.to_string(),
-            }),
+            Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
         }
     }
 }
@@ -227,11 +246,7 @@ impl InterfaceApi for RealAppInterfaceApi {
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppResponse {
     /// There has been an error in the request
-    Error {
-        // TODO maybe this could be serialized instead of stringified?
-        /// Stringified version of the error
-        debug: String,
-    },
+    Error(ExternalApiWireError),
     /// The response to a zome call
     ZomeInvocationResponse {
         /// The data that was returned by this call
@@ -251,6 +266,10 @@ pub enum AdminResponse {
     AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
     ListDnas(Vec<DnaHash>),
+    /// Keystore generated a new AgentPubKey
+    GenerateAgentPubKey(AgentPubKey),
+    /// Listing all the AgentPubKeys in the Keystore
+    ListAgentPubKeys(Vec<AgentPubKey>),
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
 }
@@ -285,6 +304,10 @@ pub enum AdminRequest {
     InstallDna(PathBuf, Option<serde_json::Value>),
     /// List all installed [Dna]s
     ListDnas,
+    /// Generate a new AgentPubKey
+    GenerateAgentPubKey,
+    /// List all AgentPubKeys in Keystore
+    ListAgentPubKeys,
 }
 
 #[allow(missing_docs)]
@@ -315,21 +338,37 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_types::test_utils::{fake_dna, fake_dna_file};
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_types::{
+        observability,
+        test_utils::{fake_dna_file, write_fake_dna_file},
+    };
     use matches::assert_matches;
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
     async fn install_list_dna() -> Result<()> {
-        let handle = Conductor::builder().test().await?.into_handle();
+        observability::test_run().ok();
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env)
+            .await?
+            .run()
+            .await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
-        let dna = fake_dna(&uuid.to_string());
-        let (dna_path, _tempdir) = fake_dna_file(dna.clone()).unwrap();
-        let dna_hash = dna.dna_hash();
-        admin_api
+        let dna = fake_dna_file(&uuid.to_string());
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let dna_hash = dna.dna_hash().clone();
+        let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
             .await;
+        assert_matches!(install_response, AdminResponse::DnaInstalled);
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
@@ -337,10 +376,59 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn generate_and_list_pub_keys() -> Result<()> {
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env)
+            .await?
+            .run()
+            .await
+            .unwrap();
+        let admin_api = RealAdminInterfaceApi::new(handle);
+
+        let agent_pub_key = admin_api
+            .handle_admin_request(AdminRequest::GenerateAgentPubKey)
+            .await;
+
+        let agent_pub_key = match agent_pub_key {
+            AdminResponse::GenerateAgentPubKey(key) => key,
+            _ => panic!("bad type: {:?}", agent_pub_key),
+        };
+
+        let pub_key_list = admin_api
+            .handle_admin_request(AdminRequest::ListAgentPubKeys)
+            .await;
+
+        let mut pub_key_list = match pub_key_list {
+            AdminResponse::ListAgentPubKeys(list) => list,
+            _ => panic!("bad type: {:?}", pub_key_list),
+        };
+
+        // includes our two pre-generated test keys
+        let mut expects = vec![
+            AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4").unwrap(),
+            AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK").unwrap(),
+            agent_pub_key,
+        ];
+
+        pub_key_list.sort();
+        expects.sort();
+
+        assert_eq!(expects, pub_key_list);
+
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
-        let mut dna = fake_dna(&uuid.to_string());
-        let (dna_path, _tmpdir) = fake_dna_file(dna.clone())?;
+        let dna = fake_dna_file(&uuid.to_string());
+        let (dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await?;
         let json = serde_json::json!({
             "test": "example",
             "how_many": 42,
@@ -348,8 +436,9 @@ mod test {
         let properties = Some(json.clone());
         let result = read_parse_dna(dna_path, properties).await?;
         let properties = Properties::new(json);
+        let mut dna = dna.dna().clone();
         dna.properties = properties.try_into().unwrap();
-        assert_eq!(dna, result);
+        assert_eq!(&dna, result.dna());
         Ok(())
     }
 }

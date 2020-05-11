@@ -10,17 +10,11 @@ use holochain_types::{
     header,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
+    Header,
 };
 use holochain_zome_types::entry::Entry;
 
-fn fixtures() -> (
-    AgentPubKey,
-    ChainHeader,
-    Entry,
-    AgentPubKey,
-    ChainHeader,
-    Entry,
-) {
+fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) {
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();
@@ -28,16 +22,16 @@ fn fixtures() -> (
     let jessy_id = fake_agent_pubkey_2();
     let jessy_entry = Entry::Agent(jessy_id.clone().into());
 
-    let jimbo_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+    let jimbo_header = Header::EntryCreate(header::EntryCreate {
+        timestamp: Timestamp::now(),
         author: jimbo_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_address: (&jimbo_entry).try_into().unwrap(),
     });
 
-    let jessy_header = ChainHeader::EntryCreate(header::EntryCreate {
-        timestamp: chrono::Utc::now().timestamp().into(),
+    let jessy_header = Header::EntryCreate(header::EntryCreate {
+        timestamp: Timestamp::now(),
         author: jessy_id.clone(),
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
@@ -56,7 +50,7 @@ fn fixtures() -> (
 #[tokio::test(threaded_scheduler)]
 async fn get_links() -> SourceChainResult<()> {
     let env = test_cell_env();
-    let dbs = env.dbs().await?;
+    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
 

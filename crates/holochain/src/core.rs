@@ -14,7 +14,6 @@ pub mod init;
 pub mod ribosome;
 #[allow(missing_docs)]
 pub mod signal;
-#[allow(missing_docs)]
 pub mod state;
 pub mod validate;
 #[allow(missing_docs)]

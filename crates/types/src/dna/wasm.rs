@@ -13,7 +13,7 @@ use std::{
 use tracing::*;
 
 /// Represents web assembly code.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Eq)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
     code: Arc<Vec<u8>>,

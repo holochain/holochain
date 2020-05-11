@@ -7,7 +7,7 @@ pub mod error;
 pub mod wasm;
 pub mod zome;
 use crate::prelude::*;
-use error::DnaError;
+pub use error::DnaError;
 pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
@@ -18,9 +18,16 @@ pub struct Properties {
     properties: serde_json::Value,
 }
 
+impl Properties {
+    /// Create new properties from json value
+    pub fn new(properties: serde_json::Value) -> Self {
+        Properties { properties }
+    }
+}
+
 /// Represents the top-level holochain dna object.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
-pub struct Dna {
+pub struct DnaDef {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
 
@@ -35,13 +42,11 @@ pub struct Dna {
     pub zomes: BTreeMap<ZomeName, zome::Zome>,
 }
 
-impl Dna {
-    /// Gets DnaHash from Dna
-    // FIXME: use async with_data, or consider wrapper type
-    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413222920
-    pub fn dna_hash(&self) -> DnaHash {
-        let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
-        DnaHash::with_data_sync(&sb.bytes())
+impl DnaDef {
+    /// Calculate DnaHash for DnaDef
+    pub async fn dna_hash(&self) -> DnaHash {
+        let sb: SerializedBytes = self.try_into().expect("failed to hash DnaDef");
+        DnaHash::with_data(&sb.bytes()).await
     }
 
     /// Return a Zome
@@ -52,9 +57,111 @@ impl Dna {
     }
 }
 
-impl Properties {
-    /// Create new properties from json value
-    pub fn new(properties: serde_json::Value) -> Self {
-        Properties { properties }
+/// Represents a full DNA file including WebAssembly bytecode.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
+pub struct DnaFile {
+    /// The hashable portion that can be shared with hApp code.
+    dna: DnaDef,
+
+    /// The hash of `self.dna` converted through `SerializedBytes`.
+    /// (This can be a full holo_hash because we never send a `DnaFile` to Wasm.)
+    dna_hash: holo_hash::DnaHash,
+
+    /// The bytes of the WASM zomes referenced in the Dna portion.
+    code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
+}
+
+impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
+    fn from(dna_file: DnaFile) -> (DnaDef, Vec<wasm::DnaWasm>) {
+        (
+            dna_file.dna,
+            dna_file.code.into_iter().map(|(_, w)| w).collect(),
+        )
+    }
+}
+
+impl DnaFile {
+    /// Construct a new DnaFile instance.
+    pub async fn new(
+        dna: DnaDef,
+        wasm: impl IntoIterator<Item = wasm::DnaWasm>,
+    ) -> Result<Self, DnaError> {
+        let mut code = BTreeMap::new();
+        for wasm in wasm {
+            let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
+            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+            code.insert(wasm_hash, wasm);
+        }
+        let dna_sb: SerializedBytes = (&dna).try_into()?;
+        let dna_hash = holo_hash::DnaHash::with_data(dna_sb.bytes()).await;
+        Ok(Self {
+            dna,
+            dna_hash,
+            code,
+        })
+    }
+
+    /// Load dna_file bytecode into this rust struct.
+    pub async fn from_file_content(data: &[u8]) -> Result<Self, DnaError> {
+        // Not super efficient memory-wise, but doesn't block any threads
+        let data = data.to_vec();
+        tokio::task::spawn_blocking(move || {
+            let mut gz = flate2::read::GzDecoder::new(&data[..]);
+            let mut bytes = Vec::new();
+            use std::io::Read;
+            gz.read_to_end(&mut bytes)?;
+            let sb: SerializedBytes = UnsafeBytes::from(bytes).into();
+            let dna_file: DnaFile = sb.try_into()?;
+            Ok(dna_file)
+        })
+        .await
+        .expect("blocking thread panicked - panicking here too")
+    }
+
+    /// Transform this DnaFile into a new DnaFile with different properties
+    /// and, hence, a different DnaHash.
+    pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
+        let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
+        dna.properties = properties;
+        DnaFile::new(dna, wasm).await
+    }
+
+    /// The hashable portion that can be shared with hApp code.
+    pub fn dna(&self) -> &DnaDef {
+        &self.dna
+    }
+
+    /// The hash of the dna def
+    /// (this can be a full holo_hash because we never send a DnaFile to WASM)
+    pub fn dna_hash(&self) -> &holo_hash::DnaHash {
+        &self.dna_hash
+    }
+
+    /// The bytes of the WASM zomes referenced in the Dna portion.
+    pub fn code(&self) -> &BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm> {
+        &self.code
+    }
+
+    /// Fetch the Webassembly byte code for a zome.
+    pub fn get_wasm_for_zome(&self, zome_name: &str) -> Result<&wasm::DnaWasm, DnaError> {
+        let wasm_hash = &self.dna.get_zome(zome_name)?.wasm_hash;
+        self.code
+            .get(wasm_hash)
+            .ok_or_else(|| DnaError::InvalidWasmHash)
+    }
+
+    /// Render this dna_file as bytecode to send over the wire, or store in a file.
+    pub async fn to_file_content(&self) -> Result<Vec<u8>, DnaError> {
+        // Not super efficient memory-wise, but doesn't block any threads
+        let dna_file = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let data: SerializedBytes = dna_file.try_into()?;
+            let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+            use std::io::Write;
+            enc.write_all(data.bytes())?;
+            Ok(enc.finish()?)
+        })
+        .await
+        .expect("blocking thread panic!d - panicing here too")
     }
 }

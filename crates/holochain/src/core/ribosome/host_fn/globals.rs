@@ -16,6 +16,9 @@ pub async fn globals(
 ) -> RibosomeResult<GlobalsOutput> {
     Ok(GlobalsOutput::new(ZomeGlobals {
         dna_name: ribosome.dna().name.clone(),
+) -> GlobalsOutput {
+    GlobalsOutput::new(ZomeGlobals {
+        dna_name: ribosome.dna_file.dna().name.clone(),
         agent_address: "".into(),                           // @TODO
         agent_id_str: "".into(),                            // @TODO
         agent_initial_hash: "".into(),                      // @TODO

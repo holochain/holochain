@@ -6,6 +6,7 @@ use crate::{
     },
     core::ribosome::wasm_ribosome::WasmRibosome,
 };
+use error::CellError;
 use holo_hash::*;
 use holochain_state::env::Environment;
 use holochain_types::{autonomic::AutonomicProcess, cell::CellId, shims::*};
@@ -40,11 +41,29 @@ impl PartialEq for Cell {
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorApi,
-    state_env: Environment,
+    state_env: EnvironmentWrite,
 }
 
 impl Cell {
-    #[allow(dead_code)]
+    pub fn create<P: AsRef<Path>>(
+        id: CellId,
+        conductor_handle: ConductorHandle,
+        env_path: P,
+        keystore: KeystoreSender,
+    ) -> CellResult<Self> {
+        let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
+        let state_env = EnvironmentWrite::new(
+            env_path.as_ref(),
+            EnvironmentKind::Cell(id.clone()),
+            keystore,
+        )?;
+        Ok(Self {
+            id,
+            conductor_api,
+            state_env,
+        })
+    }
+
     fn dna_hash(&self) -> &DnaHash {
         &self.id.dna_hash()
     }
@@ -74,25 +93,32 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
-        _conductor_api: CellConductorApi,
-        _invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResponse> {
-        unimplemented!()
+        invocation: ZomeInvocation,
+    ) -> ConductorApiResult<ZomeInvocationResult> {
+        let arc = self.state_env();
+        let env = arc.guard().await;
+        let reader = env.reader()?;
+        let workflow = InvokeZomeWorkflow {
+            ribosome: self.get_ribosome().await?,
+            invocation,
+        };
+        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
+        Ok(run_workflow(self.state_env(), workflow, workspace)
+            .await
+            .map_err(Box::new)?)
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn get_ribosome(&self) -> WasmRibosome {
-        unimplemented!()
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
+    pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
+        match self.conductor_api.get_dna(self.dna_hash().clone()).await {
+            Some(dna) => Ok(WasmRibosome::new(dna)),
+            None => Err(CellError::DnaMissing),
+        }
     }
 
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn state_env(&self) -> Environment {
+    // TODO: reevaluate once Workflows are fully implemented (after B-01567)
+    pub(crate) fn state_env(&self) -> EnvironmentWrite {
         self.state_env.clone()
-    }
-
-    // TODO: tighten up visibility: only WorkflowRunner needs to access this
-    pub(crate) fn get_conductor_api(&self) -> CellConductorApi {
-        self.conductor_api.clone()
     }
 }
 
