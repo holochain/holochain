@@ -6,9 +6,12 @@ use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
+    // @todo PostCommitWorkspace?
+    workspace: UnsafeInvokeZomeWorkspace,
     zome_name: ZomeName,
     headers: HeaderHashes,
 }
@@ -25,6 +28,9 @@ impl Invocation for PostCommitInvocation {
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&self.headers).try_into()?))
+    }
+    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
+        self.workspace
     }
 }
 

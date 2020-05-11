@@ -18,6 +18,7 @@ pub async fn commit_entry(
 ) -> RibosomeResult<CommitEntryOutput> {
     let entry: Entry = input.into_inner();
     let validate = ribosome.run_validate(ValidateInvocation {
+        workspace: host_context.workspace,
         zome_name: host_context.zome_name(),
         entry: Arc::new(entry),
     })?;

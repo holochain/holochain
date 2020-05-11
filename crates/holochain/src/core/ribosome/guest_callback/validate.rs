@@ -8,9 +8,12 @@ use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::sync::Arc;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {
+    // @todo ValidateWorkspace?
+    pub workspace: UnsafeInvokeZomeWorkspace,
     pub zome_name: ZomeName,
     // Arc here as entry may be very large
     // don't want to clone the Entry just to validate it
@@ -44,6 +47,9 @@ impl Invocation for ValidateInvocation {
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&*self.entry).try_into()?))
+    }
+    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
+        self.workspace
     }
 }
 

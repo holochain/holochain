@@ -61,7 +61,7 @@ where
             let result = {
                 // TODO: TK-01564: Return this result
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                ribosome.call_zome_function(raw_workspace, invocation)
+                ribosome.call_zome_function(invocation)
             };
 
             // Get the new head
@@ -155,9 +155,10 @@ pub mod tests {
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{
-        entry::Entry, nucleus::ZomeInvocationResponse, observability,
+        observability,
         test_utils::fake_agent_pubkey_1,
     };
+    use holochain_zome_types::entry::Entry;
     use holochain_zome_types::ZomeExternGuestOutput;
 
     use futures::{future::BoxFuture, FutureExt};

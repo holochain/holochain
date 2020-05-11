@@ -99,6 +99,7 @@ pub trait Invocation: Clone // + TryInto<HostInput, Error=SerializedBytesError>
     /// this is intentionally NOT a reference to self because HostInput may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<HostInput, SerializedBytesError>;
+    fn workspace(&self) -> UnsafeInvokeZomeWorkspace;
 }
 
 /// A top-level call into a zome function,
@@ -106,6 +107,8 @@ pub trait Invocation: Clone // + TryInto<HostInput, Error=SerializedBytesError>
 #[allow(missing_docs)] // members are self-explanitory
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocation {
+    #[serde(skip)]
+    pub workspace: UnsafeInvokeZomeWorkspace,
     /// The ID of the [Cell] in which this Zome-call would be invoked
     pub cell_id: CellId,
     /// The name of the Zome containing the function that would be invoked
@@ -134,6 +137,9 @@ impl Invocation for ZomeInvocation {
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(self.payload)
+    }
+    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
+        self.workspace
     }
 }
 
@@ -176,13 +182,15 @@ pub trait RibosomeT: Sized {
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult>;
 
-    fn run_post_commit(&self, invocation: PostCommitInvocation)
+    fn run_post_commit(&self,
+        invocation: PostCommitInvocation)
         -> RibosomeResult<PostCommitResult>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateResult>;
+    fn run_validate(&self,
+        invocation: ValidateInvocation) -> RibosomeResult<ValidateResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
@@ -194,7 +202,6 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         self,
-        workspace: UnsafeInvokeZomeWorkspace,
         // TODO: ConductorHandle
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;

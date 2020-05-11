@@ -199,7 +199,6 @@ pub mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
-        chain_header::ChainHeader,
         header,
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},

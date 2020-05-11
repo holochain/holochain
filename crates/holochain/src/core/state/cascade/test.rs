@@ -8,7 +8,6 @@ use holochain_state::{
 };
 use holochain_types::{
     address::EntryAddress,
-    chain_header::ChainHeader,
     header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},

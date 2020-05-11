@@ -71,7 +71,7 @@ pub mod raw {
     /// writing to the data but this is never contested
     /// because of the single threaded nature.
     pub struct UnsafeInvokeZomeWorkspace {
-        workspace: std::rc::Weak<std::sync::Mutex<*mut std::ffi::c_void>>,
+        workspace: std::sync::Weak<std::sync::Mutex<*mut std::ffi::c_void>>,
     }
 
     // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.

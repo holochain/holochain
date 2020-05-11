@@ -8,9 +8,12 @@ use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
+    // @todo ValidationPackageWorkspace?
+    workspace: UnsafeInvokeZomeWorkspace,
     zome_name: ZomeName,
     app_entry_type: AppEntryType,
 }
@@ -33,6 +36,9 @@ impl Invocation for ValidationPackageInvocation {
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&self.app_entry_type).try_into()?))
+    }
+    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
+        self.workspace
     }
 }
 
