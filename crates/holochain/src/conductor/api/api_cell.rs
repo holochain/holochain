@@ -8,6 +8,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_types::{
     autonomic::AutonomicCue, cell::CellId, dna::DnaFile, nucleus::ZomeInvocation, prelude::Todo,
 };
+use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
 /// Cells an API for calling back to their [Conductor].
@@ -49,7 +50,8 @@ impl CellConductorApiT for CellConductorApi {
     }
 
     async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
-        unimplemented!()
+        warn!("Using placeholder dpki");
+        Ok(format!("TODO"))
     }
 
     async fn network_send(&self, _message: Todo) -> ConductorApiResult<()> {

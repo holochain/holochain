@@ -13,7 +13,7 @@ use futures::StreamExt;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    cell::{CellId, CellHandle},
+    cell::{CellHandle, CellId},
     dna::{DnaFile, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
@@ -182,9 +182,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .map(|(d, e)| (d, e.unwrap_err().into()))
                     .collect();
 
-                // Create cells 
-                let cell_ids = success.iter().cloned().map(|dna_hash| CellId::from((dna_hash, agent_key.clone()))).collect();
-                self.conductor_handle.create_cells(cell_ids, self.conductor_handle.clone()).await?;
+                // Create cells
+                let cell_ids = success
+                    .iter()
+                    .cloned()
+                    .map(|dna_hash| CellId::from((dna_hash, agent_key.clone())))
+                    .collect();
+                self.conductor_handle
+                    .create_cells(cell_ids, self.conductor_handle.clone())
+                    .await?;
 
                 Ok(AdminResponse::AppsActivated { success, errors })
             }
