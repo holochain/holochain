@@ -14,13 +14,10 @@
 //! #       env: wasm_env,
 //! #      tmpdir: _tmpdir,
 //! # } = test_wasm_env();
-//! let conductor: Conductor = ConductorBuilder::new().test(env, wasm_env).await.unwrap();
-//!
-//! // Do direct manipulation of the Conductor here
-//!
-//! // move the Conductor into a ConductorHandle,
-//! // making the original Conductor inaccessible
-//! let handle: ConductorHandle = conductor.run().await.unwrap();
+//! let handle: ConductorHandle = ConductorBuilder::new()
+//!    .test(env, wasm_env)
+//!    .await
+//!    .unwrap();
 //!
 //! // handles are cloneable
 //! let handle2 = handle.clone();
@@ -205,9 +202,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn genesis(&self, dna_hash: DnaHash, agent_key: AgentPubKey) -> ConductorApiResult<()> {
         let dna_file = self.get_dna(&dna_hash).await.ok_or(CellError::DnaMissing)?;
+        // TODO: D-01058: This lock also blocks the entire conductor for just one cell
         let lock = self.0.read().await;
         let cell_id = CellId::from((dna_hash, agent_key));
-        debug!(?cell_id);
+        trace!(genesis_cell = ?cell_id);
         let cell: &Cell = lock.cell_by_id(&cell_id)?;
         cell.genesis(dna_file).await.map_err(Into::into)
     }

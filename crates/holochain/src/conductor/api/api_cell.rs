@@ -51,7 +51,7 @@ impl CellConductorApiT for CellConductorApi {
 
     async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
         warn!("Using placeholder dpki");
-        Ok(format!("TODO"))
+        Ok("TODO".to_string())
     }
 
     async fn network_send(&self, _message: Todo) -> ConductorApiResult<()> {
