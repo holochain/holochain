@@ -288,6 +288,23 @@ mod test {
             .unwrap();
     }
 
+    async fn setup_admin_cells(cell_id: CellId, dna_store: MockDnaStore) -> RealAdminInterfaceApi {
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let mut state = ConductorState::default();
+        state.cells.push(cell_id.clone());
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+            .fake_state(state)
+            .test(test_env, wasm_env)
+            .await
+            .unwrap();
+        RealAdminInterfaceApi::new(conductor_handle)
+    }
+
     async fn setup_admin() -> RealAdminInterfaceApi {
         let test_env = test_conductor_env();
         let TestEnvironment {
@@ -295,13 +312,7 @@ mod test {
             tmpdir: _tmpdir,
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let conductor_handle = Conductor::builder()
-            .test(test_env, wasm_env)
-            .await
-            .unwrap()
-            .run()
-            .await
-            .unwrap();
+        let conductor_handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
         RealAdminInterfaceApi::new(conductor_handle)
     }
 
@@ -321,9 +332,6 @@ mod test {
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
             .test(test_env, wasm_env)
-            .await
-            .unwrap()
-            .run()
             .await
             .unwrap();
 
@@ -391,9 +399,6 @@ mod test {
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
             .test(test_env, wasm_env)
-            .await
-            .unwrap()
-            .run()
             .await
             .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
@@ -470,6 +475,34 @@ mod test {
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
             assert_matches!(response, AdminResponse::AppInterfaceAttached{ .. });
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn activate_app() {
+        observability::test_run().ok();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_file(&uuid.to_string());
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_get().returning(move |_| Some(dna.clone()));
+        let dna_hash = fake_dna_hash("lasers");
+        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let admin_api = setup_admin_cells(cell_id, dna_store).await;
+
+        let agent_key = fake_agent_pubkey_1();
+        let dna_hashes = vec![dna_hash];
+        let msg = AdminRequest::ActivateApps {
+            dna_hashes,
+            agent_key,
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::AppsActivated{ success, errors } if success.len() == 2 && errors.len() == 0);
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);

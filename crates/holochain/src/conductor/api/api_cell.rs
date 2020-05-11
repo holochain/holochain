@@ -70,7 +70,7 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile> {
+    async fn get_dna<'a>(&'a self, dna_hash: &'a DnaHash) -> Option<DnaFile> {
         self.conductor_handle.get_dna(dna_hash).await
     }
 }
@@ -104,5 +104,5 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile>;
+    async fn get_dna<'a>(&'a self, dna_hash: &'a DnaHash) -> Option<DnaFile>;
 }

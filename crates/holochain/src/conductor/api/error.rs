@@ -70,7 +70,7 @@ pub enum ConductorApiError {
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
 
-    /// Cell Error
+    /// Cell error
     #[error(transparent)]
     CellError(#[from] CellError),
 

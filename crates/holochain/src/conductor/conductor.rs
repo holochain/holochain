@@ -10,7 +10,7 @@
 //! users in a testing environment.
 
 use super::{
-    api::{RealAdminInterfaceApi, RealAppInterfaceApi},
+    api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
     dna_store::{DnaStore, RealDnaStore},
     error::ConductorError,
@@ -74,8 +74,11 @@ pub struct CellState {
 }
 
 /// An [Cell] tracked by a Conductor, along with some [CellState]
-struct CellItem {
-    cell: Cell,
+struct CellItem<CA>
+where
+    CA: CellConductorApiT,
+{
+    cell: Cell<CA>,
     _state: CellState,
 }
 
@@ -83,12 +86,13 @@ pub type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
-pub struct Conductor<DS = RealDnaStore>
+pub struct Conductor<DS = RealDnaStore, CA = CellConductorApi>
 where
     DS: DnaStore,
+    CA: CellConductorApiT,
 {
     /// The collection of cells associated with this Conductor
-    cells: HashMap<CellId, CellItem>,
+    cells: HashMap<CellId, CellItem<CA>>,
 
     /// The LMDB environment for persisting state related to this Conductor
     env: EnvironmentWrite,
@@ -352,6 +356,11 @@ where
 
         Ok(())
     }
+
+    #[cfg(test)]
+    pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
+        self.get_state().await
+    }
 }
 
 // -- TODO - delete this helper when we have a real keystore -- //
@@ -504,7 +513,7 @@ mod builder {
     impl ConductorBuilder<MockDnaStore> {
         /// ConductorBuilder using mocked DnaStore, for testing
         pub fn with_mock_dna_store(dna_store: MockDnaStore) -> ConductorBuilder<MockDnaStore> {
-            ConductorBuilder {
+            Self {
                 dna_store,
                 ..Default::default()
             }
@@ -522,9 +531,9 @@ mod builder {
         }
 
         /// Initialize a "production" Conductor
-        pub async fn build(self) -> ConductorResult<Conductor<DS>> {
+        pub async fn build(self) -> ConductorResult<ConductorHandle> {
             let keystore = delete_me_create_test_keystore().await;
-            let env_path = self.config.environment_path;
+            let env_path = self.config.environment_path.clone();
 
             let environment = EnvironmentWrite::new(
                 env_path.as_ref(),
@@ -535,19 +544,47 @@ mod builder {
             let wasm_environment =
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
 
-            let conductor = Conductor::new(
-                environment,
-                wasm_environment,
-                self.dna_store,
-                keystore,
-                env_path,
-            )
-            .await?;
+            #[cfg(test)]
+            let state = self.state;
+
+            let Self {
+                dna_store, config, ..
+            } = self;
+
+            let conductor =
+                Conductor::new(environment, wasm_environment, dna_store, keystore, env_path)
+                    .await?;
 
             #[cfg(test)]
-            let conductor = Self::update_fake_state(self.state, conductor).await?;
+            let conductor = Self::update_fake_state(state, conductor).await?;
 
-            Ok(conductor)
+            Self::finish(conductor, config).await
+        }
+
+        async fn finish(
+            conductor: Conductor<DS>,
+            conductor_config: ConductorConfig,
+        ) -> ConductorResult<ConductorHandle> {
+            // Get data before handle
+            let cells = conductor.get_state().await?.cells;
+            let keystore = conductor.keystore.clone();
+
+            // Create handle
+            let handle: ConductorHandle = Arc::new(ConductorHandleImpl::from((
+                RwLock::new(conductor),
+                keystore,
+            )));
+
+            handle.create_cells(cells, handle.clone()).await?;
+
+            // Create admin interfaces
+            if let Some(configs) = conductor_config.admin_interfaces {
+                handle
+                    .add_admin_interfaces_via_handle(handle.clone(), configs)
+                    .await?;
+            }
+
+            Ok(handle)
         }
 
         #[cfg(test)]
@@ -573,6 +610,7 @@ mod builder {
         /// The reason that a ConductorHandle is returned instead of a Conductor is because
         /// the admin interfaces need a handle to the conductor themselves, so we must
         /// move the Conductor into a handle to proceed
+        /*
         pub async fn with_admin(self) -> ConductorResult<ConductorHandle> {
             let conductor_config = self.config.clone();
             let conductor_handle: ConductorHandle = self.build().await?.run().await?;
@@ -584,13 +622,14 @@ mod builder {
 
             Ok(conductor_handle)
         }
+        */
 
         /// Build a Conductor with a test environment
         pub async fn test(
             self,
             test_env: TestEnvironment,
             test_wasm_env: EnvironmentWrite,
-        ) -> ConductorResult<Conductor<DS>> {
+        ) -> ConductorResult<ConductorHandle> {
             let TestEnvironment {
                 env: environment,
                 tmpdir,
@@ -608,7 +647,7 @@ mod builder {
             #[cfg(test)]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
-            Ok(conductor)
+            Self::finish(conductor, self.config).await
         }
     }
 }
@@ -672,6 +711,6 @@ pub mod tests {
             .test(test_env, wasm_env)
             .await
             .unwrap();
-        assert_eq!(state, conductor.get_state().await.unwrap());
+        assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
     }
 }
