@@ -74,7 +74,6 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
         config,
         local_addr,
         socket,
-        //connections_queue,
     })
 }
 

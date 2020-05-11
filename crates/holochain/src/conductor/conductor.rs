@@ -300,14 +300,13 @@ where
         &mut self,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
-        let os_choose_port = 0;
         let app_api = RealAppInterfaceApi::new(handle);
         let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
         let stop_rx = self.managed_task_stop_broadcaster.subscribe();
-        let (port, task) =
-            spawn_app_interface_task(os_choose_port, app_api, signal_broadcaster, stop_rx)
-                .await
-                .map_err(Box::new)?;
+        let (port, task) = spawn_app_interface_task(app_api, signal_broadcaster, stop_rx)
+            .await
+            .map_err(Box::new)?;
+        // TODO: RELIABILITY: Handle this task by restating it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
         Ok(port)
     }
