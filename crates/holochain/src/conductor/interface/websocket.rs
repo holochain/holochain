@@ -231,11 +231,12 @@ mod test {
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
         state::ConductorState,
-        Conductor,
+        Conductor, ConductorHandle,
     };
     use crate::core::ribosome::wasm_test::warm_zome;
     use crate::core::{
-        ribosome::wasm_test::zome_invocation_from_names, state::source_chain::SourceChain,
+        ribosome::wasm_test::zome_invocation_from_names,
+        state::source_chain::{SourceChain, SourceChainBuf},
     };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
@@ -247,9 +248,7 @@ mod test {
     use holochain_types::{
         cell::CellId,
         observability,
-        test_utils::{
-            fake_agent_pubkey_1, fake_dna_file, fake_dna_hash, fake_dna_zomes, write_fake_dna_file,
-        },
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
@@ -293,6 +292,30 @@ mod test {
             .await
             .unwrap();
         RealAdminInterfaceApi::new(conductor_handle)
+    }
+
+    async fn setup_admin_fake_cells(cells: &[CellId]) -> (Vec<Arc<TempDir>>, ConductorHandle) {
+        let mut tmps = vec![];
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir,
+        } = test_wasm_env();
+        tmps.push(tmpdir);
+        tmps.push(test_env.tmpdir.clone());
+        let mut state = ConductorState::default();
+        for cell in cells {
+            state.cells.push(cell.clone());
+        }
+        let conductor_handle = Conductor::builder()
+            .fake_state(state)
+            .test(test_env, wasm_env)
+            .await
+            .unwrap()
+            .run()
+            .await
+            .unwrap();
+        (tmps, conductor_handle)
     }
 
     async fn setup_app(
@@ -425,7 +448,7 @@ mod test {
         warm_zome(dna.clone(), &"zomey".into());
 
         let payload = Payload { a: 1 };
-        let dna_hash = fake_dna_hash("bob");
+        let dna_hash = dna.dna_hash().clone();
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
 
         let mut dna_store = MockDnaStore::new();
@@ -435,12 +458,13 @@ mod test {
             .with(predicate::eq(dna_hash))
             .returning(move |_| Some(dna.clone()));
 
-        let (_tmpdir, app_api) = setup_app(cell_id, dna_store).await;
-        let request = Box::new(zome_invocation_from_names(
+        let (_tmpdir, app_api) = setup_app(cell_id.clone(), dna_store).await;
+        let mut request = Box::new(zome_invocation_from_names(
             "zomey",
             "foo",
             payload.try_into().unwrap(),
         ));
+        request.cell_id = cell_id;
         let msg = AppRequest::ZomeInvocationRequest { request };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -451,5 +475,43 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, app_api).await.unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn dump_state() {
+        observability::test_run().ok();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![("zomey".into(), TestWasm::Foo.into())],
+        );
+        let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
+
+        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(&[cell_id.clone()]).await;
+
+        // Set some state
+        let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
+        fake_genesis(cell_env.clone()).await;
+
+        // Get state
+        let expected = {
+            let env = cell_env.guard().await;
+            let reader = env.reader().unwrap();
+            let source_chain = SourceChainBuf::new(&reader, &env).unwrap();
+            source_chain.dump_as_json().unwrap()
+        };
+
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
+        let msg = AdminRequest::DumpState(cell_id);
+        let msg = msg.try_into().unwrap();
+        let respond = move |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            // TODO: check the state
+            assert_matches!(response, AdminResponse::JsonState(s) if s == expected);
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
     }
 }
