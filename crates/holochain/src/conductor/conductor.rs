@@ -478,8 +478,6 @@ mod builder {
         state: Option<ConductorState>,
         #[cfg(test)]
         mock_handle: Option<MockConductorHandle>,
-        #[cfg(not(test))]
-        mock_handle: Option<()>,
     }
 
     impl ConductorBuilder {

@@ -2,7 +2,7 @@ use super::{
     config::{AdminInterfaceConfig, ConductorConfig, DpkiConfig, InterfaceDriver},
     error::ConductorError,
     state::InterfaceConfig,
-    Conductor, ConductorBuilder, ConductorHandle,
+    ConductorBuilder, ConductorHandle,
 };
 use holo_hash::*;
 use holochain_2020_legacy::config::{
@@ -137,7 +137,9 @@ fn extract_app_interfaces(legacy_interfaces: Vec<LegacyInterfaceConfig>) -> Vec<
 pub mod tests {
 
     use super::*;
-    use crate::conductor::{handle::mock::MockConductorHandle, paths::EnvironmentRootPath};
+    use crate::conductor::{
+        handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
+    };
     use holochain_2020_legacy::config as lc;
     use holochain_types::test_utils::fake_dna_file;
     use matches::assert_matches;

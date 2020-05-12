@@ -263,7 +263,7 @@ pub mod mock {
 
             fn sync_shutdown(&self);
 
-            // fn keystore(&self) -> &KeystoreSender;
+            fn sync_keystore(&self) -> &KeystoreSender;
 
             fn sync_create_cells(
                 &self,
@@ -333,7 +333,7 @@ pub mod mock {
         }
 
         fn keystore(&self) -> &KeystoreSender {
-            self.keystore()
+            self.sync_keystore()
         }
 
         async fn create_cells(
