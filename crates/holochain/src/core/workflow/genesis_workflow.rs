@@ -22,6 +22,7 @@ pub struct GenesisWorkflow<Api: CellConductorApiT> {
     api: Api,
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
+    maybe_membrane_proof: Option<SerializedBytes>,
 }
 
 impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for GenesisWorkflow<Api> {
@@ -38,6 +39,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 api,
                 dna_file,
                 agent_pubkey,
+                maybe_membrane_proof,
             } = self;
 
             // TODO: this is a placeholder for a real DPKI request to show intent
@@ -57,6 +59,18 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 hash: dna_file.dna_hash().clone(),
             });
             workspace.source_chain.put(dna_header.clone(), None).await?;
+
+            // create the agent validation entry and add it directly to the store
+            let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                prev_header: dna_header.hash().into(),
+                maybe_membrane_proof,
+            });
+            workspace
+                .source_chain
+                .put(agent_validation_header.clone(), None)
+                .await?;
 
             // create a agent chain element and add it directly to the store
             let agent_header = Header::EntryCreate(header::EntryCreate {
@@ -170,6 +184,7 @@ pub mod tests {
                 api,
                 dna_file: dna.clone(),
                 agent_pubkey: agent_pubkey.clone(),
+                maybe_membrane_proof: None,
             };
             let _: () = run_workflow(arc.clone(), workflow, workspace).await?;
         }
@@ -200,7 +215,7 @@ pub mod tests {
                 })
                 .collect()
                 .unwrap();
-            assert_eq!(hashes, vec!["EntryCreate", "Dna"]);
+            assert_eq!(hashes, vec!["EntryCreate", "AgentValidationPkg", "Dna"]);
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())

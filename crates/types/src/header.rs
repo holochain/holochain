@@ -106,7 +106,7 @@ pub struct AgentValidationPkg {
     pub timestamp: Timestamp,
     pub prev_header: HeaderAddress,
 
-    pub payload: SerializedBytes,
+    pub maybe_membrane_proof: Option<SerializedBytes>,
 }
 
 /// header for a zome init entry to mark chain ready.  No
