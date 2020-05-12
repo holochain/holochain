@@ -89,7 +89,7 @@ impl Cell {
             state_env,
         };
         if source_chain_len == 0 {
-            // geneis
+            // run genesis
             let dna_file = conductor_handle
                 .get_dna(id.dna_hash())
                 .await
