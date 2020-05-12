@@ -67,6 +67,7 @@ use futures::{
     future::{self, TryFutureExt},
     stream::{StreamExt, TryStreamExt},
 };
+use holochain_serialized_bytes::SerializedBytes;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -316,7 +317,7 @@ where
         // Only create cells not already created
         let cells_to_create = cells
             .into_iter()
-            .filter(|cell_id| !self.cells.contains_key(cell_id));
+            .filter(|(cell_id, _)| !self.cells.contains_key(cell_id));
 
         // Create the cells in parrallel
         // This will exit on the first failure however
@@ -324,13 +325,14 @@ where
         // This is ok because genesis only runs once and will be simply skipped
         // when this cell is recreated.
         let cells = futures::stream::iter(cells_to_create)
-            .map(move |cell_id| {
+            .map(move |(cell_id, proof)| {
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                 tokio::spawn(Cell::create(
                     cell_id,
                     conductor_handle.clone(),
                     root_env_dir,
                     keystore.clone(),
+                    proof,
                 ))
                 .map_err(|e| CellError::from(e))
                 .and_then(|result| async { result })
@@ -346,7 +348,7 @@ where
     /// Update the cells in the database
     pub(super) async fn add_cell_id_to_db(
         &mut self,
-        mut cells: Vec<CellId>,
+        mut cells: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()> {
         self.update_state(move |mut state| {
             state.cells.append(&mut cells);
@@ -715,13 +717,13 @@ pub mod tests {
 
         conductor
             .update_state(|mut state| {
-                state.cells.push(cell_id.clone());
+                state.cells.push((cell_id.clone(), None));
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
-        assert_eq!(state.cells, [cell_id]);
+        assert_eq!(state.cells, [(cell_id, None)]);
     }
 
     #[tokio::test(threaded_scheduler)]

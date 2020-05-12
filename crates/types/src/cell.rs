@@ -3,14 +3,13 @@
 
 use derive_more::{Display, From, Into};
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_serialized_bytes::SerializedBytes;
 use std::fmt;
 
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CellId(DnaHash, AgentPubKey, Option<SerializedBytes>);
+pub struct CellId(DnaHash, AgentPubKey);
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)
@@ -41,21 +40,10 @@ impl CellId {
     pub fn agent_pubkey(&self) -> &AgentPubKey {
         &self.1
     }
-
-    /// The agent membrane proof
-    pub fn membrane_proof(&self) -> &Option<SerializedBytes> {
-        &self.2
-    }
 }
 
 impl From<(DnaHash, AgentPubKey)> for CellId {
     fn from(pair: (DnaHash, AgentPubKey)) -> Self {
-        Self(pair.0, pair.1, None)
-    }
-}
-
-impl From<(DnaHash, AgentPubKey, Option<SerializedBytes>)> for CellId {
-    fn from(thruple: (DnaHash, AgentPubKey, Option<SerializedBytes>)) -> Self {
-        Self(thruple.0, thruple.1, thruple.2)
+        Self(pair.0, pair.1)
     }
 }

@@ -16,9 +16,10 @@ pub struct ConductorState {
     /// List of DNAs, for each a path to the DNA file. Optional.
     #[serde(default)]
     pub dnas: Vec<DnaConfig>,
+    // TODO: : Maybe we can't store proofs here
     /// List of cells, includes references to an agent and a DNA. Optional.
     #[serde(default)]
-    pub cells: Vec<CellId>,
+    pub cells: Vec<(CellId, Option<SerializedBytes>)>,
     /// List of interfaces any UI can use to access zome functions. Optional.
     #[serde(default)]
     pub interfaces: Vec<InterfaceConfig>,
@@ -88,14 +89,14 @@ impl ConductorState {
     }
 
     /// Returns all defined cell IDs
-    pub fn cell_ids(&self) -> &Vec<CellId> {
+    pub fn cell_ids(&self) -> &Vec<(CellId, Option<SerializedBytes>)> {
         &self.cells
     }
 
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &CellId) -> Self {
-        self.cells.retain(|cell| cell != id);
+        self.cells.retain(|(cell, _)| cell != id);
 
         self.interfaces = self
             .interfaces

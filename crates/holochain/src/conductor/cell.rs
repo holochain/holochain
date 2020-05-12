@@ -70,6 +70,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
+        membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
         let state_env = EnvironmentWrite::new(
@@ -96,7 +97,7 @@ impl Cell {
                 .get_dna(id.dna_hash())
                 .await
                 .ok_or(CellError::DnaMissing)?;
-            cell.genesis(dna_file, id.membrane_proof().clone())
+            cell.genesis(dna_file, membrane_proof)
                 .await
                 .map_err(Box::new)?;
         }

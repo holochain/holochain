@@ -160,12 +160,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 agent_key,
             } => {
                 // Create cells
-                let cell_ids = hashes_proofs
+                let cell_ids_proofs = hashes_proofs
                     .iter()
                     .cloned()
-                    .map(|(dna_hash, proof)| CellId::from((dna_hash, agent_key.clone(), proof)))
+                    .map(|(dna_hash, proof)| (CellId::from((dna_hash, agent_key.clone())), proof))
                     .collect();
-                self.conductor_handle.add_cell_id_to_db(cell_ids).await?;
+                self.conductor_handle
+                    .add_cell_id_to_db(cell_ids_proofs)
+                    .await?;
                 self.conductor_handle
                     .setup_cells(self.conductor_handle.clone())
                     .await?;

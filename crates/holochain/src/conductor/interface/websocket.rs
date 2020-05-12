@@ -326,7 +326,7 @@ mod test {
         tmps.push(test_env.tmpdir.clone());
         let mut state = ConductorState::default();
         for cell in cells {
-            state.cells.push(cell.clone());
+            state.cells.push((cell.clone(), None));
         }
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
@@ -347,7 +347,7 @@ mod test {
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let mut state = ConductorState::default();
-        state.cells.push(cell_id.clone());
+        state.cells.push((cell_id.clone(), None));
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
@@ -529,7 +529,7 @@ mod test {
         let cells = handle.get_state_from_handle().await.unwrap().cells;
         let expected = dna_hashes
             .into_iter()
-            .map(|(hash, proof)| CellId::from((hash, agent_key.clone(), proof)))
+            .map(|(hash, proof)| (CellId::from((hash, agent_key.clone())), proof))
             .collect::<Vec<_>>();
         assert_eq!(expected, cells);
     }
