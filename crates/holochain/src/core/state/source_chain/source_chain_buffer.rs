@@ -152,7 +152,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 Some(element) => {
                     let (signed, entry) = element.into_inner();
                     let (header, signature) = signed.into_inner();
-                    let (header, header_address) = header.into_inner_with_hash();
+                    let (header, header_address) = header.into_inner();
                     out.push(JsonChainDump {
                         element: Some(JsonChainElement {
                             signature,

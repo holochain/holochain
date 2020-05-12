@@ -33,7 +33,7 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
 
     pub async fn put(&mut self, v: DnaWasm) -> DatabaseResult<WasmHash> {
         let v = DnaWasmHashed::with_data(v).await?;
-        let (wasm, wasm_hash) = v.into_inner_with_hash();
+        let (wasm, wasm_hash) = v.into_inner();
         self.wasm.put(wasm_hash.clone().into(), wasm);
         Ok(wasm_hash)
     }

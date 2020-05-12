@@ -136,11 +136,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         maybe_entry: Option<EntryHashed>,
     ) -> DatabaseResult<()> {
         if let Some(entry) = maybe_entry {
-            let (entry, entry_address) = entry.into_inner_with_hash();
+            let (entry, entry_address) = entry.into_inner();
             self.entries.put(entry_address.into(), entry);
         }
         let (header, signature) = signed_header.into_inner();
-        let (header, header_address) = header.into_inner_with_hash();
+        let (header, header_address) = header.into_inner();
         self.headers.put(header_address.into(), (header, signature));
         Ok(())
     }

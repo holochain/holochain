@@ -215,7 +215,7 @@ pub mod tests {
             while let Some(addr) = iter.next().unwrap() {
                 if let Ok(Some(h)) = source_chain.get_header(&addr).await {
                     let (h, _) = h.into_inner();
-                    let h = h.into_inner();
+                    let (h, _) = h.into_inner();
                     headers.push(h);
                 }
             }

@@ -21,12 +21,8 @@ macro_rules! make_hashed_base {
             type Content = $t;
             type HashType = $h;
 
-            fn into_inner(self) -> Self::Content {
+            fn into_inner(self) -> (Self::Content, Self::HashType) {
                 self.0.into_inner()
-            }
-
-            fn into_inner_with_hash(self) -> (Self::Content, Self::HashType) {
-                self.0.into_inner_with_hash()
             }
 
             fn as_content(&self) -> &Self::Content {
@@ -38,17 +34,10 @@ macro_rules! make_hashed_base {
             }
         }
 
-        impl ::std::convert::From<$n> for $t {
-            fn from(n: $n) -> $t {
-                use $crate::Hashed;
-                n.into_inner()
-            }
-        }
-
         impl ::std::convert::From<$n> for ($t, $h) {
             fn from(n: $n) -> ($t, $h) {
                 use $crate::Hashed;
-                n.into_inner_with_hash()
+                n.into_inner()
             }
         }
 

@@ -10,11 +10,8 @@ pub trait Hashed {
     /// The hash type used by this "Hashed" wrapper type.
     type HashType: Sized + HoloHashCoreHash;
 
-    /// Unwrap the main item from this "Hashed" wrapper.
-    fn into_inner(self) -> Self::Content;
-
     /// Unwrap the complete contents of this "Hashed" wrapper.
-    fn into_inner_with_hash(self) -> (Self::Content, Self::HashType);
+    fn into_inner(self) -> (Self::Content, Self::HashType);
 
     /// Access the main item stored in this wrapper type.
     fn as_content(&self) -> &Self::Content;
@@ -49,11 +46,7 @@ where
     type Content = C;
     type HashType = H;
 
-    fn into_inner(self) -> Self::Content {
-        self.0
-    }
-
-    fn into_inner_with_hash(self) -> (Self::Content, Self::HashType) {
+    fn into_inner(self) -> (Self::Content, Self::HashType) {
         (self.0, self.1)
     }
 
@@ -72,7 +65,7 @@ where
     H: Sized + HoloHashCoreHash,
 {
     fn from(g: GenericHashed<C, H>) -> (C, H) {
-        g.into_inner_with_hash()
+        g.into_inner()
     }
 }
 
