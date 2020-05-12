@@ -96,14 +96,14 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
 pub async fn spawn_app_interface_task<A: InterfaceApi>(
+    port: u16,
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
     mut stop_rx: StopReceiver,
 ) -> InterfaceResult<(u16, ManagedTaskHandle)> {
     trace!("Initializing App interface");
-    let os_choose_port = 0;
     let mut listener = websocket_bind(
-        url2!("ws://127.0.0.1:{}", os_choose_port),
+        url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
     .await?;
@@ -490,8 +490,8 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn attach_app_interface() {
         observability::test_run().ok();
-        let admin_api = setup_admin().await;
-        let msg = AdminRequest::AttachAppInterface;
+        let (_tmpdir, admin_api) = setup_admin().await;
+        let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -570,7 +570,6 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = move |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            // TODO: check the state
             assert_matches!(response, AdminResponse::JsonState(s) if s == expected);
             async { Ok(()) }.boxed()
         };

@@ -155,14 +155,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
-            AttachAppInterface => {
+            AttachAppInterface { port } => {
+                let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
-                    .add_app_interface_via_handle(self.conductor_handle.clone())
+                    .add_app_interface_via_handle(port, self.conductor_handle.clone())
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
-            AdminRequest::ActivateApp {
+            ActivateApp {
                 dna_hashes,
                 agent_key,
             } => {
@@ -178,7 +179,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 
                 Ok(AdminResponse::AppsActivated)
             }
-            AdminRequest::DumpState(cell_id) => {
+            DumpState(cell_id) => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::JsonState(state))
             }
@@ -344,14 +345,18 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
-    /// Attach a [AppInterfaceApi]
-    AttachAppInterface,
     /// Activate a list of apps
     ActivateApp {
         /// Hash for each dna to be activated
         dna_hashes: Vec<DnaHash>,
         /// The agent who is activating them
         agent_key: AgentPubKey,
+    },
+    /// Attach a [AppInterfaceApi]
+    AttachAppInterface {
+        /// Optional port, use None to let the
+        /// OS choose a free port
+        port: Option<u16>,
     },
     /// Dump the state of a cell
     DumpState(CellId),

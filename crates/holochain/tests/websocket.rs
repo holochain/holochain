@@ -258,16 +258,16 @@ async fn call_zome() {
 
     // Activate cells
     let dna_hashes = vec![original_dna_hash.clone()];
-    let request = AdminRequest::ActivateApps {
+    let request = AdminRequest::ActivateApp {
         dna_hashes,
         agent_key: fake_agent_pubkey_1(),
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::AppsActivated{ success, errors } if success.len() == 1 && errors.len() == 0);
+    assert_matches!(response, AdminResponse::AppsActivated);
 
     // Attach App Interface
-    let request = AdminRequest::AttachAppInterface;
+    let request = AdminRequest::AttachAppInterface { port: None };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
     let app_port = match response {
