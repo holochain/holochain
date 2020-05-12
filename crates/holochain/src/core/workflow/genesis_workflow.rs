@@ -22,6 +22,7 @@ pub struct GenesisWorkflow<Api: CellConductorApiT> {
     api: Api,
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
+    membrane_proof: Option<SerializedBytes>,
 }
 
 impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for GenesisWorkflow<Api> {
@@ -38,6 +39,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 api,
                 dna_file,
                 agent_pubkey,
+                membrane_proof,
             } = self;
 
             // TODO: this is a placeholder for a real DPKI request to show intent
@@ -58,11 +60,23 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             });
             let dna_header_address = workspace.source_chain.put(dna_header.clone(), None).await?;
 
+            // create the agent validation entry and add it directly to the store
+            let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                prev_header: dna_header_address,
+                membrane_proof,
+            });
+            let avh_addr = workspace
+                .source_chain
+                .put(agent_validation_header.clone(), None)
+                .await?;
+
             // create a agent chain element and add it directly to the store
             let agent_header = Header::EntryCreate(header::EntryCreate {
                 timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
-                prev_header: dna_header_address,
+                prev_header: avh_addr,
                 entry_type: header::EntryType::AgentPubKey,
                 entry_address: agent_pubkey.clone().into(),
             });
@@ -124,6 +138,7 @@ pub mod tests {
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header, Timestamp,
     };
+    use matches::assert_matches;
 
     pub async fn fake_genesis<R: Readable>(source_chain: &mut SourceChain<'_, R>) -> Header {
         let agent_pubkey = fake_agent_pubkey_1();
@@ -135,10 +150,23 @@ pub mod tests {
             hash: dna.dna_hash().clone(),
         });
         let dna_hash = source_chain.put(dna_header, None).await.unwrap();
-        let agent_header = Header::EntryCreate(header::EntryCreate {
+
+        // create the agent validation entry and add it directly to the store
+        let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
             timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
             prev_header: dna_hash,
+            membrane_proof: None,
+        });
+        let avh_hash = source_chain
+            .put(agent_validation_header, None)
+            .await
+            .unwrap();
+
+        let agent_header = Header::EntryCreate(header::EntryCreate {
+            timestamp: Timestamp::now(),
+            author: agent_pubkey.clone(),
+            prev_header: avh_hash,
             entry_type: header::EntryType::AgentPubKey,
             entry_address: agent_pubkey.clone().into(),
         });
@@ -146,6 +174,7 @@ pub mod tests {
             .put(agent_header.clone(), Some(agent_entry))
             .await
             .unwrap();
+
         agent_header
     }
 
@@ -168,6 +197,7 @@ pub mod tests {
                 api,
                 dna_file: dna.clone(),
                 agent_pubkey: agent_pubkey.clone(),
+                membrane_proof: None,
             };
             let _: () = run_workflow(arc.clone(), workflow, workspace).await?;
         }
@@ -190,7 +220,10 @@ pub mod tests {
                 }
             }
 
-            matches::assert_matches!(headers.as_slice(), [Header::EntryCreate(_), Header::Dna(_)]);
+            assert_matches!(
+                headers.as_slice(),
+                [Header::EntryCreate(_), Header::AgentValidationPkg(_), Header::Dna(_)]
+            );
         }
 
         Ok(())

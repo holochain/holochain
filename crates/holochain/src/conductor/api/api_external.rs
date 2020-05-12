@@ -12,7 +12,7 @@ use crate::{
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    cell::CellHandle,
+    cell::{CellHandle, CellId},
     dna::{DnaFile, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
@@ -155,6 +155,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
+            AdminRequest::DumpState(cell_id) => {
+                let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
+                Ok(AdminResponse::JsonState(state))
+            }
         }
     }
 }
@@ -272,6 +276,8 @@ pub enum AdminResponse {
     ListAgentPubKeys(Vec<AgentPubKey>),
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
+    /// State of a cell
+    JsonState(String),
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
@@ -308,6 +314,8 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
+    /// Dump the state of a cell
+    DumpState(CellId),
 }
 
 #[allow(missing_docs)]
