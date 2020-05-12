@@ -35,7 +35,7 @@ use crate::{
         error::ConductorResult,
         handle::ConductorHandle,
     },
-    core::state::wasm::WasmBuf,
+    core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
@@ -332,6 +332,15 @@ where
         env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
 
         Ok(())
+    }
+
+    pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+        let cell = self.cell_by_id(cell_id)?;
+        let arc = cell.state_env();
+        let env = arc.guard().await;
+        let reader = env.reader()?;
+        let source_chain = SourceChainBuf::new(&reader, &env)?;
+        Ok(source_chain.dump_as_json()?)
     }
 }
 
