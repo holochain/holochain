@@ -88,7 +88,7 @@ impl Cell {
             conductor_api,
             state_env,
         };
-        // TODO: : Make this check more robust
+        // TODO: TK-01747: Make this check more robust
         if source_chain_len == 0 {
             // run genesis
             let dna_file = conductor_handle
