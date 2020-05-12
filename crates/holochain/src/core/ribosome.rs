@@ -23,19 +23,19 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use error::RibosomeResult;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
-use holochain_types::{shims::*};
+use holochain_types::dna::DnaFile;
+use holochain_types::shims::*;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 use holochain_zome_types::HostInput;
 use mockall::automock;
 use std::iter::Iterator;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use holochain_types::dna::DnaFile;
 
 #[derive(Clone)]
 pub struct HostContext {
@@ -139,7 +139,7 @@ impl Invocation for ZomeInvocation {
         Ok(self.payload)
     }
     fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace
+        self.workspace.clone()
     }
 }
 
@@ -182,15 +182,13 @@ pub trait RibosomeT: Sized {
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult>;
 
-    fn run_post_commit(&self,
-        invocation: PostCommitInvocation)
+    fn run_post_commit(&self, invocation: PostCommitInvocation)
         -> RibosomeResult<PostCommitResult>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validate(&self,
-        invocation: ValidateInvocation) -> RibosomeResult<ValidateResult>;
+    fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
@@ -214,35 +212,19 @@ pub mod wasm_test {
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomeInvocation;
     use crate::core::ribosome::ZomeInvocationResponse;
+    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use core::time::Duration;
     use holo_hash::holo_hash_core::HeaderHash;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{
-        shims::SourceChainCommitBundle,
-        test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id},
-    };
+    use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_types::test_utils::fake_header_hash;
+    use holochain_types::test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::commit::CommitEntryResult;
-    use holochain_zome_types::zome::ZomeName;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::{
-        ribosome::HostContext, workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
-    };
-    use std::collections::BTreeMap;
-
-    fn zome_from_code(code: DnaWasm) -> Zome {
-        let mut zome = fake_zome();
-        zome.code = code;
-        zome
-    }
-
-    fn dna_from_zomes(zomes: BTreeMap<ZomeName, Zome>) -> Dna {
-        let mut dna = fake_dna("uuid");
-        dna.zomes = zomes;
-        dna
-    }
+    use crate::core::ribosome::HostContext;
 
     pub fn zome_invocation_from_names(
         zome_name: &str,
@@ -250,6 +232,9 @@ pub mod wasm_test {
         payload: SerializedBytes,
     ) -> ZomeInvocation {
         ZomeInvocation {
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Empty)
+                .next()
+                .unwrap(),
             zome_name: zome_name.into(),
             fn_name: fn_name.into(),
             cell_id: fake_cell_id("bob"),
@@ -268,7 +253,9 @@ pub mod wasm_test {
                 .instance(HostContext {
                     zome_name: zome_name.into(),
                     allow_side_effects: AllowSideEffects::No,
-                    workspace: UnsafeInvokeZomeWorkspace::test_dropped_guard(),
+                    workspace: UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Empty)
+                        .next()
+                        .unwrap(),
                 })
                 .unwrap();
         }
@@ -306,13 +293,7 @@ pub mod wasm_test {
                     $fn_name,
                     $input.try_into().unwrap(),
                 );
-                let zome_invocation_response = ribosome
-                    .call_zome_function(
-                        $crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::test_dropped_guard(
-                        ),
-                        invocation,
-                    )
-                    .unwrap();
+                let zome_invocation_response = ribosome.call_zome_function(invocation).unwrap();
 
                 // instance building off a warm module should be the slowest part of a wasm test
                 // so if each instance (including inner callbacks) takes ~1ms this gives us
@@ -345,9 +326,7 @@ pub mod wasm_test {
             ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
-            ribosome
-                .call_zome_function(UnsafeInvokeZomeWorkspace::test_dropped_guard(), invocation)
-                .unwrap()
+            ribosome.call_zome_function(invocation).unwrap()
         );
     }
 

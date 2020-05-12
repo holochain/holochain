@@ -410,7 +410,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn call_zome_function() {
+    async fn websocket_call_zome_function() {
         observability::test_run().ok();
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
         struct Payload {

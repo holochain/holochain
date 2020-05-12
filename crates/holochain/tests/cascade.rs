@@ -6,7 +6,6 @@ use holochain_2020::core::state::{
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     address::EntryAddress,
-    chain_header::ChainHeader,
     header,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},

@@ -4,12 +4,12 @@ use crate::core::state::{
     source_chain::{ChainElement, SignedHeader, SourceChainError, SourceChainResult},
 };
 use fallible_iterator::FallibleIterator;
+use holochain_state::db::GetDb;
 use holochain_state::{
     buffer::BufferedStore,
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_state::db::GetDb;
 use holochain_types::Header;
 use holochain_types::{address::HeaderAddress, prelude::*};
 use holochain_zome_types::entry::Entry;

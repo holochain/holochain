@@ -1,7 +1,8 @@
     #![allow(clippy::mutex_atomic)]
 use super::*;
+use fixt::prelude::*;
 use futures::Future;
-use std::{marker::PhantomData};
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -31,8 +32,34 @@ pub struct UnsafeInvokeZomeWorkspace {
     workspace: std::sync::Weak<std::sync::Mutex<TrustedToBeThreadsafePointer>>,
 }
 
+fixturator!(
+    UnsafeInvokeZomeWorkspace,
+    {
+        /// Useful when we need this type for tests where we don't want to use it.
+        /// It will always return None.
+        let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
+        let guard = Arc::new(std::sync::Mutex::new(TrustedToBeThreadsafePointer(
+            fake_ptr,
+        )));
+        let workspace = Arc::downgrade(&guard);
+        // Make sure the weak Arc cannot be upgraded
+        std::mem::drop(guard);
+        UnsafeInvokeZomeWorkspace { workspace }
+    },
+    {
+        UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
+            .next()
+            .unwrap()
+    },
+    {
+        UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
+            .next()
+            .unwrap()
+    }
+);
+
 /// if it was safe code we wouldn't need trust
-unsafe impl Send for TrustedToBeThreadsafePointer { }
+unsafe impl Send for TrustedToBeThreadsafePointer {}
 
 // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
 /// If this guard is dropped the underlying
@@ -60,18 +87,6 @@ impl UnsafeInvokeZomeWorkspace {
         (guard, workspace)
     }
 
-    #[cfg(test)]
-    /// Useful when we need this type for tests where we don't want to use it.
-    /// It will always return None.
-    pub fn test_dropped_guard() -> Self {
-        let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
-        let guard = Rc::new(std::sync::Mutex::new(fake_ptr));
-        let workspace = Rc::downgrade(&guard);
-        // Make sure the weak Arc cannot be upgraded
-        std::mem::drop(guard);
-        Self { workspace }
-    }
-
     pub async unsafe fn apply_ref<
         'a,
         R,
@@ -86,7 +101,7 @@ impl UnsafeInvokeZomeWorkspace {
             // Check that no-one else can write
             Some(lock) => match lock.try_lock().ok() {
                 Some(guard) => {
-                    let mut ffi: *mut std::ffi::c_void = guard.0;
+                    let ffi: *mut std::ffi::c_void = guard.0;
                     let sc = ffi as *const InvokeZomeWorkspace;
                     match sc.as_ref() {
                         Some(s) => Some(f(s).await),
@@ -113,7 +128,7 @@ impl UnsafeInvokeZomeWorkspace {
             // Check that no-one else can write
             Some(lock) => match lock.try_lock().ok() {
                 Some(guard) => {
-                    let mut ffi: *mut std::ffi::c_void = guard.0;
+                    let ffi: *mut std::ffi::c_void = guard.0;
                     let sc = ffi as *mut InvokeZomeWorkspace;
                     match sc.as_mut() {
                         Some(s) => Some(f(s).await),

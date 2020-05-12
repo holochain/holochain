@@ -40,6 +40,9 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeInvocation;
 use crate::core::ribosome::ZomeInvocationResponse;
 use fallible_iterator::FallibleIterator;
+use holo_hash_core::HoloHashCoreHash;
+use holochain_types::dna::DnaError;
+use holochain_types::dna::DnaFile;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
@@ -49,9 +52,6 @@ use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
-use holochain_types::dna::DnaFile;
-use holochain_types::dna::DnaError;
-use holo_hash_core::HoloHashCoreHash;
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -194,7 +194,6 @@ impl WasmRibosome {
 }
 
 impl RibosomeT for WasmRibosome {
-
     fn dna_file(&self) -> &DnaFile {
         &self.dna_file
     }

@@ -21,9 +21,7 @@
 //! committing changes to the associated Workspace and triggering other
 //! workflows.
 
-use crate::{
-    core::state::workspace::{Workspace},
-};
+use crate::core::state::workspace::Workspace;
 mod effects;
 pub mod error;
 mod genesis_workflow;

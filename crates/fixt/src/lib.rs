@@ -3,6 +3,7 @@ pub mod number;
 pub mod prelude;
 pub mod string;
 pub mod unit;
+pub use paste;
 
 #[derive(Clone)]
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over
@@ -77,7 +78,7 @@ macro_rules! basic_test {
         basic_test!($type, $empty_expected, $predictable_expected, true);
     };
     ( $type:ty, $empty_expected:expr, $predictable_expected:expr, $test_unpredictable:literal ) => {
-        paste::item! {
+        item! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _empty>] () {
@@ -90,7 +91,7 @@ macro_rules! basic_test {
             }
         }
 
-        paste::item! {
+        item! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _predictable>] () {
@@ -103,7 +104,7 @@ macro_rules! basic_test {
             }
         }
 
-        paste::item! {
+        item! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _unpredictable>] () {
@@ -146,7 +147,7 @@ macro_rules! basic_test {
 #[macro_export]
 macro_rules! fixturator {
     ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
-        paste::item! {
+        item! {
             pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
 
             impl <Curve>[<$type:camel Fixturator>]<Curve> {
@@ -243,18 +244,26 @@ pub struct Empty;
 /// a direct delegation of fixtures to the inner type for new types
 macro_rules! newtype_fixturator {
     ( $outer:ident<$inner:ty> ) => {
-        fixturator!($outer, {
-            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
-            self.0.index = self.0.index + 1;
-            $outer(fixturator.next().unwrap())
-        }, {
-            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
-            self.0.index = self.0.index + 1;
-            $outer(fixturator.next().unwrap())
-        }, {
-            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
-            self.0.index = self.0.index + 1;
-            $outer(fixturator.next().unwrap())
-        });
-    }
+        fixturator!(
+            $outer,
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer(fixturator.next().unwrap())
+            }
+        );
+    };
 }

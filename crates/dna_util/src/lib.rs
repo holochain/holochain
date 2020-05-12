@@ -3,8 +3,8 @@
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
-use std::collections::BTreeMap;
 use holochain_zome_types::zome::ZomeName;
+use std::collections::BTreeMap;
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]

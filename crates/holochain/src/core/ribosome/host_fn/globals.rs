@@ -1,13 +1,13 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
+use crate::core::ribosome::RibosomeT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::globals::ZomeGlobals;
 use holochain_zome_types::GlobalsInput;
 use holochain_zome_types::GlobalsOutput;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use crate::core::ribosome::RibosomeT;
 
 pub async fn globals(
     ribosome: Arc<WasmRibosome>,

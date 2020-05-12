@@ -1,6 +1,7 @@
 use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::Entry;
@@ -8,7 +9,6 @@ use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::sync::Arc;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {
@@ -49,7 +49,7 @@ impl Invocation for ValidateInvocation {
         Ok(HostInput::new((&*self.entry).try_into()?))
     }
     fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace
+        self.workspace.clone()
     }
 }
 

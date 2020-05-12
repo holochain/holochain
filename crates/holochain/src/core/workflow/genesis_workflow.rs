@@ -15,8 +15,8 @@ use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_types::{dna::DnaFile, header, Header};
-use must_future::MustBoxFuture;
 use holochain_zome_types::entry::Entry;
+use must_future::MustBoxFuture;
 
 /// The struct which implements the genesis Workflow
 pub struct GenesisWorkflow<Api: CellConductorApiT> {
@@ -126,10 +126,11 @@ pub mod tests {
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header, Timestamp,
     };
+    use holochain_zome_types::entry::Entry;
 
     pub async fn fake_genesis<R: Readable>(source_chain: &mut SourceChain<'_, R>) -> Header {
         let agent_pubkey = fake_agent_pubkey_1();
-        let agent_entry = Entry::Agent(agent_pubkey.clone());
+        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
         let dna = fake_dna_file("cool dna");
         let dna_header = Header::Dna(header::Dna {
             timestamp: Timestamp::now(),

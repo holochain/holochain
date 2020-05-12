@@ -3,6 +3,8 @@ use super::{
     error::{WorkflowError, WorkflowResult},
     InitializeZomesWorkflow, Workflow, WorkflowEffects,
 };
+use crate::core::ribosome::ZomeInvocation;
+use crate::core::ribosome::ZomeInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::state::{
     cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
@@ -13,8 +15,6 @@ use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use must_future::MustBoxFuture;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::core::ribosome::ZomeInvocationResponse;
-use crate::core::ribosome::ZomeInvocation;
 
 pub mod unsafe_invoke_zome_workspace;
 
@@ -154,12 +154,9 @@ pub mod tests {
     use crate::core::workflow::{effects::WorkflowTriggers, fake_genesis, WorkflowError};
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-    use holochain_types::{
-        observability,
-        test_utils::fake_agent_pubkey_1,
-    };
+    use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
     use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::ZomeExternGuestOutput;
+    use holochain_zome_types::GuestOutput;
 
     use futures::{future::BoxFuture, FutureExt};
     use matches::assert_matches;
@@ -200,11 +197,9 @@ pub mod tests {
         // Setup the ribosome mock
         ribosome
             .expect_call_zome_function()
-            .returning(move |_workspace, _invocation| {
+            .returning(move |_invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeInvocationResponse::ZomeApiFn(
-                    ZomeExternGuestOutput::new(x),
-                ))
+                Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
 
         // Call the zome function
@@ -292,12 +287,12 @@ pub mod tests {
         let agent_header = fake_genesis(&mut workspace.source_chain).await;
 
         let agent_pubkey = fake_agent_pubkey_1();
-        let agent_entry = Entry::Agent(agent_pubkey.clone());
+        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
         let mut ribosome = MockRibosomeT::new();
         // Call zome mock that it writes to source chain
         ribosome
             .expect_call_zome_function()
-            .returning(move |_unsafe_workspace, _invocation| {
+            .returning(move |_invocation| {
                 let agent_header = agent_header.clone();
                 let agent_entry = agent_entry.clone();
                 let _call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, ()> {
@@ -314,9 +309,7 @@ pub mod tests {
                 unsafe { unsafe_workspace.apply_mut(call).await };
                 */
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeInvocationResponse::ZomeApiFn(
-                    ZomeExternGuestOutput::new(x),
-                ))
+                Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
 
         let invocation =

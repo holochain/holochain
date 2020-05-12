@@ -14,8 +14,8 @@ pub mod nucleus;
 pub mod observability;
 pub mod persistence;
 pub mod prelude;
-pub mod validate;
 mod timestamp;
+pub mod validate;
 
 /// Placeholders to allow other things to compile
 #[allow(missing_docs)]

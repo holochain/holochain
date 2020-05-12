@@ -13,6 +13,7 @@
    # can be any github ref
    # branch, tag, commit, etc.
    ref = "1ca45a6f1899947e7fd0addc951858c110a391a5";
+   /* ref = "master"; */
    # ^^ this is HEAD of 2020-02-27-rust-stable-2 as of 2020-04-09 (david.b)
 
    # the sha of what is downloaded from the above ref
@@ -20,6 +21,7 @@
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
+   /* sha256 = "0xqhrs1dqfsa8dbdn54bkp3v5yxakc7vabvczsapd0c50nnal9fq"; */
    sha256 = "1y8qn74m69p65ncsq3qjrydvkzdh71mymv66l64h6m6nyj7hpn63";
 
    # the github owner of the holonix repo

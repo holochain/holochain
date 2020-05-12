@@ -1,13 +1,13 @@
 use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::DnaDef;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
-use holochain_types::dna::DnaDef;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
@@ -39,7 +39,7 @@ impl Invocation for MigrateAgentInvocation {
         Ok(HostInput::new((&self.migrate_agent).try_into()?))
     }
     fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace
+        self.workspace.clone()
     }
 }
 
