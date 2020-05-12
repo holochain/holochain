@@ -1,5 +1,6 @@
 use super::{
     config::{AdminInterfaceConfig, ConductorConfig, DpkiConfig, InterfaceDriver},
+    error::ConductorError,
     state::InterfaceConfig,
     Conductor, ConductorBuilder, ConductorHandle,
 };
@@ -8,14 +9,30 @@ use holochain_2020_legacy::config::{
     Configuration as LegacyConfig, DpkiConfiguration as LegacyDpkiConfig,
     InterfaceConfiguration as LegacyInterfaceConfig, InterfaceDriver as LegacyInterfaceDriver,
 };
-use holochain_types::{cell::CellId, dna::DnaFile, test_utils::fake_agent_pubkey_1};
+use holochain_types::{
+    cell::CellId,
+    dna::{DnaError, DnaFile},
+    test_utils::fake_agent_pubkey_1,
+};
 use std::fs;
 use std::{collections::HashMap, io::Read, path::PathBuf};
 use thiserror::Error;
 use tracing::*;
 
 #[derive(Debug, Error)]
-pub enum CompatConfigError {}
+pub enum CompatConfigError {
+    #[error("Legacy config contains a broken reference: {0}")]
+    BrokenReference(String),
+
+    #[error(transparent)]
+    ConductorError(#[from] ConductorError),
+
+    #[error(transparent)]
+    DnaError(#[from] DnaError),
+
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
+}
 
 pub async fn load_conductor_from_legacy_config(
     legacy: LegacyConfig,
@@ -30,22 +47,19 @@ pub async fn load_conductor_from_legacy_config(
     warn!("Using a constant fake agent. FIXME: use a proper test agent");
     let agent: AgentPubKey = fake_agent_pubkey_1();
 
-    let conductor: ConductorHandle = builder.config(config).with_admin().await.expect("TODO");
+    let conductor: ConductorHandle = builder.config(config).with_admin().await?;
 
     let mut dna_hashes: HashMap<PathBuf, DnaHash> = HashMap::new();
     for dna_config in legacy.dnas.clone() {
         let mut buffer = Vec::new();
         let path: PathBuf = dna_config.file.clone().into();
-        fs::File::open(&path)
-            .expect("TODO")
-            .read_to_end(&mut buffer)
-            .expect("TODO");
-        let mut dna_file = DnaFile::from_file_content(&mut buffer).await.expect("TODO");
+        fs::File::open(&path)?.read_to_end(&mut buffer)?;
+        let mut dna_file = DnaFile::from_file_content(&mut buffer).await?;
         if let Some(uuid) = dna_config.uuid.clone() {
-            dna_file = dna_file.with_uuid(uuid).await.expect("TODO");
+            dna_file = dna_file.with_uuid(uuid).await?;
         }
         dna_hashes.insert(path, dna_file.dna_hash().clone());
-        conductor.install_dna(dna_file).await.expect("TODO");
+        conductor.install_dna(dna_file).await?;
     }
 
     let mut cell_ids: Vec<CellId> = vec![];
@@ -53,12 +67,11 @@ pub async fn load_conductor_from_legacy_config(
         // NB: disregarding agent config for now, using a hard-coded pre-made one
         let dna_config = legacy
             .dna_by_id(&i.dna)
-            // .ok_or_else(|| BrokenReference(format!("No DNA by id: {}", i.dna)))
-            .expect("TODO");
+            .ok_or_else(|| BrokenReference(format!("No DNA for id: {}", i.dna)))?;
         // make sure we have installed this DNA
         let dna_hash = dna_hashes
-            .get(&PathBuf::from(dna_config.file))
-            .expect("TODO")
+            .get(&PathBuf::from(dna_config.file.clone()))
+            .ok_or_else(|| BrokenReference(format!("No DNA for path: {}", dna_config.file)))?
             .clone();
         cell_ids.push(CellId::new(dna_hash, agent.clone()));
     }
@@ -66,10 +79,7 @@ pub async fn load_conductor_from_legacy_config(
     // TODO: hook up app interfaces
     let _app_interfaces = extract_app_interfaces(legacy.interfaces);
 
-    conductor
-        .create_cells(cell_ids, conductor.clone())
-        .await
-        .expect("TODO");
+    conductor.create_cells(cell_ids, conductor.clone()).await?;
 
     Ok(conductor)
 }
@@ -267,12 +277,12 @@ pub mod tests {
             .times(1)
             .returning(|_| Ok(()));
 
-        todo!("assert that create_cells is called with the proper CellIds");
         handle
             .expect_sync_create_cells()
             .times(1)
             .returning(|_ids, _handle| Ok(()));
 
+        todo!("assert that create_cells is called with the proper CellIds");
         todo!("assert app interfaces created");
 
         let builder = Conductor::builder().with_mock_handle(handle).await;
