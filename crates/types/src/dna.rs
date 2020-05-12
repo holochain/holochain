@@ -37,7 +37,7 @@ pub struct DnaDef {
     pub properties: SerializedBytes,
 
     /// An array of zomes associated with your holochain application.
-    pub zomes: BTreeMap<String, zome::Zome>,
+    pub zomes: Vec<(String, zome::Zome)>,
 }
 
 impl DnaDef {
@@ -50,7 +50,9 @@ impl DnaDef {
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &str) -> Result<&zome::Zome, DnaError> {
         self.zomes
-            .get(zome_name)
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .map(|(_, zome)| zome)
             .ok_or_else(|| DnaError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 }
