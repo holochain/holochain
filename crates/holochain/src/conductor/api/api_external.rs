@@ -172,6 +172,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 
                 Ok(AdminResponse::AppsActivated)
             }
+            AttachAppInterface { port } => {
+                let port = port.unwrap_or(0);
+                let port = self
+                    .conductor_handle
+                    .add_app_interface_via_handle(port, self.conductor_handle.clone())
+                    .await?;
+                Ok(AdminResponse::AppInterfaceAttached { port })
+            }
             AdminRequest::DumpState(cell_id) => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::JsonState(state))
@@ -291,6 +299,11 @@ pub enum AdminResponse {
     GenerateAgentPubKey(AgentPubKey),
     /// Listing all the AgentPubKeys in the Keystore
     ListAgentPubKeys(Vec<AgentPubKey>),
+    /// [AppInterfaceApi] successfully attached
+    AppInterfaceAttached {
+        /// Port of the new [AppInterfaceApi]
+        port: u16,
+    },
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
     /// List of apps that activated or failed
@@ -339,6 +352,12 @@ pub enum AdminRequest {
         hashes_proofs: Vec<(DnaHash, Option<SerializedBytes>)>,
         /// The agent who is activating them
         agent_key: AgentPubKey,
+    },
+    /// Attach a [AppInterfaceApi]
+    AttachAppInterface {
+        /// Optional port, use None to let the
+        /// OS choose a free port
+        port: Option<u16>,
     },
     /// Dump the state of a cell
     DumpState(CellId),
