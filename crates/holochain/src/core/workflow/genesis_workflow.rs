@@ -76,7 +76,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             let agent_header = Header::EntryCreate(header::EntryCreate {
                 timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
-                prev_header: dna_header.hash().into(),
+                prev_header: agent_validation_header.hash().into(),
                 entry_type: header::EntryType::AgentPubKey,
                 entry_address: agent_pubkey.clone().into(),
             });
@@ -150,6 +150,13 @@ pub mod tests {
             author: agent_pubkey.clone(),
             hash: dna.dna_hash().clone(),
         });
+        // create the agent validation entry and add it directly to the store
+        let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
+            timestamp: Timestamp::now(),
+            author: agent_pubkey.clone(),
+            prev_header: dna_header.hash().into(),
+            maybe_membrane_proof: None,
+        });
         let agent_header = Header::EntryCreate(header::EntryCreate {
             timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
@@ -158,6 +165,10 @@ pub mod tests {
             entry_address: agent_pubkey.clone().into(),
         });
         source_chain.put(dna_header, None).await.unwrap();
+        source_chain
+            .put(agent_validation_header.clone(), None)
+            .await
+            .unwrap();
         source_chain
             .put(agent_header.clone(), Some(agent_entry))
             .await
