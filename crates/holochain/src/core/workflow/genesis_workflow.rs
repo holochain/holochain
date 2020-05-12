@@ -183,6 +183,12 @@ pub mod tests {
                 .map(|h| {
                     Ok(match h.header() {
                         Header::Dna(header::Dna { .. }) => "Dna",
+                        Header::AgentValidationPkg(header::AgentValidationPkg { .. }) => {
+                            "AgentValidationPkg"
+                        }
+                        Header::InitZomesComplete(header::InitZomesComplete { .. }) => {
+                            "InitZomesComplete"
+                        }
                         Header::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
                         Header::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
                         Header::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",

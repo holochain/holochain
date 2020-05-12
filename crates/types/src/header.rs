@@ -20,6 +20,8 @@ use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
 pub enum Header {
     // The first header in a chain (for the DNA) doesn't have a previous header
     Dna(Dna),
+    AgentValidationPkg(AgentValidationPkg),
+    InitZomesComplete(InitZomesComplete),
     LinkAdd(LinkAdd),
     LinkRemove(LinkRemove),
     ChainOpen(ChainOpen),
@@ -39,6 +41,8 @@ impl Header {
     pub fn author(&self) -> &AgentPubKey {
         match self {
             Header::Dna(i) => &i.author,
+            Header::AgentValidationPkg(i) => &i.author,
+            Header::InitZomesComplete(i) => &i.author,
             Header::LinkAdd(i) => &i.author,
             Header::LinkRemove(i) => &i.author,
             Header::ChainOpen(i) => &i.author,
@@ -67,6 +71,8 @@ impl Header {
     pub fn prev_header(&self) -> Option<&HeaderAddress> {
         Some(match self {
             Self::Dna(Dna { .. }) => return None,
+            Self::AgentValidationPkg(AgentValidationPkg { prev_header, .. }) => prev_header,
+            Self::InitZomesComplete(InitZomesComplete { prev_header, .. }) => prev_header,
             Self::LinkAdd(LinkAdd { prev_header, .. }) => prev_header,
             Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
             Self::EntryDelete(EntryDelete { prev_header, .. }) => prev_header,
@@ -91,6 +97,24 @@ pub struct Dna {
     pub timestamp: Timestamp,
     // No previous header, because DNA is always first chain entry
     pub hash: DnaHash,
+}
+
+/// header for a agent validation entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct AgentValidationPkg {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub prev_header: HeaderAddress,
+
+    pub payload: SerializedBytes,
+}
+
+/// header for a zome init entry to mark chain ready.  No
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct InitZomesComplete {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub prev_header: HeaderAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
