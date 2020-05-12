@@ -1,7 +1,7 @@
 use crate::core::state::source_chain::{
     ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
-use holo_hash::{EntryHash, HeaderHash, Hashed};
+use holo_hash::{EntryHash, Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -16,9 +16,8 @@ use holochain_types::{
     address::{EntryAddress, HeaderAddress},
     entry::{Entry, EntryHashed},
     header,
-    Header,
-    HeaderHashed,
-    prelude::{Signature},
+    prelude::Signature,
+    Header, HeaderHashed,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -93,8 +92,12 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         signed_header: SignedHeaderHashed,
     ) -> SourceChainResult<Option<ChainElement>> {
         let maybe_entry_address = match signed_header.header() {
-            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => Some(entry_address.clone()),
-            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => Some(entry_address.clone()),
+            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => {
+                Some(entry_address.clone())
+            }
+            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
+                Some(entry_address.clone())
+            }
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {
@@ -110,10 +113,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                 maybe_cas_entry
             }
         };
-        Ok(Some(ChainElement::new(
-            signed_header,
-            maybe_entry,
-        )))
+        Ok(Some(ChainElement::new(signed_header, maybe_entry)))
     }
 
     /// given a header address return the full chain element for that address
@@ -141,8 +141,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
         let (header, signature) = signed_header.into_inner();
         let (header, header_address) = header.into_inner_with_hash();
-        self.headers
-            .put(header_address.into(), (header, signature));
+        self.headers.put(header_address.into(), (header, signature));
         Ok(())
     }
 

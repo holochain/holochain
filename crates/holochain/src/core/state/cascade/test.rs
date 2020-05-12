@@ -37,12 +37,20 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
 
     let jimbo_id = fake_agent_pubkey_1();
     let jessy_id = fake_agent_pubkey_2();
-    let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(async {
-        (
-            EntryHashed::with_data(Entry::Agent(jimbo_id.clone())).await.unwrap(),
-            EntryHashed::with_data(Entry::Agent(jessy_id.clone())).await.unwrap(),
-        )
-    }, std::time::Duration::from_secs(1)).unwrap();
+    let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
+        async {
+            (
+                EntryHashed::with_data(Entry::Agent(jimbo_id.clone()))
+                    .await
+                    .unwrap(),
+                EntryHashed::with_data(Entry::Agent(jessy_id.clone()))
+                    .await
+                    .unwrap(),
+            )
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap();
 
     let jimbo_header = Header::EntryCreate(header::EntryCreate {
         timestamp: Timestamp::now(),

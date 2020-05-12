@@ -119,10 +119,7 @@ impl SignedHeaderHashed {
 
     /// Constructor for an already signed header
     pub fn with_presigned(header: HeaderHashed, signature: Signature) -> Self {
-        Self {
-            header,
-            signature,
-        }
+        Self { header, signature }
     }
 
     pub fn into_inner(self) -> (HeaderHashed, Signature) {

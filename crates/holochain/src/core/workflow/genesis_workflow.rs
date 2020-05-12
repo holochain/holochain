@@ -114,11 +114,9 @@ pub mod tests {
 
     use super::{GenesisWorkflow, GenesisWorkspace};
     use crate::core::workflow::run_workflow;
-    use crate::{
-        conductor::api::MockCellConductorApi,
-        core::{state::source_chain::SourceChain, workflow::error::WorkflowError},
-    };
+    use crate::{conductor::api::MockCellConductorApi, core::state::source_chain::SourceChain};
     use fallible_iterator::FallibleIterator;
+    use holo_hash::Hashed;
     use holochain_state::{env::*, prelude::Readable, test_utils::test_cell_env};
     use holochain_types::{
         entry::Entry,
@@ -136,14 +134,14 @@ pub mod tests {
             author: agent_pubkey.clone(),
             hash: dna.dna_hash().clone(),
         });
+        let dna_hash = source_chain.put(dna_header, None).await.unwrap();
         let agent_header = Header::EntryCreate(header::EntryCreate {
             timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
-            prev_header: dna_header.hash().into(),
+            prev_header: dna_hash,
             entry_type: header::EntryType::AgentPubKey,
             entry_address: agent_pubkey.clone().into(),
         });
-        source_chain.put(dna_header, None).await.unwrap();
         source_chain
             .put(agent_header.clone(), Some(agent_entry))
             .await
@@ -174,29 +172,27 @@ pub mod tests {
             let _: () = run_workflow(arc.clone(), workflow, workspace).await?;
         }
 
-        env.with_reader(|reader| {
+        {
+            let reader = env.reader()?;
+
             let source_chain = SourceChain::new(&reader, &dbs)?;
             assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
-            let hashes: Vec<_> = source_chain
-                .iter_back()
-                .map(|h| {
-                    Ok(match h.header() {
-                        Header::Dna(header::Dna { .. }) => "Dna",
-                        Header::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
-                        Header::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
-                        Header::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
-                        Header::ChainClose(header::ChainClose { .. }) => "ChainClose",
-                        Header::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
-                        Header::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
-                        Header::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
-                    })
-                })
-                .collect()
-                .unwrap();
-            assert_eq!(hashes, vec!["EntryCreate", "Dna"]);
-            Result::<_, WorkflowError>::Ok(())
-        })?;
+
+            let mut iter = source_chain.iter_back();
+            let mut headers = Vec::new();
+
+            while let Some(addr) = iter.next().unwrap() {
+                if let Ok(Some(h)) = source_chain.get_header(&addr).await {
+                    let (h, _) = h.into_inner();
+                    let h = h.into_inner();
+                    headers.push(h);
+                }
+            }
+
+            matches::assert_matches!(headers.as_slice(), [Header::EntryCreate(_), Header::Dna(_)]);
+        }
+
         Ok(())
     }
 }

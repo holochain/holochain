@@ -51,7 +51,7 @@ use holochain_state::{
 };
 use holochain_types::{
     cell::{CellHandle, CellId},
-    dna::{DnaFile, wasm::DnaWasmHashed},
+    dna::DnaFile,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -323,9 +323,8 @@ where
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
-            if let None = wasm_buf.get(&wasm_hash.into())? {
-                let dna_wasm = DnaWasmHashed::with_data(dna_wasm).await?;
-                wasm_buf.put(dna_wasm)?;
+            if let None = wasm_buf.get(&wasm_hash.into()).await? {
+                wasm_buf.put(dna_wasm).await?;
             }
         }
 

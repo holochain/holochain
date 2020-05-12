@@ -5,7 +5,12 @@ use crate::core::state::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
-use holochain_types::{address::HeaderAddress, entry::{Entry, EntryHashed}, prelude::*, Header, HeaderHashed};
+use holochain_types::{
+    address::HeaderAddress,
+    entry::{Entry, EntryHashed},
+    prelude::*,
+    Header, HeaderHashed,
+};
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -55,7 +60,10 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_prev_header(k)
     }
 
-    pub async fn get_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<SignedHeaderHashed>> {
+    pub async fn get_header(
+        &self,
+        k: &HeaderAddress,
+    ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         self.cas.get_header(k).await
     }
 
@@ -69,13 +77,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderAddress> {
         let header = HeaderHashed::with_data(header).await?;
-        let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
         let header_address = header.as_hash().to_owned();
+        let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
         let maybe_entry = match maybe_entry {
             None => None,
-            Some(entry) => {
-                Some(EntryHashed::with_data(entry).await?)
-            }
+            Some(entry) => Some(EntryHashed::with_data(entry).await?),
         };
 
         /*
@@ -85,7 +91,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         }
         */
 
-        self.sequence.put_header(header_address.into());
+        self.sequence.put_header(header_address.clone());
         self.cas.put(signed_header, maybe_entry)?;
         Ok(header_address)
     }
@@ -197,12 +203,9 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
         match &self.current {
             None => Ok(None),
             Some(top) => {
-                if let Some(prev_header) = self.store.get_prev_header(top)? {
-                    self.current = Some(prev_header.clone());
-                    Ok(Some(prev_header))
-                } else {
-                    Ok(None)
-                }
+                let top = top.to_owned();
+                self.current = self.store.get_prev_header(&top)?;
+                Ok(Some(top))
             }
         }
     }
@@ -220,36 +223,45 @@ pub mod tests {
         header,
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        Header,
-        HeaderHashed,
+        Header, HeaderHashed,
     };
 
-    fn fixtures() -> (AgentPubKey, HeaderHashed, Option<Entry>, HeaderHashed, Option<Entry>) {
+    fn fixtures() -> (
+        AgentPubKey,
+        HeaderHashed,
+        Option<Entry>,
+        HeaderHashed,
+        Option<Entry>,
+    ) {
         let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());
 
-        let (dna_header, agent_header) = tokio_safe_block_on::tokio_safe_block_on(async move {
-            let dna_header = Header::Dna(header::Dna {
-                timestamp: Timestamp::now(),
-                author: agent_pubkey.clone(),
-                hash: dna.dna_hash().clone(),
-            });
-            let dna_header = HeaderHashed::with_data(dna_header).await.unwrap();
+        let (dna_header, agent_header) = tokio_safe_block_on::tokio_safe_block_on(
+            async {
+                let dna_header = Header::Dna(header::Dna {
+                    timestamp: Timestamp::now(),
+                    author: agent_pubkey.clone(),
+                    hash: dna.dna_hash().clone(),
+                });
+                let dna_header = HeaderHashed::with_data(dna_header).await.unwrap();
 
-            let agent_header = Header::EntryCreate(header::EntryCreate {
-                timestamp: Timestamp::now(),
-                author: agent_pubkey.clone(),
-                prev_header: dna_header.as_hash().to_owned().into(),
-                entry_type: header::EntryType::AgentPubKey,
-                entry_address: agent_pubkey.clone().into(),
-            });
-            let agent_header = HeaderHashed::with_data(agent_header).await.unwrap();
+                let agent_header = Header::EntryCreate(header::EntryCreate {
+                    timestamp: Timestamp::now(),
+                    author: agent_pubkey.clone(),
+                    prev_header: dna_header.as_hash().to_owned().into(),
+                    entry_type: header::EntryType::AgentPubKey,
+                    entry_address: agent_pubkey.clone().into(),
+                });
+                let agent_header = HeaderHashed::with_data(agent_header).await.unwrap();
 
-            (dna_header, agent_header)
-        }, std::time::Duration::from_secs(1)).unwrap();
+                (dna_header, agent_header)
+            },
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap();
 
         (
             agent_pubkey,
@@ -273,8 +285,12 @@ pub mod tests {
 
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put(dna_header.as_content().clone(), dna_entry.clone()).await?;
-            store.put(agent_header.as_content().clone(), agent_entry.clone()).await?;
+            store
+                .put(dna_header.as_content().clone(), dna_entry.clone())
+                .await?;
+            store
+                .put(agent_header.as_content().clone(), agent_entry.clone())
+                .await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         };
 
@@ -305,7 +321,15 @@ pub mod tests {
             let mut res = Vec::new();
 
             while let Some(addr) = iter.next()? {
-                res.push(store.get_element(&addr).await.unwrap().unwrap().header().clone());
+                res.push(
+                    store
+                        .get_element(&addr)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .header()
+                        .clone(),
+                );
             }
             assert_eq!(
                 vec![
@@ -331,8 +355,13 @@ pub mod tests {
             let reader = env.reader()?;
 
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put(dna_header.as_content().clone(), dna_entry).await?;
-            store.put(agent_header.as_content().clone(), agent_entry).await?;
+            store
+                .put(dna_header.as_content().clone(), dna_entry)
+                .await?;
+            store
+                .put(agent_header.as_content().clone(), agent_entry)
+                .await?;
+
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
