@@ -11,7 +11,7 @@ categories = ["cryptography"]
 edition = "2018"
 
 [dependencies]
-holochain_serialized_bytes = "0.0.38"
+holochain_serialized_bytes = "0.0.39"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 ghost_actor = "0.1.0-alpha.8"
 serde = { version = "1.0.104", features = ["derive"] }
