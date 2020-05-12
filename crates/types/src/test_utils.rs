@@ -9,7 +9,7 @@ use crate::{
 };
 use holo_hash::AgentPubKey;
 use holochain_zome_types::ZomeExternHostInput;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {
@@ -41,13 +41,13 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
             .try_into()
             .unwrap(),
         uuid: uuid.to_string(),
-        zomes: BTreeMap::new(),
+        zomes: Vec::new(),
     };
     let mut wasm_code = Vec::new();
     for (zome_name, wasm) in zomes {
         let wasm_hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
         let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
-        dna.zomes.insert(zome_name, Zome { wasm_hash });
+        dna.zomes.push((zome_name, Zome { wasm_hash }));
         wasm_code.push(wasm);
     }
     tokio_safe_block_on::tokio_safe_block_on(
