@@ -155,10 +155,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
-            AttachAppInterface => {
+            AttachAppInterface { port } => {
+                let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
-                    .add_app_interface_via_handle(self.conductor_handle.clone())
+                    .add_app_interface_via_handle(port, self.conductor_handle.clone())
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -327,7 +328,11 @@ pub enum AdminRequest {
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
     /// Attach a [AppInterfaceApi]
-    AttachAppInterface,
+    AttachAppInterface {
+        /// Optional port, use None to let the
+        /// OS choose a free port
+        port: Option<u16>,
+    },
     /// Dump the state of a cell
     DumpState(CellId),
 }

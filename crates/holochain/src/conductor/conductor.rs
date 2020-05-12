@@ -294,12 +294,13 @@ where
 
     pub(super) async fn add_app_interface_via_handle(
         &mut self,
+        port: u16,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
         let app_api = RealAppInterfaceApi::new(handle);
         let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
         let stop_rx = self.managed_task_stop_broadcaster.subscribe();
-        let (port, task) = spawn_app_interface_task(app_api, signal_broadcaster, stop_rx)
+        let (port, task) = spawn_app_interface_task(port, app_api, signal_broadcaster, stop_rx)
             .await
             .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restating it if it fails and log the error
