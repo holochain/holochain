@@ -470,7 +470,7 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppsActivated{ success, errors } if success.len() == 2 && errors.len() == 0);
+            assert_matches!(response, AdminResponse::AppsActivated);
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);

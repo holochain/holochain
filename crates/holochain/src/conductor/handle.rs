@@ -47,7 +47,7 @@
 
 use super::{
     api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
-    error::ConductorResult, manager::TaskManagerRunHandle, Cell, CellError, Conductor,
+    error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
 };
 use crate::core::workflow::ZomeInvocationResult;
 use derive_more::From;
@@ -99,9 +99,6 @@ pub trait ConductorHandleT: Send + Sync {
         &self,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResult>;
-
-    /// Invoke a zome function on a Cell
-    async fn genesis(&self, dna_hash: DnaHash, agent_key: AgentPubKey) -> ConductorApiResult<()>;
 
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
@@ -189,16 +186,6 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         cell.invoke_zome(invocation).await.map_err(Into::into)
     }
 
-    async fn genesis(&self, dna_hash: DnaHash, agent_key: AgentPubKey) -> ConductorApiResult<()> {
-        let dna_file = self.get_dna(&dna_hash).await.ok_or(CellError::DnaMissing)?;
-        // TODO: D-01058: This lock also blocks the entire conductor for just one cell
-        let lock = self.0.read().await;
-        let cell_id = CellId::from((dna_hash, agent_key));
-        trace!(genesis_cell = ?cell_id);
-        let cell: &Cell = lock.cell_by_id(&cell_id)?;
-        cell.genesis(dna_file).await.map_err(Into::into)
-    }
-
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
         let lock = self.0.write().await;
         let cell = lock.cell_by_id(cell_id)?;
@@ -227,8 +214,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         cells: Vec<CellId>,
         handle: ConductorHandle,
     ) -> ConductorResult<()> {
-        let mut lock = self.0.write().await;
-        lock.create_cells(cells, handle).await?;
+        // Update the db
+        let cells = self.0.write().await.update_cells(cells).await?;
+        // Only create if there are any cells
+        if cells.len() > 0 {
+            let cells = {
+                let lock = self.0.read().await;
+                lock.create_cells(cells, handle).await?
+            };
+            self.0.write().await.load_cells(cells);
+        }
         Ok(())
     }
 

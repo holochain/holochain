@@ -25,6 +25,7 @@ use super::{
     },
     paths::EnvironmentRootPath,
     state::ConductorState,
+    CellError,
 };
 use crate::{
     conductor::{
@@ -53,13 +54,16 @@ use holochain_types::{
     cell::{CellHandle, CellId},
     dna::DnaFile,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 pub use builder::*;
-use futures::future;
+use futures::{
+    future::{self, TryFutureExt},
+    stream::{StreamExt, TryStreamExt},
+};
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -277,27 +281,82 @@ where
 
     /// Create the cells from the db
     pub(super) async fn create_cells(
-        &mut self,
+        &self,
         cells: Vec<CellId>,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<()> {
-        for cell_id in cells {
-            // If the cell is already loaded then do nothing
-            if let std::collections::hash_map::Entry::Vacant(v) = self.cells.entry(cell_id.clone())
-            {
-                let cell = Cell::create(
+    ) -> ConductorResult<Vec<Cell>> {
+        let len = cells.len();
+        // This function should never be called with no cells
+        // as it's wasteful and the futures stream will await
+        // forever
+        debug_assert!(len != 0);
+
+        let root_env_dir = self.root_env_dir.clone();
+        let keystore = self.keystore.clone();
+
+        // Only create cells not already created
+        let cells_to_create = cells
+            .into_iter()
+            .filter(|cell_id| !self.cells.contains_key(cell_id));
+
+        // Create the cells in parrallel
+        // This will exit on the first failure however
+        // The cells may still finish genesis in the background.
+        // This is ok because genesis only runs once and will be simply skipped
+        // when this cell is recreated.
+        let cells = futures::stream::iter(cells_to_create)
+            .map(move |cell_id| {
+                let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
+                tokio::spawn(Cell::create(
                     cell_id,
                     conductor_handle.clone(),
-                    &(self.root_env_dir.as_ref()),
-                    self.keystore.clone(),
-                )?;
-                v.insert(CellItem {
+                    root_env_dir,
+                    keystore.clone(),
+                ))
+                .map_err(|e| CellError::from(e))
+                .and_then(|result| async { result })
+            })
+            .buffer_unordered(len)
+            // Exit early if any fail
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        Ok(cells)
+    }
+
+    /// Update the cells in the database
+    pub(super) async fn update_cells(
+        &mut self,
+        mut cells: Vec<CellId>,
+    ) -> ConductorResult<Vec<CellId>> {
+        Ok(self
+            .update_state(move |mut state| {
+                state.cells.append(&mut cells);
+                // Make sure they are unique
+                state.cells = state
+                    .cells
+                    .iter()
+                    .cloned()
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect();
+                Ok(state)
+            })
+            .await?
+            .cells)
+    }
+
+    /// Load the cells into memory
+    pub(super) fn load_cells(&mut self, cells: Vec<Cell>) {
+        for cell in cells {
+            self.cells.insert(
+                cell.id().clone(),
+                CellItem {
                     cell,
                     _state: CellState { _active: false },
-                });
-            }
+                },
+            );
         }
-        Ok(())
     }
 
     pub(super) async fn put_wasm(&mut self, dna: DnaFile) -> ConductorResult<()> {
@@ -419,8 +478,6 @@ where
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
 
-    // FIXME: remove allow once we actually use this function
-    #[allow(dead_code)]
     async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
     where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
