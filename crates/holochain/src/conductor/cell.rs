@@ -6,6 +6,7 @@ use crate::{
     },
     core::{
         ribosome::WasmRibosome,
+        state::source_chain::SourceChainBuf,
         workflow::{
             run_workflow, GenesisWorkflow, GenesisWorkspace, InvokeZomeWorkflow,
             InvokeZomeWorkspace, ZomeInvocationResult,
@@ -63,23 +64,39 @@ where
 }
 
 impl Cell {
-    pub fn create<P: AsRef<Path>>(
+    pub async fn create<P: AsRef<Path>>(
         id: CellId,
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
     ) -> CellResult<Self> {
-        let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
         let state_env = EnvironmentWrite::new(
             env_path.as_ref(),
             EnvironmentKind::Cell(id.clone()),
             keystore,
         )?;
-        Ok(Self {
-            id,
+        let source_chain_len = {
+            // check if genesis ran on source chain buf
+            let env_ref = state_env.guard().await;
+            let reader = env_ref.reader()?;
+            let source_chain = SourceChainBuf::new(&reader, &env_ref)?;
+            source_chain.len()
+        };
+        let cell = Self {
+            id: id.clone(),
             conductor_api,
             state_env,
-        })
+        };
+        if source_chain_len == 0 {
+            // geneis
+            let dna_file = conductor_handle
+                .get_dna(id.dna_hash())
+                .await
+                .ok_or(CellError::DnaMissing)?;
+            cell.genesis(dna_file).await.map_err(Box::new)?;
+        }
+        Ok(cell)
     }
 
     fn dna_hash(&self) -> &DnaHash {
@@ -88,6 +105,10 @@ impl Cell {
 
     fn agent_pubkey(&self) -> &AgentPubKey {
         &self.id.agent_pubkey()
+    }
+
+    pub fn id(&self) -> &CellId {
+        &self.id
     }
 
     /// Entry point for incoming messages from the network that need to be handled
@@ -125,17 +146,18 @@ impl Cell {
             .map_err(Box::new)?)
     }
 
-    pub async fn genesis(&self, dna_file: DnaFile) -> ConductorApiResult<()> {
+    async fn genesis(&self, dna_file: DnaFile) -> ConductorApiResult<()> {
         let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
         let workspace = GenesisWorkspace::new(&reader, &env)?;
 
-        let workflow = GenesisWorkflow {
-            api: self.conductor_api.clone(),
-            dna_file: dna_file,
-            agent_pubkey: self.agent_pubkey().clone(),
-        };
+        let workflow = GenesisWorkflow::new(
+            self.conductor_api.clone(),
+            dna_file,
+            self.agent_pubkey().clone(),
+        );
+
         Ok(run_workflow(self.state_env(), workflow, workspace)
             .await
             .map_err(Box::new)?)

@@ -19,9 +19,9 @@ use must_future::MustBoxFuture;
 
 /// The struct which implements the genesis Workflow
 pub struct GenesisWorkflow<Api: CellConductorApiT> {
-    pub api: Api,
-    pub dna_file: DnaFile,
-    pub agent_pubkey: AgentPubKey,
+    api: Api,
+    dna_file: DnaFile,
+    agent_pubkey: AgentPubKey,
 }
 
 impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for GenesisWorkflow<Api> {
@@ -83,6 +83,16 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
         }
         .boxed()
         .into()
+    }
+}
+
+impl<Api: CellConductorApiT> GenesisWorkflow<Api> {
+    pub fn new(api: Api, dna_file: DnaFile, agent_pubkey: AgentPubKey) -> Self {
+        Self {
+            api,
+            dna_file,
+            agent_pubkey,
+        }
     }
 }
 

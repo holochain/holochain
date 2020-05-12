@@ -9,7 +9,6 @@ use crate::{
     },
     core::workflow::ZomeInvocationResult,
 };
-use futures::StreamExt;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
@@ -163,7 +162,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
-            AdminRequest::ActivateApps {
+            AdminRequest::ActivateApp {
                 dna_hashes,
                 agent_key,
             } => {
@@ -177,32 +176,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .create_cells(cell_ids, self.conductor_handle.clone())
                     .await?;
 
-                // Call genesis
-                let len = dna_hashes.len();
-                let results = futures::stream::iter(dna_hashes.into_iter().map(|dna_hash| {
-                    let agent_key = agent_key.clone();
-                    async move {
-                        (
-                            dna_hash.clone(),
-                            self.conductor_handle.genesis(dna_hash, agent_key).await,
-                        )
-                    }
-                }))
-                .buffer_unordered(len)
-                .collect::<Vec<_>>()
-                .await;
-                let (success, errors): (Vec<_>, Vec<_>) =
-                    results.into_iter().partition(|(_, r)| r.is_ok());
-                let success: Vec<_> = success.into_iter().map(|(d, _)| d).collect();
-                let errors: Vec<_> = errors
-                    .into_iter()
-                    // Unwrap safe due to partition
-                    .map(|(d, e)| (d, e.unwrap_err().into()))
-                    .collect();
-
-                // FIXME: What if genesis fails but we have created the cells?
-
-                Ok(AdminResponse::AppsActivated { success, errors })
+                Ok(AdminResponse::AppsActivated)
+            }
+            AdminRequest::DumpState(cell_id) => {
+                let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
+                Ok(AdminResponse::JsonState(state))
             }
         }
     }
@@ -327,12 +305,9 @@ pub enum AdminResponse {
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
     /// List of apps that activated or failed
-    AppsActivated {
-        /// Apps that activated successfully
-        success: Vec<DnaHash>,
-        /// Apps that failed to activate
-        errors: Vec<(DnaHash, ExternalApiWireError)>,
-    },
+    AppsActivated,
+    /// State of a cell
+    JsonState(String),
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
@@ -372,12 +347,14 @@ pub enum AdminRequest {
     /// Attach a [AppInterfaceApi]
     AttachAppInterface,
     /// Activate a list of apps
-    ActivateApps {
+    ActivateApp {
         /// Hash for each dna to be activated
         dna_hashes: Vec<DnaHash>,
         /// The agent who is activating them
         agent_key: AgentPubKey,
     },
+    /// Dump the state of a cell
+    DumpState(CellId),
 }
 
 #[allow(missing_docs)]
