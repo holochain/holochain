@@ -154,7 +154,7 @@ impl DnaDefJson {
     pub fn from_dna_def(dna: DnaDef) -> DnaUtilResult<DnaDefJson> {
         let properties: JsonValueDecodeHelper = dna.properties.try_into()?;
         let mut zomes = BTreeMap::new();
-        for zome_name in dna.zomes.keys() {
+        for zome_name in dna.zomes.into_iter().map(|(name, _)| name) {
             let zome_file = format!("./{}.wasm", zome_name);
             zomes.insert(
                 zome_name.clone(),
@@ -180,7 +180,7 @@ impl DnaDefJson {
         let properties: SerializedBytes =
             JsonValueDecodeHelper(self.properties.clone()).try_into()?;
 
-        let mut zomes = BTreeMap::new();
+        let mut zomes = Vec::new();
         let mut wasm_list = Vec::new();
 
         for (zome_name, zome) in self.zomes.iter() {
@@ -192,7 +192,7 @@ impl DnaDefJson {
             let wasm: DnaWasm = zome_content.into();
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
             let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
-            zomes.insert(zome_name.clone(), Zome { wasm_hash });
+            zomes.push((zome_name.clone(), Zome { wasm_hash }));
             wasm_list.push(wasm);
         }
 
