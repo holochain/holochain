@@ -16,7 +16,7 @@ pub struct ConductorState {
     /// List of DNAs, for each a path to the DNA file. Optional.
     #[serde(default)]
     pub dnas: Vec<DnaConfig>,
-    // TODO: : Maybe we can't store proofs here
+    // TODO: B-01610: Maybe we can't store proofs here
     /// List of cells, includes references to an agent and a DNA. Optional.
     #[serde(default)]
     pub cells: Vec<(CellId, Option<SerializedBytes>)>,
