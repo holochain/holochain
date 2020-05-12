@@ -282,14 +282,14 @@ where
     /// Create the cells from the db
     pub(super) async fn create_cells(
         &self,
-        cells: Vec<CellId>,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Cell>> {
+        let cells = self.get_state().await?.cells;
         let len = cells.len();
-        // This function should never be called with no cells
-        // as it's wasteful and the futures stream will await
-        // forever
-        debug_assert!(len != 0);
+        // Only create if there are any cells
+        if cells.len() == 0 {
+            return Ok(vec![]);
+        }
 
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
@@ -325,29 +325,28 @@ where
     }
 
     /// Update the cells in the database
-    pub(super) async fn update_cells(
+    pub(super) async fn add_cell_id_to_db(
         &mut self,
         mut cells: Vec<CellId>,
-    ) -> ConductorResult<Vec<CellId>> {
-        Ok(self
-            .update_state(move |mut state| {
-                state.cells.append(&mut cells);
-                // Make sure they are unique
-                state.cells = state
-                    .cells
-                    .iter()
-                    .cloned()
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .collect();
-                Ok(state)
-            })
-            .await?
-            .cells)
+    ) -> ConductorResult<()> {
+        self.update_state(move |mut state| {
+            state.cells.append(&mut cells);
+            // Make sure they are unique
+            state.cells = state
+                .cells
+                .iter()
+                .cloned()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            Ok(state)
+        })
+        .await?;
+        Ok(())
     }
 
-    /// Load the cells into memory
-    pub(super) fn load_cells(&mut self, cells: Vec<Cell>) {
+    /// Add the cells to the cell map
+    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             self.cells.insert(
                 cell.id().clone(),
@@ -595,7 +594,6 @@ mod builder {
             conductor_config: ConductorConfig,
         ) -> ConductorResult<ConductorHandle> {
             // Get data before handle
-            let cells = conductor.get_state().await?.cells;
             let keystore = conductor.keystore.clone();
 
             // Create handle
@@ -604,7 +602,7 @@ mod builder {
                 keystore,
             )));
 
-            handle.create_cells(cells, handle.clone()).await?;
+            handle.setup_cells(handle.clone()).await?;
 
             // Create admin interfaces
             if let Some(configs) = conductor_config.admin_interfaces {

@@ -276,7 +276,7 @@ mod test {
             .unwrap();
     }
 
-    async fn setup_admin_cells(dna_store: MockDnaStore) -> (Arc<TempDir>, RealAdminInterfaceApi) {
+    async fn setup_admin_cells(dna_store: MockDnaStore) -> (Arc<TempDir>, ConductorHandle) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
@@ -287,7 +287,7 @@ mod test {
             .test(test_env, wasm_env)
             .await
             .unwrap();
-        (tmpdir, RealAdminInterfaceApi::new(conductor_handle))
+        (tmpdir, conductor_handle)
     }
 
     async fn setup_admin() -> (Arc<TempDir>, RealAdminInterfaceApi) {
@@ -488,17 +488,17 @@ mod test {
             .cloned()
             .map(|dna| (dna.dna_hash().clone(), dna))
             .collect::<HashMap<_, _>>();
-        let dna_hashes = dna_map.keys().cloned().collect();
+        let dna_hashes = dna_map.keys().cloned().collect::<Vec<_>>();
         let mut dna_store = MockDnaStore::new();
         dna_store
             .expect_get()
             .returning(move |hash| dna_map.get(&hash).cloned());
-        let (_tmpdir, admin_api) = setup_admin_cells(dna_store).await;
+        let (_tmpdir, handle) = setup_admin_cells(dna_store).await;
 
         let agent_key = fake_agent_pubkey_1();
         let msg = AdminRequest::ActivateApp {
-            dna_hashes,
-            agent_key,
+            dna_hashes: dna_hashes.clone(),
+            agent_key: agent_key.clone(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -508,7 +508,15 @@ mod test {
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap();
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+            .await
+            .unwrap();
+        let cells = handle.get_state_from_handle().await.unwrap().cells;
+        let expected = dna_hashes
+            .into_iter()
+            .map(|hash| CellId::from((hash, agent_key.clone())))
+            .collect::<Vec<_>>();
+        assert_eq!(expected, cells);
     }
 
     #[tokio::test(threaded_scheduler)]

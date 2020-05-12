@@ -165,8 +165,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .cloned()
                     .map(|dna_hash| CellId::from((dna_hash, agent_key.clone())))
                     .collect();
+                self.conductor_handle.add_cell_id_to_db(cell_ids).await?;
                 self.conductor_handle
-                    .create_cells(cell_ids, self.conductor_handle.clone())
+                    .setup_cells(self.conductor_handle.clone())
                     .await?;
 
                 Ok(AdminResponse::AppsActivated)
