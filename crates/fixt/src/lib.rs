@@ -1,6 +1,7 @@
 pub mod bool;
 pub mod number;
 pub mod prelude;
+pub mod serialized_bytes;
 pub mod string;
 pub mod unit;
 pub use paste;
@@ -148,8 +149,10 @@ macro_rules! basic_test {
 macro_rules! fixturator {
     ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
         item! {
+            #[allow(missing_docs)]
             pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
 
+            #[allow(missing_docs)]
             impl <Curve>[<$type:camel Fixturator>]<Curve> {
                 pub fn new(curve: Curve) -> [<$type:camel Fixturator>]<Curve> {
                     Self::new_indexed(curve, 0)
@@ -159,6 +162,7 @@ macro_rules! fixturator {
                 }
             }
 
+            #[allow(missing_docs)]
             impl Iterator for [<$type:camel Fixturator>]<Empty> {
                 type Item = $type;
 
@@ -168,6 +172,7 @@ macro_rules! fixturator {
                 }
             }
 
+            #[allow(missing_docs)]
             impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
                 type Item = $type;
 
@@ -177,6 +182,7 @@ macro_rules! fixturator {
                 }
             }
 
+            #[allow(missing_docs)]
             impl Iterator for [<$type:camel Fixturator>]<Predictable> {
                 type Item = $type;
 

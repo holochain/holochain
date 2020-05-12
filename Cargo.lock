@@ -697,8 +697,10 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 name = "fixt"
 version = "0.0.1"
 dependencies = [
+ "holochain_serialized_bytes",
  "paste",
  "rand 0.7.3",
+ "serde",
 ]
 
 [[package]]
@@ -1152,6 +1154,7 @@ dependencies = [
  "base64 0.10.1",
  "chrono",
  "derive_more",
+ "fixt",
  "flate2",
  "futures",
  "hcid",

@@ -52,6 +52,8 @@ derive_more = "0.99.3"
 rust-base58 = "0.0.4"
 shrinkwraprs = "0.3.0"
 
+fixt = { path = "../fixt" }
+
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
 matches = "0.1.8"

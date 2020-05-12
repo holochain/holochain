@@ -52,6 +52,7 @@ use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
+use fixt::prelude::*;
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -284,3 +285,23 @@ impl RibosomeT for WasmRibosome {
         Ok(post_commit_results.into())
     }
 }
+
+fixturator!(WasmRibosome,
+    {
+        WasmRibosome {
+            dna_file: DnaFileFixturator::new(Empty).next().unwrap()
+        }
+    },
+    {
+        WasmRibosome {
+            dna_file: DnaFileFixturator::new(Unpredictable).next().unwrap()
+        }
+    },
+    {
+        let ribosome = WasmRibosome {
+            dna_file: DnaFileFixturator::new_indexed(Predictable, self.0.index).next().unwrap()
+        };
+        self.0.index = self.0.index + 1;
+        ribosome
+    }
+);

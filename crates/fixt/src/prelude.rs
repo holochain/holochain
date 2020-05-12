@@ -5,6 +5,7 @@ pub use crate::newtype_fixturator;
 pub use crate::number::*;
 pub use crate::string::{CharFixturator, StringFixturator};
 pub use crate::unit::UnitFixturator;
+pub use crate::serialized_bytes::SerializedBytesFixturator;
 pub use crate::Empty;
 pub use crate::Fixturator;
 pub use crate::Predictable;
