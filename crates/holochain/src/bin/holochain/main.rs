@@ -85,7 +85,7 @@ async fn async_main() {
         let toml =
             fs::read_to_string(legacy_config_path).expect("Couldn't read legacy config from file");
         let legacy_config = toml::from_str(&toml).expect("Couldn't deserialize legacy config");
-        load_conductor_from_legacy_config(legacy_config)
+        load_conductor_from_legacy_config(legacy_config, Conductor::builder())
             .await
             .expect("Couldn't initialize conductor from legacy config")
     } else {

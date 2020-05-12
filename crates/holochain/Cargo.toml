@@ -57,6 +57,7 @@ predicates = "1.0.4"
 must_future = "0.1.1"
 either = "1.5.0"
 holochain_2020_legacy = { path = "../legacy" }
+cfg-if = "0.1"
 
 [dev-dependencies]
 anyhow = "1.0.26"

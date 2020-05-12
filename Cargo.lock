@@ -956,6 +956,7 @@ dependencies = [
  "async-trait",
  "base64 0.10.1",
  "boolinator",
+ "cfg-if",
  "chrono",
  "crossbeam-channel",
  "derive_more",

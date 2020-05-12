@@ -223,3 +223,129 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(cell.state_env())
     }
 }
+
+#[cfg(test)]
+pub mod mock {
+    use super::*;
+    use mockall::mock;
+
+    // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
+    // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
+    // by delegating each async trait method to its sync counterpart
+    // See https://github.com/asomers/mockall/issues/75
+    mock! {
+
+        pub ConductorHandle {
+            fn sync_check_running(&self) -> ConductorResult<()>;
+
+            fn sync_add_admin_interfaces_via_handle(
+                &self,
+                handle: ConductorHandle,
+                configs: Vec<AdminInterfaceConfig>,
+            ) -> ConductorResult<()>;
+
+            fn sync_install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
+
+            fn sync_list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
+
+            fn sync_get_dna(&self, hash: DnaHash) -> Option<DnaFile>;
+
+            fn sync_invoke_zome(
+                &self,
+                invocation: ZomeInvocation,
+            ) -> ConductorApiResult<ZomeInvocationResult>;
+
+            fn sync_autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
+
+            fn sync_get_wait_handle(&self) -> Option<TaskManagerRunHandle>;
+
+            fn sync_get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
+
+            fn sync_shutdown(&self);
+
+            // fn keystore(&self) -> &KeystoreSender;
+
+            fn sync_create_cells(
+                &self,
+                cell_ids: Vec<CellId>,
+                handle: ConductorHandle,
+            ) -> ConductorResult<()>;
+
+            fn sync_get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+        }
+
+        trait Clone {
+            fn clone(&self) -> Self;
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ConductorHandleT for MockConductorHandle {
+        async fn check_running(&self) -> ConductorResult<()> {
+            self.sync_check_running()
+        }
+
+        async fn add_admin_interfaces_via_handle(
+            &self,
+            handle: ConductorHandle,
+            configs: Vec<AdminInterfaceConfig>,
+        ) -> ConductorResult<()> {
+            self.sync_add_admin_interfaces_via_handle(handle, configs)
+        }
+
+        async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+            self.sync_install_dna(dna)
+        }
+
+        async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
+            self.sync_list_dnas()
+        }
+
+        async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile> {
+            self.sync_get_dna(hash)
+        }
+
+        async fn invoke_zome(
+            &self,
+            invocation: ZomeInvocation,
+        ) -> ConductorApiResult<ZomeInvocationResult> {
+            self.sync_invoke_zome(invocation)
+        }
+
+        async fn autonomic_cue(
+            &self,
+            cue: AutonomicCue,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<()> {
+            self.sync_autonomic_cue(cue, cell_id)
+        }
+
+        async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle> {
+            self.sync_get_wait_handle()
+        }
+
+        async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+            self.sync_get_arbitrary_admin_websocket_port()
+        }
+
+        async fn shutdown(&self) {
+            self.sync_shutdown()
+        }
+
+        fn keystore(&self) -> &KeystoreSender {
+            self.keystore()
+        }
+
+        async fn create_cells(
+            &self,
+            cell_ids: Vec<CellId>,
+            handle: ConductorHandle,
+        ) -> ConductorResult<()> {
+            self.sync_create_cells(cell_ids, handle)
+        }
+
+        async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
+            self.sync_get_cell_env(cell_id)
+        }
+    }
+}

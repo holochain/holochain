@@ -61,6 +61,9 @@ use tracing::*;
 pub use builder::*;
 use futures::future;
 
+#[cfg(test)]
+use super::handle::mock::MockConductorHandle;
+
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
 /// essentially immutable, and perhaps we just throw it out and make a new one
@@ -473,9 +476,13 @@ mod builder {
         dna_store: DS,
         #[cfg(test)]
         state: Option<ConductorState>,
+        #[cfg(test)]
+        mock_handle: Option<MockConductorHandle>,
+        #[cfg(not(test))]
+        mock_handle: Option<()>,
     }
 
-    impl ConductorBuilder<RealDnaStore> {
+    impl ConductorBuilder {
         /// Default ConductorBuilder
         pub fn new() -> Self {
             Self::default()
@@ -538,6 +545,14 @@ mod builder {
             self
         }
 
+        /// Pass a mock handle in, which will be returned regardless of whatever
+        /// else happens to this builder
+        #[cfg(test)]
+        pub async fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
+            self.mock_handle = Some(handle);
+            self
+        }
+
         #[cfg(test)]
         async fn update_fake_state(
             state: Option<ConductorState>,
@@ -555,6 +570,13 @@ mod builder {
         /// the admin interfaces need a handle to the conductor themselves, so we must
         /// move the Conductor into a handle to proceed
         pub async fn with_admin(self) -> ConductorResult<ConductorHandle> {
+            cfg_if::cfg_if! {
+                if #[cfg(test)] {
+                    if let Some(handle) = self.mock_handle {
+                        return Ok(Arc::new(handle));
+                    }
+                }
+            }
             let conductor_config = self.config.clone();
             let conductor_handle: ConductorHandle = self.build().await?.run().await?;
             if let Some(configs) = conductor_config.admin_interfaces {
