@@ -3,7 +3,8 @@
 use crate::{
     conductor::{error::ConductorError, interface::error::InterfaceError, CellError},
     core::{
-        ribosome::error::RibosomeError, state::workspace::WorkspaceError,
+        ribosome::error::RibosomeError,
+        state::{source_chain::SourceChainError, workspace::WorkspaceError},
         workflow::error::WorkflowRunError,
     },
 };
@@ -77,6 +78,9 @@ pub enum ConductorApiError {
     /// Error in the Interface
     #[error("An error occurred in the interface: {0:?}")]
     InterfaceError(#[from] InterfaceError),
+
+    #[error(transparent)]
+    SourceChainError(#[from] SourceChainError),
 }
 
 /// All the serialization errors that can occur
