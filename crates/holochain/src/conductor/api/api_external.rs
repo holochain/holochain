@@ -171,6 +171,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 
                 Ok(AdminResponse::AppsActivated)
             }
+            AdminRequest::DumpState(cell_id) => {
+                let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
+                Ok(AdminResponse::JsonState(state))
+            }
         }
     }
 }
@@ -290,6 +294,8 @@ pub enum AdminResponse {
     Error(ExternalApiWireError),
     /// List of apps that activated or failed
     AppsActivated,
+    /// State of a cell
+    JsonState(String),
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
@@ -333,6 +339,8 @@ pub enum AdminRequest {
         /// The agent who is activating them
         agent_key: AgentPubKey,
     },
+    /// Dump the state of a cell
+    DumpState(CellId),
 }
 
 #[allow(missing_docs)]

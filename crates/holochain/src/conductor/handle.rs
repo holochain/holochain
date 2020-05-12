@@ -123,6 +123,9 @@ pub trait ConductorHandleT: Send + Sync {
         cell_api: ConductorHandle,
     ) -> ConductorResult<()>;
 
+    /// Dump the cells state
+    async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
     // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -225,6 +228,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             self.0.write().await.load_cells(cells);
         }
         Ok(())
+    }
+
+    async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+        self.0.read().await.dump_cell_state(cell_id).await
     }
 
     #[cfg(test)]
