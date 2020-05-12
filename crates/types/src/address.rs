@@ -22,29 +22,31 @@ pub enum HeaderAddress {
     Header(HeaderHash),
 }
 
+macro_rules! match_header_addr {
+    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+        match $h {
+            HeaderAddress::Header($i) => {
+                $($t)*
+            }
+        }
+    };
+}
+
 impl holo_hash_core::HoloHashCoreHash for HeaderAddress {
     fn get_raw(&self) -> &[u8] {
-        unimplemented!()
+        match_header_addr!(self => |i| { i.get_raw() })
     }
 
     fn get_bytes(&self) -> &[u8] {
-        unimplemented!()
+        match_header_addr!(self => |i| { i.get_bytes() })
     }
 
     fn get_loc(&self) -> u32 {
-        unimplemented!()
+        match_header_addr!(self => |i| { i.get_loc() })
     }
 
     fn into_inner(self) -> std::vec::Vec<u8> {
-        unimplemented!()
-    }
-}
-
-impl From<HeaderAddress> for holo_hash_core::HoloHashCore {
-    fn from(header_address: HeaderAddress) -> holo_hash_core::HoloHashCore {
-        match header_address {
-            HeaderAddress::Header(header_hash) => header_hash.into(),
-        }
+        match_header_addr!(self => |i| { i.into_inner() })
     }
 }
 
@@ -58,11 +60,15 @@ impl PartialEq<HeaderHash> for HeaderAddress {
     }
 }
 
+impl From<HeaderAddress> for holo_hash_core::HoloHashCore {
+    fn from(header_address: HeaderAddress) -> holo_hash_core::HoloHashCore {
+        match_header_addr!(header_address => |i| { i.into() })
+    }
+}
+
 impl From<HeaderAddress> for HoloHash {
     fn from(header_address: HeaderAddress) -> HoloHash {
-        match header_address {
-            HeaderAddress::Header(header_hash) => header_hash.into(),
-        }
+        match_header_addr!(header_address => |i| { i.into() })
     }
 }
 
@@ -80,9 +86,7 @@ impl From<&HeaderHash> for HeaderAddress {
 
 impl std::fmt::Display for HeaderAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            HeaderAddress::Header(hash) => write!(f, "{}", hash),
-        }
+        match_header_addr!(self => |i| { i.fmt(f) })
     }
 }
 
@@ -107,48 +111,52 @@ pub enum EntryAddress {
     Agent(AgentPubKey),
 }
 
+macro_rules! match_entry_addr {
+    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+        match $h {
+            EntryAddress::Entry($i) => {
+                $($t)*
+            }
+            EntryAddress::Agent($i) => {
+                $($t)*
+            }
+        }
+    };
+}
+
 impl holo_hash_core::HoloHashCoreHash for EntryAddress {
     fn get_raw(&self) -> &[u8] {
-        unimplemented!()
+        match_entry_addr!(self => |i| { i.get_raw() })
     }
 
     fn get_bytes(&self) -> &[u8] {
-        unimplemented!()
+        match_entry_addr!(self => |i| { i.get_bytes() })
     }
 
     fn get_loc(&self) -> u32 {
-        unimplemented!()
+        match_entry_addr!(self => |i| { i.get_loc() })
     }
 
     fn into_inner(self) -> std::vec::Vec<u8> {
-        unimplemented!()
+        match_entry_addr!(self => |i| { i.into_inner() })
     }
 }
 
 impl From<EntryAddress> for holo_hash_core::HoloHashCore {
     fn from(entry_address: EntryAddress) -> holo_hash_core::HoloHashCore {
-        match entry_address {
-            EntryAddress::Entry(entry_hash) => entry_hash.into(),
-            EntryAddress::Agent(agent_pubkey) => agent_pubkey.into(),
-        }
+        match_entry_addr!(entry_address => |i| { i.into() })
     }
 }
 
 impl From<EntryAddress> for HoloHash {
     fn from(entry_address: EntryAddress) -> HoloHash {
-        match entry_address {
-            EntryAddress::Entry(entry_hash) => entry_hash.into(),
-            EntryAddress::Agent(agent_pubkey) => agent_pubkey.into(),
-        }
+        match_entry_addr!(entry_address => |i| { i.into() })
     }
 }
 
 impl std::fmt::Display for EntryAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            EntryAddress::Entry(entry_hash) => entry_hash.fmt(f),
-            EntryAddress::Agent(agent_pubkey) => agent_pubkey.fmt(f),
-        }
+        match_entry_addr!(self => |i| { i.fmt(f) })
     }
 }
 
@@ -163,13 +171,25 @@ pub enum DhtAddress {
     Header(HeaderHash),
 }
 
-impl From<DhtAddress> for HoloHash {
-    fn from(entry_address: DhtAddress) -> HoloHash {
-        match entry_address {
-            DhtAddress::Entry(entry_hash) => entry_hash.into(),
-            DhtAddress::Agent(agent_pubkey) => agent_pubkey.into(),
-            DhtAddress::Header(header_hash) => header_hash.into(),
+macro_rules! match_dht_addr {
+    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+        match $h {
+            DhtAddress::Entry($i) => {
+                $($t)*
+            }
+            DhtAddress::Agent($i) => {
+                $($t)*
+            }
+            DhtAddress::Header($i) => {
+                $($t)*
+            }
         }
+    };
+}
+
+impl From<DhtAddress> for HoloHash {
+    fn from(dht_address: DhtAddress) -> HoloHash {
+        match_dht_addr!(dht_address => |i| { i.into() })
     }
 }
 
@@ -182,10 +202,6 @@ impl TryFrom<&AgentPubKey> for DhtAddress {
 
 impl std::fmt::Display for DhtAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            DhtAddress::Entry(entry_hash) => write!(f, "{}", entry_hash),
-            DhtAddress::Agent(agent_pubkey) => write!(f, "{}", agent_pubkey),
-            DhtAddress::Header(header_hash) => write!(f, "{}", header_hash),
-        }
+        match_dht_addr!(self => |i| { i.fmt(f) })
     }
 }
