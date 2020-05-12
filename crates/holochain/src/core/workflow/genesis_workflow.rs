@@ -101,11 +101,17 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
 }
 
 impl<Api: CellConductorApiT> GenesisWorkflow<Api> {
-    pub fn new(api: Api, dna_file: DnaFile, agent_pubkey: AgentPubKey) -> Self {
+    pub fn new(
+        api: Api,
+        dna_file: DnaFile,
+        agent_pubkey: AgentPubKey,
+        membrane_proof: Option<SerializedBytes>,
+    ) -> Self {
         Self {
             api,
             dna_file,
             agent_pubkey,
+            membrane_proof,
         }
     }
 }

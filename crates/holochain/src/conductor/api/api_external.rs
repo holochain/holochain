@@ -156,14 +156,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
             AdminRequest::ActivateApp {
-                dna_hashes,
+                hashes_proofs,
                 agent_key,
             } => {
                 // Create cells
-                let cell_ids = dna_hashes
+                let cell_ids = hashes_proofs
                     .iter()
                     .cloned()
-                    .map(|dna_hash| CellId::from((dna_hash, agent_key.clone())))
+                    .map(|(dna_hash, proof)| CellId::from((dna_hash, agent_key.clone(), proof)))
                     .collect();
                 self.conductor_handle.add_cell_id_to_db(cell_ids).await?;
                 self.conductor_handle
@@ -335,8 +335,8 @@ pub enum AdminRequest {
     ListAgentPubKeys,
     /// Activate a list of apps
     ActivateApp {
-        /// Hash for each dna to be activated
-        dna_hashes: Vec<DnaHash>,
+        /// Hash for each dna to be activated and maybe a proof
+        hashes_proofs: Vec<(DnaHash, Option<SerializedBytes>)>,
         /// The agent who is activating them
         agent_key: AgentPubKey,
     },

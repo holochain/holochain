@@ -488,7 +488,11 @@ mod test {
             .cloned()
             .map(|dna| (dna.dna_hash().clone(), dna))
             .collect::<HashMap<_, _>>();
-        let dna_hashes = dna_map.keys().cloned().collect::<Vec<_>>();
+        let dna_hashes = dna_map
+            .keys()
+            .cloned()
+            .map(|hash| (hash, None))
+            .collect::<Vec<_>>();
         let mut dna_store = MockDnaStore::new();
         dna_store
             .expect_get()
@@ -497,7 +501,7 @@ mod test {
 
         let agent_key = fake_agent_pubkey_1();
         let msg = AdminRequest::ActivateApp {
-            dna_hashes: dna_hashes.clone(),
+            hashes_proofs: dna_hashes.clone(),
             agent_key: agent_key.clone(),
         };
         let msg = msg.try_into().unwrap();
@@ -514,7 +518,7 @@ mod test {
         let cells = handle.get_state_from_handle().await.unwrap().cells;
         let expected = dna_hashes
             .into_iter()
-            .map(|hash| CellId::from((hash, agent_key.clone())))
+            .map(|(hash, proof)| CellId::from((hash, agent_key.clone(), proof)))
             .collect::<Vec<_>>();
         assert_eq!(expected, cells);
     }
