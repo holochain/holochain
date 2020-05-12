@@ -22,6 +22,7 @@ macro_rules! start_hard_timeout {
 #[macro_export]
 macro_rules! end_hard_timeout {
     ( $t0:ident, $timeout:literal ) => {{
+        use std::convert::TryFrom;
         if cfg!(test) {
             let hard_timeout_nanos = i128::try_from(
                 std::time::SystemTime::now()

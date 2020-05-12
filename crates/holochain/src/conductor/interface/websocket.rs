@@ -233,6 +233,7 @@ mod test {
         state::ConductorState,
         Conductor,
     };
+    use crate::core::ribosome::wasm_test::warm_zome;
     use crate::core::{
         ribosome::wasm_test::zome_invocation_from_names, state::source_chain::SourceChain,
     };
@@ -421,6 +422,8 @@ mod test {
             &uuid.to_string(),
             vec![("zomey".into(), TestWasm::Foo.into())],
         );
+        warm_zome(dna.clone(), &"zomey".into());
+
         let payload = Payload { a: 1 };
         let dna_hash = fake_dna_hash("bob");
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));

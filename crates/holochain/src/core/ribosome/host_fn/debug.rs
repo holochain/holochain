@@ -34,7 +34,7 @@ pub mod wasm_test {
         // this shows that debug is called but our line numbers will be messed up
         // the line numbers will show as coming from this test because we made the input here
         let output: DebugOutput = crate::call_test_ribosome!(
-            "imports",
+            "imports".into(),
             "debug",
             DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
         );
@@ -44,7 +44,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     async fn wasm_line_numbers_test() {
         // this shows that we can get line numbers out of wasm
-        let output: DebugOutput = crate::call_test_ribosome!("debug", "debug", ());
+        let output: DebugOutput = crate::call_test_ribosome!("debug".into(), "debug", ());
         assert_eq!(output, DebugOutput::new(()));
     }
 }

@@ -24,6 +24,6 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_sys_time_test() {
         let _: SysTimeOutput =
-            crate::call_test_ribosome!("imports", "sys_time", SysTimeInput::new(()));
+            crate::call_test_ribosome!("imports".into(), "sys_time", SysTimeInput::new(()));
     }
 }
