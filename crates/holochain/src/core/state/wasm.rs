@@ -1,11 +1,10 @@
-use holo_hash::WasmHash;
+use holo_hash::{WasmHash, Hashed};
 use holochain_state::buffer::{BufferedStore, CasBuf};
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
 use holochain_state::transaction::Readable;
 use holochain_state::transaction::{Reader, Writer};
-use holochain_types::dna::wasm::DnaWasm;
-use std::convert::TryInto;
+use holochain_types::dna::wasm::{DnaWasm, DnaWasmHashed};
 
 pub type WasmCas<'env, R> = CasBuf<'env, DnaWasm, R>;
 
@@ -25,8 +24,9 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
         self.wasm.get(&wasm_hash.clone().into())
     }
 
-    pub fn put(&mut self, v: DnaWasm) -> DatabaseResult<()> {
-        self.wasm.put((&v).try_into()?, v);
+    pub fn put(&mut self, v: DnaWasmHashed) -> DatabaseResult<()> {
+        let (wasm, wasm_hash) = v.into_inner_with_hash();
+        self.wasm.put(wasm_hash.into(), wasm);
         Ok(())
     }
 }

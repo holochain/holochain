@@ -51,6 +51,10 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_element(k).await
     }
 
+    pub fn get_prev_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<HeaderAddress>> {
+        self.cas.get_prev_header(k)
+    }
+
     pub async fn get_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<SignedHeaderHashed>> {
         self.cas.get_header(k).await
     }
@@ -194,7 +198,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 if let Some(prev_header) = self.store.get_prev_header(top)? {
-                    self.current = prev_header.clone();
+                    self.current = Some(prev_header.clone());
                     Ok(Some(prev_header))
                 } else {
                     Ok(None)
@@ -217,28 +221,35 @@ pub mod tests {
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header,
+        HeaderHashed,
     };
 
-    fn fixtures() -> (AgentPubKey, Header, Option<Entry>, Header, Option<Entry>) {
+    fn fixtures() -> (AgentPubKey, HeaderHashed, Option<Entry>, HeaderHashed, Option<Entry>) {
         let _ = holochain_crypto::crypto_init_sodium();
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         let agent_entry = Entry::Agent(agent_pubkey.clone());
 
-        let dna_header = Header::Dna(header::Dna {
-            timestamp: Timestamp::now(),
-            author: agent_pubkey.clone(),
-            hash: dna.dna_hash().clone(),
-        });
+        let (dna_header, agent_header) = tokio_safe_block_on::tokio_safe_block_on(async move {
+            let dna_header = Header::Dna(header::Dna {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                hash: dna.dna_hash().clone(),
+            });
+            let dna_header = HeaderHashed::with_data(dna_header).await.unwrap();
 
-        let agent_header = Header::EntryCreate(header::EntryCreate {
-            timestamp: Timestamp::now(),
-            author: agent_pubkey.clone(),
-            prev_header: dna_header.hash().into(),
-            entry_type: header::EntryType::AgentPubKey,
-            entry_address: agent_pubkey.clone().into(),
-        });
+            let agent_header = Header::EntryCreate(header::EntryCreate {
+                timestamp: Timestamp::now(),
+                author: agent_pubkey.clone(),
+                prev_header: dna_header.as_hash().to_owned().into(),
+                entry_type: header::EntryType::AgentPubKey,
+                entry_address: agent_pubkey.clone().into(),
+            });
+            let agent_header = HeaderHashed::with_data(agent_header).await.unwrap();
+
+            (dna_header, agent_header)
+        }, std::time::Duration::from_secs(1)).unwrap();
 
         (
             agent_pubkey,
@@ -262,8 +273,8 @@ pub mod tests {
 
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
-            store.put(dna_header.clone(), dna_entry.clone()).await?;
-            store.put(agent_header.clone(), agent_entry.clone()).await?;
+            store.put(dna_header.as_content().clone(), dna_entry.clone()).await?;
+            store.put(agent_header.as_content().clone(), agent_entry.clone()).await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         };
 
@@ -275,30 +286,33 @@ pub mod tests {
 
             // get the full element
             let dna_element_fetched = store
-                .get_element(&dna_header.hash().into())
+                .get_element(dna_header.as_hash())
+                .await
                 .expect("error retrieving")
                 .expect("entry not found");
             let agent_element_fetched = store
-                .get_element(&agent_header.hash().into())
+                .get_element(agent_header.as_hash())
+                .await
                 .expect("error retrieving")
                 .expect("entry not found");
-            assert_eq!(dna_header, *dna_element_fetched.header());
+            assert_eq!(dna_header.as_content(), dna_element_fetched.header());
             assert_eq!(dna_entry, *dna_element_fetched.entry());
-            assert_eq!(agent_header, *agent_element_fetched.header());
+            assert_eq!(agent_header.as_content(), agent_element_fetched.header());
             assert_eq!(agent_entry, *agent_element_fetched.entry());
 
             // check that you can iterate on the chain
+            let mut iter = store.iter_back();
+            let mut res = Vec::new();
+
+            while let Some(addr) = iter.next()? {
+                res.push(store.get_element(&addr).await.unwrap().unwrap().header().clone());
+            }
             assert_eq!(
-                store
-                    .iter_back()
-                    .map(|h| Ok(store
-                        .get_element(&h.header().hash().into())?
-                        .unwrap()
-                        .header()
-                        .clone()))
-                    .collect::<Vec<_>>()
-                    .unwrap(),
-                vec![agent_header, dna_header]
+                vec![
+                    agent_header.as_content().clone(),
+                    dna_header.as_content().clone(),
+                ],
+                res
             );
         }
 
@@ -317,8 +331,8 @@ pub mod tests {
             let reader = env.reader()?;
 
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
-            store.put(dna_header.clone(), dna_entry).await?;
-            store.put(agent_header.clone(), agent_entry).await?;
+            store.put(dna_header.as_content().clone(), dna_entry).await?;
+            store.put(agent_header.as_content().clone(), agent_entry).await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
@@ -326,7 +340,7 @@ pub mod tests {
             let reader = env.reader()?;
 
             let store = SourceChainBuf::new(&reader, &dbs)?;
-            let json = store.dump_as_json()?;
+            let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
             let parsed = parsed
                 .as_array()

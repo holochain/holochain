@@ -67,7 +67,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         header_address: &HeaderAddress,
     ) -> DatabaseResult<Option<HeaderAddress>> {
         if let Ok(Some((header, _))) = self.headers.get(&header_address.to_owned().into()) {
-            Ok(header.prev_header())
+            Ok(header.prev_header().map(|h| h.to_owned()))
         } else {
             Ok(None)
         }

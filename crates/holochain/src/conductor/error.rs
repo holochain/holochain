@@ -66,6 +66,9 @@ pub enum ConductorError {
     // Box is to avoid cycle in error definition
     #[error(transparent)]
     InterfaceError(#[from] Box<InterfaceError>),
+
+    #[error(transparent)]
+    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 }
 
 // TODO: can this be removed?
