@@ -12,7 +12,7 @@ pub enum InterfaceError {
     SignalReceive(tokio::sync::broadcast::RecvError),
     #[error(transparent)]
     RequestHandler(ConductorError),
-    #[error("Got an unexpected string: {0}")]
+    #[error("Got an unexpected message: {0}")]
     UnexpectedMessage(String),
     #[error("Failed to send across interface")]
     SendError,
