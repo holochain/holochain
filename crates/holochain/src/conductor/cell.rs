@@ -146,7 +146,7 @@ impl Cell {
             .map_err(Box::new)?)
     }
 
-    pub async fn genesis(&self, dna_file: DnaFile) -> ConductorApiResult<()> {
+    async fn genesis(&self, dna_file: DnaFile) -> ConductorApiResult<()> {
         let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;

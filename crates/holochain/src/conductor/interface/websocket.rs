@@ -301,7 +301,10 @@ mod test {
         (tmpdir, RealAdminInterfaceApi::new(conductor_handle))
     }
 
-    async fn setup_admin_fake_cells(cells: &[CellId]) -> (Vec<Arc<TempDir>>, ConductorHandle) {
+    async fn setup_admin_fake_cells(
+        cells: &[CellId],
+        dna_store: MockDnaStore,
+    ) -> (Vec<Arc<TempDir>>, ConductorHandle) {
         let mut tmps = vec![];
         let test_env = test_conductor_env();
         let TestEnvironment {
@@ -314,7 +317,7 @@ mod test {
         for cell in cells {
             state.cells.push(cell.clone());
         }
-        let conductor_handle = Conductor::builder()
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
             .test(test_env, wasm_env)
             .await
@@ -493,7 +496,7 @@ mod test {
         let (_tmpdir, admin_api) = setup_admin_cells(dna_store).await;
 
         let agent_key = fake_agent_pubkey_1();
-        let msg = AdminRequest::ActivateApps {
+        let msg = AdminRequest::ActivateApp {
             dna_hashes,
             agent_key,
         };
@@ -518,11 +521,14 @@ mod test {
         );
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
-        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(&[cell_id.clone()]).await;
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_get().returning(move |_| Some(dna.clone()));
+
+        let (_tmpdir, conductor_handle) =
+            setup_admin_fake_cells(&[cell_id.clone()], dna_store).await;
 
         // Set some state
         let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
-        fake_genesis(cell_env.clone()).await;
 
         // Get state
         let expected = {

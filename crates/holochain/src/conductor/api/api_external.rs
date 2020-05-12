@@ -155,7 +155,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
-            AdminRequest::ActivateApps {
+            AdminRequest::ActivateApp {
                 dna_hashes,
                 agent_key,
             } => {
@@ -333,7 +333,7 @@ pub enum AdminRequest {
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
     /// Activate a list of apps
-    ActivateApps {
+    ActivateApp {
         /// Hash for each dna to be activated
         dna_hashes: Vec<DnaHash>,
         /// The agent who is activating them
