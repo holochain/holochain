@@ -1,11 +1,11 @@
 use crate::core::state::{
     chain_cas::{ChainCasBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
-    source_chain::{ChainElement, SignedHeader, SourceChainError, SourceChainResult},
+    source_chain::{ChainElement, SignedHeaderHashed, SourceChainError, SourceChainResult},
 };
 use fallible_iterator::FallibleIterator;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
+use holochain_types::{address::HeaderAddress, entry::{Entry, EntryHashed}, prelude::*, Header, HeaderHashed};
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -46,13 +46,13 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_entry(k)
     }*/
 
-    pub fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
+    pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
         debug!("GET {:?}", k);
-        self.cas.get_element(k)
+        self.cas.get_element(k).await
     }
 
-    pub fn get_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<SignedHeader>> {
-        self.cas.get_header(k)
+    pub async fn get_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<SignedHeaderHashed>> {
+        self.cas.get_header(k).await
     }
 
     pub fn cas(&self) -> &ChainCasBuf<R> {
@@ -63,8 +63,16 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &mut self,
         header: Header,
         maybe_entry: Option<Entry>,
-    ) -> SourceChainResult<()> {
-        let signed_header = SignedHeader::new(&self.keystore, header.to_owned()).await?;
+    ) -> SourceChainResult<HeaderAddress> {
+        let header = HeaderHashed::with_data(header).await?;
+        let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
+        let header_address = header.as_hash().to_owned();
+        let maybe_entry = match maybe_entry {
+            None => None,
+            Some(entry) => {
+                Some(EntryHashed::with_data(entry).await?)
+            }
+        };
 
         /*
         FIXME: this needs to happen here.
@@ -73,9 +81,9 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         }
         */
 
-        self.sequence.put_header(header.hash().into());
+        self.sequence.put_header(header_address.into());
         self.cas.put(signed_header, maybe_entry)?;
-        Ok(())
+        Ok(header_address)
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
@@ -101,10 +109,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     }
 
     /// dump the entire source chain as a pretty-printed json string
-    pub fn dump_as_json(&self) -> Result<String, SourceChainError> {
+    pub async fn dump_as_json(&self) -> Result<String, SourceChainError> {
         #[derive(Serialize, Deserialize)]
         struct JsonChainElement {
             pub signature: Signature,
+            pub header_address: HeaderAddress,
             pub header: Header,
             pub entry: Option<Entry>,
         }
@@ -116,24 +125,37 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             element: Option<JsonChainElement>,
         }
 
-        Ok(serde_json::to_string_pretty(
-            &self
-                .iter_back()
-                .map(|h| {
-                    let maybe_element = self.get_element(&h.header().hash().into())?;
-                    match maybe_element {
-                        None => Ok(JsonChainDump { element: None }),
-                        Some(element) => Ok(JsonChainDump {
-                            element: Some(JsonChainElement {
-                                signature: element.signature().to_owned(),
-                                header: element.header().to_owned(),
-                                entry: element.entry().to_owned(),
-                            }),
+        let mut iter = self.iter_back();
+        let mut out = Vec::new();
+
+        while let Some(addr) = iter.next()? {
+            let h = match self.get_header(&addr).await? {
+                None => {
+                    out.push(JsonChainDump { element: None });
+                    continue;
+                }
+                Some(h) => h,
+            };
+            let maybe_element = self.get_element(h.header_address()).await?;
+            match maybe_element {
+                None => out.push(JsonChainDump { element: None }),
+                Some(element) => {
+                    let (signed, entry) = element.into_inner();
+                    let (header, signature) = signed.into_inner();
+                    let (header, header_address) = header.into_inner_with_hash();
+                    out.push(JsonChainDump {
+                        element: Some(JsonChainElement {
+                            signature,
+                            header_address,
+                            header,
+                            entry,
                         }),
-                    }
-                })
-                .collect::<Vec<_>>()?,
-        )?)
+                    });
+                }
+            }
+        }
+
+        Ok(serde_json::to_string_pretty(&out)?)
     }
 }
 
@@ -164,16 +186,16 @@ impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
 /// Follows Header.link through every previous Entry (of any EntryType) in the chain
 // #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
 impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
-    type Item = SignedHeader;
+    type Item = HeaderAddress;
     type Error = SourceChainError;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         match &self.current {
             None => Ok(None),
             Some(top) => {
-                if let Some(signed_header) = self.store.get_header(top)? {
-                    self.current = signed_header.header().prev_header().map(|h| h.to_owned());
-                    Ok(Some(signed_header))
+                if let Some(prev_header) = self.store.get_prev_header(top)? {
+                    self.current = prev_header.clone();
+                    Ok(Some(prev_header))
                 } else {
                     Ok(None)
                 }

@@ -69,7 +69,14 @@ impl Header {
     }
 }
 
-make_hashed!( (pub) HeaderHashed, Header, HeaderHash );
+make_hashed_base!( (pub) HeaderHashed, Header, HeaderAddress );
+
+impl HeaderHashed {
+    pub async fn with_data(header: Header) -> Result<Self, SerializedBytesError> {
+        let sb = SerializedBytes::try_from(&header)?;
+        Ok(HeaderHashed::with_pre_hashed(header, HeaderAddress::Header(HeaderHash::with_data(sb.bytes()).await)))
+    }
+}
 
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def

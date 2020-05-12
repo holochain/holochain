@@ -27,7 +27,7 @@ pub mod universal_map;
 pub mod test_utils;
 
 #[doc(inline)]
-pub use header::Header;
+pub use header::{Header, HeaderHashed};
 
 pub use timestamp::Timestamp;
 

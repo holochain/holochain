@@ -4,7 +4,7 @@ use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::{future::BoxFuture, FutureExt};
 use holochain_types::{
-    entry::Entry, header, header::Header, test_utils::fake_agent_pubkey_1, Timestamp,
+    address::HeaderAddress, entry::Entry, header, header::Header, test_utils::fake_agent_pubkey_1, Timestamp,
 };
 use holochain_zome_types::CommitEntryInput;
 use holochain_zome_types::CommitEntryOutput;
@@ -18,7 +18,7 @@ pub async fn commit_entry<'a>(
     // Example of mutating source chain
     // TODO: EXAMPLE: This is only an example of how to use the workspace
     // and should be removed when this is implemented.
-    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<()>> {
+    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderAddress>> {
         async move {
             let source_chain = &mut workspace.source_chain;
             let agent_pubkey = fake_agent_pubkey_1();

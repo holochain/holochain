@@ -4,10 +4,58 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
 /// address type for header hash to promote it to an "address" e.g. for use in a CAS
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    derive_more::From,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+)]
 pub enum HeaderAddress {
     /// a header hash, the only option
     Header(HeaderHash),
+}
+
+impl holo_hash_core::HoloHashCoreHash for HeaderAddress {
+    fn get_raw(&self) -> &[u8] {
+        unimplemented!()
+    }
+
+    fn get_bytes(&self) -> &[u8] {
+        unimplemented!()
+    }
+
+    fn get_loc(&self) -> u32 {
+        unimplemented!()
+    }
+
+    fn into_inner(self) -> std::vec::Vec<u8> {
+        unimplemented!()
+    }
+}
+
+impl From<HeaderAddress> for holo_hash_core::HoloHashCore {
+    fn from(header_address: HeaderAddress) -> holo_hash_core::HoloHashCore {
+        match header_address {
+            HeaderAddress::Header(header_hash) => header_hash.into(),
+        }
+    }
+}
+
+impl PartialEq<HeaderHash> for HeaderAddress {
+    #[allow(irrefutable_let_patterns)]
+    fn eq(&self, other: &HeaderHash) -> bool {
+        if let HeaderAddress::Header(hash) = self {
+            return hash == other;
+        }
+        false
+    }
 }
 
 impl From<HeaderAddress> for HoloHash {
@@ -24,9 +72,9 @@ impl From<holo_hash::holo_hash_core::HeaderHash> for HeaderAddress {
     }
 }
 
-impl From<HeaderHash> for HeaderAddress {
-    fn from(header_hash: HeaderHash) -> HeaderAddress {
-        HeaderAddress::Header(header_hash)
+impl From<&HeaderHash> for HeaderAddress {
+    fn from(header_hash: &HeaderHash) -> HeaderAddress {
+        header_hash.to_owned().into()
     }
 }
 
