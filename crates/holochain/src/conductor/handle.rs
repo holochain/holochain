@@ -86,6 +86,13 @@ pub trait ConductorHandleT: Send + Sync {
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()>;
 
+    /// Add an app interface
+    async fn add_app_interface_via_handle(
+        &self,
+        port: u16,
+        conductor_handle: ConductorHandle,
+    ) -> ConductorResult<u16>;
+
     /// Install a [Dna] in this Conductor
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
@@ -156,6 +163,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let mut lock = self.0.write().await;
         lock.add_admin_interfaces_via_handle(handle, configs).await
+    }
+
+    async fn add_app_interface_via_handle(
+        &self,
+        port: u16,
+        handle: ConductorHandle,
+    ) -> ConductorResult<u16> {
+        let mut lock = self.0.write().await;
+        lock.add_app_interface_via_handle(port, handle).await
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
