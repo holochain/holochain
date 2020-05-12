@@ -1,7 +1,13 @@
 #![allow(clippy::mutex_atomic)]
 use super::*;
 use futures::Future;
-use std::{marker::PhantomData, sync::Arc};
+use std::{
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        Arc,
+    },
+};
 use tracing::*;
 
 // TODO write tests to verify the invariant.
@@ -23,7 +29,7 @@ use tracing::*;
 /// writing to the data but this is never contested
 /// because of the single threaded nature.
 pub struct UnsafeInvokeZomeWorkspace {
-    workspace: std::sync::Weak<std::sync::Mutex<*mut std::ffi::c_void>>,
+    workspace: std::sync::Weak<std::sync::Mutex<AtomicPtr<std::ffi::c_void>>>,
 }
 
 // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
@@ -33,7 +39,7 @@ pub struct UnsafeInvokeZomeWorkspace {
 /// Don't use `mem::forget` on this type as it will
 /// break the checks.
 pub struct UnsafeInvokeZomeWorkspaceGuard<'env> {
-    workspace: Option<Arc<std::sync::Mutex<*mut std::ffi::c_void>>>,
+    workspace: Option<Arc<std::sync::Mutex<AtomicPtr<std::ffi::c_void>>>>,
     phantom: PhantomData<&'env ()>,
 }
 
@@ -42,7 +48,7 @@ impl UnsafeInvokeZomeWorkspace {
         workspace: &'env mut InvokeZomeWorkspace,
     ) -> (UnsafeInvokeZomeWorkspaceGuard<'env>, Self) {
         let raw_ptr = workspace as *mut InvokeZomeWorkspace as *mut std::ffi::c_void;
-        let guard = Arc::new(std::sync::Mutex::new(raw_ptr));
+        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(raw_ptr)));
         let workspace = Arc::downgrade(&guard);
         let guard = UnsafeInvokeZomeWorkspaceGuard {
             workspace: Some(guard),
@@ -57,7 +63,7 @@ impl UnsafeInvokeZomeWorkspace {
     /// It will always return None.
     pub fn test_dropped_guard() -> Self {
         let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
-        let guard = Arc::new(std::sync::Mutex::new(fake_ptr));
+        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(fake_ptr)));
         let workspace = Arc::downgrade(&guard);
         // Make sure the weak Arc cannot be upgraded
         std::mem::drop(guard);
@@ -92,7 +98,8 @@ impl UnsafeInvokeZomeWorkspace {
                 .ok()
             {
                 Some(guard) => {
-                    let sc = *guard as *const InvokeZomeWorkspace;
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *const InvokeZomeWorkspace;
                     match sc.as_ref() {
                         Some(s) => Some(f(s).await),
                         None => None,
@@ -132,7 +139,8 @@ impl UnsafeInvokeZomeWorkspace {
                 .ok()
             {
                 Some(guard) => {
-                    let sc = *guard as *mut InvokeZomeWorkspace;
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *mut InvokeZomeWorkspace;
                     match sc.as_mut() {
                         Some(s) => Some(f(s).await),
                         None => None,
