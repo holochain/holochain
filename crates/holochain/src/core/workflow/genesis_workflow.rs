@@ -22,7 +22,7 @@ pub struct GenesisWorkflow<Api: CellConductorApiT> {
     api: Api,
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
-    maybe_membrane_proof: Option<SerializedBytes>,
+    membrane_proof: Option<SerializedBytes>,
 }
 
 impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for GenesisWorkflow<Api> {
@@ -39,7 +39,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 api,
                 dna_file,
                 agent_pubkey,
-                maybe_membrane_proof,
+                membrane_proof,
             } = self;
 
             // TODO: this is a placeholder for a real DPKI request to show intent
@@ -65,7 +65,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
                 prev_header: dna_header.hash().into(),
-                maybe_membrane_proof,
+                membrane_proof,
             });
             workspace
                 .source_chain
@@ -140,6 +140,7 @@ pub mod tests {
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header, Timestamp,
     };
+    use matches::assert_matches;
 
     pub async fn fake_genesis<R: Readable>(source_chain: &mut SourceChain<'_, R>) -> Header {
         let agent_pubkey = fake_agent_pubkey_1();
@@ -155,7 +156,7 @@ pub mod tests {
             timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
             prev_header: dna_header.hash().into(),
-            maybe_membrane_proof: None,
+            membrane_proof: None,
         });
         let agent_header = Header::EntryCreate(header::EntryCreate {
             timestamp: Timestamp::now(),
@@ -195,7 +196,7 @@ pub mod tests {
                 api,
                 dna_file: dna.clone(),
                 agent_pubkey: agent_pubkey.clone(),
-                maybe_membrane_proof: None,
+                membrane_proof: None,
             };
             let _: () = run_workflow(arc.clone(), workflow, workspace).await?;
         }
@@ -206,27 +207,13 @@ pub mod tests {
             source_chain.chain_head().expect("chain head should be set");
             let hashes: Vec<_> = source_chain
                 .iter_back()
-                .map(|h| {
-                    Ok(match h.header() {
-                        Header::Dna(header::Dna { .. }) => "Dna",
-                        Header::AgentValidationPkg(header::AgentValidationPkg { .. }) => {
-                            "AgentValidationPkg"
-                        }
-                        Header::InitZomesComplete(header::InitZomesComplete { .. }) => {
-                            "InitZomesComplete"
-                        }
-                        Header::LinkAdd(header::LinkAdd { .. }) => "LinkAdd",
-                        Header::LinkRemove(header::LinkRemove { .. }) => "LinkRemove",
-                        Header::EntryDelete(header::EntryDelete { .. }) => "EntryDelete",
-                        Header::ChainClose(header::ChainClose { .. }) => "ChainClose",
-                        Header::ChainOpen(header::ChainOpen { .. }) => "ChainOpen",
-                        Header::EntryCreate(header::EntryCreate { .. }) => "EntryCreate",
-                        Header::EntryUpdate(header::EntryUpdate { .. }) => "EntryUpdate",
-                    })
-                })
+                .map(|h| Ok(h.header().clone()))
                 .collect()
                 .unwrap();
-            assert_eq!(hashes, vec!["EntryCreate", "AgentValidationPkg", "Dna"]);
+            assert_matches!(
+                hashes.as_slice(),
+                [Header::EntryCreate(_), Header::AgentValidationPkg(_), Header::Dna(_)]
+            );
             Result::<_, WorkflowError>::Ok(())
         })?;
         Ok(())
