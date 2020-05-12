@@ -473,8 +473,13 @@ mod test {
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
+
+        let websocket_timeout = crate::start_hard_timeout!();
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, app_api).await.unwrap();
+        // the time here should be almost the same (about +0.1ms) vs. the raw wasm_ribosome call
+        // the overhead of a websocket request locally is small
+        crate::end_hard_timeout!(websocket_timeout, 2_000_000);
     }
 
     #[tokio::test(threaded_scheduler)]
