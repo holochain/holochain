@@ -3,7 +3,9 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
-/// address type for header hash to promote it to an "address" e.g. for use in a CAS
+/// address type for header hash to promote it to an "address" e.g. for use when getting a header
+/// from a CAS or the DHT.  This is similar to EntryAddress which promotes and entry hash to a
+/// retrievable entity.
 #[derive(
     Debug,
     Clone,
@@ -22,6 +24,7 @@ pub enum HeaderAddress {
     Header(HeaderHash),
 }
 
+/// a utility macro just to not have to type in the match statement everywhere.
 macro_rules! match_header_addr {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
@@ -111,6 +114,7 @@ pub enum EntryAddress {
     Agent(AgentPubKey),
 }
 
+/// utility macro to make it more ergonomic to access the enum variants
 macro_rules! match_entry_addr {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
@@ -171,6 +175,7 @@ pub enum DhtAddress {
     Header(HeaderHash),
 }
 
+/// utility macro to make it more ergonomic to access the enum variants
 macro_rules! match_dht_addr {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
