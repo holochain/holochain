@@ -95,6 +95,7 @@ use crate::prelude::*;
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     // No previous header, because DNA is always first chain entry
     pub hash: DnaHash,
 }
@@ -104,6 +105,7 @@ pub struct Dna {
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub membrane_proof: Option<SerializedBytes>,
@@ -114,6 +116,7 @@ pub struct AgentValidationPkg {
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 }
 
@@ -121,6 +124,7 @@ pub struct InitZomesComplete {
 pub struct LinkAdd {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub base_address: DhtAddress,
@@ -133,6 +137,7 @@ pub struct LinkAdd {
 pub struct LinkRemove {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderAddress,
@@ -142,6 +147,7 @@ pub struct LinkRemove {
 pub struct ChainOpen {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub prev_dna_hash: DnaHash,
@@ -151,6 +157,7 @@ pub struct ChainOpen {
 pub struct ChainClose {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub new_dna_hash: DnaHash,
@@ -160,6 +167,7 @@ pub struct ChainClose {
 pub struct EntryCreate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub entry_type: EntryType,
@@ -170,6 +178,7 @@ pub struct EntryCreate {
 pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub replaces_address: DhtAddress,
@@ -182,6 +191,7 @@ pub struct EntryUpdate {
 pub struct EntryDelete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     /// Address of the Element being deleted
