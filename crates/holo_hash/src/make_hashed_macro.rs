@@ -101,7 +101,7 @@ macro_rules! make_hashed_base {
 /// The purpose of these hashed wrappers is to make an ergonomic and generalized way to create data and cache
 /// the calculated hash of that data along with it in a ways that's safe and let's us not have to recalculate it many times.
 ///
-/// The first parameter to the macro is the name of the hashed type usually just the name of type which is passed 
+/// The first parameter to the macro is the name of the hashed type usually just the name of type which is passed
 /// as the second parameter with the word `Hashed` added.  The third parameter is kind of hash this type is
 /// hashed to which must be a `holo_hash` type.
 ///
