@@ -3,7 +3,10 @@
 
 pub mod conductor;
 pub mod core;
-
+pub mod fixt;
+pub extern crate strum;
+#[macro_use]
+extern crate strum_macros;
 use holochain_wasmer_host;
 
 #[macro_export]

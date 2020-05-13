@@ -19,6 +19,8 @@ serde = { version = "1.0.104", features = ["derive"] }
 serde_bytes = "0.11"
 thiserror = "1"
 tokio = { version = "0.2", optional = true }
+fixt = { path = "../fixt" }
+rand = "0.7"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }

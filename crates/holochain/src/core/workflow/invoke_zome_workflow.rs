@@ -203,8 +203,11 @@ pub mod tests {
             });
 
         // Call the zome function
-        let invocation =
-            zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
+        let invocation = zome_invocation_from_names(
+            "zomey".into(),
+            "fun_times",
+            Payload { a: 1 }.try_into().unwrap(),
+        );
         let workflow = InvokeZomeWorkflow {
             invocation,
             ribosome,
@@ -233,8 +236,11 @@ pub mod tests {
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
-        let invocation =
-            zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
+        let invocation = zome_invocation_from_names(
+            "zomey".into(),
+            "fun_times",
+            Payload { a: 1 }.try_into().unwrap(),
+        );
         invocation.cap = todo!("Make secret cap token");
         let error = run_invoke_zome(workspace, ribosome, invocation)
             .await
@@ -312,8 +318,11 @@ pub mod tests {
                 Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
 
-        let invocation =
-            zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
+        let invocation = zome_invocation_from_names(
+            "zomey".into(),
+            "fun_times",
+            Payload { a: 1 }.try_into().unwrap(),
+        );
         // IDEA: Mock the system validation and check it's called
         /* This is one way to test the correctness of the calls to sys val
         let mut sys_val = MockSystemValidation::new();
@@ -344,8 +353,11 @@ pub mod tests {
         let reader = env_ref.reader().unwrap();
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
-        let invocation =
-            zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
+        let invocation = zome_invocation_from_names(
+            "zomey".into(),
+            "fun_times",
+            Payload { a: 1 }.try_into().unwrap(),
+        );
         // TODO: B-01093: Mock the app validation and check it's called
         // TODO: B-01093: How can I pass a app validation into this?
         // These are just static calls
@@ -370,8 +382,11 @@ pub mod tests {
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output
-        let invocation =
-            zome_invocation_from_names("zomey", "fun_times", Payload { a: 1 }.try_into().unwrap());
+        let invocation = zome_invocation_from_names(
+            "zomey".into(),
+            "fun_times",
+            Payload { a: 1 }.try_into().unwrap(),
+        );
         let (_result, effects) = run_invoke_zome(workspace, ribosome, invocation)
             .await
             .unwrap();

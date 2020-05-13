@@ -436,7 +436,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_validate"
+name = "test_wasm_init_pass"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",

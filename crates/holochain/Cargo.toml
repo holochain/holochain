@@ -57,11 +57,14 @@ predicates = "1.0.4"
 must_future = "0.1.1"
 either = "1.5.0"
 fixt = { path = "../fixt" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm" }
+rand = "0.7"
+strum = "0.18.0"
+strum_macros = "0.18.0"
 
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 test_wasm_common = { path = "../test_utils/wasm_common" }
 maplit = "1.0.2"
 matches = "0.1.8"

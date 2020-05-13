@@ -233,11 +233,11 @@ mod test {
         state::ConductorState,
         Conductor, ConductorHandle,
     };
-    use crate::core::ribosome::wasm_test::warm_zome;
     use crate::core::{
         ribosome::wasm_test::zome_invocation_from_names,
         state::source_chain::{SourceChain, SourceChainBuf},
     };
+    use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{
@@ -443,9 +443,13 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
-            vec![("zomey".into(), TestWasm::Foo.into())],
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
-        warm_zome(dna.clone(), &"zomey".into());
+
+        // warm the zome
+        let _ = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
 
         let payload = Payload { a: 1 };
         let dna_hash = dna.dna_hash().clone();
@@ -460,7 +464,7 @@ mod test {
 
         let (_tmpdir, app_api) = setup_app(cell_id.clone(), dna_store).await;
         let mut request = Box::new(zome_invocation_from_names(
-            "zomey",
+            TestWasm::Foo.into(),
             "foo",
             payload.try_into().unwrap(),
         ));

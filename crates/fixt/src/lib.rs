@@ -47,7 +47,7 @@ pub use paste;
 /// essentially, the iteration of a fixturator should work like some_iter.cycle()
 pub struct Fixturator<Item, Curve> {
     item: std::marker::PhantomData<Item>,
-    curve: Curve,
+    pub curve: Curve,
     pub index: usize,
 }
 
@@ -269,6 +269,27 @@ macro_rules! newtype_fixturator {
                     expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
                 self.0.index = self.0.index + 1;
                 $outer(fixturator.next().unwrap())
+            }
+        );
+    };
+}
+
+#[macro_export]
+macro_rules! enum_fixturator {
+    ( $enum:ident, $empty:expr ) => {
+        use crate::strum::IntoEnumIterator;
+        use rand::seq::IteratorRandom;
+        fixturator!(
+            $enum,
+            $empty,
+            {
+                let mut rng = rand::thread_rng();
+                $enum::iter().choose(&mut rng).unwrap()
+            },
+            {
+                let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
+                self.0.index = self.0.index + 1;
+                ret
             }
         );
     };

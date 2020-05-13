@@ -52,6 +52,8 @@ derive_more = "0.99.3"
 rust-base58 = "0.0.4"
 shrinkwraprs = "0.3.0"
 
+# dev deps?
+rand = "0.7"
 fixt = { path = "../fixt" }
 
 [dev-dependencies]

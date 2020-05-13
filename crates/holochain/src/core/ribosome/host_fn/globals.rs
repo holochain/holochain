@@ -11,11 +11,12 @@ use std::sync::Arc;
 
 pub async fn globals(
     ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
+    host_context: Arc<HostContext>,
     _input: GlobalsInput,
 ) -> RibosomeResult<GlobalsOutput> {
     Ok(GlobalsOutput::new(ZomeGlobals {
         dna_name: ribosome.dna_file().dna().name.clone(),
+        zome_name: host_context.zome_name.clone(),
         agent_address: "".into(),                           // @TODO
         agent_id_str: "".into(),                            // @TODO
         agent_initial_hash: "".into(),                      // @TODO
@@ -28,13 +29,14 @@ pub async fn globals(
 
 #[cfg(test)]
 pub mod test {
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::GlobalsInput;
     use holochain_zome_types::GlobalsOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_globals_test() {
         let globals: GlobalsOutput =
-            crate::call_test_ribosome!("imports".into(), "globals", GlobalsInput::new(()));
+            crate::call_test_ribosome!(TestWasm::Imports, "globals", GlobalsInput::new(()));
         assert_eq!(globals.inner_ref().dna_name, "test",);
     }
 }

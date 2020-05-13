@@ -85,6 +85,7 @@
 //!
 //! ```
 
+use fixt::prelude::*;
 pub use holo_hash_core;
 pub use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
@@ -504,6 +505,16 @@ new_holo_hash! {
     DhtOpHash,
     DHTOP_PREFIX,
 }
+
+fixturator!(
+    DnaHash,
+    { DnaHash::with_pre_hashed_sync(vec![0; 32]) },
+    {
+        let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
+        DnaHash::with_pre_hashed_sync(random_bytes)
+    },
+    { DnaHash::with_pre_hashed_sync(vec![0xdb; 32]) }
+);
 
 #[cfg(test)]
 mod tests {

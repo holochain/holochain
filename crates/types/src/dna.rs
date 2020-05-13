@@ -11,7 +11,6 @@ pub use error::DnaError;
 pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
-use fixt::prelude::*;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = BTreeMap<ZomeName, zome::Zome>;
@@ -46,53 +45,6 @@ pub struct DnaDef {
     pub zomes: Zomes,
 }
 
-fixturator!(Zomes,
-    {
-        BTreeMap::default()
-    },
-    {
-        // @todo implement unpredictable zomes
-        BTreeMap::default()
-    },
-    {
-        // @todo implement predictable zomes
-        BTreeMap::default()
-    }
-);
-
-fixturator!(DnaDef,
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-            uuid: StringFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-            zomes: ZomesFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    },
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-            uuid: StringFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-            zomes: ZomesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    },
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-            uuid: StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-            zomes: ZomesFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    }
-);
-
 impl DnaDef {
     /// Calculate DnaHash for DnaDef
     pub async fn dna_hash(&self) -> DnaHash {
@@ -108,43 +60,22 @@ impl DnaDef {
     }
 }
 
+/// Wasms need to be an ordered map from WasmHash to a DnaWasm
+pub type Wasms = BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>;
+
 /// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
-    dna: DnaDef,
+    pub dna: DnaDef,
 
     /// The hash of `self.dna` converted through `SerializedBytes`.
     /// (This can be a full holo_hash because we never send a `DnaFile` to Wasm.)
-    dna_hash: holo_hash::DnaHash,
+    pub dna_hash: holo_hash::DnaHash,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
-    code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
+    pub code: Wasms,
 }
-
-fixturator!(DnaFile,
-    {
-        DnaFile {
-            dna: DnaDefFixturator::new(Empty).next().unwrap(),
-            dna_hash: DnaHashFixturator::new(Empty).next().unwrap(),
-            code: WasmsFixturator::new(Empty).next().unwrap(),
-        }
-    },
-    {
-        DnaFile {
-            dna: DnaDefFixturator::new(Unpredictable).next().unwrap(),
-            dna_hash: DnaHashFixturator::new(Unpredictable).next().unwrap(),
-            code: WasmsFixturator::new(Unpredictable).next().unwrap(),
-        }
-    },
-    {
-        DnaFile {
-            dna: DnaDefFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-            dna_hash: DnaHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-            code: WasmsFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        }
-    }
-);
 
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
     fn from(dna_file: DnaFile) -> (DnaDef, Vec<wasm::DnaWasm>) {

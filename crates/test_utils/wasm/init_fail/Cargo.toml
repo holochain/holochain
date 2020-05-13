@@ -1,5 +1,5 @@
 [package]
-name = "test_wasm_init"
+name = "test_wasm_init_fail"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
@@ -10,7 +10,7 @@ edition = "2018"
 [workspace]
 
 [lib]
-name = "test_wasm_init"
+name = "test_wasm_init_fail"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]

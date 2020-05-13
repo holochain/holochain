@@ -24,7 +24,10 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::fixt::ZomeNameFixturator;
 use error::RibosomeResult;
+use fixt::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
@@ -39,10 +42,49 @@ use std::iter::Iterator;
 
 #[derive(Clone)]
 pub struct HostContext {
-    zome_name: ZomeName,
+    pub zome_name: ZomeName,
     allow_side_effects: AllowSideEffects,
     workspace: UnsafeInvokeZomeWorkspace,
 }
+
+fixturator!(
+    HostContext,
+    {
+        HostContext {
+            zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
+                .next()
+                .unwrap(),
+            allow_side_effects: AllowSideEffectsFixturator::new(Empty).next().unwrap(),
+        }
+    },
+    {
+        HostContext {
+            zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+            allow_side_effects: AllowSideEffectsFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+        }
+    },
+    {
+        let host_context = HostContext {
+            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            allow_side_effects: AllowSideEffectsFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+        };
+        self.0.index = self.0.index + 1;
+        host_context
+    }
+);
 
 impl HostContext {
     pub fn zome_name(&self) -> ZomeName {
@@ -53,11 +95,12 @@ impl HostContext {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, EnumIter)]
 pub enum AllowSideEffects {
     Yes,
     No,
 }
+enum_fixturator!(AllowSideEffects, AllowSideEffects::No);
 
 #[derive(Debug)]
 pub struct FnComponents(Vec<String>);
@@ -207,17 +250,14 @@ pub trait RibosomeT: Sized {
 
 #[cfg(test)]
 pub mod wasm_test {
-    use super::wasm_ribosome::WasmRibosome;
-    use super::AllowSideEffects;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomeInvocation;
     use crate::core::ribosome::ZomeInvocationResponse;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+    use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
     use holo_hash::holo_hash_core::HeaderHash;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::DnaFile;
-    use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::test_utils::fake_header_hash;
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id};
     use holochain_wasm_test_utils::TestWasm;
@@ -226,10 +266,8 @@ pub mod wasm_test {
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
-    use crate::core::ribosome::HostContext;
-
     pub fn zome_invocation_from_names(
-        zome_name: &str,
+        zome_name: ZomeName,
         fn_name: &str,
         payload: SerializedBytes,
     ) -> ZomeInvocation {
@@ -237,7 +275,7 @@ pub mod wasm_test {
             workspace: UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Empty)
                 .next()
                 .unwrap(),
-            zome_name: zome_name.into(),
+            zome_name,
             fn_name: fn_name.into(),
             cell_id: fake_cell_id("bob"),
             cap: fake_cap_token(),
@@ -245,35 +283,6 @@ pub mod wasm_test {
             provenance: fake_agent_pubkey_1(),
             as_at: fake_header_hash("fake"),
         }
-    }
-
-    // warm the zome module in the module cache
-    pub fn warm_zome(dna_file: DnaFile, zome_name: &ZomeName) {
-        WasmRibosome::new(dna_file)
-            .module(HostContext {
-                zome_name: zome_name.clone(),
-                allow_side_effects: AllowSideEffects::No,
-                workspace: UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Empty)
-                    .next()
-                    .unwrap(),
-            })
-            .unwrap();
-    }
-
-    pub fn test_ribosome(warm: Option<&ZomeName>) -> WasmRibosome {
-        let dna_file = fake_dna_zomes(
-            "uuid",
-            vec![
-                ("foo".into(), TestWasm::Foo.into()),
-                ("imports".into(), TestWasm::Imports.into()),
-                ("debug".into(), TestWasm::Debug.into()),
-                ("validate".into(), TestWasm::Validate.into()),
-            ],
-        );
-        if let Some(zome_name) = warm {
-            warm_zome(dna_file.clone(), zome_name);
-        }
-        WasmRibosome::new(dna_file)
     }
 
     pub fn now() -> Duration {
@@ -284,16 +293,22 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $zome:expr, $fn_name:literal, $input:expr ) => {
+        ( $test_wasm:expr, $fn_name:literal, $input:expr ) => {
             tokio::task::spawn(async move {
+                // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
                 use std::convert::TryInto;
-                let ribosome = $crate::core::ribosome::wasm_test::test_ribosome(Some(&$zome));
+                let ribosome =
+                    $crate::fixt::WasmRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
+                        $test_wasm.into(),
+                    ]))
+                    .next()
+                    .unwrap();
 
                 let timeout = $crate::start_hard_timeout!();
 
                 let invocation = $crate::core::ribosome::wasm_test::zome_invocation_from_names(
-                    $zome,
+                    $test_wasm.into(),
                     $fn_name,
                     $input.try_into().unwrap(),
                 );
@@ -321,10 +336,15 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_foo_test() {
-        let ribosome = test_ribosome(Some(&"foo".into()));
+        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
 
-        let invocation =
-            zome_invocation_from_names("foo", "foo", SerializedBytes::try_from(()).unwrap());
+        let invocation = zome_invocation_from_names(
+            TestWasm::Foo.into(),
+            "foo",
+            SerializedBytes::try_from(()).unwrap(),
+        );
 
         assert_eq!(
             ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(
@@ -338,7 +358,7 @@ pub mod wasm_test {
     async fn pass_validate_test() {
         assert_eq!(
             CommitEntryResult::Success(HeaderHash::new(vec![0xdb; 36])),
-            call_test_ribosome!("validate".into(), "always_validates", ()),
+            call_test_ribosome!(TestWasm::Validate, "always_validates", ()),
         );
     }
 
@@ -346,7 +366,7 @@ pub mod wasm_test {
     async fn fail_validate_test() {
         assert_eq!(
             CommitEntryResult::Fail("Invalid(\"NeverValidates never validates\")".to_string()),
-            call_test_ribosome!("validate".into(), "never_validates", ()),
+            call_test_ribosome!(TestWasm::Validate, "never_validates", ()),
         );
     }
 }
