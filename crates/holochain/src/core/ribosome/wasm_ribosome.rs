@@ -216,8 +216,6 @@ impl RibosomeT for WasmRibosome {
     ) -> RibosomeResult<ZomeInvocationResponse> {
         let timeout = crate::start_hard_timeout!();
 
-        println!("{:?}", invocation);
-
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
         let fn_name = invocation.fn_name.clone();

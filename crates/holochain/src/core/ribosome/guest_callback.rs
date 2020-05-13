@@ -36,7 +36,6 @@ impl<I: Invocation> FallibleIterator for CallIterator<WasmRibosome, I> {
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let timeout = crate::start_hard_timeout!();
-        println!("{:?} {:?}", self.remaining_zomes, self.remaining_components);
         let next = Ok(match self.remaining_zomes.first() {
             // there are no zomes left, we are finished
             None => None,
