@@ -52,8 +52,7 @@ with holonix.pkgs;
    # that can be built directly as nix packages
    ++ ([(
     holonix.pkgs.writeShellScriptBin "dna-util" ''
-    cd "''${HC_TARGET_PREFIX}/crates/dna_util"
-    cargo run -- "''${@}"
+    cargo run --manifest-path "''${HC_TARGET_PREFIX}/crates/dna_util/Cargo.toml" -- "''${@}"
     ''
    )])
   ;
