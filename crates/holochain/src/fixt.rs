@@ -19,6 +19,7 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::Entry;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -45,6 +46,17 @@ fixturator!(
         self.0.index = self.0.index + 1;
         ret
     }
+);
+
+fixturator!(
+    Entry,
+    Entry::App(SerializedBytesFixturator::new(Empty).next().unwrap()),
+    Entry::App(
+        SerializedBytesFixturator::new(Unpredictable)
+            .next()
+            .unwrap()
+    ),
+    Entry::App(SerializedBytesFixturator::new(Predictable).next().unwrap())
 );
 
 fixturator!(
