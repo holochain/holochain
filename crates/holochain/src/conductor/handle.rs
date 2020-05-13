@@ -124,7 +124,7 @@ pub trait ConductorHandleT: Send + Sync {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Add some [CellId]s to the db
-    async fn add_cell_id_to_db(
+    async fn add_cell_ids_to_db(
         &self,
         cells: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()>;
@@ -231,12 +231,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.1
     }
 
-    async fn add_cell_id_to_db(
+    async fn add_cell_ids_to_db(
         &self,
         cells: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()> {
         // Update the db
-        self.0.write().await.add_cell_id_to_db(cells).await
+        self.0.write().await.add_cell_ids_to_db(cells).await
     }
 
     async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<()> {

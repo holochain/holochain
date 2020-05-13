@@ -326,7 +326,7 @@ mod test {
         tmps.push(test_env.tmpdir.clone());
         let mut state = ConductorState::default();
         for cell in cells {
-            state.cells.push((cell.clone(), None));
+            state.cell_ids_with_proofs.push((cell.clone(), None));
         }
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
@@ -347,7 +347,7 @@ mod test {
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let mut state = ConductorState::default();
-        state.cells.push((cell_id.clone(), None));
+        state.cell_ids_with_proofs.push((cell_id.clone(), None));
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
@@ -512,7 +512,7 @@ mod test {
 
         let agent_key = fake_agent_pubkey_1();
         let msg = AdminRequest::ActivateApp {
-            hashes_proofs: dna_hashes.clone(),
+            hashes_with_proofs: dna_hashes.clone(),
             agent_key: agent_key.clone(),
         };
         let msg = msg.try_into().unwrap();
@@ -526,7 +526,11 @@ mod test {
         handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
             .await
             .unwrap();
-        let cells = handle.get_state_from_handle().await.unwrap().cells;
+        let cells = handle
+            .get_state_from_handle()
+            .await
+            .unwrap()
+            .cell_ids_with_proofs;
         let expected = dna_hashes
             .into_iter()
             .map(|(hash, proof)| (CellId::from((hash, agent_key.clone())), proof))

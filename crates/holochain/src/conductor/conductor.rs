@@ -304,7 +304,7 @@ where
         &self,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Cell>> {
-        let cells = self.get_state().await?.cells;
+        let cells = self.get_state().await?.cell_ids_with_proofs;
         let len = cells.len();
         // Only create if there are any cells
         if cells.len() == 0 {
@@ -345,16 +345,16 @@ where
         Ok(cells)
     }
 
-    /// Update the cells in the database
-    pub(super) async fn add_cell_id_to_db(
+    /// Register CellIds in the database
+    pub(super) async fn add_cell_ids_to_db(
         &mut self,
-        mut cells: Vec<(CellId, Option<SerializedBytes>)>,
+        mut cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()> {
         self.update_state(move |mut state| {
-            state.cells.append(&mut cells);
+            state.cell_ids_with_proofs.append(&mut cell_ids_with_proofs);
             // Make sure they are unique
-            state.cells = state
-                .cells
+            state.cell_ids_with_proofs = state
+                .cell_ids_with_proofs
                 .iter()
                 .cloned()
                 .collect::<HashSet<_>>()
@@ -366,7 +366,7 @@ where
         Ok(())
     }
 
-    /// Add the cells to the cell map
+    /// Add fully constructed cells to to the cell map in the Conductor
     pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             self.cells.insert(
@@ -717,13 +717,13 @@ pub mod tests {
 
         conductor
             .update_state(|mut state| {
-                state.cells.push((cell_id.clone(), None));
+                state.cell_ids_with_proofs.push((cell_id.clone(), None));
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
-        assert_eq!(state.cells, [(cell_id, None)]);
+        assert_eq!(state.cell_ids_with_proofs, [(cell_id, None)]);
     }
 
     #[tokio::test(threaded_scheduler)]
