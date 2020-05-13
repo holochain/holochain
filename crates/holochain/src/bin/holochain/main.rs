@@ -82,10 +82,18 @@ async fn async_main() {
     debug!("config_path: {}", config_path);
 
     let conductor = if let Some(legacy_config_path) = opt.legacy_tryorama_config_path {
+        use holochain_types::test_utils::fake_agent_pubkey_1;
+
         let toml =
             fs::read_to_string(legacy_config_path).expect("Couldn't read legacy config from file");
+
+        // We ignore the specified agent config for now, and use a pregenerated test AgentPubKey
+        // FIXME: use a real agent!
+        warn!("Using a constant fake agent. FIXME: use a proper test agent");
+        let fake_agent = fake_agent_pubkey_1();
+
         let legacy_config = toml::from_str(&toml).expect("Couldn't deserialize legacy config");
-        load_conductor_from_legacy_config(legacy_config, Conductor::builder())
+        load_conductor_from_legacy_config(legacy_config, Conductor::builder(), fake_agent)
             .await
             .expect("Couldn't initialize conductor from legacy config")
     } else {
@@ -130,7 +138,7 @@ async fn async_main() {
         // Initialize the Conductor
         let conductor: ConductorHandle = Conductor::builder()
             .config(config)
-            .with_admin()
+            .build()
             .await
             .expect("Could not initialize Conductor from configuration");
 

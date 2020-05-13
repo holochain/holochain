@@ -12,10 +12,13 @@ use holochain_2020_legacy::config::{
 use holochain_types::{
     cell::CellId,
     dna::{DnaError, DnaFile},
-    test_utils::fake_agent_pubkey_1,
 };
 use std::fs;
-use std::{collections::HashMap, io::Read, path::PathBuf};
+use std::{
+    collections::HashMap,
+    io::Read,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 use tracing::*;
 
@@ -37,19 +40,19 @@ pub enum CompatConfigError {
 pub async fn load_conductor_from_legacy_config(
     legacy: LegacyConfig,
     builder: ConductorBuilder,
+    agent_pubkey: AgentPubKey,
 ) -> Result<ConductorHandle, CompatConfigError> {
     use CompatConfigError::*;
 
     let config = config_from_legacy(&legacy);
 
-    // We ignore the specified agent config for now, and use a pregenerated test AgentPubKey
-    // FIXME: use a real agent!
-    warn!("Using a constant fake agent. FIXME: use a proper test agent");
-    let agent: AgentPubKey = fake_agent_pubkey_1();
+    let conductor: ConductorHandle = builder.config(config).build().await?;
 
-    let conductor: ConductorHandle = builder.config(config).with_admin().await?;
+    fn dna_key(path: &Path, uuid: &Option<String>) -> String {
+        format!("{:?} ; {:?}", path, uuid)
+    }
 
-    let mut dna_hashes: HashMap<PathBuf, DnaHash> = HashMap::new();
+    let mut dna_hashes: HashMap<String, DnaHash> = HashMap::new();
     for dna_config in legacy.dnas.clone() {
         let mut buffer = Vec::new();
         let path: PathBuf = dna_config.file.clone().into();
@@ -58,11 +61,14 @@ pub async fn load_conductor_from_legacy_config(
         if let Some(uuid) = dna_config.uuid.clone() {
             dna_file = dna_file.with_uuid(uuid).await?;
         }
-        dna_hashes.insert(path, dna_file.dna_hash().clone());
+        dna_hashes.insert(
+            dna_key(&path, &dna_config.uuid),
+            dna_file.dna_hash().clone(),
+        );
         conductor.install_dna(dna_file).await?;
     }
 
-    let mut cell_ids: Vec<CellId> = vec![];
+    let mut cell_ids = vec![];
     for i in legacy.instances.clone() {
         // NB: disregarding agent config for now, using a hard-coded pre-made one
         let dna_config = legacy
@@ -70,16 +76,30 @@ pub async fn load_conductor_from_legacy_config(
             .ok_or_else(|| BrokenReference(format!("No DNA for id: {}", i.dna)))?;
         // make sure we have installed this DNA
         let dna_hash = dna_hashes
-            .get(&PathBuf::from(dna_config.file.clone()))
+            .get(&dna_key(
+                &PathBuf::from(dna_config.file.clone()),
+                &dna_config.uuid,
+            ))
             .ok_or_else(|| BrokenReference(format!("No DNA for path: {}", dna_config.file)))?
             .clone();
-        cell_ids.push(CellId::new(dna_hash, agent.clone()));
+        let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
+        cell_ids.push((cell_id, None));
     }
 
-    // TODO: hook up app interfaces
-    let _app_interfaces = extract_app_interfaces(legacy.interfaces);
+    let app_interfaces = extract_app_interfaces(legacy.interfaces);
 
-    conductor.create_cells(cell_ids, conductor.clone()).await?;
+    conductor.add_cell_ids_to_db(cell_ids).await?;
+    conductor.setup_cells(conductor.clone()).await?;
+
+    for i in app_interfaces {
+        let InterfaceConfig {
+            driver: InterfaceDriver::Websocket { port },
+            cells: _,
+        } = i;
+        conductor
+            .add_app_interface_via_handle(port, conductor.clone())
+            .await?;
+    }
 
     Ok(conductor)
 }
@@ -126,7 +146,7 @@ fn extract_app_interfaces(legacy_interfaces: Vec<LegacyInterfaceConfig>) -> Vec<
         .filter_map(|c: LegacyInterfaceConfig| {
             convert_interface_driver(c.driver).map(|driver| InterfaceConfig {
                 driver,
-                // FIXME: cells not hooked up for now since we don't use it
+                // FIXME: cells not hooked up for now since we don't use signals yet
                 cells: Vec::new(),
             })
         })
@@ -141,20 +161,13 @@ pub mod tests {
         handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
     };
     use holochain_2020_legacy::config as lc;
-    use holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_file};
     use matches::assert_matches;
     use mockall::predicate;
     use std::path::PathBuf;
     use tempdir::TempDir;
 
-    fn legacy_fixtures() -> (
-        lc::Configuration,
-        Vec<lc::DnaConfiguration>,
-        Vec<lc::InstanceConfiguration>,
-        Vec<lc::InterfaceConfiguration>,
-        EnvironmentRootPath,
-        TempDir,
-    ) {
+    fn legacy_fixtures() -> (lc::Configuration, EnvironmentRootPath, TempDir) {
         let dir = TempDir::new("").unwrap();
         let dnas = vec![
             lc::DnaConfiguration {
@@ -167,7 +180,7 @@ pub mod tests {
                 id: "a2".to_string(),
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
-                uuid: Some("a".to_string()),
+                uuid: Some("significant-uuid".to_string()),
             },
             lc::DnaConfiguration {
                 id: "b".to_string(),
@@ -223,19 +236,12 @@ pub mod tests {
             ..Default::default()
         };
 
-        (
-            legacy_config,
-            dnas,
-            instances,
-            interfaces,
-            persistence_dir.into(),
-            dir,
-        )
+        (legacy_config, persistence_dir.into(), dir)
     }
 
     #[tokio::test]
     async fn test_config_from_legacy() {
-        let (legacy_config, _, _, _, persistence_dir, _) = legacy_fixtures();
+        let (legacy_config, persistence_dir, _) = legacy_fixtures();
         let config = config_from_legacy(&legacy_config);
         assert_eq!(config.environment_path, persistence_dir);
         assert_matches!(
@@ -249,9 +255,10 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_build_conductor_from_legacy() {
-        let (legacy_config, dnas, instances, interfaces, _, dir) = legacy_fixtures();
-        let dna1 = fake_dna_file("a");
-        let dna2 = fake_dna_file("b");
+        let (legacy_config, _, dir) = legacy_fixtures();
+        let dna1 = fake_dna_file("A8d8nifNnj");
+        let dna2 = fake_dna_file("90jmi9oINoiO");
+        let agent_pubkey = fake_agent_pubkey_1();
 
         tokio::fs::write(
             dir.path().join("a.dna.gz"),
@@ -267,29 +274,57 @@ pub mod tests {
         .await
         .unwrap();
 
+        let dna1a = dna1
+            .clone()
+            .with_uuid("significant-uuid".into())
+            .await
+            .unwrap();
+
+        let expected_cell_ids = vec![
+            (
+                CellId::new(dna1.dna_hash().clone(), agent_pubkey.clone()),
+                None,
+            ),
+            (
+                CellId::new(dna1a.dna_hash().clone(), agent_pubkey.clone()),
+                None,
+            ),
+        ];
+
         let mut handle = MockConductorHandle::new();
         handle
             .expect_sync_install_dna()
             .with(predicate::eq(dna1))
-            .times(2)
+            .times(1)
+            .returning(|_| Ok(()));
+        handle
+            .expect_sync_install_dna()
+            .with(predicate::eq(dna1a))
+            .times(1)
             .returning(|_| Ok(()));
         handle
             .expect_sync_install_dna()
             .with(predicate::eq(dna2))
             .times(1)
             .returning(|_| Ok(()));
-
         handle
-            .expect_sync_create_cells()
+            .expect_sync_add_cell_ids_to_db()
+            .with(predicate::eq(expected_cell_ids))
             .times(1)
-            .returning(|_ids, _handle| Ok(()));
-
-        todo!("assert that create_cells is called with the proper CellIds");
-        todo!("assert app interfaces created");
+            .returning(|_| Ok(()));
+        handle
+            .expect_sync_setup_cells()
+            .times(1)
+            .returning(|_| Ok(()));
+        handle
+            .expect_sync_add_app_interface_via_handle()
+            .with(predicate::eq(1111), predicate::always())
+            .times(1)
+            .returning(|port, _| Ok(port));
 
         let builder = Conductor::builder().with_mock_handle(handle).await;
-        let _ = load_conductor_from_legacy_config(legacy_config, builder)
+        let _ = load_conductor_from_legacy_config(legacy_config, builder, agent_pubkey)
             .await
-            .expect("TODO");
+            .unwrap();
     }
 }

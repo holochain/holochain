@@ -14,13 +14,10 @@
 //! #       env: wasm_env,
 //! #      tmpdir: _tmpdir,
 //! # } = test_wasm_env();
-//! let conductor: Conductor = ConductorBuilder::new().test(env, wasm_env).await.unwrap();
-//!
-//! // Do direct manipulation of the Conductor here
-//!
-//! // move the Conductor into a ConductorHandle,
-//! // making the original Conductor inaccessible
-//! let handle: ConductorHandle = conductor.run().await.unwrap();
+//! let handle: ConductorHandle = ConductorBuilder::new()
+//!    .test(env, wasm_env)
+//!    .await
+//!    .unwrap();
 //!
 //! // handles are cloneable
 //! let handle2 = handle.clone();
@@ -62,6 +59,8 @@ use tokio::sync::RwLock;
 use tracing::*;
 
 #[cfg(test)]
+use super::state::ConductorState;
+#[cfg(test)]
 use holochain_state::env::EnvironmentWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
@@ -86,6 +85,13 @@ pub trait ConductorHandleT: Send + Sync {
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()>;
 
+    /// Add an app interface
+    async fn add_app_interface_via_handle(
+        &self,
+        port: u16,
+        conductor_handle: ConductorHandle,
+    ) -> ConductorResult<u16>;
+
     /// Install a [Dna] in this Conductor
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
@@ -93,7 +99,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile>;
+    async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
@@ -117,16 +123,26 @@ pub trait ConductorHandleT: Send + Sync {
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
 
-    /// Create the cells from the database
-    async fn create_cells(
+    /// Add some [CellId]s to the db
+    async fn add_cell_ids_to_db(
         &self,
-        cell_ids: Vec<CellId>,
-        handle: ConductorHandle,
+        cells: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()>;
+
+    /// Setup the cells from the database
+    /// Only creates any cells that are not already created
+    async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+
+    /// Dump the cells state
+    async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
     // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+
+    // HACK: remove when B-01593 lands
+    #[cfg(test)]
+    async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
 
 /// The current "production" implementation of a ConductorHandle.
@@ -155,6 +171,15 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         lock.add_admin_interfaces_via_handle(handle, configs).await
     }
 
+    async fn add_app_interface_via_handle(
+        &self,
+        port: u16,
+        handle: ConductorHandle,
+    ) -> ConductorResult<u16> {
+        let mut lock = self.0.write().await;
+        lock.add_app_interface_via_handle(port, handle).await
+    }
+
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         {
             self.0.write().await.put_wasm(dna.clone()).await?;
@@ -166,7 +191,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(self.0.read().await.dna_store().list())
     }
 
-    async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile> {
+    async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.0.read().await.dna_store().get(hash)
     }
 
@@ -206,14 +231,25 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.1
     }
 
-    async fn create_cells(
+    async fn add_cell_ids_to_db(
         &self,
-        cell_ids: Vec<CellId>,
-        handle: ConductorHandle,
+        cells: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()> {
-        let mut lock = self.0.write().await;
-        lock.create_cells(cell_ids, handle).await?;
+        // Update the db
+        self.0.write().await.add_cell_ids_to_db(cells).await
+    }
+
+    async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<()> {
+        let cells = {
+            let lock = self.0.read().await;
+            lock.create_cells(handle).await?
+        };
+        self.0.write().await.add_cells(cells);
         Ok(())
+    }
+
+    async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+        self.0.read().await.dump_cell_state(cell_id).await
     }
 
     #[cfg(test)]
@@ -221,6 +257,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.0.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.state_env())
+    }
+
+    #[cfg(test)]
+    async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
+        let lock = self.0.read().await;
+        Ok(lock.get_state_from_handle().await?)
     }
 }
 
@@ -244,11 +286,17 @@ pub mod mock {
                 configs: Vec<AdminInterfaceConfig>,
             ) -> ConductorResult<()>;
 
+            fn sync_add_app_interface_via_handle(
+                &self,
+                port: u16,
+                conductor_handle: ConductorHandle,
+            ) -> ConductorResult<u16>;
+
             fn sync_install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
             fn sync_list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
-            fn sync_get_dna(&self, hash: DnaHash) -> Option<DnaFile>;
+            fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
             fn sync_invoke_zome(
                 &self,
@@ -265,13 +313,20 @@ pub mod mock {
 
             fn sync_keystore(&self) -> &KeystoreSender;
 
-            fn sync_create_cells(
+            fn sync_add_cell_ids_to_db(
                 &self,
-                cell_ids: Vec<CellId>,
-                handle: ConductorHandle,
+                cells: Vec<(CellId, Option<SerializedBytes>)>,
             ) -> ConductorResult<()>;
 
+            fn sync_setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+
+            fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+            #[cfg(test)]
             fn sync_get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+
+            #[cfg(test)]
+            fn sync_get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
         }
 
         trait Clone {
@@ -293,6 +348,14 @@ pub mod mock {
             self.sync_add_admin_interfaces_via_handle(handle, configs)
         }
 
+        async fn add_app_interface_via_handle(
+            &self,
+            port: u16,
+            conductor_handle: ConductorHandle,
+        ) -> ConductorResult<u16> {
+            self.sync_add_app_interface_via_handle(port, conductor_handle)
+        }
+
         async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
             self.sync_install_dna(dna)
         }
@@ -301,7 +364,7 @@ pub mod mock {
             self.sync_list_dnas()
         }
 
-        async fn get_dna(&self, hash: DnaHash) -> Option<DnaFile> {
+        async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
             self.sync_get_dna(hash)
         }
 
@@ -336,16 +399,35 @@ pub mod mock {
             self.sync_keystore()
         }
 
-        async fn create_cells(
+        /// Add some [CellId]s to the db
+        async fn add_cell_ids_to_db(
             &self,
-            cell_ids: Vec<CellId>,
-            handle: ConductorHandle,
+            cells: Vec<(CellId, Option<SerializedBytes>)>,
         ) -> ConductorResult<()> {
-            self.sync_create_cells(cell_ids, handle)
+            self.sync_add_cell_ids_to_db(cells)
         }
 
+        /// Setup the cells from the database
+        /// Only creates any cells that are not already created
+        async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()> {
+            self.sync_setup_cells(cell_api)
+        }
+
+        /// Dump the cells state
+        async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+            self.sync_dump_cell_state(cell_id)
+        }
+
+        // HACK: remove when B-01593 lands
+        #[cfg(test)]
         async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
             self.sync_get_cell_env(cell_id)
+        }
+
+        // HACK: remove when B-01593 lands
+        #[cfg(test)]
+        async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
+            self.sync_get_state_from_handle()
         }
     }
 }

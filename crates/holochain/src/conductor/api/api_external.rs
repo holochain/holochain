@@ -12,7 +12,7 @@ use crate::{
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    cell::CellHandle,
+    cell::{CellHandle, CellId},
     dna::{DnaFile, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
 };
@@ -156,6 +156,37 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
+            AdminRequest::ActivateApp {
+                hashes_with_proofs,
+                agent_key,
+            } => {
+                // Create cells
+                let cell_ids_with_proofs = hashes_with_proofs
+                    .iter()
+                    .cloned()
+                    .map(|(dna_hash, proof)| (CellId::from((dna_hash, agent_key.clone())), proof))
+                    .collect();
+                self.conductor_handle
+                    .add_cell_ids_to_db(cell_ids_with_proofs)
+                    .await?;
+                self.conductor_handle
+                    .setup_cells(self.conductor_handle.clone())
+                    .await?;
+
+                Ok(AdminResponse::AppsActivated)
+            }
+            AttachAppInterface { port } => {
+                let port = port.unwrap_or(0);
+                let port = self
+                    .conductor_handle
+                    .add_app_interface_via_handle(port, self.conductor_handle.clone())
+                    .await?;
+                Ok(AdminResponse::AppInterfaceAttached { port })
+            }
+            AdminRequest::DumpState(cell_id) => {
+                let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
+                Ok(AdminResponse::JsonState(state))
+            }
         }
     }
 }
@@ -271,8 +302,17 @@ pub enum AdminResponse {
     GenerateAgentPubKey(AgentPubKey),
     /// Listing all the AgentPubKeys in the Keystore
     ListAgentPubKeys(Vec<AgentPubKey>),
+    /// [AppInterfaceApi] successfully attached
+    AppInterfaceAttached {
+        /// Port of the new [AppInterfaceApi]
+        port: u16,
+    },
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
+    /// List of apps that activated or failed
+    AppsActivated,
+    /// State of a cell
+    JsonState(String),
 }
 
 /// The set of messages that a conductor understands how to handle over an App interface
@@ -309,6 +349,21 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
+    /// Activate a list of apps
+    ActivateApp {
+        /// Hash for each dna to be activated and maybe a proof
+        hashes_with_proofs: Vec<(DnaHash, Option<SerializedBytes>)>,
+        /// The agent who is activating them
+        agent_key: AgentPubKey,
+    },
+    /// Attach a [AppInterfaceApi]
+    AttachAppInterface {
+        /// Optional port, use None to let the
+        /// OS choose a free port
+        port: Option<u16>,
+    },
+    /// Dump the state of a cell
+    DumpState(CellId),
 }
 
 #[allow(missing_docs)]
@@ -356,11 +411,7 @@ mod test {
             tmpdir: _tmpdir,
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder()
-            .test(test_env, wasm_env)
-            .await?
-            .run()
-            .await?;
+        let handle = Conductor::builder().test(test_env, wasm_env).await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
@@ -384,12 +435,7 @@ mod test {
             tmpdir: _tmpdir,
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder()
-            .test(test_env, wasm_env)
-            .await?
-            .run()
-            .await
-            .unwrap();
+        let handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle);
 
         let agent_pub_key = admin_api
