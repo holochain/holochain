@@ -15,8 +15,8 @@ pub enum MigrateAgentCallbackResult {
 }
 
 impl From<GuestOutput> for MigrateAgentCallbackResult {
-    fn from(callback_guest_output: GuestOutput) -> Self {
-        match callback_guest_output.try_into() {
+    fn from(guest_output: GuestOutput) -> Self {
+        match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Fail(ZomeName::unknown(), format!("{:?}", e)),
         }

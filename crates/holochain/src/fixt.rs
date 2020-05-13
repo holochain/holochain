@@ -14,6 +14,7 @@ use holochain_types::dna::Zomes;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
@@ -22,6 +23,26 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 newtype_fixturator!(ZomeName<String>);
+fixturator!(
+    MigrateAgent,
+    MigrateAgent::Close,
+    {
+        if rand::random() {
+            MigrateAgent::Close
+        } else {
+            MigrateAgent::Open
+        }
+    },
+    {
+        let ret = if self.0.index % 2 == 0 {
+            MigrateAgent::Close
+        } else {
+            MigrateAgent::Open
+        };
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
 
 fixturator!(
     Wasms,

@@ -13,8 +13,8 @@ pub enum ValidateCallbackResult {
 }
 
 impl From<GuestOutput> for ValidateCallbackResult {
-    fn from(callback_guest_output: GuestOutput) -> Self {
-        match callback_guest_output.into_inner().try_into() {
+    fn from(guest_output: GuestOutput) -> Self {
+        match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Invalid(format!("{:?}", e)),
         }
@@ -32,8 +32,8 @@ pub enum ValidationPackageCallbackResult {
 }
 
 impl From<GuestOutput> for ValidationPackageCallbackResult {
-    fn from(callback_guest_output: GuestOutput) -> Self {
-        match callback_guest_output.try_into() {
+    fn from(guest_output: GuestOutput) -> Self {
+        match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => {
                 ValidationPackageCallbackResult::Fail(ZomeName::unknown(), format!("{:?}", e))

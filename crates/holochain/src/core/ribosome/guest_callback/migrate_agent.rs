@@ -2,6 +2,10 @@ use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::fixt::DnaDefFixturator;
+use crate::fixt::MigrateAgentFixturator;
+use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::migrate_agent::MigrateAgent;
@@ -16,6 +20,58 @@ pub struct MigrateAgentInvocation {
     dna_def: DnaDef,
     migrate_agent: MigrateAgent,
 }
+
+fixturator!(
+    MigrateAgentInvocation,
+    {
+        let migrate_agent_invocation = MigrateAgentInvocation {
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Empty, self.0.index)
+                .next()
+                .unwrap(),
+            dna_def: DnaDefFixturator::new_indexed(Empty, self.0.index)
+                .next()
+                .unwrap(),
+            migrate_agent: MigrateAgentFixturator::new_indexed(Empty, self.0.index)
+                .next()
+                .unwrap(),
+        };
+        self.0.index = self.0.index + 1;
+        migrate_agent_invocation
+    },
+    {
+        let migrate_agent_invocation = MigrateAgentInvocation {
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(
+                Unpredictable,
+                self.0.index,
+            )
+            .next()
+            .unwrap(),
+            dna_def: DnaDefFixturator::new_indexed(Unpredictable, self.0.index)
+                .next()
+                .unwrap(),
+            migrate_agent: MigrateAgentFixturator::new_indexed(Empty, self.0.index)
+                .next()
+                .unwrap(),
+        };
+        self.0.index = self.0.index + 1;
+        migrate_agent_invocation
+    },
+    {
+        let migrate_agent_invocation = MigrateAgentInvocation {
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            dna_def: DnaDefFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            migrate_agent: MigrateAgentFixturator::new_indexed(Empty, self.0.index)
+                .next()
+                .unwrap(),
+        };
+        self.0.index = self.0.index + 1;
+        migrate_agent_invocation
+    }
+);
 
 impl Invocation for MigrateAgentInvocation {
     fn allow_side_effects(&self) -> AllowSideEffects {
@@ -53,6 +109,7 @@ impl TryFrom<MigrateAgentInvocation> for HostInput {
 }
 
 /// the aggregate result of all zome callbacks for migrating an agent between dnas
+#[derive(PartialEq, Debug)]
 pub enum MigrateAgentResult {
     /// all implemented migrate agent callbacks in all zomes passed
     Pass,
@@ -74,5 +131,89 @@ impl From<Vec<MigrateAgentCallbackResult>> for MigrateAgentResult {
                 MigrateAgentCallbackResult::Pass => acc,
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::MigrateAgentInvocationFixturator;
+    use super::MigrateAgentResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::WasmRibosomeFixturator;
+    use holochain_wasm_test_utils::TestWasm;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_migrate_agent_unimplemented() {
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+
+        let result = ribosome
+            .run_migrate_agent(migrate_agent_invocation)
+            .unwrap();
+        assert_eq!(result, MigrateAgentResult::Pass,);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_migrate_agent_implemented_pass() {
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
+            .next()
+            .unwrap();
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+
+        let result = ribosome
+            .run_migrate_agent(migrate_agent_invocation)
+            .unwrap();
+        assert_eq!(result, MigrateAgentResult::Pass,);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_migrate_agent_implemented_fail() {
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
+            .next()
+            .unwrap();
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+
+        let result = ribosome
+            .run_migrate_agent(migrate_agent_invocation)
+            .unwrap();
+        assert_eq!(
+            result,
+            MigrateAgentResult::Fail(TestWasm::MigrateAgentFail.into(), "no migrate".into()),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_migrate_agent_multi_implemented_fail() {
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![
+            TestWasm::MigrateAgentPass,
+            TestWasm::MigrateAgentFail,
+        ]))
+        .next()
+        .unwrap();
+        let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+
+        let result = ribosome
+            .run_migrate_agent(migrate_agent_invocation)
+            .unwrap();
+        assert_eq!(
+            result,
+            MigrateAgentResult::Fail(TestWasm::MigrateAgentFail.into(), "no migrate".into()),
+        );
     }
 }

@@ -9,8 +9,8 @@ pub enum PostCommitCallbackResult {
 }
 
 impl From<GuestOutput> for PostCommitCallbackResult {
-    fn from(callback_guest_output: GuestOutput) -> Self {
-        match callback_guest_output.try_into() {
+    fn from(guest_output: GuestOutput) -> Self {
+        match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Fail(vec![].into(), format!("{:?}", e)),
         }
