@@ -35,7 +35,12 @@ pub enum Entry {
     CapTokenGrant(CapTokenGrant),
 }
 
-make_hashed_base!( (pub) EntryHashed, Entry, EntryAddress );
+make_hashed_base! {
+    Visibility(pub),
+    HashedName(EntryHashed),
+    ContentType(Entry),
+    HashType(EntryAddress),
+}
 
 impl EntryHashed {
     /// Construct (and hash) a new EntryHashed with given Entry.

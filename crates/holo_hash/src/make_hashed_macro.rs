@@ -2,9 +2,24 @@
 /// Generate a "Hashed" wrapper struct around a `TryInto<SerializedBytes>` item.
 /// Only includes a `with_pre_hashed` constructor.
 ///
-/// `make_hashed_base! { (pub) MyTypeHashed, MyType, holo_hash::EntryHash }`
+/// ```
+/// # use holochain_serialized_bytes::prelude::*;
+/// # #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// # pub struct MyType;
+/// holo_hash::make_hashed_base! {
+///     Visibility(pub),
+///     HashedName(MyTypeHashed),
+///     ContentType(MyType),
+///     HashType(holo_hash::EntryHash),
+/// }
+/// ```
 macro_rules! make_hashed_base {
-    (($($vis:tt)*) $n:ident, $t:ty, $h:ty) => {
+    (
+        Visibility($($vis:tt)*),
+        HashedName($n:ident),
+        ContentType($t:ty),
+        HashType($h:ty),
+    ) => {
         /// "Hashed" wrapper type - provides access to the original item,
         /// plus the HoloHash of that item.
         #[derive(::std::fmt::Debug, ::std::clone::Clone)]
@@ -98,21 +113,46 @@ macro_rules! make_hashed_base {
 /// Generate a "Hashed" wrapper struct around a `TryInto<SerializedBytes>` item.
 /// Including a `with_data` hashing constructor.
 ///
-/// The purpose of these hashed wrappers is to make an ergonomic and generalized way to create data and cache
-/// the calculated hash of that data along with it in a ways that's safe and let's us not have to recalculate it many times.
+/// The purpose of these hashed wrappers is to make an ergonomic and
+/// generalized way to create data and cache the calculated hash of that
+/// data along with it in a ways that's safe and let's us not have to
+/// recalculate it many times.
 ///
-/// The first parameter to the macro is the name of the hashed type usually just the name of type which is passed
-/// as the second parameter with the word `Hashed` added.  The third parameter is kind of hash this type is
-/// hashed to which must be a `holo_hash` type.
+/// Parameters:
+/// - Visibility - specify the visibility for the new struct.
+/// - HashedName - specify the name for the new struct.
+/// - ContentType - the type that will be wrapped and hashed.
+/// - HashType - the hash type to be generated.
 ///
-/// `make_hashed! { (pub) MyTypeHashed, MyType, holo_hash::EntryHash }`
+/// ```
+/// # use holochain_serialized_bytes::prelude::*;
+/// # #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// # pub struct MyType;
+/// holo_hash::make_hashed! {
+///     Visibility(pub),
+///     HashedName(MyTypeHashed),
+///     ContentType(MyType),
+///     HashType(holo_hash::EntryHash),
+/// }
+/// ```
 macro_rules! make_hashed {
-    (($($vis:tt)*) $n:ident, $t:ty, $h:ty) => {
-        $crate::make_hashed_base!( ($($vis)*) $n, $t, $h );
+    (
+        Visibility($($vis:tt)*),
+        HashedName($n:ident),
+        ContentType($t:ty),
+        HashType($h:ty),
+    ) => {
+        $crate::make_hashed_base! {
+            Visibility($($vis)*),
+            HashedName($n),
+            ContentType($t),
+            HashType($h),
+        }
 
         impl $n {
             /// Serialize and hash the given item, producing a "Hashed" wrapper.
             pub async fn with_data(t: $t) -> Result<Self, ::holochain_serialized_bytes::SerializedBytesError> {
+                use ::std::convert::TryFrom;
                 let sb = ::holochain_serialized_bytes::SerializedBytes::try_from(&t)?;
                 Ok(Self::with_pre_hashed(t, <$h>::with_data(sb.bytes()).await))
             }

@@ -75,7 +75,12 @@ impl Header {
     }
 }
 
-make_hashed_base!( (pub) HeaderHashed, Header, HeaderAddress );
+make_hashed_base! {
+    Visibility(pub),
+    HashedName(HeaderHashed),
+    ContentType(Header),
+    HashType(HeaderAddress),
+}
 
 impl HeaderHashed {
     pub async fn with_data(header: Header) -> Result<Self, SerializedBytesError> {

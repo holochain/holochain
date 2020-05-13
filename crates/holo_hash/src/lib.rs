@@ -512,7 +512,12 @@ mod tests {
         pub i: i64,
     }
 
-    make_hashed! { (pub) MyTestHashed, MyTest, DhtOpHash }
+    make_hashed! {
+        Visibility(pub),
+        HashedName(MyTestHashed),
+        ContentType(MyTest),
+        HashType(DhtOpHash),
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn check_hashed_type() {
