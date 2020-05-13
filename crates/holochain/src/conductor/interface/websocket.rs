@@ -264,7 +264,7 @@ mod test {
     use holochain_websocket::WebsocketMessage;
     use matches::assert_matches;
     use mockall::predicate;
-    use std::convert::TryInto;
+    use std::{collections::HashMap, convert::TryInto};
     use tempdir::TempDir;
     use uuid::Uuid;
 
@@ -287,24 +287,35 @@ mod test {
             .unwrap();
     }
 
-    async fn setup_admin() -> RealAdminInterfaceApi {
+    async fn setup_admin_cells(dna_store: MockDnaStore) -> (Arc<TempDir>, ConductorHandle) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
-        let _tmpdir = test_env.tmpdir.clone();
-        let conductor_handle = Conductor::builder()
+        let tmpdir = test_env.tmpdir.clone();
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .test(test_env, wasm_env)
             .await
-            .unwrap()
-            .run()
-            .await
             .unwrap();
-        RealAdminInterfaceApi::new(conductor_handle)
+        (tmpdir, conductor_handle)
     }
 
-    async fn setup_admin_fake_cells(cells: &[CellId]) -> (Vec<Arc<TempDir>>, ConductorHandle) {
+    async fn setup_admin() -> (Arc<TempDir>, RealAdminInterfaceApi) {
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let tmpdir = test_env.tmpdir.clone();
+        let conductor_handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
+        (tmpdir, RealAdminInterfaceApi::new(conductor_handle))
+    }
+
+    async fn setup_admin_fake_cells(
+        cell_ids: &[CellId],
+        dna_store: MockDnaStore,
+    ) -> (Vec<Arc<TempDir>>, ConductorHandle) {
         let mut tmps = vec![];
         let test_env = test_conductor_env();
         let TestEnvironment {
@@ -314,15 +325,12 @@ mod test {
         tmps.push(tmpdir);
         tmps.push(test_env.tmpdir.clone());
         let mut state = ConductorState::default();
-        for cell in cells {
-            state.cells.push(cell.clone());
+        for cell in cell_ids {
+            state.cell_ids_with_proofs.push((cell.clone(), None));
         }
-        let conductor_handle = Conductor::builder()
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
             .test(test_env, wasm_env)
-            .await
-            .unwrap()
-            .run()
             .await
             .unwrap();
         (tmps, conductor_handle)
@@ -339,14 +347,11 @@ mod test {
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let mut state = ConductorState::default();
-        state.cells.push(cell_id.clone());
+        state.cell_ids_with_proofs.push((cell_id.clone(), None));
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .fake_state(state)
             .test(test_env, wasm_env)
-            .await
-            .unwrap()
-            .run()
             .await
             .unwrap();
 
@@ -358,7 +363,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
-        let admin_api = setup_admin().await;
+        let (_tmpdir, admin_api) = setup_admin().await;
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -377,7 +382,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn invalid_request() {
         observability::test_run().ok();
-        let admin_api = setup_admin().await;
+        let (_tmpdir, admin_api) = setup_admin().await;
         let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -414,9 +419,6 @@ mod test {
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
             .test(test_env, wasm_env)
-            .await
-            .unwrap()
-            .run()
             .await
             .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
@@ -486,9 +488,60 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn activate_app() {
+        observability::test_run().ok();
+        let dnas = [Uuid::new_v4(); 2]
+            .iter()
+            .map(|uuid| fake_dna_file(&uuid.to_string()))
+            .collect::<Vec<_>>();
+        let dna_map = dnas
+            .iter()
+            .cloned()
+            .map(|dna| (dna.dna_hash().clone(), dna))
+            .collect::<HashMap<_, _>>();
+        let dna_hashes = dna_map
+            .keys()
+            .cloned()
+            .map(|hash| (hash, None))
+            .collect::<Vec<_>>();
+        let mut dna_store = MockDnaStore::new();
+        dna_store
+            .expect_get()
+            .returning(move |hash| dna_map.get(&hash).cloned());
+        let (_tmpdir, handle) = setup_admin_cells(dna_store).await;
+
+        let agent_key = fake_agent_pubkey_1();
+        let msg = AdminRequest::ActivateApp {
+            hashes_with_proofs: dna_hashes.clone(),
+            agent_key: agent_key.clone(),
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::AppsActivated);
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+            .await
+            .unwrap();
+        let cells = handle
+            .get_state_from_handle()
+            .await
+            .unwrap()
+            .cell_ids_with_proofs;
+        let expected = dna_hashes
+            .into_iter()
+            .map(|(hash, proof)| (CellId::from((hash, agent_key.clone())), proof))
+            .collect::<Vec<_>>();
+        assert_eq!(expected, cells);
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn attach_app_interface() {
         observability::test_run().ok();
-        let admin_api = setup_admin().await;
+        let (_tmpdir, admin_api) = setup_admin().await;
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -500,6 +553,7 @@ mod test {
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
     }
+
     #[tokio::test(threaded_scheduler)]
     async fn dump_state() {
         observability::test_run().ok();
@@ -510,11 +564,14 @@ mod test {
         );
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
-        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(&[cell_id.clone()]).await;
+        let mut dna_store = MockDnaStore::new();
+        dna_store.expect_get().returning(move |_| Some(dna.clone()));
+
+        let (_tmpdir, conductor_handle) =
+            setup_admin_fake_cells(&[cell_id.clone()], dna_store).await;
 
         // Set some state
         let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
-        fake_genesis(cell_env.clone()).await;
 
         // Get state
         let expected = {
