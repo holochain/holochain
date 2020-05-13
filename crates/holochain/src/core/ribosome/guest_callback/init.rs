@@ -107,9 +107,11 @@ impl From<Vec<InitCallbackResult>> for InitResult {
         callback_results
             .into_iter()
             .fold(Self::Pass, |acc, x| match x {
+                // fail overrides everything
                 InitCallbackResult::Fail(zome_name, fail_string) => {
                     Self::Fail(zome_name, fail_string)
                 }
+                // unresolved deps overrides pass but not fail
                 InitCallbackResult::UnresolvedDependencies(zome_name, ud) => match acc {
                     Self::Fail(_, _) => acc,
                     _ => Self::UnresolvedDependencies(
@@ -117,7 +119,8 @@ impl From<Vec<InitCallbackResult>> for InitResult {
                         ud.into_iter().map(|h| h.into()).collect(),
                     ),
                 },
-                InitCallbackResult::Pass => Self::Pass,
+                // passing callback allows the acc to carry forward
+                InitCallbackResult::Pass => acc,
             })
     }
 }
@@ -165,6 +168,25 @@ mod test {
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome.run_init(init_invocation).unwrap();
-        assert_eq!(result, InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),);
+        assert_eq!(
+            result,
+            InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_init_multi_implemented_fail() {
+        let ribosome =
+            WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))
+                .next()
+                .unwrap();
+        let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna.clone();
+
+        let result = ribosome.run_init(init_invocation).unwrap();
+        assert_eq!(
+            result,
+            InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
+        );
     }
 }
