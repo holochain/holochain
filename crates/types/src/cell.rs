@@ -31,7 +31,6 @@ impl fmt::Display for CellId {
 }
 
 impl CellId {
-
     /// Create a CellId from its components
     pub fn new(dna_hash: DnaHash, agent_pubkey: AgentPubKey) -> Self {
         CellId(dna_hash, agent_pubkey)

@@ -377,7 +377,6 @@ pub struct SignalConfig {
 }
 
 impl Configuration {
-
     /// Returns the agent configuration with the given ID if present
     pub fn agent_by_id(&self, id: &str) -> Option<AgentConfiguration> {
         self.agents.iter().find(|ac| &ac.id == id).cloned()
@@ -397,5 +396,4 @@ impl Configuration {
     pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfiguration> {
         self.interfaces.iter().find(|ic| &ic.id == id).cloned()
     }
-
 }

@@ -2,9 +2,9 @@
 #[deny(missing_docs)]
 pub mod api;
 mod cell;
+pub mod compat;
 #[allow(clippy::module_inception)]
 mod conductor;
-pub mod compat;
 #[deny(missing_docs)]
 pub mod config;
 pub mod dna_store;
