@@ -257,9 +257,9 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
     // Activate cells
-    let dna_hashes = vec![original_dna_hash.clone()];
+    let dna_hashes = vec![(original_dna_hash.clone(), None)];
     let request = AdminRequest::ActivateApp {
-        dna_hashes,
+        hashes_with_proofs: dna_hashes,
         agent_key: fake_agent_pubkey_1(),
     };
     let response = client.request(request);

@@ -16,6 +16,7 @@ use crate::{
 use error::CellError;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     env::{EnvironmentKind, EnvironmentWrite},
     prelude::*,
@@ -69,6 +70,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
+        membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
         let state_env = EnvironmentWrite::new(
@@ -88,13 +90,16 @@ impl Cell {
             conductor_api,
             state_env,
         };
+        // TODO: TK-01747: Make this check more robust
         if source_chain_len == 0 {
-            // geneis
+            // run genesis
             let dna_file = conductor_handle
                 .get_dna(id.dna_hash())
                 .await
                 .ok_or(CellError::DnaMissing)?;
-            cell.genesis(dna_file).await.map_err(Box::new)?;
+            cell.genesis(dna_file, membrane_proof)
+                .await
+                .map_err(Box::new)?;
         }
         Ok(cell)
     }
@@ -146,7 +151,11 @@ impl Cell {
             .map_err(Box::new)?)
     }
 
-    async fn genesis(&self, dna_file: DnaFile) -> ConductorApiResult<()> {
+    async fn genesis(
+        &self,
+        dna_file: DnaFile,
+        membrane_proof: Option<SerializedBytes>,
+    ) -> ConductorApiResult<()> {
         let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
@@ -156,6 +165,7 @@ impl Cell {
             self.conductor_api.clone(),
             dna_file,
             self.agent_pubkey().clone(),
+            membrane_proof,
         );
 
         Ok(run_workflow(self.state_env(), workflow, workspace)

@@ -67,6 +67,7 @@ use futures::{
     future::{self, TryFutureExt},
     stream::{StreamExt, TryStreamExt},
 };
+use holochain_serialized_bytes::SerializedBytes;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -301,22 +302,22 @@ where
     /// Create the cells from the db
     pub(super) async fn create_cells(
         &self,
-        cells: Vec<CellId>,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Cell>> {
-        let len = cells.len();
-        // This function should never be called with no cells
-        // as it's wasteful and the futures stream will await
-        // forever
-        debug_assert!(len != 0);
+        let cell_ids = self.get_state().await?.cell_ids_with_proofs;
+        let len = cell_ids.len();
+        // Only create if there are any cells
+        if cell_ids.len() == 0 {
+            return Ok(vec![]);
+        }
 
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
 
         // Only create cells not already created
-        let cells_to_create = cells
+        let cells_to_create = cell_ids
             .into_iter()
-            .filter(|cell_id| !self.cells.contains_key(cell_id));
+            .filter(|(cell_id, _)| !self.cells.contains_key(cell_id));
 
         // Create the cells in parrallel
         // This will exit on the first failure however
@@ -324,13 +325,14 @@ where
         // This is ok because genesis only runs once and will be simply skipped
         // when this cell is recreated.
         let cells = futures::stream::iter(cells_to_create)
-            .map(move |cell_id| {
+            .map(move |(cell_id, proof)| {
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                 tokio::spawn(Cell::create(
                     cell_id,
                     conductor_handle.clone(),
                     root_env_dir,
                     keystore.clone(),
+                    proof,
                 ))
                 .map_err(|e| CellError::from(e))
                 .and_then(|result| async { result })
@@ -343,30 +345,29 @@ where
         Ok(cells)
     }
 
-    /// Update the cells in the database
-    pub(super) async fn update_cells(
+    /// Register CellIds in the database
+    pub(super) async fn add_cell_ids_to_db(
         &mut self,
-        mut cells: Vec<CellId>,
-    ) -> ConductorResult<Vec<CellId>> {
-        Ok(self
-            .update_state(move |mut state| {
-                state.cells.append(&mut cells);
-                // Make sure they are unique
-                state.cells = state
-                    .cells
-                    .iter()
-                    .cloned()
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .collect();
-                Ok(state)
-            })
-            .await?
-            .cells)
+        mut cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+    ) -> ConductorResult<()> {
+        self.update_state(move |mut state| {
+            state.cell_ids_with_proofs.append(&mut cell_ids_with_proofs);
+            // Make sure they are unique
+            state.cell_ids_with_proofs = state
+                .cell_ids_with_proofs
+                .iter()
+                .cloned()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            Ok(state)
+        })
+        .await?;
+        Ok(())
     }
 
-    /// Load the cells into memory
-    pub(super) fn load_cells(&mut self, cells: Vec<Cell>) {
+    /// Add fully constructed cells to to the cell map in the Conductor
+    pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             self.cells.insert(
                 cell.id().clone(),
@@ -614,7 +615,6 @@ mod builder {
             conductor_config: ConductorConfig,
         ) -> ConductorResult<ConductorHandle> {
             // Get data before handle
-            let cells = conductor.get_state().await?.cells;
             let keystore = conductor.keystore.clone();
 
             // Create handle
@@ -623,7 +623,7 @@ mod builder {
                 keystore,
             )));
 
-            handle.create_cells(cells, handle.clone()).await?;
+            handle.setup_cells(handle.clone()).await?;
 
             // Create admin interfaces
             if let Some(configs) = conductor_config.admin_interfaces {
@@ -717,13 +717,13 @@ pub mod tests {
 
         conductor
             .update_state(|mut state| {
-                state.cells.push(cell_id.clone());
+                state.cell_ids_with_proofs.push((cell_id.clone(), None));
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
-        assert_eq!(state.cells, [cell_id]);
+        assert_eq!(state.cell_ids_with_proofs, [(cell_id, None)]);
     }
 
     #[tokio::test(threaded_scheduler)]

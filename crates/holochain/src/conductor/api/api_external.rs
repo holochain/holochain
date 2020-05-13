@@ -155,6 +155,25 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
+            ActivateApp {
+                hashes_with_proofs,
+                agent_key,
+            } => {
+                // Create cells
+                let cell_ids_with_proofs = hashes_with_proofs
+                    .iter()
+                    .cloned()
+                    .map(|(dna_hash, proof)| (CellId::from((dna_hash, agent_key.clone())), proof))
+                    .collect();
+                self.conductor_handle
+                    .add_cell_ids_to_db(cell_ids_with_proofs)
+                    .await?;
+                self.conductor_handle
+                    .setup_cells(self.conductor_handle.clone())
+                    .await?;
+
+                Ok(AdminResponse::AppsActivated)
+            }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
                 let port = self
@@ -162,22 +181,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .add_app_interface_via_handle(port, self.conductor_handle.clone())
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
-            }
-            ActivateApp {
-                dna_hashes,
-                agent_key,
-            } => {
-                // Create cells
-                let cell_ids = dna_hashes
-                    .iter()
-                    .cloned()
-                    .map(|dna_hash| CellId::from((dna_hash, agent_key.clone())))
-                    .collect();
-                self.conductor_handle
-                    .create_cells(cell_ids, self.conductor_handle.clone())
-                    .await?;
-
-                Ok(AdminResponse::AppsActivated)
             }
             DumpState(cell_id) => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
@@ -347,8 +350,8 @@ pub enum AdminRequest {
     ListAgentPubKeys,
     /// Activate a list of apps
     ActivateApp {
-        /// Hash for each dna to be activated
-        dna_hashes: Vec<DnaHash>,
+        /// Hash for each dna to be activated and maybe a proof
+        hashes_with_proofs: Vec<(DnaHash, Option<SerializedBytes>)>,
         /// The agent who is activating them
         agent_key: AgentPubKey,
     },

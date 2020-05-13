@@ -123,12 +123,15 @@ pub trait ConductorHandleT: Send + Sync {
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
 
-    /// Create the cells from the database
-    async fn create_cells(
+    /// Add some [CellId]s to the db
+    async fn add_cell_ids_to_db(
         &self,
-        cells: Vec<CellId>,
-        cell_api: ConductorHandle,
+        cells: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()>;
+
+    /// Setup the cells from the database
+    /// Only creates any cells that are not already created
+    async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -228,21 +231,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.1
     }
 
-    async fn create_cells(
+    async fn add_cell_ids_to_db(
         &self,
-        cells: Vec<CellId>,
-        handle: ConductorHandle,
+        cells: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()> {
         // Update the db
-        let cells = self.0.write().await.update_cells(cells).await?;
-        // Only create if there are any cells
-        if cells.len() > 0 {
-            let cells = {
-                let lock = self.0.read().await;
-                lock.create_cells(cells, handle).await?
-            };
-            self.0.write().await.load_cells(cells);
-        }
+        self.0.write().await.add_cell_ids_to_db(cells).await
+    }
+
+    async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<()> {
+        let cells = {
+            let lock = self.0.read().await;
+            lock.create_cells(handle).await?
+        };
+        self.0.write().await.add_cells(cells);
         Ok(())
     }
 

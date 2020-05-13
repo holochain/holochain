@@ -92,7 +92,7 @@ impl WebsocketSender {
     #[must_use]
     pub fn request<SB1, SB2>(&mut self, msg: SB1) -> BoxFuture<'static, Result<SB2>>
     where
-        SB1: 'static + std::convert::TryInto<SerializedBytes> + Send +std::fmt::Debug,
+        SB1: 'static + std::convert::TryInto<SerializedBytes> + Send + std::fmt::Debug,
         <SB1 as std::convert::TryInto<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
         SB2: 'static + std::convert::TryFrom<SerializedBytes> + Send,
