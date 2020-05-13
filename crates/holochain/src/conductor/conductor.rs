@@ -304,10 +304,10 @@ where
         &self,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Cell>> {
-        let cells = self.get_state().await?.cell_ids_with_proofs;
-        let len = cells.len();
+        let cell_ids = self.get_state().await?.cell_ids_with_proofs;
+        let len = cell_ids.len();
         // Only create if there are any cells
-        if cells.len() == 0 {
+        if cell_ids.len() == 0 {
             return Ok(vec![]);
         }
 
@@ -315,7 +315,7 @@ where
         let keystore = self.keystore.clone();
 
         // Only create cells not already created
-        let cells_to_create = cells
+        let cells_to_create = cell_ids
             .into_iter()
             .filter(|(cell_id, _)| !self.cells.contains_key(cell_id));
 

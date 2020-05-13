@@ -313,7 +313,7 @@ mod test {
     }
 
     async fn setup_admin_fake_cells(
-        cells: &[CellId],
+        cell_ids: &[CellId],
         dna_store: MockDnaStore,
     ) -> (Vec<Arc<TempDir>>, ConductorHandle) {
         let mut tmps = vec![];
@@ -325,7 +325,7 @@ mod test {
         tmps.push(tmpdir);
         tmps.push(test_env.tmpdir.clone());
         let mut state = ConductorState::default();
-        for cell in cells {
+        for cell in cell_ids {
             state.cell_ids_with_proofs.push((cell.clone(), None));
         }
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
