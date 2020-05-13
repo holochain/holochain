@@ -1,4 +1,3 @@
-use crate::zome::ZomeName;
 use crate::zome_io::GuestOutput;
 use holo_hash_core::EntryHash;
 use holochain_serialized_bytes::prelude::*;
@@ -21,23 +20,21 @@ impl From<GuestOutput> for ValidateCallbackResult {
     }
 }
 
-#[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct ValidationPackage;
 
 #[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
-    Fail(ZomeName, String),
-    UnresolvedDependencies(ZomeName, Vec<EntryHash>),
+    Fail(String),
+    UnresolvedDependencies(Vec<EntryHash>),
 }
 
 impl From<GuestOutput> for ValidationPackageCallbackResult {
     fn from(guest_output: GuestOutput) -> Self {
         match guest_output.into_inner().try_into() {
             Ok(v) => v,
-            Err(e) => {
-                ValidationPackageCallbackResult::Fail(ZomeName::unknown(), format!("{:?}", e))
-            }
+            Err(e) => ValidationPackageCallbackResult::Fail(format!("{:?}", e)),
         }
     }
 }

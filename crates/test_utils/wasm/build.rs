@@ -40,6 +40,8 @@ fn main() {
         "validate",
         "validate_invalid",
         "validate_valid",
+        "validation_package_fail",
+        "validation_package_success",
     ]
     .iter()
     {

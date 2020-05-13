@@ -176,9 +176,9 @@ pub enum EntryType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
-    id: Vec<u8>,
-    zome_id: ZomeId,
-    is_public: bool,
+    pub id: Vec<u8>,
+    pub zome_id: ZomeId,
+    pub is_public: bool,
 }
 
 impl AppEntryType {

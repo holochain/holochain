@@ -174,7 +174,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_validate_implemented_success() {
+    async fn test_validate_implemented_valid() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
@@ -188,7 +188,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_validate_implemented_fail() {
+    async fn test_validate_implemented_invalid() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();

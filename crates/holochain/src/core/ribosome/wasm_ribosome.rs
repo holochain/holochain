@@ -262,7 +262,7 @@ impl RibosomeT for WasmRibosome {
         Ok(migrate_agent_results.into())
     }
 
-    fn run_custom_validation_package(
+    fn run_validation_package(
         &self,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult> {

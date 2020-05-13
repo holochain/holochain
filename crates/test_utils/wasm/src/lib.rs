@@ -18,6 +18,8 @@ pub enum TestWasm {
     Validate,
     ValidateInvalid,
     ValidateValid,
+    ValidationPackageFail,
+    ValidationPackageSuccess,
 }
 
 impl From<TestWasm> for ZomeName {
@@ -35,6 +37,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Validate => "validate",
             TestWasm::ValidateInvalid => "validate_invalid",
             TestWasm::ValidateValid => "validate_valid",
+            TestWasm::ValidationPackageFail => "validation_package_fail",
+            TestWasm::ValidationPackageSuccess => "validation_package_success",
         })
     }
 }
@@ -100,6 +104,16 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::ValidateValid => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_validate_valid.wasm"
+            ))
+            .to_vec(),
+            TestWasm::ValidationPackageFail => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_validation_package_fail.wasm"
+            ))
+            .to_vec(),
+            TestWasm::ValidationPackageSuccess => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm"
             ))
             .to_vec(),
         })

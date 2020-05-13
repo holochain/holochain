@@ -1,4 +1,5 @@
 pub mod bool;
+pub mod bytes;
 pub mod number;
 pub mod prelude;
 pub mod serialized_bytes;
