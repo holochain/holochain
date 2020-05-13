@@ -36,6 +36,8 @@ fn main() {
         "init_fail",
         "migrate_agent_pass",
         "migrate_agent_fail",
+        "post_commit_success",
+        "post_commit_fail",
     ]
     .iter()
     {

@@ -4,7 +4,9 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContextFixturator;
 use fixt::prelude::*;
 use holo_hash::DnaHashFixturator;
+use holo_hash::HeaderHashFixturator;
 use holo_hash::WasmHash;
+use holo_hash_core::HeaderHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaDef;
@@ -14,6 +16,7 @@ use holochain_types::dna::Zomes;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
 use rand::seq::IteratorRandom;
@@ -41,6 +44,32 @@ fixturator!(
         };
         self.0.index = self.0.index + 1;
         ret
+    }
+);
+
+fixturator!(
+    HeaderHashes,
+    vec![].into(),
+    {
+        let mut rng = rand::thread_rng();
+        let number_of_hashes = rng.gen_range(0, 5);
+
+        let mut hashes: Vec<HeaderHash> = vec![];
+        let mut header_hash_fixturator = HeaderHashFixturator::new(Unpredictable);
+        for _ in (0..number_of_hashes) {
+            hashes.push(header_hash_fixturator.next().unwrap().into());
+        }
+        hashes.into()
+    },
+    {
+        let mut hashes: Vec<HeaderHash> = vec![];
+        let mut header_hash_fixturator =
+            HeaderHashFixturator::new_indexed(Predictable, self.0.index);
+        for _ in 0..3 {
+            hashes.push(header_hash_fixturator.next().unwrap().into());
+        }
+        self.0.index = self.0.index + 1;
+        hashes.into()
     }
 );
 

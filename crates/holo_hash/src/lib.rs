@@ -508,12 +508,22 @@ new_holo_hash! {
 
 fixturator!(
     DnaHash,
-    { DnaHash::with_pre_hashed_sync(vec![0; 32]) },
+    DnaHash::with_pre_hashed_sync(vec![0; 32]),
     {
         let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
         DnaHash::with_pre_hashed_sync(random_bytes)
     },
-    { DnaHash::with_pre_hashed_sync(vec![0xdb; 32]) }
+    DnaHash::with_pre_hashed_sync(vec![0xdb; 32])
+);
+
+fixturator!(
+    HeaderHash,
+    HeaderHash::with_pre_hashed_sync(vec![0; 32]),
+    {
+        let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
+        HeaderHash::with_pre_hashed_sync(random_bytes)
+    },
+    HeaderHash::with_pre_hashed_sync(vec![0xdb; 32])
 );
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use holo_hash_core::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct HeaderHashes(Vec<HeaderHash>);
 
 impl From<Vec<HeaderHash>> for HeaderHashes {

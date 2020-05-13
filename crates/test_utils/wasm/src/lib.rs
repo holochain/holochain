@@ -14,6 +14,8 @@ pub enum TestWasm {
     InitFail,
     MigrateAgentPass,
     MigrateAgentFail,
+    PostCommitSuccess,
+    PostCommitFail,
 }
 
 impl From<TestWasm> for ZomeName {
@@ -27,6 +29,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::InitFail => "init_fail",
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
+            TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::PostCommitFail => "post_commit_fail",
         })
     }
 }
@@ -72,6 +76,16 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::MigrateAgentFail => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_migrate_agent_fail.wasm"
+            ))
+            .to_vec(),
+            TestWasm::PostCommitSuccess => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
+            ))
+            .to_vec(),
+            TestWasm::PostCommitFail => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm"
             ))
             .to_vec(),
         })

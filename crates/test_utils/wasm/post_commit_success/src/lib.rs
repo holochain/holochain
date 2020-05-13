@@ -2,7 +2,7 @@ extern crate wee_alloc;
 
 use holochain_wasmer_guest::*;
 use holochain_zome_types::*;
-use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+use holochain_zome_types::post_commit::PostCommitCallbackResult;
 
 // Use `wee_alloc` as the global allocator.
 #[global_allocator]
@@ -40,6 +40,6 @@ host_externs!(
 
 
 #[no_mangle]
-pub extern "C" fn migrate_agent(_: RemotePtr) -> RemotePtr {
-    ret!(GuestOutput::new(try_result!(MigrateAgentCallbackResult::Pass.try_into(), "failed to serialize migrate agent return value")));
+pub extern "C" fn post_commit(_: RemotePtr) -> RemotePtr {
+    ret!(GuestOutput::new(try_result!(PostCommitCallbackResult::Success.try_into(), "failed to serialize post commit return value")));
 }
