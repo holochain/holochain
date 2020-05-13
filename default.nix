@@ -47,12 +47,13 @@ with holonix.pkgs;
     pkgs = holonix.pkgs;
    }).buildInputs
 
-   # DELETE-ME helper for ignoring missing_docs
-   # until we get all the docs in place
-   # usage: `source hc-allow-missing-docs`
+   # convenience command for executing dna-util
+   # until such time as we have release artifacts
+   # that can be built directly as nix packages
    ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-allow-missing-docs" ''
-    export RUSTFLAGS="$RUSTFLAGS -A missing_docs"
+    holonix.pkgs.writeShellScriptBin "dna-util" ''
+    cd "''${HC_TARGET_PREFIX}/crates/dna_util"
+    cargo run -- "''${@}"
     ''
    )])
   ;
