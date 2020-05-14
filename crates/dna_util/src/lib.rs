@@ -7,7 +7,7 @@
 //! ├── test-zome-1.wasm
 //! └── test-zome-2.wasm
 //!
-//! ``` bash
+//! ```sh
 //! $ dna_util --help
 //!
 //!     dna_util 0.0.1
@@ -33,7 +33,7 @@
 //!     Extract a DnaFile into a Dna Working Directory.
 //!
 //!     (`dna_util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
-//! ``` bash
+//! ```
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};

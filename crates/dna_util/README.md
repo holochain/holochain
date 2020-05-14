@@ -16,7 +16,7 @@ test-dna.dna.workdir/
 ├── test-zome-1.wasm
 └── test-zome-2.wasm
 
-``` bash
+```sh
 $ dna_util --help
 
     dna_util 0.0.1
@@ -42,7 +42,7 @@ dna_util [OPTIONS]
     Extract a DnaFile into a Dna Working Directory.
 
     (`dna_util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
-``` bash
+```
 
 ## Contribute
 Holochain is an open source project.  We welcome all sorts of participation and are actively working on increasing surface area to accept it.  Please see our [contributing guidelines](/CONTRIBUTING.md) for our general practices and protocols on participating in the community, as well as specific expectations around things like code formatting, testing practices, continuous integration, etc.
@@ -52,8 +52,9 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019-2020, Holochain Foundation
+Copyright (C) 2019 - 2020, Holochain Foundation
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This program is free software: you can redistribute it and/or modify it under the terms of the license
+provided in the LICENSE file (Apache 2.0).  This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE.
