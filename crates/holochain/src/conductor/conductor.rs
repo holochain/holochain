@@ -388,8 +388,8 @@ where
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
-            if let None = wasm_buf.get(&wasm_hash.into())? {
-                wasm_buf.put(dna_wasm)?;
+            if let None = wasm_buf.get(&wasm_hash.into()).await? {
+                wasm_buf.put(dna_wasm).await?;
             }
         }
 
@@ -405,7 +405,7 @@ where
         let env = arc.guard().await;
         let reader = env.reader()?;
         let source_chain = SourceChainBuf::new(&reader, &env)?;
-        Ok(source_chain.dump_as_json()?)
+        Ok(source_chain.dump_as_json().await?)
     }
 
     #[cfg(test)]

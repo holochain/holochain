@@ -578,7 +578,7 @@ mod test {
             let env = cell_env.guard().await;
             let reader = env.reader().unwrap();
             let source_chain = SourceChainBuf::new(&reader, &env).unwrap();
-            source_chain.dump_as_json().unwrap()
+            source_chain.dump_as_json().await.unwrap()
         };
 
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);

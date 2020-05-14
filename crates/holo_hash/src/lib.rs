@@ -24,6 +24,8 @@
 //! # Example
 //!
 //! ```
+//! # #[tokio::main]
+//! # async fn main () {
 //! use holo_hash::*;
 //! use std::convert::TryInto;
 //! use holochain_serialized_bytes::SerializedBytes;
@@ -41,6 +43,7 @@
 //!     "{\"type\":\"EntryHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
 //!     &format!("{:?}", bytes),
 //! );
+//! # }
 //! ```
 //!
 //! # Advanced
@@ -49,40 +52,38 @@
 //! HoloHash provides sync (blocking) and async (non-blocking) apis for hashing.
 //!
 //! ```
+//! # #[tokio::main]
+//! # async fn main () {
 //! use holo_hash::*;
 //!
 //! let entry_content = b"test entry content";
 //!
-//! let entry_hash: HoloHash = EntryHash::with_data_sync(entry_content).into();
-//!
-//! // if in a futures context you should await instead to not block executor:
-//! // let entry_hash = EntryHash::with_data(entry_content).await;
+//! let entry_hash: HoloHash = EntryHash::with_data(entry_content).await.into();
 //!
 //! assert_eq!(
 //!     "EntryHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",
 //!     &format!("{:?}", entry_hash),
 //! );
-//!
+//! # }
 //! ```
 //!
 //! ## Sometimes your data doesn't want to be re-hashed:
 //!
 //! ```
+//! # #[tokio::main]
+//! # async fn main () {
 //! use holo_hash::*;
 //!
 //! // pretend our pub key is all 0xdb bytes
 //! let agent_pub_key = vec![0xdb; 32];
 //!
-//! let agent_id: HoloHash = AgentPubKey::with_pre_hashed_sync(agent_pub_key).into();
-//!
-//! // if in a futures context you should await instead to not block executor:
-//! // let agent_id = AgentPubKey::with_pre_hashed(agent_pub_key).await;
+//! let agent_id: HoloHash = AgentPubKey::with_pre_hashed(agent_pub_key).await.into();
 //!
 //! assert_eq!(
 //!     "AgentPubKey(uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv)",
 //!     &format!("{:?}", agent_id),
 //! );
-//!
+//! # }
 //! ```
 
 pub use holo_hash_core;
@@ -253,31 +254,17 @@ macro_rules! new_holo_hash {
 
             impl $name {
                 /// Construct a new hash instance from an already generated hash.
-                pub fn with_pre_hashed_sync(mut hash: Vec<u8>) -> Self {
+                pub async fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
                     assert_eq!(32, hash.len(), "only 32 byte hashes supported");
-                    hash.append(&mut holo_dht_location_bytes(&hash));
-                    Self(holo_hash_core::$name::new(hash))
-                }
-
-                /// Construct a new hash instance from an already generated hash.
-                #[cfg(feature = "async")]
-                pub async fn with_pre_hashed(hash: Vec<u8>) -> Self {
                     tokio::task::block_in_place(|| {
-                        $name::with_pre_hashed_sync(hash)
+                        hash.append(&mut holo_dht_location_bytes(&hash));
+                        Self(holo_hash_core::$name::new(hash))
                     })
-                }
-
-                /// Construct a new hash instance from raw data (blocking).
-                pub fn with_data_sync(data: &[u8]) -> Self {
-                    $name::with_pre_hashed_sync(blake2b_256(data))
                 }
 
                 /// Construct a new hash instance from raw data.
-                #[cfg(feature = "async")]
                 pub async fn with_data(data: &[u8]) -> Self {
-                    tokio::task::block_in_place(|| {
-                        $name::with_data_sync(data)
-                    })
+                    $name::with_pre_hashed(blake2b_256(data)).await
                 }
             }
 
@@ -505,10 +492,49 @@ new_holo_hash! {
     DHTOP_PREFIX,
 }
 
+mod hashed;
+pub use hashed::*;
+
+#[macro_use]
+mod make_hashed_macro;
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::convert::TryInto;
+
+    /// test struct
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+    pub struct MyTest {
+        /// string
+        pub s: String,
+        /// integer
+        pub i: i64,
+    }
+
+    make_hashed! {
+        Visibility(pub),
+        HashedName(MyTestHashed),
+        ContentType(MyTest),
+        HashType(DhtOpHash),
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn check_hashed_type() {
+        use crate::hashed::Hashed;
+
+        let my_type = MyTest {
+            s: "test".to_string(),
+            i: 42,
+        };
+
+        let my_type_hashed = MyTestHashed::with_data(my_type).await.unwrap();
+
+        assert_eq!(
+            "uhCQkQFRMcbVVfPJ5AbAv0HJq0geatTakGEEj5rpv_Dp0pjmJob3P",
+            my_type_hashed.as_hash().to_string(),
+        );
+    }
 
     #[test]
     fn check_serialized_bytes() {
@@ -579,15 +605,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn agent_id_as_bytes_sync() {
-        let hash = vec![0xdb; 32];
-        let hash: &[u8] = &hash;
-        let agent_id = AgentPubKey::with_pre_hashed_sync(hash.to_vec());
-        assert_eq!(hash, agent_id.get_bytes());
-    }
-
-    #[cfg(feature = "async")]
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_as_bytes() {
         tokio::task::spawn(async move {
@@ -600,16 +617,6 @@ mod tests {
         .unwrap();
     }
 
-    #[test]
-    fn agent_id_prehash_sync_display() {
-        let agent_id = AgentPubKey::with_pre_hashed_sync(vec![0xdb; 32]);
-        assert_eq!(
-            "uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv",
-            &format!("{}", agent_id),
-        );
-    }
-
-    #[cfg(feature = "async")]
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_prehash_display() {
         tokio::task::spawn(async move {
@@ -631,16 +638,6 @@ mod tests {
         assert_eq!(3_860_645_936, agent_id.get_loc());
     }
 
-    #[test]
-    fn agent_id_sync_debug() {
-        let agent_id = AgentPubKey::with_data_sync(&[0xdb; 32]);
-        assert_eq!(
-            "AgentPubKey(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
-            &format!("{:?}", agent_id),
-        );
-    }
-
-    #[cfg(feature = "async")]
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_debug() {
         tokio::task::spawn(async move {
@@ -654,16 +651,6 @@ mod tests {
         .unwrap();
     }
 
-    #[test]
-    fn agent_id_sync_display() {
-        let agent_id = AgentPubKey::with_data_sync(&[0xdb; 32]);
-        assert_eq!(
-            "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm",
-            &format!("{}", agent_id),
-        );
-    }
-
-    #[cfg(feature = "async")]
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_display() {
         tokio::task::spawn(async move {
@@ -677,13 +664,6 @@ mod tests {
         .unwrap();
     }
 
-    #[test]
-    fn agent_id_sync_loc() {
-        let agent_id = AgentPubKey::with_data_sync(&[0xdb; 32]);
-        assert_eq!(3_860_645_936, agent_id.get_loc());
-    }
-
-    #[cfg(feature = "async")]
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_loc() {
         tokio::task::spawn(async move {

@@ -99,9 +99,10 @@ where
     W0: 'static + Workflow<'env, Output = ()>,
 {
     #[allow(unreachable_code)]
-    fn run(self, env: EnvironmentWrite) -> TriggerOutput {
+    fn run(self, _env: EnvironmentWrite) -> TriggerOutput {
         tokio::spawn(async {
-            let _handle = run_workflow(env, self, todo!("get workspace"));
+            // FIXME: Uncomment when this works, it panics atm
+            //let _handle = run_workflow(env, self, todo!("get workspace"));
             Ok(())
         })
     }
