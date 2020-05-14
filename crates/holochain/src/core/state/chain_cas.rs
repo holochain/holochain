@@ -1,8 +1,7 @@
 use crate::core::state::source_chain::{
-    ChainElement, ChainInvalidReason, SignedHeader, SourceChainError, SourceChainResult,
+    ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
+use holo_hash::{EntryHash, Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -15,12 +14,14 @@ use holochain_state::{
 };
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
-    entry::Entry,
-    header, Header,
+    entry::{Entry, EntryHashed},
+    header,
+    prelude::Signature,
+    Header, HeaderHashed,
 };
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
-pub type HeaderCas<'env, R> = CasBuf<'env, SignedHeader, R>;
+pub type HeaderCas<'env, R> = CasBuf<'env, (Header, Signature), R>;
 
 /// A convenient pairing of two CasBufs, one for entries and one for headers
 pub struct ChainCasBuf<'env, R: Readable = Reader<'env>> {
@@ -60,22 +61,36 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         self.entries.get(&entry_address.into()).map(|e| e.is_some())
     }
 
-    pub fn get_header(
+    pub async fn get_header(
         &self,
         header_address: &HeaderAddress,
-    ) -> DatabaseResult<Option<SignedHeader>> {
-        self.headers.get(&header_address.to_owned().into())
+    ) -> DatabaseResult<Option<SignedHeaderHashed>> {
+        if let Ok(Some((header, signature))) = self.headers.get(&header_address.to_owned().into()) {
+            let header = fatal_db_deserialize_check!(
+                "ChainCasBuf::get_header",
+                header_address,
+                HeaderHashed::with_data(header).await,
+            );
+            fatal_db_hash_check!("ChainCasBuf::get_header", header_address, header.as_hash());
+            Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
+        } else {
+            Ok(None)
+        }
     }
 
-    // local helper function which given a SignedHeader, looks for an entry in the cas
+    // local helper function which given a SignedHeaderHashed, looks for an entry in the cas
     // and builds a ChainElement struct
     fn chain_element(
         &self,
-        signed_header: SignedHeader,
+        signed_header: SignedHeaderHashed,
     ) -> SourceChainResult<Option<ChainElement>> {
-        let maybe_entry_address = match signed_header.header().clone() {
-            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => Some(entry_address),
-            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => Some(entry_address),
+        let maybe_entry_address = match signed_header.header() {
+            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => {
+                Some(entry_address.clone())
+            }
+            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
+                Some(entry_address.clone())
+            }
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {
@@ -91,19 +106,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                 maybe_cas_entry
             }
         };
-        Ok(Some(ChainElement::new(
-            signed_header.signature().to_owned(),
-            signed_header.header().to_owned(),
-            maybe_entry,
-        )))
+        Ok(Some(ChainElement::new(signed_header, maybe_entry)))
     }
 
     /// given a header address return the full chain element for that address
-    pub fn get_element(
+    pub async fn get_element(
         &self,
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
-        if let Some(signed_header) = self.get_header(header_address)? {
+        if let Some(signed_header) = self.get_header(header_address).await? {
             self.chain_element(signed_header)
         } else {
             Ok(None)
@@ -114,14 +125,16 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     /// N.B. this code assumes that the header and entry have been validated
     pub fn put(
         &mut self,
-        signed_header: SignedHeader,
-        maybe_entry: Option<Entry>,
+        signed_header: SignedHeaderHashed,
+        maybe_entry: Option<EntryHashed>,
     ) -> DatabaseResult<()> {
         if let Some(entry) = maybe_entry {
-            self.entries.put(entry.entry_address().into(), entry);
+            let (entry, entry_address) = entry.into_inner();
+            self.entries.put(entry_address.into(), entry);
         }
-        self.headers
-            .put(signed_header.header().hash().into(), signed_header);
+        let (header, signature) = signed_header.into_inner();
+        let (header, header_address) = header.into_inner();
+        self.headers.put(header_address.into(), (header, signature));
         Ok(())
     }
 

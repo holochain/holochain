@@ -58,15 +58,6 @@ impl Header {
         unimplemented!()
     }
 
-    // FIXME: use async with_data, or consider wrapper type
-    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
-    /// Computes the hash of this header.
-    pub fn hash(&self) -> HeaderHash {
-        // hash the header enum variant struct
-        let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
-        HeaderHash::with_data_sync(&sb.bytes())
-    }
-
     /// returns the previous header except for the DNA header which doesn't have a previous
     pub fn prev_header(&self) -> Option<&HeaderAddress> {
         Some(match self {
@@ -81,6 +72,23 @@ impl Header {
             Self::EntryCreate(EntryCreate { prev_header, .. }) => prev_header,
             Self::EntryUpdate(EntryUpdate { prev_header, .. }) => prev_header,
         })
+    }
+}
+
+make_hashed_base! {
+    Visibility(pub),
+    HashedName(HeaderHashed),
+    ContentType(Header),
+    HashType(HeaderAddress),
+}
+
+impl HeaderHashed {
+    pub async fn with_data(header: Header) -> Result<Self, SerializedBytesError> {
+        let sb = SerializedBytes::try_from(&header)?;
+        Ok(HeaderHashed::with_pre_hashed(
+            header,
+            HeaderAddress::Header(HeaderHash::with_data(sb.bytes()).await),
+        ))
     }
 }
 
