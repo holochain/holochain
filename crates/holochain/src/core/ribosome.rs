@@ -43,7 +43,7 @@ use std::iter::Iterator;
 #[derive(Clone)]
 pub struct HostContext {
     pub zome_name: ZomeName,
-    allow_side_effects: AllowSideEffects,
+    allow_side_effects: bool,
     workspace: UnsafeInvokeZomeWorkspace,
 }
 
@@ -55,7 +55,7 @@ fixturator!(
             workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
                 .next()
                 .unwrap(),
-            allow_side_effects: AllowSideEffectsFixturator::new(Empty).next().unwrap(),
+            allow_side_effects: BoolFixturator::new(Empty).next().unwrap(),
         }
     },
     {
@@ -64,9 +64,7 @@ fixturator!(
             workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            allow_side_effects: AllowSideEffectsFixturator::new(Unpredictable)
-                .next()
-                .unwrap(),
+            allow_side_effects: BoolFixturator::new(Unpredictable).next().unwrap(),
         }
     },
     {
@@ -77,7 +75,7 @@ fixturator!(
             workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-            allow_side_effects: AllowSideEffectsFixturator::new_indexed(Predictable, self.0.index)
+            allow_side_effects: BoolFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
         };
@@ -90,20 +88,10 @@ impl HostContext {
     pub fn zome_name(&self) -> ZomeName {
         self.zome_name.clone()
     }
-    pub fn allow_side_effects(&self) -> AllowSideEffects {
+    pub fn allow_side_effects(&self) -> bool {
         self.allow_side_effects
     }
 }
-
-/// represents whether a call is allowed to call host functions that have side effects
-/// e.g. we don't want to be writing during validation callbacks
-/// if this is No then the host functions still exist, but are no-ops
-#[derive(Clone, Copy, EnumIter)]
-pub enum AllowSideEffects {
-    Yes,
-    No,
-}
-enum_fixturator!(AllowSideEffects, AllowSideEffects::No);
 
 #[derive(Debug)]
 pub struct FnComponents(Vec<String>);
@@ -138,7 +126,7 @@ impl From<Vec<String>> for FnComponents {
 
 pub trait Invocation: Clone // + TryInto<HostInput, Error=SerializedBytesError>
 {
-    fn allow_side_effects(&self) -> AllowSideEffects;
+    fn allow_side_effects(&self) -> bool;
     fn zome_names(&self) -> Vec<ZomeName>;
     fn fn_components(&self) -> FnComponents;
     /// the serialized input from the host for the wasm call
@@ -172,8 +160,8 @@ pub struct ZomeInvocation {
 }
 
 impl Invocation for ZomeInvocation {
-    fn allow_side_effects(&self) -> AllowSideEffects {
-        AllowSideEffects::Yes
+    fn allow_side_effects(&self) -> bool {
+        true
     }
     fn zome_names(&self) -> Vec<ZomeName> {
         vec![self.zome_name.to_owned()]

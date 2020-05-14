@@ -1,5 +1,6 @@
 use crate::header::HeaderHashes;
 use crate::zome_io::GuestOutput;
+use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -13,6 +14,15 @@ impl From<GuestOutput> for PostCommitCallbackResult {
         match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Fail(vec![].into(), format!("{:?}", e)),
+        }
+    }
+}
+
+impl CallbackResult for PostCommitCallbackResult {
+    fn is_definitive(&self) -> bool {
+        match self {
+            PostCommitCallbackResult::Fail(_, _) => true,
+            _ => false,
         }
     }
 }

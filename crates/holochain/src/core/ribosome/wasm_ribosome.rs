@@ -36,7 +36,6 @@ use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::update_entry::update_entry;
-use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeInvocation;
@@ -52,6 +51,7 @@ use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::CallbackResult;
 use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
 
@@ -180,33 +180,49 @@ impl WasmRibosome {
         ns.insert("__capability", func!(invoke_host_function!(capability)));
         ns.insert("__noop", func!(invoke_host_function!(noop)));
 
-        match allow_side_effects {
-            AllowSideEffects::Yes => {
-                ns.insert("__call", func!(invoke_host_function!(call)));
-                ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
-                ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
-                ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
-                ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
-                ns.insert("__send", func!(invoke_host_function!(send)));
-                ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
-                ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
-            }
-            AllowSideEffects::No => {
-                ns.insert("__call", func!(invoke_host_function!(noop)));
-                ns.insert("__commit_entry", func!(invoke_host_function!(noop)));
-                ns.insert("__emit_signal", func!(invoke_host_function!(noop)));
-                ns.insert("__link_entries", func!(invoke_host_function!(noop)));
-                ns.insert("__remove_link", func!(invoke_host_function!(noop)));
-                ns.insert("__send", func!(invoke_host_function!(noop)));
-                ns.insert("__update_entry", func!(invoke_host_function!(noop)));
-                ns.insert("__remove_entry", func!(invoke_host_function!(noop)));
-            }
+        if allow_side_effects {
+            ns.insert("__call", func!(invoke_host_function!(call)));
+            ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
+            ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
+            ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
+            ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
+            ns.insert("__send", func!(invoke_host_function!(send)));
+            ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
+            ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
+        } else {
+            ns.insert("__call", func!(invoke_host_function!(noop)));
+            ns.insert("__commit_entry", func!(invoke_host_function!(noop)));
+            ns.insert("__emit_signal", func!(invoke_host_function!(noop)));
+            ns.insert("__link_entries", func!(invoke_host_function!(noop)));
+            ns.insert("__remove_link", func!(invoke_host_function!(noop)));
+            ns.insert("__send", func!(invoke_host_function!(noop)));
+            ns.insert("__update_entry", func!(invoke_host_function!(noop)));
+            ns.insert("__remove_entry", func!(invoke_host_function!(noop)));
         }
         imports.register("env", ns);
 
         crate::end_hard_timeout!(timeout, crate::perf::WASM_INSTANCE);
         imports
     }
+}
+
+macro_rules! do_callback {
+    ( $self:ident, $invocation:ident, $callback_result:ty ) => {{
+        let mut results: Vec<$callback_result> = vec![];
+        // fallible iterator syntax instead of for loop
+        let mut call_iterator = $self.call_iterator($self.clone(), $invocation);
+        while let Some(output) = call_iterator.next()? {
+            let callback_result: $callback_result = output.into();
+            // return early if we have a definitive answer, no need to keep invoking callbacks
+            // if we know we are done
+            if callback_result.is_definitive() {
+                return Ok(vec![callback_result].into());
+            }
+            results.push(callback_result);
+        }
+        // fold all the non-definitive callbacks down into a single overall result
+        Ok(results.into())
+    }};
 }
 
 impl RibosomeT for WasmRibosome {
@@ -250,51 +266,31 @@ impl RibosomeT for WasmRibosome {
     }
 
     fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateResult> {
-        let callback_outputs: Vec<GuestOutput> =
-            self.call_iterator(self.clone(), invocation).collect()?;
-        let validate_callback_results: Vec<ValidateCallbackResult> =
-            callback_outputs.into_iter().map(|c| c.into()).collect();
-        Ok(validate_callback_results.into())
+        do_callback!(self, invocation, ValidateCallbackResult)
     }
 
     fn run_init(&self, invocation: InitInvocation) -> RibosomeResult<InitResult> {
-        let callback_outputs: Vec<GuestOutput> =
-            self.call_iterator(self.clone(), invocation).collect()?;
-        let init_callback_results: Vec<InitCallbackResult> =
-            callback_outputs.into_iter().map(|c| c.into()).collect();
-        Ok(init_callback_results.into())
+        do_callback!(self, invocation, InitCallbackResult)
     }
 
     fn run_migrate_agent(
         &self,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult> {
-        let callback_outputs: Vec<GuestOutput> =
-            self.call_iterator(self.clone(), invocation).collect()?;
-        let migrate_agent_results: Vec<MigrateAgentCallbackResult> =
-            callback_outputs.into_iter().map(|c| c.into()).collect();
-        Ok(migrate_agent_results.into())
+        do_callback!(self, invocation, MigrateAgentCallbackResult)
     }
 
     fn run_validation_package(
         &self,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult> {
-        let callback_outputs: Vec<GuestOutput> =
-            self.call_iterator(self.clone(), invocation).collect()?;
-        let validation_package_results: Vec<ValidationPackageCallbackResult> =
-            callback_outputs.into_iter().map(|c| c.into()).collect();
-        Ok(validation_package_results.into())
+        do_callback!(self, invocation, ValidationPackageCallbackResult)
     }
 
     fn run_post_commit(
         &self,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult> {
-        let callback_outputs: Vec<GuestOutput> =
-            self.call_iterator(self.clone(), invocation).collect()?;
-        let post_commit_results: Vec<PostCommitCallbackResult> =
-            callback_outputs.into_iter().map(|c| c.into()).collect();
-        Ok(post_commit_results.into())
+        do_callback!(self, invocation, PostCommitCallbackResult)
     }
 }

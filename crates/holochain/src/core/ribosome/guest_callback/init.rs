@@ -1,4 +1,3 @@
-use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
@@ -63,8 +62,8 @@ fixturator!(
 );
 
 impl Invocation for InitInvocation {
-    fn allow_side_effects(&self) -> AllowSideEffects {
-        AllowSideEffects::Yes
+    fn allow_side_effects(&self) -> bool {
+        true
     }
     fn zome_names(&self) -> Vec<ZomeName> {
         self.dna_def
