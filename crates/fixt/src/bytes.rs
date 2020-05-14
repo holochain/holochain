@@ -6,6 +6,9 @@ const UNPREDICTABLE_MAX_LEN: usize = 32;
 
 type Bytes = Vec<u8>;
 
+// Simply generate "bytes" which is a Vec<u8>
+// likely the most interesting is the Unpredictable curve that throws out random bytes in a vec
+// of random length between 0 and 32 bytes long
 fixturator!(
     Bytes,
     vec![],

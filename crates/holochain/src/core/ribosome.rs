@@ -317,7 +317,7 @@ pub mod wasm_test {
                 // instance building off a warm module should be the slowest part of a wasm test
                 // so if each instance (including inner callbacks) takes ~1ms this gives us
                 // headroom on 4 call(back)s
-                $crate::end_hard_timeout!(timeout, 5_000_000);
+                $crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
 
                 let output = match zome_invocation_response {
                     crate::core::ribosome::ZomeInvocationResponse::ZomeApiFn(guest_output) => {

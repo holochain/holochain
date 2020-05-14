@@ -187,8 +187,7 @@ impl WasmRibosome {
         // }
         imports.register("env", ns);
 
-        // this is quite fast, indicative times are about 40_000 nanos
-        crate::end_hard_timeout!(timeout, 100_000);
+        crate::end_hard_timeout!(timeout, crate::perf::WASM_INSTANCE);
         imports
     }
 }
@@ -228,7 +227,7 @@ impl RibosomeT for WasmRibosome {
         // instance building is slow 1s+ on a cold cache but should be ~0.8-1 millis on a cache hit
         // tests should be warming the instance cache before calling zome functions
         // there could be nested callbacks in this call so we give it 5ms
-        crate::end_hard_timeout!(timeout, 5_000_000);
+        crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
 
         Ok(ZomeInvocationResponse::ZomeApiFn(guest_output))
     }

@@ -49,15 +49,11 @@ impl<I: Invocation> FallibleIterator for CallIterator<WasmRibosome, I> {
                         };
                         let module_timeout = crate::start_hard_timeout!();
                         let module = self.ribosome.module(host_context.clone())?;
-                        // if you're blowing this up in a test, make sure to warm the zome cache!
-                        // fetching a module from the cache should be near instant
-                        crate::end_hard_timeout!(module_timeout, 50_000);
+                        crate::end_hard_timeout!(module_timeout, crate::perf::WASM_MODULE_CACHE_HIT);
 
                         if module.info().exports.contains_key(&to_call) {
                             // there is a callback to_call and it is implemented in the wasm
-                            let instance_timeout = crate::start_hard_timeout!();
                             let mut instance = self.ribosome.instance(host_context)?;
-                            crate::end_hard_timeout!(instance_timeout, 500_000);
 
                             let call_timeout = crate::start_hard_timeout!();
                             let result: Self::Item = holochain_wasmer_host::guest::call(
@@ -68,7 +64,7 @@ impl<I: Invocation> FallibleIterator for CallIterator<WasmRibosome, I> {
                                 // @todo - is this a problem for large payloads like entries?
                                 self.invocation.clone().host_input()?,
                             )?;
-                            crate::end_hard_timeout!(call_timeout, 5_000_000);
+                            crate::end_hard_timeout!(call_timeout, crate::perf::MULTI_WASM_CALL);
 
                             Some(result)
                         } else {
@@ -88,9 +84,8 @@ impl<I: Invocation> FallibleIterator for CallIterator<WasmRibosome, I> {
                 }
             }
         });
-        // a single invocation should only take about 1ms during tests, but it can have nested
-        // callbacks so we give space for 5ms
-        crate::end_hard_timeout!(timeout, 5_000_000);
+        // the total should add trivial overhead vs the inner calls
+        crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
         next
     }
 }

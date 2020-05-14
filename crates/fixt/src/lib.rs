@@ -276,6 +276,10 @@ macro_rules! newtype_fixturator {
 }
 
 #[macro_export]
+/// Creates a simple way to generate enums that use the strum way of iterating
+/// https://docs.rs/strum/0.18.0/strum/
+/// iterates over all the variants (Predictable) or selects random variants (Unpredictable)
+/// You do still need to BYO "empty" variant as the macro doesn't know what to use there
 macro_rules! enum_fixturator {
     ( $enum:ident, $empty:expr ) => {
         use crate::strum::IntoEnumIterator;

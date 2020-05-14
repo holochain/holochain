@@ -497,7 +497,7 @@ mod test {
         handle_incoming_message(msg, app_api).await.unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw wasm_ribosome call
         // the overhead of a websocket request locally is small
-        crate::end_hard_timeout!(websocket_timeout, 2_000_000);
+        crate::end_hard_timeout!(websocket_timeout, crate::perf::ONE_WASM_CALL);
     }
 
     #[tokio::test(threaded_scheduler)]
