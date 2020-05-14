@@ -34,6 +34,7 @@ pub mod test {
     use holochain_zome_types::GlobalsOutput;
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn invoke_import_globals_test() {
         let globals: GlobalsOutput =
             crate::call_test_ribosome!(TestWasm::Imports, "globals", GlobalsInput::new(()));

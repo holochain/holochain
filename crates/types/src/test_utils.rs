@@ -10,7 +10,7 @@ use crate::{
 use holo_hash::AgentPubKey;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {

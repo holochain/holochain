@@ -160,6 +160,7 @@ mod test {
     use holochain_zome_types::validate::ValidationPackage;
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_validation_package_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -177,6 +178,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_validation_package_implemented_success() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
             .next()
@@ -194,6 +196,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_validation_package_implemented_fail() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
             .next()

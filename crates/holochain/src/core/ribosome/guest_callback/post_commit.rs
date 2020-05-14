@@ -131,6 +131,7 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_post_commit_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -145,6 +146,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_post_commit_implemented_success() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
             .next()
@@ -159,6 +161,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_post_commit_implemented_fail() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
             .next()

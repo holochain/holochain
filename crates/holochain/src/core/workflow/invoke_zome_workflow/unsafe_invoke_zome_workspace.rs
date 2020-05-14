@@ -38,12 +38,8 @@ pub struct UnsafeInvokeZomeWorkspace {
 fixturator!(
     UnsafeInvokeZomeWorkspace,
     {
-        /// Useful when we need this type for tests where we don't want to use it.
-        /// It will always return None.
         let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
-        let guard = Arc::new(std::sync::Mutex::new(TrustedToBeThreadsafePointer(
-            fake_ptr,
-        )));
+        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(fake_ptr)));
         let workspace = Arc::downgrade(&guard);
         // Make sure the weak Arc cannot be upgraded
         std::mem::drop(guard);
@@ -60,9 +56,6 @@ fixturator!(
             .unwrap()
     }
 );
-
-/// if it was safe code we wouldn't need trust
-unsafe impl Send for TrustedToBeThreadsafePointer {}
 
 // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
 /// If this guard is dropped the underlying

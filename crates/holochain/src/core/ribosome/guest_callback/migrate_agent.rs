@@ -78,7 +78,11 @@ impl Invocation for MigrateAgentInvocation {
         AllowSideEffects::No
     }
     fn zome_names(&self) -> Vec<ZomeName> {
-        self.dna_def.zomes.keys().cloned().collect()
+        self.dna_def
+            .zomes
+            .iter()
+            .map(|(zome_name, _)| zome_name.clone())
+            .collect()
     }
     fn fn_components(&self) -> FnComponents {
         vec![
@@ -145,6 +149,7 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_migrate_agent_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -161,6 +166,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_migrate_agent_implemented_pass() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
             .next()
@@ -177,6 +183,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_migrate_agent_implemented_fail() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
             .next()
@@ -196,6 +203,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_migrate_agent_multi_implemented_fail() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![
             TestWasm::MigrateAgentPass,

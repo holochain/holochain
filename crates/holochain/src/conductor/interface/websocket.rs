@@ -447,6 +447,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn websocket_call_zome_function() {
         observability::test_run().ok();
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

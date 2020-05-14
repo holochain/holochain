@@ -63,6 +63,7 @@ strum = "0.18.0"
 strum_macros = "0.18.0"
 
 [dev-dependencies]
+serial_test = "0.4.0"
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
 test_wasm_common = { path = "../test_utils/wasm_common" }

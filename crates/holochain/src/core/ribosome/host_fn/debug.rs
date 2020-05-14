@@ -31,6 +31,7 @@ pub mod wasm_test {
     use holochain_zome_types::DebugOutput;
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn ribosome_debug_test() {
         // this shows that debug is called but our line numbers will be messed up
         // the line numbers will show as coming from this test because we made the input here
@@ -43,6 +44,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn wasm_line_numbers_test() {
         // this shows that we can get line numbers out of wasm
         let output: DebugOutput = crate::call_test_ribosome!(TestWasm::Debug, "debug", ());

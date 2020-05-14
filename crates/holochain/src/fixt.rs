@@ -144,14 +144,14 @@ fixturator!(
 
 fixturator!(
     Zomes,
-    { BTreeMap::new() },
+    { Vec::new() },
     {
         // @todo implement unpredictable zomes
-        BTreeMap::new()
+        ZomesFixturator::new(Empty).next().unwrap()
     },
     {
         // @todo implement predictable zomes
-        BTreeMap::new()
+        ZomesFixturator::new(Empty).next().unwrap()
     }
 );
 
@@ -246,14 +246,14 @@ fixturator!(
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmsFixturator::new(Unpredictable).next().unwrap();
-        let mut zomes: Zomes = BTreeMap::new();
+        let mut zomes: Zomes = Vec::new();
         for (hash, wasm) in wasms {
-            zomes.insert(
+            zomes.push((
                 zome_name_fixturator.next().unwrap(),
                 Zome {
                     wasm_hash: hash.to_owned(),
                 },
-            );
+            ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         dna_def.zomes = zomes;
@@ -269,14 +269,14 @@ fixturator!(
         let wasms = WasmsFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap();
-        let mut zomes: Zomes = BTreeMap::new();
+        let mut zomes: Zomes = Vec::new();
         for (hash, wasm) in wasms {
-            zomes.insert(
+            zomes.push((
                 zome_name_fixturator.next().unwrap(),
                 Zome {
                     wasm_hash: hash.to_owned(),
                 },
-            );
+            ));
         }
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, self.0.index)
             .next()

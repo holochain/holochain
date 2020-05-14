@@ -67,7 +67,11 @@ impl Invocation for InitInvocation {
         AllowSideEffects::Yes
     }
     fn zome_names(&self) -> Vec<ZomeName> {
-        self.dna_def.zomes.keys().cloned().collect()
+        self.dna_def
+            .zomes
+            .iter()
+            .map(|(zome_name, _)| zome_name.clone())
+            .collect()
     }
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()
@@ -136,6 +140,7 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_init_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -148,6 +153,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_init_implemented_pass() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
@@ -160,6 +166,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_init_implemented_fail() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
@@ -175,6 +182,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn test_init_multi_implemented_fail() {
         let ribosome =
             WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))

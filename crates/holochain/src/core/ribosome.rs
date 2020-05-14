@@ -335,6 +335,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn invoke_foo_test() {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
             .next()
@@ -355,6 +356,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn pass_validate_test() {
         assert_eq!(
             CommitEntryResult::Success(HeaderHash::new(vec![0xdb; 36])),
@@ -363,6 +365,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn fail_validate_test() {
         assert_eq!(
             CommitEntryResult::Fail("Invalid(\"NeverValidates never validates\")".to_string()),

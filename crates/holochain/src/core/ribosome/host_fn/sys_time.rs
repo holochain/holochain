@@ -23,6 +23,7 @@ pub mod wasm_test {
     use holochain_zome_types::{SysTimeInput, SysTimeOutput};
 
     #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
     async fn invoke_import_sys_time_test() {
         let _: SysTimeOutput =
             crate::call_test_ribosome!(TestWasm::Imports, "sys_time", SysTimeInput::new(()));
