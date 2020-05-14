@@ -25,7 +25,7 @@
 //! use tokio::stream::StreamExt;
 //! use std::convert::TryInto;
 //!
-//! #[derive(serde::Serialize, serde::Deserialize)]
+//! #[derive(serde::Serialize, serde::Deserialize, Debug)]
 //! struct TestMessage(pub String);
 //! try_from_serialized_bytes!(TestMessage);
 //!
@@ -129,7 +129,7 @@ mod tests {
     use super::*;
     use tokio::stream::StreamExt;
 
-    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(serde::Serialize, serde::Deserialize, Debug)]
     struct TestMessage(pub String);
     try_from_serialized_bytes!(TestMessage);
 
