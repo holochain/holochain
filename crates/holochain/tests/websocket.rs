@@ -10,7 +10,7 @@ use holochain_2020::conductor::{
 use holochain_types::{
     cell::CellId,
     dna::{DnaFile, Properties},
-    nucleus::ZomeInvocation,
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     observability,
     prelude::*,
     test_utils::{
@@ -25,6 +25,7 @@ use matches::assert_matches;
 use std::sync::Arc;
 use std::{path::PathBuf, process::Stdio, time::Duration};
 use tempdir::TempDir;
+use test_wasm_common::TestString;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::stream::StreamExt;
@@ -224,7 +225,7 @@ async fn call_zome() {
     cmd.arg("--structured")
         .arg("--config-path")
         .arg(config_path)
-        .env("RUST_LOG", "debug")
+        .env("RUST_LOG", "trace")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
@@ -293,9 +294,13 @@ async fn call_zome() {
     ));
     let request = AppRequest::ZomeInvocationRequest { request };
     let response = app_interface.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AppResponse::ZomeInvocationResponse{ .. });
-    trace!(?response);
+    let call_response = check_timeout(&mut holochain, response, 2000).await;
+    let foo = TestString::from(String::from("foo"));
+    let expected = Box::new(ZomeInvocationResponse::ZomeApiFn(
+        ZomeExternGuestOutput::new(foo.try_into().unwrap()),
+    ));
+    trace!(?call_response);
+    assert_matches!(call_response, AppResponse::ZomeInvocationResponse{ response } if response == expected);
 
     holochain.kill().expect("Failed to kill holochain");
 }
