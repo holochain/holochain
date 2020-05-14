@@ -240,15 +240,17 @@ pub mod tests {
         let (dna_header, agent_header) = tokio_safe_block_on::tokio_safe_block_on(
             async {
                 let dna_header = Header::Dna(header::Dna {
-                    timestamp: Timestamp::now(),
                     author: agent_pubkey.clone(),
+                    timestamp: Timestamp::now(),
+                    header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
                 let dna_header = HeaderHashed::with_data(dna_header).await.unwrap();
 
                 let agent_header = Header::EntryCreate(header::EntryCreate {
-                    timestamp: Timestamp::now(),
                     author: agent_pubkey.clone(),
+                    timestamp: Timestamp::now(),
+                    header_seq: 0,
                     prev_header: dna_header.as_hash().to_owned().into(),
                     entry_type: header::EntryType::AgentPubKey,
                     entry_address: agent_pubkey.clone().into(),

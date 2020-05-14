@@ -54,16 +54,18 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
 
             // create a DNA chain element and add it directly to the store
             let dna_header = Header::Dna(header::Dna {
-                timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
+                timestamp: Timestamp::now(),
+                header_seq: 0,
                 hash: dna_file.dna_hash().clone(),
             });
             let dna_header_address = workspace.source_chain.put(dna_header.clone(), None).await?;
 
             // create the agent validation entry and add it directly to the store
             let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
-                timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
+                timestamp: Timestamp::now(),
+                header_seq: 1,
                 prev_header: dna_header_address,
                 membrane_proof,
             });
@@ -74,8 +76,9 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
 
             // create a agent chain element and add it directly to the store
             let agent_header = Header::EntryCreate(header::EntryCreate {
-                timestamp: Timestamp::now(),
                 author: agent_pubkey.clone(),
+                timestamp: Timestamp::now(),
+                header_seq: 2,
                 prev_header: avh_addr,
                 entry_type: header::EntryType::AgentPubKey,
                 entry_address: agent_pubkey.clone().into(),
@@ -161,16 +164,18 @@ pub mod tests {
         let agent_entry = Entry::Agent(agent_pubkey.clone());
         let dna = fake_dna_file("cool dna");
         let dna_header = Header::Dna(header::Dna {
-            timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 0,
             hash: dna.dna_hash().clone(),
         });
         let dna_hash = source_chain.put(dna_header, None).await.unwrap();
 
         // create the agent validation entry and add it directly to the store
         let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
-            timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 1,
             prev_header: dna_hash,
             membrane_proof: None,
         });
@@ -180,8 +185,9 @@ pub mod tests {
             .unwrap();
 
         let agent_header = Header::EntryCreate(header::EntryCreate {
-            timestamp: Timestamp::now(),
             author: agent_pubkey.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 2,
             prev_header: avh_hash,
             entry_type: header::EntryType::AgentPubKey,
             entry_address: agent_pubkey.clone().into(),
