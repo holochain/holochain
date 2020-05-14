@@ -19,9 +19,9 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
  [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
-Copyright (C) 2017 - 2020, Holochain Foundation
+Copyright (C) 2019 - 2020, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
-provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful, bu
-t WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- PURPOSE.
+provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE.
