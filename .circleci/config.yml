@@ -20,11 +20,11 @@ commands:
 jobs:
   merge-test:
     docker:
-     - image: holochain/holochain-2020:circle.build.2020-04-15-dockerz
+     - image: holochain/holochain-2020:circle.build.latest
        auth:
         username: $DOCKER_USER
         password: $DOCKER_PASS
-    resource_class: xlarge
+    resource_class: large
     steps:
       - checkout
       - run:
