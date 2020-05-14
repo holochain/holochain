@@ -3,30 +3,38 @@
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]
 pub enum DnaUtilError {
     /// std::io::Error
-    #[error("std::io::Error: {0}")]
+    #[error("IO error: {0}")]
     StdIoError(#[from] std::io::Error),
 
+    /// Missing filesystem path
+    #[error("Couldn't find path: {1:?}. Detail: {0}")]
+    PathNotFound(std::io::Error, PathBuf),
+
     /// DnaError
-    #[error("DnaError: {0}")]
+    #[error("DNA error: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
 
     /// SerializedBytesError
-    #[error("SerializedBytesError: {0}")]
+    #[error("Internal serialization error: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
 
+    /// serde_json::Error
+    #[error("JSON serialization error: {0}")]
+    SerdeJsonError(#[from] serde_json::Error),
+
     /// InvalidInput
-    #[error("InvalidInput: {0}")]
+    #[error("Invalid input: {0}")]
     InvalidInput(String),
 
-    /// serde_json::Error
-    #[error("serde_json::Error: {0}")]
-    SerdeJsonError(#[from] serde_json::Error),
+    /// anything else
+    #[error("Unknown error: {0}")]
+    MiscError(#[from] Box<dyn std::error::Error>),
 }
 
 /// DnaUtil Result type.
@@ -50,7 +58,7 @@ fn dna_file_path_convert(
     } else {
         if !tmp_lossy.ends_with(".dna.workdir") {
             return Err(DnaUtilError::InvalidInput(format!(
-                "bad compile path, work dirs must end with '.dna_work_dir': {}",
+                "bad compile path, work dirs must end with '.dna.workdir': {}",
                 dna_file_path.display()
             )));
         }
@@ -117,7 +125,9 @@ pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResu
     let mut json_filename = dna_work_dir.clone();
     json_filename.push("dna.json");
 
-    let json_data = tokio::fs::read(json_filename).await?;
+    let json_data = tokio::fs::read(json_filename.clone())
+        .await
+        .map_err(move |e| DnaUtilError::PathNotFound(e, json_filename.to_owned()))?;
 
     let json_file: DnaDefJson = serde_json::from_slice(&json_data)?;
 
