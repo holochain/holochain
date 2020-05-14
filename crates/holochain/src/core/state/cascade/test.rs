@@ -53,16 +53,18 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     .unwrap();
 
     let jimbo_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
         author: jimbo_id.clone(),
+        timestamp: Timestamp::now(),
+        header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_address: jimbo_entry.as_hash().clone(),
     });
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
         author: jessy_id.clone(),
+        timestamp: Timestamp::now(),
+        header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_address: jessy_entry.as_hash().clone(),
