@@ -52,12 +52,13 @@ where
             // Get te current head
             let chain_head_start = workspace.source_chain.chain_head()?.clone();
 
+            tracing::trace!(line = line!());
             // Create the unsafe sourcechain for use with wasm closure
             let result = {
-                // TODO: TK-01564: Return this result
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 ribosome.call_zome_function(raw_workspace, invocation)
             };
+            tracing::trace!(line = line!());
 
             // Get the new head
             let chain_head_end = workspace.source_chain.chain_head()?;
