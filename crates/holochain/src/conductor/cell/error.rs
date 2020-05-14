@@ -1,3 +1,4 @@
+use crate::conductor::api::error::ConductorApiError;
 use holochain_state::error::DatabaseError;
 use thiserror::Error;
 
@@ -7,6 +8,10 @@ pub enum CellError {
     DatabaseError(#[from] DatabaseError),
     #[error("The Dna was not found in the store")]
     DnaMissing,
+    #[error("Failed to join the create cell task: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+    #[error("Genesis failed: {0}")]
+    Genesis(#[from] Box<ConductorApiError>),
 }
 
 pub type CellResult<T> = Result<T, CellError>;
