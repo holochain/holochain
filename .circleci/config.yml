@@ -20,7 +20,7 @@ commands:
 jobs:
   merge-test:
     docker:
-     - image: holochain/holochain-2020:circle.build.latest
+     - image: holochain/holochain-2020:circle.build.develop
        auth:
         username: $DOCKER_USER
         password: $DOCKER_PASS
