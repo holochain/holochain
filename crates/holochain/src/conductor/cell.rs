@@ -11,6 +11,14 @@ use crate::{
         cell::error::CellResult,
     },
     core::ribosome::wasm_ribosome::WasmRibosome,
+    core::{
+        ribosome::WasmRibosome,
+        state::source_chain::SourceChainBuf,
+        workflow::{
+            run_workflow, GenesisWorkflow, GenesisWorkspace, InvokeZomeWorkflow,
+            InvokeZomeWorkspace, ZomeInvocationResult,
+        },
+    },
 };
 use error::CellError;
 use holo_hash::*;
@@ -21,6 +29,18 @@ use holochain_state::env::ReadManager;
 use holochain_types::{autonomic::AutonomicProcess, cell::CellId, shims::*};
 use std::hash::{Hash, Hasher};
 use std::path::Path;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::{
+    env::{EnvironmentKind, EnvironmentWrite},
+    prelude::*,
+};
+use holochain_types::{
+    autonomic::AutonomicProcess, cell::CellId, dna::DnaFile, nucleus::ZomeInvocation, shims::*,
+};
+use std::{
+    hash::{Hash, Hasher},
+    path::Path,
+};
 
 pub mod error;
 
@@ -48,39 +68,65 @@ impl PartialEq for Cell {
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [CellConductorApi] or an [AppInterfaceApi])
-pub struct Cell {
+pub struct Cell<CA = CellConductorApi>
+where
+    CA: CellConductorApiT,
+{
     id: CellId,
-    conductor_api: CellConductorApi,
+    conductor_api: CA,
     state_env: EnvironmentWrite,
 }
 
 impl Cell {
-    pub fn create<P: AsRef<Path>>(
+    pub async fn create<P: AsRef<Path>>(
         id: CellId,
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
+        membrane_proof: Option<SerializedBytes>,
     ) -> CellResult<Self> {
-        let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
         let state_env = EnvironmentWrite::new(
             env_path.as_ref(),
             EnvironmentKind::Cell(id.clone()),
             keystore,
         )?;
-        Ok(Self {
-            id,
+        let source_chain_len = {
+            // check if genesis ran on source chain buf
+            let env_ref = state_env.guard().await;
+            let reader = env_ref.reader()?;
+            let source_chain = SourceChainBuf::new(&reader, &env_ref)?;
+            source_chain.len()
+        };
+        let cell = Self {
+            id: id.clone(),
             conductor_api,
             state_env,
-        })
+        };
+        // TODO: TK-01747: Make this check more robust
+        if source_chain_len == 0 {
+            // run genesis
+            let dna_file = conductor_handle
+                .get_dna(id.dna_hash())
+                .await
+                .ok_or(CellError::DnaMissing)?;
+            cell.genesis(dna_file, membrane_proof)
+                .await
+                .map_err(Box::new)?;
+        }
+        Ok(cell)
     }
 
     fn dna_hash(&self) -> &DnaHash {
         &self.id.dna_hash()
     }
 
-    #[allow(dead_code)]
     fn agent_pubkey(&self) -> &AgentPubKey {
         &self.id.agent_pubkey()
+    }
+
+    pub fn id(&self) -> &CellId {
+        &self.id
     }
 
     /// Entry point for incoming messages from the network that need to be handled
@@ -118,9 +164,31 @@ impl Cell {
             .map_err(Box::new)?)
     }
 
+    async fn genesis(
+        &self,
+        dna_file: DnaFile,
+        membrane_proof: Option<SerializedBytes>,
+    ) -> ConductorApiResult<()> {
+        let arc = self.state_env();
+        let env = arc.guard().await;
+        let reader = env.reader()?;
+        let workspace = GenesisWorkspace::new(&reader, &env)?;
+
+        let workflow = GenesisWorkflow::new(
+            self.conductor_api.clone(),
+            dna_file,
+            self.agent_pubkey().clone(),
+            membrane_proof,
+        );
+
+        Ok(run_workflow(self.state_env(), workflow, workspace)
+            .await
+            .map_err(Box::new)?)
+    }
+
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
-        match self.conductor_api.get_dna(self.dna_hash().clone()).await {
+        match self.conductor_api.get_dna(self.dna_hash()).await {
             Some(dna) => Ok(WasmRibosome::new(dna)),
             None => Err(CellError::DnaMissing),
         }

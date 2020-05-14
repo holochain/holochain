@@ -38,7 +38,7 @@ mock! {
         fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
         fn mock_keystore(&self) -> &KeystoreSender;
-        fn sync_get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile>;
+        fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
     }
 
     trait Clone {
@@ -75,7 +75,7 @@ impl CellConductorApiT for MockCellConductorApi {
     fn keystore(&self) -> &KeystoreSender {
         self.mock_keystore()
     }
-    async fn get_dna(&self, dna_hash: DnaHash) -> Option<DnaFile> {
+    async fn get_dna<'a>(&'a self, dna_hash: &'a DnaHash) -> Option<DnaFile> {
         self.sync_get_dna(dna_hash)
     }
 }

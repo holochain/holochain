@@ -13,7 +13,7 @@ use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
-pub type Zomes = BTreeMap<ZomeName, zome::Zome>;
+pub type Zomes = Vec<(ZomeName, zome::Zome)>;
 
 /// A type to allow json values to be used as [SerializedBtyes]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -55,7 +55,9 @@ impl DnaDef {
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &ZomeName) -> Result<&zome::Zome, DnaError> {
         self.zomes
-            .get(zome_name)
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .map(|(_, zome)| zome)
             .ok_or_else(|| DnaError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
     }
 }

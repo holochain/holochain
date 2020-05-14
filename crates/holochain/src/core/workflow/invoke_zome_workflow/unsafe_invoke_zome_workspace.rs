@@ -1,12 +1,15 @@
-    #![allow(clippy::mutex_atomic)]
+#![allow(clippy::mutex_atomic)]
 use super::*;
 use fixt::prelude::*;
 use futures::Future;
-use std::marker::PhantomData;
-use std::sync::Arc;
-
-#[derive(Debug)]
-struct TrustedToBeThreadsafePointer(*mut std::ffi::c_void);
+use std::{
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        Arc,
+    },
+};
+use tracing::*;
 
 // TODO write tests to verify the invariant.
 /// This is needed to use the database where
@@ -29,7 +32,7 @@ struct TrustedToBeThreadsafePointer(*mut std::ffi::c_void);
 /// Default is used to avoid serde
 #[derive(Debug, Clone, Default)]
 pub struct UnsafeInvokeZomeWorkspace {
-    workspace: std::sync::Weak<std::sync::Mutex<TrustedToBeThreadsafePointer>>,
+    workspace: std::sync::Weak<std::sync::Mutex<AtomicPtr<std::ffi::c_void>>>,
 }
 
 fixturator!(
@@ -68,7 +71,7 @@ unsafe impl Send for TrustedToBeThreadsafePointer {}
 /// Don't use `mem::forget` on this type as it will
 /// break the checks.
 pub struct UnsafeInvokeZomeWorkspaceGuard<'env> {
-    workspace: Option<Arc<std::sync::Mutex<TrustedToBeThreadsafePointer>>>,
+    workspace: Option<Arc<std::sync::Mutex<AtomicPtr<std::ffi::c_void>>>>,
     phantom: PhantomData<&'env ()>,
 }
 
@@ -77,7 +80,7 @@ impl UnsafeInvokeZomeWorkspace {
         workspace: &'env mut InvokeZomeWorkspace,
     ) -> (UnsafeInvokeZomeWorkspaceGuard<'env>, Self) {
         let raw_ptr = workspace as *mut InvokeZomeWorkspace as *mut std::ffi::c_void;
-        let guard = Arc::new(std::sync::Mutex::new(TrustedToBeThreadsafePointer(raw_ptr)));
+        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(raw_ptr)));
         let workspace = Arc::downgrade(&guard);
         let guard = UnsafeInvokeZomeWorkspaceGuard {
             workspace: Some(guard),
@@ -85,6 +88,18 @@ impl UnsafeInvokeZomeWorkspace {
         };
         let workspace = Self { workspace };
         (guard, workspace)
+    }
+
+    #[cfg(test)]
+    /// Useful when we need this type for tests where we don't want to use it.
+    /// It will always return None.
+    pub fn test_dropped_guard() -> Self {
+        let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
+        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(fake_ptr)));
+        let workspace = Arc::downgrade(&guard);
+        // Make sure the weak Arc cannot be upgraded
+        std::mem::drop(guard);
+        Self { workspace }
     }
 
     pub async unsafe fn apply_ref<
@@ -99,10 +114,24 @@ impl UnsafeInvokeZomeWorkspace {
         // Check it exists
         match self.workspace.upgrade() {
             // Check that no-one else can write
-            Some(lock) => match lock.try_lock().ok() {
+            Some(lock) => match lock
+                .try_lock()
+                .map_err(|e| {
+                    if let std::sync::TryLockError::WouldBlock = e {
+                        error!(
+                            "{}{}{}",
+                            "Failed to get lock on unsafe type. ",
+                            "This means the lock is being used by multiple threads.",
+                            "This is a BUG and should not be happening"
+                        );
+                    }
+                    e
+                })
+                .ok()
+            {
                 Some(guard) => {
-                    let ffi: *mut std::ffi::c_void = guard.0;
-                    let sc = ffi as *const InvokeZomeWorkspace;
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *const InvokeZomeWorkspace;
                     match sc.as_ref() {
                         Some(s) => Some(f(s).await),
                         None => None,
@@ -126,10 +155,24 @@ impl UnsafeInvokeZomeWorkspace {
         // Check it exists
         match self.workspace.upgrade() {
             // Check that no-one else can write
-            Some(lock) => match lock.try_lock().ok() {
+            Some(lock) => match lock
+                .try_lock()
+                .map_err(|e| {
+                    if let std::sync::TryLockError::WouldBlock = e {
+                        error!(
+                            "{}{}{}",
+                            "Failed to get lock on unsafe type. ",
+                            "This means the lock is being used by multiple threads.",
+                            "This is a BUG and should not be happening"
+                        );
+                    }
+                    e
+                })
+                .ok()
+            {
                 Some(guard) => {
-                    let ffi: *mut std::ffi::c_void = guard.0;
-                    let sc = ffi as *mut InvokeZomeWorkspace;
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *mut InvokeZomeWorkspace;
                     match sc.as_mut() {
                         Some(s) => Some(f(s).await),
                         None => None,
