@@ -228,12 +228,10 @@ pub mod tests {
             let mut iter = source_chain.iter_back();
             let mut headers = Vec::new();
 
-            while let Some(addr) = iter.next().unwrap() {
-                if let Ok(Some(h)) = source_chain.get_header(&addr).await {
-                    let (h, _) = h.into_inner();
-                    let (h, _) = h.into_inner();
-                    headers.push(h);
-                }
+            while let Some(h) = iter.next().unwrap() {
+                let (h, _) = h.into_inner();
+                let (h, _) = h.into_inner();
+                headers.push(h);
             }
 
             assert_matches!(

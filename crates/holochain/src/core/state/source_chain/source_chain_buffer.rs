@@ -56,10 +56,6 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_element(k).await
     }
 
-    pub fn get_prev_header(&self, k: &HeaderAddress) -> DatabaseResult<Option<HeaderAddress>> {
-        self.cas.get_prev_header(k)
-    }
-
     pub async fn get_header(
         &self,
         k: &HeaderAddress,
@@ -138,14 +134,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         let mut iter = self.iter_back();
         let mut out = Vec::new();
 
-        while let Some(addr) = iter.next()? {
-            let h = match self.get_header(&addr).await? {
-                None => {
-                    out.push(JsonChainDump { element: None });
-                    continue;
-                }
-                Some(h) => h,
-            };
+        while let Some(h) = iter.next()? {
             let maybe_element = self.get_element(h.header_address()).await?;
             match maybe_element {
                 None => out.push(JsonChainDump { element: None }),
@@ -179,6 +168,8 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
     }
 }
 
+/// FallibleIterator returning SignedHeaderHashed instances from chain
+/// starting with the head, moving back to the origin (Dna) header.
 pub struct SourceChainBackwardIterator<'env, R: Readable> {
     store: &'env SourceChainBuf<'env, R>,
     current: Option<HeaderAddress>,
@@ -193,10 +184,8 @@ impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
     }
 }
 
-/// Follows Header.link through every previous Entry (of any EntryType) in the chain
-// #[holochain_tracing_macros::newrelic_autotrace(HOLOCHAIN_CORE)]
 impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
-    type Item = HeaderAddress;
+    type Item = SignedHeaderHashed;
     type Error = SourceChainError;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
@@ -204,8 +193,17 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
             None => Ok(None),
             Some(top) => {
                 let top = top.to_owned();
-                self.current = self.store.get_prev_header(&top)?;
-                Ok(Some(top))
+                // TODO - Using a block_on here due to FallibleIterator.
+                //        We should switch `iter_back()` to produce an async Stream.
+                let header: Option<SignedHeaderHashed> = tokio_safe_block_on::tokio_safe_block_on(
+                    async { self.store.get_header(&top).await },
+                    std::time::Duration::from_secs(1),
+                )??;
+                self.current = match &header {
+                    None => None,
+                    Some(header) => header.header().prev_header().map(|h| h.clone()),
+                };
+                Ok(header)
             }
         }
     }
@@ -320,10 +318,10 @@ pub mod tests {
             let mut iter = store.iter_back();
             let mut res = Vec::new();
 
-            while let Some(addr) = iter.next()? {
+            while let Some(h) = iter.next()? {
                 res.push(
                     store
-                        .get_element(&addr)
+                        .get_element(h.header_address())
                         .await
                         .unwrap()
                         .unwrap()
