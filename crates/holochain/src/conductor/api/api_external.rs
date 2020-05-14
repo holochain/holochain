@@ -155,7 +155,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
-            AdminRequest::ActivateApp {
+            ActivateApp {
                 hashes_with_proofs,
                 agent_key,
             } => {
@@ -182,7 +182,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
-            AdminRequest::DumpState(cell_id) => {
+            DumpState(cell_id) => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::JsonState(state))
             }

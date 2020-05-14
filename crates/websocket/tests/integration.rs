@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use tokio::stream::StreamExt;
 use url2::prelude::*;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct TestMessage(pub String);
 try_from_serialized_bytes!(TestMessage);
 
