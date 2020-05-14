@@ -24,7 +24,7 @@ jobs:
        auth:
         username: $DOCKER_USER
         password: $DOCKER_PASS
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - run:
