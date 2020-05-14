@@ -10,11 +10,14 @@ pub mod nucleus;
 // FIXME: remove these allows when entire lib is documented
 //      (these can be peeled off one by one to make iterative work easier)
 pub mod init;
+pub mod migrate_agent;
+pub mod post_commit;
 #[allow(missing_docs)]
 pub mod ribosome;
 #[allow(missing_docs)]
 pub mod signal;
 pub mod state;
 pub mod validate;
+pub mod validation_package;
 #[allow(missing_docs)]
 pub mod workflow;
