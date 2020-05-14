@@ -11,11 +11,13 @@ Current version: 0.0.1
 A utility to create a DNA file from a source working directory, and vice-versa
 
 This utility expects a working directory of the following structure:
+```sh
 test-dna.dna.workdir/
 ├── dna.json
 ├── test-zome-1.wasm
 └── test-zome-2.wasm
-
+```
+Usage instructions from the `--help` flag:
 ```sh
 $ dna_util --help
 
