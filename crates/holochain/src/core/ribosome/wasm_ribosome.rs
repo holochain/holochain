@@ -25,6 +25,7 @@ use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::globals::globals;
 use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::link_entries::link_entries;
+use crate::core::ribosome::host_fn::noop::noop;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::remove_entry::remove_entry;
@@ -35,6 +36,7 @@ use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::update_entry::update_entry;
+use crate::core::ribosome::AllowSideEffects;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeInvocation;
@@ -99,6 +101,8 @@ impl WasmRibosome {
 
     fn imports(&self, host_context: HostContext) -> ImportObject {
         let timeout = crate::start_hard_timeout!();
+
+        let allow_side_effects = host_context.allow_side_effects();
 
         // it is important that WasmRibosome and ZomeInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
@@ -174,17 +178,30 @@ impl WasmRibosome {
         ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
         ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         ns.insert("__capability", func!(invoke_host_function!(capability)));
+        ns.insert("__noop", func!(invoke_host_function!(noop)));
 
-        // if allow_side_effects {
-        ns.insert("__call", func!(invoke_host_function!(call)));
-        ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
-        ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
-        ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
-        ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
-        ns.insert("__send", func!(invoke_host_function!(send)));
-        ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
-        ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
-        // }
+        match allow_side_effects {
+            AllowSideEffects::Yes => {
+                ns.insert("__call", func!(invoke_host_function!(call)));
+                ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
+                ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
+                ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
+                ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
+                ns.insert("__send", func!(invoke_host_function!(send)));
+                ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
+                ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
+            }
+            AllowSideEffects::No => {
+                ns.insert("__call", func!(invoke_host_function!(noop)));
+                ns.insert("__commit_entry", func!(invoke_host_function!(noop)));
+                ns.insert("__emit_signal", func!(invoke_host_function!(noop)));
+                ns.insert("__link_entries", func!(invoke_host_function!(noop)));
+                ns.insert("__remove_link", func!(invoke_host_function!(noop)));
+                ns.insert("__send", func!(invoke_host_function!(noop)));
+                ns.insert("__update_entry", func!(invoke_host_function!(noop)));
+                ns.insert("__remove_entry", func!(invoke_host_function!(noop)));
+            }
+        }
         imports.register("env", ns);
 
         crate::end_hard_timeout!(timeout, crate::perf::WASM_INSTANCE);

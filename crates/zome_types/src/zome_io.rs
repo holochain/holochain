@@ -105,6 +105,10 @@ wasm_io_types!(
     // DebugMsg includes line numbers etc. so the wasm can tell the host about it's own code
     pub struct DebugInput(crate::debug::DebugMsg);
     pub struct DebugOutput(());
+    // there's nothing to go in or out of a noop
+    // used to "defuse" host functions when side effects are not allowed
+    pub struct NoopInput(());
+    pub struct NoopOutput(());
     // every externed function that the zome developer exposes to holochain returns GuestOutput
     // as the zome developer can expose callbacks in a "sparse" way based on names and the functions
     // can take different input (e.g. validation vs. hooks like init, etc.) all we can say is that

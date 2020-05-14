@@ -12,6 +12,7 @@ pub mod get_links;
 pub mod globals;
 pub mod keystore;
 pub mod link_entries;
+pub mod noop;
 pub mod property;
 pub mod query;
 pub mod remove_entry;

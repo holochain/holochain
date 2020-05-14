@@ -95,6 +95,9 @@ impl HostContext {
     }
 }
 
+/// represents whether a call is allowed to call host functions that have side effects
+/// e.g. we don't want to be writing during validation callbacks
+/// if this is No then the host functions still exist, but are no-ops
 #[derive(Clone, Copy, EnumIter)]
 pub enum AllowSideEffects {
     Yes,

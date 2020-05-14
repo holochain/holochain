@@ -49,7 +49,10 @@ impl<I: Invocation> FallibleIterator for CallIterator<WasmRibosome, I> {
                         };
                         let module_timeout = crate::start_hard_timeout!();
                         let module = self.ribosome.module(host_context.clone())?;
-                        crate::end_hard_timeout!(module_timeout, crate::perf::WASM_MODULE_CACHE_HIT);
+                        crate::end_hard_timeout!(
+                            module_timeout,
+                            crate::perf::WASM_MODULE_CACHE_HIT
+                        );
 
                         if module.info().exports.contains_key(&to_call) {
                             // there is a callback to_call and it is implemented in the wasm
