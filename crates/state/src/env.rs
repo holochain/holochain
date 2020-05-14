@@ -165,7 +165,6 @@ impl EnvironmentWrite {
         // remove the directory
         std::fs::remove_dir_all(&self.0.path)?;
         Ok(())
-
     }
 }
 

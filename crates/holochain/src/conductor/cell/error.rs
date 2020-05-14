@@ -1,5 +1,6 @@
 use crate::conductor::api::error::ConductorApiError;
 use holochain_state::error::DatabaseError;
+use holochain_types::cell::CellId;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -12,7 +13,9 @@ pub enum CellError {
     JoinError(#[from] tokio::task::JoinError),
     #[error("Genesis failed: {0}")]
     Genesis(#[from] Box<ConductorApiError>),
-    #[error("The environment was not created and is missing")]
+    #[error("This cell has not had a successful genesis and cannot be created")]
+    CellWithoutGenesis(CellId),
+    #[error("This cells environment has been removed")]
     EnvMissing,
 }
 

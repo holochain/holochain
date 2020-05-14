@@ -68,9 +68,10 @@ pub enum ConductorError {
     InterfaceError(#[from] Box<InterfaceError>),
 
     #[error("Failed to create the following cells in the app: {errors:?}")]
-    CreateCellsFailed{
-        errors: Vec<CellError>,
-    }
+    CreateCellsFailed { errors: Vec<CellError> },
+
+    #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
+    GenesisFailed { errors: Vec<CellError> },
 }
 
 // TODO: can this be removed?
