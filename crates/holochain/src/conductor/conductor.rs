@@ -361,11 +361,6 @@ where
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Cell>> {
         let cell_ids = self.get_state().await?.cell_ids;
-        // Only create if there are any cells
-        if cell_ids.len() == 0 {
-            return Ok(vec![]);
-        }
-
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
 
@@ -389,11 +384,12 @@ where
             .await
             .into_iter()
             .partition(Result::is_ok);
+
         // unwrap safe because of the partition
         let success = success.into_iter().map(Result::unwrap);
         // If there was errors, cleanup and return the errors
         if !errors.is_empty() {
-            for mut cell in success {
+            for cell in success {
                 cell.cleanup().await?;
             }
             // match needed to avoid Debug requirement on unwrap_err
@@ -467,7 +463,7 @@ where
 
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
-        let arc = cell.state_env()?;
+        let arc = cell.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
         let source_chain = SourceChainBuf::new(&reader, &env)?;

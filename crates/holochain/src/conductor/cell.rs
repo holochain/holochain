@@ -64,7 +64,7 @@ where
 {
     id: CellId,
     conductor_api: CA,
-    state_env: Option<EnvironmentWrite>,
+    state_env: EnvironmentWrite,
 }
 
 impl Cell {
@@ -91,8 +91,6 @@ impl Cell {
             let source_chain = SourceChainBuf::new(&reader, &env_ref)?;
             source_chain.len()
         };
-
-        let state_env = Some(state_env);
 
         // TODO: TK-01747: Make this check more robust
         if source_chain_len == 0 {
@@ -188,7 +186,7 @@ impl Cell {
         &self,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResult> {
-        let arc = self.state_env()?;
+        let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
         let workflow = InvokeZomeWorkflow {
@@ -196,17 +194,15 @@ impl Cell {
             invocation,
         };
         let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
-        Ok(run_workflow(self.state_env()?, workflow, workspace)
+        Ok(run_workflow(self.state_env().clone(), workflow, workspace)
             .await
             .map_err(Box::new)?)
     }
 
-    pub async fn cleanup(&mut self) -> CellResult<()> {
+    pub async fn cleanup(self) -> CellResult<()> {
         // Remove db from global map
         // Delete directory
-        if let Some(state_env) = self.state_env.take() {
-            state_env.remove().await?;
-        }
+        self.state_env.remove().await?;
         // TODO: Could anyone be using this db?
         // TODO: LMDB doesn't complain about a removed directory
         // so removing this could trick a workflow into thinking
@@ -223,8 +219,8 @@ impl Cell {
     }
 
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn state_env(&self) -> CellResult<EnvironmentWrite> {
-        self.state_env.clone().ok_or(CellError::EnvMissing)
+    pub(crate) fn state_env(&self) -> &EnvironmentWrite {
+        &self.state_env
     }
 }
 
