@@ -78,7 +78,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         if let Ok(Some((header, signature))) = self.headers.get(&header_address.to_owned().into()) {
             let header = HeaderHashed::with_data(header).await?;
-            assert_eq!(header_address, header.as_hash());
+            fatal_db_hash_check!("ChainCasBuf::get_header", header_address, header.as_hash());
             Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
         } else {
             Ok(None)

@@ -25,7 +25,7 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
             None => Ok(None),
             Some(wasm) => {
                 let wasm = DnaWasmHashed::with_data(wasm).await?;
-                assert_eq!(wasm_hash, wasm.as_hash());
+                fatal_db_hash_check!("WasmBuf::get", wasm_hash, wasm.as_hash());
                 Ok(Some(wasm))
             }
         }
