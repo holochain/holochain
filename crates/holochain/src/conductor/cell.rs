@@ -203,10 +203,6 @@ impl Cell {
         // Remove db from global map
         // Delete directory
         self.state_env.remove().await?;
-        // TODO: Could anyone be using this db?
-        // TODO: LMDB doesn't complain about a removed directory
-        // so removing this could trick a workflow into thinking
-        // it has committed to the db successfully
         Ok(())
     }
 
