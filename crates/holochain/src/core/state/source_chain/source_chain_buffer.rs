@@ -197,7 +197,7 @@ impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R
                 //        We should switch `iter_back()` to produce an async Stream.
                 let header: Option<SignedHeaderHashed> = tokio_safe_block_on::tokio_safe_block_on(
                     async { self.store.get_header(&top).await },
-                    std::time::Duration::from_secs(1),
+                    std::time::Duration::from_secs(10),
                 )??;
                 self.current = match &header {
                     None => None,

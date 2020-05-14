@@ -66,7 +66,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         header_address: &HeaderAddress,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         if let Ok(Some((header, signature))) = self.headers.get(&header_address.to_owned().into()) {
-            let header = HeaderHashed::with_data(header).await?;
+            let header = fatal_db_deserialize_check!(
+                "ChainCasBuf::get_header",
+                header_address,
+                HeaderHashed::with_data(header).await,
+            );
             fatal_db_hash_check!("ChainCasBuf::get_header", header_address, header.as_hash());
             Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
         } else {

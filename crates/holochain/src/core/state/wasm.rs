@@ -24,7 +24,11 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
         match self.wasm.get(&wasm_hash.clone().into())? {
             None => Ok(None),
             Some(wasm) => {
-                let wasm = DnaWasmHashed::with_data(wasm).await?;
+                let wasm = fatal_db_deserialize_check!(
+                    "WasmBuf::get",
+                    wasm_hash,
+                    DnaWasmHashed::with_data(wasm).await,
+                );
                 fatal_db_hash_check!("WasmBuf::get", wasm_hash, wasm.as_hash());
                 Ok(Some(wasm))
             }
