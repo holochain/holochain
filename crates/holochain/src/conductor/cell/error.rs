@@ -12,6 +12,8 @@ pub enum CellError {
     JoinError(#[from] tokio::task::JoinError),
     #[error("Genesis failed: {0}")]
     Genesis(#[from] Box<ConductorApiError>),
+    #[error("The environment was not created and is missing")]
+    EnvMissing,
 }
 
 pub type CellResult<T> = Result<T, CellError>;

@@ -256,7 +256,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.0.read().await;
         let cell = lock.cell_by_id(cell_id)?;
-        Ok(cell.state_env())
+        Ok(cell.state_env()?)
     }
 
     #[cfg(test)]

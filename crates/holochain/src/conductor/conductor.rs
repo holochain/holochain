@@ -305,7 +305,6 @@ where
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<Cell>> {
         let cell_ids = self.get_state().await?.cell_ids_with_proofs;
-        let len = cell_ids.len();
         // Only create if there are any cells
         if cell_ids.len() == 0 {
             return Ok(vec![]);
@@ -319,6 +318,43 @@ where
             .into_iter()
             .filter(|(cell_id, _)| !self.cells.contains_key(cell_id));
 
+        let cells_tasks = cells_to_create
+            .map(move |(cell_id, proof)| {
+                let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
+                tokio::spawn(Cell::create(
+                    cell_id,
+                    conductor_handle.clone(),
+                    root_env_dir,
+                    keystore.clone(),
+                    proof,
+                ))
+                .map_err(|e| CellError::from(e))
+                .and_then(|result| async { result })
+            })
+            .collect::<Vec<_>>();
+        let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
+            .await
+            .into_iter()
+            .partition(Result::is_ok);
+        // unwrap safe because of the partition
+        let success = success.into_iter().map(Result::unwrap);
+        // If there was errors, cleanup and return the errors
+        if !errors.is_empty() {
+            for mut cell in success {
+                cell.cleanup().await?;
+            }
+            // match needed to avoid Debug requirement on unwrap_err
+            let errors = errors.into_iter().map(|e| match e {
+                Err(e) => e,
+                Ok(_) => unreachable!("Safe because of the partition")
+            }).collect();
+            Err(ConductorError::CreateCellsFailed { errors })
+        } else {
+            // No errors so return the cells
+            Ok(success.collect())
+        }
+
+        /*
         // Create the cells in parrallel
         // This will exit on the first failure however
         // The cells may still finish genesis in the background.
@@ -341,8 +377,7 @@ where
             // Exit early if any fail
             .try_collect::<Vec<_>>()
             .await?;
-
-        Ok(cells)
+            */
     }
 
     /// Register CellIds in the database
@@ -401,7 +436,7 @@ where
 
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
-        let arc = cell.state_env();
+        let arc = cell.state_env()?;
         let env = arc.guard().await;
         let reader = env.reader()?;
         let source_chain = SourceChainBuf::new(&reader, &env)?;

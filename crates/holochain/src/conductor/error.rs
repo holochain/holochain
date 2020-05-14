@@ -66,6 +66,11 @@ pub enum ConductorError {
     // Box is to avoid cycle in error definition
     #[error(transparent)]
     InterfaceError(#[from] Box<InterfaceError>),
+
+    #[error("Failed to create the following cells in the app: {errors:?}")]
+    CreateCellsFailed{
+        errors: Vec<CellError>,
+    }
 }
 
 // TODO: can this be removed?

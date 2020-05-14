@@ -61,7 +61,7 @@ where
 {
     id: CellId,
     conductor_api: CA,
-    state_env: EnvironmentWrite,
+    state_env: Option<EnvironmentWrite>,
 }
 
 impl Cell {
@@ -85,6 +85,7 @@ impl Cell {
             let source_chain = SourceChainBuf::new(&reader, &env_ref)?;
             source_chain.len()
         };
+        let state_env = Some(state_env);
         let cell = Self {
             id: id.clone(),
             conductor_api,
@@ -138,7 +139,7 @@ impl Cell {
         &self,
         invocation: ZomeInvocation,
     ) -> ConductorApiResult<ZomeInvocationResult> {
-        let arc = self.state_env();
+        let arc = self.state_env()?;
         let env = arc.guard().await;
         let reader = env.reader()?;
         let workflow = InvokeZomeWorkflow {
@@ -146,7 +147,7 @@ impl Cell {
             invocation,
         };
         let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
-        Ok(run_workflow(self.state_env(), workflow, workspace)
+        Ok(run_workflow(self.state_env()?, workflow, workspace)
             .await
             .map_err(Box::new)?)
     }
@@ -156,7 +157,7 @@ impl Cell {
         dna_file: DnaFile,
         membrane_proof: Option<SerializedBytes>,
     ) -> ConductorApiResult<()> {
-        let arc = self.state_env();
+        let arc = self.state_env()?;
         let env = arc.guard().await;
         let reader = env.reader()?;
         let workspace = GenesisWorkspace::new(&reader, &env)?;
@@ -168,9 +169,22 @@ impl Cell {
             membrane_proof,
         );
 
-        Ok(run_workflow(self.state_env(), workflow, workspace)
+        Ok(run_workflow(self.state_env()?, workflow, workspace)
             .await
             .map_err(Box::new)?)
+    }
+
+    pub async fn cleanup(&mut self) -> CellResult<()> {
+        // Remove db from global map
+        // Delete directory
+        if let Some(state_env) = self.state_env.take() {
+            state_env.remove().await?;
+        }
+        // TODO: Could anyone be using this db?
+        // TODO: LMDB doesn't complain about a removed directory
+        // so removing this could trick a workflow into thinking
+        // it has committed to the db successfully
+        Ok(())
     }
 
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
@@ -182,8 +196,8 @@ impl Cell {
     }
 
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn state_env(&self) -> EnvironmentWrite {
-        self.state_env.clone()
+    pub(crate) fn state_env(&self) -> CellResult<EnvironmentWrite> {
+        self.state_env.clone().ok_or(CellError::EnvMissing)
     }
 }
 
