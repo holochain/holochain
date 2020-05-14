@@ -302,11 +302,6 @@ where
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<Vec<CellId>> {
-        // Only continue if there are any cells
-        if cell_ids_with_proofs.len() == 0 {
-            return Ok(vec![]);
-        }
-
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
 
