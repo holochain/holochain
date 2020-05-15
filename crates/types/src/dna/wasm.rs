@@ -19,6 +19,13 @@ pub struct DnaWasm {
     code: Arc<Vec<u8>>,
 }
 
+holo_hash::make_hashed! {
+    Visibility(pub),
+    HashedName(DnaWasmHashed),
+    ContentType(DnaWasm),
+    HashType(holo_hash::WasmHash),
+}
+
 impl TryFrom<&DnaWasm> for SerializedBytes {
     type Error = SerializedBytesError;
     fn try_from(dna_wasm: &DnaWasm) -> Result<Self, Self::Error> {
