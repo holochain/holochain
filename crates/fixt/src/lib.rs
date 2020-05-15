@@ -276,6 +276,35 @@ macro_rules! newtype_fixturator {
 }
 
 #[macro_export]
+/// a direct delegation of fixtures to the inner type for wasm io types
+/// @see zome types crate
+macro_rules! wasm_io_fixturator {
+    ( $outer:ident<$inner:ty> ) => {
+        fixturator!(
+            $outer,
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer::new(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer::new(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer::new(fixturator.next().unwrap())
+            }
+        );
+    };
+}
+
+#[macro_export]
 /// Creates a simple way to generate enums that use the strum way of iterating
 /// https://docs.rs/strum/0.18.0/strum/
 /// iterates over all the variants (Predictable) or selects random variants (Unpredictable)

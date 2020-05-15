@@ -25,15 +25,20 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
 use error::RibosomeResult;
 use fixt::prelude::*;
 use holo_hash::AgentPubKey;
+use holo_hash::AgentPubKeyFixturator;
 use holo_hash::HeaderHash;
+use holo_hash::HeaderHashFixturator;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
+use holochain_types::cell::CellIdFixturator;
 use holochain_types::dna::DnaFile;
 use holochain_types::shims::*;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 use holochain_zome_types::HostInput;
@@ -159,6 +164,84 @@ pub struct ZomeInvocation {
     pub as_at: HeaderHash,
 }
 
+fixturator!(
+    ZomeInvocation,
+    {
+        ZomeInvocation {
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
+                .next()
+                .unwrap(),
+            cell_id: CellIdFixturator::new(Empty).next().unwrap(),
+            zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
+            cap: CapTokenFixturator::new(Empty).next().unwrap(),
+            fn_name: StringFixturator::new(Empty).next().unwrap(),
+            payload: HostInputFixturator::new(Empty).next().unwrap(),
+            provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
+            as_at: HeaderHashFixturator::new(Empty).next().unwrap(),
+        }
+    },
+    {
+        ZomeInvocation {
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+            cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
+            zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
+            cap: CapTokenFixturator::new(Unpredictable).next().unwrap(),
+            fn_name: StringFixturator::new(Unpredictable).next().unwrap(),
+            payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
+            provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+            as_at: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
+        }
+    },
+    {
+        let ret = ZomeInvocation {
+            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            cell_id: CellIdFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            cap: CapTokenFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            fn_name: StringFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            payload: HostInputFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            provenance: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            as_at: HeaderHashFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+        };
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
+
+/// Fixturator curve for a named zome invocation
+/// cell id, test wasm for zome to call, function name, host input payload
+pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub HostInput);
+
+impl Iterator for ZomeInvocationFixturator<NamedInvocation> {
+    type Item = ZomeInvocation;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut ret = ZomeInvocationFixturator::new(Unpredictable).next().unwrap();
+        ret.cell_id = self.0.curve.0.clone();
+        ret.zome_name = self.0.curve.1.clone().into();
+        ret.fn_name = self.0.curve.2.clone();
+        ret.payload = self.0.curve.3.clone();
+        Some(ret)
+    }
+}
+
 impl Invocation for ZomeInvocation {
     fn allow_side_effects(&self) -> bool {
         true
@@ -242,39 +325,15 @@ pub trait RibosomeT: Sized {
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeInvocation;
     use crate::core::ribosome::ZomeInvocationResponse;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
     use holo_hash::holo_hash_core::HeaderHash;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::test_utils::fake_header_hash;
-    use holochain_types::test_utils::{fake_agent_pubkey_1, fake_cap_token, fake_cell_id};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::commit::CommitEntryResult;
-    use holochain_zome_types::zome::ZomeName;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
-
-    pub fn zome_invocation_from_names(
-        zome_name: ZomeName,
-        fn_name: &str,
-        payload: SerializedBytes,
-    ) -> ZomeInvocation {
-        ZomeInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Empty)
-                .next()
-                .unwrap(),
-            zome_name,
-            fn_name: fn_name.into(),
-            cell_id: fake_cell_id("bob"),
-            cap: fake_cap_token(),
-            payload: HostInput::new(payload),
-            provenance: fake_agent_pubkey_1(),
-            as_at: fake_header_hash("fake"),
-        }
-    }
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -298,11 +357,18 @@ pub mod wasm_test {
 
                 let timeout = $crate::start_hard_timeout!();
 
-                let invocation = $crate::core::ribosome::wasm_test::zome_invocation_from_names(
-                    $test_wasm.into(),
-                    $fn_name,
-                    $input.try_into().unwrap(),
-                );
+                let invocation = $crate::core::ribosome::ZomeInvocationFixturator::new(
+                    $crate::core::ribosome::NamedInvocation(
+                        holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                            .next()
+                            .unwrap(),
+                        $test_wasm.into(),
+                        $fn_name.into(),
+                        holochain_zome_types::HostInput::new($input.try_into().unwrap()),
+                    ),
+                )
+                .next()
+                .unwrap();
                 let zome_invocation_response = ribosome.call_zome_function(invocation).unwrap();
 
                 // instance building off a warm module should be the slowest part of a wasm test
@@ -332,11 +398,18 @@ pub mod wasm_test {
             .next()
             .unwrap();
 
-        let invocation = zome_invocation_from_names(
-            TestWasm::Foo.into(),
-            "foo",
-            SerializedBytes::try_from(()).unwrap(),
-        );
+        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+            crate::core::ribosome::NamedInvocation(
+                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                    .next()
+                    .unwrap(),
+                TestWasm::Foo.into(),
+                "foo".into(),
+                HostInput::new(().try_into().unwrap()),
+            ),
+        )
+        .next()
+        .unwrap();
 
         assert_eq!(
             ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(

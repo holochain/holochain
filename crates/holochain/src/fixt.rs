@@ -21,13 +21,17 @@ use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
+use holochain_zome_types::HostInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+wasm_io_fixturator!(HostInput<SerializedBytes>);
+
 newtype_fixturator!(ZomeName<String>);
+
 fixturator!(
     MigrateAgent,
     MigrateAgent::Close,

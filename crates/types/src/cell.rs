@@ -2,7 +2,8 @@
 //! can track its source chain and service network requests / responses.
 
 use derive_more::{Display, From, Into};
-use holo_hash::{AgentPubKey, DnaHash};
+use fixt::prelude::*;
+use holo_hash::{AgentPubKey, AgentPubKeyFixturator, DnaHash, DnaHashFixturator};
 use std::fmt;
 
 /// The unique identifier for a Cell.
@@ -10,6 +11,30 @@ use std::fmt;
 /// and sufficient to refer to a cell in a conductor
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CellId(DnaHash, AgentPubKey);
+
+fixturator!(
+    CellId,
+    CellId(
+        DnaHashFixturator::new(Empty).next().unwrap(),
+        AgentPubKeyFixturator::new(Empty).next().unwrap()
+    ),
+    CellId(
+        DnaHashFixturator::new(Unpredictable).next().unwrap(),
+        AgentPubKeyFixturator::new(Unpredictable).next().unwrap()
+    ),
+    {
+        let ret = CellId(
+            DnaHashFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+        );
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
 
 /// A conductor-specific name for a Cell
 /// (Used to be instance_id)

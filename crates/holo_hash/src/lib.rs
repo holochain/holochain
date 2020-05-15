@@ -526,6 +526,16 @@ fixturator!(
     HeaderHash::with_pre_hashed_sync(vec![0xdb; 32])
 );
 
+fixturator!(
+    AgentPubKey,
+    AgentPubKey::with_pre_hashed_sync(vec![0; 32]),
+    {
+        let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
+        AgentPubKey::with_pre_hashed_sync(random_bytes)
+    },
+    AgentPubKey::with_pre_hashed_sync(vec![0xdb; 32])
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;

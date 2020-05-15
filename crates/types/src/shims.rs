@@ -1,8 +1,12 @@
 use crate::prelude::*;
 use derive_more::Constructor;
+use fixt::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapToken;
+
+fixturator!(CapToken, CapToken, CapToken, CapToken);
+
 #[derive(Clone, Constructor, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
 pub struct CapabilityRequest {
     cap_token: CapToken,

@@ -244,10 +244,7 @@ mod test {
         state::ConductorState,
         Conductor, ConductorHandle,
     };
-    use crate::core::{
-        ribosome::wasm_test::zome_invocation_from_names,
-        state::source_chain::{SourceChain, SourceChainBuf},
-    };
+    use crate::core::state::source_chain::{SourceChain, SourceChainBuf};
     use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
@@ -263,6 +260,7 @@ mod test {
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
+    use holochain_zome_types::HostInput;
     use matches::assert_matches;
     use mockall::predicate;
     use std::{collections::HashMap, convert::TryInto};
@@ -477,12 +475,18 @@ mod test {
             .returning(move |_| Some(dna.clone()));
 
         let (_tmpdir, app_api) = setup_app(cell_id.clone(), dna_store).await;
-        let mut request = Box::new(zome_invocation_from_names(
-            TestWasm::Foo.into(),
-            "foo",
-            payload.try_into().unwrap(),
-        ));
-        request.cell_id = cell_id;
+        let request = Box::new(
+            crate::core::ribosome::ZomeInvocationFixturator::new(
+                crate::core::ribosome::NamedInvocation(
+                    cell_id,
+                    TestWasm::Foo.into(),
+                    "foo".into(),
+                    HostInput::new(payload.try_into().unwrap()),
+                ),
+            )
+            .next()
+            .unwrap(),
+        );
         let msg = AppRequest::ZomeInvocationRequest { request };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
