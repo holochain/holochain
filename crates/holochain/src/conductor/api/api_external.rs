@@ -4,6 +4,7 @@ use super::error::{
 use crate::{
     conductor::{
         config::AdminInterfaceConfig,
+        error::CreateAppError,
         interface::error::{InterfaceError, InterfaceResult},
         ConductorHandle,
     },
@@ -12,6 +13,7 @@ use crate::{
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
+    app::{AppId, AppPaths, MembraneProofs},
     cell::{CellHandle, CellId},
     dna::{DnaFile, Properties},
     nucleus::{ZomeInvocation, ZomeInvocationResponse},
@@ -128,11 +130,43 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .add_admin_interfaces_via_handle(self.conductor_handle.clone(), configs)
                     .await?,
             )),
-            InstallDna(dna_path, properties) => {
-                trace!(?dna_path);
-                let dna = read_parse_dna(dna_path, properties).await?;
-                self.conductor_handle.install_dna(dna).await?;
-                Ok(AdminResponse::DnaInstalled)
+            InstallApp { app_paths, proofs } => {
+                trace!(?app_paths.dnas);
+                let AppPaths {
+                    app_id,
+                    agent_key,
+                    dnas,
+                } = app_paths;
+                let proofs = proofs.proofs;
+
+                // Install Dnas
+                let install_dna_tasks = dnas.into_iter().map(|(dna_path, properties)| async {
+                    let dna = read_parse_dna(dna_path, properties).await?;
+                    let hash = dna.dna_hash().clone();
+                    self.conductor_handle.install_dna(dna).await?;
+                    ConductorApiResult::Ok(hash)
+                });
+
+                // Collect proofs
+                let cell_ids_with_proofs = futures::future::join_all(install_dna_tasks)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .map(|hash| {
+                        (
+                            CellId::from((hash.clone(), agent_key.clone())),
+                            proofs.get(&hash).cloned(),
+                        )
+                    })
+                    .collect();
+
+                // Call genesis
+                self.conductor_handle
+                    .genesis_cells(app_id, cell_ids_with_proofs, self.conductor_handle.clone())
+                    .await?;
+
+                Ok(AdminResponse::AppInstalled)
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -156,24 +190,30 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
             }
-            ActivateApp {
-                hashes_with_proofs,
-                agent_key,
-            } => {
+            ActivateApp { app_id } => {
+                // Activate app
+                self.conductor_handle.activate_app(app_id.clone()).await?;
+
                 // Create cells
-                let cell_ids_with_proofs = hashes_with_proofs
-                    .iter()
-                    .cloned()
-                    .map(|(dna_hash, proof)| (CellId::from((dna_hash, agent_key.clone())), proof))
-                    .collect();
-                self.conductor_handle
-                    .genesis_cells(cell_ids_with_proofs, self.conductor_handle.clone())
-                    .await?;
-                self.conductor_handle
+                let errors = self
+                    .conductor_handle
                     .setup_cells(self.conductor_handle.clone())
                     .await?;
 
-                Ok(AdminResponse::AppsActivated)
+                // Check if this app was created successfully
+                errors
+                    .into_iter()
+                    // We only care about this app for the activate command
+                    .find(|cell_error| match cell_error {
+                        CreateAppError::Failed {
+                            app_id: error_app_id,
+                            ..
+                        } => error_app_id == &app_id,
+                    })
+                    // There was an error in this app so return it
+                    .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
+                    // No error, return success
+                    .unwrap_or(Ok(AdminResponse::AppsActivated))
             }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
@@ -293,7 +333,7 @@ pub enum AdminResponse {
     /// This response is unimplemented
     Unimplemented(AdminRequest),
     /// [Dna] has successfully been installed
-    DnaInstalled,
+    AppInstalled,
     /// AdminInterfaces have successfully been added
     AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
@@ -341,8 +381,15 @@ pub enum AdminRequest {
     Stop(CellHandle),
     /// Set up and register an Admin interface task
     AddAdminInterfaces(Vec<AdminInterfaceConfig>),
-    /// Install a [Dna] from a path with optional properties
-    InstallDna(PathBuf, Option<serde_json::Value>),
+    /// Install an app from a list of Dna paths
+    /// Triggers genesis to be run on all cells and
+    /// Dnas to be stored
+    InstallApp {
+        /// App Id, [AgentPubKey] and paths to Dnas
+        app_paths: AppPaths,
+        /// Optional membrane proofs for Dnas
+        proofs: MembraneProofs,
+    },
     /// List all installed [Dna]s
     ListDnas,
     /// Generate a new AgentPubKey
@@ -351,10 +398,8 @@ pub enum AdminRequest {
     ListAgentPubKeys,
     /// Activate a list of apps
     ActivateApp {
-        /// Hash for each dna to be activated and maybe a proof
-        hashes_with_proofs: Vec<(DnaHash, Option<SerializedBytes>)>,
-        /// The agent who is activating them
-        agent_key: AgentPubKey,
+        /// The id of the app to activate
+        app_id: AppId,
     },
     /// Attach a [AppInterfaceApi]
     AttachAppInterface {
@@ -397,7 +442,7 @@ mod test {
     use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
     use holochain_types::{
         observability,
-        test_utils::{fake_dna_file, write_fake_dna_file},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, write_fake_dna_file},
     };
     use matches::assert_matches;
     use uuid::Uuid;
@@ -417,10 +462,17 @@ mod test {
         let dna = fake_dna_file(&uuid.to_string());
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_hash = dna.dna_hash().clone();
+        let agent_key = fake_agent_pubkey_1();
+        let app_paths = AppPaths {
+            dnas: vec![(dna_path, None)],
+            app_id: "test".to_string(),
+            agent_key,
+        };
+        let proofs = MembraneProofs::empty();
         let install_response = admin_api
-            .handle_admin_request(AdminRequest::InstallDna(dna_path, None))
+            .handle_admin_request(AdminRequest::InstallApp { app_paths, proofs })
             .await;
-        assert_matches!(install_response, AdminResponse::DnaInstalled);
+        assert_matches!(install_response, AdminResponse::AppInstalled);
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);

@@ -1,5 +1,6 @@
 use crate::conductor::interface::InterfaceDriver;
-use holochain_types::{cell::CellId, dna::error::DnaError};
+
+use holochain_types::{app::Apps, cell::CellId, dna::error::DnaError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -10,7 +11,10 @@ use std::collections::HashMap;
 /// via string IDs.
 #[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct ConductorState {
-    // TODO: B-01610: Maybe we shouldn't store proofs here
+    /// Apps that are ready to be activated
+    pub inactive_apps: Apps,
+    /// Apps that are active and will be loaded
+    pub active_apps: Apps,
     /// List of cell IDs, includes references to an agent and a DNA. Optional.
     #[serde(default)]
     pub cell_ids: Vec<CellId>,

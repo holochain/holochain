@@ -46,13 +46,22 @@
 //! code which interacted with the Conductor would also have to be highly generic.
 
 use super::{
-    api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
-    error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
+    api::error::ConductorApiResult,
+    config::AdminInterfaceConfig,
+    dna_store::DnaStore,
+    error::{ConductorResult, CreateAppError},
+    manager::TaskManagerRunHandle,
+    Cell, Conductor,
 };
 use crate::core::workflow::ZomeInvocationResult;
 use derive_more::From;
 use holochain_types::{
-    autonomic::AutonomicCue, cell::CellId, dna::DnaFile, nucleus::ZomeInvocation, prelude::*,
+    app::{App, AppId},
+    autonomic::AutonomicCue,
+    cell::CellId,
+    dna::DnaFile,
+    nucleus::ZomeInvocation,
+    prelude::*,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -129,13 +138,17 @@ pub trait ConductorHandleT: Send + Sync {
     /// Run genesis on [CellId]s and add them to the db
     async fn genesis_cells(
         &self,
+        app_id: AppId,
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         cell_api: ConductorHandle,
     ) -> ConductorResult<()>;
 
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
-    async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+    async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<Vec<CreateAppError>>;
+
+    /// Activate an app
+    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -237,27 +250,45 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn genesis_cells(
         &self,
+        app_id: AppId,
         cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         cell_api: ConductorHandle,
     ) -> ConductorResult<()> {
-        let cells = {
+        let cell_ids = {
             self.0
                 .read()
                 .await
                 .genesis_cells(cells_ids_with_proofs, cell_api)
                 .await?
         };
+        let app = App { app_id, cell_ids };
         // Update the db
-        self.0.write().await.add_cell_ids_to_db(cells).await
+        self.0.write().await.add_inactive_app_to_db(app).await
     }
 
-    async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<()> {
+    async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<Vec<CreateAppError>> {
         let cells = {
             let lock = self.0.read().await;
-            lock.create_cells(handle).await?
+            lock.create_active_app_cells(handle).await?.into_iter()
         };
-        self.0.write().await.add_cells(cells);
-        Ok(())
+        let add_cells_tasks = cells.map(|result| async {
+            match result {
+                Ok(cells) => {
+                    self.0.write().await.add_cells(cells);
+                    None
+                }
+                Err(e) => Some(e),
+            }
+        });
+        Ok(futures::future::join_all(add_cells_tasks)
+            .await
+            .into_iter()
+            .filter_map(|r| r)
+            .collect())
+    }
+
+    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
+        self.0.write().await.activate_app_in_db(app_id).await
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
@@ -326,12 +357,15 @@ pub mod mock {
             fn sync_keystore(&self) -> &KeystoreSender;
 
             fn sync_genesis_cells(
-        &self,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        cell_api: ConductorHandle,
-    ) -> ConductorResult<()>;
+                &self,
+                app_id: AppId,
+                cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+                cell_api: ConductorHandle,
+            ) -> ConductorResult<()>;
 
-            fn sync_setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+            fn sync_setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<Vec<CreateAppError>>;
+            
+            fn sync_activate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
             fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
@@ -414,16 +448,24 @@ pub mod mock {
 
         async fn genesis_cells(
             &self,
+            app_id: AppId,
             cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
             cell_api: ConductorHandle,
         ) -> ConductorResult<()> {
-            self.sync_genesis_cells(cell_ids_with_proofs, cell_api)
+            self.sync_genesis_cells(app_id, cell_ids_with_proofs, cell_api)
         }
 
         /// Setup the cells from the database
         /// Only creates any cells that are not already created
-        async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()> {
+        async fn setup_cells(
+            &self,
+            cell_api: ConductorHandle,
+        ) -> ConductorResult<Vec<CreateAppError>> {
             self.sync_setup_cells(cell_api)
+        }
+        
+        async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
+            self.sync_activate_app(app_id)
         }
 
         /// Dump the cells state

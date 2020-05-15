@@ -11,8 +11,9 @@ use crate::{
         ribosome::WasmRibosome,
         state::source_chain::SourceChainBuf,
         workflow::{
-            run_workflow, GenesisWorkflow, GenesisWorkspace, InvokeZomeWorkflow,
-            InvokeZomeWorkspace, ZomeInvocationResult,
+            run_workflow, GenesisWorkflow, GenesisWorkspace, InitializeZomesWorkflow,
+            InitializeZomesWorkspace, InvokeZomeWorkflow, InvokeZomeWorkspace,
+            ZomeInvocationResult,
         },
     },
 };
@@ -25,7 +26,7 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    autonomic::AutonomicProcess, cell::CellId, nucleus::ZomeInvocation, prelude::Todo,
+    autonomic::AutonomicProcess, cell::CellId, nucleus::ZomeInvocation, prelude::Todo, Header,
 };
 use std::{
     hash::{Hash, Hasher},
@@ -89,11 +90,24 @@ impl Cell {
             let env_ref = state_env.guard().await;
             let reader = env_ref.reader()?;
             let source_chain = SourceChainBuf::new(&reader, &env_ref)?;
+
+            // Check if initialization has run
+            if let Some(Header::InitZomesComplete(_)) = source_chain.get_index(4).await? {
+            } else {
+                // If not run it
+                // TODO: B-01085 Run this when initializa zomes is complete
+                let _run_init = || async {
+                    let workspace = InitializeZomesWorkspace {};
+                    let workflow = InitializeZomesWorkflow {};
+                    run_workflow(state_env.clone(), workflow, workspace).await
+                };
+            }
+
             source_chain.len()
         };
 
         // TODO: TK-01747: Make this check more robust
-        if source_chain_len == 0 {
+        if source_chain_len == 4 {
             Err(CellError::CellWithoutGenesis(id))
         } else {
             Ok(Self {
@@ -197,9 +211,13 @@ impl Cell {
     }
 
     pub async fn cleanup(self) -> CellResult<()> {
+        let path = self.state_env.path().clone();
         // Remove db from global map
         // Delete directory
-        self.state_env.remove().await?;
+        self.state_env
+            .remove()
+            .await
+            .map_err(|e| CellError::Cleanup(e.to_string(), path))?;
         Ok(())
     }
 

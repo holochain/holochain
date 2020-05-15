@@ -4,6 +4,7 @@
 #![deny(missing_docs)]
 
 pub mod address;
+pub mod app;
 pub mod autonomic;
 pub mod cell;
 pub mod db;

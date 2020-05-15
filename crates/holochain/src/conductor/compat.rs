@@ -87,8 +87,19 @@ pub async fn load_conductor_from_legacy_config(
 
     let app_interfaces = extract_app_interfaces(legacy.interfaces);
 
-    conductor.genesis_cells(cell_ids, conductor.clone()).await?;
-    conductor.setup_cells(conductor.clone()).await?;
+    // There is only one app and it wont be referenced
+    // externally so we can use LEGACY as the id
+    let app_id = "LEGACY".to_string();
+    conductor
+        .genesis_cells(app_id.clone(), cell_ids, conductor.clone())
+        .await?;
+    conductor.activate_app(app_id.clone()).await?;
+    let errors = conductor.setup_cells(conductor.clone()).await?;
+
+    // If there are any errors return the first one
+    if let Some(error) = errors.into_iter().next() {
+        return Err(ConductorError::from(error).into());
+    }
 
     for i in app_interfaces {
         let InterfaceConfig {
@@ -307,13 +318,17 @@ pub mod tests {
             .returning(|_| Ok(()));
         handle
             .expect_sync_genesis_cells()
-            .with(predicate::eq(expected_cell_ids), predicate::always())
+            .with(
+                predicate::always(),
+                predicate::eq(expected_cell_ids),
+                predicate::always(),
+            )
             .times(1)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
         handle
             .expect_sync_setup_cells()
             .times(1)
-            .returning(|_| Ok(()));
+            .returning(|_| Ok(vec![]));
         handle
             .expect_sync_add_app_interface_via_handle()
             .with(predicate::eq(1111), predicate::always())
