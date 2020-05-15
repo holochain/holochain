@@ -1,6 +1,6 @@
 //! Types related to making calls into Zomes.
 
-use crate::{cell::CellId, prelude::*, shims::CapToken};
+use crate::{capability::CapSecret, cell::CellId, prelude::*};
 use holo_hash::AgentPubKey;
 use holochain_zome_types::*;
 
@@ -17,7 +17,7 @@ pub struct ZomeInvocation {
     /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
     /// The capability request authorization this [ZomeInvocation]
-    pub cap: CapToken,
+    pub cap: CapSecret,
     /// The name of the Zome function to call
     pub fn_name: String,
     /// The serialized data to pass an an argument to the Zome call
