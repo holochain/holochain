@@ -2,22 +2,30 @@ use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
 use holochain_2020::conductor::{
-    api::{AdminRequest, AdminResponse},
+    api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
     config::*,
     error::ConductorError,
     Conductor, ConductorHandle,
 };
 use holochain_types::{
+    cell::CellId,
     dna::{DnaFile, Properties},
+    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     observability,
     prelude::*,
-    test_utils::{fake_dna_file, write_fake_dna_file},
+    test_utils::{
+        fake_agent_pubkey_1, fake_cap_token, fake_dna_file, fake_dna_zomes, fake_header_hash,
+        write_fake_dna_file,
+    },
 };
+use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
+use holochain_zome_types::*;
 use matches::assert_matches;
 use std::sync::Arc;
 use std::{path::PathBuf, process::Stdio, time::Duration};
 use tempdir::TempDir;
+use test_wasm_common::TestString;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::stream::StreamExt;
@@ -76,15 +84,17 @@ fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
     path
 }
 
-async fn check_timeout(
+#[instrument(skip(holochain, response))]
+async fn check_timeout<T>(
     holochain: &mut Child,
-    response: impl Future<Output = Result<AdminResponse, std::io::Error>>,
+    response: impl Future<Output = Result<T, std::io::Error>>,
     timeout_millis: u64,
-) -> AdminResponse {
+) -> T {
     match tokio::time::timeout(std::time::Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response.unwrap(),
         Err(_) => {
             holochain.kill().unwrap();
+            error!("Timeout");
             panic!("Timed out on request");
         }
     }
@@ -110,6 +120,23 @@ async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Websock
         Arc::new(WebsocketConfig::default()),
     )
     .await?)
+}
+
+fn zome_invocation_from_names(
+    zome_name: &str,
+    fn_name: &str,
+    payload: SerializedBytes,
+    cell_id: CellId,
+) -> ZomeInvocation {
+    ZomeInvocation {
+        zome_name: zome_name.into(),
+        fn_name: fn_name.into(),
+        cell_id,
+        cap: fake_cap_token(),
+        payload: ZomeExternHostInput::new(payload),
+        provenance: fake_agent_pubkey_1(),
+        as_at: fake_header_hash("fake"),
+    }
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -174,6 +201,106 @@ async fn call_admin() {
 
     let expects = vec![dna.dna_hash().clone()];
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
+
+    holochain.kill().expect("Failed to kill holochain");
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn call_zome() {
+    observability::test_run().ok();
+    // NOTE: This is a full integration test that
+    // actually runs the holochain binary
+
+    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    let port = 9910;
+
+    let tmp_dir = TempDir::new("conductor_cfg_2").unwrap();
+    let path = tmp_dir.path().to_path_buf();
+    let environment_path = path.clone();
+    let config = create_config(port, environment_path);
+    let config_path = write_config(path, &config);
+
+    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
+    let mut cmd = Command::from(cmd);
+    cmd.arg("--structured")
+        .arg("--config-path")
+        .arg(config_path)
+        .env("RUST_LOG", "trace")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
+    spawn_output(&mut holochain);
+    check_started(&mut holochain).await;
+
+    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
+
+    let uuid = Uuid::new_v4();
+    let dna = fake_dna_zomes(
+        &uuid.to_string(),
+        vec![("zomey".into(), TestWasm::Foo.into())],
+    );
+    let original_dna_hash = dna.dna_hash().clone();
+
+    // Install Dna
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+    let request = AdminRequest::InstallDna(fake_dna_path, None);
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 3000).await;
+    assert_matches!(response, AdminResponse::DnaInstalled);
+
+    // List Dnas
+    let request = AdminRequest::ListDnas;
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+
+    let expects = vec![original_dna_hash.clone()];
+    assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
+
+    // Activate cells
+    let dna_hashes = vec![(original_dna_hash.clone(), None)];
+    let request = AdminRequest::ActivateApp {
+        hashes_with_proofs: dna_hashes,
+        agent_key: fake_agent_pubkey_1(),
+    };
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+    assert_matches!(response, AdminResponse::AppsActivated);
+
+    // Attach App Interface
+    let request = AdminRequest::AttachAppInterface { port: None };
+    let response = client.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+    let app_port = match response {
+        AdminResponse::AppInterfaceAttached { port } => port,
+        _ => panic!("Attach app interface failed: {:?}", response),
+    };
+
+    // Connect to App Interface
+    let (mut app_interface, _) = websocket_client_by_port(app_port).await.unwrap();
+
+    // Call Zome
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+    struct Payload {
+        a: u32,
+    }
+    let payload = Payload { a: 1 };
+    let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
+    let request = Box::new(zome_invocation_from_names(
+        "zomey",
+        "foo",
+        payload.try_into().unwrap(),
+        cell_id,
+    ));
+    let request = AppRequest::ZomeInvocationRequest { request };
+    let response = app_interface.request(request);
+    let call_response = check_timeout(&mut holochain, response, 2000).await;
+    let foo = TestString::from(String::from("foo"));
+    let expected = Box::new(ZomeInvocationResponse::ZomeApiFn(
+        ZomeExternGuestOutput::new(foo.try_into().unwrap()),
+    ));
+    trace!(?call_response);
+    assert_matches!(call_response, AppResponse::ZomeInvocationResponse{ response } if response == expected);
 
     holochain.kill().expect("Failed to kill holochain");
 }

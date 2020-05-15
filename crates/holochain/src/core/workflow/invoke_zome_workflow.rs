@@ -1,14 +1,10 @@
 use super::Workspace;
-use super::{
-    error::{WorkflowError, WorkflowResult},
-    InitializeZomesWorkflow, Workflow, WorkflowEffects,
-};
+use super::{error::WorkflowResult, InitializeZomesWorkflow, Workflow, WorkflowEffects};
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::state::{
     cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
     workspace::WorkspaceResult,
 };
-use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
@@ -56,17 +52,20 @@ where
             // Get te current head
             let chain_head_start = workspace.source_chain.chain_head()?.clone();
 
+            tracing::trace!(line = line!());
             // Create the unsafe sourcechain for use with wasm closure
             let result = {
-                // TODO: TK-01564: Return this result
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 ribosome.call_zome_function(raw_workspace, invocation)
             };
+            tracing::trace!(line = line!());
 
             // Get the new head
             let chain_head_end = workspace.source_chain.chain_head()?;
 
             // Has there been changes?
+            // david.b - this isn't doing anything?... commenting out for now
+            /*
             if chain_head_start != *chain_head_end {
                 // get the changes
                 workspace
@@ -89,6 +88,7 @@ where
                     })
                     .collect::<Vec<_>>()?;
             }
+            */
 
             let fx = WorkflowEffects {
                 workspace,

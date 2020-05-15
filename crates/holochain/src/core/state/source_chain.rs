@@ -10,7 +10,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Reader},
 };
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header};
+use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header, HeaderHashed};
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
@@ -56,17 +56,21 @@ impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChainElement {
-    signed_header: SignedHeader,
+    signed_header: SignedHeaderHashed,
     maybe_entry: Option<Entry>,
 }
 
 impl ChainElement {
     /// Raw element constructor.  Used only when we know that the values are valid.
-    pub fn new(signature: Signature, header: Header, maybe_entry: Option<Entry>) -> Self {
+    pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
         Self {
-            signed_header: SignedHeader { signature, header },
+            signed_header,
             maybe_entry,
         }
+    }
+
+    pub fn into_inner(self) -> (SignedHeaderHashed, Option<Entry>) {
+        (self.signed_header, self.maybe_entry)
     }
 
     /// Validates a chain element
@@ -83,6 +87,11 @@ impl ChainElement {
         self.signed_header.signature()
     }
 
+    /// Access the header address
+    pub fn header_address(&self) -> &HeaderAddress {
+        self.signed_header.header_address()
+    }
+
     /// Access the Header portion of this triple.
     pub fn header(&self) -> &Header {
         self.signed_header.header()
@@ -95,22 +104,36 @@ impl ChainElement {
 }
 
 /// the header and the signature that signed it
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct SignedHeader {
-    header: Header,
+#[derive(Clone, Debug, PartialEq)]
+pub struct SignedHeaderHashed {
+    header: HeaderHashed,
     signature: Signature,
 }
 
-impl SignedHeader {
+impl SignedHeaderHashed {
     /// SignedHeader constructor
-    pub async fn new(keystore: &KeystoreSender, header: Header) -> SourceChainResult<Self> {
-        let signature = header.author().sign(keystore, &header).await?;
-        Ok(Self { signature, header })
+    pub async fn new(keystore: &KeystoreSender, header: HeaderHashed) -> SourceChainResult<Self> {
+        let signature = header.author().sign(keystore, &*header).await?;
+        Ok(Self::with_presigned(header, signature))
+    }
+
+    /// Constructor for an already signed header
+    pub fn with_presigned(header: HeaderHashed, signature: Signature) -> Self {
+        Self { header, signature }
+    }
+
+    pub fn into_inner(self) -> (HeaderHashed, Signature) {
+        (self.header, self.signature)
+    }
+
+    /// Access the Header Hash.
+    pub fn header_address(&self) -> &HeaderAddress {
+        self.header.as_hash()
     }
 
     /// Access the Header portion.
     pub fn header(&self) -> &Header {
-        &self.header
+        &*self.header
     }
     /// Access the signature portion.
     pub fn signature(&self) -> &Signature {
@@ -121,7 +144,7 @@ impl SignedHeader {
         if !self
             .header
             .author()
-            .verify_signature(&self.signature, &self.header)
+            .verify_signature(&self.signature, &*self.header)
             .await?
         {
             return Err(SourceChainError::InvalidSignature);
