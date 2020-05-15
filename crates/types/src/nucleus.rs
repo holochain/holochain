@@ -4,9 +4,6 @@ use crate::{cell::CellId, prelude::*, shims::CapToken};
 use holo_hash::AgentPubKey;
 use holochain_zome_types::*;
 
-/// The ZomeId is a pair of CellId and ZomeName.
-pub type ZomeId = (CellId, ZomeName);
-
 /// ZomeName as a String (should this be a newtype?)
 pub type ZomeName = String;
 
