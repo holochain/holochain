@@ -10,6 +10,7 @@ use structopt::StructOpt;
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
+const MAGIC_CONDUCTOR_READY_STRING: &'static str = "Conductor ready.";
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]
@@ -146,6 +147,12 @@ async fn async_main() {
     };
 
     info!("Conductor successfully initialized.");
+
+    // This println has special meaning. Other processes can detect it and know
+    // that the conductor has been initialized, in particular that the admin
+    // interfaces are running, and can be connected to.
+    println!("{}", MAGIC_CONDUCTOR_READY_STRING);
+
     // kick off actual conductor task here
     let waiting_handle = conductor
         .get_wait_handle()
