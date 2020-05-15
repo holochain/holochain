@@ -1,5 +1,41 @@
 #![forbid(missing_docs)]
-//! DnaFile Utilities
+//! A utility to create a DNA file from a source working directory, and vice-versa
+//!
+//! This utility expects a working directory of the following structure:
+//! ```sh
+//! test-dna.dna.workdir/
+//! ├── dna.json
+//! ├── test-zome-1.wasm
+//! └── test-zome-2.wasm
+//! ```
+//! Usage instructions from the `--help` flag:
+//! ```sh
+//! $ dna_util --help
+//!
+//!     dna_util 0.0.1
+//!     Holochain DnaFile Utility.
+//!
+//!     USAGE:
+//! dna_util [OPTIONS]
+//!
+//!     FLAGS:
+//! -h, --help
+//!     Prints help information
+//!
+//!     -V, --version
+//!     Prints version information
+//!
+//!
+//!     OPTIONS:
+//! -c, --compile <compile>
+//!     Compile a Dna Working Directory into a DnaFile.
+//!
+//!     (`dna_util -c my-dna.dna_work_dir` creates file `my-dna.dna.gz`)
+//!     -e, --extract <extract>
+//!     Extract a DnaFile into a Dna Working Directory.
+//!
+//!     (`dna_util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
+//! ```
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
