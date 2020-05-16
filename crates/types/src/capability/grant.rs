@@ -54,7 +54,7 @@ impl CapGrant {
         match self {
             CapGrant::Authorship(agent_pubkey) => CapAccess::Assigned {
                 secret: agent_pubkey.to_string().into(),
-                assignees: HashSet::from([agent_pubkey.clone()].iter().cloned().collect()),
+                assignees: [agent_pubkey.clone()].iter().cloned().collect(),
             },
             CapGrant::Invocation(InvocationCapGrant { access, .. }) => access.clone(),
         }
