@@ -1,52 +1,51 @@
 use super::CapSecret;
 use crate::nucleus::ZomeName;
+use derive_more::From;
 use holo_hash::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
 /// System entry to hold a capabilities granted by the callee
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, From)]
 pub enum CapGrant {
-    /// For Authorship:
-    /// assignees = my agent id
-    /// things i can do:
-    /// - write to my source chain
-    /// - modify any capability
-    /// - replace this capability IF call to DPKI allows
+    /// Grants the capability of writing to the source chain for this agent key.
+    /// This grant is provided by the `Entry::Agent` entry on the source chain,
+    /// and this capability is not
     Authorship(AgentPubKey),
 
     /// General capability for giving fine grained access to zome functions
     /// and/or private data
-    CallPermission {
-        /// A string by which to later query for saved grants.
-        /// This does not need to be unique within a source chain.
-        tag: String,
-        /// Specifies who may claim this capability, and by what means
-        access: CapAccess,
-        /// Set of functions which this capability grants access to
-        functions: GrantedFunctions,
-    },
+    Invocation(InvocationCapGrant),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+/// The payload for the Invocation capability grant.
+/// This data is committed to the source chain as a private entry.
+pub struct InvocationCapGrant {
+    /// A string by which to later query for saved grants.
+    /// This does not need to be unique within a source chain.
+    tag: String,
+    /// Specifies who may claim this capability, and by what means
+    access: CapAccess,
+    /// Set of functions to which this capability grants invocation access
+    functions: GrantedFunctions,
 }
 
 impl CapGrant {
-    /// Create a new CallPermission capability grant
-    pub fn new_call_permission(
-        tag: String,
-        access: CapAccess,
-        functions: GrantedFunctions,
-    ) -> Self {
-        CapGrant::CallPermission {
+    /// Create a new Invocation capability grant
+    pub fn invocation(tag: String, access: CapAccess, functions: GrantedFunctions) -> Self {
+        CapGrant::Invocation(InvocationCapGrant {
             tag,
             access,
             functions,
-        }
+        })
     }
 
     /// Check if a tag matches this grant.
     pub fn tag_matches(&self, query: &str) -> bool {
         match self {
             CapGrant::Authorship(agent_pubkey) => agent_pubkey.to_string() == *query,
-            CapGrant::CallPermission { tag, .. } => tag == query,
+            CapGrant::Invocation(InvocationCapGrant { tag, .. }) => tag == query,
         }
     }
 
@@ -57,7 +56,7 @@ impl CapGrant {
                 secret: agent_pubkey.to_string().into(),
                 assignees: HashSet::from([agent_pubkey.clone()].iter().cloned().collect()),
             },
-            CapGrant::CallPermission { access, .. } => access.clone(),
+            CapGrant::Invocation(InvocationCapGrant { access, .. }) => access.clone(),
         }
     }
 }
