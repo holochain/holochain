@@ -8,6 +8,7 @@ use holochain_state::{
 };
 use holochain_types::{
     address::EntryAddress,
+    entry::{Entry, EntryHashed},
     header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
@@ -24,10 +25,10 @@ struct Chains<'env> {
     cache: SourceChainBuf<'env, Reader<'env>>,
     jimbo_id: AgentPubKey,
     jimbo_header: Header,
-    jimbo_entry: Entry,
+    jimbo_entry: EntryHashed,
     jessy_id: AgentPubKey,
     jessy_header: Header,
-    jessy_entry: Entry,
+    jessy_entry: EntryHashed,
     mock_primary_meta: MockChainMetaBuf,
     mock_cache_meta: MockChainMetaBuf,
 }
@@ -36,24 +37,38 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();
-    let jimbo_entry = Entry::Agent(jimbo_id.clone().into());
     let jessy_id = fake_agent_pubkey_2();
-    let jessy_entry = Entry::Agent(jessy_id.clone().into());
+    let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
+        async {
+            (
+                EntryHashed::with_data(Entry::Agent(jimbo_id.clone()))
+                    .await
+                    .unwrap(),
+                EntryHashed::with_data(Entry::Agent(jessy_id.clone()))
+                    .await
+                    .unwrap(),
+            )
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap();
 
     let jimbo_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
         author: jimbo_id.clone(),
+        timestamp: Timestamp::now(),
+        header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: EntryAddress::try_from(&jimbo_entry)?,
+        entry_address: jimbo_entry.as_hash().clone(),
     });
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
         author: jessy_id.clone(),
+        timestamp: Timestamp::now(),
+        header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: EntryAddress::try_from(&jessy_entry)?,
+        entry_address: jessy_entry.as_hash().clone(),
     });
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
@@ -91,9 +106,9 @@ async fn live_local_return() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
-    let address = EntryAddress::try_from(&jimbo_entry)?;
+    let address = jimbo_entry.as_hash().clone();
 
     // set it's metadata to LIVE
     mock_primary_meta
@@ -110,7 +125,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
     // check it returns
-    assert_eq!(entry.unwrap(), jimbo_entry);
+    assert_eq!(&entry.unwrap(), jimbo_entry.as_content());
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -135,9 +150,9 @@ async fn dead_local_none() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
-    let address = EntryAddress::try_from(&jimbo_entry)?;
+    let address = jimbo_entry.as_hash().clone();
 
     // set it's metadata to Dead
     mock_primary_meta
@@ -179,9 +194,9 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     cache
-        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
-    let address = EntryAddress::try_from(&jimbo_entry)?;
+    let address = jimbo_entry.as_hash().clone();
 
     // set it's metadata to Live
     mock_cache_meta
@@ -223,7 +238,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    let address = EntryAddress::try_from(&jimbo_entry)?;
+    let address = jimbo_entry.as_hash().clone();
 
     // call dht_get with above address
     let cascade = Cascade::new(
@@ -262,13 +277,13 @@ async fn links_local_return() -> SourceChainResult<()> {
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.clone()))
+        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
-    let base = EntryAddress::try_from(&jimbo_entry)?;
-    let target = EntryAddress::try_from(&jessy_entry)?;
+    let base = jimbo_entry.as_hash().clone();
+    let target = jessy_entry.as_hash().clone();
     let result = target.clone();
 
     // Return a link between entries
@@ -316,13 +331,13 @@ async fn links_cache_return() -> SourceChainResult<()> {
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.clone()))
+        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.clone()))
+        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
-    let base = EntryAddress::try_from(&jimbo_entry)?;
-    let target = EntryAddress::try_from(&jessy_entry)?;
+    let base = jimbo_entry.as_hash().clone();
+    let target = jessy_entry.as_hash().clone();
     let result = target.clone();
 
     // Return empty links
@@ -370,8 +385,8 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
 
-    let base = EntryAddress::try_from(&jimbo_entry)?;
-    let target = EntryAddress::try_from(&jessy_entry)?;
+    let base = jimbo_entry.as_hash().clone();
+    let target = jessy_entry.as_hash().clone();
     let result = target.clone();
 
     // Return empty links

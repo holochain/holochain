@@ -1,16 +1,10 @@
 use super::Workspace;
-use super::{
-    error::{WorkflowError, WorkflowResult},
-    InitializeZomesWorkflow, Workflow, WorkflowEffects,
-};
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::ribosome::ZomeInvocationResponse;
+use super::{error::WorkflowResult, InitializeZomesWorkflow, Workflow, WorkflowEffects};
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::state::{
     cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
     workspace::WorkspaceResult,
 };
-use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use must_future::MustBoxFuture;
@@ -69,6 +63,8 @@ where
             let chain_head_end = workspace.source_chain.chain_head()?;
 
             // Has there been changes?
+            // david.b - this isn't doing anything?... commenting out for now
+            /*
             if chain_head_start != *chain_head_end {
                 // get the changes
                 workspace
@@ -91,6 +87,7 @@ where
                     })
                     .collect::<Vec<_>>()?;
             }
+            */
 
             let fx = WorkflowEffects {
                 workspace,

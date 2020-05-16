@@ -58,15 +58,6 @@ impl Header {
         unimplemented!()
     }
 
-    // FIXME: use async with_data, or consider wrapper type
-    // https://github.com/Holo-Host/holochain-2020/pull/86#discussion_r413226841
-    /// Computes the hash of this header.
-    pub fn hash(&self) -> HeaderHash {
-        // hash the header enum variant struct
-        let sb: SerializedBytes = self.try_into().expect("TODO: can this fail?");
-        HeaderHash::with_data_sync(&sb.bytes())
-    }
-
     /// returns the previous header except for the DNA header which doesn't have a previous
     pub fn prev_header(&self) -> Option<&HeaderAddress> {
         Some(match self {
@@ -84,6 +75,23 @@ impl Header {
     }
 }
 
+make_hashed_base! {
+    Visibility(pub),
+    HashedName(HeaderHashed),
+    ContentType(Header),
+    HashType(HeaderAddress),
+}
+
+impl HeaderHashed {
+    pub async fn with_data(header: Header) -> Result<Self, SerializedBytesError> {
+        let sb = SerializedBytes::try_from(&header)?;
+        Ok(HeaderHashed::with_pre_hashed(
+            header,
+            HeaderAddress::Header(HeaderHash::with_data(sb.bytes()).await),
+        ))
+    }
+}
+
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 pub type ZomeId = u8;
@@ -95,6 +103,7 @@ use crate::prelude::*;
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     // No previous header, because DNA is always first chain entry
     pub hash: DnaHash,
 }
@@ -104,6 +113,7 @@ pub struct Dna {
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub membrane_proof: Option<SerializedBytes>,
@@ -114,6 +124,7 @@ pub struct AgentValidationPkg {
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 }
 
@@ -121,6 +132,7 @@ pub struct InitZomesComplete {
 pub struct LinkAdd {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub base_address: DhtAddress,
@@ -133,6 +145,7 @@ pub struct LinkAdd {
 pub struct LinkRemove {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderAddress,
@@ -142,6 +155,7 @@ pub struct LinkRemove {
 pub struct ChainOpen {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub prev_dna_hash: DnaHash,
@@ -151,6 +165,7 @@ pub struct ChainOpen {
 pub struct ChainClose {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub new_dna_hash: DnaHash,
@@ -160,6 +175,7 @@ pub struct ChainClose {
 pub struct EntryCreate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub entry_type: EntryType,
@@ -170,6 +186,7 @@ pub struct EntryCreate {
 pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     pub replaces_address: DhtAddress,
@@ -182,6 +199,7 @@ pub struct EntryUpdate {
 pub struct EntryDelete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
+    pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
     /// Address of the Element being deleted

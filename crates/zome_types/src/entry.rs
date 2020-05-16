@@ -26,3 +26,24 @@ pub enum Entry {
     /// capabilities
     CapTokenGrant(CapTokenGrant),
 }
+
+make_hashed_base! {
+    Visibility(pub),
+    HashedName(EntryHashed),
+    ContentType(Entry),
+    HashType(EntryAddress),
+}
+
+impl EntryHashed {
+    /// Construct (and hash) a new EntryHashed with given Entry.
+    pub async fn with_data(entry: Entry) -> Result<Self, SerializedBytesError> {
+        let hash = match &entry {
+            Entry::Agent(key) => EntryAddress::Agent(key.to_owned()),
+            entry => {
+                let sb = SerializedBytes::try_from(entry)?;
+                EntryAddress::Entry(EntryHash::with_data(sb.bytes()).await)
+            }
+        };
+        Ok(EntryHashed::with_pre_hashed(entry, hash))
+    }
+}

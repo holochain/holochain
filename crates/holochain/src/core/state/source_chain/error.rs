@@ -37,6 +37,9 @@ pub enum SourceChainError {
 
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    #[error(transparent)]
+    BlockOnError(#[from] tokio_safe_block_on::BlockOnError),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

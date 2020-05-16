@@ -5,7 +5,7 @@ use holochain_2020::core::state::{
 };
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    address::EntryAddress,
+    entry::{Entry, EntryHashed},
     header,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
@@ -13,28 +13,50 @@ use holochain_types::{
 };
 use holochain_zome_types::entry::Entry;
 
-fn fixtures() -> (AgentPubKey, Header, Entry, AgentPubKey, Header, Entry) {
+fn fixtures() -> (
+    AgentPubKey,
+    Header,
+    EntryHashed,
+    AgentPubKey,
+    Header,
+    EntryHashed,
+) {
     let previous_header = fake_header_hash("previous");
 
     let jimbo_id = fake_agent_pubkey_1();
-    let jimbo_entry = Entry::Agent(jimbo_id.clone().into());
     let jessy_id = fake_agent_pubkey_2();
-    let jessy_entry = Entry::Agent(jessy_id.clone().into());
+
+    let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
+        async {
+            (
+                EntryHashed::with_data(Entry::Agent(jimbo_id.clone()))
+                    .await
+                    .unwrap(),
+                EntryHashed::with_data(Entry::Agent(jessy_id.clone()))
+                    .await
+                    .unwrap(),
+            )
+        },
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap();
 
     let jimbo_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
         author: jimbo_id.clone(),
+        timestamp: Timestamp::now(),
+        header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: (&jimbo_entry).try_into().unwrap(),
+        entry_address: jimbo_entry.as_hash().clone(),
     });
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
-        timestamp: Timestamp::now(),
         author: jessy_id.clone(),
+        timestamp: Timestamp::now(),
+        header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: (&jessy_entry).try_into().unwrap(),
+        entry_address: jessy_entry.as_hash().clone(),
     });
     (
         jimbo_id,
@@ -62,9 +84,13 @@ async fn get_links() -> SourceChainResult<()> {
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
-    let base = EntryAddress::try_from(&jimbo_entry)?;
-    source_chain.put(jimbo_header, Some(jimbo_entry)).await?;
-    source_chain.put(jessy_header, Some(jessy_entry)).await?;
+    let base = jimbo_entry.as_hash().clone();
+    source_chain
+        .put(jimbo_header, Some(jimbo_entry.as_content().clone()))
+        .await?;
+    source_chain
+        .put(jessy_header, Some(jessy_entry.as_content().clone()))
+        .await?;
 
     // Pass in stores as references
     let cascade = Cascade::new(
