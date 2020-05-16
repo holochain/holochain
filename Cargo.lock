@@ -987,6 +987,7 @@ dependencies = [
  "serde_bytes",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
 ]
 
 [[package]]

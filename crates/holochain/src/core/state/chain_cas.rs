@@ -14,13 +14,12 @@ use holochain_state::{
 };
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
-    entry::{Entry, EntryHashed},
+    entry::EntryHashed,
     header,
     prelude::Signature,
     Header, HeaderHashed,
 };
 use holochain_zome_types::entry::Entry;
-use std::convert::TryFrom;
 
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
 pub type HeaderCas<'env, R> = CasBuf<'env, (Header, Signature), R>;

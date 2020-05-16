@@ -5,7 +5,7 @@ use holochain_2020::core::state::{
 };
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    entry::{Entry, EntryHashed},
+    entry::EntryHashed,
     header,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
@@ -29,10 +29,10 @@ fn fixtures() -> (
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::with_data(Entry::Agent(jimbo_id.clone()))
+                EntryHashed::with_data(Entry::Agent(jimbo_id.clone().into()))
                     .await
                     .unwrap(),
-                EntryHashed::with_data(Entry::Agent(jessy_id.clone()))
+                EntryHashed::with_data(Entry::Agent(jessy_id.clone().into()))
                     .await
                     .unwrap(),
             )

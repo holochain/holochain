@@ -2,7 +2,6 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::entry::Entry;
 
 /// address type for header hash to promote it to an "address" e.g. for use when getting a header
 /// from a CAS or the DHT.  This is similar to EntryAddress which promotes and entry hash to a
@@ -147,23 +146,6 @@ impl holo_hash_core::HoloHashCoreHash for EntryAddress {
     }
 }
 
-impl TryFrom<&Entry> for EntryAddress {
-    type Error = SerializedBytesError;
-    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(match entry {
-            Entry::Agent(key) => EntryAddress::Agent(key.to_owned().into()),
-            _ => {
-                let serialized_bytes: SerializedBytes = entry.try_into()?;
-                EntryAddress::Entry(EntryHash::with_data_sync(serialized_bytes.bytes()))
-            }
-        })
-    }
-}
-
-impl TryFrom<Entry> for EntryAddress {
-    type Error = SerializedBytesError;
-    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
-        Self::try_from(&entry)
 impl From<EntryAddress> for holo_hash_core::HoloHashCore {
     fn from(entry_address: EntryAddress) -> holo_hash_core::HoloHashCore {
         match_entry_addr!(entry_address => |i| { i.into() })
@@ -210,20 +192,6 @@ macro_rules! match_dht_addr {
     };
 }
 
-impl TryFrom<&Entry> for DhtAddress {
-    type Error = SerializedBytesError;
-    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
-        Ok(match EntryAddress::try_from(entry)? {
-            EntryAddress::Entry(entry_hash) => DhtAddress::Entry(entry_hash),
-            EntryAddress::Agent(agent_pub_key) => DhtAddress::Agent(agent_pub_key),
-        })
-    }
-}
-
-impl TryFrom<&Header> for DhtAddress {
-    type Error = SerializedBytesError;
-    fn try_from(header: &Header) -> Result<Self, Self::Error> {
-        Ok(DhtAddress::Header(HeaderHash::try_from(header)?))
 impl From<DhtAddress> for HoloHash {
     fn from(dht_address: DhtAddress) -> HoloHash {
         match_dht_addr!(dht_address => |i| { i.into() })

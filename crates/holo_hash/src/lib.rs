@@ -495,32 +495,80 @@ new_holo_hash! {
 
 fixturator!(
     DnaHash,
-    DnaHash::with_pre_hashed_sync(vec![0; 32]),
+    {
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { DnaHash::with_pre_hashed(vec![0; 32]).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
+    },
     {
         let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-        DnaHash::with_pre_hashed_sync(random_bytes)
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { DnaHash::with_pre_hashed(random_bytes).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
     },
-    DnaHash::with_pre_hashed_sync(vec![0xdb; 32])
+    {
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { DnaHash::with_pre_hashed(vec![0xdb; 32]).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
+    }
 );
 
 fixturator!(
     HeaderHash,
-    HeaderHash::with_pre_hashed_sync(vec![0; 32]),
+    {
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { HeaderHash::with_pre_hashed(vec![0; 32]).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
+    },
     {
         let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-        HeaderHash::with_pre_hashed_sync(random_bytes)
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { HeaderHash::with_pre_hashed(random_bytes).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
     },
-    HeaderHash::with_pre_hashed_sync(vec![0xdb; 32])
+    {
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { HeaderHash::with_pre_hashed(vec![0xdb; 32]).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
+    }
 );
 
 fixturator!(
     AgentPubKey,
-    AgentPubKey::with_pre_hashed_sync(vec![0; 32]),
+    {
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { AgentPubKey::with_pre_hashed(vec![0; 32]).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
+    },
     {
         let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-        AgentPubKey::with_pre_hashed_sync(random_bytes)
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { AgentPubKey::with_pre_hashed(random_bytes).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
     },
-    AgentPubKey::with_pre_hashed_sync(vec![0xdb; 32])
+    {
+        tokio_safe_block_on::tokio_safe_block_on(
+            async { AgentPubKey::with_pre_hashed(vec![0xdb; 32]).await },
+            std::time::Duration::from_millis(10),
+        )
+        .unwrap()
+    }
 );
 mod hashed;
 pub use hashed::*;

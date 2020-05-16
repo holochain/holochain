@@ -21,6 +21,7 @@ thiserror = "1"
 tokio = { version = "0.2" }
 fixt = { path = "../fixt" }
 rand = "0.7"
+tokio_safe_block_on = "0.1.1"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }

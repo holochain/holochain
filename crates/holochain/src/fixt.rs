@@ -130,7 +130,15 @@ fixturator!(
         let mut dna_wasm_fixturator = DnaWasmFixturator::new(Unpredictable);
         for _ in (0..number_of_wasms) {
             let wasm = dna_wasm_fixturator.next().unwrap();
-            wasms.insert(WasmHash::with_data_sync(&*wasm.code()).into(), wasm);
+            wasms.insert(
+                tokio_safe_block_on::tokio_safe_block_on(
+                    async { WasmHash::with_data(&*wasm.code()).await },
+                    std::time::Duration::from_millis(10),
+                )
+                .unwrap()
+                .into(),
+                wasm,
+            );
         }
         wasms
     },
@@ -139,7 +147,15 @@ fixturator!(
         let mut dna_wasm_fixturator = DnaWasmFixturator::new_indexed(Predictable, self.0.index);
         for _ in (0..3) {
             let wasm = dna_wasm_fixturator.next().unwrap();
-            wasms.insert(WasmHash::with_data_sync(&*wasm.code()).into(), wasm);
+            wasms.insert(
+                tokio_safe_block_on::tokio_safe_block_on(
+                    async { WasmHash::with_data(&*wasm.code()).await },
+                    std::time::Duration::from_millis(10),
+                )
+                .unwrap()
+                .into(),
+                wasm,
+            );
         }
         self.0.index = self.0.index + 1;
         wasms

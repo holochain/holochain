@@ -10,16 +10,10 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::Header;
-use holochain_types::{address::HeaderAddress, prelude::*};
-use holochain_zome_types::entry::Entry;
-use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
 use holochain_types::{
-    address::HeaderAddress,
-    entry::{Entry, EntryHashed},
-    prelude::*,
-    Header, HeaderHashed,
+    address::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,
 };
+use holochain_zome_types::entry::Entry;
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {

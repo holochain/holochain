@@ -1,5 +1,7 @@
 use super::Workspace;
 use super::{error::WorkflowResult, InitializeZomesWorkflow, Workflow, WorkflowEffects};
+use crate::core::ribosome::ZomeInvocation;
+use crate::core::ribosome::ZomeInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::state::{
     cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,

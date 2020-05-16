@@ -8,6 +8,7 @@ pub mod autonomic;
 pub mod cell;
 pub mod db;
 pub mod dna;
+pub mod entry;
 pub mod header;
 pub mod link;
 pub mod nucleus;
