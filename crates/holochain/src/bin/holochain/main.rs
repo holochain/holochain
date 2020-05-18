@@ -91,7 +91,6 @@ async fn async_main() {
     // interfaces are running, and can be connected to.
     println!("{}", MAGIC_CONDUCTOR_READY_STRING);
 
-    // kick off actual conductor task here
     let waiting_handle = conductor
         .get_wait_handle()
         .await
