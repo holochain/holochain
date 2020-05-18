@@ -4,7 +4,10 @@ use crate::core::ribosome::ZomeInvocation;
 use crate::core::ribosome::ZomeInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::state::{
-    cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
+    cascade::Cascade,
+    chain_cas::ChainCasBuf,
+    chain_meta::ChainMetaBuf,
+    source_chain::{SourceChain, SourceChainResult},
     workspace::WorkspaceResult,
 };
 use futures::future::FutureExt;
@@ -73,13 +76,12 @@ where
             // Get te current head
             let _chain_head_start = workspace.source_chain.chain_head()?.clone();
 
-            let as_at = todo!("Get the as_at");
-
             tracing::trace!(line = line!());
             // Create the unsafe sourcechain for use with wasm closure
             let result = {
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
+                let as_at = todo!("Maybe this isn't needed?");
                 ribosome.call_zome_function(invocation.to_zome_invocation(raw_workspace, as_at))
             };
             tracing::trace!(line = line!());

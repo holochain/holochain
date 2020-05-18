@@ -49,7 +49,6 @@ use super::{
     api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
     error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
 };
-use crate::core::ribosome::ZomeInvocation;
 use crate::core::workflow::{ZomeInvocationExternal, ZomeInvocationResult};
 use derive_more::From;
 use holochain_types::dna::DnaFile;

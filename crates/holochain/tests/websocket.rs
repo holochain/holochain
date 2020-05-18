@@ -14,7 +14,8 @@ use holochain_types::{
     dna::{DnaFile, Properties},
     observability,
     prelude::*,
-    test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file}, shims::CapToken,
+    shims::CapToken,
+    test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
@@ -273,7 +274,7 @@ async fn call_zome() {
         fn_name: "foo".to_string(),
         payload: HostInput::new(payload.try_into().unwrap()),
         provenance: fake_agent_pubkey_1(),
-        cap: CapToken{},
+        cap: CapToken {},
     });
     let request = AppRequest::ZomeInvocationRequest { request };
     let response = app_interface.request(request);

@@ -10,7 +10,7 @@ use crate::{
         state::source_chain::SourceChainBuf,
         workflow::{
             run_workflow, GenesisWorkflow, GenesisWorkspace, InvokeZomeWorkflow,
-            InvokeZomeWorkspace, ZomeInvocationResult, ZomeInvocationExternal,
+            InvokeZomeWorkspace, ZomeInvocationExternal, ZomeInvocationResult,
         },
     },
 };
