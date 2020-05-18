@@ -8,7 +8,10 @@ use crate::core::state::{
     workspace::WorkspaceResult,
 };
 use futures::future::FutureExt;
+use holo_hash::{AgentPubKey, HeaderHash};
 use holochain_state::prelude::*;
+use holochain_types::{cell::CellId, shims::CapToken};
+use holochain_zome_types::{zome::ZomeName, HostInput};
 use must_future::MustBoxFuture;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
@@ -18,9 +21,26 @@ pub mod unsafe_invoke_zome_workspace;
 /// TODO: do we want this to be the same as ZomeInvocationRESPONSE?
 pub type ZomeInvocationResult = RibosomeResult<ZomeInvocationResponse>;
 
+/// Everything needed to call a zome function
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ZomeInvocationExternal {
+    /// The ID of the [Cell] in which this Zome-call would be invoked
+    pub cell_id: CellId,
+    /// The name of the Zome containing the function that would be invoked
+    pub zome_name: ZomeName,
+    /// The capability request authorization this [ZomeInvocation]
+    pub cap: CapToken,
+    /// The name of the Zome function to call
+    pub fn_name: String,
+    /// The serialized data to pass an an argument to the Zome call
+    pub payload: HostInput,
+    /// the provenance of the call
+    pub provenance: AgentPubKey,
+}
+
 pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     pub ribosome: Ribosome,
-    pub invocation: ZomeInvocation,
+    pub invocation: ZomeInvocationExternal,
 }
 
 impl<'env, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
@@ -31,7 +51,7 @@ where
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = Option<InitializeZomesWorkflow>;
 
-    #[allow(unreachable_code, unused_variables)]
+    #[allow(unreachable_code)]
     fn workflow(
         self,
         mut workspace: Self::Workspace,
@@ -51,18 +71,21 @@ where
             };
 
             // Get te current head
-            let chain_head_start = workspace.source_chain.chain_head()?.clone();
+            let _chain_head_start = workspace.source_chain.chain_head()?.clone();
+
+            let as_at = todo!("Get the as_at");
 
             tracing::trace!(line = line!());
             // Create the unsafe sourcechain for use with wasm closure
             let result = {
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                ribosome.call_zome_function(invocation)
+
+                ribosome.call_zome_function(invocation.to_zome_invocation(raw_workspace, as_at))
             };
             tracing::trace!(line = line!());
 
             // Get the new head
-            let chain_head_end = workspace.source_chain.chain_head()?;
+            let _chain_head_end = workspace.source_chain.chain_head()?;
 
             // Has there been changes?
             // david.b - this isn't doing anything?... commenting out for now
@@ -146,6 +169,25 @@ impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
     }
 }
 
+impl ZomeInvocationExternal {
+    fn to_zome_invocation(
+        self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        as_at: HeaderHash,
+    ) -> ZomeInvocation {
+        ZomeInvocation {
+            workspace: workspace,
+            cell_id: self.cell_id,
+            zome_name: self.zome_name,
+            cap: self.cap,
+            fn_name: self.fn_name,
+            payload: self.payload,
+            provenance: self.provenance,
+            as_at,
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -170,7 +212,7 @@ pub mod tests {
     async fn run_invoke_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
         workspace: InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> WorkflowResult<'env, InvokeZomeWorkflow<Ribosome>> {
         let workflow = InvokeZomeWorkflow {
             invocation,

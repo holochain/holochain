@@ -32,6 +32,7 @@ pub(crate) use genesis_workflow::*;
 pub(crate) use initialize_zomes_workflow::*;
 pub(crate) use invoke_zome_workflow::unsafe_invoke_zome_workspace;
 pub(crate) use invoke_zome_workflow::*;
+pub use invoke_zome_workflow::ZomeInvocationExternal;
 
 pub use effects::*;
 

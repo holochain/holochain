@@ -7,15 +7,14 @@ use holochain_2020::conductor::{
     error::ConductorError,
     Conductor, ConductorHandle,
 };
-use holochain_2020::core::ribosome::NamedInvocation;
-use holochain_2020::core::ribosome::ZomeInvocationFixturator;
 use holochain_2020::core::ribosome::ZomeInvocationResponse;
+use holochain_2020::core::workflow::ZomeInvocationExternal;
 use holochain_types::{
     cell::CellId,
     dna::{DnaFile, Properties},
     observability,
     prelude::*,
-    test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
+    test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file}, shims::CapToken,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
@@ -268,16 +267,14 @@ async fn call_zome() {
     }
     let payload = Payload { a: 1 };
     let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
-    let request = Box::new(
-        ZomeInvocationFixturator::new(NamedInvocation(
-            cell_id,
-            TestWasm::Foo,
-            "foo".into(),
-            HostInput::new(payload.try_into().unwrap()),
-        ))
-        .next()
-        .unwrap(),
-    );
+    let request = Box::new(ZomeInvocationExternal {
+        cell_id,
+        zome_name: TestWasm::Foo.into(),
+        fn_name: "foo".to_string(),
+        payload: HostInput::new(payload.try_into().unwrap()),
+        provenance: fake_agent_pubkey_1(),
+        cap: CapToken{},
+    });
     let request = AppRequest::ZomeInvocationRequest { request };
     let response = app_interface.request(request);
     let call_response = check_timeout(&mut holochain, response, 2000).await;

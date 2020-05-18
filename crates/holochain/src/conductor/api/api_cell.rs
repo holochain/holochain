@@ -2,8 +2,7 @@
 
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::ConductorHandle;
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::workflow::ZomeInvocationResult;
+use crate::core::workflow::{ZomeInvocationExternal, ZomeInvocationResult};
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
@@ -34,7 +33,7 @@ impl CellConductorApiT for CellConductorApi {
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> ConductorApiResult<ZomeInvocationResult> {
         if *cell_id == invocation.cell_id {
             self.conductor_handle
@@ -85,7 +84,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> ConductorApiResult<ZomeInvocationResult>;
 
     /// Make a request to the DPKI service running for this Conductor.

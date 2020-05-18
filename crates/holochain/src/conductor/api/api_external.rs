@@ -1,14 +1,14 @@
 use super::error::{
     ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
 };
-use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
+use crate::core::ribosome::ZomeInvocationResponse;
 use crate::{
     conductor::{
         config::AdminInterfaceConfig,
         interface::error::{InterfaceError, InterfaceResult},
         ConductorHandle,
     },
-    core::workflow::ZomeInvocationResult,
+    core::workflow::{ZomeInvocationExternal, ZomeInvocationResult},
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -61,7 +61,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     /// Invoke a zome function on any cell in this conductor.
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> ConductorApiResult<ZomeInvocationResult>;
 
     // -- provided -- //
@@ -248,7 +248,7 @@ impl RealAppInterfaceApi {
 impl AppInterfaceApi for RealAppInterfaceApi {
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> ConductorApiResult<ZomeInvocationResult> {
         self.conductor_handle.invoke_zome(invocation).await
     }
@@ -326,7 +326,7 @@ pub enum AppRequest {
     /// Call a zome function
     ZomeInvocationRequest {
         /// Information about which zome call you want to make
-        request: Box<ZomeInvocation>,
+        request: Box<ZomeInvocationExternal>,
     },
 }
 

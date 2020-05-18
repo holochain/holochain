@@ -50,7 +50,7 @@ use super::{
     error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
 };
 use crate::core::ribosome::ZomeInvocation;
-use crate::core::workflow::ZomeInvocationResult;
+use crate::core::workflow::{ZomeInvocationExternal, ZomeInvocationResult};
 use derive_more::From;
 use holochain_types::dna::DnaFile;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::*};
@@ -104,7 +104,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> ConductorApiResult<ZomeInvocationResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
@@ -197,7 +197,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> ConductorApiResult<ZomeInvocationResult> {
         // FIXME: D-01058: We are holding this read lock for
         // the entire call to invoke_zome and blocking

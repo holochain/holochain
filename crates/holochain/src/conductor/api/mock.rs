@@ -3,8 +3,7 @@
 
 use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::workflow::ZomeInvocationResult;
+use crate::core::workflow::{ZomeInvocationExternal, ZomeInvocationResult};
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
@@ -23,7 +22,7 @@ mock! {
         fn sync_invoke_zome(
             &self,
             cell_id: &CellId,
-            invocation: ZomeInvocation,
+            invocation: ZomeInvocationExternal,
         ) -> ConductorApiResult<ZomeInvocationResult>;
 
         fn sync_network_send(&self, message: Todo) -> ConductorApiResult<()>;
@@ -51,7 +50,7 @@ impl CellConductorApiT for MockCellConductorApi {
     async fn invoke_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeInvocation,
+        invocation: ZomeInvocationExternal,
     ) -> ConductorApiResult<ZomeInvocationResult> {
         self.sync_invoke_zome(cell_id, invocation)
     }
