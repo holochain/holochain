@@ -15,8 +15,6 @@ pub enum CellError {
     Genesis(#[from] Box<ConductorApiError>),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
-    #[error("This cells environment has been removed")]
-    EnvMissing,
 }
 
 pub type CellResult<T> = Result<T, CellError>;

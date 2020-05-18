@@ -111,7 +111,7 @@ impl Cell {
         env_path: P,
         keystore: KeystoreSender,
         membrane_proof: Option<SerializedBytes>,
-    ) -> CellResult<(CellId, EnvironmentWrite)> {
+    ) -> CellResult<EnvironmentWrite> {
         // create the environment
         let state_env = EnvironmentWrite::new(
             env_path.as_ref(),
@@ -148,7 +148,7 @@ impl Cell {
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        Ok((id, state_env))
+        Ok(state_env)
     }
 
     fn dna_hash(&self) -> &DnaHash {

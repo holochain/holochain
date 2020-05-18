@@ -124,7 +124,7 @@ pub trait ConductorHandleT: Send + Sync {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Run genesis on [CellId]s and add them to the db
-    async fn genesis(
+    async fn genesis_cells(
         &self,
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         cell_api: ConductorHandle,
@@ -232,7 +232,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.1
     }
 
-    async fn genesis(
+    async fn genesis_cells(
         &self,
         cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         cell_api: ConductorHandle,
@@ -241,7 +241,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             self.0
                 .read()
                 .await
-                .genesis(cells_ids_with_proofs, cell_api)
+                .genesis_cells(cells_ids_with_proofs, cell_api)
                 .await?
         };
         // Update the db

@@ -297,7 +297,7 @@ where
     }
 
     /// Create the cells from the db
-    pub(super) async fn genesis(
+    pub(super) async fn genesis_cells(
         &self,
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         conductor_handle: ConductorHandle,
@@ -310,14 +310,14 @@ where
             .map(move |(cell_id, proof)| {
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
                 tokio::spawn(Cell::genesis(
-                    cell_id,
+                    cell_id.clone(),
                     conductor_handle.clone(),
                     root_env_dir,
                     keystore.clone(),
                     proof,
                 ))
                 .map_err(|e| CellError::from(e))
-                .and_then(|result| async { result })
+                .and_then(|result| async { result.map(|env| (cell_id, env)) })
             })
             .collect::<Vec<_>>();
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)

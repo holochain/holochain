@@ -314,7 +314,7 @@ mod test {
             .unwrap();
 
         conductor_handle
-            .genesis(cell_ids_with_proofs, conductor_handle.clone())
+            .genesis_cells(cell_ids_with_proofs, conductor_handle.clone())
             .await
             .unwrap();
 
@@ -343,7 +343,7 @@ mod test {
             .unwrap();
 
         conductor_handle
-            .genesis(cell_ids_with_proofs, conductor_handle.clone())
+            .genesis_cells(cell_ids_with_proofs, conductor_handle.clone())
             .await
             .unwrap();
 
