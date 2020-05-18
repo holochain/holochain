@@ -65,24 +65,38 @@ pub async fn sys_validate_header(
         // verify we have the correct previous header
         let prev_header = match prev_header {
             None => {
-                return Err(SourceChainError::InvalidPreviousHeader);
+                return Err(SourceChainError::InvalidPreviousHeader(
+                    "expected previous header, received None".to_string(),
+                ));
             }
             Some(prev_header) => prev_header,
         };
 
         // ensure the hashes match
         if asserted_prev_header != prev_header.as_hash() {
-            return Err(SourceChainError::InvalidPreviousHeader);
+            return Err(SourceChainError::InvalidPreviousHeader(format!(
+                "expected header hash: {}, received: {}",
+                asserted_prev_header,
+                prev_header.as_hash(),
+            )));
         }
 
         // make sure the timestamps are in order
         if header.timestamp() < prev_header.timestamp() {
-            return Err(SourceChainError::InvalidPreviousHeader);
+            return Err(SourceChainError::InvalidPreviousHeader(format!(
+                "expected timestamp < {}, received: {}",
+                header.timestamp().to_string(),
+                prev_header.timestamp().to_string(),
+            )));
         }
 
         // make sure the header_seq is strictly ordered
         if header.header_seq() - 1 != prev_header.header_seq() {
-            return Err(SourceChainError::InvalidPreviousHeader);
+            return Err(SourceChainError::InvalidPreviousHeader(format!(
+                "expected header_seq: {}, received: {}",
+                header.header_seq() - 1,
+                prev_header.header_seq(),
+            )));
         }
     }
 
@@ -158,7 +172,7 @@ mod tests {
 
         matches::assert_matches!(
             sys_validate_element(&fake_agent_pubkey_1(), &second, Some(&first)).await,
-            Err(SourceChainError::InvalidPreviousHeader)
+            Err(SourceChainError::InvalidPreviousHeader(_))
         );
     }
 
@@ -179,7 +193,7 @@ mod tests {
 
         matches::assert_matches!(
             sys_validate_element(&fake_agent_pubkey_1(), &second, Some(&first)).await,
-            Err(SourceChainError::InvalidPreviousHeader)
+            Err(SourceChainError::InvalidPreviousHeader(_))
         );
     }
 
@@ -200,7 +214,7 @@ mod tests {
 
         matches::assert_matches!(
             sys_validate_element(&fake_agent_pubkey_1(), &second, Some(&first)).await,
-            Err(SourceChainError::InvalidPreviousHeader)
+            Err(SourceChainError::InvalidPreviousHeader(_))
         );
     }
 }
