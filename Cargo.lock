@@ -1003,7 +1003,6 @@ dependencies = [
  "hcid",
  "holo_hash",
  "holo_hash_core",
- "holochain_2020_legacy",
  "holochain_common",
  "holochain_crypto",
  "holochain_keystore",
@@ -1016,6 +1015,7 @@ dependencies = [
  "holochain_zome_types",
  "human-panic",
  "lazy_static",
+ "legacy",
  "maplit",
  "matches",
  "mockall",
@@ -1041,13 +1041,6 @@ dependencies = [
  "url2",
  "url_serde",
  "uuid 0.7.4",
-]
-
-[[package]]
-name = "holochain_2020_legacy"
-version = "0.0.1"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -1381,6 +1374,13 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "legacy"
+version = "0.0.1"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "lexical-core"
