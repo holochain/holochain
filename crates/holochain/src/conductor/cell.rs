@@ -19,9 +19,8 @@ use error::CellError;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::ReadManager;
-use holochain_state::env::{EnvironmentKind, EnvironmentWrite};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId, dna::DnaFile, shims::*};
+use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
+use holochain_types::{autonomic::AutonomicProcess, cell::CellId, dna::DnaFile, prelude::Todo};
 use std::{
     hash::{Hash, Hasher},
     path::Path,
@@ -115,10 +114,7 @@ impl Cell {
     }
 
     /// Entry point for incoming messages from the network that need to be handled
-    pub async fn handle_network_message(
-        &self,
-        _msg: Lib3hToClient,
-    ) -> CellResult<Option<Lib3hToClientResponse>> {
+    pub async fn handle_network_message(&self, _msg: Todo) -> CellResult<Option<Todo>> {
         unimplemented!()
     }
 
@@ -192,7 +188,7 @@ impl Cell {
 // so instead of explicitly building resources, we can downcast a Cell to exactly
 // the right set of resource getter traits
 trait NetSend {
-    fn network_send(&self, msg: Lib3hClientProtocol) -> Result<(), NetError>;
+    fn network_send(&self, msg: Todo) -> Result<(), NetError>;
 }
 
 #[allow(dead_code)]
