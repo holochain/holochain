@@ -65,7 +65,7 @@ impl CapGrant {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum CapAccess {
     /// No restriction: accessible by anyone
-    Open,
+    Unrestricted,
     /// Accessible by anyone who can provide the secret
     Transferable {
         /// The secret
@@ -81,9 +81,9 @@ pub enum CapAccess {
 }
 
 impl CapAccess {
-    /// Create a new CapAccess::Open
-    pub fn open() -> Self {
-        CapAccess::Open
+    /// Create a new CapAccess::Unrestricted
+    pub fn unrestricted() -> Self {
+        CapAccess::Unrestricted
     }
 
     /// Create a new CapAccess::Transferable with random secret
@@ -104,7 +104,7 @@ impl CapAccess {
     /// Check if access is granted given the inputs
     pub fn is_authorized(&self, agent_key: &AgentPubKey, maybe_secret: Option<&CapSecret>) -> bool {
         match self {
-            CapAccess::Open => true,
+            CapAccess::Unrestricted => true,
             CapAccess::Transferable { secret } => Some(secret) == maybe_secret,
             CapAccess::Assigned { secret, assignees } => {
                 Some(secret) == maybe_secret && assignees.contains(agent_key)
