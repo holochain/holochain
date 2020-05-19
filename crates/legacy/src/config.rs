@@ -358,22 +358,22 @@ pub struct SignalConfig {
 
 impl Config {
     /// Returns the agent configuration with the given ID if present
-    pub fn agent_by_id(&self, id: &str) -> Option<AgentConfig> {
-        self.agents.iter().find(|ac| &ac.id == id).cloned()
+    pub fn agent_by_id(&self, id: &str) -> Option<&AgentConfig> {
+        self.agents.iter().find(|ac| &ac.id == id)
     }
 
     /// Returns the DNA configuration with the given ID if present
-    pub fn dna_by_id(&self, id: &str) -> Option<DnaConfig> {
-        self.dnas.iter().find(|dc| &dc.id == id).cloned()
+    pub fn dna_by_id(&self, id: &str) -> Option<&DnaConfig> {
+        self.dnas.iter().find(|dc| &dc.id == id)
     }
 
     /// Returns the instance configuration with the given ID if present
-    pub fn instance_by_id(&self, id: &str) -> Option<InstanceConfig> {
-        self.instances.iter().find(|ic| &ic.id == id).cloned()
+    pub fn instance_by_id(&self, id: &str) -> Option<&InstanceConfig> {
+        self.instances.iter().find(|ic| &ic.id == id)
     }
 
     /// Returns the interface configuration with the given ID if present
-    pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfig> {
-        self.interfaces.iter().find(|ic| &ic.id == id).cloned()
+    pub fn interface_by_id(&self, id: &str) -> Option<&InterfaceConfig> {
+        self.interfaces.iter().find(|ic| &ic.id == id)
     }
 }

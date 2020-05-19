@@ -47,9 +47,9 @@ pub async fn load_conductor_from_legacy_config(
     }
 
     let mut dna_hashes: HashMap<String, DnaHash> = HashMap::new();
-    for dna_config in legacy.dnas.clone() {
+    for dna_config in &legacy.dnas {
         let mut buffer = Vec::new();
-        let path: PathBuf = dna_config.file.clone().into();
+        let path = Path::new(&dna_config.file);
         fs::File::open(&path)?.read_to_end(&mut buffer)?;
         let mut dna_file = DnaFile::from_file_content(&mut buffer).await?;
         if let Some(uuid) = dna_config.uuid.clone() {
@@ -63,17 +63,14 @@ pub async fn load_conductor_from_legacy_config(
     }
 
     let mut cell_ids = vec![];
-    for i in legacy.instances.clone() {
+    for i in &legacy.instances {
         // NB: disregarding agent config for now, using a hard-coded pre-made one
         let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
             CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
         })?;
         // make sure we have installed this DNA
         let dna_hash = dna_hashes
-            .get(&dna_key(
-                &PathBuf::from(dna_config.file.clone()),
-                &dna_config.uuid,
-            ))
+            .get(&dna_key(Path::new(&dna_config.file), &dna_config.uuid))
             .ok_or_else(|| {
                 CompatConfigError::BrokenReference(format!("No DNA for path: {}", dna_config.file))
             })?
