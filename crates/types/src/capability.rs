@@ -14,12 +14,11 @@ mod grant;
 pub use claim::*;
 pub use grant::*;
 
-/// A CapSecret is a secret that is used to claim this set of permissions
-/// It is a random, unique identifier for this capability,
-/// except in the case of public capabilities, in which case it is merely unique.
+/// A CapSecret is used to claim ability to exercise a capability.
+///
+/// It is a random, unique identifier for the capability, which is shared by
+/// the Grantor to allow access to others.
 /// A capability CAN be updated (replaced with a new one) with the same secret.
-/// NB for review: previously the secret was the address of the entry,
-/// but this is unsafe due to the small search space for a valid CapGrant.
 #[derive(From, Into, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CapSecret(String);
 
