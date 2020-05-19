@@ -98,6 +98,11 @@ impl ChainElement {
         self.signed_header.header()
     }
 
+    /// Access the HeaderHashed portion.
+    pub fn header_hashed(&self) -> &HeaderHashed {
+        self.signed_header.header_hashed()
+    }
+
     /// Access the Entry portion of this triple.
     pub fn entry(&self) -> &Option<Entry> {
         &self.maybe_entry
@@ -136,10 +141,17 @@ impl SignedHeaderHashed {
     pub fn header(&self) -> &Header {
         &*self.header
     }
+
+    /// Access the HeaderHashed portion.
+    pub fn header_hashed(&self) -> &HeaderHashed {
+        &self.header
+    }
+
     /// Access the signature portion.
     pub fn signature(&self) -> &Signature {
         &self.signature
     }
+
     /// Validates a signed header
     pub async fn validate(&self) -> SourceChainResult<()> {
         if !self
