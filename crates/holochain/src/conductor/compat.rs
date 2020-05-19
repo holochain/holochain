@@ -9,10 +9,7 @@ use holochain_types::{
     cell::CellId,
     dna::{DnaError, DnaFile},
 };
-use legacy::{
-    DpkiConfiguration as LegacyDpkiConfig, InterfaceConfig as LegacyInterfaceConfig,
-    InterfaceDriver as LegacyInterfaceDriver,
-};
+use legacy::{DpkiConfiguration as LegacyDpkiConfig, InterfaceDriver as LegacyInterfaceDriver};
 use std::fs;
 use std::{
     collections::HashMap,
@@ -128,22 +125,22 @@ fn convert_interface_driver(legacy: LegacyInterfaceDriver) -> Option<InterfaceDr
 }
 
 fn extract_admin_interfaces(
-    legacy_interfaces: Vec<LegacyInterfaceConfig>,
+    legacy_interfaces: Vec<legacy::InterfaceConfig>,
 ) -> Vec<AdminInterfaceConfig> {
     legacy_interfaces
         .into_iter()
         .filter(|c| c.admin)
-        .filter_map(|c: LegacyInterfaceConfig| {
+        .filter_map(|c: legacy::InterfaceConfig| {
             convert_interface_driver(c.driver).map(|driver| AdminInterfaceConfig { driver })
         })
         .collect()
 }
 
-fn extract_app_interfaces(legacy_interfaces: Vec<LegacyInterfaceConfig>) -> Vec<InterfaceConfig> {
+fn extract_app_interfaces(legacy_interfaces: Vec<legacy::InterfaceConfig>) -> Vec<InterfaceConfig> {
     legacy_interfaces
         .into_iter()
         .filter(|c| !c.admin)
-        .filter_map(|c: LegacyInterfaceConfig| {
+        .filter_map(|c: legacy::InterfaceConfig| {
             convert_interface_driver(c.driver).map(|driver| InterfaceConfig {
                 driver,
                 // FIXME: cells not hooked up for now since we don't use signals yet
