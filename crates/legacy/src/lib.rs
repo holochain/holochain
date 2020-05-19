@@ -1,6 +1,6 @@
 mod config;
 
 pub use config::{
-    Configuration, DnaConfiguration, DpkiConfiguration, InstanceConfiguration,
+    Config, DnaConfiguration, DpkiConfiguration, InstanceConfiguration,
     InterfaceConfiguration, InterfaceDriver, StorageConfiguration,
 };

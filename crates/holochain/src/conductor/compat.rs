@@ -10,7 +10,7 @@ use holochain_types::{
     dna::{DnaError, DnaFile},
 };
 use legacy::{
-    Configuration as LegacyConfig, DpkiConfiguration as LegacyDpkiConfig,
+    Config as LegacyConfig, DpkiConfiguration as LegacyDpkiConfig,
     InterfaceConfiguration as LegacyInterfaceConfig, InterfaceDriver as LegacyInterfaceDriver,
 };
 use std::fs;
@@ -167,7 +167,7 @@ pub mod tests {
     use std::path::PathBuf;
     use tempdir::TempDir;
 
-    fn legacy_fixtures() -> (lc::Configuration, EnvironmentRootPath, TempDir) {
+    fn legacy_fixtures() -> (lc::Config, EnvironmentRootPath, TempDir) {
         let dir = TempDir::new("").unwrap();
         let dnas = vec![
             lc::DnaConfiguration {
@@ -227,7 +227,7 @@ pub mod tests {
 
         let persistence_dir = PathBuf::from("persistence_dir");
 
-        let legacy_config = lc::Configuration {
+        let legacy_config = lc::Config {
             dnas: dnas.clone(),
             instances: instances.clone(),
             interfaces: interfaces.clone(),

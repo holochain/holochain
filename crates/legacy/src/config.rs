@@ -15,7 +15,7 @@ use std::{collections::HashMap, path::PathBuf};
 /// the agent and DNA to be instantiated) are implemented
 /// via string IDs.
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
-pub struct Configuration {
+pub struct Config {
     /// List of Agents, this mainly means identities and their keys. Required.
     pub agents: Vec<AgentConfiguration>,
     /// List of DNAs, for each a path to the DNA file. Optional.
@@ -356,7 +356,7 @@ pub struct SignalConfig {
     pub consistency: bool,
 }
 
-impl Configuration {
+impl Config {
     /// Returns the agent configuration with the given ID if present
     pub fn agent_by_id(&self, id: &str) -> Option<AgentConfiguration> {
         self.agents.iter().find(|ac| &ac.id == id).cloned()
