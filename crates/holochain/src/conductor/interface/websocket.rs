@@ -301,11 +301,8 @@ mod test {
             .unwrap();
 
         conductor_handle
-            .genesis_cells(
-                "test app".to_string(),
-                cell_ids_with_proofs,
-                conductor_handle.clone(),
-            )
+            .clone()
+            .genesis_cells("test app".to_string(), cell_ids_with_proofs)
             .await
             .unwrap();
 
@@ -318,10 +315,7 @@ mod test {
             .await
             .unwrap();
 
-        let errors = conductor_handle
-            .setup_cells(conductor_handle.clone())
-            .await
-            .unwrap();
+        let errors = conductor_handle.clone().setup_cells().await.unwrap();
 
         assert!(errors.is_empty());
 
@@ -345,11 +339,8 @@ mod test {
             .unwrap();
 
         conductor_handle
-            .genesis_cells(
-                "test app".to_string(),
-                cell_ids_with_proofs,
-                conductor_handle.clone(),
-            )
+            .clone()
+            .genesis_cells("test app".to_string(), cell_ids_with_proofs)
             .await
             .unwrap();
 
@@ -358,10 +349,7 @@ mod test {
             .await
             .unwrap();
 
-        let errors = conductor_handle
-            .setup_cells(conductor_handle.clone())
-            .await
-            .unwrap();
+        let errors = conductor_handle.clone().setup_cells().await.unwrap();
 
         assert!(errors.is_empty());
 

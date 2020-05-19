@@ -91,10 +91,11 @@ pub async fn load_conductor_from_legacy_config(
     // externally so we can use LEGACY as the id
     let app_id = "LEGACY".to_string();
     conductor
-        .genesis_cells(app_id.clone(), cell_ids, conductor.clone())
+        .clone()
+        .genesis_cells(app_id.clone(), cell_ids)
         .await?;
     conductor.activate_app(app_id.clone()).await?;
-    let errors = conductor.setup_cells(conductor.clone()).await?;
+    let errors = conductor.clone().setup_cells().await?;
 
     // If there are any errors return the first one
     if let Some(error) = errors.into_iter().next() {
@@ -106,9 +107,7 @@ pub async fn load_conductor_from_legacy_config(
             driver: InterfaceDriver::Websocket { port },
             cells: _,
         } = i;
-        conductor
-            .add_app_interface_via_handle(port, conductor.clone())
-            .await?;
+        conductor.clone().add_app_interface(port).await?;
     }
 
     Ok(conductor)
@@ -319,21 +318,25 @@ pub mod tests {
         handle
             .expect_sync_genesis_cells()
             .with(
-                predicate::always(),
+                predicate::eq("LEGACY".to_string()),
                 predicate::eq(expected_cell_ids),
-                predicate::always(),
             )
             .times(1)
-            .returning(|_, _, _| Ok(()));
+            .returning(|_, _| Ok(()));
+        handle
+            .expect_sync_activate_app()
+            .with(predicate::eq("LEGACY".to_string()))
+            .times(1)
+            .returning(|_| Ok(()));
         handle
             .expect_sync_setup_cells()
             .times(1)
-            .returning(|_| Ok(vec![]));
+            .returning(|| Ok(vec![]));
         handle
-            .expect_sync_add_app_interface_via_handle()
-            .with(predicate::eq(1111), predicate::always())
+            .expect_sync_add_app_interface()
+            .with(predicate::eq(1111))
             .times(1)
-            .returning(|port, _| Ok(port));
+            .returning(|port| Ok(port));
 
         let builder = Conductor::builder().with_mock_handle(handle).await;
         let _ = load_conductor_from_legacy_config(legacy_config, builder, agent_pubkey)
