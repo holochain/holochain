@@ -511,11 +511,13 @@ fixturator!(
         .unwrap()
     },
     {
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { DnaHash::with_pre_hashed(vec![0xdb; 32]).await },
+        let ret = tokio_safe_block_on::tokio_safe_block_on(
+            async { DnaHash::with_pre_hashed(vec![self.0.index as _; 32]).await },
             std::time::Duration::from_millis(10),
         )
-        .unwrap()
+        .unwrap();
+        self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
+        ret
     }
 );
 
@@ -537,11 +539,13 @@ fixturator!(
         .unwrap()
     },
     {
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { HeaderHash::with_pre_hashed(vec![0xdb; 32]).await },
+        let ret = tokio_safe_block_on::tokio_safe_block_on(
+            async { HeaderHash::with_pre_hashed(vec![self.0.index as _; 32]).await },
             std::time::Duration::from_millis(10),
         )
-        .unwrap()
+        .unwrap();
+        self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
+        ret
     }
 );
 
@@ -563,11 +567,13 @@ fixturator!(
         .unwrap()
     },
     {
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { AgentPubKey::with_pre_hashed(vec![0xdb; 32]).await },
+        let ret = tokio_safe_block_on::tokio_safe_block_on(
+            async { AgentPubKey::with_pre_hashed(vec![self.0.index as _; 32]).await },
             std::time::Duration::from_millis(10),
         )
-        .unwrap()
+        .unwrap();
+        self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
+        ret
     }
 );
 mod hashed;
