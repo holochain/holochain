@@ -79,18 +79,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// around having a circular reference in the types.
     ///
     /// Never use a ConductorHandle for different Conductor here!
-    async fn add_admin_interfaces_via_handle(
-        &self,
-        handle: ConductorHandle,
+    async fn add_admin_interfaces(
+        self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()>;
 
     /// Add an app interface
-    async fn add_app_interface_via_handle(
-        &self,
-        port: u16,
-        conductor_handle: ConductorHandle,
-    ) -> ConductorResult<u16>;
+    async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16>;
 
     /// Install a [Dna] in this Conductor
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
@@ -128,14 +123,13 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Run genesis on [CellId]s and add them to the db
     async fn genesis_cells(
-        &self,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        cell_api: ConductorHandle,
+        self: Arc<Self>,
+        cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()>;
 
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
-    async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+    async fn setup_cells(self: Arc<Self>) -> ConductorResult<()>;
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -166,22 +160,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.0.read().await.check_running()
     }
 
-    async fn add_admin_interfaces_via_handle(
-        &self,
-        handle: ConductorHandle,
+    async fn add_admin_interfaces(
+        self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
         let mut lock = self.0.write().await;
-        lock.add_admin_interfaces_via_handle(handle, configs).await
+        lock.add_admin_interfaces_via_handle(configs, self.clone())
+            .await
     }
 
-    async fn add_app_interface_via_handle(
-        &self,
-        port: u16,
-        handle: ConductorHandle,
-    ) -> ConductorResult<u16> {
+    async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
         let mut lock = self.0.write().await;
-        lock.add_app_interface_via_handle(port, handle).await
+        lock.add_app_interface_via_handle(port, self.clone()).await
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
@@ -236,25 +226,24 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn genesis_cells(
-        &self,
+        self: Arc<Self>,
         cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        cell_api: ConductorHandle,
     ) -> ConductorResult<()> {
         let cells = {
             self.0
                 .read()
                 .await
-                .genesis_cells(cells_ids_with_proofs, cell_api)
+                .genesis_cells(cells_ids_with_proofs, self.clone())
                 .await?
         };
         // Update the db
         self.0.write().await.add_cell_ids_to_db(cells).await
     }
 
-    async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<()> {
+    async fn setup_cells(self: Arc<Self>) -> ConductorResult<()> {
         let cells = {
             let lock = self.0.read().await;
-            lock.create_cells(handle).await?
+            lock.create_cells(self.clone()).await?
         };
         self.0.write().await.add_cells(cells);
         Ok(())
@@ -292,16 +281,14 @@ pub mod mock {
         pub ConductorHandle {
             fn sync_check_running(&self) -> ConductorResult<()>;
 
-            fn sync_add_admin_interfaces_via_handle(
+            fn sync_add_admin_interfaces(
                 &self,
-                handle: ConductorHandle,
                 configs: Vec<AdminInterfaceConfig>,
             ) -> ConductorResult<()>;
 
-            fn sync_add_app_interface_via_handle(
+            fn sync_add_app_interface(
                 &self,
                 port: u16,
-                conductor_handle: ConductorHandle,
             ) -> ConductorResult<u16>;
 
             fn sync_install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
@@ -326,12 +313,11 @@ pub mod mock {
             fn sync_keystore(&self) -> &KeystoreSender;
 
             fn sync_genesis_cells(
-        &self,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        cell_api: ConductorHandle,
-    ) -> ConductorResult<()>;
+                &self,
+                cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+            ) -> ConductorResult<()>;
 
-            fn sync_setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+            fn sync_setup_cells(&self) -> ConductorResult<()>;
 
             fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
@@ -353,20 +339,15 @@ pub mod mock {
             self.sync_check_running()
         }
 
-        async fn add_admin_interfaces_via_handle(
-            &self,
-            handle: ConductorHandle,
+        async fn add_admin_interfaces(
+            self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<()> {
-            self.sync_add_admin_interfaces_via_handle(handle, configs)
+            self.sync_add_admin_interfaces(configs)
         }
 
-        async fn add_app_interface_via_handle(
-            &self,
-            port: u16,
-            conductor_handle: ConductorHandle,
-        ) -> ConductorResult<u16> {
-            self.sync_add_app_interface_via_handle(port, conductor_handle)
+        async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
+            self.sync_add_app_interface(port)
         }
 
         async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
@@ -413,17 +394,16 @@ pub mod mock {
         }
 
         async fn genesis_cells(
-            &self,
+            self: Arc<Self>,
             cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-            cell_api: ConductorHandle,
         ) -> ConductorResult<()> {
-            self.sync_genesis_cells(cell_ids_with_proofs, cell_api)
+            self.sync_genesis_cells(cell_ids_with_proofs)
         }
 
         /// Setup the cells from the database
         /// Only creates any cells that are not already created
-        async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()> {
-            self.sync_setup_cells(cell_api)
+        async fn setup_cells(self: Arc<Self>) -> ConductorResult<()> {
+            self.sync_setup_cells()
         }
 
         /// Dump the cells state

@@ -213,8 +213,8 @@ where
     /// and modify the conductor accordingly, based on the config passed in
     pub(super) async fn add_admin_interfaces_via_handle(
         &mut self,
-        handle: ConductorHandle,
         configs: Vec<AdminInterfaceConfig>,
+        handle: ConductorHandle,
     ) -> ConductorResult<()>
     where
         DS: DnaStore + 'static,
@@ -695,13 +695,11 @@ mod builder {
                 keystore,
             )));
 
-            handle.setup_cells(handle.clone()).await?;
+            handle.clone().setup_cells().await?;
 
             // Create admin interfaces
             if let Some(configs) = conductor_config.admin_interfaces {
-                handle
-                    .add_admin_interfaces_via_handle(handle.clone(), configs)
-                    .await?;
+                handle.clone().add_admin_interfaces(configs).await?;
             }
 
             Ok(handle)

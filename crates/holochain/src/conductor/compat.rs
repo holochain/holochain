@@ -87,17 +87,15 @@ pub async fn load_conductor_from_legacy_config(
 
     let app_interfaces = extract_app_interfaces(legacy.interfaces);
 
-    conductor.genesis_cells(cell_ids, conductor.clone()).await?;
-    conductor.setup_cells(conductor.clone()).await?;
+    conductor.clone().genesis_cells(cell_ids).await?;
+    conductor.clone().setup_cells().await?;
 
     for i in app_interfaces {
         let InterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
             cells: _,
         } = i;
-        conductor
-            .add_app_interface_via_handle(port, conductor.clone())
-            .await?;
+        conductor.clone().add_app_interface(port).await?;
     }
 
     Ok(conductor)
@@ -307,18 +305,18 @@ pub mod tests {
             .returning(|_| Ok(()));
         handle
             .expect_sync_genesis_cells()
-            .with(predicate::eq(expected_cell_ids), predicate::always())
-            .times(1)
-            .returning(|_, _| Ok(()));
-        handle
-            .expect_sync_setup_cells()
+            .with(predicate::eq(expected_cell_ids))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_add_app_interface_via_handle()
-            .with(predicate::eq(1111), predicate::always())
+            .expect_sync_setup_cells()
             .times(1)
-            .returning(|port, _| Ok(port));
+            .returning(|| Ok(()));
+        handle
+            .expect_sync_add_app_interface()
+            .with(predicate::eq(1111))
+            .times(1)
+            .returning(|port| Ok(port));
 
         let builder = Conductor::builder().with_mock_handle(handle).await;
         let _ = load_conductor_from_legacy_config(legacy_config, builder, agent_pubkey)
