@@ -157,28 +157,27 @@ pub mod tests {
         handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
     };
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_file};
-    use legacy as lc;
     use matches::assert_matches;
     use mockall::predicate;
     use std::path::PathBuf;
     use tempdir::TempDir;
 
-    fn legacy_fixtures() -> (lc::Config, EnvironmentRootPath, TempDir) {
+    fn legacy_fixtures() -> (legacy::Config, EnvironmentRootPath, TempDir) {
         let dir = TempDir::new("").unwrap();
         let dnas = vec![
-            lc::DnaConfig {
+            legacy::DnaConfig {
                 id: "a1".to_string(),
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: None,
             },
-            lc::DnaConfig {
+            legacy::DnaConfig {
                 id: "a2".to_string(),
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: Some("significant-uuid".to_string()),
             },
-            lc::DnaConfig {
+            legacy::DnaConfig {
                 id: "b".to_string(),
                 file: dir.path().join("b.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
@@ -186,44 +185,44 @@ pub mod tests {
             },
         ];
         let instances = vec![
-            lc::InstanceConfig {
+            legacy::InstanceConfig {
                 agent: "".to_string(),
                 dna: "a1".to_string(),
                 id: "".to_string(),
-                storage: lc::StorageConfiguration::Memory,
+                storage: legacy::StorageConfiguration::Memory,
             },
-            lc::InstanceConfig {
+            legacy::InstanceConfig {
                 agent: "".to_string(),
                 dna: "a2".to_string(),
                 id: "".to_string(),
-                storage: lc::StorageConfiguration::Memory,
+                storage: legacy::StorageConfiguration::Memory,
             },
         ];
         let interfaces = vec![
-            lc::InterfaceConfig {
+            legacy::InterfaceConfig {
                 admin: false,
                 choose_free_port: None,
-                driver: lc::InterfaceDriver::Websocket { port: 1111 },
+                driver: legacy::InterfaceDriver::Websocket { port: 1111 },
                 id: "".to_string(),
                 instances: vec![],
             },
-            lc::InterfaceConfig {
+            legacy::InterfaceConfig {
                 admin: true,
                 choose_free_port: None,
-                driver: lc::InterfaceDriver::Websocket { port: 2222 },
+                driver: legacy::InterfaceDriver::Websocket { port: 2222 },
                 id: "".to_string(),
                 instances: vec![],
             },
         ];
 
-        let dpki = lc::DpkiConfig {
+        let dpki = legacy::DpkiConfig {
             instance_id: "foo".into(),
             init_params: "bar".into(),
         };
 
         let persistence_dir = PathBuf::from("persistence_dir");
 
-        let legacy_config = lc::Config {
+        let legacy_config = legacy::Config {
             dnas: dnas.clone(),
             instances: instances.clone(),
             interfaces: interfaces.clone(),
