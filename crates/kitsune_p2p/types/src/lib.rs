@@ -28,11 +28,15 @@ pub mod transport {
             Api {
                 IncomingRequest(
                     "Event for handling incoming requests from a remote.",
-                    Vec<u8>,
+                    (url2::Url2, Vec<u8>),
                     Vec<u8>,
                 ),
             }
         }
+
+        /// Receiver type for incoming connection events.
+        pub type TransportConnectionEventReceiver =
+            tokio::sync::mpsc::Receiver<TransportConnectionEvent>;
 
         ghost_actor::ghost_actor! {
             Visibility(pub),
@@ -59,11 +63,15 @@ pub mod transport {
             Api {
                 IncomingConnection(
                     "Event for handling incoming connections from a remote.",
-                    super::transport_connection::TransportConnectionSender,
+                    (url2::Url2, super::transport_connection::TransportConnectionSender, super::transport_connection::TransportConnectionEventReceiver),
                     (),
                 ),
             }
         }
+
+        /// Receiver type for incoming listener events.
+        pub type TransportListenerEventReceiver =
+            tokio::sync::mpsc::Receiver<TransportListenerEvent>;
 
         ghost_actor::ghost_actor! {
             Visibility(pub),

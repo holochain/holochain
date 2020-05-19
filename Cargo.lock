@@ -1409,8 +1409,10 @@ dependencies = [
 name = "kitsune_p2p_transport_quic"
 version = "0.0.1"
 dependencies = [
+ "futures",
  "kitsune_p2p_types",
  "quinn",
+ "tokio",
 ]
 
 [[package]]
