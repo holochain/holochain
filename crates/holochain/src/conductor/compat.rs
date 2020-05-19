@@ -190,13 +190,13 @@ pub mod tests {
             },
         ];
         let instances = vec![
-            lc::InstanceConfiguration {
+            lc::InstanceConfig {
                 agent: "".to_string(),
                 dna: "a1".to_string(),
                 id: "".to_string(),
                 storage: lc::StorageConfiguration::Memory,
             },
-            lc::InstanceConfiguration {
+            lc::InstanceConfig {
                 agent: "".to_string(),
                 dna: "a2".to_string(),
                 id: "".to_string(),

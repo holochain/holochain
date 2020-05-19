@@ -23,7 +23,7 @@ pub struct Config {
     pub dnas: Vec<DnaConfig>,
     /// List of instances, includes references to an agent and a DNA. Optional.
     #[serde(default)]
-    pub instances: Vec<InstanceConfiguration>,
+    pub instances: Vec<InstanceConfig>,
     /// List of interfaces any UI can use to access zome functions. Optional.
     #[serde(default)]
     pub interfaces: Vec<InterfaceConfiguration>,
@@ -188,7 +188,7 @@ pub struct DnaConfig {
 /// An instance combines a DNA with an agent.
 /// Each instance has its own storage configuration.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct InstanceConfiguration {
+pub struct InstanceConfig {
     pub id: String,
     pub dna: String,
     pub agent: String,
@@ -368,7 +368,7 @@ impl Config {
     }
 
     /// Returns the instance configuration with the given ID if present
-    pub fn instance_by_id(&self, id: &str) -> Option<InstanceConfiguration> {
+    pub fn instance_by_id(&self, id: &str) -> Option<InstanceConfig> {
         self.instances.iter().find(|ic| &ic.id == id).cloned()
     }
 
