@@ -9,7 +9,7 @@ use holochain_types::{
     cell::CellId,
     dna::{DnaError, DnaFile},
 };
-use legacy::{DpkiConfig as LegacyDpkiConfig, InterfaceDriver as LegacyInterfaceDriver};
+use legacy::InterfaceDriver as LegacyInterfaceDriver;
 use std::fs;
 use std::{
     collections::HashMap,
@@ -110,7 +110,7 @@ fn config_from_legacy(legacy: &legacy::Config) -> ConductorConfig {
     }
 }
 
-fn convert_dpki(legacy: LegacyDpkiConfig) -> DpkiConfig {
+fn convert_dpki(legacy: legacy::DpkiConfig) -> DpkiConfig {
     DpkiConfig {
         instance_id: legacy.instance_id,
         init_params: legacy.init_params,
