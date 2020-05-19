@@ -167,11 +167,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .map(|(dna_hash, proof)| (CellId::from((dna_hash, agent_key.clone())), proof))
                     .collect();
                 self.conductor_handle
-                    .genesis_cells(cell_ids_with_proofs, self.conductor_handle.clone())
+                    .clone()
+                    .genesis_cells(cell_ids_with_proofs)
                     .await?;
-                self.conductor_handle
-                    .setup_cells(self.conductor_handle.clone())
-                    .await?;
+                self.conductor_handle.clone().setup_cells().await?;
 
                 Ok(AdminResponse::AppsActivated)
             }

@@ -680,7 +680,7 @@ mod builder {
                 keystore,
             )));
 
-            handle.setup_cells(handle.clone()).await?;
+            handle.clone().setup_cells().await?;
 
             // Create admin interfaces
             if let Some(configs) = conductor_config.admin_interfaces {

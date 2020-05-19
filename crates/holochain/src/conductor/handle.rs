@@ -120,14 +120,13 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Run genesis on [CellId]s and add them to the db
     async fn genesis_cells(
-        &self,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        cell_api: ConductorHandle,
+        self: Arc<Self>,
+        cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()>;
 
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
-    async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+    async fn setup_cells(self: Arc<Self>) -> ConductorResult<()>;
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -224,25 +223,24 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn genesis_cells(
-        &self,
+        self: Arc<Self>,
         cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        cell_api: ConductorHandle,
     ) -> ConductorResult<()> {
         let cells = {
             self.0
                 .read()
                 .await
-                .genesis_cells(cells_ids_with_proofs, cell_api)
+                .genesis_cells(cells_ids_with_proofs, self.clone())
                 .await?
         };
         // Update the db
         self.0.write().await.add_cell_ids_to_db(cells).await
     }
 
-    async fn setup_cells(&self, handle: ConductorHandle) -> ConductorResult<()> {
+    async fn setup_cells(self: Arc<Self>) -> ConductorResult<()> {
         let cells = {
             let lock = self.0.read().await;
-            lock.create_cells(handle).await?
+            lock.create_cells(self.clone()).await?
         };
         self.0.write().await.add_cells(cells);
         Ok(())
