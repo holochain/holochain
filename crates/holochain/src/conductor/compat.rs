@@ -10,8 +10,8 @@ use holochain_types::{
     dna::{DnaError, DnaFile},
 };
 use legacy::{
-    Config as LegacyConfig, DpkiConfiguration as LegacyDpkiConfig,
-    InterfaceConfiguration as LegacyInterfaceConfig, InterfaceDriver as LegacyInterfaceDriver,
+    DpkiConfiguration as LegacyDpkiConfig, InterfaceConfiguration as LegacyInterfaceConfig,
+    InterfaceDriver as LegacyInterfaceDriver,
 };
 use std::fs;
 use std::{
@@ -38,7 +38,7 @@ pub enum CompatConfigError {
 }
 
 pub async fn load_conductor_from_legacy_config(
-    legacy: LegacyConfig,
+    legacy: legacy::Config,
     builder: ConductorBuilder,
     agent_pubkey: AgentPubKey,
 ) -> Result<ConductorHandle, CompatConfigError> {
@@ -104,7 +104,7 @@ pub async fn load_conductor_from_legacy_config(
     Ok(conductor)
 }
 
-fn config_from_legacy(legacy: &LegacyConfig) -> ConductorConfig {
+fn config_from_legacy(legacy: &legacy::Config) -> ConductorConfig {
     ConductorConfig {
         environment_path: legacy.persistence_dir.clone().into(),
         dpki: legacy.dpki.clone().map(convert_dpki),
