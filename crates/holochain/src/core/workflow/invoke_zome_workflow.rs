@@ -37,7 +37,6 @@ where
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = Option<InitializeZomesWorkflow>;
 
-    //#[allow(unreachable_code, unused_variables)]
     fn workflow(
         self,
         mut workspace: Self::Workspace,
