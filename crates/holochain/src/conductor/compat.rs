@@ -51,7 +51,7 @@ pub async fn load_conductor_from_legacy_config(
         let mut buffer = Vec::new();
         let path = Path::new(&dna_config.file);
         fs::File::open(&path)?.read_to_end(&mut buffer)?;
-        let mut dna_file = DnaFile::from_file_content(&mut buffer).await?;
+        let mut dna_file = DnaFile::from_file_content(&buffer).await?;
         if let Some(uuid) = dna_config.uuid.clone() {
             dna_file = dna_file.with_uuid(uuid).await?;
         }
