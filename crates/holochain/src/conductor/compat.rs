@@ -9,7 +9,7 @@ use holochain_types::{
     cell::CellId,
     dna::{DnaError, DnaFile},
 };
-use legacy::{DpkiConfiguration as LegacyDpkiConfig, InterfaceDriver as LegacyInterfaceDriver};
+use legacy::{DpkiConfig as LegacyDpkiConfig, InterfaceDriver as LegacyInterfaceDriver};
 use std::fs;
 use std::{
     collections::HashMap,
@@ -217,7 +217,7 @@ pub mod tests {
             },
         ];
 
-        let dpki = lc::DpkiConfiguration {
+        let dpki = lc::DpkiConfig {
             instance_id: "foo".into(),
             init_params: "bar".into(),
         };

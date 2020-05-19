@@ -76,7 +76,7 @@ pub struct Config {
 
     /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
     /// keys for new instances
-    pub dpki: Option<DpkiConfiguration>,
+    pub dpki: Option<DpkiConfig>,
 
     /// Which signals to emit
     #[serde(default)]
@@ -344,7 +344,7 @@ pub struct UiInterfaceConfiguration {
 /// Configure which app instance id to treat as the DPKI application handler
 /// as well as what parameters to pass it on its initialization
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct DpkiConfiguration {
+pub struct DpkiConfig {
     pub instance_id: String,
     pub init_params: String,
 }
