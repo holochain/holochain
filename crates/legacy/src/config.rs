@@ -20,7 +20,7 @@ pub struct Config {
     pub agents: Vec<AgentConfig>,
     /// List of DNAs, for each a path to the DNA file. Optional.
     #[serde(default)]
-    pub dnas: Vec<DnaConfiguration>,
+    pub dnas: Vec<DnaConfig>,
     /// List of instances, includes references to an agent and a DNA. Optional.
     #[serde(default)]
     pub instances: Vec<InstanceConfiguration>,
@@ -177,7 +177,7 @@ pub struct AgentConfig {
 /// A hash can optionally be provided, which could be used to validate that the DNA being installed
 /// is the DNA that was intended to be installed.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct DnaConfiguration {
+pub struct DnaConfig {
     pub id: String,
     pub file: String,
     pub hash: String,
@@ -363,7 +363,7 @@ impl Config {
     }
 
     /// Returns the DNA configuration with the given ID if present
-    pub fn dna_by_id(&self, id: &str) -> Option<DnaConfiguration> {
+    pub fn dna_by_id(&self, id: &str) -> Option<DnaConfig> {
         self.dnas.iter().find(|dc| &dc.id == id).cloned()
     }
 

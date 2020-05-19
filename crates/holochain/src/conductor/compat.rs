@@ -170,19 +170,19 @@ pub mod tests {
     fn legacy_fixtures() -> (lc::Config, EnvironmentRootPath, TempDir) {
         let dir = TempDir::new("").unwrap();
         let dnas = vec![
-            lc::DnaConfiguration {
+            lc::DnaConfig {
                 id: "a1".to_string(),
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: None,
             },
-            lc::DnaConfiguration {
+            lc::DnaConfig {
                 id: "a2".to_string(),
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: Some("significant-uuid".to_string()),
             },
-            lc::DnaConfiguration {
+            lc::DnaConfig {
                 id: "b".to_string(),
                 file: dir.path().join("b.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
