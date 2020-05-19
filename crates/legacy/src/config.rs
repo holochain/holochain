@@ -17,7 +17,7 @@ use std::{collections::HashMap, path::PathBuf};
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
 pub struct Config {
     /// List of Agents, this mainly means identities and their keys. Required.
-    pub agents: Vec<AgentConfiguration>,
+    pub agents: Vec<AgentConfig>,
     /// List of DNAs, for each a path to the DNA file. Optional.
     #[serde(default)]
     pub dnas: Vec<DnaConfiguration>,
@@ -161,7 +161,7 @@ impl Default for TracingConfiguration {
 
 /// An agent has a name/ID and is optionally defined by a private key that resides in a file
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct AgentConfiguration {
+pub struct AgentConfig {
     pub id: String,
     pub name: String,
     pub public_address: String,
@@ -358,7 +358,7 @@ pub struct SignalConfig {
 
 impl Config {
     /// Returns the agent configuration with the given ID if present
-    pub fn agent_by_id(&self, id: &str) -> Option<AgentConfiguration> {
+    pub fn agent_by_id(&self, id: &str) -> Option<AgentConfig> {
         self.agents.iter().find(|ac| &ac.id == id).cloned()
     }
 
