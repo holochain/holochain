@@ -91,17 +91,18 @@ async fn async_main() {
     // interfaces are running, and can be connected to.
     println!("{}", MAGIC_CONDUCTOR_READY_STRING);
 
-    let waiting_handle = conductor
-        .get_wait_handle()
+    // Await on the main JoinHandle, keeping the process alive until all
+    // Conductor activity has ceased
+    conductor
+        .take_shutdown_handle()
         .await
-        .expect("No wait handle in conductor");
-
-    waiting_handle
+        .expect("The shutdown handle has already been taken.")
         .await
         .map_err(|e| {
             error!(error = &e as &dyn Error, "Failed to join the main task");
+            e
         })
-        .ok();
+        .expect("Error while joining threads during shutdown");
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await

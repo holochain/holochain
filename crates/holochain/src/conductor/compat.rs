@@ -62,7 +62,6 @@ pub async fn load_conductor_from_legacy_config(
         .instances
         .iter()
         .map(|i| {
-            // NB: disregarding agent config for now, using a hard-coded pre-made one
             let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
                 CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
             })?;
@@ -78,6 +77,9 @@ pub async fn load_conductor_from_legacy_config(
                 })?
                 .clone();
 
+            // NB: disregarding agent config, using a hard-coded pre-made one
+            // for now. In the future we can actually pay attention to
+            // `i.agent` to get agent info
             let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
             Ok((cell_id, None))
         })

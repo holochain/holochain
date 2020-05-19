@@ -208,7 +208,7 @@ where
             })
     }
 
-    pub(super) fn get_wait_handle(&mut self) -> Option<TaskManagerRunHandle> {
+    pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
 

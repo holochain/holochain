@@ -114,8 +114,11 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
 
     /// Return the JoinHandle for all managed tasks, which when resolved will
-    /// signal that the Conductor has completely shut down
-    async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle>;
+    /// signal that the Conductor has completely shut down.
+    ///
+    /// NB: The JoinHandle is not cloneable,
+    /// so this can only ever be called successfully once.
+    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle>;
 
     /// Send a signal to all managed tasks asking them to end ASAP.
     async fn shutdown(&self);
@@ -215,8 +218,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle> {
-        self.0.write().await.get_wait_handle()
+    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
+        self.0.write().await.take_shutdown_handle()
     }
 
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
@@ -305,7 +308,7 @@ pub mod mock {
 
             fn sync_autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
 
-            fn sync_get_wait_handle(&self) -> Option<TaskManagerRunHandle>;
+            fn sync_take_shutdown_handle(&self) -> Option<TaskManagerRunHandle>;
 
             fn sync_get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
 
@@ -383,8 +386,8 @@ pub mod mock {
             self.sync_autonomic_cue(cue, cell_id)
         }
 
-        async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle> {
-            self.sync_get_wait_handle()
+        async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
+            self.sync_take_shutdown_handle()
         }
 
         async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
