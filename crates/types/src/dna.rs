@@ -126,6 +126,14 @@ impl DnaFile {
         DnaFile::new(dna, wasm).await
     }
 
+    /// Transform this DnaFile into a new DnaFile with a different UUID
+    /// and, hence, a different DnaHash.
+    pub async fn with_uuid(self, uuid: String) -> Result<Self, DnaError> {
+        let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
+        dna.uuid = uuid;
+        DnaFile::new(dna, wasm).await
+    }
+
     /// The hashable portion that can be shared with hApp code.
     pub fn dna(&self) -> &DnaDef {
         &self.dna

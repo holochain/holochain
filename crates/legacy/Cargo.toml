@@ -1,0 +1,12 @@
+[package]
+name = "holochain_2020_legacy"
+version = "0.0.1"
+description = "Holochain legacy types"
+license = "GPL-3.0-only"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+
+[dependencies]
+serde = "1.0.104"
