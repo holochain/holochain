@@ -26,7 +26,7 @@ pub struct Config {
     pub instances: Vec<InstanceConfig>,
     /// List of interfaces any UI can use to access zome functions. Optional.
     #[serde(default)]
-    pub interfaces: Vec<InterfaceConfiguration>,
+    pub interfaces: Vec<InterfaceConfig>,
 
     /// List of bridges between instances. Optional.
     #[serde(default)]
@@ -231,7 +231,7 @@ pub enum StorageConfiguration {
 /// An admin flag will enable conductor functions for programatically changing the configuration
 /// (e.g. installing apps)
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct InterfaceConfiguration {
+pub struct InterfaceConfig {
     pub id: String,
     pub driver: InterfaceDriver,
     #[serde(default)]
@@ -373,7 +373,7 @@ impl Config {
     }
 
     /// Returns the interface configuration with the given ID if present
-    pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfiguration> {
+    pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfig> {
         self.interfaces.iter().find(|ic| &ic.id == id).cloned()
     }
 }

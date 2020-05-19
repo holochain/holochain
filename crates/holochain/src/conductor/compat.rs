@@ -10,7 +10,7 @@ use holochain_types::{
     dna::{DnaError, DnaFile},
 };
 use legacy::{
-    DpkiConfiguration as LegacyDpkiConfig, InterfaceConfiguration as LegacyInterfaceConfig,
+    DpkiConfiguration as LegacyDpkiConfig, InterfaceConfig as LegacyInterfaceConfig,
     InterfaceDriver as LegacyInterfaceDriver,
 };
 use std::fs;
@@ -204,14 +204,14 @@ pub mod tests {
             },
         ];
         let interfaces = vec![
-            lc::InterfaceConfiguration {
+            lc::InterfaceConfig {
                 admin: false,
                 choose_free_port: None,
                 driver: lc::InterfaceDriver::Websocket { port: 1111 },
                 id: "".to_string(),
                 instances: vec![],
             },
-            lc::InterfaceConfiguration {
+            lc::InterfaceConfig {
                 admin: true,
                 choose_free_port: None,
                 driver: lc::InterfaceDriver::Websocket { port: 2222 },
