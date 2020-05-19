@@ -15,3 +15,4 @@ futures = "0.3"
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 quinn = "0.6.1"
 tokio = { version = "0.2", features = ["full"] }
+tokio_safe_block_on = "0.1.1"

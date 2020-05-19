@@ -3,6 +3,7 @@
 
 /// Re-exported dependencies.
 pub mod dependencies {
+    pub use ::futures;
     pub use ::ghost_actor;
     pub use ::thiserror;
     pub use ::tokio;
@@ -17,7 +18,37 @@ pub mod transport {
         /// GhostError
         #[error(transparent)]
         GhostError(#[from] ghost_actor::GhostError),
+
+        /// Custom
+        #[error("Custom: {0}")]
+        Custom(Box<dyn std::error::Error + Send + Sync>),
+
+        /// Other
+        #[error("Other: {0}")]
+        Other(String),
     }
+
+    impl TransportError {
+        /// promote a custom error type to a TransportError
+        pub fn custom(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+            Self::Custom(e.into())
+        }
+    }
+
+    impl From<String> for TransportError {
+        fn from(s: String) -> Self {
+            Self::Other(s)
+        }
+    }
+
+    impl From<&str> for TransportError {
+        fn from(s: &str) -> Self {
+            s.to_string().into()
+        }
+    }
+
+    /// Result type for remote communication.
+    pub type TransportResult<T> = Result<T, TransportError>;
 
     /// Defines an established connection to a remote peer.
     pub mod transport_connection {
@@ -36,13 +67,18 @@ pub mod transport {
 
         /// Receiver type for incoming connection events.
         pub type TransportConnectionEventReceiver =
-            tokio::sync::mpsc::Receiver<TransportConnectionEvent>;
+            futures::channel::mpsc::Receiver<TransportConnectionEvent>;
 
         ghost_actor::ghost_actor! {
             Visibility(pub),
             Name(TransportConnection),
             Error(super::TransportError),
             Api {
+                RemoteUrl(
+                    "Retrieve the current url (address) of the remote end of this connection.",
+                    (),
+                    url2::Url2,
+                ),
                 Request(
                     "Make a request of the remote end of this connection.",
                     Vec<u8>,
@@ -63,7 +99,7 @@ pub mod transport {
             Api {
                 IncomingConnection(
                     "Event for handling incoming connections from a remote.",
-                    (url2::Url2, super::transport_connection::TransportConnectionSender, super::transport_connection::TransportConnectionEventReceiver),
+                    (super::transport_connection::TransportConnectionSender, super::transport_connection::TransportConnectionEventReceiver),
                     (),
                 ),
             }
@@ -71,7 +107,7 @@ pub mod transport {
 
         /// Receiver type for incoming listener events.
         pub type TransportListenerEventReceiver =
-            tokio::sync::mpsc::Receiver<TransportListenerEvent>;
+            futures::channel::mpsc::Receiver<TransportListenerEvent>;
 
         ghost_actor::ghost_actor! {
             Visibility(pub),
@@ -81,7 +117,10 @@ pub mod transport {
                 Connect(
                     "Attempt to establish an outgoing connection to a remote.",
                     url2::Url2,
-                    super::transport_connection::TransportConnectionSender,
+                    (
+                        super::transport_connection::TransportConnectionSender,
+                        super::transport_connection::TransportConnectionEventReceiver,
+                    ),
                 ),
             }
         }

@@ -1413,12 +1413,14 @@ dependencies = [
  "kitsune_p2p_types",
  "quinn",
  "tokio",
+ "tokio_safe_block_on",
 ]
 
 [[package]]
 name = "kitsune_p2p_types"
 version = "0.0.1"
 dependencies = [
+ "futures",
  "ghost_actor",
  "thiserror",
  "tokio",

@@ -11,6 +11,7 @@ categories = ["network-programming"]
 edition = "2018"
 
 [dependencies]
+futures = "0.3"
 ghost_actor = "0.1.0-alpha.9"
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = ["full"] }
