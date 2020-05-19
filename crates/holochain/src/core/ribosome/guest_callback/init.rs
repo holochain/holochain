@@ -14,8 +14,8 @@ use holochain_zome_types::HostInput;
 #[derive(Clone)]
 pub struct InitInvocation {
     // @todo InitWorkspace?
-    workspace: UnsafeInvokeZomeWorkspace,
-    dna_def: DnaDef,
+    pub workspace: UnsafeInvokeZomeWorkspace,
+    pub dna_def: DnaDef,
 }
 
 fixturator!(

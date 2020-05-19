@@ -1,5 +1,5 @@
 use super::Workspace;
-use super::{error::WorkflowResult, InitializeZomesWorkflow, Workflow, WorkflowEffects};
+use super::{error::WorkflowResult, Workflow, WorkflowEffects};
 use crate::core::ribosome::ZomeInvocation;
 use crate::core::ribosome::ZomeInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
@@ -23,13 +23,13 @@ pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     pub invocation: ZomeInvocation,
 }
 
-impl<'env, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
+impl<'env, Ribosome: 'static> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
 where
     Ribosome: RibosomeT + Send + Sync + 'env,
 {
     type Output = ZomeInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
-    type Triggers = Option<InitializeZomesWorkflow>;
+    type Triggers = ();
 
     #[allow(unreachable_code, unused_variables)]
     fn workflow(
@@ -41,14 +41,6 @@ where
                 ribosome,
                 invocation,
             } = self;
-
-            // Check if the initialize workflow has been successfully run
-            // TODO: check for existence of initialization-done marker, when implemented
-            let triggers = if workspace.source_chain.len() < 4 {
-                Some(InitializeZomesWorkflow {})
-            } else {
-                None
-            };
 
             // Get te current head
             let chain_head_start = workspace.source_chain.chain_head()?.clone();
@@ -95,7 +87,7 @@ where
                 workspace,
                 callbacks: Default::default(),
                 signals: Default::default(),
-                triggers,
+                triggers: Default::default(),
             };
 
             Ok((result, fx))
@@ -167,7 +159,7 @@ pub mod tests {
         a: u32,
     }
 
-    async fn run_invoke_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
+    async fn run_invoke_zome<'env, Ribosome: RibosomeT + Send + Sync + 'static>(
         workspace: InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
         invocation: ZomeInvocation,
@@ -183,6 +175,10 @@ pub mod tests {
     // Check if source chain seq/head ("as at") is less than 4, if so,
     // Call Initialize zomes workflows (which will end up adding an entry
     // for "zome initialization complete") MVI
+    // FIXME: I think this can be removed because initialize will be called
+    // from create_cell and there's no need to trigger it here because
+    // a cell cannot exist without have init already run
+    #[ignore]
     #[tokio::test(threaded_scheduler)]
     async fn runs_init() {
         let env = test_cell_env();
@@ -226,7 +222,7 @@ pub mod tests {
         assert!(effects.signals.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(!effects.triggers.is_empty());
-        assert_matches!(effects.triggers, Some(InitializeZomesWorkflow {}));
+        //assert_matches!(effects.triggers, Some(InitializeZomesWorkflow {ribosome}));
     }
 
     // 1.  Check if there is a Capability token secret in the parameters.

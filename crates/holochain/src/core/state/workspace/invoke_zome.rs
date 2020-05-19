@@ -41,6 +41,9 @@ impl<'env> InvokeZomeWorkspace<'env> {
 impl<'env> Workspace for InvokeZomeWorkspace<'env> {
     fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
         self.source_chain.into_inner().flush_to_txn(&mut writer)?;
+        self.meta.into_inner().flush_to_txn(&mut writer)?;
+        self.cache_cas.into_inner().flush_to_txn(&mut writer)?;
+        self.cache_meta.into_inner().flush_to_txn(&mut writer)?;
         writer.commit()?;
         Ok(())
     }
