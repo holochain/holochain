@@ -62,22 +62,30 @@ pub async fn load_conductor_from_legacy_config(
         conductor.install_dna(dna_file).await?;
     }
 
-    let mut cell_ids = vec![];
-    for i in &legacy.instances {
-        // NB: disregarding agent config for now, using a hard-coded pre-made one
-        let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
-            CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
-        })?;
-        // make sure we have installed this DNA
-        let dna_hash = dna_hashes
-            .get(&dna_key(Path::new(&dna_config.file), &dna_config.uuid))
-            .ok_or_else(|| {
-                CompatConfigError::BrokenReference(format!("No DNA for path: {}", dna_config.file))
-            })?
-            .clone();
-        let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
-        cell_ids.push((cell_id, None));
-    }
+    let cell_ids = legacy
+        .instances
+        .iter()
+        .map(|i| {
+            // NB: disregarding agent config for now, using a hard-coded pre-made one
+            let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
+                CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
+            })?;
+
+            // make sure we have installed this DNA
+            let dna_hash = dna_hashes
+                .get(&dna_key(Path::new(&dna_config.file), &dna_config.uuid))
+                .ok_or_else(|| {
+                    CompatConfigError::BrokenReference(format!(
+                        "No DNA for path: {}",
+                        dna_config.file
+                    ))
+                })?
+                .clone();
+
+            let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
+            Ok((cell_id, None))
+        })
+        .collect::<Result<Vec<_>, CompatConfigError>>()?;
 
     let app_interfaces = extract_app_interfaces(legacy.interfaces);
 
