@@ -10,11 +10,7 @@ use holochain_types::{
     dna::{DnaError, DnaFile},
 };
 use std::fs;
-use std::{
-    collections::HashMap,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, io::Read, path::Path};
 use thiserror::Error;
 use tracing::*;
 
