@@ -32,6 +32,8 @@ impl CapClaim {
     }
 
     /// Access the tag
+    ///
+    /// (We may consider changing this to `tag_matches` to match CapGrant)
     pub fn tag(&self) -> &str {
         &self.tag
     }

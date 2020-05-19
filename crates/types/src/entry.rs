@@ -7,7 +7,7 @@
 
 use crate::{
     address::EntryAddress,
-    capability::{CapClaim, CapGrant, InvocationCapGrant},
+    capability::{CapClaim, CapGrant, ZomeCallCapGrant},
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -50,7 +50,7 @@ pub type CapClaimEntry = CapClaim;
 /// grant is already implied by `Entry::Agent`, so that should not be committed
 /// to a chain. This is a type alias because if we add other capability types
 /// in the future, we may want to include them
-pub type CapGrantEntry = InvocationCapGrant;
+pub type CapGrantEntry = ZomeCallCapGrant;
 
 make_hashed_base! {
     Visibility(pub),

@@ -9,32 +9,31 @@ use std::collections::{BTreeMap, HashSet};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, From)]
 pub enum CapGrant {
     /// Grants the capability of writing to the source chain for this agent key.
-    /// This grant is provided by the `Entry::Agent` entry on the source chain,
-    /// and this capability is not
+    /// This grant is provided by the `Entry::Agent` entry on the source chain.
     Authorship(AgentPubKey),
 
     /// General capability for giving fine grained access to zome functions
     /// and/or private data
-    Invocation(InvocationCapGrant),
+    ZomeCall(ZomeCallCapGrant),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-/// The payload for the Invocation capability grant.
+/// The payload for the ZomeCall capability grant.
 /// This data is committed to the source chain as a private entry.
-pub struct InvocationCapGrant {
+pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
     tag: String,
     /// Specifies who may claim this capability, and by what means
     access: CapAccess,
-    /// Set of functions to which this capability grants invocation access
+    /// Set of functions to which this capability grants ZomeCall access
     functions: GrantedFunctions,
 }
 
 impl CapGrant {
-    /// Create a new Invocation capability grant
-    pub fn invocation(tag: String, access: CapAccess, functions: GrantedFunctions) -> Self {
-        CapGrant::Invocation(InvocationCapGrant {
+    /// Create a new ZomeCall capability grant
+    pub fn zome_call(tag: String, access: CapAccess, functions: GrantedFunctions) -> Self {
+        CapGrant::ZomeCall(ZomeCallCapGrant {
             tag,
             access,
             functions,
@@ -45,7 +44,7 @@ impl CapGrant {
     pub fn tag_matches(&self, query: &str) -> bool {
         match self {
             CapGrant::Authorship(agent_pubkey) => agent_pubkey.to_string() == *query,
-            CapGrant::Invocation(InvocationCapGrant { tag, .. }) => tag == query,
+            CapGrant::ZomeCall(ZomeCallCapGrant { tag, .. }) => tag == query,
         }
     }
 
@@ -56,7 +55,7 @@ impl CapGrant {
                 secret: agent_pubkey.to_string().into(),
                 assignees: [agent_pubkey.clone()].iter().cloned().collect(),
             },
-            CapGrant::Invocation(InvocationCapGrant { access, .. }) => access.clone(),
+            CapGrant::ZomeCall(ZomeCallCapGrant { access, .. }) => access.clone(),
         }
     }
 }
