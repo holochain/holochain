@@ -9,7 +9,7 @@ use holochain_types::{
     cell::CellId,
     dna::{DnaError, DnaFile},
 };
-use legacy::config::{
+use legacy::{
     Configuration as LegacyConfig, DpkiConfiguration as LegacyDpkiConfig,
     InterfaceConfiguration as LegacyInterfaceConfig, InterfaceDriver as LegacyInterfaceDriver,
 };
@@ -161,7 +161,7 @@ pub mod tests {
         handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
     };
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_file};
-    use legacy::config as lc;
+    use legacy as lc;
     use matches::assert_matches;
     use mockall::predicate;
     use std::path::PathBuf;
