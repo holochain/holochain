@@ -64,7 +64,7 @@ fixturator!(
             zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Unpredictable, self.0.index)
+            app_entry_type: AppEntryTypeFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
         };
