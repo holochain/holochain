@@ -5,8 +5,8 @@ use holo_hash::{EntryHash, Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
-        GetDb, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES,
-        PRIMARY_CHAIN_HEADERS,
+        GetDb, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES_PRIVATE,
+        PRIMARY_CHAIN_ENTRIES_PUBLIC, PRIMARY_CHAIN_HEADERS,
     },
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
@@ -25,40 +25,76 @@ pub type HeaderCas<'env, R> = CasBuf<'env, (Header, Signature), R>;
 
 /// A convenient pairing of two CasBufs, one for entries and one for headers
 pub struct ChainCasBuf<'env, R: Readable = Reader<'env>> {
-    entries: EntryCas<'env, R>,
+    entries_public: EntryCas<'env, R>,
+    entries_private: Option<EntryCas<'env, R>>,
     headers: HeaderCas<'env, R>,
 }
 
 impl<'env, R: Readable> ChainCasBuf<'env, R> {
     fn new(
         reader: &'env R,
-        entries_store: SingleStore,
+        entries_public_store: SingleStore,
+        entries_private_store: Option<SingleStore>,
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
+        let entries_private = if let Some(store) = entries_private_store {
+            Some(CasBuf::new(reader, store)?)
+        } else {
+            None
+        };
         Ok(Self {
-            entries: CasBuf::new(reader, entries_store)?,
+            entries_public: CasBuf::new(reader, entries_public_store)?,
+            entries_private,
             headers: CasBuf::new(reader, headers_store)?,
         })
     }
 
-    pub fn primary(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let entries = dbs.get_db(&*PRIMARY_CHAIN_ENTRIES)?;
+    pub fn primary(reader: &'env R, dbs: &impl GetDb, allow_private: bool) -> DatabaseResult<Self> {
         let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
-        Self::new(reader, entries, headers)
+        let entries = dbs.get_db(&*PRIMARY_CHAIN_ENTRIES_PUBLIC)?;
+        let entries_private = if allow_private {
+            Some(dbs.get_db(&*PRIMARY_CHAIN_ENTRIES_PRIVATE)?)
+        } else {
+            None
+        };
+        Self::new(reader, entries, entries_private, headers)
     }
 
     pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let entries = dbs.get_db(&*CACHE_CHAIN_ENTRIES)?;
         let headers = dbs.get_db(&*CACHE_CHAIN_HEADERS)?;
-        Self::new(reader, entries, headers)
+        Self::new(reader, entries, None, headers)
     }
 
+    /// Get an entry by its address
+    ///
+    /// First attempt to get from the public entry DB. If not present, and
+    /// private DB access is specified, attempt to get as a private entry.
     pub fn get_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        self.entries.get(&entry_address.into())
+        match self.get_public_entry(entry_address.clone())? {
+            Some(entry) => Ok(Some(entry)),
+            None => self.get_private_entry(entry_address),
+        }
+    }
+
+    /// Get an entry from the private DB if specified, else always return None
+    /// TODO: maybe expose publicly if it makes sense (it is safe to do so)
+    fn get_public_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
+        self.entries_public.get(&entry_address.into())
+    }
+
+    /// Get an entry from the private DB if specified, else always return None
+    /// TODO: maybe expose publicly if it makes sense (it is safe to do so)
+    fn get_private_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
+        if let Some(ref db) = self.entries_private {
+            db.get(&entry_address.into())
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn contains(&self, entry_address: EntryAddress) -> DatabaseResult<bool> {
-        self.entries.get(&entry_address.into()).map(|e| e.is_some())
+        self.get_entry(entry_address).map(|e| e.is_some())
     }
 
     pub async fn get_header(
@@ -80,24 +116,32 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
     // local helper function which given a SignedHeaderHashed, looks for an entry in the cas
     // and builds a ChainElement struct
-    fn chain_element(
+    fn get_element_inner(
         &self,
         signed_header: SignedHeaderHashed,
     ) -> SourceChainResult<Option<ChainElement>> {
         let maybe_entry_address = match signed_header.header() {
-            Header::EntryCreate(header::EntryCreate { entry_address, .. }) => {
-                Some(entry_address.clone())
-            }
-            Header::EntryUpdate(header::EntryUpdate { entry_address, .. }) => {
-                Some(entry_address.clone())
-            }
+            Header::EntryCreate(header::EntryCreate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address.clone(), entry_type.is_public())),
+            Header::EntryUpdate(header::EntryUpdate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address.clone(), entry_type.is_public())),
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {
             None => None,
-            Some(entry_address) => {
+            Some((entry_address, is_public)) => {
                 // if the header has an address it better have been stored!
-                let maybe_cas_entry = self.get_entry(entry_address.clone())?;
+                let maybe_cas_entry = if is_public {
+                    self.get_public_entry(entry_address.clone())?
+                } else {
+                    self.get_private_entry(entry_address.clone())?
+                };
                 if maybe_cas_entry.is_none() {
                     return Err(SourceChainError::InvalidStructure(
                         ChainInvalidReason::MissingData(entry_address),
@@ -115,7 +159,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
         if let Some(signed_header) = self.get_header(header_address).await? {
-            self.chain_element(signed_header)
+            self.get_element_inner(signed_header)
         } else {
             Ok(None)
         }
@@ -128,31 +172,45 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         signed_header: SignedHeaderHashed,
         maybe_entry: Option<EntryHashed>,
     ) -> DatabaseResult<()> {
-        if let Some(entry) = maybe_entry {
-            let (entry, entry_address) = entry.into_inner();
-            self.entries.put(entry_address.into(), entry);
-        }
         let (header, signature) = signed_header.into_inner();
         let (header, header_address) = header.into_inner();
+
+        if let Some(entry) = maybe_entry {
+            let (entry, entry_address) = entry.into_inner();
+            if let Some(entry_type) = header.entry_type() {
+                if entry_type.is_public() {
+                    self.entries_public.put(entry_address.into(), entry);
+                } else {
+                    self.entries_private
+                        .as_mut()
+                        .map(|db| db.put(entry_address.into(), entry));
+                }
+            } else {
+                unreachable!(
+                    "Attempting to put an entry, but the header has no entry_type. Header hash: {}",
+                    header_address
+                );
+            }
+        }
+
         self.headers.put(header_address.into(), (header, signature));
         Ok(())
     }
 
-    // TODO: consolidate into single delete which handles full element deleted together
-    pub fn delete_entry(&mut self, k: EntryHash) {
-        self.entries.delete(k.into())
-    }
-
-    pub fn delete_header(&mut self, k: HeaderHash) {
-        self.headers.delete(k.into())
+    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
+        self.headers.delete(header_hash.into());
+        self.entries_public.delete(entry_hash.clone().into());
+        self.entries_private
+            .as_mut()
+            .map(|db| db.delete(entry_hash.into()));
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
         &self.headers
     }
 
-    pub fn entries(&self) -> &EntryCas<'env, R> {
-        &self.entries
+    pub fn public_entries(&self) -> &EntryCas<'env, R> {
+        &self.entries_public
     }
 }
 
@@ -160,8 +218,19 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuf<'env, R> {
     type Error = DatabaseError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
-        self.entries.flush_to_txn(writer)?;
+        self.entries_public.flush_to_txn(writer)?;
+        if let Some(db) = self.entries_private {
+            db.flush_to_txn(writer)?
+        };
         self.headers.flush_to_txn(writer)?;
         Ok(())
+    }
+}
+
+mod tests {
+
+    #[test]
+    fn can_write_private_entry() {
+        todo!("write plenty of tests")
     }
 }

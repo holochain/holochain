@@ -77,8 +77,12 @@ macro_rules! match_header {
 
 impl Header {
     /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
-    pub fn is_public(&self) -> bool {
-        unimplemented!()
+    pub fn entry_type(&self) -> Option<&EntryType> {
+        match self {
+            Self::EntryCreate(EntryCreate { entry_type, .. }) => Some(entry_type),
+            Self::EntryUpdate(EntryUpdate { entry_type, .. }) => Some(entry_type),
+            _ => None,
+        }
     }
 
     /// Returns the public key of the agent who signed this header.
@@ -252,6 +256,17 @@ pub enum EntryType {
     App(AppEntryType),
     CapTokenClaim,
     CapTokenGrant,
+}
+
+impl EntryType {
+    pub fn is_public(&self) -> bool {
+        match self {
+            EntryType::AgentPubKey => true,
+            EntryType::App(t) => t.is_public,
+            EntryType::CapTokenClaim => false,
+            EntryType::CapTokenGrant => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
