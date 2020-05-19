@@ -126,10 +126,11 @@ pub trait ConductorHandleT: Send + Sync {
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
 
-    /// Add some [CellId]s to the db
-    async fn add_cell_ids_to_db(
+    /// Run genesis on [CellId]s and add them to the db
+    async fn genesis_cells(
         &self,
-        cells: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_api: ConductorHandle,
     ) -> ConductorResult<()>;
 
     /// Setup the cells from the database
@@ -234,10 +235,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.1
     }
 
-    async fn add_cell_ids_to_db(
+    async fn genesis_cells(
         &self,
-        cells: Vec<(CellId, Option<SerializedBytes>)>,
+        cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_api: ConductorHandle,
     ) -> ConductorResult<()> {
+        let cells = {
+            self.0
+                .read()
+                .await
+                .genesis_cells(cells_ids_with_proofs, cell_api)
+                .await?
+        };
         // Update the db
         self.0.write().await.add_cell_ids_to_db(cells).await
     }
@@ -259,7 +268,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.0.read().await;
         let cell = lock.cell_by_id(cell_id)?;
-        Ok(cell.state_env())
+        Ok(cell.state_env().clone())
     }
 
     #[cfg(test)]
@@ -316,10 +325,11 @@ pub mod mock {
 
             fn sync_keystore(&self) -> &KeystoreSender;
 
-            fn sync_add_cell_ids_to_db(
-                &self,
-                cells: Vec<(CellId, Option<SerializedBytes>)>,
-            ) -> ConductorResult<()>;
+            fn sync_genesis_cells(
+        &self,
+        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_api: ConductorHandle,
+    ) -> ConductorResult<()>;
 
             fn sync_setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
 
@@ -402,12 +412,12 @@ pub mod mock {
             self.sync_keystore()
         }
 
-        /// Add some [CellId]s to the db
-        async fn add_cell_ids_to_db(
+        async fn genesis_cells(
             &self,
-            cells: Vec<(CellId, Option<SerializedBytes>)>,
+            cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+            cell_api: ConductorHandle,
         ) -> ConductorResult<()> {
-            self.sync_add_cell_ids_to_db(cells)
+            self.sync_genesis_cells(cell_ids_with_proofs, cell_api)
         }
 
         /// Setup the cells from the database

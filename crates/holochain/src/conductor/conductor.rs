@@ -63,10 +63,7 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 pub use builder::*;
-use futures::{
-    future::{self, TryFutureExt},
-    stream::{StreamExt, TryStreamExt},
-};
+use futures::future::{self, TryFutureExt};
 use holochain_serialized_bytes::SerializedBytes;
 
 #[cfg(test)]
@@ -303,61 +300,121 @@ where
     }
 
     /// Create the cells from the db
-    pub(super) async fn create_cells(
+    pub(super) async fn genesis_cells(
         &self,
+        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<Cell>> {
-        let cell_ids = self.get_state().await?.cell_ids_with_proofs;
-        let len = cell_ids.len();
-        // Only create if there are any cells
-        if cell_ids.len() == 0 {
-            return Ok(vec![]);
-        }
-
+    ) -> ConductorResult<Vec<CellId>> {
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
 
-        // Only create cells not already created
-        let cells_to_create = cell_ids
+        let cells_tasks = cell_ids_with_proofs
             .into_iter()
-            .filter(|(cell_id, _)| !self.cells.contains_key(cell_id));
-
-        // Create the cells in parrallel
-        // This will exit on the first failure however
-        // The cells may still finish genesis in the background.
-        // This is ok because genesis only runs once and will be simply skipped
-        // when this cell is recreated.
-        let cells = futures::stream::iter(cells_to_create)
             .map(move |(cell_id, proof)| {
                 let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-                tokio::spawn(Cell::create(
-                    cell_id,
+                tokio::spawn(Cell::genesis(
+                    cell_id.clone(),
                     conductor_handle.clone(),
                     root_env_dir,
                     keystore.clone(),
                     proof,
                 ))
                 .map_err(|e| CellError::from(e))
-                .and_then(|result| async { result })
+                .and_then(|result| async { result.map(|env| (cell_id, env)) })
             })
-            .buffer_unordered(len)
-            // Exit early if any fail
-            .try_collect::<Vec<_>>()
-            .await?;
+            .collect::<Vec<_>>();
+        let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
+            .await
+            .into_iter()
+            .partition(Result::is_ok);
 
-        Ok(cells)
+        // unwrap safe because of the partition
+        let success = success.into_iter().map(Result::unwrap);
+
+        // If there was errors, cleanup and return the errors
+        if !errors.is_empty() {
+            for (_, state_env) in success {
+                state_env.remove().await?;
+            }
+
+            // match needed to avoid Debug requirement on unwrap_err
+            let errors = errors
+                .into_iter()
+                .map(|e| match e {
+                    Err(e) => e,
+                    Ok(_) => unreachable!("Safe because of the partition"),
+                })
+                .collect();
+
+            Err(ConductorError::GenesisFailed { errors })
+        } else {
+            // No errors so return the cells
+            Ok(success.map(|(cell_id, _)| cell_id).collect())
+        }
+    }
+
+    /// Create the cells from the db
+    pub(super) async fn create_cells(
+        &self,
+        conductor_handle: ConductorHandle,
+    ) -> ConductorResult<Vec<Cell>> {
+        let cell_ids = self.get_state().await?.cell_ids;
+        let root_env_dir = self.root_env_dir.clone();
+        let keystore = self.keystore.clone();
+
+        // Only create cells not already created
+        let cells_to_create = cell_ids
+            .into_iter()
+            .filter(|cell_id| !self.cells.contains_key(cell_id));
+
+        let cells_tasks = cells_to_create
+            .map(move |cell_id| {
+                let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
+                Cell::create(
+                    cell_id,
+                    conductor_handle.clone(),
+                    root_env_dir,
+                    keystore.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
+            .await
+            .into_iter()
+            .partition(Result::is_ok);
+
+        // unwrap safe because of the partition
+        let success = success.into_iter().map(Result::unwrap);
+        // If there was errors, cleanup and return the errors
+        if !errors.is_empty() {
+            for cell in success {
+                cell.cleanup().await?;
+            }
+            // match needed to avoid Debug requirement on unwrap_err
+            let errors = errors
+                .into_iter()
+                .map(|e| match e {
+                    Err(e) => e,
+                    Ok(_) => unreachable!("Safe because of the partition"),
+                })
+                .collect();
+            Err(ConductorError::CreateCellsFailed { errors })
+        } else {
+            // No errors so return the cells
+            Ok(success.collect())
+        }
     }
 
     /// Register CellIds in the database
     pub(super) async fn add_cell_ids_to_db(
         &mut self,
-        mut cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        mut cell_ids: Vec<CellId>,
     ) -> ConductorResult<()> {
         self.update_state(move |mut state| {
-            state.cell_ids_with_proofs.append(&mut cell_ids_with_proofs);
+            state.cell_ids.append(&mut cell_ids);
             // Make sure they are unique
-            state.cell_ids_with_proofs = state
-                .cell_ids_with_proofs
+            state.cell_ids = state
+                .cell_ids
                 .iter()
                 .cloned()
                 .collect::<HashSet<_>>()
@@ -740,13 +797,13 @@ pub mod tests {
 
         conductor
             .update_state(|mut state| {
-                state.cell_ids_with_proofs.push((cell_id.clone(), None));
+                state.cell_ids.push(cell_id.clone());
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
-        assert_eq!(state.cell_ids_with_proofs, [(cell_id, None)]);
+        assert_eq!(state.cell_ids, [cell_id]);
     }
 
     #[tokio::test(threaded_scheduler)]

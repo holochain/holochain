@@ -87,7 +87,7 @@ pub async fn load_conductor_from_legacy_config(
 
     let app_interfaces = extract_app_interfaces(legacy.interfaces);
 
-    conductor.add_cell_ids_to_db(cell_ids).await?;
+    conductor.genesis_cells(cell_ids, conductor.clone()).await?;
     conductor.setup_cells(conductor.clone()).await?;
 
     for i in app_interfaces {
@@ -306,10 +306,10 @@ pub mod tests {
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_add_cell_ids_to_db()
-            .with(predicate::eq(expected_cell_ids))
+            .expect_sync_genesis_cells()
+            .with(predicate::eq(expected_cell_ids), predicate::always())
             .times(1)
-            .returning(|_| Ok(()));
+            .returning(|_, _| Ok(()));
         handle
             .expect_sync_setup_cells()
             .times(1)

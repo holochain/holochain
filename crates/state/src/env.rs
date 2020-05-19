@@ -156,6 +156,16 @@ impl EnvironmentWrite {
     pub async fn guard(&self) -> EnvironmentRefRw<'_> {
         EnvironmentRefRw(self.0.guard().await)
     }
+
+    /// Remove the db and directory
+    pub async fn remove(self) -> DatabaseResult<()> {
+        let mut map = ENVIRONMENTS.write();
+        map.remove(&self.0.path);
+        // TODO remove this db from the DB_MAP_MAP?
+        // remove the directory
+        std::fs::remove_dir_all(&self.0.path)?;
+        Ok(())
+    }
 }
 
 /// The various types of LMDB environment, used to specify the list of databases to initialize

@@ -1,6 +1,4 @@
 use crate::conductor::interface::InterfaceDriver;
-
-use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::{cell::CellId, dna::error::DnaError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -15,7 +13,7 @@ pub struct ConductorState {
     // TODO: B-01610: Maybe we shouldn't store proofs here
     /// List of cell IDs, includes references to an agent and a DNA. Optional.
     #[serde(default)]
-    pub cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+    pub cell_ids: Vec<CellId>,
 
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
@@ -37,17 +35,14 @@ impl ConductorState {
     }
 
     /// Returns all defined cell IDs
-    pub fn cell_ids(&self) -> Vec<&CellId> {
-        self.cell_ids_with_proofs
-            .iter()
-            .map(|(cell_id, _)| cell_id)
-            .collect()
+    pub fn cell_ids(&self) -> &Vec<CellId> {
+        &self.cell_ids
     }
 
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &CellId) -> Self {
-        self.cell_ids_with_proofs.retain(|(cell, _)| cell != id);
+        self.cell_ids.retain(|cell| cell != id);
 
         self.interfaces = self
             .interfaces
