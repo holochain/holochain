@@ -2,6 +2,7 @@
 #[deny(missing_docs)]
 pub mod api;
 mod cell;
+pub mod compat;
 #[allow(clippy::module_inception)]
 mod conductor;
 #[deny(missing_docs)]

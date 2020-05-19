@@ -992,6 +992,7 @@ dependencies = [
  "async-trait",
  "base64 0.10.1",
  "boolinator",
+ "cfg-if",
  "chrono",
  "crossbeam-channel",
  "derive_more",
@@ -1002,6 +1003,7 @@ dependencies = [
  "hcid",
  "holo_hash",
  "holo_hash_core",
+ "holochain_2020_legacy",
  "holochain_common",
  "holochain_crypto",
  "holochain_keystore",
@@ -1039,6 +1041,13 @@ dependencies = [
  "url2",
  "url_serde",
  "uuid 0.7.4",
+]
+
+[[package]]
+name = "holochain_2020_legacy"
+version = "0.0.1"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

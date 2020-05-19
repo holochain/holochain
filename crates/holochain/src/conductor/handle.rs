@@ -114,8 +114,11 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
 
     /// Return the JoinHandle for all managed tasks, which when resolved will
-    /// signal that the Conductor has completely shut down
-    async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle>;
+    /// signal that the Conductor has completely shut down.
+    ///
+    /// NB: The JoinHandle is not cloneable,
+    /// so this can only ever be called successfully once.
+    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle>;
 
     /// Send a signal to all managed tasks asking them to end ASAP.
     async fn shutdown(&self);
@@ -216,8 +219,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn get_wait_handle(&self) -> Option<TaskManagerRunHandle> {
-        self.0.write().await.get_wait_handle()
+    async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
+        self.0.write().await.take_shutdown_handle()
     }
 
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
@@ -272,5 +275,172 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.0.read().await;
         Ok(lock.get_state_from_handle().await?)
+    }
+}
+
+#[cfg(test)]
+pub mod mock {
+    use super::*;
+    use mockall::mock;
+
+    // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
+    // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
+    // by delegating each async trait method to its sync counterpart
+    // See https://github.com/asomers/mockall/issues/75
+    mock! {
+
+        pub ConductorHandle {
+            fn sync_check_running(&self) -> ConductorResult<()>;
+
+            fn sync_add_admin_interfaces_via_handle(
+                &self,
+                handle: ConductorHandle,
+                configs: Vec<AdminInterfaceConfig>,
+            ) -> ConductorResult<()>;
+
+            fn sync_add_app_interface_via_handle(
+                &self,
+                port: u16,
+                conductor_handle: ConductorHandle,
+            ) -> ConductorResult<u16>;
+
+            fn sync_install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
+
+            fn sync_list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
+
+            fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
+
+            fn sync_invoke_zome(
+                &self,
+                invocation: ZomeInvocation,
+            ) -> ConductorApiResult<ZomeInvocationResult>;
+
+            fn sync_autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
+
+            fn sync_take_shutdown_handle(&self) -> Option<TaskManagerRunHandle>;
+
+            fn sync_get_arbitrary_admin_websocket_port(&self) -> Option<u16>;
+
+            fn sync_shutdown(&self);
+
+            fn sync_keystore(&self) -> &KeystoreSender;
+
+            fn sync_genesis_cells(
+        &self,
+        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_api: ConductorHandle,
+    ) -> ConductorResult<()>;
+
+            fn sync_setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()>;
+
+            fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+            #[cfg(test)]
+            fn sync_get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+
+            #[cfg(test)]
+            fn sync_get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
+        }
+
+        trait Clone {
+            fn clone(&self) -> Self;
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ConductorHandleT for MockConductorHandle {
+        async fn check_running(&self) -> ConductorResult<()> {
+            self.sync_check_running()
+        }
+
+        async fn add_admin_interfaces_via_handle(
+            &self,
+            handle: ConductorHandle,
+            configs: Vec<AdminInterfaceConfig>,
+        ) -> ConductorResult<()> {
+            self.sync_add_admin_interfaces_via_handle(handle, configs)
+        }
+
+        async fn add_app_interface_via_handle(
+            &self,
+            port: u16,
+            conductor_handle: ConductorHandle,
+        ) -> ConductorResult<u16> {
+            self.sync_add_app_interface_via_handle(port, conductor_handle)
+        }
+
+        async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+            self.sync_install_dna(dna)
+        }
+
+        async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
+            self.sync_list_dnas()
+        }
+
+        async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
+            self.sync_get_dna(hash)
+        }
+
+        async fn invoke_zome(
+            &self,
+            invocation: ZomeInvocation,
+        ) -> ConductorApiResult<ZomeInvocationResult> {
+            self.sync_invoke_zome(invocation)
+        }
+
+        async fn autonomic_cue(
+            &self,
+            cue: AutonomicCue,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<()> {
+            self.sync_autonomic_cue(cue, cell_id)
+        }
+
+        async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
+            self.sync_take_shutdown_handle()
+        }
+
+        async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
+            self.sync_get_arbitrary_admin_websocket_port()
+        }
+
+        async fn shutdown(&self) {
+            self.sync_shutdown()
+        }
+
+        fn keystore(&self) -> &KeystoreSender {
+            self.sync_keystore()
+        }
+
+        async fn genesis_cells(
+            &self,
+            cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+            cell_api: ConductorHandle,
+        ) -> ConductorResult<()> {
+            self.sync_genesis_cells(cell_ids_with_proofs, cell_api)
+        }
+
+        /// Setup the cells from the database
+        /// Only creates any cells that are not already created
+        async fn setup_cells(&self, cell_api: ConductorHandle) -> ConductorResult<()> {
+            self.sync_setup_cells(cell_api)
+        }
+
+        /// Dump the cells state
+        async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+            self.sync_dump_cell_state(cell_id)
+        }
+
+        // HACK: remove when B-01593 lands
+        #[cfg(test)]
+        async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
+            self.sync_get_cell_env(cell_id)
+        }
+
+        // HACK: remove when B-01593 lands
+        #[cfg(test)]
+        async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
+            self.sync_get_state_from_handle()
+        }
     }
 }
