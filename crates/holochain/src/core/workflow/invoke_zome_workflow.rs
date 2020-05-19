@@ -1,10 +1,17 @@
 use super::Workspace;
-use super::{error::WorkflowResult, InitializeZomesWorkflow, Workflow, WorkflowEffects};
-use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
-use crate::core::state::{
-    cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
-    workspace::WorkspaceResult,
+use super::{
+    error::{WorkflowError, WorkflowResult},
+    InitializeZomesWorkflow, Workflow, WorkflowEffects,
 };
+use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
+use crate::core::{
+    state::{
+        cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf,
+        source_chain::SourceChain, workspace::WorkspaceResult,
+    },
+    sys_validate_element,
+};
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::nucleus::{ZomeInvocation, ZomeInvocationResponse};
@@ -30,7 +37,7 @@ where
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = Option<InitializeZomesWorkflow>;
 
-    #[allow(unreachable_code, unused_variables)]
+    //#[allow(unreachable_code, unused_variables)]
     fn workflow(
         self,
         mut workspace: Self::Workspace,
@@ -52,6 +59,8 @@ where
             // Get te current head
             let chain_head_start = workspace.source_chain.chain_head()?.clone();
 
+            let agent_key = invocation.provenance.clone();
+
             tracing::trace!(line = line!());
             // Create the unsafe sourcechain for use with wasm closure
             let result = {
@@ -64,31 +73,49 @@ where
             let chain_head_end = workspace.source_chain.chain_head()?;
 
             // Has there been changes?
-            // david.b - this isn't doing anything?... commenting out for now
-            /*
             if chain_head_start != *chain_head_end {
                 // get the changes
-                workspace
+                let mut new_headers = workspace
                     .source_chain
                     .iter_back()
-                    .scan(None, |current_header, entry| {
+                    .scan(None, |current_header, element| {
                         let my_header = current_header.clone();
-                        *current_header = entry.header().prev_header().cloned();
+                        *current_header = element.header().prev_header().cloned();
                         let r = match my_header {
                             Some(current_header) if current_header == chain_head_start => None,
-                            _ => Some(entry),
+                            _ => Some(element),
                         };
                         Ok(r)
                     })
-                    .map_err(WorkflowError::from)
-                    // call the sys validation on the changes etc.
-                    .map(|chain_head| {
-                        // check_entry_hash(&chain_head.entry_address.into())?
-                        Ok(chain_head)
-                    })
-                    .collect::<Vec<_>>()?;
+                    .map_err(WorkflowError::from);
+
+                while let Some(header) = new_headers.next()? {
+                    let chain_element = workspace
+                        .source_chain
+                        .get_element(header.header_address())
+                        .await?;
+                    let prev_chain_element = chain_element.as_ref().and_then(|c| {
+                        let source_chain = &workspace.source_chain;
+                        c.header()
+                            .prev_header()
+                            .cloned()
+                            .map(|h| async move { source_chain.get_element(&h).await })
+                    });
+                    let prev_chain_element =
+                        futures::future::OptionFuture::from(prev_chain_element)
+                            .await
+                            .transpose()?
+                            .flatten();
+                    if let Some(ref chain_element) = chain_element {
+                        sys_validate_element(
+                            &agent_key,
+                            chain_element,
+                            prev_chain_element.as_ref(),
+                        )
+                        .await?;
+                    }
+                }
             }
-            */
 
             let fx = WorkflowEffects {
                 workspace,
@@ -275,7 +302,8 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-    // TODO: B-01092: SYSTEM_VALIDATION: Finish when sys val lands
+    // FIXME: Maybe this should be removed because there it's a way to test that sys validate
+    // is called and all the other checks would be duplicating the unit test inside sys val.
     #[ignore]
     #[tokio::test]
     async fn calls_system_validation<'a>() {
