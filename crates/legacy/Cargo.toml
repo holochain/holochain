@@ -1,5 +1,5 @@
 [package]
-name = "legacy"
+name = "holochain_2020_legacy"
 version = "0.0.1"
 description = "Holochain legacy types"
 license = "GPL-3.0-only"

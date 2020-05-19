@@ -56,7 +56,7 @@ uuid = { version = "0.7", features = ["serde", "v4"] }
 predicates = "1.0.4"
 must_future = "0.1.1"
 either = "1.5.0"
-legacy = { path = "../legacy" }
+legacy = { path = "../legacy", package = "holochain_2020_legacy" }
 cfg-if = "0.1"
 
 [dev-dependencies]
