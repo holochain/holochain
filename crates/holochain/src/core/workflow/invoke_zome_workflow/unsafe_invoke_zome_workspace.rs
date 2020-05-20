@@ -126,7 +126,7 @@ impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
                     std::time::Duration::from_secs(10),
                 )
                 .ok();
-                // Try to consume now hoping noone has taken a lock in the meantime
+                // TODO: B-01648: Try to consume now hoping noone has taken a lock in the meantime
                 Arc::try_unwrap(arc).expect(
                     "UnsafeInvokeZomeWorkspace still has live references when workflow is finished",
                 );
