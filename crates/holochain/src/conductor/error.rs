@@ -82,7 +82,7 @@ pub enum ConductorError {
     #[error("Tried to activate an app that was not installed")]
     AppNotInstalled,
 
-    #[error("Tried to deactivate an app was not active")]
+    #[error("Tried to deactivate an app that was not active")]
     AppNotActive,
 }
 
