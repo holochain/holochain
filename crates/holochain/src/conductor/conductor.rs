@@ -835,13 +835,18 @@ pub mod tests {
 
         conductor
             .update_state(|mut state| {
-                state.cell_ids.push(cell_id.clone());
+                state
+                    .inactive_apps
+                    .insert("fake app".to_string(), vec![cell_id.clone()]);
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
-        assert_eq!(state.cell_ids, [cell_id]);
+        assert_eq!(
+            state.inactive_apps.values().collect::<Vec<_>>()[0].as_slice(),
+            &[cell_id]
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

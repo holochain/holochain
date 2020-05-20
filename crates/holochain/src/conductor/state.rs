@@ -12,13 +12,11 @@ use std::collections::HashMap;
 #[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct ConductorState {
     /// Apps that are ready to be activated
+    #[serde(default)]
     pub inactive_apps: Apps,
     /// Apps that are active and will be loaded
-    pub active_apps: Apps,
-    /// List of cell IDs, includes references to an agent and a DNA. Optional.
     #[serde(default)]
-    pub cell_ids: Vec<CellId>,
-
+    pub active_apps: Apps,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub interfaces: HashMap<InterfaceId, InterfaceConfig>,
@@ -38,15 +36,16 @@ impl ConductorState {
         self.interfaces.get(id).cloned()
     }
 
-    /// Returns all defined cell IDs
-    pub fn cell_ids(&self) -> &Vec<CellId> {
-        &self.cell_ids
-    }
-
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &CellId) -> Self {
-        self.cell_ids.retain(|cell| cell != id);
+        for cell_ids in self.active_apps.values_mut() {
+            cell_ids.retain(|cell| cell != id);
+        }
+
+        for cell_ids in self.inactive_apps.values_mut() {
+            cell_ids.retain(|cell| cell != id);
+        }
 
         self.interfaces = self
             .interfaces
