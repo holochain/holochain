@@ -13,7 +13,6 @@ pub mod header;
 pub mod link;
 pub mod nucleus;
 pub mod observability;
-pub mod persistence;
 pub mod prelude;
 mod timestamp;
 
@@ -30,5 +29,3 @@ pub mod test_utils;
 pub use header::{Header, HeaderHashed};
 
 pub use timestamp::Timestamp;
-
-use holochain_zome_types;
