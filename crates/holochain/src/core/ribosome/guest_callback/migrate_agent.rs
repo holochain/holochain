@@ -1,7 +1,6 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::DnaDefFixturator;
 use crate::fixt::MigrateAgentFixturator;
 use fixt::prelude::*;
@@ -14,8 +13,6 @@ use holochain_zome_types::HostInput;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
-    // @todo MigrateAgentWorkspace?
-    workspace: UnsafeInvokeZomeWorkspace,
     dna_def: DnaDef,
     migrate_agent: MigrateAgent,
 }
@@ -24,9 +21,6 @@ fixturator!(
     MigrateAgentInvocation,
     {
         let migrate_agent_invocation = MigrateAgentInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
             dna_def: DnaDefFixturator::new_indexed(Empty, self.0.index)
                 .next()
                 .unwrap(),
@@ -39,12 +33,6 @@ fixturator!(
     },
     {
         let migrate_agent_invocation = MigrateAgentInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(
-                Unpredictable,
-                self.0.index,
-            )
-            .next()
-            .unwrap(),
             dna_def: DnaDefFixturator::new_indexed(Unpredictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -57,9 +45,6 @@ fixturator!(
     },
     {
         let migrate_agent_invocation = MigrateAgentInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
             dna_def: DnaDefFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -76,12 +61,8 @@ impl Invocation for MigrateAgentInvocation {
     fn allow_side_effects(&self) -> bool {
         false
     }
-    fn zome_names(&self) -> Vec<ZomeName> {
-        self.dna_def
-            .zomes
-            .iter()
-            .map(|(zome_name, _)| zome_name.clone())
-            .collect()
+    fn zomes(&self) -> ZomesToInvoke {
+        ZomesToInvoke::All
     }
     fn fn_components(&self) -> FnComponents {
         vec![
@@ -96,9 +77,6 @@ impl Invocation for MigrateAgentInvocation {
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&self.migrate_agent).try_into()?))
-    }
-    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace.clone()
     }
 }
 
@@ -143,6 +121,7 @@ mod test {
     use super::MigrateAgentInvocationFixturator;
     use super::MigrateAgentResult;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
@@ -150,6 +129,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_unimplemented() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
@@ -159,7 +141,7 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(migrate_agent_invocation)
+            .run_migrate_agent(workspace, migrate_agent_invocation)
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
@@ -167,6 +149,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_implemented_pass() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
             .next()
             .unwrap();
@@ -176,7 +161,7 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(migrate_agent_invocation)
+            .run_migrate_agent(workspace, migrate_agent_invocation)
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
@@ -184,6 +169,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_implemented_fail() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
             .next()
             .unwrap();
@@ -193,7 +181,7 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(migrate_agent_invocation)
+            .run_migrate_agent(workspace, migrate_agent_invocation)
             .unwrap();
         assert_eq!(
             result,
@@ -204,6 +192,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_multi_implemented_fail() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![
             TestWasm::MigrateAgentPass,
             TestWasm::MigrateAgentFail,
@@ -216,7 +207,7 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(migrate_agent_invocation)
+            .run_migrate_agent(workspace, migrate_agent_invocation)
             .unwrap();
         assert_eq!(
             result,

@@ -181,11 +181,11 @@ impl Cell {
         let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
+        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
         let workflow = InvokeZomeWorkflow {
             ribosome: self.get_ribosome().await?,
             invocation,
         };
-        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
         Ok(run_workflow(self.state_env().clone(), workflow, workspace)
             .await
             .map_err(Box::new)?)

@@ -12,6 +12,7 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod wasm_ribosome;
 
+use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -31,8 +32,6 @@ use error::RibosomeResult;
 use fixt::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
-use holo_hash::HeaderHash;
-use holo_hash::HeaderHashFixturator;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;
@@ -129,16 +128,48 @@ impl From<Vec<String>> for FnComponents {
     }
 }
 
-pub trait Invocation: Clone // + TryInto<HostInput, Error=SerializedBytesError>
-{
+pub enum ZomesToInvoke {
+    All,
+    One(ZomeName),
+}
+
+pub trait Invocation: Clone {
+    /// Invocations can be externally driven (e.g. by a websockets client) or internally (e.g. from
+    /// a callback triggered by the subconscious in order to allow the conscious to provide
+    /// feedback. In some of these cases we allow side effects to be possible, such as committing a
+    /// new entry, which will in turn trigger other callbacks, such as validation, that must be
+    /// pure functions on the input data. For pure callbacks, allow_side_effects must return false.
+    /// In the case that allow_side_effects is false, any call to a host function with side effects
+    /// should be an unreachable!() error and halt execution. This is a panic because the happ
+    /// developer must avoid use of any host function calls that produce side effects while
+    /// implementing callbacks that must be pure.
     fn allow_side_effects(&self) -> bool;
-    fn zome_names(&self) -> Vec<ZomeName>;
+    /// Some invocations call into a single zome and some call into many or all zomes.
+    /// An example of an invocation that calls across all zomes is init. Init must pass for every
+    /// zome in order for the Dna overall to successfully init.
+    /// An example of an invocation that calls a single zome is validation of an entry, because
+    /// the entry is only defined in a single zome, so it only makes sense for that exact zome to
+    /// define the validation logic for that entry.
+    /// In the future this may be expanded to support a subset of zomes that is larger than one.
+    /// For example, we may want to trigger a callback in all zomes that implement a
+    /// trait/interface, but this doesn't exist yet, so the only valid options are All or One.
+    fn zomes(&self) -> ZomesToInvoke;
+    /// Invocations execute in a "sparse" manner of decreasing specificity. In technical terms this
+    /// means that the list of strings in FnComponents will be concatenated into a single function
+    /// name to be called, then the last string will be removed and a shorter function name will
+    /// be attempted and so on until all variations have been attempted.
+    /// For example, if FnComponents was vec!["foo", "bar", "baz"] it would loop as "foo_bar_baz"
+    /// then "foo_bar" then "foo". All of those three callbacks that are defined will be called
+    /// _unless a definitive callback result is returned_.
+    /// @see CallbackResult::is_definitive() in zome_types.
+    /// All of the individual callback results are then folded into a single overall result value
+    /// as a From implementation on the invocation results structs (e.g. zome results vs. ribosome
+    /// results).
     fn fn_components(&self) -> FnComponents;
     /// the serialized input from the host for the wasm call
     /// this is intentionally NOT a reference to self because HostInput may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<HostInput, SerializedBytesError>;
-    fn workspace(&self) -> UnsafeInvokeZomeWorkspace;
 }
 
 /// A top-level call into a zome function,
@@ -146,8 +177,6 @@ pub trait Invocation: Clone // + TryInto<HostInput, Error=SerializedBytesError>
 #[allow(missing_docs)] // members are self-explanitory
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeInvocation {
-    #[serde(skip)]
-    pub workspace: UnsafeInvokeZomeWorkspace,
     /// The ID of the [Cell] in which this Zome-call would be invoked
     pub cell_id: CellId,
     /// The name of the Zome containing the function that would be invoked
@@ -160,45 +189,32 @@ pub struct ZomeInvocation {
     pub payload: HostInput,
     /// the provenance of the call
     pub provenance: AgentPubKey,
-    /// the hash of the top header at the time of call
-    pub as_at: HeaderHash,
 }
 
 fixturator!(
     ZomeInvocation,
     {
         ZomeInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
-                .next()
-                .unwrap(),
             cell_id: CellIdFixturator::new(Empty).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
             cap: CapTokenFixturator::new(Empty).next().unwrap(),
             fn_name: StringFixturator::new(Empty).next().unwrap(),
             payload: HostInputFixturator::new(Empty).next().unwrap(),
             provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-            as_at: HeaderHashFixturator::new(Empty).next().unwrap(),
         }
     },
     {
         ZomeInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Unpredictable)
-                .next()
-                .unwrap(),
             cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
             cap: CapTokenFixturator::new(Unpredictable).next().unwrap(),
             fn_name: StringFixturator::new(Unpredictable).next().unwrap(),
             payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
             provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-            as_at: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
         }
     },
     {
         let ret = ZomeInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
             cell_id: CellIdFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -215,9 +231,6 @@ fixturator!(
                 .next()
                 .unwrap(),
             provenance: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            as_at: HeaderHashFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
         };
@@ -246,17 +259,14 @@ impl Invocation for ZomeInvocation {
     fn allow_side_effects(&self) -> bool {
         true
     }
-    fn zome_names(&self) -> Vec<ZomeName> {
-        vec![self.zome_name.to_owned()]
+    fn zomes(&self) -> ZomesToInvoke {
+        ZomesToInvoke::One(self.zome_name.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec![self.fn_name.to_owned()].into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(self.payload)
-    }
-    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace.clone()
     }
 }
 
@@ -273,6 +283,16 @@ pub enum ZomeInvocationResponse {
 pub trait RibosomeT: Sized {
     fn dna_file(&self) -> &DnaFile;
 
+    fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName>;
+
+    fn maybe_call<I: Invocation + 'static>(
+        &self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        invocation: &I,
+        zome_name: &ZomeName,
+        to_call: String,
+    ) -> Result<Option<GuestOutput>, RibosomeError>;
+
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
         unimplemented!()
@@ -287,28 +307,42 @@ pub trait RibosomeT: Sized {
         // self.instance().exports().filter(|e| !e.is_callback())
     }
 
-    fn run_init(&self, invocation: InitInvocation) -> RibosomeResult<InitResult>;
+    fn run_init(
+        &self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        invocation: InitInvocation,
+    ) -> RibosomeResult<InitResult>;
 
     fn run_migrate_agent(
         &self,
+        workspace: UnsafeInvokeZomeWorkspace,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
 
     fn run_validation_package(
         &self,
+        workspace: UnsafeInvokeZomeWorkspace,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult>;
 
-    fn run_post_commit(&self, invocation: PostCommitInvocation)
-        -> RibosomeResult<PostCommitResult>;
+    fn run_post_commit(
+        &self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        invocation: PostCommitInvocation,
+    ) -> RibosomeResult<PostCommitResult>;
 
     /// Helper function for running a validation callback. Just calls
     /// [`run_callback`][] under the hood.
     /// [`run_callback`]: #method.run_callback
-    fn run_validate(&self, invocation: ValidateInvocation) -> RibosomeResult<ValidateResult>;
+    fn run_validate(
+        &self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        invocation: ValidateInvocation,
+    ) -> RibosomeResult<ValidateResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
+        workspace: UnsafeInvokeZomeWorkspace,
         ribosome: R,
         invocation: I,
     ) -> CallIterator<R, I>;
@@ -317,6 +351,7 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         self,
+        workspace: UnsafeInvokeZomeWorkspace,
         // TODO: ConductorHandle
         invocation: ZomeInvocation,
     ) -> RibosomeResult<ZomeInvocationResponse>;
@@ -326,6 +361,7 @@ pub trait RibosomeT: Sized {
 pub mod wasm_test {
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomeInvocationResponse;
+    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
     use holo_hash::holo_hash_core::HeaderHash;
@@ -357,6 +393,7 @@ pub mod wasm_test {
 
                 let timeout = $crate::start_hard_timeout!();
 
+                let workspace = $crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable).next().unwrap();
                 let invocation = $crate::core::ribosome::ZomeInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
                         holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
@@ -369,7 +406,7 @@ pub mod wasm_test {
                 )
                 .next()
                 .unwrap();
-                let zome_invocation_response = ribosome.call_zome_function(invocation).unwrap();
+                let zome_invocation_response = ribosome.call_zome_function(workspace, invocation).unwrap();
 
                 // instance building off a warm module should be the slowest part of a wasm test
                 // so if each instance (including inner callbacks) takes ~1ms this gives us
@@ -394,6 +431,10 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn invoke_foo_test() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
@@ -415,7 +456,7 @@ pub mod wasm_test {
             ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
-            ribosome.call_zome_function(invocation).unwrap()
+            ribosome.call_zome_function(workspace, invocation).unwrap()
         );
     }
 

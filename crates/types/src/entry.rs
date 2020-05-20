@@ -1,4 +1,4 @@
-//! An Entry is a unit of data in a Holochain Source Chain.	use holo_hash_core::AgentPubKey;
+//! An Entry is a unit of data in a Holochain Source Chain.
 //!
 //! This module contains all the necessary definitions for Entry, which broadly speaking
 //! refers to any data which will be written into the ContentAddressableStorage, or the EntityAttributeValueStorage.

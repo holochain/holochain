@@ -1,7 +1,6 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::EntryFixturator;
 use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
@@ -15,8 +14,6 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {
-    // @todo ValidateWorkspace?
-    pub workspace: UnsafeInvokeZomeWorkspace,
     pub zome_name: ZomeName,
     // Arc here as entry may be very large
     // don't want to clone the Entry just to validate it
@@ -29,9 +26,6 @@ fixturator!(
     ValidateInvocation,
     {
         let validate_invocation = ValidateInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
                 .next()
                 .unwrap(),
@@ -46,12 +40,6 @@ fixturator!(
     },
     {
         let validate_invocation = ValidateInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(
-                Unpredictable,
-                self.0.index,
-            )
-            .next()
-            .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -66,9 +54,6 @@ fixturator!(
     },
     {
         let validate_invocation = ValidateInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -87,11 +72,11 @@ impl Invocation for ValidateInvocation {
     fn allow_side_effects(&self) -> bool {
         false
     }
-    fn zome_names(&self) -> Vec<ZomeName> {
+    fn zomes(&self) -> ZomesToInvoke {
         // entries are specific to zomes so only validate in the zome the entry is defined in
         // note that here it is possible there is a zome/entry mismatch
         // we rely on the invocation to be built correctly
-        vec![self.zome_name.clone()]
+        ZomesToInvoke::One(self.zome_name.clone())
     }
     fn fn_components(&self) -> FnComponents {
         vec![
@@ -108,9 +93,6 @@ impl Invocation for ValidateInvocation {
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&*self.entry).try_into()?))
-    }
-    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace.clone()
     }
 }
 
@@ -154,6 +136,7 @@ mod test {
     use super::ValidateInvocationFixturator;
     use super::ValidateResult;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
@@ -161,6 +144,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validate_unimplemented() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
@@ -169,13 +155,18 @@ mod test {
             .unwrap();
         validate_invocation.zome_name = TestWasm::Foo.into();
 
-        let result = ribosome.run_validate(validate_invocation).unwrap();
+        let result = ribosome
+            .run_validate(workspace, validate_invocation)
+            .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validate_implemented_valid() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
@@ -184,13 +175,18 @@ mod test {
             .unwrap();
         validate_invocation.zome_name = TestWasm::ValidateValid.into();
 
-        let result = ribosome.run_validate(validate_invocation).unwrap();
+        let result = ribosome
+            .run_validate(workspace, validate_invocation)
+            .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validate_implemented_invalid() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
@@ -199,7 +195,9 @@ mod test {
             .unwrap();
         validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
 
-        let result = ribosome.run_validate(validate_invocation).unwrap();
+        let result = ribosome
+            .run_validate(workspace, validate_invocation)
+            .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
 }

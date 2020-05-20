@@ -57,7 +57,7 @@ where
             // Create the unsafe sourcechain for use with wasm closure
             let result = {
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                ribosome.call_zome_function(invocation)
+                ribosome.call_zome_function(raw_workspace, invocation)
             };
             tracing::trace!(line = line!());
 
@@ -198,7 +198,7 @@ pub mod tests {
         // Setup the ribosome mock
         ribosome
             .expect_call_zome_function()
-            .returning(move |_invocation| {
+            .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
                 Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
@@ -313,7 +313,7 @@ pub mod tests {
         // Call zome mock that it writes to source chain
         ribosome
             .expect_call_zome_function()
-            .returning(move |_invocation| {
+            .returning(move |_workspace, _invocation| {
                 let agent_header = agent_header.clone();
                 let agent_entry = agent_entry.clone();
                 let _call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, ()> {
