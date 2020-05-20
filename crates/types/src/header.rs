@@ -259,19 +259,31 @@ pub enum EntryType {
 }
 
 impl EntryType {
-    pub fn is_public(&self) -> bool {
+    pub fn visibility(&self) -> &EntryVisibility {
         match self {
-            EntryType::AgentPubKey => true,
-            EntryType::App(t) => t.is_public,
-            EntryType::CapTokenClaim => false,
-            EntryType::CapTokenGrant => false,
+            EntryType::AgentPubKey => &EntryVisibility::Public,
+            EntryType::App(t) => &t.visibility,
+            EntryType::CapTokenClaim => &EntryVisibility::Private,
+            EntryType::CapTokenGrant => &EntryVisibility::Private,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
-    id: Vec<u8>,
-    zome_id: ZomeId,
-    is_public: bool,
+    pub(crate) id: Vec<u8>,
+    pub(crate) zome_id: ZomeId,
+    pub(crate) visibility: EntryVisibility,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum EntryVisibility {
+    Public,
+    Private,
+}
+
+impl EntryVisibility {
+    pub fn is_public(&self) -> bool {
+        *self == EntryVisibility::Public
+    }
 }

@@ -10,6 +10,7 @@
 use crate::core::state::source_chain::{
     ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
+use header::EntryVisibility;
 use holo_hash::{EntryHash, Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
@@ -28,6 +29,7 @@ use holochain_types::{
     prelude::Signature,
     Header, HeaderHashed,
 };
+use tracing::*;
 
 /// A CasBuf with Entries for values
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
@@ -60,6 +62,9 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         })
     }
 
+    /// Create a ChainCasBuf using the source chain databases.
+    /// The `allow_private` argument allows you to specify whether private
+    /// entries should be readable or writeable with this reference.
     pub fn primary(reader: &'env R, dbs: &impl GetDb, allow_private: bool) -> DatabaseResult<Self> {
         let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
         let entries = dbs.get_db(&*PRIMARY_CHAIN_PUBLIC_ENTRIES)?;
@@ -71,6 +76,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         Self::new(reader, entries, private_entries, headers)
     }
 
+    /// Create a ChainCasBuf using the cache databases.
+    /// There is no cache for private entries, so private entries are disallowed
     pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let entries = dbs.get_db(&*CACHE_CHAIN_ENTRIES)?;
         let headers = dbs.get_db(&*CACHE_CHAIN_HEADERS)?;
@@ -136,29 +143,40 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                 entry_address,
                 entry_type,
                 ..
-            }) => Some((entry_address.clone(), entry_type.is_public())),
+            }) => Some((entry_address.clone(), entry_type.visibility())),
             Header::EntryUpdate(header::EntryUpdate {
                 entry_address,
                 entry_type,
                 ..
-            }) => Some((entry_address.clone(), entry_type.is_public())),
+            }) => Some((entry_address.clone(), entry_type.visibility())),
             _ => None,
         };
         let maybe_entry = match maybe_entry_address {
             None => None,
-            Some((entry_address, is_public)) => {
-                // if the header has an address it better have been stored!
-                let maybe_cas_entry = if is_public {
-                    self.get_public_entry(entry_address.clone())?
-                } else {
-                    self.get_private_entry(entry_address.clone())?
-                };
-                if maybe_cas_entry.is_none() {
-                    return Err(SourceChainError::InvalidStructure(
-                        ChainInvalidReason::MissingData(entry_address),
-                    ));
+            Some((entry_address, visibility)) => {
+                match visibility {
+                    // if the header has an address it better have been stored!
+                    EntryVisibility::Public => Some(
+                        self.public_entries
+                            .get(&entry_address.clone().into())?
+                            .ok_or_else(|| {
+                                SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
+                                    entry_address,
+                                ))
+                            })?,
+                    ),
+                    EntryVisibility::Private => {
+                        if let Some(ref db) = self.private_entries {
+                            Some(db.get(&entry_address.clone().into())?.ok_or_else(|| {
+                                SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
+                                    entry_address,
+                                ))
+                            })?)
+                        } else {
+                            None
+                        }
+                    }
                 }
-                maybe_cas_entry
             }
         };
         Ok(Some(ChainElement::new(signed_header, maybe_entry)))
@@ -189,12 +207,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         if let Some(entry) = maybe_entry {
             let (entry, entry_address) = entry.into_inner();
             if let Some(entry_type) = header.entry_type() {
-                if entry_type.is_public() {
-                    self.public_entries.put(entry_address.into(), entry);
-                } else {
-                    self.private_entries
-                        .as_mut()
-                        .map(|db| db.put(entry_address.into(), entry));
+                match entry_type.visibility() {
+                    EntryVisibility::Public => self.public_entries.put(entry_address.into(), entry),
+                    EntryVisibility::Private => {
+                        if let Some(db) = self.private_entries.as_mut() {
+                            db.put(entry_address.into(), entry);
+                        } else {
+                            error!("Attempted ChainCasBuf::put on a private entry with a disabled private DB: {}", entry_address);
+                        }
+                    }
                 }
             } else {
                 unreachable!(
@@ -238,10 +259,141 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuf<'env, R> {
     }
 }
 
+#[cfg(test)]
 mod tests {
 
-    #[test]
-    fn can_write_private_entry() {
-        todo!("write plenty of tests")
+    use super::ChainCasBuf;
+    use crate::test_utils::fake_unique_element;
+    use holo_hash::*;
+    use holochain_keystore::test_keystore::spawn_test_keystore;
+    use holochain_keystore::AgentPubKeyExt;
+    use holochain_state::{prelude::*, test_utils::test_cell_env};
+    use holochain_types::header::EntryVisibility;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {
+        let keystore = spawn_test_keystore(Vec::new()).await?;
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+
+        let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
+        let (header_pub, entry_pub) =
+            fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Public).await?;
+        let (header_priv, entry_priv) =
+            fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Private).await?;
+
+        // write one public-entry header and one private-entry header
+        env.with_commit(|txn| {
+            let reader = env.reader()?;
+            let mut store = ChainCasBuf::primary(&reader, &env, true)?;
+            store.put(header_pub, Some(entry_pub.clone()))?;
+            store.put(header_priv, Some(entry_priv.clone()))?;
+            store.flush_to_txn(txn)
+        })?;
+
+        // Can retrieve both entries when private entries are enabled
+        {
+            let reader = env.reader()?;
+            let store = ChainCasBuf::primary(&reader, &env, true)?;
+            assert_eq!(
+                store.get_entry(entry_pub.as_hash().clone()),
+                Ok(Some(entry_pub.as_content().clone()))
+            );
+            assert_eq!(
+                store.get_entry(entry_priv.as_hash().clone()),
+                Ok(Some(entry_priv.as_content().clone()))
+            );
+            assert_eq!(
+                store.get_private_entry(entry_priv.as_hash().clone()),
+                Ok(Some(entry_priv.as_content().clone()))
+            );
+            assert_eq!(
+                store.get_public_entry(entry_priv.as_hash().clone()),
+                Ok(None)
+            );
+        }
+
+        // Cannot retrieve private entry when disabled
+        {
+            let reader = env.reader()?;
+            let store = ChainCasBuf::primary(&reader, &env, false)?;
+            assert_eq!(
+                store.get_entry(entry_pub.as_hash().clone()),
+                Ok(Some(entry_pub.as_content().clone()))
+            );
+            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(
+                store.get_private_entry(entry_priv.as_hash().clone()),
+                Ok(None)
+            );
+            assert_eq!(
+                store.get_public_entry(entry_priv.as_hash().clone()),
+                Ok(None)
+            );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn cannot_write_private_entry_when_disabled() -> anyhow::Result<()> {
+        let keystore = spawn_test_keystore(Vec::new()).await?;
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+
+        let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
+        let (header_pub, entry_pub) =
+            fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Public).await?;
+        let (header_priv, entry_priv) =
+            fake_unique_element(&keystore, agent_key.clone(), EntryVisibility::Private).await?;
+
+        // write one public-entry header and one private-entry header (which will be a noop)
+        env.with_commit(|txn| {
+            let reader = env.reader()?;
+            let mut store = ChainCasBuf::primary(&reader, &env, false)?;
+            store.put(header_pub, Some(entry_pub.clone()))?;
+            store.put(header_priv, Some(entry_priv.clone()))?;
+            store.flush_to_txn(txn)
+        })?;
+
+        // Can retrieve both entries when private entries are enabled
+        {
+            let reader = env.reader()?;
+            let store = ChainCasBuf::primary(&reader, &env, true)?;
+            assert_eq!(
+                store.get_entry(entry_pub.as_hash().clone()),
+                Ok(Some(entry_pub.as_content().clone()))
+            );
+            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(
+                store.get_private_entry(entry_priv.as_hash().clone()),
+                Ok(None)
+            );
+            assert_eq!(
+                store.get_public_entry(entry_priv.as_hash().clone()),
+                Ok(None)
+            );
+        }
+
+        // Cannot retrieve private entry when disabled
+        {
+            let reader = env.reader()?;
+            let store = ChainCasBuf::primary(&reader, &env, false)?;
+            assert_eq!(
+                store.get_entry(entry_pub.as_hash().clone()),
+                Ok(Some(entry_pub.as_content().clone()))
+            );
+            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(
+                store.get_private_entry(entry_priv.as_hash().clone()),
+                Ok(None)
+            );
+            assert_eq!(
+                store.get_public_entry(entry_priv.as_hash().clone()),
+                Ok(None)
+            );
+        }
+
+        Ok(())
     }
 }
