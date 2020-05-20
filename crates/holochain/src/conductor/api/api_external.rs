@@ -339,7 +339,7 @@ pub enum AppResponse {
 pub enum AdminResponse {
     /// This response is unimplemented
     Unimplemented(AdminRequest),
-    /// [Dna] has successfully been installed
+    /// hApp [Dna]s have successfully been installed
     AppInstalled,
     /// AdminInterfaces have successfully been added
     AdminInterfacesAdded(()),
