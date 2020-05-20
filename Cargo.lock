@@ -906,9 +906,9 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.1.0-alpha.8"
+version = "0.1.0-alpha.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30ea3ccfb8fbc6ba245ea015b215723caec32964255f8b213b73bedf75af2072"
+checksum = "288b00060303e7c45fb5c0c4f9944b864ffd2db477f7d1b6a87bc77e521f162c"
 dependencies = [
  "futures",
  "must_future",
@@ -1087,6 +1087,18 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "holochain_p2p"
+version = "0.0.1"
+dependencies = [
+ "futures",
+ "ghost_actor",
+ "holo_hash",
+ "holochain_keystore",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2954,18 +2966,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.16"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d12a1dae4add0f0d568eebc7bf142f145ba1aa2544cafb195c76f0f409091b60"
+checksum = "5976891d6950b4f68477850b5b9e5aa64d955961466f9e174363f573e54e8ca7"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.16"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f34e0c1caaa462fd840ec6b768946ea1e7842620d94fe29d5b847138f521269"
+checksum = "ab81dbd1cd69cd2ce22ecfbdd3bdb73334ba25350649408cc6c085f46d89573d"
 dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",

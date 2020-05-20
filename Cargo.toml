@@ -8,6 +8,7 @@ members = [
   "crates/keystore",
   "crates/legacy",
   "crates/holochain",
+  "crates/holochain_p2p",
   "crates/holo_hash",
   "crates/holo_hash_core",
   "crates/state",
