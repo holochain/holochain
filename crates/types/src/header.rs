@@ -76,7 +76,7 @@ macro_rules! match_header {
 }
 
 impl Header {
-    /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
+    /// returns the type of the entry if it's an app entry
     pub fn entry_type(&self) -> Option<&EntryType> {
         match self {
             Self::EntryCreate(EntryCreate { entry_type, .. }) => Some(entry_type),
@@ -85,7 +85,7 @@ impl Header {
         }
     }
 
-    /// Returns the public key of the agent who signed this header.
+    /// returns the public key of the agent who signed this header.
     pub fn author(&self) -> &AgentPubKey {
         match_header!(self => |i| { &i.author })
     }
@@ -283,6 +283,7 @@ pub enum EntryVisibility {
 }
 
 impl EntryVisibility {
+    /// converts entry visibility enum into boolean value on public
     pub fn is_public(&self) -> bool {
         *self == EntryVisibility::Public
     }
