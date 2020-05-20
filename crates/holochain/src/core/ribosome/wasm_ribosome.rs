@@ -128,7 +128,7 @@ impl WasmRibosome {
                                 std::sync::Arc::clone(&closure_host_context_arc),
                                 input,
                             ),
-                            // TODO - Identify calls that are essentially synchronous vs those that
+                            // TODO: B-01647 Identify calls that are essentially synchronous vs those that
                             // may be async, such as get, send, etc.
                             // async calls should require timeouts specified by hApp devs
                             // pluck those timeouts out, and apply them here:
