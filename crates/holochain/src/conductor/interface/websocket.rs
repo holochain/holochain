@@ -241,16 +241,14 @@ mod test {
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
-        state::ConductorState,
         Conductor, ConductorHandle,
     };
-    use crate::core::state::source_chain::{SourceChain, SourceChainBuf};
+    use crate::core::state::source_chain::SourceChainBuf;
     use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{
-        buffer::BufferedStore,
-        env::{EnvironmentWrite, ReadManager, WriteManager},
+        env::ReadManager,
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
@@ -271,19 +269,6 @@ mod test {
     #[serde(rename = "snake-case", tag = "type", content = "data")]
     enum AdmonRequest {
         InstallsDna(String),
-    }
-
-    async fn fake_genesis(env: EnvironmentWrite) {
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-
-        let mut source_chain = SourceChain::new(&reader, &env).unwrap();
-        crate::core::workflow::fake_genesis(&mut source_chain).await;
-
-        // Flush the db
-        env_ref
-            .with_commit(|writer| source_chain.0.flush_to_txn(writer))
-            .unwrap();
     }
 
     async fn setup_admin_cells(dna_store: MockDnaStore) -> (Arc<TempDir>, ConductorHandle) {
@@ -312,7 +297,7 @@ mod test {
     }
 
     async fn setup_admin_fake_cells(
-        cell_ids: &[CellId],
+        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Vec<Arc<TempDir>>, ConductorHandle) {
         let mut tmps = vec![];
@@ -323,20 +308,24 @@ mod test {
         } = test_wasm_env();
         tmps.push(tmpdir);
         tmps.push(test_env.tmpdir.clone());
-        let mut state = ConductorState::default();
-        for cell in cell_ids {
-            state.cell_ids_with_proofs.push((cell.clone(), None));
-        }
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .fake_state(state)
             .test(test_env, wasm_env)
             .await
             .unwrap();
+
+        conductor_handle
+            .clone()
+            .genesis_cells(cell_ids_with_proofs)
+            .await
+            .unwrap();
+
+        conductor_handle.clone().setup_cells().await.unwrap();
+
         (tmps, conductor_handle)
     }
 
     async fn setup_app(
-        cell_id: CellId,
+        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi) {
         let test_env = test_conductor_env();
@@ -345,17 +334,19 @@ mod test {
             tmpdir: _tmpdir,
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
-        let mut state = ConductorState::default();
-        state.cell_ids_with_proofs.push((cell_id.clone(), None));
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .fake_state(state)
             .test(test_env, wasm_env)
             .await
             .unwrap();
 
-        let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
-        fake_genesis(cell_env).await;
+        conductor_handle
+            .clone()
+            .genesis_cells(cell_ids_with_proofs)
+            .await
+            .unwrap();
+
+        conductor_handle.clone().setup_cells().await.unwrap();
 
         (tmpdir, RealAppInterfaceApi::new(conductor_handle))
     }
@@ -474,11 +465,11 @@ mod test {
             .with(predicate::eq(dna_hash))
             .returning(move |_| Some(dna.clone()));
 
-        let (_tmpdir, app_api) = setup_app(cell_id.clone(), dna_store).await;
-        let request = Box::new(
+        let (_tmpdir, app_api) = setup_app(vec![(cell_id.clone(), None)], dna_store).await;
+        let mut request = Box::new(
             crate::core::ribosome::ZomeInvocationFixturator::new(
                 crate::core::ribosome::NamedInvocation(
-                    cell_id,
+                    cell_id.clone(),
                     TestWasm::Foo.into(),
                     "foo".into(),
                     HostInput::new(payload.try_into().unwrap()),
@@ -487,6 +478,7 @@ mod test {
             .next()
             .unwrap(),
         );
+        request.cell_id = cell_id;
         let msg = AppRequest::ZomeInvocationRequest { request };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -543,14 +535,10 @@ mod test {
         handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
             .await
             .unwrap();
-        let cells = handle
-            .get_state_from_handle()
-            .await
-            .unwrap()
-            .cell_ids_with_proofs;
+        let cells = handle.get_state_from_handle().await.unwrap().cell_ids;
         let expected = dna_hashes
             .into_iter()
-            .map(|(hash, proof)| (CellId::from((hash, agent_key.clone())), proof))
+            .map(|(hash, _)| CellId::from((hash, agent_key.clone())))
             .collect::<Vec<_>>();
         assert_eq!(expected, cells);
     }
@@ -585,7 +573,7 @@ mod test {
         dna_store.expect_get().returning(move |_| Some(dna.clone()));
 
         let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(&[cell_id.clone()], dna_store).await;
+            setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
 
         // Set some state
         let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
