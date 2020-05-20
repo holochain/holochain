@@ -89,24 +89,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     /// First attempt to get from the public entry DB. If not present, and
     /// private DB access is specified, attempt to get as a private entry.
     pub fn get_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        match self.get_public_entry(entry_address.clone())? {
+        match self.public_entries.get(&entry_address.clone().into())? {
             Some(entry) => Ok(Some(entry)),
-            None => self.get_private_entry(entry_address),
-        }
-    }
-
-    /// Get an entry from the public DB, else return None
-    fn get_public_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        self.public_entries.get(&entry_address.into())
-    }
-
-    /// Get an entry from the private DB if specified, else always return None
-    /// TODO: maybe expose publicly if it makes sense (it is safe to do so)
-    fn get_private_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        if let Some(ref db) = self.private_entries {
-            db.get(&entry_address.into())
-        } else {
-            Ok(None)
+            None => {
+                if let Some(ref db) = self.private_entries {
+                    db.get(&entry_address.into())
+                } else {
+                    Ok(None)
+                }
+            }
         }
     }
 
@@ -131,7 +122,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    // local helper function which given a SignedHeaderHashed, looks for an entry in the cas
+    // local helper function which, given a SignedHeaderHashed, looks for an entry in the cas
     // and builds a ChainElement struct
     fn get_element_inner(
         &self,
@@ -302,14 +293,6 @@ mod tests {
                 store.get_entry(entry_priv.as_hash().clone()),
                 Ok(Some(entry_priv.as_content().clone()))
             );
-            assert_eq!(
-                store.get_private_entry(entry_priv.as_hash().clone()),
-                Ok(Some(entry_priv.as_content().clone()))
-            );
-            assert_eq!(
-                store.get_public_entry(entry_priv.as_hash().clone()),
-                Ok(None)
-            );
         }
 
         // Cannot retrieve private entry when disabled
@@ -321,14 +304,6 @@ mod tests {
                 Ok(Some(entry_pub.as_content().clone()))
             );
             assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
-            assert_eq!(
-                store.get_private_entry(entry_priv.as_hash().clone()),
-                Ok(None)
-            );
-            assert_eq!(
-                store.get_public_entry(entry_priv.as_hash().clone()),
-                Ok(None)
-            );
         }
 
         Ok(())
@@ -364,14 +339,6 @@ mod tests {
                 Ok(Some(entry_pub.as_content().clone()))
             );
             assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
-            assert_eq!(
-                store.get_private_entry(entry_priv.as_hash().clone()),
-                Ok(None)
-            );
-            assert_eq!(
-                store.get_public_entry(entry_priv.as_hash().clone()),
-                Ok(None)
-            );
         }
 
         // Cannot retrieve private entry when disabled
@@ -383,14 +350,6 @@ mod tests {
                 Ok(Some(entry_pub.as_content().clone()))
             );
             assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
-            assert_eq!(
-                store.get_private_entry(entry_priv.as_hash().clone()),
-                Ok(None)
-            );
-            assert_eq!(
-                store.get_public_entry(entry_priv.as_hash().clone()),
-                Ok(None)
-            );
         }
 
         Ok(())
