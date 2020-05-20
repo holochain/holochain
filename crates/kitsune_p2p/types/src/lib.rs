@@ -114,6 +114,11 @@ pub mod transport {
             Name(TransportListener),
             Error(super::TransportError),
             Api {
+                BoundUrl(
+                    "Retrieve the current url (address) this listener is bound to.",
+                    (),
+                    url2::Url2,
+                ),
                 Connect(
                     "Attempt to establish an outgoing connection to a remote.",
                     url2::Url2,

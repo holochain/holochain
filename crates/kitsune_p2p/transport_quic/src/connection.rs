@@ -30,7 +30,7 @@ struct TransportConnectionQuic {
 impl TransportConnectionHandler<(), ConnectionInner> for TransportConnectionQuic {
     fn handle_remote_url(&mut self) -> TransportConnectionHandlerResult<Url2> {
         let out = url2!(
-            "{}:{}",
+            "{}://{}",
             crate::SCHEME,
             self.quinn_connection.remote_address()
         );
