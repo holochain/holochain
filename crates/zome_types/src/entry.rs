@@ -28,8 +28,20 @@ pub enum Entry {
     App(SerializedBytes),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
-    CapTokenClaim(CapTokenClaim),
+    CapClaim(CapClaimEntry),
     /// The capability grant system entry which allows granting of application defined
     /// capabilities
-    CapTokenGrant(CapTokenGrant),
+    CapGrant(CapGrantEntry),
+}
+
+impl Entry {
+    /// If this entry represents a capability grant, return a `CapGrant`.
+    #[allow(dead_code)]
+    pub(crate) fn cap_grant(&self) -> Option<CapGrant> {
+        match self {
+            Entry::Agent(key) => Some(key.clone().into()),
+            Entry::CapGrant(data) => Some(data.clone().into()),
+            _ => None,
+        }
+    }
 }

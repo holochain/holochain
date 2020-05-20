@@ -1,11 +1,11 @@
 //! Some common testing helpers.
 
 use crate::{
+    capability::CapSecret,
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, Properties},
     dna::{DnaDef, DnaFile},
     prelude::*,
-    shims::CapToken,
 };
 use holo_hash::AgentPubKey;
 use holochain_zome_types::zome::ZomeName;
@@ -108,10 +108,9 @@ pub fn fake_header_hash(name: &str) -> HeaderHash {
     .unwrap()
 }
 
-/// A fixture example CapabilityRequest for unit testing.
-pub fn fake_cap_token() -> CapToken {
-    // TODO: real fake CapToken
-    CapToken
+/// A fixture example CapSecret for unit testing.
+pub fn fake_cap_secret() -> CapSecret {
+    CapSecret::random()
 }
 
 /// A fixture example ZomeInvocationPayload for unit testing.

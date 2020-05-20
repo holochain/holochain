@@ -1,4 +1,3 @@
-
 pub struct Address;
 pub struct Signature;
 pub struct PublicKey;
@@ -7,8 +6,8 @@ pub struct DnaHash;
 pub struct HeaderHash;
 pub struct SerializedBytes;
 pub struct EntryHash;
-pub struct CapTokenClaim;
-pub struct CapTokenGrant;
+pub struct CapClaim;
+pub struct CapGrant;
 pub struct ZomeId;
 
 mod holo_hash {
@@ -31,7 +30,6 @@ pub enum Header {
     EntryDelete(header::EntryDelete),
 }
 
-
 pub mod header {
     //! Holochain's header variations
     //!
@@ -45,7 +43,6 @@ pub mod header {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         // No previous header, because DNA is always first chain entry
-
         pub hash: DnaHash,
     }
 
@@ -54,10 +51,10 @@ pub mod header {
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
 
-        pub base: Address,   // Not Address, but HeaderHash or EntryHash or PublicKey
+        pub base: Address, // Not Address, but HeaderHash or EntryHash or PublicKey
         pub target: Address, // Not Address, but HeaderHash or EntryHash or PublicKey
         pub tag: SerializedBytes,
-        pub link_type: SerializedBytes
+        pub link_type: SerializedBytes,
     }
 
     pub struct LinkRemove {
@@ -115,27 +112,35 @@ pub mod header {
 }
 
 impl Header {
-    pub fn is_public() -> bool { unimplemented!() }
-    pub fn author() -> PublicKey { unimplemented!() }
-    pub fn timestamp() -> Timestamp { unimplemented!() }
-    pub fn hash() -> holo_hash::Hash { unimplemented!() }// hash of header!!
+    pub fn is_public() -> bool {
+        unimplemented!()
+    }
+    pub fn author() -> PublicKey {
+        unimplemented!()
+    }
+    pub fn timestamp() -> Timestamp {
+        unimplemented!()
+    }
+    pub fn hash() -> holo_hash::Hash {
+        unimplemented!() // hash of header!!
+    }
     pub fn prev_header(&self) -> Option<&HeaderHash> {
         Some(match self {
-            Self::Dna (header::Dna { .. }) => return None,
-            Self::LinkAdd (header::LinkAdd { prev_header, .. }) => prev_header,
-            Self::LinkRemove (header::LinkRemove { prev_header, .. }) => prev_header,
-            Self::EntryDelete (header::EntryDelete { prev_header, .. }) => prev_header,
-            Self::ChainClose (header::ChainClose { prev_header, .. }) => prev_header,
-            Self::ChainOpen (header::ChainOpen { prev_header, .. }) => prev_header,
-            Self::EntryCreate (header::EntryCreate { prev_header, .. }) => prev_header,
-            Self::EntryUpdate (header::EntryUpdate{ prev_header, .. }) => prev_header,
+            Self::Dna(header::Dna { .. }) => return None,
+            Self::LinkAdd(header::LinkAdd { prev_header, .. }) => prev_header,
+            Self::LinkRemove(header::LinkRemove { prev_header, .. }) => prev_header,
+            Self::EntryDelete(header::EntryDelete { prev_header, .. }) => prev_header,
+            Self::ChainClose(header::ChainClose { prev_header, .. }) => prev_header,
+            Self::ChainOpen(header::ChainOpen { prev_header, .. }) => prev_header,
+            Self::EntryCreate(header::EntryCreate { prev_header, .. }) => prev_header,
+            Self::EntryUpdate(header::EntryUpdate { prev_header, .. }) => prev_header,
         })
     }
 }
 
 pub enum Entry {
-    CapTokenClaim(CapTokenClaim),
-    CapTokenGrant(CapTokenGrant),
+    CapClaim(CapClaim),
+    CapGrant(CapGrant),
     AgentKey(PublicKey),
     // Stores the App's provided entry data
     App(AppEntry),
@@ -155,8 +160,8 @@ pub enum EntryType {
         app_entry_type: AppEntryType,
         is_public: bool,
     },
-    CapTokenClaim,
-    CapTokenGrant,
+    CapClaim,
+    CapGrant,
 }
 
 pub struct AppEntryType(Vec<u8>);
