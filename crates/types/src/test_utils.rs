@@ -1,13 +1,12 @@
 //! Some common testing helpers.
 
 use crate::{
-    address::EntryAddress,
+    capability::CapSecret,
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, Properties},
     dna::{DnaDef, DnaFile},
     header::{AppEntryType, EntryVisibility, ZomeId},
     prelude::*,
-    shims::CapToken,
 };
 use holo_hash::AgentPubKey;
 use holochain_zome_types::ZomeExternHostInput;
@@ -109,20 +108,9 @@ pub fn fake_header_hash(name: &str) -> HeaderHash {
     .unwrap()
 }
 
-/// A fixture example EntryAddress for unit testing.
-pub fn fake_entry_address(name: &str) -> EntryAddress {
-    tokio_safe_block_on::tokio_safe_block_on(
-        EntryHash::with_data(name.as_bytes()),
-        std::time::Duration::from_secs(1),
-    )
-    .unwrap()
-    .into()
-}
-
-/// A fixture example CapabilityRequest for unit testing.
-pub fn fake_cap_token() -> CapToken {
-    // TODO: real fake CapToken
-    CapToken
+/// A fixture example CapSecret for unit testing.
+pub fn fake_cap_secret() -> CapSecret {
+    CapSecret::random()
 }
 
 /// A fixture example ZomeInvocationPayload for unit testing.

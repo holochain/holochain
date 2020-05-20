@@ -1172,6 +1172,7 @@ dependencies = [
  "matches",
  "multihash",
  "must_future",
+ "nanoid",
  "regex",
  "rust-base58",
  "serde",

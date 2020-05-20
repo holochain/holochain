@@ -232,9 +232,9 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
         self.headers.delete(header_hash.into());
         self.public_entries.delete(entry_hash.clone().into());
-        self.private_entries
-            .as_mut()
-            .map(|db| db.delete(entry_hash.into()));
+        if let Some(db) = self.private_entries.as_mut() {
+            db.delete(entry_hash.into())
+        }
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {

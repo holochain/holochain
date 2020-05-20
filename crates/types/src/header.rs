@@ -254,8 +254,8 @@ pub enum EntryType {
     // Stores the App's provided filtration data
     // FIXME: Change this if we are keeping Zomes
     App(AppEntryType),
-    CapTokenClaim,
-    CapTokenGrant,
+    CapClaim,
+    CapGrant,
 }
 
 impl EntryType {
@@ -263,8 +263,8 @@ impl EntryType {
         match self {
             EntryType::AgentPubKey => &EntryVisibility::Public,
             EntryType::App(t) => &t.visibility,
-            EntryType::CapTokenClaim => &EntryVisibility::Private,
-            EntryType::CapTokenGrant => &EntryVisibility::Private,
+            EntryType::CapClaim => &EntryVisibility::Private,
+            EntryType::CapGrant => &EntryVisibility::Private,
         }
     }
 }
