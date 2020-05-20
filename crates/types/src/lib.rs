@@ -6,6 +6,7 @@
 pub mod address;
 pub mod app;
 pub mod autonomic;
+pub mod capability;
 pub mod cell;
 pub mod db;
 pub mod dna;
@@ -14,7 +15,6 @@ pub mod header;
 pub mod link;
 pub mod nucleus;
 pub mod observability;
-pub mod persistence;
 pub mod prelude;
 mod timestamp;
 
@@ -31,5 +31,3 @@ pub mod test_utils;
 pub use header::{Header, HeaderHashed};
 
 pub use timestamp::Timestamp;
-
-use holochain_zome_types;

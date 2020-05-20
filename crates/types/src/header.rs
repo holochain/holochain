@@ -250,8 +250,8 @@ pub enum EntryType {
     // Stores the App's provided filtration data
     // FIXME: Change this if we are keeping Zomes
     App(AppEntryType),
-    CapTokenClaim,
-    CapTokenGrant,
+    CapClaim,
+    CapGrant,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
