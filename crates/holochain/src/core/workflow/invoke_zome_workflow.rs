@@ -93,18 +93,13 @@ where
                         .source_chain
                         .get_element(header.header_address())
                         .await?;
-                    let prev_chain_element = chain_element.as_ref().and_then(|c| {
-                        let source_chain = &workspace.source_chain;
-                        c.header()
-                            .prev_header()
-                            .cloned()
-                            .map(|h| async move { source_chain.get_element(&h).await })
-                    });
-                    let prev_chain_element =
-                        futures::future::OptionFuture::from(prev_chain_element)
-                            .await
-                            .transpose()?
-                            .flatten();
+                    let prev_chain_element = match chain_element {
+                        Some(ref c) => match c.header().prev_header() {
+                            Some(h) => workspace.source_chain.get_element(&h).await?,
+                            None => None,
+                        },
+                        None => None,
+                    };
                     if let Some(ref chain_element) = chain_element {
                         sys_validate_element(
                             &agent_key,
