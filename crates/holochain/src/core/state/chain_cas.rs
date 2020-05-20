@@ -96,7 +96,6 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     }
 
     /// Get an entry from the public DB, else return None
-    /// TODO: maybe expose publicly if it makes sense (it is safe to do so)
     fn get_public_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
         self.public_entries.get(&entry_address.into())
     }
