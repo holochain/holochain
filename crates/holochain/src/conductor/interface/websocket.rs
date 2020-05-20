@@ -314,14 +314,12 @@ mod test {
             .unwrap();
 
         conductor_handle
-            .genesis_cells(cell_ids_with_proofs, conductor_handle.clone())
+            .clone()
+            .genesis_cells(cell_ids_with_proofs)
             .await
             .unwrap();
 
-        conductor_handle
-            .setup_cells(conductor_handle.clone())
-            .await
-            .unwrap();
+        conductor_handle.clone().setup_cells().await.unwrap();
 
         (tmps, conductor_handle)
     }
@@ -343,14 +341,12 @@ mod test {
             .unwrap();
 
         conductor_handle
-            .genesis_cells(cell_ids_with_proofs, conductor_handle.clone())
+            .clone()
+            .genesis_cells(cell_ids_with_proofs)
             .await
             .unwrap();
 
-        conductor_handle
-            .setup_cells(conductor_handle.clone())
-            .await
-            .unwrap();
+        conductor_handle.clone().setup_cells().await.unwrap();
 
         (tmpdir, RealAppInterfaceApi::new(conductor_handle))
     }
