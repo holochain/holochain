@@ -18,12 +18,14 @@ pub struct Leave {
     pub agent_pub_key: AgentPubKey,
 }
 
-/// Invoke a zome function on a remote node (if you have been granted the capability.
+/// Invoke a zome function on a remote node (if you have been granted the capability).
 pub struct CallRemote {
     /// The dna_hash / space_hash context.
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
+
+    // TODO - parameters
 }
 
 /// Publish data to the correct neigborhood.
@@ -32,6 +34,8 @@ pub struct Publish {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
+
+    // TODO - parameters
 }
 
 /// Request a validation package.
@@ -40,6 +44,8 @@ pub struct GetValidationPackage {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
+
+    // TODO - parameters
 }
 
 /// Get an entry from the DHT.
@@ -48,6 +54,8 @@ pub struct Get {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
+
+    // TODO - parameters
 }
 
 /// Get links from the DHT.
@@ -56,6 +64,8 @@ pub struct GetLinks {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
+
+    // TODO - parameters
 }
 
 ghost_actor::ghost_actor! {
@@ -74,29 +84,29 @@ ghost_actor::ghost_actor! {
             (),
         ),
         CallRemote(
-            "Invoke a zome function on a remote node (if you have been granted the capability.",
+            "Invoke a zome function on a remote node (if you have been granted the capability).",
             CallRemote,
-            (),
+            (), // TODO - proper return type
         ),
         Publish(
             "Publish data to the correct neigborhood.",
             Publish,
-            (),
+            (), // TODO - proper return type
         ),
         GetValidationPackage(
             "Request a validation package.",
             GetValidationPackage,
-            (),
+            (), // TODO - proper return type
         ),
         Get(
             "Get an entry from the DHT.",
             Get,
-            (),
+            (), // TODO - proper return type
         ),
         GetLinks(
             "Get links from the DHT.",
             GetLinks,
-            (),
+            (), // TODO - proper return type
         ),
     }
 }
