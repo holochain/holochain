@@ -5,6 +5,7 @@
 
 pub mod address;
 pub mod autonomic;
+pub mod capability;
 pub mod cell;
 pub mod db;
 pub mod dna;
