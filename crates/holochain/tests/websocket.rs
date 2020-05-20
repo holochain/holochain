@@ -280,7 +280,7 @@ async fn call_zome() {
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::AppsActivated);
+    assert_matches!(response, AdminResponse::AppActivated);
 
     // Attach App Interface
     let request = AdminRequest::AttachAppInterface { port: None };

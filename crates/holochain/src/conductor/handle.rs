@@ -144,6 +144,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Activate an app
     async fn activate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
+    /// Deactivate an app
+    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
+
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
@@ -282,6 +285,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.0.write().await.activate_app_in_db(app_id).await
     }
 
+    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()> {
+        let cell_ids_to_remove = self.0.write().await.deactivate_app_in_db(app_id).await?;
+        self.0.write().await.remove_cells(cell_ids_to_remove);
+        Ok(())
+    }
+
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         self.0.read().await.dump_cell_state(cell_id).await
     }
@@ -354,6 +363,8 @@ pub mod mock {
             fn sync_setup_cells(&self) -> ConductorResult<Vec<CreateAppError>>;
 
             fn sync_activate_app(&self, app_id: AppId) -> ConductorResult<()>;
+
+            fn sync_deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
             fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
@@ -445,6 +456,10 @@ pub mod mock {
 
         async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
             self.sync_activate_app(app_id)
+        }
+
+        async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()> {
+            self.sync_deactivate_app(app_id)
         }
 
         /// Dump the cells state

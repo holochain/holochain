@@ -212,7 +212,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     // There was an error in this app so return it
                     .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
                     // No error, return success
-                    .unwrap_or(Ok(AdminResponse::AppsActivated))
+                    .unwrap_or(Ok(AdminResponse::AppActivated))
+            }
+            DeactivateApp { app_id } => {
+                // Activate app
+                self.conductor_handle.deactivate_app(app_id.clone()).await?;
+                Ok(AdminResponse::AppDeactivated)
             }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
@@ -349,8 +354,10 @@ pub enum AdminResponse {
     },
     /// An error has ocurred in this request
     Error(ExternalApiWireError),
-    /// List of apps that activated or failed
-    AppsActivated,
+    /// App activated successfully
+    AppActivated,
+    /// App deactivated successfully
+    AppDeactivated,
     /// State of a cell
     JsonState(String),
 }
@@ -396,9 +403,14 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all AgentPubKeys in Keystore
     ListAgentPubKeys,
-    /// Activate a list of apps
+    /// Activate an app
     ActivateApp {
         /// The id of the app to activate
+        app_id: AppId,
+    },
+    /// Deactivate an app
+    DeactivateApp {
+        /// The id of the app to deactivate
         app_id: AppId,
     },
     /// Attach a [AppInterfaceApi]

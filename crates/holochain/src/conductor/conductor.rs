@@ -443,10 +443,9 @@ where
         Ok(())
     }
 
-    /// Register an app inactive in the database
+    /// Activate an app in the database
     pub(super) async fn activate_app_in_db(&mut self, app_id: AppId) -> ConductorResult<()> {
         self.update_state(move |mut state| {
-            debug!(?state.inactive_apps);
             let cell_ids = state
                 .inactive_apps
                 .remove(&app_id)
@@ -458,7 +457,32 @@ where
         Ok(())
     }
 
-    /// Add fully constructed cells to to the cell map in the Conductor
+    /// Deactivate an app in the database
+    pub(super) async fn deactivate_app_in_db(
+        &mut self,
+        app_id: AppId,
+    ) -> ConductorResult<Vec<CellId>> {
+        let state = self
+            .update_state({
+                let app_id = app_id.clone();
+                move |mut state| {
+                    let cell_ids = state
+                        .active_apps
+                        .remove(&app_id)
+                        .ok_or(ConductorError::AppNotActive)?;
+                    state.inactive_apps.insert(app_id, cell_ids);
+                    Ok(state)
+                }
+            })
+            .await?;
+        Ok(state
+            .inactive_apps
+            .get(&app_id)
+            .expect("This app was just put here")
+            .clone())
+    }
+
+    /// Add fully constructed cells to the cell map in the Conductor
     pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             self.cells.insert(
@@ -468,6 +492,13 @@ where
                     _state: CellState { _active: false },
                 },
             );
+        }
+    }
+
+    /// Remove cells from the cell map in the Conductor
+    pub(super) fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
+        for cell_id in cell_ids {
+            self.cells.remove(&cell_id);
         }
     }
 

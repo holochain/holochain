@@ -523,32 +523,68 @@ mod test {
             .returning(move |hash| dna_map.get(&hash).cloned());
         let (_tmpdir, handle) = setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
 
+        // Activate the app
         let msg = AdminRequest::ActivateApp {
             app_id: "test app".to_string(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppsActivated);
+            assert_matches!(response, AdminResponse::AppActivated);
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
+
         handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
             .await
             .unwrap();
-        let cells = handle
-            .get_state_from_handle()
-            .await
-            .unwrap()
-            .active_apps
-            .get("test app")
-            .cloned()
-            .unwrap();
+
+        // Get the state
+        let state = handle.get_state_from_handle().await.unwrap();
+
+        // Check it is not in inactive apps
+        let r = state.inactive_apps.get("test app");
+        assert_eq!(r, None);
+
+        // Check it is in active apps
+        let cells = state.active_apps.get("test app").cloned().unwrap();
+
+        // Collect the expected result
         let expected = dna_hashes
             .into_iter()
             .map(|hash| CellId::from((hash, agent_key.clone())))
             .collect::<Vec<_>>();
+
+        assert_eq!(expected, cells);
+
+        // Now deactivate app
+        let msg = AdminRequest::DeactivateApp {
+            app_id: "test app".to_string(),
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::AppDeactivated);
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+            .await
+            .unwrap();
+
+        // Get the state
+        let state = handle.get_state_from_handle().await.unwrap();
+
+        // Check it's removed from active
+        let r = state.active_apps.get("test app");
+        assert_eq!(r, None);
+
+        // Check it's added to inactive
+        let cells = state.inactive_apps.get("test app").cloned().unwrap();
+
         assert_eq!(expected, cells);
     }
 
