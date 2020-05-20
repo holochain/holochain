@@ -296,8 +296,9 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-    // FIXME: Maybe this should be removed because there it's a way to test that sys validate
-    // is called and all the other checks would be duplicating the unit test inside sys val.
+
+    // TODO: B-01100 Make sure this test is in the right place when SysValidation complete
+    // so we aren't duplicating the unit test inside sys val.
     #[ignore]
     #[tokio::test]
     async fn calls_system_validation<'a>() {
