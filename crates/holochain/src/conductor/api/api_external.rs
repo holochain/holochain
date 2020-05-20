@@ -99,6 +99,7 @@ pub struct RealAdminInterfaceApi {
     conductor_handle: ConductorHandle,
 
     /// Needed to spawn an App interface
+    // TODO: is this needed? it's not currently being used.
     app_api: RealAppInterfaceApi,
 }
 
@@ -124,7 +125,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             Stop(_cell_handle) => unimplemented!(),
             AddAdminInterfaces(configs) => Ok(AdminResponse::AdminInterfacesAdded(
                 self.conductor_handle
-                    .add_admin_interfaces_via_handle(self.conductor_handle.clone(), configs)
+                    .clone()
+                    .add_admin_interfaces(configs)
                     .await?,
             )),
             InstallDna(dna_path, properties) => {
@@ -166,11 +168,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .map(|(dna_hash, proof)| (CellId::from((dna_hash, agent_key.clone())), proof))
                     .collect();
                 self.conductor_handle
-                    .genesis_cells(cell_ids_with_proofs, self.conductor_handle.clone())
+                    .clone()
+                    .genesis_cells(cell_ids_with_proofs)
                     .await?;
-                self.conductor_handle
-                    .setup_cells(self.conductor_handle.clone())
-                    .await?;
+                self.conductor_handle.clone().setup_cells().await?;
 
                 Ok(AdminResponse::AppsActivated)
             }
@@ -178,7 +179,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
-                    .add_app_interface_via_handle(port, self.conductor_handle.clone())
+                    .clone()
+                    .add_app_interface(port)
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }

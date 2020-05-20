@@ -66,6 +66,9 @@ pub use builder::*;
 use futures::future::{self, TryFutureExt};
 use holochain_serialized_bytes::SerializedBytes;
 
+#[cfg(test)]
+use super::handle::mock::MockConductorHandle;
+
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
 /// essentially immutable, and perhaps we just throw it out and make a new one
@@ -202,7 +205,7 @@ where
             })
     }
 
-    pub(super) fn get_wait_handle(&mut self) -> Option<TaskManagerRunHandle> {
+    pub(super) fn take_shutdown_handle(&mut self) -> Option<TaskManagerRunHandle> {
         self.task_manager_run_handle.take()
     }
 
@@ -210,8 +213,8 @@ where
     /// and modify the conductor accordingly, based on the config passed in
     pub(super) async fn add_admin_interfaces_via_handle(
         &mut self,
-        handle: ConductorHandle,
         configs: Vec<AdminInterfaceConfig>,
+        handle: ConductorHandle,
     ) -> ConductorResult<()>
     where
         DS: DnaStore + 'static,
@@ -607,9 +610,11 @@ mod builder {
         dna_store: DS,
         #[cfg(test)]
         state: Option<ConductorState>,
+        #[cfg(test)]
+        mock_handle: Option<MockConductorHandle>,
     }
 
-    impl ConductorBuilder<RealDnaStore> {
+    impl ConductorBuilder {
         /// Default ConductorBuilder
         pub fn new() -> Self {
             Self::default()
@@ -638,6 +643,16 @@ mod builder {
 
         /// Initialize a "production" Conductor
         pub async fn build(self) -> ConductorResult<ConductorHandle> {
+            cfg_if::cfg_if! {
+                // if mock_handle is specified, return that instead of
+                // a real handle
+                if #[cfg(test)] {
+                    if let Some(handle) = self.mock_handle {
+                        return Ok(Arc::new(handle));
+                    }
+                }
+            }
+
             let keystore = delete_me_create_test_keystore().await;
             let env_path = self.config.environment_path.clone();
 
@@ -680,13 +695,11 @@ mod builder {
                 keystore,
             )));
 
-            handle.setup_cells(handle.clone()).await?;
+            handle.clone().setup_cells().await?;
 
             // Create admin interfaces
             if let Some(configs) = conductor_config.admin_interfaces {
-                handle
-                    .add_admin_interfaces_via_handle(handle.clone(), configs)
-                    .await?;
+                handle.clone().add_admin_interfaces(configs).await?;
             }
 
             Ok(handle)
@@ -696,6 +709,14 @@ mod builder {
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
             self.state = Some(state);
+            self
+        }
+
+        /// Pass a mock handle in, which will be returned regardless of whatever
+        /// else happens to this builder
+        #[cfg(test)]
+        pub async fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
+            self.mock_handle = Some(handle);
             self
         }
 
