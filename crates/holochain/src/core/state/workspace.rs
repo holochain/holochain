@@ -38,7 +38,7 @@ pub mod tests {
     use crate::core::state::workspace::WorkspaceResult;
     use holochain_state::{
         buffer::{BufferedStore, KvBuf},
-        db::{GetDb, PRIMARY_CHAIN_ENTRIES_PUBLIC, PRIMARY_CHAIN_HEADERS},
+        db::{GetDb, PRIMARY_CHAIN_HEADERS, PRIMARY_CHAIN_PUBLIC_ENTRIES},
         prelude::*,
         test_utils::test_cell_env,
     };
@@ -52,7 +52,7 @@ pub mod tests {
     impl<'env> TestWorkspace<'env> {
         pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_ENTRIES_PUBLIC)?)?,
+                one: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_PUBLIC_ENTRIES)?)?,
                 two: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?)?,
             })
         }

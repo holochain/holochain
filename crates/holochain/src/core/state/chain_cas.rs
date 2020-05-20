@@ -1,3 +1,12 @@
+/// A convenient composition of CasBufs, representing source chain data.
+///
+/// Source chain data is split into three databases: one for headers, and two
+/// for public and private entries. Specifying the private_entries DB in a
+/// ChainCasBuf is optional, so that if it's not supplied, the ChainCasBuf
+/// will not be able to access private data. This restriction is useful when
+/// using the ChainCasBuf for caching non-authored data, or for situations where
+/// it is known that private entries should be protected, such as when handling
+/// a get_entry request from the network.
 use crate::core::state::source_chain::{
     ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
@@ -5,8 +14,8 @@ use holo_hash::{EntryHash, Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
-        GetDb, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_ENTRIES_PRIVATE,
-        PRIMARY_CHAIN_ENTRIES_PUBLIC, PRIMARY_CHAIN_HEADERS,
+        GetDb, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_HEADERS,
+        PRIMARY_CHAIN_PRIVATE_ENTRIES, PRIMARY_CHAIN_PUBLIC_ENTRIES,
     },
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
@@ -20,44 +29,46 @@ use holochain_types::{
     Header, HeaderHashed,
 };
 
+/// A CasBuf with Entries for values
 pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
+/// A CasBuf with SignedHeaders for values
 pub type HeaderCas<'env, R> = CasBuf<'env, (Header, Signature), R>;
 
-/// A convenient pairing of two CasBufs, one for entries and one for headers
+/// The representation of a chain CAS, using two or three DB references
 pub struct ChainCasBuf<'env, R: Readable = Reader<'env>> {
-    entries_public: EntryCas<'env, R>,
-    entries_private: Option<EntryCas<'env, R>>,
+    public_entries: EntryCas<'env, R>,
+    private_entries: Option<EntryCas<'env, R>>,
     headers: HeaderCas<'env, R>,
 }
 
 impl<'env, R: Readable> ChainCasBuf<'env, R> {
     fn new(
         reader: &'env R,
-        entries_public_store: SingleStore,
-        entries_private_store: Option<SingleStore>,
+        public_entries_store: SingleStore,
+        private_entries_store: Option<SingleStore>,
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
-        let entries_private = if let Some(store) = entries_private_store {
+        let private_entries = if let Some(store) = private_entries_store {
             Some(CasBuf::new(reader, store)?)
         } else {
             None
         };
         Ok(Self {
-            entries_public: CasBuf::new(reader, entries_public_store)?,
-            entries_private,
+            public_entries: CasBuf::new(reader, public_entries_store)?,
+            private_entries,
             headers: CasBuf::new(reader, headers_store)?,
         })
     }
 
     pub fn primary(reader: &'env R, dbs: &impl GetDb, allow_private: bool) -> DatabaseResult<Self> {
         let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
-        let entries = dbs.get_db(&*PRIMARY_CHAIN_ENTRIES_PUBLIC)?;
-        let entries_private = if allow_private {
-            Some(dbs.get_db(&*PRIMARY_CHAIN_ENTRIES_PRIVATE)?)
+        let entries = dbs.get_db(&*PRIMARY_CHAIN_PUBLIC_ENTRIES)?;
+        let private_entries = if allow_private {
+            Some(dbs.get_db(&*PRIMARY_CHAIN_PRIVATE_ENTRIES)?)
         } else {
             None
         };
-        Self::new(reader, entries, entries_private, headers)
+        Self::new(reader, entries, private_entries, headers)
     }
 
     pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
@@ -80,13 +91,13 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     /// Get an entry from the private DB if specified, else always return None
     /// TODO: maybe expose publicly if it makes sense (it is safe to do so)
     fn get_public_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        self.entries_public.get(&entry_address.into())
+        self.public_entries.get(&entry_address.into())
     }
 
     /// Get an entry from the private DB if specified, else always return None
     /// TODO: maybe expose publicly if it makes sense (it is safe to do so)
     fn get_private_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        if let Some(ref db) = self.entries_private {
+        if let Some(ref db) = self.private_entries {
             db.get(&entry_address.into())
         } else {
             Ok(None)
@@ -179,9 +190,9 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
             let (entry, entry_address) = entry.into_inner();
             if let Some(entry_type) = header.entry_type() {
                 if entry_type.is_public() {
-                    self.entries_public.put(entry_address.into(), entry);
+                    self.public_entries.put(entry_address.into(), entry);
                 } else {
-                    self.entries_private
+                    self.private_entries
                         .as_mut()
                         .map(|db| db.put(entry_address.into(), entry));
                 }
@@ -199,8 +210,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
     pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
         self.headers.delete(header_hash.into());
-        self.entries_public.delete(entry_hash.clone().into());
-        self.entries_private
+        self.public_entries.delete(entry_hash.clone().into());
+        self.private_entries
             .as_mut()
             .map(|db| db.delete(entry_hash.into()));
     }
@@ -210,7 +221,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     }
 
     pub fn public_entries(&self) -> &EntryCas<'env, R> {
-        &self.entries_public
+        &self.public_entries
     }
 }
 
@@ -218,8 +229,8 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuf<'env, R> {
     type Error = DatabaseError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
-        self.entries_public.flush_to_txn(writer)?;
-        if let Some(db) = self.entries_private {
+        self.public_entries.flush_to_txn(writer)?;
+        if let Some(db) = self.private_entries {
             db.flush_to_txn(writer)?
         };
         self.headers.flush_to_txn(writer)?;
