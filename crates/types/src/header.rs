@@ -76,11 +76,21 @@ macro_rules! match_header {
 }
 
 impl Header {
-    /// returns the type of the entry if it's an app entry
-    pub fn entry_type(&self) -> Option<&EntryType> {
+    /// Returns the address and entry type of the Entry, if applicable.
+    // TODO: DRY: possibly create an `EntryData` struct which is used by both
+    // EntryCreate and EntryUpdate
+    pub fn entry_data(&self) -> Option<(&EntryAddress, &EntryType)> {
         match self {
-            Self::EntryCreate(EntryCreate { entry_type, .. }) => Some(entry_type),
-            Self::EntryUpdate(EntryUpdate { entry_type, .. }) => Some(entry_type),
+            Self::EntryCreate(EntryCreate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address, entry_type)),
+            Self::EntryUpdate(EntryUpdate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address, entry_type)),
             _ => None,
         }
     }

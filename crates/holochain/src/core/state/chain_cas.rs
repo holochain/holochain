@@ -122,36 +122,26 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    // local helper function which, given a SignedHeaderHashed, looks for an entry in the cas
-    // and builds a ChainElement struct
-    fn get_element_inner(
-        &self,
-        signed_header: SignedHeaderHashed,
-    ) -> SourceChainResult<Option<ChainElement>> {
-        let maybe_entry_address = match signed_header.header() {
-            Header::EntryCreate(header::EntryCreate {
-                entry_address,
-                entry_type,
-                ..
-            }) => Some((entry_address.clone(), entry_type.visibility())),
-            Header::EntryUpdate(header::EntryUpdate {
-                entry_address,
-                entry_type,
-                ..
-            }) => Some((entry_address.clone(), entry_type.visibility())),
-            _ => None,
-        };
-        let maybe_entry = match maybe_entry_address {
+    /// Get the Entry out of Header if it exists.
+    ///
+    /// If the header contains no entry data, return None
+    /// If the header contains entry data:
+    /// - if it is a public entry, but the entry cannot be found, return error
+    /// - if it is a private entry and cannot be found, return error
+    /// - if it is a private entry but the private DB is disabled, return None
+    fn get_entry_from_header(&self, header: &Header) -> SourceChainResult<Option<Entry>> {
+        Ok(match header.entry_data() {
             None => None,
-            Some((entry_address, visibility)) => {
-                match visibility {
-                    // if the header has an address it better have been stored!
+            Some((entry_address, entry_type)) => {
+                match entry_type.visibility() {
+                    // if the header references an entry and the database is
+                    // available, it better have been stored!
                     EntryVisibility::Public => Some(
                         self.public_entries
                             .get(&entry_address.clone().into())?
                             .ok_or_else(|| {
                                 SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                    entry_address,
+                                    entry_address.clone(),
                                 ))
                             })?,
                     ),
@@ -159,17 +149,17 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                         if let Some(ref db) = self.private_entries {
                             Some(db.get(&entry_address.clone().into())?.ok_or_else(|| {
                                 SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                    entry_address,
+                                    entry_address.clone(),
                                 ))
                             })?)
                         } else {
+                            // If the private DB is disabled, just return None
                             None
                         }
                     }
                 }
             }
-        };
-        Ok(Some(ChainElement::new(signed_header, maybe_entry)))
+        })
     }
 
     /// given a header address return the full chain element for that address
@@ -178,7 +168,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
         if let Some(signed_header) = self.get_header(header_address).await? {
-            self.get_element_inner(signed_header)
+            let maybe_entry = self.get_entry_from_header(signed_header.header())?;
+            Ok(Some(ChainElement::new(signed_header, maybe_entry)))
         } else {
             Ok(None)
         }
@@ -196,7 +187,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
         if let Some(entry) = maybe_entry {
             let (entry, entry_address) = entry.into_inner();
-            if let Some(entry_type) = header.entry_type() {
+            if let Some((_, entry_type)) = header.entry_data() {
                 match entry_type.visibility() {
                     EntryVisibility::Public => self.public_entries.put(entry_address.into(), entry),
                     EntryVisibility::Private => {
