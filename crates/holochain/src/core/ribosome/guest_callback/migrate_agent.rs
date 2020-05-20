@@ -48,7 +48,7 @@ fixturator!(
             dna_def: DnaDefFixturator::new_indexed(Unpredictable, self.0.index)
                 .next()
                 .unwrap(),
-            migrate_agent: MigrateAgentFixturator::new_indexed(Empty, self.0.index)
+            migrate_agent: MigrateAgentFixturator::new_indexed(Unpredictable, self.0.index)
                 .next()
                 .unwrap(),
         };
