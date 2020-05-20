@@ -38,7 +38,22 @@ impl TransportConnectionHandler<(), ConnectionInner> for TransportConnectionQuic
     }
 
     fn handle_request(&mut self, input: Vec<u8>) -> TransportConnectionHandlerResult<Vec<u8>> {
-        Ok(async move { Ok(input) }.boxed().into())
+        let maybe_bi = self.quinn_connection.open_bi();
+        Ok(async move {
+            let (mut bi_send, bi_recv) = maybe_bi.await.map_err(TransportError::custom)?;
+            bi_send
+                .write_all(&input)
+                .await
+                .map_err(TransportError::custom)?;
+            bi_send.finish().await.map_err(TransportError::custom)?;
+            let res = bi_recv
+                .read_to_end(std::usize::MAX)
+                .await
+                .map_err(TransportError::custom)?;
+            Ok(res)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_ghost_actor_internal(
