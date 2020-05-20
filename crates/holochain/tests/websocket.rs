@@ -205,6 +205,63 @@ async fn call_admin() {
     holochain.kill().expect("Failed to kill holochain");
 }
 
+async fn start_holochain(config_path: PathBuf) -> Child {
+    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
+    let mut cmd = Command::from(cmd);
+    cmd.arg("--structured")
+        .arg("--config-path")
+        .arg(config_path)
+        .env("RUST_LOG", "trace")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
+    spawn_output(&mut holochain);
+    check_started(&mut holochain).await;
+    holochain
+}
+
+async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut Child) {
+    // Connect to App Interface
+    let (mut app_interface, _) = websocket_client_by_port(app_port).await.unwrap();
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+    struct Payload {
+        a: u32,
+    }
+    let payload = Payload { a: 1 };
+    let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
+    let request = Box::new(zome_invocation_from_names(
+        "zomey",
+        "foo",
+        payload.try_into().unwrap(),
+        cell_id,
+    ));
+    let request = AppRequest::ZomeInvocationRequest { request };
+    let response = app_interface.request(request);
+    let call_response = check_timeout(holochain, response, 2000).await;
+    let foo = TestString::from(String::from("foo"));
+    let expected = Box::new(ZomeInvocationResponse::ZomeApiFn(
+        ZomeExternGuestOutput::new(foo.try_into().unwrap()),
+    ));
+    trace!(?call_response);
+    assert_matches!(call_response, AppResponse::ZomeInvocationResponse{ response } if response == expected);
+    app_interface
+        .close(1000, "Shutting down".into())
+        .await
+        .unwrap();
+}
+
+async fn attach_app_interface(client: &mut WebsocketSender, holochain: &mut Child) -> u16 {
+    let request = AdminRequest::AttachAppInterface { port: None };
+    let response = client.request(request);
+    let response = check_timeout(holochain, response, 1000).await;
+    match response {
+        AdminResponse::AppInterfaceAttached { port } => port,
+        _ => panic!("Attach app interface failed: {:?}", response),
+    }
+}
+
 #[tokio::test(threaded_scheduler)]
 async fn call_zome() {
     observability::test_run().ok();
@@ -220,18 +277,7 @@ async fn call_zome() {
     let config = create_config(port, environment_path);
     let config_path = write_config(path, &config);
 
-    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
-    let mut cmd = Command::from(cmd);
-    cmd.arg("--structured")
-        .arg("--config-path")
-        .arg(config_path)
-        .env("RUST_LOG", "trace")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
-    spawn_output(&mut holochain);
-    check_started(&mut holochain).await;
+    let mut holochain = start_holochain(config_path.clone()).await;
 
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
@@ -268,40 +314,26 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::AppsActivated);
 
     // Attach App Interface
-    let request = AdminRequest::AttachAppInterface { port: None };
-    let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
-    let app_port = match response {
-        AdminResponse::AppInterfaceAttached { port } => port,
-        _ => panic!("Attach app interface failed: {:?}", response),
-    };
-
-    // Connect to App Interface
-    let (mut app_interface, _) = websocket_client_by_port(app_port).await.unwrap();
+    let app_port = attach_app_interface(&mut client, &mut holochain).await;
 
     // Call Zome
-    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-    struct Payload {
-        a: u32,
-    }
-    let payload = Payload { a: 1 };
-    let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
-    let request = Box::new(zome_invocation_from_names(
-        "zomey",
-        "foo",
-        payload.try_into().unwrap(),
-        cell_id,
-    ));
-    let request = AppRequest::ZomeInvocationRequest { request };
-    let response = app_interface.request(request);
-    let call_response = check_timeout(&mut holochain, response, 2000).await;
-    let foo = TestString::from(String::from("foo"));
-    let expected = Box::new(ZomeInvocationResponse::ZomeApiFn(
-        ZomeExternGuestOutput::new(foo.try_into().unwrap()),
-    ));
-    trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeInvocationResponse{ response } if response == expected);
+    call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
 
+    client.close(1000, "Shutting down".into()).await.unwrap();
+    // Shutdown holochain
+    holochain.kill().expect("Failed to kill holochain");
+
+    // Call zome after resart
+    let mut holochain = start_holochain(config_path).await;
+    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
+    
+    // Attach App Interface
+    let app_port = attach_app_interface(&mut client, &mut holochain).await;
+
+    // Call Zome again
+    call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
+
+    // Shutdown holochain
     holochain.kill().expect("Failed to kill holochain");
 }
 
