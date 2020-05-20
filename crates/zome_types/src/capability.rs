@@ -24,7 +24,6 @@
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.
 
-use derive_more::{From, Into};
 use serde::{Deserialize, Serialize};
 
 mod claim;
@@ -37,15 +36,21 @@ pub use grant::*;
 /// It is a random, unique identifier for the capability, which is shared by
 /// the Grantor to allow access to others.
 /// A capability CAN be updated (replaced with a new one) with the same secret.
-#[derive(From, Into, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CapSecret(String);
 
-impl CapSecret {
-    /// Creates a new unique secret from randomness.
-    pub fn random() -> Self {
-        Self(nanoid::nanoid!())
+impl From<String> for CapSecret {
+    fn from(s: String) -> Self {
+        Self(s)
     }
+}
 
+impl CapSecret {
+//     // /// Creates a new unique secret from randomness.
+//     // pub fn random() -> Self {
+//     //     Self(nanoid::nanoid!())
+//     // }
+//
     /// Creates a secret from a known string.
     pub fn from_string<S: Into<String>>(s: S) -> Self {
         Self(s.into())

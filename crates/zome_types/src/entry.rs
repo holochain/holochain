@@ -7,14 +7,27 @@
 
 use holo_hash_core::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
+use crate::capability::CapClaim;
+use crate::capability::ZomeCallCapGrant;
+use crate::capability::CapGrant;
 
-//TODO move to capabilities module
-/// Entry data for a capability claim
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct CapTokenClaim;
-/// Entry data for a capability grant
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct CapTokenGrant;
+/// The data type written to the source chain when explicitly granting a capability.
+/// NB: this is not simply `CapGrant`, because the `CapGrant::Authorship`
+/// grant is already implied by `Entry::Agent`, so that should not be committed
+/// to a chain. This is a type alias because if we add other capability types
+/// in the future, we may want to include them
+pub type CapGrantEntry = ZomeCallCapGrant;
+
+// //TODO move to capabilities module
+// /// Entry data for a capability claim
+// #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+// pub struct CapTokenClaim;
+// /// Entry data for a capability grant
+// #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+// pub struct CapTokenGrant;
+
+/// The data type written to the source chain to denote a capability claim
+pub type CapClaimEntry = CapClaim;
 
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

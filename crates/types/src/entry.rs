@@ -13,16 +13,6 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::Entry;
 
-/// The data type written to the source chain to denote a capability claim
-pub type CapClaimEntry = CapClaim;
-
-/// The data type written to the source chain when explicitly granting a capability.
-/// NB: this is not simply `CapGrant`, because the `CapGrant::Authorship`
-/// grant is already implied by `Entry::Agent`, so that should not be committed
-/// to a chain. This is a type alias because if we add other capability types
-/// in the future, we may want to include them
-pub type CapGrantEntry = ZomeCallCapGrant;
-
 make_hashed_base! {
     Visibility(pub),
     HashedName(EntryHashed),

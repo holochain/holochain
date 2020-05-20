@@ -1,12 +1,11 @@
 use super::CapSecret;
-use crate::nucleus::ZomeName;
-use derive_more::From;
-use holo_hash::*;
+use crate::zome::ZomeName;
+use holo_hash_core::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
 /// System entry to hold a capabilities granted by the callee
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, From)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum CapGrant {
     /// Grants the capability of writing to the source chain for this agent key.
     /// This grant is provided by the `Entry::Agent` entry on the source chain.
