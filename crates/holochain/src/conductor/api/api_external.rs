@@ -148,19 +148,21 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     ConductorApiResult::Ok(hash)
                 });
 
-                // Collect proofs
+                // Join all the install tasks
                 let cell_ids_with_proofs = futures::future::join_all(install_dna_tasks)
                     .await
                     .into_iter()
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter()
-                    .map(|hash| {
-                        (
-                            CellId::from((hash.clone(), agent_key.clone())),
-                            proofs.get(&hash).cloned(),
-                        )
+                    // If they are ok create proofs
+                    .map(|result| {
+                        result.map(|hash| {
+                            (
+                                CellId::from((hash.clone(), agent_key.clone())),
+                                proofs.get(&hash).cloned(),
+                            )
+                        })
                     })
-                    .collect();
+                    // Check all passed and return the poofs
+                    .collect::<Result<Vec<_>, _>>()?;
 
                 // Call genesis
                 self.conductor_handle

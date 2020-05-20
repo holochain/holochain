@@ -95,7 +95,7 @@ impl Cell {
             if let Some(Header::InitZomesComplete(_)) = source_chain.get_index(4).await? {
             } else {
                 // If not run it
-                // TODO: B-01085 Run this when initializa zomes is complete
+                // TODO: TK-01852 Run this when initializa zomes is complete
                 let _run_init = || async {
                     let workspace = InitializeZomesWorkspace {};
                     let workflow = InitializeZomesWorkflow {};
