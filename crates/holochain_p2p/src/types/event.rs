@@ -8,7 +8,6 @@ pub struct CallRemoteEvt {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -18,7 +17,6 @@ pub struct PublishEvt {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -28,7 +26,6 @@ pub struct GetValidationPackageEvt {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -38,7 +35,6 @@ pub struct GetEvt {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -48,7 +44,6 @@ pub struct GetLinksEvt {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -58,7 +53,6 @@ pub struct ListDhtOpHashesEvt {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -68,7 +62,6 @@ pub struct FetchDhtOpsEvt {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 

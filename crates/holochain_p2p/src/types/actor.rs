@@ -24,7 +24,6 @@ pub struct CallRemote {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -34,7 +33,6 @@ pub struct Publish {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -44,7 +42,6 @@ pub struct GetValidationPackage {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -54,7 +51,6 @@ pub struct Get {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
@@ -64,7 +60,6 @@ pub struct GetLinks {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-
     // TODO - parameters
 }
 
