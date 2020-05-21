@@ -2,7 +2,7 @@
 name = "holochain_p2p"
 version = "0.0.1"
 description = "holochain specific wrapper around more generic p2p module"
-license = "0GPL-3.0-only"
+license = "CAL-1.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
