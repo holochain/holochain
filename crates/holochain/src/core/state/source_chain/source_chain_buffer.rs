@@ -313,9 +313,12 @@ pub mod tests {
                 .expect("error retrieving")
                 .expect("entry not found");
             assert_eq!(dna_header.as_content(), dna_element_fetched.header());
-            assert_eq!(dna_entry, *dna_element_fetched.entry());
+            assert_eq!(dna_entry.as_ref(), dna_element_fetched.entry().as_option());
             assert_eq!(agent_header.as_content(), agent_element_fetched.header());
-            assert_eq!(agent_entry, *agent_element_fetched.entry());
+            assert_eq!(
+                agent_entry.as_ref(),
+                agent_element_fetched.entry().as_option()
+            );
 
             // check that you can iterate on the chain
             let mut iter = store.iter_back();
