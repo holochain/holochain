@@ -14,7 +14,7 @@ use holochain_types::{
     observability,
     prelude::*,
     test_utils::{
-        fake_agent_pubkey_1, fake_cap_token, fake_dna_file, fake_dna_zomes, fake_header_hash,
+        fake_agent_pubkey_1, fake_cap_secret, fake_dna_file, fake_dna_zomes, fake_header_hash,
         write_fake_dna_file,
     },
 };
@@ -132,7 +132,7 @@ fn zome_invocation_from_names(
         zome_name: zome_name.into(),
         fn_name: fn_name.into(),
         cell_id,
-        cap: fake_cap_token(),
+        cap: fake_cap_secret(),
         payload: ZomeExternHostInput::new(payload),
         provenance: fake_agent_pubkey_1(),
         as_at: fake_header_hash("fake"),

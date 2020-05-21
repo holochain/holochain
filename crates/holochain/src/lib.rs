@@ -6,5 +6,6 @@ mod fatal;
 
 pub mod conductor;
 pub mod core;
+pub mod test_utils;
 
 use holochain_wasmer_host;

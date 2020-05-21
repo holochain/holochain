@@ -1,0 +1,21 @@
+[package]
+name = "kitsune_p2p_transport_quic"
+version = "0.0.1"
+description = "QUIC transport module for kitsune-p2p"
+license = "Apache-2.0"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "dht", "networking"]
+categories = ["network-programming"]
+edition = "2018"
+
+[dependencies]
+futures = "0.3"
+kitsune_p2p_types = { version = "0.0.1", path = "../types" }
+quinn = "0.6.1"
+rcgen = "=0.8.0"
+rustls = { version = "0.17", features = ["dangerous_configuration"] }
+tokio = { version = "0.2", features = ["full"] }
+tokio_safe_block_on = "0.1.1"
+webpki = "0.21.2"
