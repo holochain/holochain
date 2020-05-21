@@ -9,7 +9,12 @@ pub mod zome;
 use crate::prelude::*;
 pub use error::DnaError;
 pub use holo_hash::*;
+use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
+
+/// Zomes need to be an ordered map from ZomeName to a Zome
+pub type Zomes = Vec<(ZomeName, zome::Zome)>;
+
 /// A type to allow json values to be used as [SerializedBtyes]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct Properties {
@@ -37,7 +42,7 @@ pub struct DnaDef {
     pub properties: SerializedBytes,
 
     /// An array of zomes associated with your holochain application.
-    pub zomes: Vec<(String, zome::Zome)>,
+    pub zomes: Zomes,
 }
 
 impl DnaDef {
@@ -48,7 +53,7 @@ impl DnaDef {
     }
 
     /// Return a Zome
-    pub fn get_zome(&self, zome_name: &str) -> Result<&zome::Zome, DnaError> {
+    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<&zome::Zome, DnaError> {
         self.zomes
             .iter()
             .find(|(name, _)| name == zome_name)
@@ -57,18 +62,21 @@ impl DnaDef {
     }
 }
 
+/// Wasms need to be an ordered map from WasmHash to a DnaWasm
+pub type Wasms = BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>;
+
 /// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
-    dna: DnaDef,
+    pub dna: DnaDef,
 
     /// The hash of `self.dna` converted through `SerializedBytes`.
     /// (This can be a full holo_hash because we never send a `DnaFile` to Wasm.)
-    dna_hash: holo_hash::DnaHash,
+    pub dna_hash: holo_hash::DnaHash,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
-    code: BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>,
+    pub code: Wasms,
 }
 
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
@@ -151,7 +159,7 @@ impl DnaFile {
     }
 
     /// Fetch the Webassembly byte code for a zome.
-    pub fn get_wasm_for_zome(&self, zome_name: &str) -> Result<&wasm::DnaWasm, DnaError> {
+    pub fn get_wasm_for_zome(&self, zome_name: &ZomeName) -> Result<&wasm::DnaWasm, DnaError> {
         let wasm_hash = &self.dna.get_zome(zome_name)?.wasm_hash;
         self.code
             .get(wasm_hash)

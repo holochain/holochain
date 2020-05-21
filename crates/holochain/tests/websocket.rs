@@ -7,16 +7,15 @@ use holochain_2020::conductor::{
     error::ConductorError,
     Conductor, ConductorHandle,
 };
+use holochain_2020::core::ribosome::NamedInvocation;
+use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
+use holochain_2020::core::ribosome::ZomeCallInvocationResponse;
 use holochain_types::{
     cell::CellId,
     dna::{DnaFile, Properties},
-    nucleus::{ZomeInvocation, ZomeInvocationResponse},
     observability,
     prelude::*,
-    test_utils::{
-        fake_agent_pubkey_1, fake_cap_secret, fake_dna_file, fake_dna_zomes, fake_header_hash,
-        write_fake_dna_file,
-    },
+    test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
@@ -122,23 +121,6 @@ async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Websock
     .await?)
 }
 
-fn zome_invocation_from_names(
-    zome_name: &str,
-    fn_name: &str,
-    payload: SerializedBytes,
-    cell_id: CellId,
-) -> ZomeInvocation {
-    ZomeInvocation {
-        zome_name: zome_name.into(),
-        fn_name: fn_name.into(),
-        cell_id,
-        cap: fake_cap_secret(),
-        payload: ZomeExternHostInput::new(payload),
-        provenance: fake_agent_pubkey_1(),
-        as_at: fake_header_hash("fake"),
-    }
-}
-
 #[tokio::test(threaded_scheduler)]
 async fn call_admin() {
     observability::test_run().ok();
@@ -231,21 +213,25 @@ async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut 
     }
     let payload = Payload { a: 1 };
     let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
-    let request = Box::new(zome_invocation_from_names(
-        "zomey",
-        "foo",
-        payload.try_into().unwrap(),
-        cell_id,
-    ));
-    let request = AppRequest::ZomeInvocationRequest { request };
+    let request = Box::new(
+        ZomeCallInvocationFixturator::new(NamedInvocation(
+            cell_id,
+            TestWasm::Foo,
+            "foo".into(),
+            HostInput::new(payload.try_into().unwrap()),
+        ))
+        .next()
+        .unwrap(),
+    );
+    let request = AppRequest::ZomeCallInvocationRequest { request };
     let response = app_interface.request(request);
     let call_response = check_timeout(holochain, response, 2000).await;
     let foo = TestString::from(String::from("foo"));
-    let expected = Box::new(ZomeInvocationResponse::ZomeApiFn(
-        ZomeExternGuestOutput::new(foo.try_into().unwrap()),
-    ));
+    let expected = Box::new(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(
+        foo.try_into().unwrap(),
+    )));
     trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeInvocationResponse{ response } if response == expected);
+    assert_matches!(call_response, AppResponse::ZomeCallInvocationResponse{ response } if response == expected);
     app_interface
         .close(1000, "Shutting down".into())
         .await
@@ -303,7 +289,7 @@ async fn call_zome() {
     let uuid = Uuid::new_v4();
     let dna = fake_dna_zomes(
         &uuid.to_string(),
-        vec![("zomey".into(), TestWasm::Foo.into())],
+        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
     );
     let original_dna_hash = dna.dna_hash().clone();
 

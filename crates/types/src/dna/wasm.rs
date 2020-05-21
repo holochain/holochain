@@ -16,7 +16,7 @@ use tracing::*;
 #[derive(Serialize, Deserialize, Clone, Eq)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
-    code: Arc<Vec<u8>>,
+    pub code: Arc<Vec<u8>>,
 }
 
 holo_hash::make_hashed! {

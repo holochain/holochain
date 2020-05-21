@@ -24,5 +24,5 @@ pub extern "C" fn debug(_: RemotePtr) -> RemotePtr {
         output.try_into(),
         "failed to serialize output for extern response"
     );
-    ret!(ZomeExternGuestOutput::new(output_sb));
+    ret!(GuestOutput::new(output_sb));
 }

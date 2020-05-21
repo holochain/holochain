@@ -1,8 +1,10 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
+use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
 use holochain_wasmer_host::prelude::WasmError;
+use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
 /// Errors occurring during a [Ribosome] call
@@ -15,6 +17,14 @@ pub enum RibosomeError {
     /// Wasm error while working with Ribosome.
     #[error("Wasm error while working with Ribosome: {0}")]
     WasmError(#[from] WasmError),
+
+    /// Serialization error while working with Ribosome.
+    #[error("Serialization error while working with Ribosome: {0}")]
+    SerializationError(#[from] SerializedBytesError),
+
+    /// A ZomeFn was called by name that doesn't exist
+    #[error("Attempted to call a zome function that doesn't exist: Zome: {0} Fn {1}")]
+    ZomeFnNotExists(ZomeName, String),
 }
 
 /// Type alias
