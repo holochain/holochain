@@ -9,11 +9,11 @@ pub mod cell;
 pub mod db;
 pub mod dna;
 pub mod entry;
+pub mod fixt;
 pub mod header;
 pub mod link;
 pub mod nucleus;
 pub mod observability;
-pub mod persistence;
 pub mod prelude;
 mod timestamp;
 pub mod validate;
@@ -28,8 +28,9 @@ pub mod universal_map;
 pub mod test_utils;
 
 #[doc(inline)]
+pub use entry::{Entry, EntryHashed};
+
+#[doc(inline)]
 pub use header::{Header, HeaderHashed};
 
 pub use timestamp::Timestamp;
-
-use holochain_zome_types;

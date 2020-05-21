@@ -22,17 +22,17 @@
 //! workflows.
 
 use crate::core::state::workspace::Workspace;
+mod call_zome_workflow;
 mod effects;
 pub mod error;
 mod genesis_workflow;
 mod initialize_zomes_workflow;
-mod invoke_zome_workflow;
+pub(crate) use call_zome_workflow::unsafe_invoke_zome_workspace;
+pub(crate) use call_zome_workflow::*;
 #[allow(unused_imports)]
 pub(crate) use genesis_workflow::*;
 #[allow(unused_imports)]
 pub(crate) use initialize_zomes_workflow::*;
-pub(crate) use invoke_zome_workflow::unsafe_invoke_zome_workspace;
-pub(crate) use invoke_zome_workflow::*;
 
 pub use effects::*;
 

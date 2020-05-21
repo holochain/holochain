@@ -1,14 +1,14 @@
 use super::error::{
     ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
 };
-use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
+use crate::core::ribosome::{ZomeCallInvocation, ZomeCallInvocationResponse};
 use crate::{
     conductor::{
         config::AdminInterfaceConfig,
         interface::error::{InterfaceError, InterfaceResult},
         ConductorHandle,
     },
-    core::workflow::ZomeInvocationResult,
+    core::workflow::ZomeCallInvocationResult,
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -59,10 +59,10 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 #[async_trait::async_trait]
 pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     /// Invoke a zome function on any cell in this conductor.
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult>;
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
     // -- provided -- //
 
@@ -70,9 +70,9 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     async fn handle_request(&self, request: AppRequest) -> AppResponse {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
-                AppRequest::ZomeInvocationRequest { request } => {
-                    match self.invoke_zome(*request).await? {
-                        Ok(response) => Ok(AppResponse::ZomeInvocationResponse {
+                AppRequest::ZomeCallInvocationRequest { request } => {
+                    match self.call_zome(*request).await? {
+                        Ok(response) => Ok(AppResponse::ZomeCallInvocationResponse {
                             response: Box::new(response),
                         }),
                         Err(e) => Ok(AppResponse::Error(e.into())),
@@ -99,6 +99,7 @@ pub struct RealAdminInterfaceApi {
     conductor_handle: ConductorHandle,
 
     /// Needed to spawn an App interface
+    // TODO: is this needed? it's not currently being used.
     app_api: RealAppInterfaceApi,
 }
 
@@ -124,7 +125,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             Stop(_cell_handle) => unimplemented!(),
             AddAdminInterfaces(configs) => Ok(AdminResponse::AdminInterfacesAdded(
                 self.conductor_handle
-                    .add_admin_interfaces_via_handle(self.conductor_handle.clone(), configs)
+                    .clone()
+                    .add_admin_interfaces(configs)
                     .await?,
             )),
             InstallDna(dna_path, properties) => {
@@ -166,11 +168,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .map(|(dna_hash, proof)| (CellId::from((dna_hash, agent_key.clone())), proof))
                     .collect();
                 self.conductor_handle
-                    .add_cell_ids_to_db(cell_ids_with_proofs)
+                    .clone()
+                    .genesis_cells(cell_ids_with_proofs)
                     .await?;
-                self.conductor_handle
-                    .setup_cells(self.conductor_handle.clone())
-                    .await?;
+                self.conductor_handle.clone().setup_cells().await?;
 
                 Ok(AdminResponse::AppsActivated)
             }
@@ -178,7 +179,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = port.unwrap_or(0);
                 let port = self
                     .conductor_handle
-                    .add_app_interface_via_handle(port, self.conductor_handle.clone())
+                    .clone()
+                    .add_app_interface(port)
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -246,11 +248,11 @@ impl RealAppInterfaceApi {
 
 #[async_trait::async_trait]
 impl AppInterfaceApi for RealAppInterfaceApi {
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
-        self.conductor_handle.invoke_zome(invocation).await
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+        self.conductor_handle.call_zome(invocation).await
     }
 }
 
@@ -279,9 +281,9 @@ pub enum AppResponse {
     /// There has been an error in the request
     Error(ExternalApiWireError),
     /// The response to a zome call
-    ZomeInvocationResponse {
+    ZomeCallInvocationResponse {
         /// The data that was returned by this call
-        response: Box<ZomeInvocationResponse>,
+        response: Box<ZomeCallInvocationResponse>,
     },
 }
 
@@ -324,9 +326,9 @@ pub enum AppRequest {
         request: Box<CryptoRequest>,
     },
     /// Call a zome function
-    ZomeInvocationRequest {
+    ZomeCallInvocationRequest {
         /// Information about which zome call you want to make
-        request: Box<ZomeInvocation>,
+        request: Box<ZomeCallInvocation>,
     },
 }
 

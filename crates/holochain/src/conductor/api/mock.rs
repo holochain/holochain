@@ -3,8 +3,8 @@
 
 use super::CellConductorApiT;
 use crate::conductor::api::error::ConductorApiResult;
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::workflow::ZomeInvocationResult;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
@@ -20,11 +20,11 @@ mock! {
 
     pub CellConductorApi {
 
-        fn sync_invoke_zome(
+        fn sync_call_zome(
             &self,
             cell_id: &CellId,
-            invocation: ZomeInvocation,
-        ) -> ConductorApiResult<ZomeInvocationResult>;
+            invocation: ZomeCallInvocation,
+        ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
         fn sync_network_send(&self, message: Todo) -> ConductorApiResult<()>;
 
@@ -48,12 +48,12 @@ mock! {
 
 #[async_trait]
 impl CellConductorApiT for MockCellConductorApi {
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
-        self.sync_invoke_zome(cell_id, invocation)
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+        self.sync_call_zome(cell_id, invocation)
     }
 
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {

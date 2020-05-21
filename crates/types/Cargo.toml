@@ -22,6 +22,7 @@ holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 # holochain_locksmith = "0.0.43-alpha3"
 lazy_static = "1.4.0"
+nanoid = "0.3"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = ["derive", "rc"] }
 serde_json = { version = "1.0.51", features = ["preserve_order"] }

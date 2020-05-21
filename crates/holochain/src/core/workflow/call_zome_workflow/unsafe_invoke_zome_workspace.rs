@@ -16,13 +16,10 @@ use tracing::*;
 /// the lifetimes cannot be verified by
 /// the compiler (e.g. with wasmer).
 /// The checks are moved to runtime.
-/// The api is non-blocking because this
-/// should never be contested if the invariant is held.
 /// This type cannot write to the db.
 /// It only takes a [Reader].
 /// ## Thread Safety
-/// This type is not `Send` or `Sync` and cannot be
-/// shared between threads.
+/// This type is `Send` and `Sync`
 /// It's best to imagine it like a regular `&` except that it
 /// is enforced at runtime.
 /// ### Mutex
@@ -32,14 +29,14 @@ use tracing::*;
 /// Default is used to avoid serde
 #[derive(Debug, Clone, Default)]
 pub struct UnsafeInvokeZomeWorkspace {
-    workspace: std::sync::Weak<std::sync::Mutex<AtomicPtr<std::ffi::c_void>>>,
+    workspace: std::sync::Weak<tokio::sync::RwLock<AtomicPtr<std::ffi::c_void>>>,
 }
 
 fixturator!(
     UnsafeInvokeZomeWorkspace,
     {
         let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
-        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(fake_ptr)));
+        let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(fake_ptr)));
         let workspace = Arc::downgrade(&guard);
         // Make sure the weak Arc cannot be upgraded
         std::mem::drop(guard);
@@ -64,7 +61,7 @@ fixturator!(
 /// Don't use `mem::forget` on this type as it will
 /// break the checks.
 pub struct UnsafeInvokeZomeWorkspaceGuard<'env> {
-    workspace: Option<Arc<std::sync::Mutex<AtomicPtr<std::ffi::c_void>>>>,
+    workspace: Option<Arc<tokio::sync::RwLock<AtomicPtr<std::ffi::c_void>>>>,
     phantom: PhantomData<&'env ()>,
 }
 
@@ -73,7 +70,7 @@ impl UnsafeInvokeZomeWorkspace {
         workspace: &'env mut InvokeZomeWorkspace,
     ) -> (UnsafeInvokeZomeWorkspaceGuard<'env>, Self) {
         let raw_ptr = workspace as *mut InvokeZomeWorkspace as *mut std::ffi::c_void;
-        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(raw_ptr)));
+        let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(raw_ptr)));
         let workspace = Arc::downgrade(&guard);
         let guard = UnsafeInvokeZomeWorkspaceGuard {
             workspace: Some(guard),
@@ -88,7 +85,7 @@ impl UnsafeInvokeZomeWorkspace {
     /// It will always return None.
     pub fn test_dropped_guard() -> Self {
         let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
-        let guard = Arc::new(std::sync::Mutex::new(AtomicPtr::new(fake_ptr)));
+        let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(fake_ptr)));
         let workspace = Arc::downgrade(&guard);
         // Make sure the weak Arc cannot be upgraded
         std::mem::drop(guard);
@@ -103,36 +100,20 @@ impl UnsafeInvokeZomeWorkspace {
     >(
         &self,
         f: F,
-    ) -> Option<R> {
+    ) -> Result<R, error::UnsafeInvokeZomeWorkspaceError> {
         // Check it exists
         match self.workspace.upgrade() {
             // Check that no-one else can write
-            Some(lock) => match lock
-                .try_lock()
-                .map_err(|e| {
-                    if let std::sync::TryLockError::WouldBlock = e {
-                        error!(
-                            "{}{}{}",
-                            "Failed to get lock on unsafe type. ",
-                            "This means the lock is being used by multiple threads.",
-                            "This is a BUG and should not be happening"
-                        );
-                    }
-                    e
-                })
-                .ok()
-            {
-                Some(guard) => {
-                    let sc = guard.load(Ordering::SeqCst);
-                    let sc = sc as *const InvokeZomeWorkspace;
-                    match sc.as_ref() {
-                        Some(s) => Some(f(s).await),
-                        None => None,
-                    }
+            Some(lock) => {
+                let guard = lock.read().await;
+                let sc = guard.load(Ordering::SeqCst);
+                let sc = sc as *const InvokeZomeWorkspace;
+                match sc.as_ref() {
+                    Some(s) => Ok(f(s).await),
+                    None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
                 }
-                None => None,
-            },
-            None => None,
+            }
+            None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
         }
     }
 
@@ -144,43 +125,53 @@ impl UnsafeInvokeZomeWorkspace {
     >(
         &self,
         f: F,
-    ) -> Option<R> {
+    ) -> Result<R, error::UnsafeInvokeZomeWorkspaceError> {
         // Check it exists
         match self.workspace.upgrade() {
             // Check that no-one else can write
-            Some(lock) => match lock
-                .try_lock()
-                .map_err(|e| {
-                    if let std::sync::TryLockError::WouldBlock = e {
-                        error!(
-                            "{}{}{}",
-                            "Failed to get lock on unsafe type. ",
-                            "This means the lock is being used by multiple threads.",
-                            "This is a BUG and should not be happening"
-                        );
-                    }
-                    e
-                })
-                .ok()
-            {
-                Some(guard) => {
-                    let sc = guard.load(Ordering::SeqCst);
-                    let sc = sc as *mut InvokeZomeWorkspace;
-                    match sc.as_mut() {
-                        Some(s) => Some(f(s).await),
-                        None => None,
-                    }
+            Some(lock) => {
+                let guard = lock.write().await;
+                let sc = guard.load(Ordering::SeqCst);
+                let sc = sc as *mut InvokeZomeWorkspace;
+                match sc.as_mut() {
+                    Some(s) => Ok(f(s).await),
+                    None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
                 }
-                None => None,
-            },
-            None => None,
+            }
+            None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
         }
     }
 }
 
 impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
     fn drop(&mut self) {
-        Arc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"))
-            .expect("BUG: Invariant broken, strong reference active while guard is dropped");
+        let arc = Arc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"));
+        match arc {
+            Err(arc) => {
+                warn!("Trying to drop UnsafeInvokeZomeWorkspace but there must be outstanding references");
+                // Wait on the lock to check if others have it
+                tokio_safe_block_on::tokio_safe_block_on(
+                    arc.write(),
+                    std::time::Duration::from_secs(10),
+                )
+                .ok();
+                // TODO: B-01648: Try to consume now hoping noone has taken a lock in the meantime
+                Arc::try_unwrap(arc).expect(
+                    "UnsafeInvokeZomeWorkspace still has live references when workflow is finished",
+                );
+            }
+            Ok(_) => (),
+        }
+    }
+}
+
+mod error {
+    use thiserror::Error;
+    #[derive(Error, Debug)]
+    pub enum UnsafeInvokeZomeWorkspaceError {
+        #[error(
+            "The guard for this workspace has been dropped and this workspace is no loanger valid"
+        )]
+        GuardDropped,
     }
 }

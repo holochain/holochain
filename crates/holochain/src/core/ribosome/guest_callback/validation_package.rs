@@ -1,12 +1,11 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
-use crate::fixt::AppEntryTypeFixturator;
+use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::fixt::AppEntryTypeFixturator;
 use holochain_types::header::AppEntryType;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
@@ -15,8 +14,6 @@ use holochain_zome_types::HostInput;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
-    // @todo ValidationPackageWorkspace?
-    workspace: UnsafeInvokeZomeWorkspace,
     zome_name: ZomeName,
     app_entry_type: AppEntryType,
 }
@@ -25,9 +22,6 @@ fixturator!(
     ValidationPackageInvocation,
     {
         let validation_package_invocation = ValidationPackageInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
                 .next()
                 .unwrap(),
@@ -40,12 +34,6 @@ fixturator!(
     },
     {
         let validation_package_invocation = ValidationPackageInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(
-                Unpredictable,
-                self.0.index,
-            )
-            .next()
-            .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -58,13 +46,10 @@ fixturator!(
     },
     {
         let validation_package_invocation = ValidationPackageInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Unpredictable, self.0.index)
+            app_entry_type: AppEntryTypeFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
         };
@@ -77,8 +62,8 @@ impl Invocation for ValidationPackageInvocation {
     fn allow_side_effects(&self) -> bool {
         false
     }
-    fn zome_names(&self) -> Vec<ZomeName> {
-        vec![self.zome_name.to_owned()]
+    fn zomes(&self) -> ZomesToInvoke {
+        ZomesToInvoke::One(self.zome_name.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         // @todo zome_id is a u8, is this really an ergonomic way for us to interact with
@@ -91,9 +76,6 @@ impl Invocation for ValidationPackageInvocation {
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&self.app_entry_type).try_into()?))
-    }
-    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace.clone()
     }
 }
 
@@ -153,6 +135,7 @@ mod test {
     use super::ValidationPackageInvocationFixturator;
     use super::ValidationPackageResult;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
@@ -161,6 +144,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validation_package_unimplemented() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
@@ -171,7 +157,7 @@ mod test {
         validation_package_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_validation_package(validation_package_invocation)
+            .run_validation_package(workspace, validation_package_invocation)
             .unwrap();
         assert_eq!(result, ValidationPackageResult::NotImplemented,);
     }
@@ -179,6 +165,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validation_package_implemented_success() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
             .next()
             .unwrap();
@@ -189,7 +178,7 @@ mod test {
         validation_package_invocation.zome_name = TestWasm::ValidationPackageSuccess.into();
 
         let result = ribosome
-            .run_validation_package(validation_package_invocation)
+            .run_validation_package(workspace, validation_package_invocation)
             .unwrap();
         assert_eq!(result, ValidationPackageResult::Success(ValidationPackage),);
     }
@@ -197,6 +186,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validation_package_implemented_fail() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
             .next()
             .unwrap();
@@ -207,7 +199,7 @@ mod test {
         validation_package_invocation.zome_name = TestWasm::ValidationPackageFail.into();
 
         let result = ribosome
-            .run_validation_package(validation_package_invocation)
+            .run_validation_package(workspace, validation_package_invocation)
             .unwrap();
         assert_eq!(result, ValidationPackageResult::Fail("bad package".into()),);
     }

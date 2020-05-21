@@ -107,8 +107,8 @@ wasm_io_types!(
     pub struct DebugOutput(());
     // there's nothing to go in or out of a noop
     // used to "defuse" host functions when side effects are not allowed
-    pub struct NoopInput(());
-    pub struct NoopOutput(());
+    pub struct UnreachableInput(());
+    pub struct UnreachableOutput(());
     // every externed function that the zome developer exposes to holochain returns GuestOutput
     // as the zome developer can expose callbacks in a "sparse" way based on names and the functions
     // can take different input (e.g. validation vs. hooks like init, etc.) all we can say is that

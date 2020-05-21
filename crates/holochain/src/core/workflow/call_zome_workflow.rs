@@ -1,12 +1,19 @@
 use super::Workspace;
-use super::{error::WorkflowResult, Workflow, WorkflowEffects};
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::ribosome::ZomeInvocationResponse;
-use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
-use crate::core::state::{
-    cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf, source_chain::SourceChain,
-    workspace::WorkspaceResult,
+use super::{
+    error::{WorkflowError, WorkflowResult},
+    InitializeZomesWorkflow, Workflow, WorkflowEffects,
 };
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::ZomeCallInvocationResponse;
+use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
+use crate::core::{
+    state::{
+        cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf,
+        source_chain::SourceChain, workspace::WorkspaceResult,
+    },
+    sys_validate_element,
+};
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use must_future::MustBoxFuture;
@@ -15,23 +22,22 @@ use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 pub mod unsafe_invoke_zome_workspace;
 
 /// Placeholder for the return value of a zome invocation
-/// TODO: do we want this to be the same as ZomeInvocationRESPONSE?
-pub type ZomeInvocationResult = RibosomeResult<ZomeInvocationResponse>;
+/// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
+pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallInvocationResponse>;
 
 pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     pub ribosome: Ribosome,
-    pub invocation: ZomeInvocation,
+    pub invocation: ZomeCallInvocation,
 }
 
 impl<'env, Ribosome: 'static> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
 where
     Ribosome: RibosomeT + Send + Sync + 'env,
 {
-    type Output = ZomeInvocationResult;
+    type Output = ZomeCallInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = ();
 
-    #[allow(unreachable_code, unused_variables)]
     fn workflow(
         self,
         mut workspace: Self::Workspace,
@@ -45,11 +51,13 @@ where
             // Get te current head
             let chain_head_start = workspace.source_chain.chain_head()?.clone();
 
+            let agent_key = invocation.provenance.clone();
+
             tracing::trace!(line = line!());
             // Create the unsafe sourcechain for use with wasm closure
             let result = {
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                ribosome.call_zome_function(invocation)
+                ribosome.call_zome_function(raw_workspace, invocation)
             };
             tracing::trace!(line = line!());
 
@@ -57,31 +65,44 @@ where
             let chain_head_end = workspace.source_chain.chain_head()?;
 
             // Has there been changes?
-            // david.b - this isn't doing anything?... commenting out for now
-            /*
             if chain_head_start != *chain_head_end {
                 // get the changes
-                workspace
+                let mut new_headers = workspace
                     .source_chain
                     .iter_back()
-                    .scan(None, |current_header, entry| {
+                    .scan(None, |current_header, element| {
                         let my_header = current_header.clone();
-                        *current_header = entry.header().prev_header().cloned();
+                        *current_header = element.header().prev_header().cloned();
                         let r = match my_header {
                             Some(current_header) if current_header == chain_head_start => None,
-                            _ => Some(entry),
+                            _ => Some(element),
                         };
                         Ok(r)
                     })
-                    .map_err(WorkflowError::from)
-                    // call the sys validation on the changes etc.
-                    .map(|chain_head| {
-                        // check_entry_hash(&chain_head.entry_address.into())?
-                        Ok(chain_head)
-                    })
-                    .collect::<Vec<_>>()?;
+                    .map_err(WorkflowError::from);
+
+                while let Some(header) = new_headers.next()? {
+                    let chain_element = workspace
+                        .source_chain
+                        .get_element(header.header_address())
+                        .await?;
+                    let prev_chain_element = match chain_element {
+                        Some(ref c) => match c.header().prev_header() {
+                            Some(h) => workspace.source_chain.get_element(&h).await?,
+                            None => None,
+                        },
+                        None => None,
+                    };
+                    if let Some(ref chain_element) = chain_element {
+                        sys_validate_element(
+                            &agent_key,
+                            chain_element,
+                            prev_chain_element.as_ref(),
+                        )
+                        .await?;
+                    }
+                }
             }
-            */
 
             let fx = WorkflowEffects {
                 workspace,
@@ -159,10 +180,10 @@ pub mod tests {
         a: u32,
     }
 
-    async fn run_invoke_zome<'env, Ribosome: RibosomeT + Send + Sync + 'static>(
+    async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
         workspace: InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
-        invocation: ZomeInvocation,
+        invocation: ZomeCallInvocation,
     ) -> WorkflowResult<'env, InvokeZomeWorkflow<Ribosome>> {
         let workflow = InvokeZomeWorkflow {
             invocation,
@@ -194,12 +215,12 @@ pub mod tests {
         // Setup the ribosome mock
         ribosome
             .expect_call_zome_function()
-            .returning(move |_invocation| {
+            .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
 
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -240,7 +261,7 @@ pub mod tests {
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -253,7 +274,7 @@ pub mod tests {
         .next()
         .unwrap();
         invocation.cap = todo!("Make secret cap token");
-        let error = run_invoke_zome(workspace, ribosome, invocation)
+        let error = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap_err();
         assert_matches!(error, WorkflowError::CapabilityMissing);
@@ -289,7 +310,9 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-    // TODO: B-01092: SYSTEM_VALIDATION: Finish when sys val lands
+
+    // TODO: B-01100 Make sure this test is in the right place when SysValidation complete
+    // so we aren't duplicating the unit test inside sys val.
     #[ignore]
     #[tokio::test]
     async fn calls_system_validation<'a>() {
@@ -309,7 +332,7 @@ pub mod tests {
         // Call zome mock that it writes to source chain
         ribosome
             .expect_call_zome_function()
-            .returning(move |_invocation| {
+            .returning(move |_workspace, _invocation| {
                 let agent_header = agent_header.clone();
                 let agent_entry = agent_entry.clone();
                 let _call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, ()> {
@@ -326,10 +349,10 @@ pub mod tests {
                 unsafe { unsafe_workspace.apply_mut(call).await };
                 */
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
 
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -350,7 +373,7 @@ pub mod tests {
             .returning(|_entry_hash| Ok(()));
         */
 
-        let (_result, effects) = run_invoke_zome(workspace, ribosome, invocation)
+        let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();
         assert!(effects.triggers.is_empty());
@@ -371,7 +394,7 @@ pub mod tests {
         let reader = env_ref.reader().unwrap();
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -386,7 +409,7 @@ pub mod tests {
         // TODO: B-01093: Mock the app validation and check it's called
         // TODO: B-01093: How can I pass a app validation into this?
         // These are just static calls
-        let (_result, effects) = run_invoke_zome(workspace, ribosome, invocation)
+        let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();
         assert!(effects.triggers.is_empty());
@@ -407,7 +430,7 @@ pub mod tests {
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -419,7 +442,7 @@ pub mod tests {
         )
         .next()
         .unwrap();
-        let (_result, effects) = run_invoke_zome(workspace, ribosome, invocation)
+        let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();
         assert!(effects.triggers.is_empty());

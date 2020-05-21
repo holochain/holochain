@@ -66,7 +66,7 @@ guest_functions!(
     [ __entry_address, entry_address, EntryAddressInput, EntryAddressOutput ],
     [ __sys_time, sys_time, SysTimeInput, SysTimeOutput ],
     [ __debug, debug, DebugInput, DebugOutput ],
-    [ __noop, noop, NoopInput, NoopOutput ]
+    [ __unreachable, unreachable, UnreachableInput, UnreachableOutput ]
 );
 
 // this is the type of thing you'd expect to see in an HDK to cache the global constants

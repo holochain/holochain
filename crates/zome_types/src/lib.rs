@@ -1,3 +1,4 @@
+pub mod capability;
 pub mod commit;
 pub mod debug;
 pub mod entry;

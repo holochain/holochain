@@ -2,8 +2,8 @@
 
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::ConductorHandle;
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::workflow::ZomeInvocationResult;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
@@ -31,18 +31,18 @@ impl CellConductorApi {
 
 #[async_trait]
 impl CellConductorApiT for CellConductorApi {
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
         if *cell_id == invocation.cell_id {
             self.conductor_handle
-                .invoke_zome(invocation)
+                .call_zome(invocation)
                 .await
                 .map_err(Into::into)
         } else {
-            Err(ConductorApiError::ZomeInvocationCellMismatch {
+            Err(ConductorApiError::ZomeCallInvocationCellMismatch {
                 api_cell_id: cell_id.clone(),
                 invocation_cell_id: invocation.cell_id,
             })
@@ -82,11 +82,11 @@ impl CellConductorApiT for CellConductorApi {
 pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// Invoke a zome function on any cell in this conductor.
     /// An invocation on a different Cell than this one corresponds to a bridged call.
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult>;
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
     /// Make a request to the DPKI service running for this Conductor.
     /// TODO: decide on actual signature

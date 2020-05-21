@@ -25,7 +25,7 @@ pub struct SourceChainBuf<'env, R: Readable> {
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
     pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::primary(reader, dbs)?,
+            cas: ChainCasBuf::primary(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })
@@ -102,9 +102,10 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     /// Get the AgentPubKey from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
     pub fn agent_pubkey(&self) -> DatabaseResult<Option<AgentPubKey>> {
+        // TODO: rewrite in terms of just getting the correct Header
         Ok(self
             .cas
-            .entries()
+            .public_entries()
             .iter_raw()?
             .filter_map(|(_, e)| match e {
                 Entry::Agent(agent_pubkey) => Some(agent_pubkey),
@@ -316,9 +317,12 @@ pub mod tests {
                 .expect("error retrieving")
                 .expect("entry not found");
             assert_eq!(dna_header.as_content(), dna_element_fetched.header());
-            assert_eq!(dna_entry, *dna_element_fetched.entry());
+            assert_eq!(dna_entry.as_ref(), dna_element_fetched.entry().as_option());
             assert_eq!(agent_header.as_content(), agent_element_fetched.header());
-            assert_eq!(agent_entry, *agent_element_fetched.entry());
+            assert_eq!(
+                agent_entry.as_ref(),
+                agent_element_fetched.entry().as_option()
+            );
 
             // check that you can iterate on the chain
             let mut iter = store.iter_back();

@@ -17,11 +17,13 @@ pub async fn commit_entry(
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
     let entry: Entry = input.into_inner();
-    let validate = ribosome.run_validate(ValidateInvocation {
-        workspace: host_context.workspace.clone(),
-        zome_name: host_context.zome_name(),
-        entry: Arc::new(entry),
-    })?;
+    let validate = ribosome.run_validate(
+        host_context.workspace.clone(),
+        ValidateInvocation {
+            zome_name: host_context.zome_name(),
+            entry: Arc::new(entry),
+        },
+    )?;
     Ok(CommitEntryOutput::new(match validate {
         // @todo move validation to a workflow
         // the only reason this is here is so we can write realistic looking tests prior

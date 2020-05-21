@@ -1,7 +1,6 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::HeaderHashesFixturator;
 use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
@@ -13,8 +12,6 @@ use holochain_zome_types::HostInput;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
-    // @todo PostCommitWorkspace?
-    workspace: UnsafeInvokeZomeWorkspace,
     zome_name: ZomeName,
     headers: HeaderHashes,
 }
@@ -23,9 +20,6 @@ fixturator!(
     PostCommitInvocation,
     {
         let post_commit_invocation = PostCommitInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
                 .next()
                 .unwrap(),
@@ -38,12 +32,6 @@ fixturator!(
     },
     {
         let post_commit_invocation = PostCommitInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(
-                Unpredictable,
-                self.0.index,
-            )
-            .next()
-            .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -56,9 +44,6 @@ fixturator!(
     },
     {
         let post_commit_invocation = PostCommitInvocation {
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
             zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -75,17 +60,14 @@ impl Invocation for PostCommitInvocation {
     fn allow_side_effects(&self) -> bool {
         true
     }
-    fn zome_names(&self) -> Vec<ZomeName> {
-        vec![self.zome_name.to_owned()]
+    fn zomes(&self) -> ZomesToInvoke {
+        ZomesToInvoke::One(self.zome_name.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["post_commit".into()].into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(HostInput::new((&self.headers).try_into()?))
-    }
-    fn workspace(&self) -> UnsafeInvokeZomeWorkspace {
-        self.workspace.clone()
     }
 }
 
@@ -124,6 +106,7 @@ mod test {
     use super::PostCommitInvocationFixturator;
     use super::PostCommitResult;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use holo_hash::HeaderHashFixturator;
@@ -132,6 +115,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_unimplemented() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
@@ -140,13 +126,18 @@ mod test {
             .unwrap();
         post_commit_invocation.zome_name = TestWasm::Foo.into();
 
-        let result = ribosome.run_post_commit(post_commit_invocation).unwrap();
+        let result = ribosome
+            .run_post_commit(workspace, post_commit_invocation)
+            .unwrap();
         assert_eq!(result, PostCommitResult::Success,);
     }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_implemented_success() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
             .next()
             .unwrap();
@@ -155,13 +146,18 @@ mod test {
             .unwrap();
         post_commit_invocation.zome_name = TestWasm::PostCommitSuccess.into();
 
-        let result = ribosome.run_post_commit(post_commit_invocation).unwrap();
+        let result = ribosome
+            .run_post_commit(workspace, post_commit_invocation)
+            .unwrap();
         assert_eq!(result, PostCommitResult::Success,);
     }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_implemented_fail() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
             .next()
             .unwrap();
@@ -170,7 +166,9 @@ mod test {
             .unwrap();
         post_commit_invocation.zome_name = TestWasm::PostCommitFail.into();
 
-        let result = ribosome.run_post_commit(post_commit_invocation).unwrap();
+        let result = ribosome
+            .run_post_commit(workspace, post_commit_invocation)
+            .unwrap();
         assert_eq!(
             result,
             PostCommitResult::Fail(

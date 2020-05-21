@@ -31,31 +31,83 @@ pub enum Header {
     EntryDelete(EntryDelete),
 }
 
+/// a utility wrapper to write intos for our data types
+macro_rules! write_into_header {
+    ($($n:ident),*,) => {
+        $(
+            impl From<$n> for Header {
+                fn from(n: $n) -> Self {
+                    Self::$n(n)
+                }
+            }
+        )*
+    };
+}
+
+write_into_header! {
+    Dna,
+    AgentValidationPkg,
+    InitZomesComplete,
+    LinkAdd,
+    LinkRemove,
+    ChainOpen,
+    ChainClose,
+    EntryCreate,
+    EntryUpdate,
+    EntryDelete,
+}
+
+/// a utility macro just to not have to type in the match statement everywhere.
+macro_rules! match_header {
+    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+        match $h {
+            Header::Dna($i) => { $($t)* }
+            Header::AgentValidationPkg($i) => { $($t)* }
+            Header::InitZomesComplete($i) => { $($t)* }
+            Header::LinkAdd($i) => { $($t)* }
+            Header::LinkRemove($i) => { $($t)* }
+            Header::ChainOpen($i) => { $($t)* }
+            Header::ChainClose($i) => { $($t)* }
+            Header::EntryCreate($i) => { $($t)* }
+            Header::EntryUpdate($i) => { $($t)* }
+            Header::EntryDelete($i) => { $($t)* }
+        }
+    };
+}
+
 impl Header {
-    /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
-    pub fn is_public(&self) -> bool {
-        unimplemented!()
+    /// Returns the address and entry type of the Entry, if applicable.
+    // TODO: DRY: possibly create an `EntryData` struct which is used by both
+    // EntryCreate and EntryUpdate
+    pub fn entry_data(&self) -> Option<(&EntryAddress, &EntryType)> {
+        match self {
+            Self::EntryCreate(EntryCreate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address, entry_type)),
+            Self::EntryUpdate(EntryUpdate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address, entry_type)),
+            _ => None,
+        }
     }
 
-    /// Returns the public key of the agent who signed this header.
+    /// returns the public key of the agent who signed this header.
     pub fn author(&self) -> &AgentPubKey {
-        match self {
-            Header::Dna(i) => &i.author,
-            Header::AgentValidationPkg(i) => &i.author,
-            Header::InitZomesComplete(i) => &i.author,
-            Header::LinkAdd(i) => &i.author,
-            Header::LinkRemove(i) => &i.author,
-            Header::ChainOpen(i) => &i.author,
-            Header::ChainClose(i) => &i.author,
-            Header::EntryCreate(i) => &i.author,
-            Header::EntryUpdate(i) => &i.author,
-            Header::EntryDelete(i) => &i.author,
-        }
+        match_header!(self => |i| { &i.author })
     }
 
     /// returns the timestamp of when the header was created
     pub fn timestamp(&self) -> Timestamp {
-        unimplemented!()
+        match_header!(self => |i| { i.timestamp })
+    }
+
+    /// returns the sequence ordinal of this header
+    pub fn header_seq(&self) -> u32 {
+        match_header!(self => |i| { i.header_seq })
     }
 
     /// returns the previous header except for the DNA header which doesn't have a previous
@@ -212,19 +264,49 @@ pub enum EntryType {
     // Stores the App's provided filtration data
     // FIXME: Change this if we are keeping Zomes
     App(AppEntryType),
-    CapTokenClaim,
-    CapTokenGrant,
+    CapClaim,
+    CapGrant,
+}
+
+impl EntryType {
+    pub fn visibility(&self) -> &EntryVisibility {
+        match self {
+            EntryType::AgentPubKey => &EntryVisibility::Public,
+            EntryType::App(t) => &t.visibility,
+            EntryType::CapClaim => &EntryVisibility::Private,
+            EntryType::CapGrant => &EntryVisibility::Private,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
-    pub id: Vec<u8>,
-    pub zome_id: ZomeId,
-    pub is_public: bool,
+    pub(crate) id: Vec<u8>,
+    pub(crate) zome_id: ZomeId,
+    pub(crate) visibility: EntryVisibility,
 }
 
 impl AppEntryType {
+    pub fn id(&self) -> &[u8] {
+        &self.id
+    }
     pub fn zome_id(&self) -> &ZomeId {
         &self.zome_id
+    }
+    pub fn visibility(&self) -> &EntryVisibility {
+        &self.visibility
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum EntryVisibility {
+    Public,
+    Private,
+}
+
+impl EntryVisibility {
+    /// converts entry visibility enum into boolean value on public
+    pub fn is_public(&self) -> bool {
+        *self == EntryVisibility::Public
     }
 }
