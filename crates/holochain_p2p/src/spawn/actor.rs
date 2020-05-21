@@ -1,5 +1,6 @@
 use crate::{actor, actor::*, event::*};
 
+use crate::holo_hash_core::HoloHashCoreHash;
 use futures::future::FutureExt;
 
 ghost_actor::ghost_chan! {
@@ -20,7 +21,6 @@ pub(crate) struct HolochainP2pActor {
     internal_sender: HolochainP2pInternalSender<Internal>,
     #[allow(dead_code)]
     evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
-    #[allow(dead_code)]
     kitsune_p2p: kitsune_p2p::actor::KitsuneP2pSender,
 }
 
@@ -40,8 +40,22 @@ impl HolochainP2pActor {
 }
 
 impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
-    fn handle_join(&mut self, _input: actor::Join) -> HolochainP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+    fn handle_join(&mut self, input: actor::Join) -> HolochainP2pHandlerResult<()> {
+        let actor::Join {
+            dna_hash,
+            agent_pub_key,
+        } = input;
+        let space: kitsune_p2p::KitsuneSpace = dna_hash.into_inner().into();
+        let agent: kitsune_p2p::KitsuneAgent = agent_pub_key.into_inner().into();
+
+        let mut kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            Ok(kitsune_p2p
+                .join(kitsune_p2p::actor::Join { space, agent })
+                .await?)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_leave(&mut self, _input: actor::Leave) -> HolochainP2pHandlerResult<()> {
