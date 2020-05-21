@@ -59,7 +59,7 @@ async fn run() -> DnaUtilResult<()> {
 #[tokio::main(threaded_scheduler)]
 pub async fn main() {
     if let Err(err) = run().await {
-        println!("dna-util: {}", err);
+        eprintln!("dna-util: {}", err);
         std::process::exit(1);
     }
 }

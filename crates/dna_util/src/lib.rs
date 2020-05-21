@@ -71,7 +71,7 @@ pub enum DnaUtilError {
 
     /// anything else
     #[error("Unknown error: {0}")]
-    MiscError(#[from] Box<dyn std::error::Error>),
+    MiscError(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 
 /// DnaUtil Result type.
