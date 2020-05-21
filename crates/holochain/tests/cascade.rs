@@ -46,7 +46,7 @@ fn fixtures() -> (
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jimbo_entry.as_hash().clone(),
+        entry_hash: jimbo_entry.as_hash().clone(),
     });
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
@@ -55,7 +55,7 @@ fn fixtures() -> (
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jessy_entry.as_hash().clone(),
+        entry_hash: jessy_entry.as_hash().clone(),
     });
     (
         jimbo_id,

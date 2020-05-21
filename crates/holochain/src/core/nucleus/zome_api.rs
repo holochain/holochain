@@ -17,7 +17,7 @@ pub trait ZomeApi {
     // fn decrypt();
     // fn emit_signal();
     // fn encrypt();
-    // fn entry_address();
+    // fn entry_hash();
     // // fn entry_type_properties();
     // fn get_entry();
     // // fn get_entry_history();

@@ -7,7 +7,7 @@ use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
 use holochain_types::{
-    address::EntryAddress,
+    address::EntryHash,
     entry::{Entry, EntryHashed},
     header, observability,
     prelude::*,
@@ -58,7 +58,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jimbo_entry.as_hash().clone(),
+        entry_hash: jimbo_entry.as_hash().clone(),
     });
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
@@ -67,7 +67,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
-        entry_address: jessy_entry.as_hash().clone(),
+        entry_hash: jessy_entry.as_hash().clone(),
     });
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
@@ -289,7 +289,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     mock_primary_meta
         .expect_get_links()
         .with(
-            predicate::eq(EntryAddress::from(base.clone())),
+            predicate::eq(EntryHash::from(base.clone())),
             predicate::eq("".to_string()),
         )
         .returning(move |_, _| Ok(hashset! {target.clone()}));

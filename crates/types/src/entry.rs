@@ -6,7 +6,7 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::{
-    address::EntryAddress,
+    address::EntryHash,
     capability::{CapClaim, CapGrant, ZomeCallCapGrant},
 };
 use holo_hash::*;
@@ -56,17 +56,17 @@ make_hashed_base! {
     Visibility(pub),
     HashedName(EntryHashed),
     ContentType(Entry),
-    HashType(EntryAddress),
+    HashType(EntryHash),
 }
 
 impl EntryHashed {
     /// Construct (and hash) a new EntryHashed with given Entry.
     pub async fn with_data(entry: Entry) -> Result<Self, SerializedBytesError> {
         let hash = match &entry {
-            Entry::Agent(key) => EntryAddress::Agent(key.to_owned()),
+            Entry::Agent(key) => EntryHash::Agent(key.to_owned()),
             entry => {
                 let sb = SerializedBytes::try_from(entry)?;
-                EntryAddress::Entry(EntryContentHash::with_data(sb.bytes()).await)
+                EntryHash::Entry(EntryContentHash::with_data(sb.bytes()).await)
             }
         };
         Ok(EntryHashed::with_pre_hashed(entry, hash))

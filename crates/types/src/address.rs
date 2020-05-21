@@ -4,7 +4,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
 /// address type for header hash to promote it to an "address" e.g. for use when getting a header
-/// from a CAS or the DHT.  This is similar to EntryAddress which promotes and entry hash to a
+/// from a CAS or the DHT.  This is similar to EntryHash which promotes and entry hash to a
 /// retrievable entity.
 #[derive(
     Debug,
@@ -107,7 +107,7 @@ impl std::fmt::Display for HeaderAddress {
     Deserialize,
     SerializedBytes,
 )]
-pub enum EntryAddress {
+pub enum EntryHash {
     /// standard entry hash
     Entry(EntryContentHash),
     /// agents are entries too
@@ -118,17 +118,17 @@ pub enum EntryAddress {
 macro_rules! match_entry_addr {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
-            EntryAddress::Entry($i) => {
+            EntryHash::Entry($i) => {
                 $($t)*
             }
-            EntryAddress::Agent($i) => {
+            EntryHash::Agent($i) => {
                 $($t)*
             }
         }
     };
 }
 
-impl holo_hash_core::HoloHashCoreHash for EntryAddress {
+impl holo_hash_core::HoloHashCoreHash for EntryHash {
     fn get_raw(&self) -> &[u8] {
         match_entry_addr!(self => |i| { i.get_raw() })
     }
@@ -146,19 +146,19 @@ impl holo_hash_core::HoloHashCoreHash for EntryAddress {
     }
 }
 
-impl From<EntryAddress> for holo_hash_core::HoloHashCore {
-    fn from(entry_address: EntryAddress) -> holo_hash_core::HoloHashCore {
-        match_entry_addr!(entry_address => |i| { i.into() })
+impl From<EntryHash> for holo_hash_core::HoloHashCore {
+    fn from(entry_hash: EntryHash) -> holo_hash_core::HoloHashCore {
+        match_entry_addr!(entry_hash => |i| { i.into() })
     }
 }
 
-impl From<EntryAddress> for HoloHash {
-    fn from(entry_address: EntryAddress) -> HoloHash {
-        match_entry_addr!(entry_address => |i| { i.into() })
+impl From<EntryHash> for HoloHash {
+    fn from(entry_hash: EntryHash) -> HoloHash {
+        match_entry_addr!(entry_hash => |i| { i.into() })
     }
 }
 
-impl std::fmt::Display for EntryAddress {
+impl std::fmt::Display for EntryHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match_entry_addr!(self => |i| { i.fmt(f) })
     }

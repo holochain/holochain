@@ -14,7 +14,7 @@ pub mod debug;
 pub mod decrypt;
 pub mod emit_signal;
 pub mod encrypt;
-pub mod entry_address;
+pub mod entry_hash;
 pub mod entry_type_properties;
 pub mod error;
 pub mod get_entry;
@@ -35,7 +35,7 @@ pub mod update_entry;
 
 use self::{
     call::call, capability::capability, commit_entry::commit_entry, debug::debug, decrypt::decrypt,
-    emit_signal::emit_signal, encrypt::encrypt, entry_address::entry_address,
+    emit_signal::emit_signal, encrypt::encrypt, entry_hash::entry_hash,
     entry_type_properties::entry_type_properties, get_entry::get_entry, get_links::get_links,
     globals::globals, keystore::keystore, link_entries::link_entries, property::property,
     query::query, remove_entry::remove_entry, remove_link::remove_link, schedule::schedule,
@@ -174,7 +174,7 @@ impl WasmRibosome {
                 "__decrypt" => func!(invoke_host_function!(decrypt)),
                 "__emit_signal" => func!(invoke_host_function!(emit_signal)),
                 "__encrypt" => func!(invoke_host_function!(encrypt)),
-                "__entry_address" => func!(invoke_host_function!(entry_address)),
+                "__entry_hash" => func!(invoke_host_function!(entry_hash)),
                 "__entry_type_properties" => func!(invoke_host_function!(entry_type_properties)),
                 "__get_entry" => func!(invoke_host_function!(get_entry)),
                 "__get_links" => func!(invoke_host_function!(get_links)),

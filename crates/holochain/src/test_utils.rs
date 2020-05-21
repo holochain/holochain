@@ -24,7 +24,7 @@ pub async fn fake_unique_element(
         prev_header: fake_header_hash("1").into(),
 
         entry_type: EntryType::App(fake_app_entry_type(1, visibility)),
-        entry_address: entry.as_hash().to_owned(),
+        entry_hash: entry.as_hash().to_owned(),
     });
 
     Ok((

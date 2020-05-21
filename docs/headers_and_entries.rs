@@ -87,7 +87,7 @@ pub mod header {
         pub prev_header: HeaderHash,
 
         pub entry_type: EntryType,
-        pub entry_address: EntryContentHash,
+        pub entry_hash: EntryContentHash,
     }
 
     pub struct EntryUpdate {
@@ -98,7 +98,7 @@ pub mod header {
         pub replaces: Address, // not Address but EntryContentHash or HeaderHash ??
 
         pub entry_type: EntryType,
-        pub entry_address: EntryContentHash,
+        pub entry_hash: EntryContentHash,
     }
 
     pub struct EntryDelete {

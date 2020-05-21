@@ -93,8 +93,8 @@ wasm_io_types!(
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
     // @TODO
-    pub struct EntryAddressInput(());
-    pub struct EntryAddressOutput(());
+    pub struct EntryHashInput(());
+    pub struct EntryHashOutput(());
     // the current system time, in the opinion of the host, as a Duration
     pub struct SysTimeInput(());
     pub struct SysTimeOutput(core::time::Duration);

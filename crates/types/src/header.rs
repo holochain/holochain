@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
+use crate::address::{DhtAddress, EntryHash, HeaderAddress};
 
 /// Header contains variants for each type of header.
 ///
@@ -79,18 +79,18 @@ impl Header {
     /// Returns the address and entry type of the Entry, if applicable.
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
     // EntryCreate and EntryUpdate
-    pub fn entry_data(&self) -> Option<(&EntryAddress, &EntryType)> {
+    pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
         match self {
             Self::EntryCreate(EntryCreate {
-                entry_address,
+                entry_hash,
                 entry_type,
                 ..
-            }) => Some((entry_address, entry_type)),
+            }) => Some((entry_hash, entry_type)),
             Self::EntryUpdate(EntryUpdate {
-                entry_address,
+                entry_hash,
                 entry_type,
                 ..
-            }) => Some((entry_address, entry_type)),
+            }) => Some((entry_hash, entry_type)),
             _ => None,
         }
     }
@@ -231,7 +231,7 @@ pub struct EntryCreate {
     pub prev_header: HeaderAddress,
 
     pub entry_type: EntryType,
-    pub entry_address: EntryAddress,
+    pub entry_hash: EntryHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -244,7 +244,7 @@ pub struct EntryUpdate {
     pub replaces_address: DhtAddress,
 
     pub entry_type: EntryType,
-    pub entry_address: EntryAddress,
+    pub entry_hash: EntryHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
