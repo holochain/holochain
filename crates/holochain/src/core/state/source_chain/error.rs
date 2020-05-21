@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
-use holochain_types::composite_hash::{EntryHash, HeaderAddress};
+use holochain_types::composite_hash::{EntryAddress, HeaderAddress};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -20,7 +20,7 @@ pub enum SourceChainError {
     MissingHead,
 
     #[error("The content at address {0} is malformed and can't be deserialized.")]
-    MalformedEntry(EntryHash),
+    MalformedEntry(EntryAddress),
 
     #[error("Serialization error: {0}")]
     SerializationError(#[from] SerializedBytesError),
@@ -59,10 +59,10 @@ pub enum ChainInvalidReason {
     GenesisDataMissing,
 
     #[error("A chain header and its corresponding entry have a discrepancy. Entry address: {0}")]
-    HeaderAndEntryMismatch(EntryHash),
+    HeaderAndEntryMismatch(EntryAddress),
 
     #[error("Content was expected to definitely exist at this address, but didn't: {0}")]
-    MissingData(EntryHash),
+    MissingData(EntryAddress),
 }
 
 pub type SourceChainResult<T> = Result<T, SourceChainError>;

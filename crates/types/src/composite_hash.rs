@@ -4,7 +4,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
 /// address type for header hash to promote it to an "address" e.g. for use when getting a header
-/// from a CAS or the DHT.  This is similar to EntryHash which promotes and entry hash to a
+/// from a CAS or the DHT.  This is similar to EntryAddress which promotes and entry hash to a
 /// retrievable entity.
 // TODO: Temporary alias, in case we decide again that we want to differentiate
 // Address from Hash. Otherwise, this can be removed and all references of
@@ -25,9 +25,9 @@ pub type HeaderAddress = HeaderHash;
     Deserialize,
     SerializedBytes,
 )]
-pub enum EntryHash {
+pub enum EntryAddress {
     /// standard entry hash
-    Entry(EntryContentHash),
+    Entry(EntryHash),
     /// agents are entries too
     Agent(AgentPubKey),
 }
@@ -36,17 +36,17 @@ pub enum EntryHash {
 macro_rules! match_entry_addr {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
-            EntryHash::Entry($i) => {
+            EntryAddress::Entry($i) => {
                 $($t)*
             }
-            EntryHash::Agent($i) => {
+            EntryAddress::Agent($i) => {
                 $($t)*
             }
         }
     };
 }
 
-impl holo_hash_core::HoloHashCoreHash for EntryHash {
+impl holo_hash_core::HoloHashCoreHash for EntryAddress {
     fn get_raw(&self) -> &[u8] {
         match_entry_addr!(self => |i| { i.get_raw() })
     }
@@ -64,19 +64,19 @@ impl holo_hash_core::HoloHashCoreHash for EntryHash {
     }
 }
 
-impl From<EntryHash> for holo_hash_core::HoloHashCore {
-    fn from(entry_hash: EntryHash) -> holo_hash_core::HoloHashCore {
+impl From<EntryAddress> for holo_hash_core::HoloHashCore {
+    fn from(entry_hash: EntryAddress) -> holo_hash_core::HoloHashCore {
         match_entry_addr!(entry_hash => |i| { i.into() })
     }
 }
 
-impl From<EntryHash> for HoloHash {
-    fn from(entry_hash: EntryHash) -> HoloHash {
+impl From<EntryAddress> for HoloHash {
+    fn from(entry_hash: EntryAddress) -> HoloHash {
         match_entry_addr!(entry_hash => |i| { i.into() })
     }
 }
 
-impl std::fmt::Display for EntryHash {
+impl std::fmt::Display for EntryAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match_entry_addr!(self => |i| { i.fmt(f) })
     }
@@ -86,7 +86,7 @@ impl std::fmt::Display for EntryHash {
 #[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DhtAddress {
     /// standard entry content hash
-    EntryContent(EntryContentHash),
+    EntryContent(EntryHash),
     /// agents can be stored
     Agent(AgentPubKey),
     /// headers can be stored

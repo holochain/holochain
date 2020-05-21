@@ -6,7 +6,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::*,
 };
-use holochain_types::{composite_hash::EntryHash, shims::*};
+use holochain_types::{composite_hash::EntryAddress, shims::*};
 use mockall::mock;
 use std::collections::HashSet;
 use std::convert::TryInto;
@@ -34,7 +34,7 @@ enum Op {
 
 #[allow(dead_code)]
 struct LinkKey<'a> {
-    base: &'a EntryHash,
+    base: &'a EntryAddress,
     op: Op,
     tag: Tag,
 }
@@ -77,8 +77,8 @@ pub trait ChainMetaBufT<'env, R = Reader<'env>>
 where
     R: Readable,
 {
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
-    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
+    fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>>;
+    fn get_crud(&self, entry_hash: EntryAddress) -> DatabaseResult<EntryDhtStatus>;
 }
 pub struct ChainMetaBuf<'env, R = Reader<'env>>
 where
@@ -120,7 +120,7 @@ where
     R: Readable,
 {
     // TODO find out whether we need link_type.
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
+    fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>> {
         // TODO get removes
         // TODO get adds
         let key = LinkKey {
@@ -131,7 +131,7 @@ where
         let _values = self.links_meta.get(&key.to_key());
         Ok(HashSet::new())
     }
-    fn get_crud(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn get_crud(&self, _entry_hash: EntryAddress) -> DatabaseResult<EntryDhtStatus> {
         unimplemented!()
     }
 }
@@ -139,8 +139,8 @@ where
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
-        fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
+        fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>>;
+        fn get_crud(&self, entry_hash: EntryAddress) -> DatabaseResult<EntryDhtStatus>;
     }
 }
 
@@ -148,10 +148,10 @@ impl<'env, R> ChainMetaBufT<'env, R> for MockChainMetaBuf
 where
     R: Readable,
 {
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
+    fn get_links(&self, base: EntryAddress, tag: Tag) -> DatabaseResult<HashSet<EntryAddress>> {
         self.get_links(base, tag)
     }
-    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn get_crud(&self, entry_hash: EntryAddress) -> DatabaseResult<EntryDhtStatus> {
         self.get_crud(entry_hash)
     }
 }

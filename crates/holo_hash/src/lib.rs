@@ -40,7 +40,7 @@
 //! let bytes: SerializedBytes = entry.try_into().unwrap();
 //!
 //! assert_eq!(
-//!     "{\"type\":\"EntryContentHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
+//!     "{\"type\":\"EntryHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
 //!     &format!("{:?}", bytes),
 //! );
 //! # }
@@ -58,10 +58,10 @@
 //!
 //! let entry_content = b"test entry content";
 //!
-//! let content_hash: HoloHash = EntryContentHash::with_data(entry_content).await.into();
+//! let content_hash: HoloHash = EntryHash::with_data(entry_content).await.into();
 //!
 //! assert_eq!(
-//!     "EntryContentHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",
+//!     "EntryHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",
 //!     &format!("{:?}", content_hash),
 //! );
 //! # }
@@ -238,7 +238,7 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
         "hCok" => Ok(HoloHash::WasmHash(WasmHash::try_from(s)?)),
         "hCIk" => Ok(HoloHash::NetIdHash(NetIdHash::try_from(s)?)),
         "hCAk" => Ok(HoloHash::AgentPubKey(AgentPubKey::try_from(s)?)),
-        "hCEk" => Ok(HoloHash::EntryContentHash(EntryContentHash::try_from(s)?)),
+        "hCEk" => Ok(HoloHash::EntryHash(EntryHash::try_from(s)?)),
         "hCQk" => Ok(HoloHash::DhtOpHash(DhtOpHash::try_from(s)?)),
         "hCkk" => Ok(HoloHash::HeaderHash(HeaderHash::try_from(s)?)),
         _ => Err(HoloHashError::BadPrefix),
@@ -479,8 +479,8 @@ new_holo_hash! {
     AgentPubKey,
     AGENT_PREFIX,
 
-    "Represents a Holo/Holochain EntryContentHash - A direct hash of the entry content. (uhCEk...)",
-    EntryContentHash,
+    "Represents a Holo/Holochain EntryHash - A direct hash of the entry content. (uhCEk...)",
+    EntryHash,
     ENTRY_CONTENT_PREFIX,
 
     "Represents a Holo/Holochain HeaderHash - A direct hash of the entry header. (uhCkk...)",
@@ -591,7 +591,7 @@ mod tests {
             .unwrap();
         assert_eq!(3_860_645_936, h.get_loc());
         assert_eq!(
-            "EntryContentHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+            "EntryHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
             &format!("{:?}", h),
         );
 

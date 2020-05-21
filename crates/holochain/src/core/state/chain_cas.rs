@@ -23,7 +23,7 @@ use holochain_state::{
     prelude::{Readable, Reader, Writer},
 };
 use holochain_types::{
-    composite_hash::{EntryHash, HeaderAddress},
+    composite_hash::{EntryAddress, HeaderAddress},
     entry::{Entry, EntryHashed},
     header,
     prelude::Signature,
@@ -88,7 +88,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     ///
     /// First attempt to get from the public entry DB. If not present, and
     /// private DB access is specified, attempt to get as a private entry.
-    pub fn get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub fn get_entry(&self, entry_hash: EntryAddress) -> DatabaseResult<Option<Entry>> {
         match self.public_entries.get(&entry_hash.clone().into())? {
             Some(entry) => Ok(Some(entry)),
             None => {
@@ -101,7 +101,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn contains(&self, entry_hash: EntryHash) -> DatabaseResult<bool> {
+    pub fn contains(&self, entry_hash: EntryAddress) -> DatabaseResult<bool> {
         self.get_entry(entry_hash).map(|e| e.is_some())
     }
 
@@ -210,7 +210,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         Ok(())
     }
 
-    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
+    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryAddress) {
         self.headers.delete(header_hash.into());
         self.public_entries.delete(entry_hash.clone().into());
         if let Some(db) = self.private_entries.as_mut() {

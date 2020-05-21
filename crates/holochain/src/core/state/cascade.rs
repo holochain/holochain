@@ -43,7 +43,7 @@ use super::{
     chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus},
 };
 use holochain_state::{error::DatabaseResult, prelude::Reader};
-use holochain_types::composite_hash::EntryHash;
+use holochain_types::composite_hash::EntryAddress;
 use holochain_types::entry::Entry;
 use std::collections::HashSet;
 use tracing::*;
@@ -102,7 +102,7 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub async fn dht_get(&self, entry_hash: EntryAddress) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
             .primary
@@ -143,9 +143,9 @@ where
     // TODO: Implement customization of this behavior with an options/builder struct
     pub async fn dht_get_links<S: Into<String>>(
         &self,
-        base: EntryHash,
+        base: EntryAddress,
         tag: S,
-    ) -> DatabaseResult<HashSet<EntryHash>> {
+    ) -> DatabaseResult<HashSet<EntryAddress>> {
         // Am I an authority?
         let authority = self.primary.contains(base.clone())?;
         let tag = tag.into();

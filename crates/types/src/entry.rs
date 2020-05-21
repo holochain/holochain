@@ -7,7 +7,7 @@
 
 use crate::{
     capability::{CapClaim, CapGrant, ZomeCallCapGrant},
-    composite_hash::EntryHash,
+    composite_hash::EntryAddress,
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -56,17 +56,17 @@ make_hashed_base! {
     Visibility(pub),
     HashedName(EntryHashed),
     ContentType(Entry),
-    HashType(EntryHash),
+    HashType(EntryAddress),
 }
 
 impl EntryHashed {
     /// Construct (and hash) a new EntryHashed with given Entry.
     pub async fn with_data(entry: Entry) -> Result<Self, SerializedBytesError> {
         let hash = match &entry {
-            Entry::Agent(key) => EntryHash::Agent(key.to_owned()),
+            Entry::Agent(key) => EntryAddress::Agent(key.to_owned()),
             entry => {
                 let sb = SerializedBytes::try_from(entry)?;
-                EntryHash::Entry(EntryContentHash::with_data(sb.bytes()).await)
+                EntryAddress::Entry(EntryHash::with_data(sb.bytes()).await)
             }
         };
         Ok(EntryHashed::with_pre_hashed(entry, hash))
