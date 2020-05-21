@@ -1,12 +1,12 @@
 /// calling into wasm with only one wasm instance involved
 /// e.g. no internal callbacks or additional wasm instances in called host functions
 /// typically takes 1ms or less
-pub const ONE_WASM_CALL: i128 = 2_000_000;
+pub const ONE_WASM_CALL: i128 = 3_000_000;
 /// callint into wasm with multiple wasm instances involved
 /// e.g. calling a wasm call that then triggers a callback with its own wasm instance
 /// typically wasm calls scale linearly as long as they are simple as the wasmer call overhead is
 /// much larger than simple internal logic like validation etc.
-pub const MULTI_WASM_CALL: i128 = 5_000_000;
+pub const MULTI_WASM_CALL: i128 = 7_000_000;
 /// building a wasm instance, given a wasm module
 /// this is quite fast, indicative times are about 40_000 nanos
 pub const WASM_INSTANCE: i128 = 100_000;
