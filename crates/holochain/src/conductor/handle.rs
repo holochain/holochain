@@ -53,14 +53,14 @@ use super::{
     manager::TaskManagerRunHandle,
     Cell, Conductor,
 };
-use crate::core::workflow::ZomeInvocationResult;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::ZomeCallInvocationResult;
 use derive_more::From;
 use holochain_types::{
     app::{App, AppId},
     autonomic::AutonomicCue,
     cell::CellId,
     dna::DnaFile,
-    nucleus::ZomeInvocation,
     prelude::*,
 };
 use std::sync::Arc;
@@ -106,10 +106,10 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
     /// Invoke a zome function on a Cell
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult>;
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
@@ -205,17 +205,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.0.read().await.dna_store().get(hash)
     }
 
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
         // FIXME: D-01058: We are holding this read lock for
-        // the entire call to invoke_zome and blocking
+        // the entire call to call_zome and blocking
         // any writes to the conductor
         let lock = self.0.read().await;
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        cell.invoke_zome(invocation).await.map_err(Into::into)
+        cell.call_zome(invocation).await.map_err(Into::into)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
@@ -340,10 +340,10 @@ pub mod mock {
 
             fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
-            fn sync_invoke_zome(
+            fn sync_call_zome(
                 &self,
-                invocation: ZomeInvocation,
-            ) -> ConductorApiResult<ZomeInvocationResult>;
+                invocation: ZomeCallInvocation,
+            ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
             fn sync_autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
 
@@ -410,11 +410,11 @@ pub mod mock {
             self.sync_get_dna(hash)
         }
 
-        async fn invoke_zome(
+        async fn call_zome(
             &self,
-            invocation: ZomeInvocation,
-        ) -> ConductorApiResult<ZomeInvocationResult> {
-            self.sync_invoke_zome(invocation)
+            invocation: ZomeCallInvocation,
+        ) -> ConductorApiResult<ZomeCallInvocationResult> {
+            self.sync_call_zome(invocation)
         }
 
         async fn autonomic_cue(

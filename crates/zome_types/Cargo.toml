@@ -13,7 +13,11 @@ edition = "2018"
 [dependencies]
 holochain_serialized_bytes = "=0.0.39"
 serde = { version = "1.0.104", features = ["derive"] }
+holo_hash_core = { path = "../holo_hash_core" }
 
 # TODO: remove these two dependencies and replace with HoloHash
 multihash = "0.8.0"
 rust-base58 = "0.0.4"
+
+# TODO: remove this once there is some less obtrusive source of randomness
+nanoid = "0.3"
