@@ -10,6 +10,7 @@ members = [
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
   "crates/holochain",
+  "crates/holochain_p2p",
   "crates/holo_hash",
   "crates/holo_hash_core",
   "crates/legacy",

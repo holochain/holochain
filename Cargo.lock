@@ -1131,6 +1131,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_p2p"
+version = "0.0.1"
+dependencies = [
+ "futures",
+ "ghost_actor",
+ "holo_hash",
+ "holochain_keystore",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
