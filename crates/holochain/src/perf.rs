@@ -9,7 +9,8 @@ pub const ONE_WASM_CALL: i128 = 3_000_000;
 pub const MULTI_WASM_CALL: i128 = 7_000_000;
 /// building a wasm instance, given a wasm module
 /// this is quite fast, indicative times are about 40_000 nanos
-pub const WASM_INSTANCE: i128 = 200_000;
+/// on circle this can be much slower at several 100k
+pub const WASM_INSTANCE: i128 = 400_000;
 /// geting a wasm module from the cache should be very fast
 /// if you're blowing this up in a test, make sure to warm the zome cache!
 pub const WASM_MODULE_CACHE_HIT: i128 = 50_000;
