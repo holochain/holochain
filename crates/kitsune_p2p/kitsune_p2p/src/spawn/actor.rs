@@ -1,6 +1,12 @@
-use crate::{actor, actor::*, event::*};
-
+use crate::{actor, actor::*, event::*, types::*};
 use futures::future::FutureExt;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    sync::Arc,
+};
+
+mod space;
+use space::*;
 
 ghost_actor::ghost_chan! {
     Visibility(pub(crate)),
@@ -20,6 +26,7 @@ pub(crate) struct KitsuneP2pActor {
     internal_sender: KitsuneP2pInternalSender<Internal>,
     #[allow(dead_code)]
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    spaces: HashMap<Arc<KitsuneSpace>, Space>,
 }
 
 impl KitsuneP2pActor {
@@ -30,13 +37,21 @@ impl KitsuneP2pActor {
         Ok(Self {
             internal_sender,
             evt_sender,
+            spaces: HashMap::new(),
         })
     }
 }
 
 impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
-    fn handle_join(&mut self, _input: actor::Join) -> KitsuneP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+    fn handle_join(&mut self, input: actor::Join) -> KitsuneP2pHandlerResult<()> {
+        let actor::Join { space, agent } = input;
+        let space = Arc::new(space);
+        let agent = Arc::new(agent);
+        let space = match self.spaces.entry(space) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(Space::new(self.internal_sender.clone())),
+        };
+        space.handle_join(agent)
     }
 
     fn handle_leave(&mut self, _input: actor::Leave) -> KitsuneP2pHandlerResult<()> {
