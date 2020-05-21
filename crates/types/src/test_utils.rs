@@ -1,11 +1,11 @@
 //! Some common testing helpers.
 
 use crate::{
+    capability::CapSecret,
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, Properties},
     dna::{DnaDef, DnaFile},
     prelude::*,
-    shims::CapToken,
 };
 use holo_hash::AgentPubKey;
 use holochain_zome_types::ZomeExternHostInput;
@@ -43,15 +43,20 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
         uuid: uuid.to_string(),
         zomes: Vec::new(),
     };
-    let mut wasm_code = Vec::new();
-    for (zome_name, wasm) in zomes {
-        let wasm_hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
-        let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
-        dna.zomes.push((zome_name, Zome { wasm_hash }));
-        wasm_code.push(wasm);
-    }
     tokio_safe_block_on::tokio_safe_block_on(
-        DnaFile::new(dna, wasm_code),
+        async move {
+            let mut wasm_code = Vec::new();
+            for (zome_name, wasm) in zomes {
+                let wasm = crate::dna::wasm::DnaWasmHashed::with_data(wasm)
+                    .await
+                    .unwrap();
+                let (wasm, wasm_hash) = wasm.into_inner();
+                let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+                dna.zomes.push((zome_name, Zome { wasm_hash }));
+                wasm_code.push(wasm);
+            }
+            DnaFile::new(dna, wasm_code).await
+        },
         std::time::Duration::from_secs(1),
     )
     .unwrap()
@@ -74,7 +79,11 @@ pub fn fake_cell_id(name: &str) -> CellId {
 
 /// A fixture example DnaHash for unit testing.
 pub fn fake_dna_hash(name: &str) -> DnaHash {
-    DnaHash::with_data_sync(name.as_bytes())
+    tokio_safe_block_on::tokio_safe_block_on(
+        DnaHash::with_data(name.as_bytes()),
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap()
 }
 
 /// A fixture example AgentPubKey for unit testing.
@@ -91,13 +100,16 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 
 /// A fixture example HeaderHash for unit testing.
 pub fn fake_header_hash(name: &str) -> HeaderHash {
-    HeaderHash::with_data_sync(name.as_bytes())
+    tokio_safe_block_on::tokio_safe_block_on(
+        HeaderHash::with_data(name.as_bytes()),
+        std::time::Duration::from_secs(1),
+    )
+    .unwrap()
 }
 
-/// A fixture example CapabilityRequest for unit testing.
-pub fn fake_cap_token() -> CapToken {
-    // TODO: real fake CapToken
-    CapToken
+/// A fixture example CapSecret for unit testing.
+pub fn fake_cap_secret() -> CapSecret {
+    CapSecret::random()
 }
 
 /// A fixture example ZomeInvocationPayload for unit testing.

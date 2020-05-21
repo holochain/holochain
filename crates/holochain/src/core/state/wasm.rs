@@ -1,11 +1,10 @@
-use holo_hash::WasmHash;
+use holo_hash::{Hashed, WasmHash};
 use holochain_state::buffer::{BufferedStore, CasBuf};
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
 use holochain_state::transaction::Readable;
 use holochain_state::transaction::{Reader, Writer};
-use holochain_types::dna::wasm::DnaWasm;
-use std::convert::TryInto;
+use holochain_types::dna::wasm::{DnaWasm, DnaWasmHashed};
 
 pub type WasmCas<'env, R> = CasBuf<'env, DnaWasm, R>;
 
@@ -21,13 +20,26 @@ impl<'env, R: Readable> WasmBuf<'env, R> {
         })
     }
 
-    pub fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasm>> {
-        self.wasm.get(&wasm_hash.clone().into())
+    pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
+        match self.wasm.get(&wasm_hash.clone().into())? {
+            None => Ok(None),
+            Some(wasm) => {
+                let wasm = fatal_db_deserialize_check!(
+                    "WasmBuf::get",
+                    wasm_hash,
+                    DnaWasmHashed::with_data(wasm).await,
+                );
+                fatal_db_hash_check!("WasmBuf::get", wasm_hash, wasm.as_hash());
+                Ok(Some(wasm))
+            }
+        }
     }
 
-    pub fn put(&mut self, v: DnaWasm) -> DatabaseResult<()> {
-        self.wasm.put((&v).try_into()?, v);
-        Ok(())
+    pub async fn put(&mut self, v: DnaWasm) -> DatabaseResult<WasmHash> {
+        let v = DnaWasmHashed::with_data(v).await?;
+        let (wasm, wasm_hash) = v.into_inner();
+        self.wasm.put(wasm_hash.clone().into(), wasm);
+        Ok(wasm_hash)
     }
 }
 
@@ -59,15 +71,14 @@ async fn wasm_store_round_trip() -> DatabaseResult<()> {
 
     // a wasm
     let wasm = DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo);
-    let hash = holo_hash::WasmHash::with_data_sync(&wasm.code());
 
     // a wasm in the WasmBuf
-    wasm_buf.put(wasm.clone()).unwrap();
+    let hash = wasm_buf.put(wasm.clone()).await.unwrap();
     // a wasm from the WasmBuf
-    let ret = wasm_buf.get(&hash).unwrap().unwrap();
+    let ret = wasm_buf.get(&hash).await.unwrap().unwrap();
 
     // assert the round trip
-    assert_eq!(ret, wasm);
+    assert_eq!(ret, DnaWasmHashed::with_data(wasm).await.unwrap());
 
     Ok(())
 }
