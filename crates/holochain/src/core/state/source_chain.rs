@@ -10,7 +10,9 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Reader},
 };
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header, HeaderHashed};
+use holochain_types::{
+    address::HeaderAddress, entry::Entry, header::EntryVisibility, prelude::*, Header, HeaderHashed,
+};
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
@@ -102,9 +104,45 @@ impl ChainElement {
         self.signed_header.header_hashed()
     }
 
-    /// Access the Entry portion of this triple.
-    pub fn entry(&self) -> &Option<Entry> {
-        &self.maybe_entry
+    /// Access the Entry portion of this triple as a ChainElementEntry,
+    /// which includes the context around the presence or absence of the entry.
+    pub fn entry(&self) -> ChainElementEntry {
+        let maybe_visibilty = self
+            .header()
+            .entry_data()
+            .map(|(_, entry_type)| entry_type.visibility());
+        match (self.maybe_entry.as_ref(), maybe_visibilty) {
+            (Some(entry), Some(_)) => ChainElementEntry::Present(entry),
+            (None, Some(EntryVisibility::Private)) => ChainElementEntry::Hidden,
+            (None, None) => ChainElementEntry::NotApplicable,
+            (Some(_), None) => {
+                unreachable!("Entry is present for a Header type which has no entry reference")
+            }
+            (None, Some(EntryVisibility::Public)) => unreachable!("Entry data missing for element"),
+        }
+    }
+}
+
+/// Represents the different ways the entry_address reference within a Header
+/// can be intepreted
+#[derive(Clone, Debug, PartialEq, Eq, derive_more::From)]
+pub enum ChainElementEntry<'a> {
+    /// The Header has an entry_address reference, and the Entry is accessible.
+    Present(&'a Entry),
+    /// The Header has an entry_address reference, but we are in a public
+    /// context and the entry is private.
+    Hidden,
+    /// The Header does not contain an entry_address reference.
+    NotApplicable,
+}
+
+impl<'a> ChainElementEntry<'a> {
+    pub fn as_option(&'a self) -> Option<&'a Entry> {
+        if let ChainElementEntry::Present(entry) = self {
+            Some(entry)
+        } else {
+            None
+        }
     }
 }
 
