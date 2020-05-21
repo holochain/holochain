@@ -184,7 +184,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn add_dnas(&self) -> ConductorResult<()> {
         let dnas = self.0.read().await.get_wasms().await?;
-        Ok(self.0.write().await.dna_store_mut().add_dnas(dnas))
+        self.0.write().await.dna_store_mut().add_dnas(dnas);
+        Ok(())
     }
 
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {

@@ -68,7 +68,7 @@ impl<'env, R: Readable> DnaDefBuf<'env, R> {
     }
 
     pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<DnaHash> {
-        let dna_hash = dna_def.dna_hash().await.clone();
+        let dna_hash = dna_def.dna_hash().await;
         self.dna_defs.put(dna_hash.clone().into(), dna_def);
         Ok(dna_hash)
     }

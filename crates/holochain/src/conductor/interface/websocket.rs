@@ -401,13 +401,17 @@ mod test {
         let dna = fake_dna_file(&uuid.to_string());
 
         let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let mut dna_cache = MockDnaStore::new();
-        dna_cache
+        let mut dna_store = MockDnaStore::new();
+        dna_store
             .expect_add()
             .with(predicate::eq(dna))
             .returning(|_| Err(DnaStoreError::WriteFail));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .test(test_env, wasm_env)
             .await
             .unwrap();
@@ -457,6 +461,10 @@ mod test {
             .expect_get()
             .with(predicate::eq(dna_hash))
             .returning(move |_| Some(dna.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
         let (_tmpdir, app_api) = setup_app(vec![(cell_id.clone(), None)], dna_store).await;
         let mut request = Box::new(zome_invocation_from_names(
@@ -498,6 +506,10 @@ mod test {
         dna_store
             .expect_get()
             .returning(move |hash| dna_map.get(&hash).cloned());
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
         let (_tmpdir, handle) = setup_admin_cells(dna_store).await;
 
         let agent_key = fake_agent_pubkey_1();
@@ -552,6 +564,10 @@ mod test {
 
         let mut dna_store = MockDnaStore::new();
         dna_store.expect_get().returning(move |_| Some(dna.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
