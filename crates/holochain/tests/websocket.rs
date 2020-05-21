@@ -8,8 +8,8 @@ use holochain_2020::conductor::{
     Conductor, ConductorHandle,
 };
 use holochain_2020::core::ribosome::NamedInvocation;
-use holochain_2020::core::ribosome::ZomeInvocationFixturator;
-use holochain_2020::core::ribosome::ZomeInvocationResponse;
+use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
+use holochain_2020::core::ribosome::ZomeCallInvocationResponse;
 use holochain_types::{
     cell::CellId,
     dna::{DnaFile, Properties},
@@ -269,7 +269,7 @@ async fn call_zome() {
     let payload = Payload { a: 1 };
     let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
     let request = Box::new(
-        ZomeInvocationFixturator::new(NamedInvocation(
+        ZomeCallInvocationFixturator::new(NamedInvocation(
             cell_id,
             TestWasm::Foo,
             "foo".into(),
@@ -278,15 +278,15 @@ async fn call_zome() {
         .next()
         .unwrap(),
     );
-    let request = AppRequest::ZomeInvocationRequest { request };
+    let request = AppRequest::ZomeCallInvocationRequest { request };
     let response = app_interface.request(request);
     let call_response = check_timeout(&mut holochain, response, 2000).await;
     let foo = TestString::from(String::from("foo"));
-    let expected = Box::new(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(
+    let expected = Box::new(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(
         foo.try_into().unwrap(),
     )));
     trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeInvocationResponse{ response } if response == expected);
+    assert_matches!(call_response, AppResponse::ZomeCallInvocationResponse{ response } if response == expected);
 
     holochain.kill().expect("Failed to kill holochain");
 }

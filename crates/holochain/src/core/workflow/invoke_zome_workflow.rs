@@ -3,8 +3,8 @@ use super::{
     error::{WorkflowError, WorkflowResult},
     InitializeZomesWorkflow, Workflow, WorkflowEffects,
 };
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::ribosome::ZomeInvocationResponse;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::{
     state::{
@@ -22,19 +22,19 @@ use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 pub mod unsafe_invoke_zome_workspace;
 
 /// Placeholder for the return value of a zome invocation
-/// TODO: do we want this to be the same as ZomeInvocationRESPONSE?
-pub type ZomeInvocationResult = RibosomeResult<ZomeInvocationResponse>;
+/// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
+pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallInvocationResponse>;
 
 pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     pub ribosome: Ribosome,
-    pub invocation: ZomeInvocation,
+    pub invocation: ZomeCallInvocation,
 }
 
 impl<'env, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
 where
     Ribosome: RibosomeT + Send + Sync + 'env,
 {
-    type Output = ZomeInvocationResult;
+    type Output = ZomeCallInvocationResult;
     type Workspace = InvokeZomeWorkspace<'env>;
     type Triggers = Option<InitializeZomesWorkflow>;
 
@@ -191,7 +191,7 @@ pub mod tests {
     async fn run_invoke_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
         workspace: InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
-        invocation: ZomeInvocation,
+        invocation: ZomeCallInvocation,
     ) -> WorkflowResult<'env, InvokeZomeWorkflow<Ribosome>> {
         let workflow = InvokeZomeWorkflow {
             invocation,
@@ -221,10 +221,10 @@ pub mod tests {
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
 
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -265,7 +265,7 @@ pub mod tests {
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -353,10 +353,10 @@ pub mod tests {
                 unsafe { unsafe_workspace.apply_mut(call).await };
                 */
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });
 
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -398,7 +398,7 @@ pub mod tests {
         let reader = env_ref.reader().unwrap();
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -434,7 +434,7 @@ pub mod tests {
         let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()

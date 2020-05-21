@@ -49,8 +49,8 @@ use super::{
     api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
     error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
 };
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::workflow::ZomeInvocationResult;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::ZomeCallInvocationResult;
 use derive_more::From;
 use holochain_types::dna::DnaFile;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::*};
@@ -99,8 +99,8 @@ pub trait ConductorHandleT: Send + Sync {
     /// Invoke a zome function on a Cell
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult>;
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
@@ -191,8 +191,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
         // FIXME: D-01058: We are holding this read lock for
         // the entire call to invoke_zome and blocking
         // any writes to the conductor
@@ -299,8 +299,8 @@ pub mod mock {
 
             fn sync_invoke_zome(
                 &self,
-                invocation: ZomeInvocation,
-            ) -> ConductorApiResult<ZomeInvocationResult>;
+                invocation: ZomeCallInvocation,
+            ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
             fn sync_autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
 
@@ -364,8 +364,8 @@ pub mod mock {
 
         async fn invoke_zome(
             &self,
-            invocation: ZomeInvocation,
-        ) -> ConductorApiResult<ZomeInvocationResult> {
+            invocation: ZomeCallInvocation,
+        ) -> ConductorApiResult<ZomeCallInvocationResult> {
             self.sync_invoke_zome(invocation)
         }
 

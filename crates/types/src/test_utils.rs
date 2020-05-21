@@ -114,7 +114,7 @@ pub fn fake_cap_secret() -> CapSecret {
     CapSecret::random()
 }
 
-/// A fixture example ZomeInvocationPayload for unit testing.
+/// A fixture example ZomeCallInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> HostInput {
     HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }

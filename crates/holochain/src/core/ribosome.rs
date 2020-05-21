@@ -175,12 +175,12 @@ pub trait Invocation: Clone {
 /// i.e. coming from outside the Cell from an external Interface
 #[allow(missing_docs)] // members are self-explanitory
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ZomeInvocation {
+pub struct ZomeCallInvocation {
     /// The ID of the [Cell] in which this Zome-call would be invoked
     pub cell_id: CellId,
     /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
-    /// The capability request authorization this [ZomeInvocation]
+    /// The capability request authorization required
     pub cap: CapSecret,
     /// The name of the Zome function to call
     pub fn_name: String,
@@ -191,9 +191,9 @@ pub struct ZomeInvocation {
 }
 
 fixturator!(
-    ZomeInvocation,
+    ZomeCallInvocation,
     {
-        ZomeInvocation {
+        ZomeCallInvocation {
             cell_id: CellIdFixturator::new(Empty).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
             cap: todo!("capability arg"),
@@ -203,7 +203,7 @@ fixturator!(
         }
     },
     {
-        ZomeInvocation {
+        ZomeCallInvocation {
             cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
             cap: todo!("capability arg"),
@@ -213,7 +213,7 @@ fixturator!(
         }
     },
     {
-        let ret = ZomeInvocation {
+        let ret = ZomeCallInvocation {
             cell_id: CellIdFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -240,10 +240,12 @@ fixturator!(
 /// cell id, test wasm for zome to call, function name, host input payload
 pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub HostInput);
 
-impl Iterator for ZomeInvocationFixturator<NamedInvocation> {
-    type Item = ZomeInvocation;
+impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
+    type Item = ZomeCallInvocation;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut ret = ZomeInvocationFixturator::new(Unpredictable).next().unwrap();
+        let mut ret = ZomeCallInvocationFixturator::new(Unpredictable)
+            .next()
+            .unwrap();
         ret.cell_id = self.0.curve.0.clone();
         ret.zome_name = self.0.curve.1.clone().into();
         ret.fn_name = self.0.curve.2.clone();
@@ -252,7 +254,7 @@ impl Iterator for ZomeInvocationFixturator<NamedInvocation> {
     }
 }
 
-impl Invocation for ZomeInvocation {
+impl Invocation for ZomeCallInvocation {
     fn allow_side_effects(&self) -> bool {
         true
     }
@@ -269,7 +271,7 @@ impl Invocation for ZomeInvocation {
 
 /// Response to a zome invocation
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub enum ZomeInvocationResponse {
+pub enum ZomeCallInvocationResponse {
     /// arbitrary functions exposed by zome devs to the outside world
     ZomeApiFn(GuestOutput),
 }
@@ -350,14 +352,14 @@ pub trait RibosomeT: Sized {
         self,
         workspace: UnsafeInvokeZomeWorkspace,
         // TODO: ConductorHandle
-        invocation: ZomeInvocation,
-    ) -> RibosomeResult<ZomeInvocationResponse>;
+        invocation: ZomeCallInvocation,
+    ) -> RibosomeResult<ZomeCallInvocationResponse>;
 }
 
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeInvocationResponse;
+    use crate::core::ribosome::ZomeCallInvocationResponse;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
@@ -391,7 +393,7 @@ pub mod wasm_test {
                 let timeout = $crate::start_hard_timeout!();
 
                 let workspace = $crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable).next().unwrap();
-                let invocation = $crate::core::ribosome::ZomeInvocationFixturator::new(
+                let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
                         holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                             .next()
@@ -411,7 +413,7 @@ pub mod wasm_test {
                 $crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
 
                 let output = match zome_invocation_response {
-                    crate::core::ribosome::ZomeInvocationResponse::ZomeApiFn(guest_output) => {
+                    crate::core::ribosome::ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
                         guest_output.into_inner().try_into().unwrap()
                     }
                 };
@@ -436,7 +438,7 @@ pub mod wasm_test {
             .next()
             .unwrap();
 
-        let invocation = crate::core::ribosome::ZomeInvocationFixturator::new(
+        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
                 holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
@@ -450,7 +452,7 @@ pub mod wasm_test {
         .unwrap();
 
         assert_eq!(
-            ZomeInvocationResponse::ZomeApiFn(GuestOutput::new(
+            ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome.call_zome_function(workspace, invocation).unwrap()

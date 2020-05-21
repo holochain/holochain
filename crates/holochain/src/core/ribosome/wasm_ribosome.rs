@@ -39,8 +39,8 @@ use crate::core::ribosome::host_fn::update_entry::update_entry;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::ZomeInvocation;
-use crate::core::ribosome::ZomeInvocationResponse;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use fallible_iterator::FallibleIterator;
@@ -107,7 +107,7 @@ impl WasmRibosome {
 
         let allow_side_effects = host_context.allow_side_effects();
 
-        // it is important that WasmRibosome and ZomeInvocation are cheap to clone here
+        // it is important that WasmRibosome and ZomeCallInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
         let host_context_arc = std::sync::Arc::new(host_context);
 
@@ -301,10 +301,10 @@ impl RibosomeT for WasmRibosome {
     fn call_zome_function<'env>(
         self,
         workspace: UnsafeInvokeZomeWorkspace,
-        invocation: ZomeInvocation,
+        invocation: ZomeCallInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
-    ) -> RibosomeResult<ZomeInvocationResponse> {
+    ) -> RibosomeResult<ZomeCallInvocationResponse> {
         let timeout = crate::start_hard_timeout!();
 
         // make a copy of these for the error handling below
@@ -324,7 +324,7 @@ impl RibosomeT for WasmRibosome {
         // there could be nested callbacks in this call so we give it 5ms
         crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
 
-        Ok(ZomeInvocationResponse::ZomeApiFn(guest_output))
+        Ok(ZomeCallInvocationResponse::ZomeApiFn(guest_output))
     }
 
     fn run_validate(

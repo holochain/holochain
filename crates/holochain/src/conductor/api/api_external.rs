@@ -1,14 +1,14 @@
 use super::error::{
     ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
 };
-use crate::core::ribosome::{ZomeInvocation, ZomeInvocationResponse};
+use crate::core::ribosome::{ZomeCallInvocation, ZomeCallInvocationResponse};
 use crate::{
     conductor::{
         config::AdminInterfaceConfig,
         interface::error::{InterfaceError, InterfaceResult},
         ConductorHandle,
     },
-    core::workflow::ZomeInvocationResult,
+    core::workflow::ZomeCallInvocationResult,
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -61,8 +61,8 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     /// Invoke a zome function on any cell in this conductor.
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult>;
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
     // -- provided -- //
 
@@ -70,9 +70,9 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     async fn handle_request(&self, request: AppRequest) -> AppResponse {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
-                AppRequest::ZomeInvocationRequest { request } => {
+                AppRequest::ZomeCallInvocationRequest { request } => {
                     match self.invoke_zome(*request).await? {
-                        Ok(response) => Ok(AppResponse::ZomeInvocationResponse {
+                        Ok(response) => Ok(AppResponse::ZomeCallInvocationResponse {
                             response: Box::new(response),
                         }),
                         Err(e) => Ok(AppResponse::Error(e.into())),
@@ -250,8 +250,8 @@ impl RealAppInterfaceApi {
 impl AppInterfaceApi for RealAppInterfaceApi {
     async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
         self.conductor_handle.invoke_zome(invocation).await
     }
 }
@@ -281,9 +281,9 @@ pub enum AppResponse {
     /// There has been an error in the request
     Error(ExternalApiWireError),
     /// The response to a zome call
-    ZomeInvocationResponse {
+    ZomeCallInvocationResponse {
         /// The data that was returned by this call
-        response: Box<ZomeInvocationResponse>,
+        response: Box<ZomeCallInvocationResponse>,
     },
 }
 
@@ -326,9 +326,9 @@ pub enum AppRequest {
         request: Box<CryptoRequest>,
     },
     /// Call a zome function
-    ZomeInvocationRequest {
+    ZomeCallInvocationRequest {
         /// Information about which zome call you want to make
-        request: Box<ZomeInvocation>,
+        request: Box<ZomeCallInvocation>,
     },
 }
 

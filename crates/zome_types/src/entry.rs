@@ -18,14 +18,6 @@ use holochain_serialized_bytes::prelude::*;
 /// in the future, we may want to include them
 pub type CapGrantEntry = ZomeCallCapGrant;
 
-// //TODO move to capabilities module
-// /// Entry data for a capability claim
-// #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-// pub struct CapTokenClaim;
-// /// Entry data for a capability grant
-// #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-// pub struct CapTokenGrant;
-
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
 

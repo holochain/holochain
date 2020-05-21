@@ -467,7 +467,7 @@ mod test {
 
         let (_tmpdir, app_api) = setup_app(vec![(cell_id.clone(), None)], dna_store).await;
         let mut request = Box::new(
-            crate::core::ribosome::ZomeInvocationFixturator::new(
+            crate::core::ribosome::ZomeCallInvocationFixturator::new(
                 crate::core::ribosome::NamedInvocation(
                     cell_id.clone(),
                     TestWasm::Foo.into(),
@@ -479,11 +479,11 @@ mod test {
             .unwrap(),
         );
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeInvocationRequest { request };
+        let msg = AppRequest::ZomeCallInvocationRequest { request };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeInvocationResponse{ .. });
+            assert_matches!(response, AppResponse::ZomeCallInvocationResponse{ .. });
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);

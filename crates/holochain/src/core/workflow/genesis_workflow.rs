@@ -289,7 +289,7 @@ Functions / Workflows:
 
 - commit DNA entry (w/ special enum header with NULL  prev_header)
 
-- commit CapToken Grant for author (agent key) (w/ normal header)
+- commit CapGrant for author (agent key) (w/ normal header)
 
 
 

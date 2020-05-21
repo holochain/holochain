@@ -1,7 +1,7 @@
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
-use crate::core::ribosome::ZomeInvocation;
+use crate::core::ribosome::ZomeCallInvocation;
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
@@ -12,7 +12,7 @@ use crate::{
         state::source_chain::SourceChainBuf,
         workflow::{
             run_workflow, GenesisWorkflow, GenesisWorkspace, InvokeZomeWorkflow,
-            InvokeZomeWorkspace, ZomeInvocationResult,
+            InvokeZomeWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -176,8 +176,8 @@ impl Cell {
     /// Function called by the Conductor
     pub async fn invoke_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
         let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
