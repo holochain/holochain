@@ -17,7 +17,9 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum DbName {
     /// Primary database: KV store of chain entries, keyed by address
-    PrimaryChainEntries,
+    PrimaryChainPublicEntries,
+    /// Primary database: KV store of chain entries, keyed by address
+    PrimaryChainPrivateEntries,
     /// Primary database: KV store of chain headers, keyed by address
     PrimaryChainHeaders,
     /// Primary database: KVV store of chain metadata, storing relationships
@@ -42,7 +44,8 @@ impl std::fmt::Display for DbName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use DbName::*;
         match self {
-            PrimaryChainEntries => write!(f, "PrimaryChainEntries"),
+            PrimaryChainPublicEntries => write!(f, "PrimaryChainPublicEntries"),
+            PrimaryChainPrivateEntries => write!(f, "PrimaryChainPrivateEntries"),
             PrimaryChainHeaders => write!(f, "PrimaryChainHeaders"),
             PrimaryChainMeta => write!(f, "PrimaryChainMeta"),
             ChainSequence => write!(f, "ChainSequence"),
@@ -61,7 +64,8 @@ impl DbName {
         use DbKind::*;
         use DbName::*;
         match self {
-            PrimaryChainEntries => Single,
+            PrimaryChainPublicEntries => Single,
+            PrimaryChainPrivateEntries => Single,
             PrimaryChainHeaders => Single,
             PrimaryChainMeta => Multi,
             ChainSequence => SingleInt,
@@ -93,8 +97,11 @@ type DbMap = UniversalMap<DbName>;
 
 lazy_static! {
     /// The key to access the ChainEntries database
-    pub static ref PRIMARY_CHAIN_ENTRIES: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::PrimaryChainEntries);
+    pub static ref PRIMARY_CHAIN_PUBLIC_ENTRIES: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::PrimaryChainPublicEntries);
+    /// The key to access the PrivateChainEntries database
+    pub static ref PRIMARY_CHAIN_PRIVATE_ENTRIES: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::PrimaryChainPrivateEntries);
     /// The key to access the ChainHeaders database
     pub static ref PRIMARY_CHAIN_HEADERS: DbKey<SingleStore> =
     DbKey::<SingleStore>::new(DbName::PrimaryChainHeaders);
@@ -159,7 +166,8 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
 fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> DatabaseResult<()> {
     match kind {
         EnvironmentKind::Cell(_) => {
-            register_db(env, um, &*PRIMARY_CHAIN_ENTRIES)?;
+            register_db(env, um, &*PRIMARY_CHAIN_PUBLIC_ENTRIES)?;
+            register_db(env, um, &*PRIMARY_CHAIN_PRIVATE_ENTRIES)?;
             register_db(env, um, &*PRIMARY_CHAIN_HEADERS)?;
             register_db(env, um, &*PRIMARY_SYSTEM_META)?;
             register_db(env, um, &*PRIMARY_LINKS_META)?;

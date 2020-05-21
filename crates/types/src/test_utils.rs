@@ -5,6 +5,7 @@ use crate::{
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, Properties},
     dna::{DnaDef, DnaFile},
+    header::{AppEntryType, EntryVisibility, ZomeId},
     prelude::*,
 };
 use holo_hash::AgentPubKey;
@@ -115,4 +116,13 @@ pub fn fake_cap_secret() -> CapSecret {
 /// A fixture example ZomeInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
     ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
+}
+
+/// A fixture example AppEntryType for unit testing.
+pub fn fake_app_entry_type(zome_id: ZomeId, visibility: EntryVisibility) -> AppEntryType {
+    AppEntryType {
+        id: Vec::new(),
+        zome_id,
+        visibility,
+    }
 }
