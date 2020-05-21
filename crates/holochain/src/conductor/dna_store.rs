@@ -25,6 +25,7 @@ pub struct DnaDefBuf<'env, R: Readable = Reader<'env>> {
 #[automock]
 pub trait DnaStore: Default + Send + Sync {
     fn add(&mut self, dna: DnaFile) -> DnaStoreResult<()>;
+    fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T);
     // TODO: FAST: Make this return an iterator to avoid allocating
     fn list(&self) -> Vec<DnaHash>;
     fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
@@ -35,6 +36,9 @@ impl DnaStore for RealDnaStore {
     fn add(&mut self, dna: DnaFile) -> DnaStoreResult<()> {
         self.0.insert(dna.dna_hash().clone(), dna);
         Ok(())
+    }
+    fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T) {
+        self.0.extend(dnas);
     }
     #[instrument]
     fn list(&self) -> Vec<DnaHash> {
@@ -50,23 +54,6 @@ impl RealDnaStore {
     pub fn new() -> Self {
         RealDnaStore(HashMap::new())
     }
-
-    async fn put_in_db(&mut self, dna: DnaFile) -> DatabaseResult<()> {
-        let environ = &self.wasm_env;
-        let env = environ.guard().await;
-        let dna_defs = environ.get_db(&*holochain_state::db::DNA_DEF)?;
-        let reader = env.reader()?;
-
-        let mut dna_def_buf = DnaDefBuf::new(&reader, dna_defs)?;
-        if let None = dna_def_buf.get(dna.dna_hash()).await? {
-            dna_def_buf.put(dna.dna().clone()).await?;
-        }
-
-        // write the db
-        env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
-
-        Ok(())
-    }
 }
 
 impl<'env, R: Readable> DnaDefBuf<'env, R> {
@@ -76,7 +63,7 @@ impl<'env, R: Readable> DnaDefBuf<'env, R> {
         })
     }
 
-    pub async fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDef>> {
+    pub fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDef>> {
         self.dna_defs.get(&dna_hash.clone().into())
     }
 
@@ -84,6 +71,10 @@ impl<'env, R: Readable> DnaDefBuf<'env, R> {
         let dna_hash = dna_def.dna_hash().await.clone();
         self.dna_defs.put(dna_hash.clone().into(), dna_def);
         Ok(dna_hash)
+    }
+
+    pub fn iter(&'env self) -> DatabaseResult<impl Iterator<Item = DnaDef> + 'env> {
+        Ok(self.dna_defs.iter_raw()?.map(|(_, dna_def)| dna_def))
     }
 }
 

@@ -75,6 +75,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+
+    #[error("Wasm code was not found in the wasm store")]
+    WasmMissing,
 }
 
 // TODO: can this be removed?
