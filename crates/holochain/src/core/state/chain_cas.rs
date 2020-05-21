@@ -11,7 +11,7 @@ use crate::core::state::source_chain::{
     ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
 use header::EntryVisibility;
-use holo_hash::{EntryHash, Hashed, HeaderHash};
+use holo_hash::{Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -210,11 +210,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         Ok(())
     }
 
-    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
+    pub fn delete(&mut self, header_hash: HeaderHash, entry_address: EntryAddress) {
         self.headers.delete(header_hash.into());
-        self.public_entries.delete(entry_hash.clone().into());
+        self.public_entries.delete(entry_address.clone().into());
         if let Some(db) = self.private_entries.as_mut() {
-            db.delete(entry_hash.into())
+            db.delete(entry_address.into())
         }
     }
 

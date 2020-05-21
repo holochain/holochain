@@ -109,7 +109,7 @@ impl std::fmt::Display for HeaderAddress {
 )]
 pub enum EntryAddress {
     /// standard entry hash
-    Entry(EntryHash),
+    Entry(EntryContentHash),
     /// agents are entries too
     Agent(AgentPubKey),
 }
@@ -168,7 +168,7 @@ impl std::fmt::Display for EntryAddress {
 #[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DhtAddress {
     /// standard entry hash
-    Entry(EntryHash),
+    Entry(EntryContentHash),
     /// agents can be stored
     Agent(AgentPubKey),
     /// headers can be stored

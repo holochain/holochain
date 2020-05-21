@@ -66,7 +66,7 @@ impl EntryHashed {
             Entry::Agent(key) => EntryAddress::Agent(key.to_owned()),
             entry => {
                 let sb = SerializedBytes::try_from(entry)?;
-                EntryAddress::Entry(EntryHash::with_data(sb.bytes()).await)
+                EntryAddress::Entry(EntryContentHash::with_data(sb.bytes()).await)
             }
         };
         Ok(EntryHashed::with_pre_hashed(entry, hash))

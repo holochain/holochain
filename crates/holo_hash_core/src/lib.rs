@@ -179,8 +179,8 @@ core_holo_hash! {
     "Represents a Holo/Holochain AgentPubKey - A libsodium signature public key. (uhCAk...)",
     AgentPubKey,
 
-    "Represents a Holo/Holochain EntryHash - A direct hash of the entry data. (uhCEk...)",
-    EntryHash,
+    "Represents a Holo/Holochain EntryContentHash - A direct hash of the entry data. (uhCEk...)",
+    EntryContentHash,
 
     "Represents a Holo/Holochain HeaderHash - A direct hash of an entry header.",
     HeaderHash,
@@ -213,7 +213,10 @@ mod tests {
         assert_type("DnaHash", DnaHash::new(vec![0xdb; 36]).into());
         assert_type("NetIdHash", NetIdHash::new(vec![0xdb; 36]).into());
         assert_type("AgentPubKey", AgentPubKey::new(vec![0xdb; 36]).into());
-        assert_type("EntryHash", EntryHash::new(vec![0xdb; 36]).into());
+        assert_type(
+            "EntryContentHash",
+            EntryContentHash::new(vec![0xdb; 36]).into(),
+        );
         assert_type("DhtOpHash", DhtOpHash::new(vec![0xdb; 36]).into());
     }
 
