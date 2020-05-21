@@ -139,7 +139,10 @@ mod test {
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
+    use holo_hash::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::entry::Entry;
+    use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
@@ -199,5 +202,33 @@ mod test {
             .run_validate(workspace, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    // #[serial_test::serial]
+    async fn test_validate_implemented_multi() {
+        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
+            .next()
+            .unwrap();
+        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+        let entry = Entry::Agent(
+            AgentPubKeyFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap()
+                .into(),
+        );
+
+        validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
+        validate_invocation.entry = Arc::new(entry);
+
+        let result = ribosome
+            .run_validate(workspace, validate_invocation)
+            .unwrap();
+        assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }
 }
