@@ -22,7 +22,7 @@ pub struct SourceChainBuf<'env, R: Readable> {
 impl<'env, R: Readable> SourceChainBuf<'env, R> {
     pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::primary(reader, dbs)?,
+            cas: ChainCasBuf::primary(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })
@@ -110,9 +110,10 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     /// Get the AgentPubKey from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
     pub fn agent_pubkey(&self) -> DatabaseResult<Option<AgentPubKey>> {
+        // TODO: rewrite in terms of just getting the correct Header
         Ok(self
             .cas
-            .entries()
+            .public_entries()
             .iter_raw()?
             .filter_map(|(_, e)| match e {
                 Entry::Agent(agent_pubkey) => Some(agent_pubkey),
