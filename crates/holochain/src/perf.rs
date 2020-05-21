@@ -55,8 +55,21 @@ macro_rules! end_hard_timeout {
             .unwrap()
                 - i128::try_from($t0.as_nanos()).unwrap();
 
-            dbg!(hard_timeout_nanos);
-            assert!(hard_timeout_nanos < $timeout, "Exceeded hard timeout!");
+            dbg!(format!(
+                "{}: {} <= {}?",
+                stringify!($t0),
+                hard_timeout_nanos,
+                $timeout
+            ));
+
+            if hard_timeout_nanos > $timeout {
+                panic!(format!(
+                    "Exceeded hard timeout! {} > {} ({})",
+                    hard_timeout_nanos,
+                    $timeout,
+                    stringify!($t0, $timeout)
+                ));
+            }
         }
     }};
 }
