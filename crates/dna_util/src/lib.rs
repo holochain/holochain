@@ -164,7 +164,7 @@ pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResu
 
     let json_data = tokio::fs::read(json_filename.clone())
         .await
-        .map_err(move |e| DnaUtilError::PathNotFound(e, json_filename.to_owned()))?;
+        .map_err(move |e| DnaUtilError::PathNotFound(e, json_filename))?;
 
     let json_file: DnaDefJson = serde_json::from_slice(&json_data)?;
 
