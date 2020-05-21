@@ -607,6 +607,7 @@ dependencies = [
  "holo_hash_core",
  "holochain_serialized_bytes",
  "holochain_types",
+ "holochain_zome_types",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -725,8 +726,10 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 name = "fixt"
 version = "0.0.1"
 dependencies = [
+ "holochain_serialized_bytes",
  "paste",
  "rand 0.7.3",
+ "serde",
 ]
 
 [[package]]
@@ -995,12 +998,15 @@ version = "0.0.1"
 dependencies = [
  "base64 0.12.0",
  "blake2b_simd",
+ "fixt",
  "holo_hash_core",
  "holochain_serialized_bytes",
+ "rand 0.7.3",
  "serde",
  "serde_bytes",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
 ]
 
 [[package]]
@@ -1028,6 +1034,7 @@ dependencies = [
  "directories 2.0.2",
  "either",
  "fallible-iterator",
+ "fixt",
  "futures",
  "hcid",
  "holo_hash",
@@ -1049,15 +1056,20 @@ dependencies = [
  "matches",
  "mockall",
  "must_future",
+ "nanoid",
  "num_cpus",
  "owning_ref",
  "parking_lot",
  "petgraph",
  "predicates",
+ "rand 0.7.3",
  "serde",
  "serde_json",
+ "serial_test",
  "shrinkwraprs",
  "structopt",
+ "strum",
+ "strum_macros",
  "tempdir",
  "test_wasm_common",
  "thiserror",
@@ -1184,6 +1196,7 @@ dependencies = [
  "base64 0.10.1",
  "chrono",
  "derive_more",
+ "fixt",
  "flate2",
  "futures",
  "hcid",
@@ -1201,6 +1214,7 @@ dependencies = [
  "multihash",
  "must_future",
  "nanoid",
+ "rand 0.7.3",
  "regex",
  "rust-base58",
  "serde",
@@ -1230,7 +1244,13 @@ dependencies = [
 name = "holochain_wasm_test_utils"
 version = "0.0.1"
 dependencies = [
+ "fixt",
+ "holo_hash",
  "holochain_types",
+ "holochain_zome_types",
+ "rand 0.7.3",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]
@@ -1284,8 +1304,10 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.1"
 dependencies = [
+ "holo_hash_core",
  "holochain_serialized_bytes",
  "multihash",
+ "nanoid",
  "rust-base58",
  "serde",
 ]
@@ -2839,6 +2861,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial_test"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fef5f7c7434b2f2c598adc6f9494648a1e41274a75c0ba4056f680ae0c117fd6"
+dependencies = [
+ "lazy_static",
+ "parking_lot",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d08338d8024b227c62bd68a12c7c9883f5c66780abaef15c550dc56f46ee6515"
+dependencies = [
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.18",
+]
+
+[[package]]
 name = "sha-1"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2997,6 +3041,24 @@ checksum = "d239ca4b13aee7a2142e6795cbd69e457665ff8037aed33b3effdc430d2f927a"
 dependencies = [
  "heck",
  "proc-macro-error",
+ "proc-macro2 1.0.10",
+ "quote 1.0.3",
+ "syn 1.0.18",
+]
+
+[[package]]
+name = "strum"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
+
+[[package]]
+name = "strum_macros"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87c85aa3f8ea653bfd3ddf25f7ee357ee4d204731f6aa9ad04002306f6e2774c"
+dependencies = [
+ "heck",
  "proc-macro2 1.0.10",
  "quote 1.0.3",
  "syn 1.0.18",

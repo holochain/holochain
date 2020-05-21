@@ -118,7 +118,7 @@ macro_rules! core_holo_hash {
                 $name($name),
             )*
         }
-        holochain_serialized_bytes::holochain_serial!(HoloHashCore);
+        holochain_serialized_bytes::holochain_serial!(HoloHashCore, $( $name ),*);
 
         impl HoloHashCoreHash for HoloHashCore {
             fn get_raw(&self) -> &[u8] {

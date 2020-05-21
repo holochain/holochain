@@ -27,7 +27,24 @@ fn main() {
 
     println!("cargo:rerun-if-changed={}", hacky_file_name);
 
-    for &m in ["debug", "foo", "imports"].iter() {
+    for &m in [
+        "debug",
+        "foo",
+        "imports",
+        "init_pass",
+        "init_fail",
+        "migrate_agent_pass",
+        "migrate_agent_fail",
+        "post_commit_success",
+        "post_commit_fail",
+        "validate",
+        "validate_invalid",
+        "validate_valid",
+        "validation_package_fail",
+        "validation_package_success",
+    ]
+    .iter()
+    {
         let cargo_toml = Path::new(m).join("Cargo.toml");
 
         let cargo_command = std::env::var_os("CARGO");

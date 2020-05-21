@@ -76,12 +76,26 @@ macro_rules! match_header {
 }
 
 impl Header {
-    /// Returns `false` if this header is associated with a private entry. Otherwise, returns `true`.
-    pub fn is_public(&self) -> bool {
-        unimplemented!()
+    /// Returns the address and entry type of the Entry, if applicable.
+    // TODO: DRY: possibly create an `EntryData` struct which is used by both
+    // EntryCreate and EntryUpdate
+    pub fn entry_data(&self) -> Option<(&EntryAddress, &EntryType)> {
+        match self {
+            Self::EntryCreate(EntryCreate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address, entry_type)),
+            Self::EntryUpdate(EntryUpdate {
+                entry_address,
+                entry_type,
+                ..
+            }) => Some((entry_address, entry_type)),
+            _ => None,
+        }
     }
 
-    /// Returns the public key of the agent who signed this header.
+    /// returns the public key of the agent who signed this header.
     pub fn author(&self) -> &AgentPubKey {
         match_header!(self => |i| { &i.author })
     }
@@ -254,9 +268,45 @@ pub enum EntryType {
     CapGrant,
 }
 
+impl EntryType {
+    pub fn visibility(&self) -> &EntryVisibility {
+        match self {
+            EntryType::AgentPubKey => &EntryVisibility::Public,
+            EntryType::App(t) => &t.visibility,
+            EntryType::CapClaim => &EntryVisibility::Private,
+            EntryType::CapGrant => &EntryVisibility::Private,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
-    id: Vec<u8>,
-    zome_id: ZomeId,
-    is_public: bool,
+    pub(crate) id: Vec<u8>,
+    pub(crate) zome_id: ZomeId,
+    pub(crate) visibility: EntryVisibility,
+}
+
+impl AppEntryType {
+    pub fn id(&self) -> &[u8] {
+        &self.id
+    }
+    pub fn zome_id(&self) -> &ZomeId {
+        &self.zome_id
+    }
+    pub fn visibility(&self) -> &EntryVisibility {
+        &self.visibility
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum EntryVisibility {
+    Public,
+    Private,
+}
+
+impl EntryVisibility {
+    /// converts entry visibility enum into boolean value on public
+    pub fn is_public(&self) -> bool {
+        *self == EntryVisibility::Public
+    }
 }
