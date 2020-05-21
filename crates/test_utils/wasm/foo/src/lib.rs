@@ -19,5 +19,5 @@ pub extern "C" fn foo(_: RemotePtr) -> RemotePtr {
 
  // imagine this is inside the hdk
  let response_sb: SerializedBytes = try_result!(response.try_into(), "failed to serialize TestString");
- ret!(ZomeExternGuestOutput::new(response_sb));
+ ret!(GuestOutput::new(response_sb));
 }

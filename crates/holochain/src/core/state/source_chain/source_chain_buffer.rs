@@ -4,13 +4,16 @@ use crate::core::state::{
     source_chain::{ChainElement, SignedHeaderHashed, SourceChainError, SourceChainResult},
 };
 use fallible_iterator::FallibleIterator;
-use holochain_state::{buffer::BufferedStore, error::DatabaseResult, prelude::*};
-use holochain_types::{
-    composite_hash::HeaderAddress,
-    entry::{Entry, EntryHashed},
-    prelude::*,
-    Header, HeaderHashed,
+use holochain_state::db::GetDb;
+use holochain_state::{
+    buffer::BufferedStore,
+    error::DatabaseResult,
+    prelude::{Readable, Writer},
 };
+use holochain_types::{
+    composite_hash::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,
+};
+use holochain_zome_types::entry::Entry;
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -108,7 +111,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 Entry::Agent(agent_pubkey) => Some(agent_pubkey),
                 _ => None,
             })
-            .next())
+            .next()
+            .map(|h| h.into()))
     }
 
     pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env, R> {
@@ -218,12 +222,12 @@ pub mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
-        entry::Entry,
         header,
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header, HeaderHashed,
     };
+    use holochain_zome_types::entry::Entry;
 
     fn fixtures() -> (
         AgentPubKey,
@@ -236,7 +240,7 @@ pub mod tests {
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
-        let agent_entry = Entry::Agent(agent_pubkey.clone());
+        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
 
         let (dna_header, agent_header) = tokio_safe_block_on::tokio_safe_block_on(
             async {
@@ -313,9 +317,12 @@ pub mod tests {
                 .expect("error retrieving")
                 .expect("entry not found");
             assert_eq!(dna_header.as_content(), dna_element_fetched.header());
-            assert_eq!(dna_entry, *dna_element_fetched.entry());
+            assert_eq!(dna_entry.as_ref(), dna_element_fetched.entry().as_option());
             assert_eq!(agent_header.as_content(), agent_element_fetched.header());
-            assert_eq!(agent_entry, *agent_element_fetched.entry());
+            assert_eq!(
+                agent_entry.as_ref(),
+                agent_element_fetched.entry().as_option()
+            );
 
             // check that you can iterate on the chain
             let mut iter = store.iter_back();

@@ -38,9 +38,9 @@ wasm_io_types!(
     // @TODO
     pub struct CapabilityInput(());
     pub struct CapabilityOutput(());
-    // @TODO
-    pub struct CommitEntryInput(());
-    pub struct CommitEntryOutput(());
+    // the SerializedBytes will be stuffed into an Entry::App(SB) host side
+    pub struct CommitEntryInput(crate::entry::Entry);
+    pub struct CommitEntryOutput(crate::commit::CommitEntryResult);
     // @TODO
     pub struct DecryptInput(());
     pub struct DecryptOutput(());
@@ -105,14 +105,22 @@ wasm_io_types!(
     // DebugMsg includes line numbers etc. so the wasm can tell the host about it's own code
     pub struct DebugInput(crate::debug::DebugMsg);
     pub struct DebugOutput(());
-    // every externed function that the zome developer exposes to holochain returns ZomeExternOutput
-    // as the zome developer can expose arbitrary functions and the client will expect arbitrary data
-    // all we can say is that some SerializedBytes are being returned
-    // same deal for the input, the HDK or the dev will need to BYO context for deserialization of the
-    // inner data
-    // IMPORTANT NOTE: zome externs work differently to everything else here because the _host_
-    // is providing the input and the _guest_ is providing the output
-    // hence, the non-standard naming, to try and make this clear
-    pub struct ZomeExternHostInput(crate::SerializedBytes);
-    pub struct ZomeExternGuestOutput(crate::SerializedBytes);
+    // there's nothing to go in or out of a noop
+    // used to "defuse" host functions when side effects are not allowed
+    pub struct UnreachableInput(());
+    pub struct UnreachableOutput(());
+    // every externed function that the zome developer exposes to holochain returns GuestOutput
+    // as the zome developer can expose callbacks in a "sparse" way based on names and the functions
+    // can take different input (e.g. validation vs. hooks like init, etc.) all we can say is that
+    // some SerializedBytes are being returned
+    // in the case of ZomeExtern functions exposed to a client, the data input/output is entirely
+    // arbitrary so we can't say anything at all. In this case the happ developer must BYO
+    // deserialization context to match the client, either directly or via. the HDK.
+    // note though, that _unlike_ zome externs, the host _does_ know exactly the guest should be
+    // returning for callbacks, it's just that the unpacking of the return happens in two steps:
+    // - first the sparse callback is triggered with SB input/output
+    // - then the guest inflates the expected input or the host the expected output based on the
+    //   callback flavour
+    pub struct HostInput(crate::SerializedBytes);
+    pub struct GuestOutput(crate::SerializedBytes);
 );

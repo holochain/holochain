@@ -15,7 +15,6 @@ pub mod ribosome;
 pub mod signal;
 pub mod state;
 #[allow(missing_docs)]
-pub mod validation;
 pub mod workflow;
 
 mod sys_validate;

@@ -14,7 +14,8 @@ use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResul
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
-use holochain_types::{dna::DnaFile, entry::Entry, header, Header};
+use holochain_types::{dna::DnaFile, header, Header};
+use holochain_zome_types::entry::Entry;
 use must_future::MustBoxFuture;
 
 /// The struct which implements the genesis Workflow
@@ -85,7 +86,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             });
             workspace
                 .source_chain
-                .put(agent_header, Some(Entry::Agent(agent_pubkey)))
+                .put(agent_header, Some(Entry::Agent(agent_pubkey.into())))
                 .await?;
 
             let fx = WorkflowEffects {
@@ -152,16 +153,16 @@ pub mod tests {
     use holo_hash::Hashed;
     use holochain_state::{env::*, prelude::Readable, test_utils::test_cell_env};
     use holochain_types::{
-        entry::Entry,
         header, observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header, Timestamp,
     };
+    use holochain_zome_types::entry::Entry;
     use matches::assert_matches;
 
     pub async fn fake_genesis<R: Readable>(source_chain: &mut SourceChain<'_, R>) -> Header {
         let agent_pubkey = fake_agent_pubkey_1();
-        let agent_entry = Entry::Agent(agent_pubkey.clone());
+        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
         let dna = fake_dna_file("cool dna");
         let dna_header = Header::Dna(header::Dna {
             author: agent_pubkey.clone(),
@@ -288,7 +289,7 @@ Functions / Workflows:
 
 - commit DNA entry (w/ special enum header with NULL  prev_header)
 
-- commit CapToken Grant for author (agent key) (w/ normal header)
+- commit CapGrant for author (agent key) (w/ normal header)
 
 
 

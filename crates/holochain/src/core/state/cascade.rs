@@ -44,7 +44,7 @@ use super::{
 };
 use holochain_state::{error::DatabaseResult, prelude::Reader};
 use holochain_types::composite_hash::EntryAddress;
-use holochain_types::entry::Entry;
+use holochain_zome_types::entry::Entry;
 use std::collections::HashSet;
 use tracing::*;
 
