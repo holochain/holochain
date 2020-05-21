@@ -10,7 +10,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Reader},
 };
-use holochain_types::{address::HeaderAddress, entry::Entry, prelude::*, Header, HeaderHashed};
+use holochain_types::{composite_hash::HeaderAddress, entry::Entry, prelude::*, Header, HeaderHashed};
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;

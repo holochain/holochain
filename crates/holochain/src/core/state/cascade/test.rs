@@ -7,7 +7,7 @@ use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
 use holochain_types::{
-    address::EntryHash,
+    composite_hash::EntryHash,
     entry::{Entry, EntryHashed},
     header, observability,
     prelude::*,

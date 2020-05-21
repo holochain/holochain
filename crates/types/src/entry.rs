@@ -6,8 +6,8 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::{
-    address::EntryHash,
     capability::{CapClaim, CapGrant, ZomeCallCapGrant},
+    composite_hash::EntryHash,
 };
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;

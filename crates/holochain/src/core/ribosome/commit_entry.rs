@@ -4,7 +4,7 @@ use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::{future::BoxFuture, FutureExt};
 use holochain_types::{
-    address::HeaderAddress, entry::Entry, header, header::Header, test_utils::fake_agent_pubkey_1,
+    composite_hash::HeaderAddress, entry::Entry, header, header::Header, test_utils::fake_agent_pubkey_1,
     Timestamp,
 };
 use holochain_zome_types::CommitEntryInput;

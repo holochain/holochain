@@ -6,7 +6,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::*,
 };
-use holochain_types::{address::EntryHash, shims::*};
+use holochain_types::{composite_hash::EntryHash, shims::*};
 use mockall::mock;
 use std::collections::HashSet;
 use std::convert::TryInto;

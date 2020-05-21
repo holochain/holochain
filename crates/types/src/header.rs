@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::address::{DhtAddress, EntryHash, HeaderAddress};
+use crate::composite_hash::{DhtAddress, EntryHash, HeaderAddress};
 
 /// Header contains variants for each type of header.
 ///

@@ -1,6 +1,6 @@
 //! Placeholder for networking related types. May be deleted.
 
-use holochain_types::address::EntryHash;
+use holochain_types::composite_hash::EntryHash;
 
 /// Placeholder for a resource which can be passed into Workflows,
 /// granting access to the networking subsystem

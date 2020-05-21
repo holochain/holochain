@@ -23,7 +23,7 @@ use holochain_state::{
     prelude::{Readable, Reader, Writer},
 };
 use holochain_types::{
-    address::{EntryHash, HeaderAddress},
+    composite_hash::{EntryHash, HeaderAddress},
     entry::{Entry, EntryHashed},
     header,
     prelude::Signature,

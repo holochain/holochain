@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
-use holochain_types::address::{EntryHash, HeaderAddress};
+use holochain_types::composite_hash::{EntryHash, HeaderAddress};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
