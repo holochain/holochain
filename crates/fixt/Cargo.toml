@@ -13,6 +13,8 @@ edition = "2018"
 [dependencies]
 rand = "0.7"
 paste = "0.1.11"
+holochain_serialized_bytes = "=0.0.39"
+serde = { version = "1.0.104", features = ["derive"] }
 
 [features]
 fixt = []

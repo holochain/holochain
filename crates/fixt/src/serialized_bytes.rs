@@ -1,0 +1,106 @@
+//! @todo move all this out to the serialized bytes crate
+use crate::prelude::*;
+use holochain_serialized_bytes::prelude::*;
+use rand::seq::SliceRandom;
+
+#[derive(Clone, Copy)]
+/// there are many different types of things that we could reasonably serialize in our examples
+/// a list of things that we serialize iteratively (Predictable) or randomly (Unpredictable)
+pub enum ThingsToSerialize {
+    Unit,
+    Bool,
+    Number,
+    String,
+}
+
+pub const THINGS_TO_SERIALIZE: [ThingsToSerialize; 4] = [
+    ThingsToSerialize::Unit,
+    ThingsToSerialize::Bool,
+    ThingsToSerialize::Number,
+    ThingsToSerialize::String,
+];
+
+/// Serialization wrapper for bools
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+struct BoolWrap(bool);
+/// Serialization wrapper for u32 (number)
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+struct U32Wrap(u32);
+/// Serialzation wrapper for Strings
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+struct StringWrap(String);
+
+fixturator!(
+    SerializedBytes,
+    { SerializedBytes::try_from(()).unwrap() },
+    {
+        // randomly select a thing to serialize
+        let thing_to_serialize = THINGS_TO_SERIALIZE
+            .to_vec()
+            .choose(&mut rand::thread_rng())
+            .unwrap()
+            .to_owned();
+
+        // serialize a thing based on a delegated fixturator
+        match thing_to_serialize {
+            ThingsToSerialize::Unit => UnitFixturator::new(Unpredictable)
+                .next()
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            ThingsToSerialize::Bool => BoolWrap(BoolFixturator::new(Unpredictable).next().unwrap())
+                .try_into()
+                .unwrap(),
+            ThingsToSerialize::Number => U32Wrap(U32Fixturator::new(Unpredictable).next().unwrap())
+                .try_into()
+                .unwrap(),
+            ThingsToSerialize::String => {
+                StringWrap(StringFixturator::new(Unpredictable).next().unwrap())
+                    .try_into()
+                    .unwrap()
+            }
+        }
+    },
+    {
+        // iteratively select a thing to serialize
+        let thing_to_serialize = THINGS_TO_SERIALIZE
+            .to_vec()
+            .into_iter()
+            .cycle()
+            .nth(self.0.index)
+            .unwrap();
+
+        // serialize a thing based on a delegated fixturator
+        let ret: SerializedBytes = match thing_to_serialize {
+            ThingsToSerialize::Unit => UnitFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap()
+                .try_into()
+                .unwrap(),
+            ThingsToSerialize::Bool => BoolWrap(
+                BoolFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap(),
+            )
+            .try_into()
+            .unwrap(),
+            ThingsToSerialize::Number => U32Wrap(
+                U32Fixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap(),
+            )
+            .try_into()
+            .unwrap(),
+            ThingsToSerialize::String => StringWrap(
+                StringFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap(),
+            )
+            .try_into()
+            .unwrap(),
+        };
+
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);

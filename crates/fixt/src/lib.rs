@@ -1,8 +1,11 @@
 pub mod bool;
+pub mod bytes;
 pub mod number;
 pub mod prelude;
+pub mod serialized_bytes;
 pub mod string;
 pub mod unit;
+pub use paste;
 
 #[derive(Clone)]
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over
@@ -45,7 +48,7 @@ pub mod unit;
 /// essentially, the iteration of a fixturator should work like some_iter.cycle()
 pub struct Fixturator<Item, Curve> {
     item: std::marker::PhantomData<Item>,
-    curve: Curve,
+    pub curve: Curve,
     pub index: usize,
 }
 
@@ -77,7 +80,7 @@ macro_rules! basic_test {
         basic_test!($type, $empty_expected, $predictable_expected, true);
     };
     ( $type:ty, $empty_expected:expr, $predictable_expected:expr, $test_unpredictable:literal ) => {
-        paste::item! {
+        item! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _empty>] () {
@@ -90,7 +93,7 @@ macro_rules! basic_test {
             }
         }
 
-        paste::item! {
+        item! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _predictable>] () {
@@ -103,7 +106,7 @@ macro_rules! basic_test {
             }
         }
 
-        paste::item! {
+        item! {
             #[test]
             #[cfg(test)]
             fn [<$type:lower _unpredictable>] () {
@@ -146,9 +149,11 @@ macro_rules! basic_test {
 #[macro_export]
 macro_rules! fixturator {
     ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
-        paste::item! {
+        item! {
+            #[allow(missing_docs)]
             pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
 
+            #[allow(missing_docs)]
             impl <Curve>[<$type:camel Fixturator>]<Curve> {
                 pub fn new(curve: Curve) -> [<$type:camel Fixturator>]<Curve> {
                     Self::new_indexed(curve, 0)
@@ -158,6 +163,7 @@ macro_rules! fixturator {
                 }
             }
 
+            #[allow(missing_docs)]
             impl Iterator for [<$type:camel Fixturator>]<Empty> {
                 type Item = $type;
 
@@ -167,6 +173,7 @@ macro_rules! fixturator {
                 }
             }
 
+            #[allow(missing_docs)]
             impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
                 type Item = $type;
 
@@ -176,6 +183,7 @@ macro_rules! fixturator {
                 }
             }
 
+            #[allow(missing_docs)]
             impl Iterator for [<$type:camel Fixturator>]<Predictable> {
                 type Item = $type;
 
@@ -243,18 +251,80 @@ pub struct Empty;
 /// a direct delegation of fixtures to the inner type for new types
 macro_rules! newtype_fixturator {
     ( $outer:ident<$inner:ty> ) => {
-        fixturator!($outer, {
-            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
-            self.0.index = self.0.index + 1;
-            $outer(fixturator.next().unwrap())
-        }, {
-            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
-            self.0.index = self.0.index + 1;
-            $outer(fixturator.next().unwrap())
-        }, {
-            let mut fixturator = paste::expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
-            self.0.index = self.0.index + 1;
-            $outer(fixturator.next().unwrap())
-        });
-    }
+        fixturator!(
+            $outer,
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer(fixturator.next().unwrap())
+            }
+        );
+    };
+}
+
+#[macro_export]
+/// a direct delegation of fixtures to the inner type for wasm io types
+/// @see zome types crate
+macro_rules! wasm_io_fixturator {
+    ( $outer:ident<$inner:ty> ) => {
+        fixturator!(
+            $outer,
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer::new(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer::new(fixturator.next().unwrap())
+            },
+            {
+                let mut fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
+                self.0.index = self.0.index + 1;
+                $outer::new(fixturator.next().unwrap())
+            }
+        );
+    };
+}
+
+#[macro_export]
+/// Creates a simple way to generate enums that use the strum way of iterating
+/// https://docs.rs/strum/0.18.0/strum/
+/// iterates over all the variants (Predictable) or selects random variants (Unpredictable)
+/// You do still need to BYO "empty" variant as the macro doesn't know what to use there
+macro_rules! enum_fixturator {
+    ( $enum:ident, $empty:expr ) => {
+        use crate::strum::IntoEnumIterator;
+        use rand::seq::IteratorRandom;
+        fixturator!(
+            $enum,
+            $empty,
+            {
+                let mut rng = rand::thread_rng();
+                $enum::iter().choose(&mut rng).unwrap()
+            },
+            {
+                let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
+                self.0.index = self.0.index + 1;
+                ret
+            }
+        );
+    };
 }

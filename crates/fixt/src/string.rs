@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use rand::Rng;
 
-const EMPTY_CHAR: char = '\u{0000}';
-const PREDICTABLE_CHARS: &str = "💯❤💩.!foobarbaz!.💩❤💯";
+pub const EMPTY_CHAR: char = '\u{0000}';
+pub const PREDICTABLE_CHARS: &str = "💯❤💩.!foobarbaz!.💩❤💯";
 
 fixturator!(char, EMPTY_CHAR, rand::random(), {
     let ret = PREDICTABLE_CHARS
@@ -24,10 +24,11 @@ basic_test!(
         .collect::<Vec<char>>()
 );
 
-const EMPTY_STR: &str = "";
-const PREDICTABLE_STRS: [&str; 10] = ["💯", "❤", "💩", ".", "!", "foo", "bar", "baz", "bing", "!"];
-const UNPREDICTABLE_MIN_LEN: usize = 0;
-const UNPREDICTABLE_MAX_LEN: usize = 64;
+pub const EMPTY_STR: &str = "";
+pub const PREDICTABLE_STRS: [&str; 10] =
+    ["💯", "❤", "💩", ".", "!", "foo", "bar", "baz", "bing", "!"];
+pub const UNPREDICTABLE_MIN_LEN: usize = 0;
+pub const UNPREDICTABLE_MAX_LEN: usize = 64;
 
 fixturator!(
     String,

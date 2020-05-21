@@ -1,18 +1,18 @@
-use super::{
-    api::{error::ConductorApiError, CellConductorApiT},
-    ConductorHandle,
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::handle::ConductorHandle;
+use crate::core::ribosome::ZomeCallInvocation;
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
+    core::ribosome::wasm_ribosome::WasmRibosome,
     core::{
-        ribosome::WasmRibosome,
         state::source_chain::SourceChainBuf,
         workflow::{
             run_workflow, GenesisWorkflow, GenesisWorkspace, InvokeZomeWorkflow,
-            InvokeZomeWorkspace, ZomeInvocationResult,
+            InvokeZomeWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -20,13 +20,8 @@ use error::CellError;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    env::{EnvironmentKind, EnvironmentWrite},
-    prelude::*,
-};
-use holochain_types::{
-    autonomic::AutonomicProcess, cell::CellId, nucleus::ZomeInvocation, prelude::Todo,
-};
+use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
+use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo};
 use std::{
     hash::{Hash, Hasher},
     path::Path,
@@ -179,18 +174,18 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    pub async fn invoke_zome(
+    pub async fn call_zome(
         &self,
-        invocation: ZomeInvocation,
-    ) -> ConductorApiResult<ZomeInvocationResult> {
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
         let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
+        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
         let workflow = InvokeZomeWorkflow {
             ribosome: self.get_ribosome().await?,
             invocation,
         };
-        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
         Ok(run_workflow(self.state_env().clone(), workflow, workspace)
             .await
             .map_err(Box::new)?)

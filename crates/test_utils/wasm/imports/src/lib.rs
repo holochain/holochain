@@ -20,7 +20,7 @@ macro_rules! guest_functions {
             #[no_mangle]
             pub extern "C" fn $guest_fn(host_allocation_ptr: RemotePtr) -> RemotePtr {
                 let input = {
-                    let v: ZomeExternHostInput = host_args!(host_allocation_ptr);
+                    let v: HostInput = host_args!(host_allocation_ptr);
                     let deserialized = <$input_type>::try_from(v.into_inner());
                     try_result!(deserialized, "failed to deserialize host inputs")
                 };
@@ -35,7 +35,7 @@ macro_rules! guest_functions {
                     output.try_into(),
                     "failed to serialize output for extern response"
                 );
-                ret!(ZomeExternGuestOutput::new(output_sb));
+                ret!(GuestOutput::new(output_sb));
             }
         )*
     }
@@ -65,7 +65,8 @@ guest_functions!(
     [ __entry_type_properties, entry_type_properties, EntryTypePropertiesInput, EntryTypePropertiesOutput ],
     [ __entry_address, entry_address, EntryAddressInput, EntryAddressOutput ],
     [ __sys_time, sys_time, SysTimeInput, SysTimeOutput ],
-    [ __debug, debug, DebugInput, DebugOutput ]
+    [ __debug, debug, DebugInput, DebugOutput ],
+    [ __unreachable, unreachable, UnreachableInput, UnreachableOutput ]
 );
 
 // this is the type of thing you'd expect to see in an HDK to cache the global constants

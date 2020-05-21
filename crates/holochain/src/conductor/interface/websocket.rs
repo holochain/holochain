@@ -243,9 +243,8 @@ mod test {
         dna_store::{error::DnaStoreError, MockDnaStore},
         Conductor, ConductorHandle,
     };
-    use crate::core::{
-        ribosome::wasm_test::zome_invocation_from_names, state::source_chain::SourceChainBuf,
-    };
+    use crate::core::state::source_chain::SourceChainBuf;
+    use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{
@@ -259,6 +258,7 @@ mod test {
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
+    use holochain_zome_types::HostInput;
     use matches::assert_matches;
     use mockall::predicate;
     use std::{collections::HashMap, convert::TryInto};
@@ -436,7 +436,8 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn call_zome_function() {
+    #[serial_test::serial]
+    async fn websocket_call_zome_function() {
         observability::test_run().ok();
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
         struct Payload {
@@ -445,8 +446,14 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
-            vec![("zomey".into(), TestWasm::Foo.into())],
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
+
+        // warm the zome
+        let _ = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+
         let payload = Payload { a: 1 };
         let dna_hash = dna.dna_hash().clone();
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
@@ -459,22 +466,34 @@ mod test {
             .returning(move |_| Some(dna.clone()));
 
         let (_tmpdir, app_api) = setup_app(vec![(cell_id.clone(), None)], dna_store).await;
-        let mut request = Box::new(zome_invocation_from_names(
-            "zomey",
-            "foo",
-            payload.try_into().unwrap(),
-        ));
+        let mut request = Box::new(
+            crate::core::ribosome::ZomeCallInvocationFixturator::new(
+                crate::core::ribosome::NamedInvocation(
+                    cell_id.clone(),
+                    TestWasm::Foo.into(),
+                    "foo".into(),
+                    HostInput::new(payload.try_into().unwrap()),
+                ),
+            )
+            .next()
+            .unwrap(),
+        );
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeInvocationRequest { request };
+        let msg = AppRequest::ZomeCallInvocationRequest { request };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeInvocationResponse{ .. });
+            assert_matches!(response, AppResponse::ZomeCallInvocationResponse{ .. });
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
+
+        let websocket_timeout = crate::start_hard_timeout!();
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, app_api).await.unwrap();
+        // the time here should be almost the same (about +0.1ms) vs. the raw wasm_ribosome call
+        // the overhead of a websocket request locally is small
+        crate::end_hard_timeout!(websocket_timeout, crate::perf::ONE_WASM_CALL);
     }
 
     #[tokio::test(threaded_scheduler)]
