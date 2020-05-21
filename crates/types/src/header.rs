@@ -279,12 +279,11 @@ impl EntryType {
     }
 }
 
-// TODO: make these pub(crate) and move fixturator to this crate
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
-    pub id: Vec<u8>,
-    pub zome_id: ZomeId,
-    pub visibility: EntryVisibility,
+    pub(crate) id: Vec<u8>,
+    pub(crate) zome_id: ZomeId,
+    pub(crate) visibility: EntryVisibility,
 }
 
 impl AppEntryType {

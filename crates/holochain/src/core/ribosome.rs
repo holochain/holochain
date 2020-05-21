@@ -36,6 +36,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;
 use holochain_types::dna::DnaFile;
+use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
@@ -196,7 +197,7 @@ fixturator!(
         ZomeCallInvocation {
             cell_id: CellIdFixturator::new(Empty).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
-            cap: todo!("capability arg"),
+            cap: CapSecretFixturator::new(Empty).next().unwrap(),
             fn_name: StringFixturator::new(Empty).next().unwrap(),
             payload: HostInputFixturator::new(Empty).next().unwrap(),
             provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -206,7 +207,7 @@ fixturator!(
         ZomeCallInvocation {
             cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
-            cap: todo!("capability arg"),
+            cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
             fn_name: StringFixturator::new(Unpredictable).next().unwrap(),
             payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
             provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -220,7 +221,9 @@ fixturator!(
             zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-            cap: todo!("capability arg"),
+            cap: CapSecretFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
             fn_name: StringFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),

@@ -1,11 +1,11 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::fixt::AppEntryTypeFixturator;
 use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::fixt::AppEntryTypeFixturator;
 use holochain_types::header::AppEntryType;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;

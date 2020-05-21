@@ -13,7 +13,6 @@ use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
-use holochain_types::header::AppEntryType;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
@@ -62,33 +61,6 @@ fixturator!(
             .unwrap()
     ),
     Entry::App(SerializedBytesFixturator::new(Predictable).next().unwrap())
-);
-
-fixturator!(
-    AppEntryType,
-    AppEntryType {
-        id: BytesFixturator::new(Empty).next().unwrap(),
-        zome_id: U8Fixturator::new(Empty).next().unwrap(),
-        visibility: todo!("visibility fixturator"),
-    },
-    AppEntryType {
-        id: BytesFixturator::new(Unpredictable).next().unwrap(),
-        zome_id: U8Fixturator::new(Unpredictable).next().unwrap(),
-        visibility: todo!("visibility fixturator"),
-    },
-    {
-        let app_entry_type = AppEntryType {
-            id: BytesFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            zome_id: U8Fixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            visibility: todo!("visibility fixturator"),
-        };
-        self.0.index = self.0.index + 1;
-        app_entry_type
-    }
 );
 
 fixturator!(
