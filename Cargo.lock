@@ -513,9 +513,9 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "0.99.5"
+version = "0.99.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2323f3f47db9a0e77ce7a300605d8d2098597fc451ed1a97bb1f6411bb550a7"
+checksum = "2127768764f1556535c01b5326ef94bd60ff08dcfbdc544d53e69ed155610f5d"
 dependencies = [
  "proc-macro2 1.0.10",
  "quote 1.0.3",
@@ -1435,6 +1435,18 @@ checksum = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
+]
+
+[[package]]
+name = "kitsune_p2p"
+version = "0.0.1"
+dependencies = [
+ "derive_more",
+ "futures",
+ "ghost_actor",
+ "shrinkwraprs",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
