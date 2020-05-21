@@ -74,6 +74,7 @@ impl<'env, R: Readable> DnaDefBuf<'env, R> {
     }
 
     pub fn iter(&'env self) -> DatabaseResult<impl Iterator<Item = DnaDef> + 'env> {
+        // Don't want to pay for deserializing the keys
         Ok(self.dna_defs.iter_raw()?.map(|(_, dna_def)| dna_def))
     }
 }

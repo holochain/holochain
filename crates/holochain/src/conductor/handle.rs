@@ -96,7 +96,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
-    /// Add the [DnaFile]s from the wasm and dna_def databases
+    /// Add the [DnaFile]s from the wasm and dna_def databases into memory
     async fn add_dnas(&self) -> ConductorResult<()>;
 
     /// Invoke a zome function on a Cell

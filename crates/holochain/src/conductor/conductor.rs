@@ -455,7 +455,7 @@ where
         let wasm_tasks = dna_def_buf
             .iter()?
             .map(|dna_def| {
-                // TODO: Load all wasms from the dna_def from the wasm db into memory
+                // Load all wasms for each dna_def from the wasm db into memory
                 let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {
                     wasm_buf
                         .get(&zome.wasm_hash.into())
@@ -469,7 +469,9 @@ where
                     Ok((dna_file.dna_hash().clone(), dna_file))
                 }
             })
+            // This needs to happen due to the environment not being Send
             .collect::<Vec<_>>();
+        // try to join all the tasks and return the list of dna files
         futures::future::try_join_all(wasm_tasks).await
     }
 
