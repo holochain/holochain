@@ -5,11 +5,11 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
+use crate::capability::CapClaim;
+use crate::capability::CapGrant;
+use crate::capability::ZomeCallCapGrant;
 use holo_hash_core::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
-use crate::capability::CapClaim;
-use crate::capability::ZomeCallCapGrant;
-use crate::capability::CapGrant;
 
 /// The data type written to the source chain when explicitly granting a capability.
 /// NB: this is not simply `CapGrant`, because the `CapGrant::Authorship`
@@ -52,8 +52,8 @@ impl Entry {
     #[allow(dead_code)]
     pub(crate) fn cap_grant(&self) -> Option<CapGrant> {
         match self {
-            Entry::Agent(key) => Some(key.clone().into()),
-            Entry::CapGrant(data) => Some(data.clone().into()),
+            Entry::Agent(key) => Some(CapGrant::Authorship(key.clone())),
+            Entry::CapGrant(data) => Some(CapGrant::ZomeCall(data.clone())),
             _ => None,
         }
     }

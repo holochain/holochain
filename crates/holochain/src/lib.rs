@@ -8,4 +8,6 @@ pub mod conductor;
 pub mod core;
 pub mod fixt;
 pub mod perf;
+pub mod test_utils;
+
 use holochain_wasmer_host;

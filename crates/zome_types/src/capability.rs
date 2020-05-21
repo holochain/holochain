@@ -46,11 +46,11 @@ impl From<String> for CapSecret {
 }
 
 impl CapSecret {
-//     // /// Creates a new unique secret from randomness.
-//     // pub fn random() -> Self {
-//     //     Self(nanoid::nanoid!())
-//     // }
-//
+    /// Creates a new unique secret from randomness.
+    pub fn random() -> Self {
+        Self(nanoid::nanoid!())
+    }
+
     /// Creates a secret from a known string.
     pub fn from_string<S: Into<String>>(s: S) -> Self {
         Self(s.into())

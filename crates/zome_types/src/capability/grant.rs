@@ -40,9 +40,10 @@ impl CapGrant {
     }
 
     /// Check if a tag matches this grant.
+    /// An Authorship grant has no tag, thus will never match any tag
     pub fn tag_matches(&self, query: &str) -> bool {
         match self {
-            CapGrant::Authorship(agent_pubkey) => agent_pubkey.to_string() == *query,
+            CapGrant::Authorship(_) => false,
             CapGrant::ZomeCall(ZomeCallCapGrant { tag, .. }) => tag == query,
         }
     }
@@ -51,7 +52,7 @@ impl CapGrant {
     pub fn access(&self) -> CapAccess {
         match self {
             CapGrant::Authorship(agent_pubkey) => CapAccess::Assigned {
-                secret: agent_pubkey.to_string().into(),
+                secret: format!("{:?}", agent_pubkey).into(),
                 assignees: [agent_pubkey.clone()].iter().cloned().collect(),
             },
             CapGrant::ZomeCall(ZomeCallCapGrant { access, .. }) => access.clone(),

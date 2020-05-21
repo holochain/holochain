@@ -69,12 +69,12 @@ fixturator!(
     AppEntryType {
         id: BytesFixturator::new(Empty).next().unwrap(),
         zome_id: U8Fixturator::new(Empty).next().unwrap(),
-        is_public: BoolFixturator::new(Empty).next().unwrap(),
+        visibility: todo!("visibility fixturator"),
     },
     AppEntryType {
         id: BytesFixturator::new(Unpredictable).next().unwrap(),
         zome_id: U8Fixturator::new(Unpredictable).next().unwrap(),
-        is_public: BoolFixturator::new(Unpredictable).next().unwrap(),
+        visibility: todo!("visibility fixturator"),
     },
     {
         let app_entry_type = AppEntryType {
@@ -84,9 +84,7 @@ fixturator!(
             zome_id: U8Fixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-            is_public: BoolFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
+            visibility: todo!("visibility fixturator"),
         };
         self.0.index = self.0.index + 1;
         app_entry_type

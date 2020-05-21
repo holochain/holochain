@@ -36,11 +36,10 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;
 use holochain_types::dna::DnaFile;
-use holochain_types::shims::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::{capability::CapSecret, HostInput};
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -197,7 +196,7 @@ fixturator!(
         ZomeInvocation {
             cell_id: CellIdFixturator::new(Empty).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
-            cap: CapTokenFixturator::new(Empty).next().unwrap(),
+            cap: todo!("capability arg"),
             fn_name: StringFixturator::new(Empty).next().unwrap(),
             payload: HostInputFixturator::new(Empty).next().unwrap(),
             provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -207,7 +206,7 @@ fixturator!(
         ZomeInvocation {
             cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
             zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
-            cap: CapTokenFixturator::new(Unpredictable).next().unwrap(),
+            cap: todo!("capability arg"),
             fn_name: StringFixturator::new(Unpredictable).next().unwrap(),
             payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
             provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -221,9 +220,7 @@ fixturator!(
             zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-            cap: CapTokenFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
+            cap: todo!("capability arg"),
             fn_name: StringFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),

@@ -1,13 +1,14 @@
 //! Some common testing helpers.
 
 use crate::{
-    capability::CapSecret,
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, Properties},
     dna::{DnaDef, DnaFile},
+    header::{AppEntryType, EntryVisibility, ZomeId},
     prelude::*,
 };
 use holo_hash::AgentPubKey;
+use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::path::PathBuf;
@@ -116,4 +117,13 @@ pub fn fake_cap_secret() -> CapSecret {
 /// A fixture example ZomeInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> HostInput {
     HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
+}
+
+/// A fixture example AppEntryType for unit testing.
+pub fn fake_app_entry_type(zome_id: ZomeId, visibility: EntryVisibility) -> AppEntryType {
+    AppEntryType {
+        id: Vec::new(),
+        zome_id,
+        visibility,
+    }
 }

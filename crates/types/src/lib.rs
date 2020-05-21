@@ -5,7 +5,6 @@
 
 pub mod address;
 pub mod autonomic;
-pub mod capability;
 pub mod cell;
 pub mod db;
 pub mod dna;
@@ -26,6 +25,9 @@ pub mod universal_map;
 
 // #[cfg(test)]
 pub mod test_utils;
+
+#[doc(inline)]
+pub use entry::{Entry, EntryHashed};
 
 #[doc(inline)]
 pub use header::{Header, HeaderHashed};

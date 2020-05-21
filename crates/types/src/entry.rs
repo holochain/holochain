@@ -5,13 +5,10 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::{
-    address::EntryAddress,
-    capability::{CapClaim, CapGrant, ZomeCallCapGrant},
-};
+use crate::address::EntryAddress;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::entry::Entry;
+pub use holochain_zome_types::entry::Entry;
 
 make_hashed_base! {
     Visibility(pub),

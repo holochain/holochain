@@ -84,8 +84,8 @@ impl Invocation for ValidateInvocation {
             match *self.entry {
                 Entry::Agent(_) => "agent",
                 Entry::App(_) => "entry",
-                Entry::CapTokenClaim(_) => "cap_token_claim",
-                Entry::CapTokenGrant(_) => "cap_token_grant",
+                Entry::CapClaim(_) => "cap_claim",
+                Entry::CapGrant(_) => "cap_grant",
             }
             .into(),
         ]
