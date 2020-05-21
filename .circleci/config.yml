@@ -19,8 +19,6 @@ commands:
 
 jobs:
   merge-test:
-    environment:
-      CARGO_BUILD_JOBS: 1
     docker:
      - image: holochain/holochain-2020:circle.build.develop
        auth:
