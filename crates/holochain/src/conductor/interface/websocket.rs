@@ -20,7 +20,7 @@ use tracing::*;
 use url2::url2;
 
 // TODO: This is arbitrary, choose reasonable size.
-/// Number of singals in buffer before applying
+/// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 1000;
 
@@ -252,6 +252,7 @@ mod test {
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
+        app::{AppPaths, MembraneProofs},
         cell::CellId,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
@@ -269,20 +270,6 @@ mod test {
     #[serde(rename = "snake-case", tag = "type", content = "data")]
     enum AdmonRequest {
         InstallsDna(String),
-    }
-
-    async fn setup_admin_cells(dna_store: MockDnaStore) -> (Arc<TempDir>, ConductorHandle) {
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let tmpdir = test_env.tmpdir.clone();
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(test_env, wasm_env)
-            .await
-            .unwrap();
-        (tmpdir, conductor_handle)
     }
 
     async fn setup_admin() -> (Arc<TempDir>, RealAdminInterfaceApi) {
@@ -315,13 +302,24 @@ mod test {
 
         conductor_handle
             .clone()
-            .genesis_cells(cell_ids_with_proofs)
+            .genesis_cells("test app".to_string(), cell_ids_with_proofs)
             .await
             .unwrap();
 
-        conductor_handle.clone().setup_cells().await.unwrap();
-
         (tmps, conductor_handle)
+    }
+
+    async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
+        conductor_handle
+            .activate_app("test app".to_string())
+            .await
+            .unwrap();
+
+        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+
+        assert!(errors.is_empty());
+
+        conductor_handle
     }
 
     async fn setup_app(
@@ -342,11 +340,18 @@ mod test {
 
         conductor_handle
             .clone()
-            .genesis_cells(cell_ids_with_proofs)
+            .genesis_cells("test app".to_string(), cell_ids_with_proofs)
             .await
             .unwrap();
 
-        conductor_handle.clone().setup_cells().await.unwrap();
+        conductor_handle
+            .activate_app("test app".to_string())
+            .await
+            .unwrap();
+
+        let errors = conductor_handle.clone().setup_cells().await.unwrap();
+
+        assert!(errors.is_empty());
 
         (tmpdir, RealAppInterfaceApi::new(conductor_handle))
     }
@@ -373,7 +378,15 @@ mod test {
     async fn invalid_request() {
         observability::test_run().ok();
         let (_tmpdir, admin_api) = setup_admin().await;
-        let msg = AdminRequest::InstallDna("some$\\//weird00=-+[] \\Path".into(), None);
+        let dna = ("some$\\//weird00=-+[] \\Path".into(), None);
+        let agent_key = fake_agent_pubkey_1();
+        let app_paths = AppPaths {
+            dnas: vec![dna],
+            app_id: "test app".to_string(),
+            agent_key,
+        };
+        let proofs = MembraneProofs::empty();
+        let msg = AdminRequest::InstallApp { app_paths, proofs };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -412,7 +425,15 @@ mod test {
             .await
             .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
-        let msg = AdminRequest::InstallDna(fake_dna_path, None);
+        let dna = (fake_dna_path, None);
+        let agent_key = fake_agent_pubkey_1();
+        let app_paths = AppPaths {
+            dnas: vec![dna],
+            app_id: "test app".to_string(),
+            agent_key,
+        };
+        let proofs = MembraneProofs::empty();
+        let msg = AdminRequest::InstallApp { app_paths, proofs };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -499,6 +520,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn activate_app() {
         observability::test_run().ok();
+        let agent_key = fake_agent_pubkey_1();
         let dnas = [Uuid::new_v4(); 2]
             .iter()
             .map(|uuid| fake_dna_file(&uuid.to_string()))
@@ -508,38 +530,80 @@ mod test {
             .cloned()
             .map(|dna| (dna.dna_hash().clone(), dna))
             .collect::<HashMap<_, _>>();
-        let dna_hashes = dna_map
-            .keys()
+        let dna_hashes = dna_map.keys().cloned().collect::<Vec<_>>();
+        let cell_ids_with_proofs = dna_hashes
+            .iter()
             .cloned()
-            .map(|hash| (hash, None))
+            .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
         let mut dna_store = MockDnaStore::new();
         dna_store
             .expect_get()
             .returning(move |hash| dna_map.get(&hash).cloned());
-        let (_tmpdir, handle) = setup_admin_cells(dna_store).await;
+        let (_tmpdir, handle) = setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
 
-        let agent_key = fake_agent_pubkey_1();
+        // Activate the app
         let msg = AdminRequest::ActivateApp {
-            hashes_with_proofs: dna_hashes.clone(),
-            agent_key: agent_key.clone(),
+            app_id: "test app".to_string(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::AppsActivated);
+            assert_matches!(response, AdminResponse::AppActivated);
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
+
         handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
             .await
             .unwrap();
-        let cells = handle.get_state_from_handle().await.unwrap().cell_ids;
+
+        // Get the state
+        let state = handle.get_state_from_handle().await.unwrap();
+
+        // Check it is not in inactive apps
+        let r = state.inactive_apps.get("test app");
+        assert_eq!(r, None);
+
+        // Check it is in active apps
+        let cells = state.active_apps.get("test app").cloned().unwrap();
+
+        // Collect the expected result
         let expected = dna_hashes
             .into_iter()
-            .map(|(hash, _)| CellId::from((hash, agent_key.clone())))
+            .map(|hash| CellId::from((hash, agent_key.clone())))
             .collect::<Vec<_>>();
+
+        assert_eq!(expected, cells);
+
+        // Now deactivate app
+        let msg = AdminRequest::DeactivateApp {
+            app_id: "test app".to_string(),
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::AppDeactivated);
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+            .await
+            .unwrap();
+
+        // Get the state
+        let state = handle.get_state_from_handle().await.unwrap();
+
+        // Check it's removed from active
+        let r = state.active_apps.get("test app");
+        assert_eq!(r, None);
+
+        // Check it's added to inactive
+        let cells = state.inactive_apps.get("test app").cloned().unwrap();
+
         assert_eq!(expected, cells);
     }
 
@@ -574,6 +638,7 @@ mod test {
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
+        let conductor_handle = activate(conductor_handle).await;
 
         // Set some state
         let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();

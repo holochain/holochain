@@ -1,5 +1,6 @@
 use crate::conductor::interface::InterfaceDriver;
-use holochain_types::{cell::CellId, dna::error::DnaError};
+
+use holochain_types::{app::Apps, cell::CellId, dna::error::DnaError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -10,11 +11,12 @@ use std::collections::HashMap;
 /// via string IDs.
 #[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
 pub struct ConductorState {
-    // TODO: B-01610: Maybe we shouldn't store proofs here
-    /// List of cell IDs, includes references to an agent and a DNA. Optional.
+    /// Apps that are ready to be activated
     #[serde(default)]
-    pub cell_ids: Vec<CellId>,
-
+    pub inactive_apps: Apps,
+    /// Apps that are active and will be loaded
+    #[serde(default)]
+    pub active_apps: Apps,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub interfaces: HashMap<InterfaceId, InterfaceConfig>,
@@ -34,15 +36,16 @@ impl ConductorState {
         self.interfaces.get(id).cloned()
     }
 
-    /// Returns all defined cell IDs
-    pub fn cell_ids(&self) -> &Vec<CellId> {
-        &self.cell_ids
-    }
-
     /// Removes the cell given by id and all mentions of it in other elements so
     /// that the config is guaranteed to be valid afterwards if it was before.
     pub fn save_remove_cell(mut self, id: &CellId) -> Self {
-        self.cell_ids.retain(|cell| cell != id);
+        for cell_ids in self.active_apps.values_mut() {
+            cell_ids.retain(|cell| cell != id);
+        }
+
+        for cell_ids in self.inactive_apps.values_mut() {
+            cell_ids.retain(|cell| cell != id);
+        }
 
         self.interfaces = self
             .interfaces

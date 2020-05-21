@@ -102,6 +102,11 @@ impl EnvironmentRead {
     pub async fn dbs(&self) -> EnvironmentRefRo<'_> {
         self.guard().await
     }
+
+    /// The environments path
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
 }
 
 impl GetDb for EnvironmentWrite {
