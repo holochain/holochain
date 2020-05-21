@@ -1,6 +1,6 @@
 //! Links interrelate entries in a source chain.
 
-use crate::composite_hash::EntryAddress;
+use crate::composite_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use regex::Regex;
 
@@ -10,15 +10,15 @@ type LinkTag = String;
 /// Links interrelate entries in a source chain.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, SerializedBytes)]
 pub struct Link {
-    base: EntryAddress,
-    target: EntryAddress,
+    base: EntryHash,
+    target: EntryHash,
     link_type: LinkType,
     tag: LinkTag,
 }
 
 impl Link {
     /// Construct a new link.
-    pub fn new(base: &EntryAddress, target: &EntryAddress, link_type: &str, tag: &str) -> Self {
+    pub fn new(base: &EntryHash, target: &EntryHash, link_type: &str, tag: &str) -> Self {
         Link {
             base: base.to_owned(),
             target: target.to_owned(),
@@ -28,12 +28,12 @@ impl Link {
     }
 
     /// Get the base address of this link.
-    pub fn base(&self) -> &EntryAddress {
+    pub fn base(&self) -> &EntryHash {
         &self.base
     }
 
     /// Get the target address of this link.
-    pub fn target(&self) -> &EntryAddress {
+    pub fn target(&self) -> &EntryHash {
         &self.target
     }
 

@@ -5,7 +5,7 @@ pub struct Timestamp;
 pub struct DnaHash;
 pub struct HeaderHash;
 pub struct SerializedBytes;
-pub struct EntryHash;
+pub struct EntryContentHash;
 pub struct CapClaim;
 pub struct CapGrant;
 pub struct ZomeId;
@@ -51,8 +51,8 @@ pub mod header {
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
 
-        pub base: Address, // Not Address, but HeaderHash or EntryHash or PublicKey
-        pub target: Address, // Not Address, but HeaderHash or EntryHash or PublicKey
+        pub base: Address, // Not Address, but HeaderHash or EntryContentHash or PublicKey
+        pub target: Address, // Not Address, but HeaderHash or EntryContentHash or PublicKey
         pub tag: SerializedBytes,
         pub link_type: SerializedBytes,
     }
@@ -87,7 +87,7 @@ pub mod header {
         pub prev_header: HeaderHash,
 
         pub entry_type: EntryType,
-        pub entry_hash: EntryHash,
+        pub entry_hash: EntryContentHash,
     }
 
     pub struct EntryUpdate {
@@ -95,10 +95,10 @@ pub mod header {
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
 
-        pub replaces: Address, // not Address but EntryHash or HeaderHash ??
+        pub replaces: Address, // not Address but EntryContentHash or HeaderHash ??
 
         pub entry_type: EntryType,
-        pub entry_hash: EntryHash,
+        pub entry_hash: EntryContentHash,
     }
 
     pub struct EntryDelete {
@@ -107,7 +107,7 @@ pub mod header {
         pub prev_header: HeaderHash,
 
         /// Hash Address of the Element being deleted
-        pub removes: Address, // not Address but EntryHash or HeaderHash ??
+        pub removes: Address, // not Address but EntryContentHash or HeaderHash ??
     }
 }
 
