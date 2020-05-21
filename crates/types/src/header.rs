@@ -131,7 +131,7 @@ make_hashed_base! {
     Visibility(pub),
     HashedName(HeaderHashed),
     ContentType(Header),
-    HashType(HeaderAddress),
+    HashType(HeaderHash),
 }
 
 impl HeaderHashed {
@@ -139,7 +139,7 @@ impl HeaderHashed {
         let sb = SerializedBytes::try_from(&header)?;
         Ok(HeaderHashed::with_pre_hashed(
             header,
-            HeaderAddress::from(HeaderHash::with_data(sb.bytes()).await),
+            HeaderHash::with_data(sb.bytes()).await,
         ))
     }
 }
