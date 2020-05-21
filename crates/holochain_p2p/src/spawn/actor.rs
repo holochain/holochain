@@ -20,16 +20,21 @@ pub(crate) struct HolochainP2pActor {
     internal_sender: HolochainP2pInternalSender<Internal>,
     #[allow(dead_code)]
     evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
+    #[allow(dead_code)]
+    kitsune_p2p: kitsune_p2p::actor::KitsuneP2pSender,
 }
 
 impl HolochainP2pActor {
-    pub fn new(
+    pub async fn new(
         internal_sender: HolochainP2pInternalSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
     ) -> HolochainP2pResult<Self> {
+        let (kitsune_p2p, _kitsune_p2p_events) = kitsune_p2p::spawn_kitsune_p2p().await?;
+        // TODO - task for handling p2p_events
         Ok(Self {
             internal_sender,
             evt_sender,
+            kitsune_p2p,
         })
     }
 }

@@ -1138,6 +1138,7 @@ dependencies = [
  "ghost_actor",
  "holo_hash",
  "holochain_keystore",
+ "kitsune_p2p",
  "thiserror",
  "tokio",
 ]
