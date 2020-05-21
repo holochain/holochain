@@ -73,7 +73,7 @@ impl DbName {
             CacheChainMeta => Multi,
             ConductorState => Single,
             Wasm => Single,
-            DnaDef=> Single,
+            DnaDef => Single,
         }
     }
 }

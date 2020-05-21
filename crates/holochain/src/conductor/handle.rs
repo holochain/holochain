@@ -300,7 +300,7 @@ pub mod mock {
             fn sync_install_dna(&self, dna: DnaFile) -> ConductorResult<()>;
 
             fn sync_list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
-            
+
             fn sync_add_dnas(&self) -> ConductorResult<()>;
 
             fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;

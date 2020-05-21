@@ -64,8 +64,8 @@ use tracing::*;
 
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
+use holo_hash::{DnaHash, Hashed};
 use holochain_serialized_bytes::SerializedBytes;
-use holo_hash::{Hashed, DnaHash};
 
 #[cfg(test)]
 use super::handle::mock::MockConductorHandle;
@@ -440,7 +440,9 @@ where
         }
     }
 
-    pub(super) async fn get_wasms(&self) -> ConductorResult<impl IntoIterator<Item = (DnaHash, DnaFile)>> {
+    pub(super) async fn get_wasms(
+        &self,
+    ) -> ConductorResult<impl IntoIterator<Item = (DnaHash, DnaFile)>> {
         let environ = &self.wasm_env;
         let env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
@@ -450,21 +452,24 @@ where
         let wasm_buf = WasmBuf::new(&reader, wasm)?;
         let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // Load out all dna defs
-        let wasm_tasks = dna_def_buf.iter()?.map(|dna_def| {
-            // TODO: Load all wasms from the dna_def from the wasm db into memory
-            let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {
-                wasm_buf
-                    .get(&zome.wasm_hash.into())
-                    .await?
-                    .map(|hashed|hashed.into_inner().0)
-                    .ok_or(ConductorError::WasmMissing)
-            });
-            async move {
-                let wasms = futures::future::try_join_all(wasms).await?;
-                let dna_file = DnaFile::new(dna_def, wasms).await?;
-                Ok((dna_file.dna_hash().clone(), dna_file))
-            }
-        }).collect::<Vec<_>>();
+        let wasm_tasks = dna_def_buf
+            .iter()?
+            .map(|dna_def| {
+                // TODO: Load all wasms from the dna_def from the wasm db into memory
+                let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {
+                    wasm_buf
+                        .get(&zome.wasm_hash.into())
+                        .await?
+                        .map(|hashed| hashed.into_inner().0)
+                        .ok_or(ConductorError::WasmMissing)
+                });
+                async move {
+                    let wasms = futures::future::try_join_all(wasms).await?;
+                    let dna_file = DnaFile::new(dna_def, wasms).await?;
+                    Ok((dna_file.dna_hash().clone(), dna_file))
+                }
+            })
+            .collect::<Vec<_>>();
         futures::future::try_join_all(wasm_tasks).await
     }
 

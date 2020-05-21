@@ -262,6 +262,25 @@ async fn attach_app_interface(client: &mut WebsocketSender, holochain: &mut Chil
     }
 }
 
+async fn retry_admin_interface(port: u16, mut attempts: usize, delay: Duration) -> WebsocketSender {
+    loop {
+        match websocket_client_by_port(port).await {
+            Ok(c) => return c.0,
+            Err(e) => {
+                attempts -= 1;
+                if attempts == 0 {
+                    panic!("Failed to join admin interface");
+                }
+                warn!(
+                    "Failed with {:?} to open admin interface, trying {} more times",
+                    e, attempts
+                );
+                tokio::time::delay_for(delay).await;
+            }
+        }
+    }
+}
+
 #[tokio::test(threaded_scheduler)]
 async fn call_zome() {
     observability::test_run().ok();
@@ -322,11 +341,12 @@ async fn call_zome() {
     client.close(1000, "Shutting down".into()).await.unwrap();
     // Shutdown holochain
     holochain.kill().expect("Failed to kill holochain");
+    std::mem::drop(client);
 
     // Call zome after resart
     let mut holochain = start_holochain(config_path).await;
-    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
-    
+    let mut client = retry_admin_interface(port, 3, Duration::from_millis(100)).await;
+
     // Attach App Interface
     let app_port = attach_app_interface(&mut client, &mut holochain).await;
 
