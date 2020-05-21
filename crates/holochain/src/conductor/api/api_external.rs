@@ -59,7 +59,7 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 #[async_trait::async_trait]
 pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     /// Invoke a zome function on any cell in this conductor.
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult>;
@@ -71,7 +71,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
                 AppRequest::ZomeCallInvocationRequest { request } => {
-                    match self.invoke_zome(*request).await? {
+                    match self.call_zome(*request).await? {
                         Ok(response) => Ok(AppResponse::ZomeCallInvocationResponse {
                             response: Box::new(response),
                         }),
@@ -248,11 +248,11 @@ impl RealAppInterfaceApi {
 
 #[async_trait::async_trait]
 impl AppInterfaceApi for RealAppInterfaceApi {
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        self.conductor_handle.invoke_zome(invocation).await
+        self.conductor_handle.call_zome(invocation).await
     }
 }
 

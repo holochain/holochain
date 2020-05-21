@@ -20,7 +20,7 @@ mock! {
 
     pub CellConductorApi {
 
-        fn sync_invoke_zome(
+        fn sync_call_zome(
             &self,
             cell_id: &CellId,
             invocation: ZomeCallInvocation,
@@ -48,12 +48,12 @@ mock! {
 
 #[async_trait]
 impl CellConductorApiT for MockCellConductorApi {
-    async fn invoke_zome(
+    async fn call_zome(
         &self,
         cell_id: &CellId,
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        self.sync_invoke_zome(cell_id, invocation)
+        self.sync_call_zome(cell_id, invocation)
     }
 
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {

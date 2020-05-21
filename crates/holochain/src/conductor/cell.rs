@@ -174,7 +174,7 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    pub async fn invoke_zome(
+    pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult> {
