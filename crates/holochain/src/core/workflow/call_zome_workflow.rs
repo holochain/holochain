@@ -1,7 +1,7 @@
 use super::Workspace;
 use super::{
     error::{WorkflowError, WorkflowResult},
-    InitializeZomesWorkflow, Workflow, WorkflowEffects,
+    Workflow, WorkflowEffects,
 };
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
@@ -30,7 +30,7 @@ pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
     pub invocation: ZomeCallInvocation,
 }
 
-impl<'env, Ribosome: 'static> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
+impl<'env, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
 where
     Ribosome: RibosomeT + Send + Sync + 'env,
 {

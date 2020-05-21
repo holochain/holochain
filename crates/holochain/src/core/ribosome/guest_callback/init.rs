@@ -12,7 +12,7 @@ use holochain_zome_types::HostInput;
 
 #[derive(Clone)]
 pub struct InitInvocation {
-    dna_def: DnaDef,
+    pub dna_def: DnaDef,
 }
 
 fixturator!(

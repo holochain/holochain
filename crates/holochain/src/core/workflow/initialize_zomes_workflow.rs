@@ -43,11 +43,8 @@ where
             let result = {
                 // TODO: We need a better solution then reusung the InvokeZomeWorkspace (i.e. ghost actor)
                 let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace.0);
-                let invocation = InitInvocation {
-                    workspace: raw_workspace,
-                    dna_def,
-                };
-                ribosome.run_init(invocation)
+                let invocation = InitInvocation { dna_def };
+                ribosome.run_init(raw_workspace, invocation)
             };
 
             let prev_header = workspace.0.source_chain.chain_head()?;
