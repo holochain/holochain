@@ -286,6 +286,18 @@ pub struct AppEntryType {
     pub(crate) visibility: EntryVisibility,
 }
 
+impl AppEntryType {
+    pub fn id(&self) -> &[u8] {
+        &self.id
+    }
+    pub fn zome_id(&self) -> &ZomeId {
+        &self.zome_id
+    }
+    pub fn visibility(&self) -> &EntryVisibility {
+        &self.visibility
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum EntryVisibility {
     Public,

@@ -24,11 +24,12 @@ use holochain_state::{
 };
 use holochain_types::{
     address::{EntryAddress, HeaderAddress},
-    entry::{Entry, EntryHashed},
+    entry::EntryHashed,
     header,
     prelude::Signature,
     Header, HeaderHashed,
 };
+use holochain_zome_types::entry::Entry;
 use tracing::*;
 
 /// A CasBuf with Entries for values

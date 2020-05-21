@@ -8,12 +8,13 @@ use holochain_state::{
 };
 use holochain_types::{
     address::EntryAddress,
-    entry::{Entry, EntryHashed},
+    entry::EntryHashed,
     header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
 };
+use holochain_zome_types::entry::Entry;
 use maplit::hashset;
 use mockall::*;
 use std::collections::HashSet;
@@ -40,10 +41,10 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::with_data(Entry::Agent(jimbo_id.clone()))
+                EntryHashed::with_data(Entry::Agent(jimbo_id.clone().into()))
                     .await
                     .unwrap(),
-                EntryHashed::with_data(Entry::Agent(jessy_id.clone()))
+                EntryHashed::with_data(Entry::Agent(jessy_id.clone().into()))
                     .await
                     .unwrap(),
             )

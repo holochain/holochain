@@ -1,7 +1,6 @@
 //! Some common testing helpers.
 
 use crate::{
-    capability::CapSecret,
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, Properties},
     dna::{DnaDef, DnaFile},
@@ -9,7 +8,9 @@ use crate::{
     prelude::*,
 };
 use holo_hash::AgentPubKey;
-use holochain_zome_types::ZomeExternHostInput;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::HostInput;
 use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
@@ -35,7 +36,7 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 }
 
 /// A fixture example dna for unit testing.
-pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(String, DnaWasm)>) -> DnaFile {
+pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
         properties: Properties::new(serde_json::json!({"p": "hi"}))
@@ -113,9 +114,9 @@ pub fn fake_cap_secret() -> CapSecret {
     CapSecret::random()
 }
 
-/// A fixture example ZomeInvocationPayload for unit testing.
-pub fn fake_zome_invocation_payload() -> ZomeExternHostInput {
-    ZomeExternHostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
+/// A fixture example ZomeCallInvocationPayload for unit testing.
+pub fn fake_zome_invocation_payload() -> HostInput {
+    HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }
 
 /// A fixture example AppEntryType for unit testing.
