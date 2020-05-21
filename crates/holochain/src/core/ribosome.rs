@@ -372,6 +372,7 @@ pub mod wasm_test {
     use holochain_zome_types::commit::CommitEntryResult;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
+    use crate::core::ribosome::FnComponents;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -428,6 +429,18 @@ pub mod wasm_test {
             .await
             .unwrap();
         };
+    }
+
+    #[test]
+    fn fn_components_iterate() {
+        let fn_components = FnComponents::from(vec!["foo".into(), "bar".into(), "baz".into()]);
+        let mut expected = vec!["foo", "foo_bar", "foo_bar_baz", ];
+        for fn_component in fn_components {
+            assert_eq!(
+                fn_component,
+                expected.pop().unwrap(),
+            )
+        }
     }
 
     #[tokio::test(threaded_scheduler)]
