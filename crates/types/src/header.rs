@@ -139,7 +139,7 @@ impl HeaderHashed {
         let sb = SerializedBytes::try_from(&header)?;
         Ok(HeaderHashed::with_pre_hashed(
             header,
-            HeaderAddress::Header(HeaderHash::with_data(sb.bytes()).await),
+            HeaderAddress::from(HeaderHash::with_data(sb.bytes()).await),
         ))
     }
 }

@@ -6,92 +6,10 @@ use holochain_serialized_bytes::prelude::*;
 /// address type for header hash to promote it to an "address" e.g. for use when getting a header
 /// from a CAS or the DHT.  This is similar to EntryHash which promotes and entry hash to a
 /// retrievable entity.
-#[derive(
-    Debug,
-    Clone,
-    derive_more::From,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    SerializedBytes,
-)]
-pub enum HeaderAddress {
-    /// a header hash, the only option
-    Header(HeaderHash),
-}
-
-/// a utility macro just to not have to type in the match statement everywhere.
-macro_rules! match_header_addr {
-    ($h:ident => |$i:ident| { $($t:tt)* }) => {
-        match $h {
-            HeaderAddress::Header($i) => {
-                $($t)*
-            }
-        }
-    };
-}
-
-impl holo_hash_core::HoloHashCoreHash for HeaderAddress {
-    fn get_raw(&self) -> &[u8] {
-        match_header_addr!(self => |i| { i.get_raw() })
-    }
-
-    fn get_bytes(&self) -> &[u8] {
-        match_header_addr!(self => |i| { i.get_bytes() })
-    }
-
-    fn get_loc(&self) -> u32 {
-        match_header_addr!(self => |i| { i.get_loc() })
-    }
-
-    fn into_inner(self) -> std::vec::Vec<u8> {
-        match_header_addr!(self => |i| { i.into_inner() })
-    }
-}
-
-impl PartialEq<HeaderHash> for HeaderAddress {
-    #[allow(irrefutable_let_patterns)]
-    fn eq(&self, other: &HeaderHash) -> bool {
-        if let HeaderAddress::Header(hash) = self {
-            return hash == other;
-        }
-        false
-    }
-}
-
-impl From<HeaderAddress> for holo_hash_core::HoloHashCore {
-    fn from(header_address: HeaderAddress) -> holo_hash_core::HoloHashCore {
-        match_header_addr!(header_address => |i| { i.into() })
-    }
-}
-
-impl From<HeaderAddress> for HoloHash {
-    fn from(header_address: HeaderAddress) -> HoloHash {
-        match_header_addr!(header_address => |i| { i.into() })
-    }
-}
-
-impl From<holo_hash::holo_hash_core::HeaderHash> for HeaderAddress {
-    fn from(header_hash: holo_hash::holo_hash_core::HeaderHash) -> HeaderAddress {
-        holo_hash::HeaderHash::from(header_hash).into()
-    }
-}
-
-impl From<&HeaderHash> for HeaderAddress {
-    fn from(header_hash: &HeaderHash) -> HeaderAddress {
-        header_hash.to_owned().into()
-    }
-}
-
-impl std::fmt::Display for HeaderAddress {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match_header_addr!(self => |i| { i.fmt(f) })
-    }
-}
+// TODO: Temporary alias, in case we decide again that we want to differentiate
+// Address from Hash. Otherwise, this can be removed and all references of
+// HeaderAddress can be renamed to HeaderHash
+pub type HeaderAddress = HeaderHash;
 
 /// address type for entry hashes that can be used to retrieve entries from the cas or dht
 #[derive(
@@ -167,8 +85,8 @@ impl std::fmt::Display for EntryHash {
 /// address type for hashes that can be used to retrieve anything that can be stored on the dht
 #[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DhtAddress {
-    /// standard entry hash
-    Entry(EntryContentHash),
+    /// standard entry content hash
+    EntryContent(EntryContentHash),
     /// agents can be stored
     Agent(AgentPubKey),
     /// headers can be stored
@@ -179,7 +97,7 @@ pub enum DhtAddress {
 macro_rules! match_dht_addr {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
-            DhtAddress::Entry($i) => {
+            DhtAddress::EntryContent($i) => {
                 $($t)*
             }
             DhtAddress::Agent($i) => {
