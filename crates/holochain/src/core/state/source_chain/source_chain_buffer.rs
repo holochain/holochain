@@ -398,47 +398,17 @@ pub mod tests {
             let store = SourceChainBuf::new(&reader, &dbs)?;
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-            let parsed = parsed
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|item| {
-                    let item = item.as_object().unwrap();
-                    let element = item.get("element").unwrap();
-                    let header = element.get("header").unwrap();
-                    let header_type = header.get("type").unwrap().as_str().unwrap();
 
-                    /*let _entry_hash = header
-                        .get("entry_hash")
-                        .unwrap()
-                        .get("Entry")
-                        .unwrap()
-                        .as_array()
-                        .unwrap();
-                    let entry_type = entry.get("entry_type").unwrap().as_str().unwrap();
-                    let _entry_data: serde_json::Value = match entry_type {
-                        "AgentPubKey" => entry.get("entry").unwrap().clone(),
-                        "Dna" => entry
-                            .get("entry")
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .get("uuid")
-                            .unwrap()
-                            .clone(),
-                        _ => serde_json::Value::Null,
-                    };*/
-                    // FIXME: this test is very specific; commenting out the specifics for now
-                    // until we finalize the Entry and Header format
-                    // serde_json::json!([entry_type, entry_hash, entry_data])
-                    serde_json::json!(header_type)
-                })
-                .collect::<Vec<_>>();
-
-            assert_eq!(
-                "[\"EntryCreate\",\"Dna\"]",
-                &serde_json::to_string(&parsed).unwrap(),
+            assert_eq!(parsed[0]["element"]["header"]["type"], "EntryCreate");
+            assert_eq!(parsed[0]["element"]["header"]["entry_type"], "AgentPubKey");
+            assert_eq!(parsed[0]["element"]["entry"]["entry_type"], "Agent");
+            assert_ne!(
+                parsed[0]["element"]["entry"]["entry"],
+                serde_json::Value::Null
             );
+
+            assert_eq!(parsed[1]["element"]["header"]["type"], "Dna");
+            assert_eq!(parsed[1]["element"]["entry"], serde_json::Value::Null);
         }
 
         Ok(())
