@@ -183,7 +183,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn add_dnas(&self) -> ConductorResult<()> {
-        let dnas = self.0.read().await.get_wasms().await?;
+        let dnas = self.0.read().await.load_wasms_into_dna_files().await?;
         self.0.write().await.dna_store_mut().add_dnas(dnas);
         Ok(())
     }

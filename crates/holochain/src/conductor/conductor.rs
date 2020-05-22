@@ -440,7 +440,7 @@ where
         }
     }
 
-    pub(super) async fn get_wasms(
+    pub(super) async fn load_wasms_into_dna_files(
         &self,
     ) -> ConductorResult<impl IntoIterator<Item = (DnaHash, DnaFile)>> {
         let environ = &self.wasm_env;
