@@ -157,46 +157,24 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validate_callback_result_fold() {
         let mut rng = thread_rng();
+
+        let result_valid = || ValidateResult::Valid;
+        let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
+        let result_invalid = || ValidateResult::Invalid("".into());
+
+        let cb_valid = || ValidateCallbackResult::Valid;
+        let cb_ud = || ValidateCallbackResult::UnresolvedDependencies(vec![]);
+        let cb_invalid = || ValidateCallbackResult::Invalid("".into());
+
         for (mut results, expected) in vec![
-            (vec![], ValidateResult::Valid),
-            (vec![ValidateCallbackResult::Valid], ValidateResult::Valid),
-            (
-                vec![ValidateCallbackResult::Invalid("".into())],
-                ValidateResult::Invalid("".into()),
-            ),
-            (
-                vec![ValidateCallbackResult::UnresolvedDependencies(vec![])],
-                ValidateResult::UnresolvedDependencies(vec![]),
-            ),
-            (
-                vec![
-                    ValidateCallbackResult::Invalid("".into()),
-                    ValidateCallbackResult::Valid,
-                ],
-                ValidateResult::Invalid("".into()),
-            ),
-            (
-                vec![
-                    ValidateCallbackResult::Invalid("".into()),
-                    ValidateCallbackResult::UnresolvedDependencies(vec![]),
-                ],
-                ValidateResult::Invalid("".into()),
-            ),
-            (
-                vec![
-                    ValidateCallbackResult::Valid,
-                    ValidateCallbackResult::UnresolvedDependencies(vec![]),
-                ],
-                ValidateResult::UnresolvedDependencies(vec![]),
-            ),
-            (
-                vec![
-                    ValidateCallbackResult::Valid,
-                    ValidateCallbackResult::UnresolvedDependencies(vec![]),
-                    ValidateCallbackResult::Invalid("".into()),
-                ],
-                ValidateResult::Invalid("".into()),
-            ),
+            (vec![], result_valid()),
+            (vec![cb_valid()], result_valid()),
+            (vec![cb_invalid()], result_invalid()),
+            (vec![cb_ud()], result_ud()),
+            (vec![cb_invalid(), cb_valid()], result_invalid()),
+            (vec![cb_invalid(), cb_ud()], result_invalid()),
+            (vec![cb_valid(), cb_ud()], result_ud()),
+            (vec![cb_valid(), cb_ud(), cb_invalid()], result_invalid()),
         ] {
             // order of the results should not change the final result
             results.shuffle(&mut rng);
