@@ -50,9 +50,16 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.len()
     }
 
-    /*pub fn get_entry(&self, k: EntryHash) -> DatabaseResult<Option<Entry>> {
-        self.cas.get_entry(k)
-    }*/
+    pub async fn get_index(&self, i: u32) -> DatabaseResult<Option<Header>> {
+        if let Some(address) = self.sequence.get(i)? {
+            self.cas
+                .get_header(&address)
+                .await
+                .map(|h| h.map(|h| h.header().clone()))
+        } else {
+            Ok(None)
+        }
+    }
 
     pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
         debug!("GET {:?}", k);

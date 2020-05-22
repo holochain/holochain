@@ -11,6 +11,7 @@ use holochain_2020::core::ribosome::NamedInvocation;
 use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
 use holochain_2020::core::ribosome::ZomeCallInvocationResponse;
 use holochain_types::{
+    app::AppPaths,
     cell::CellId,
     dna::{DnaFile, Properties},
     observability,
@@ -22,7 +23,7 @@ use holochain_websocket::*;
 use holochain_zome_types::*;
 use matches::assert_matches;
 use std::sync::Arc;
-use std::{path::PathBuf, process::Stdio, time::Duration};
+use std::{collections::HashMap, path::PathBuf, process::Stdio, time::Duration};
 use tempdir::TempDir;
 use test_wasm_common::TestString;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -164,10 +165,18 @@ async fn call_admin() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let request = AdminRequest::InstallDna(fake_dna_path, properties.clone());
+    let dna_props = (fake_dna_path, properties.clone());
+    let agent_key = fake_agent_pubkey_1();
+    let app_paths = AppPaths {
+        dnas: vec![dna_props],
+        app_id: "test".to_string(),
+        agent_key,
+        proofs: HashMap::new(),
+    };
+    let request = AdminRequest::InstallApp { app_paths };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::DnaInstalled);
+    assert_matches!(response, AdminResponse::AppInstalled);
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -295,10 +304,18 @@ async fn call_zome() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let request = AdminRequest::InstallDna(fake_dna_path, None);
+    let dna_props = (fake_dna_path, None);
+    let agent_key = fake_agent_pubkey_1();
+    let app_paths = AppPaths {
+        dnas: vec![dna_props],
+        app_id: "test".to_string(),
+        agent_key,
+        proofs: HashMap::new(),
+    };
+    let request = AdminRequest::InstallApp { app_paths };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::DnaInstalled);
+    assert_matches!(response, AdminResponse::AppInstalled);
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -309,14 +326,12 @@ async fn call_zome() {
     assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
 
     // Activate cells
-    let dna_hashes = vec![(original_dna_hash.clone(), None)];
     let request = AdminRequest::ActivateApp {
-        hashes_with_proofs: dna_hashes,
-        agent_key: fake_agent_pubkey_1(),
+        app_id: "test".to_string(),
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::AppsActivated);
+    assert_matches!(response, AdminResponse::AppActivated);
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut client, &mut holochain).await;
@@ -353,9 +368,17 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
-    let request = AdminRequest::InstallDna(fake_dna_path, None);
+    let dna_props = (fake_dna_path, None);
+    let agent_key = fake_agent_pubkey_1();
+    let app_paths = AppPaths {
+        dnas: vec![dna_props],
+        app_id: "test".to_string(),
+        agent_key,
+        proofs: HashMap::new(),
+    };
+    let request = AdminRequest::InstallApp { app_paths };
     let response = client.request(request).await;
-    assert_matches!(response, Ok(AdminResponse::DnaInstalled));
+    assert_matches!(response, Ok(AdminResponse::AppInstalled));
     conductor_handle.shutdown().await;
 
     Ok(())
@@ -398,14 +421,22 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     info!("About to make failing request");
 
-    let (fake_dna, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
-    let request = AdminRequest::InstallDna(fake_dna, None);
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
+    let dna_props = (fake_dna_path, None);
+    let agent_key = fake_agent_pubkey_1();
+    let app_paths = AppPaths {
+        dnas: vec![dna_props],
+        app_id: "test".to_string(),
+        agent_key,
+        proofs: HashMap::new(),
+    };
+    let request = AdminRequest::InstallApp { app_paths };
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
         tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
-    // request should have errored since the conductor shut down,
+    // request should have encountered an error since the conductor shut down,
     // but should not have timed out (which would be an `Err(Err(_))`)
     assert_matches!(response, Ok(Err(_)));
 

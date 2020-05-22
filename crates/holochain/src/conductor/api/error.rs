@@ -1,7 +1,11 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
 use crate::{
-    conductor::{error::ConductorError, interface::error::InterfaceError, CellError},
+    conductor::{
+        error::{ConductorError, CreateAppError},
+        interface::error::InterfaceError,
+        CellError,
+    },
     core::{
         ribosome::error::RibosomeError,
         state::{source_chain::SourceChainError, workspace::WorkspaceError},
@@ -115,6 +119,8 @@ pub enum ExternalApiWireError {
     DnaReadError(String),
     /// There was an error in the ribosome
     RibosomeError(String),
+    /// Error activating app
+    ActivateApp(String),
 }
 
 impl ExternalApiWireError {
@@ -144,5 +150,11 @@ impl From<SerializationError> for ExternalApiWireError {
 impl From<RibosomeError> for ExternalApiWireError {
     fn from(e: RibosomeError) -> Self {
         ExternalApiWireError::RibosomeError(e.to_string())
+    }
+}
+
+impl From<CreateAppError> for ExternalApiWireError {
+    fn from(e: CreateAppError) -> Self {
+        ExternalApiWireError::ActivateApp(e.to_string())
     }
 }

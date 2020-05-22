@@ -1,7 +1,10 @@
 use super::{dna_store::error::DnaStoreError, interface::error::InterfaceError};
 use crate::{conductor::cell::error::CellError, core::workflow::error::WorkflowRunError};
 use holochain_state::error::DatabaseError;
-use holochain_types::cell::{CellHandle, CellId};
+use holochain_types::{
+    app::AppId,
+    cell::{CellHandle, CellId},
+};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -67,8 +70,8 @@ pub enum ConductorError {
     #[error(transparent)]
     InterfaceError(#[from] Box<InterfaceError>),
 
-    #[error("Failed to create the following cells in the app: {errors:?}")]
-    CreateCellsFailed { errors: Vec<CellError> },
+    #[error(transparent)]
+    CreateAppFailed(#[from] CreateAppError),
 
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
     GenesisFailed { errors: Vec<CellError> },
@@ -78,6 +81,21 @@ pub enum ConductorError {
 
     #[error("Wasm code was not found in the wasm store")]
     WasmMissing,
+
+    #[error("Tried to activate an app that was not installed")]
+    AppNotInstalled,
+
+    #[error("Tried to deactivate an app that was not active")]
+    AppNotActive,
+}
+
+#[derive(Error, Debug)]
+pub enum CreateAppError {
+    #[error("Failed to create the following cells in the {app_id} app: {errors:?}")]
+    Failed {
+        app_id: AppId,
+        errors: Vec<CellError>,
+    },
 }
 
 // TODO: can this be removed?

@@ -80,6 +80,13 @@ impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
         self.next_index as usize
     }
 
+    /// Get a header at an index
+    pub fn get(&self, i: u32) -> DatabaseResult<Option<HeaderAddress>> {
+        self.db
+            .get(i)
+            .map(|seq_item| seq_item.map(|si| si.header_address))
+    }
+
     /// Add a header to the chain, setting all other values automatically.
     /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
