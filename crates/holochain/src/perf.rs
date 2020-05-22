@@ -65,12 +65,12 @@ macro_rules! end_hard_timeout {
             dbg!(timeout_check);
 
             if hard_timeout_nanos > $timeout {
-                panic!(format!(
+                tracing::error!(
                     "Exceeded hard timeout! {} > {} ({})",
                     hard_timeout_nanos,
                     $timeout,
                     stringify!($t0, $timeout)
-                ));
+                );
             }
         }
     }};
