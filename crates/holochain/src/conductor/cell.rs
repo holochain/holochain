@@ -178,6 +178,7 @@ impl Cell {
         &self,
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult> {
+        // Check if init has run if not run it
         self.check_or_run_init().await?;
 
         let arc = self.state_env();

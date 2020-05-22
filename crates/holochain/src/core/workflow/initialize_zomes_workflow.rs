@@ -51,10 +51,17 @@ where
 
             // Insert the init marker
             let prev_header = workspace.0.source_chain.chain_head()?;
+            let header_seq = workspace
+                .0
+                .source_chain
+                .get_element(&prev_header)
+                .await?
+                .map(|ph| ph.header().header_seq() + 1)
+                .unwrap_or(0);
             let init_header = Header::InitZomesComplete(InitZomesComplete {
                 author,
                 timestamp: Timestamp::now(),
-                header_seq: 3,
+                header_seq,
                 prev_header: prev_header.clone(),
             });
             workspace.0.source_chain.put(init_header, None).await?;

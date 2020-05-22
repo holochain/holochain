@@ -51,6 +51,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     }
 
     // TODO: TK-01747: Make this check more robust maybe?
+    // PERF: This call must be fast
     pub fn has_genesis(&self) -> bool {
         self.sequence.len() >= 3
     }

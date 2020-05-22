@@ -49,6 +49,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     }
 
     // TODO: TK-01747: Make this check more robust maybe?
+    // PERF: This call must be fast
     pub fn has_initialized(&self) -> bool {
         self.0.len() > 3
     }

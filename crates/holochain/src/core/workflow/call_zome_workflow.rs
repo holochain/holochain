@@ -195,60 +195,6 @@ pub mod tests {
         workflow.workflow(workspace).await
     }
 
-    // 0.5. Initialization Complete?
-    // Check if source chain seq/head ("as at") is less than 4, if so,
-    // Call Initialize zomes workflows (which will end up adding an entry
-    // for "zome initialization complete") MVI
-    // FIXME: I think this can be removed because initialize will be called
-    // from create_cell and there's no need to trigger it here because
-    // a cell cannot exist without have init already run
-    #[ignore]
-    #[tokio::test(threaded_scheduler)]
-    async fn runs_init() {
-        let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
-        let mut ribosome = MockRibosomeT::new();
-
-        // Genesis
-        fake_genesis(&mut workspace.source_chain).await;
-
-        // Setup the ribosome mock
-        ribosome
-            .expect_call_zome_function()
-            .returning(move |_workspace, _invocation| {
-                let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
-            });
-
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
-                    .next()
-                    .unwrap(),
-                TestWasm::Foo.into(),
-                "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
-
-        let workflow = InvokeZomeWorkflow {
-            invocation,
-            ribosome,
-        };
-        let (_, effects) = workflow.workflow(workspace).await.unwrap();
-
-        // Check the initialize zome was added to a trigger
-        assert!(effects.signals.is_empty());
-        assert!(effects.callbacks.is_empty());
-        assert!(!effects.triggers.is_empty());
-        //assert_matches!(effects.triggers, Some(InitializeZomesWorkflow {ribosome}));
-    }
-
     // 1.  Check if there is a Capability token secret in the parameters.
     // If there isn't and the function to be called isn't public,
     // we stop the process and return an error. MVT
