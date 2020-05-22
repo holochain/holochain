@@ -1,4 +1,10 @@
-use crate::conductor::api::error::ConductorApiError;
+use crate::{
+    conductor::api::error::ConductorApiError,
+    core::{
+        ribosome::{error::RibosomeError, guest_callback::init::InitResult},
+        workflow::error::WorkflowRunError,
+    },
+};
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
 use std::path::PathBuf;
@@ -18,6 +24,12 @@ pub enum CellError {
     CellWithoutGenesis(CellId),
     #[error("The cell failed to cleanup it's environment because: {0}. Recommend manually deleting the database at: {1}")]
     Cleanup(String, PathBuf),
+    #[error(transparent)]
+    WorkflowRunError(#[from] Box<WorkflowRunError>),
+    #[error(transparent)]
+    RibosomeError(#[from] RibosomeError),
+    #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
+    InitFailed(InitResult),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

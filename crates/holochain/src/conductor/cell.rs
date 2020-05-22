@@ -7,7 +7,7 @@ use crate::{
         api::{error::ConductorApiResult, CellConductorApi},
         cell::error::CellResult,
     },
-    core::ribosome::wasm_ribosome::WasmRibosome,
+    core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
@@ -91,11 +91,35 @@ impl Cell {
             } else {
                 // If not run it
                 // TODO: TK-01852 Run this when initializa zomes is complete
-                let _run_init = || async {
-                    let workspace = InitializeZomesWorkspace {};
-                    let workflow = InitializeZomesWorkflow {};
-                    run_workflow(state_env.clone(), workflow, workspace).await
-                };
+                let run_init = tokio::spawn({
+                    let state_env = state_env.clone();
+                    let id = id.clone();
+                    async move {
+                        let env_ref = state_env.guard().await;
+                        let reader = env_ref.reader()?;
+                        // Create the workspace
+                        let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)?;
+                        let workspace = InitializeZomesWorkspace(workspace);
+
+                        // get the dna
+                        let dna_file = conductor_handle
+                            .get_dna(id.dna_hash())
+                            .await
+                            .ok_or(CellError::DnaMissing)?;
+
+                        // Create the workflow and run it
+                        let workflow = InitializeZomesWorkflow {
+                            agent_key: id.agent_pubkey().clone(),
+                            dna_file,
+                        };
+                        run_workflow(state_env.clone(), workflow, workspace).await
+                    }
+                });
+                let init_result = run_init.await?.map_err(Box::new)??;
+                match init_result {
+                    InitResult::Pass => (),
+                    r @ _ => return Err(CellError::InitFailed(r)),
+                }
             }
 
             source_chain.len()
