@@ -30,10 +30,10 @@ impl From<GuestOutput> for ValidateCallbackResult {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct ValidationPackage;
 
-#[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
     Fail(String),
