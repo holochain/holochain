@@ -13,7 +13,10 @@ use holochain_state::{
 use holochain_types::{
     composite_hash::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,
 };
-use holochain_zome_types::entry::Entry;
+use holochain_zome_types::{
+    capability::{CapClaim, CapGrant, CapSecret},
+    entry::Entry,
+};
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -106,6 +109,22 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.put_header(header_address.clone());
         self.cas.put(signed_header, maybe_entry)?;
         Ok(header_address)
+    }
+
+    pub fn put_cap_grant(&mut self, grant: CapGrant) -> SourceChainResult<()> {
+        todo!()
+    }
+
+    pub fn put_cap_claim(&mut self, claim: CapClaim) -> SourceChainResult<()> {
+        todo!()
+    }
+
+    pub fn get_cap_grant_by_secret(&self, secret: &CapSecret) -> SourceChainResult<CapGrant> {
+        todo!()
+    }
+
+    pub fn get_cap_claim_by_secret(&self, secret: &CapSecret) -> SourceChainResult<CapClaim> {
+        todo!()
     }
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
@@ -246,7 +265,11 @@ pub mod tests {
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header, HeaderHashed,
     };
-    use holochain_zome_types::entry::Entry;
+    use holochain_zome_types::{
+        capability::{CapAccess, CapClaim, CapGrant, CapSecret},
+        entry::Entry,
+    };
+    use std::collections::HashMap;
 
     fn fixtures() -> (
         AgentPubKey,
@@ -374,14 +397,13 @@ pub mod tests {
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let dbs = arc.dbs().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
             let reader = env.reader()?;
 
-            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            let mut store = SourceChainBuf::new(&reader, &env)?;
             store
                 .put(dna_header.as_content().clone(), dna_entry)
                 .await?;
@@ -395,7 +417,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let store = SourceChainBuf::new(&reader, &dbs)?;
+            let store = SourceChainBuf::new(&reader, &env)?;
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -409,6 +431,54 @@ pub mod tests {
 
             assert_eq!(parsed[1]["element"]["header"]["type"], "Dna");
             assert_eq!(parsed[1]["element"]["entry"], serde_json::Value::Null);
+        }
+
+        Ok(())
+    }
+
+    async fn test_get_cap_grant() -> SourceChainResult<()> {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let access = CapAccess::transferable();
+        let secret = access.secret().unwrap();
+        let grant = CapGrant::zome_call("tag".into(), access.clone(), HashMap::new());
+        {
+            let reader = env.reader()?;
+            let mut store = SourceChainBuf::new(&reader, &env)?;
+            store.put_cap_grant(grant.clone())?;
+            assert_eq!(store.get_cap_grant_by_secret(secret)?, grant);
+
+            env.with_commit(|writer| store.flush_to_txn(writer))?;
+        }
+
+        {
+            let reader = env.reader()?;
+            let store = SourceChainBuf::new(&reader, &env)?;
+            assert_eq!(store.get_cap_grant_by_secret(secret)?, grant);
+        }
+
+        Ok(())
+    }
+
+    async fn test_get_cap_claim() -> SourceChainResult<()> {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let secret = CapSecret::random();
+        let agent_pubkey = fake_agent_pubkey_1().into();
+        let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
+        {
+            let reader = env.reader()?;
+            let mut store = SourceChainBuf::new(&reader, &env)?;
+            store.put_cap_claim(claim.clone())?;
+            assert_eq!(store.get_cap_claim_by_secret(&secret)?, claim);
+
+            env.with_commit(|writer| store.flush_to_txn(writer))?;
+        }
+
+        {
+            let reader = env.reader()?;
+            let store = SourceChainBuf::new(&reader, &env)?;
+            assert_eq!(store.get_cap_claim_by_secret(&secret)?, claim);
         }
 
         Ok(())

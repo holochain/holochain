@@ -2,7 +2,7 @@ use super::CapSecret;
 use crate::zome::ZomeName;
 use holo_hash_core::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 /// System entry to hold a capabilities granted by the callee
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -110,8 +110,15 @@ impl CapAccess {
             }
         }
     }
+
+    pub fn secret(&self) -> Option<&CapSecret> {
+        match self {
+            CapAccess::Transferable { secret } | CapAccess::Assigned { secret, .. } => Some(secret),
+            CapAccess::Unrestricted => None,
+        }
+    }
 }
 
 /// A collection of functions grouped by zome name
 /// which are authorized within a capability
-pub type GrantedFunctions = BTreeMap<ZomeName, Vec<String>>;
+pub type GrantedFunctions = HashMap<ZomeName, Vec<String>>;
