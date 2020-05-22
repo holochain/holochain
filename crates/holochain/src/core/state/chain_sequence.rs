@@ -14,7 +14,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::address::HeaderAddress;
+use holochain_types::composite_hash::HeaderAddress;
 use serde::{Deserialize, Serialize};
 use tracing::*;
 
@@ -78,6 +78,13 @@ impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
     /// The length is just the next index
     pub fn len(&self) -> usize {
         self.next_index as usize
+    }
+
+    /// Get a header at an index
+    pub fn get(&self, i: u32) -> DatabaseResult<Option<HeaderAddress>> {
+        self.db
+            .get(i)
+            .map(|seq_item| seq_item.map(|si| si.header_address))
     }
 
     /// Add a header to the chain, setting all other values automatically.

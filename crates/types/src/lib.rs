@@ -3,9 +3,10 @@
 #![allow(clippy::cognitive_complexity)]
 #![deny(missing_docs)]
 
-pub mod address;
+pub mod app;
 pub mod autonomic;
 pub mod cell;
+pub mod composite_hash;
 pub mod db;
 pub mod dna;
 pub mod entry;

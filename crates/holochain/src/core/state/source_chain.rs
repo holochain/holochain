@@ -11,7 +11,7 @@ use holochain_state::{
     prelude::{Readable, Reader},
 };
 use holochain_types::{
-    address::HeaderAddress, header::EntryVisibility, prelude::*, Header, HeaderHashed,
+    composite_hash::HeaderAddress, header::EntryVisibility, prelude::*, Header, HeaderHashed,
 };
 use holochain_zome_types::entry::Entry;
 use shrinkwraprs::Shrinkwrap;
