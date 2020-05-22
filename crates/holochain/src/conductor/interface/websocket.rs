@@ -22,7 +22,7 @@ use url2::url2;
 // TODO: This is arbitrary, choose reasonable size.
 /// Number of signals in buffer before applying
 /// back pressure.
-pub(crate) const SIGNAL_BUFFER_SIZE: usize = 1000;
+pub(crate) const SIGNAL_BUFFER_SIZE: usize = 5;
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
@@ -252,7 +252,7 @@ mod test {
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
-        app::{AppPaths, MembraneProofs},
+        app::AppPaths,
         cell::CellId,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
@@ -384,9 +384,9 @@ mod test {
             dnas: vec![dna],
             app_id: "test app".to_string(),
             agent_key,
+            proofs: HashMap::new(),
         };
-        let proofs = MembraneProofs::empty();
-        let msg = AdminRequest::InstallApp { app_paths, proofs };
+        let msg = AdminRequest::InstallApp { app_paths };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -414,13 +414,17 @@ mod test {
         let dna = fake_dna_file(&uuid.to_string());
 
         let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let mut dna_cache = MockDnaStore::new();
-        dna_cache
+        let mut dna_store = MockDnaStore::new();
+        dna_store
             .expect_add()
             .with(predicate::eq(dna))
             .returning(|_| Err(DnaStoreError::WriteFail));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_cache)
+        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
             .test(test_env, wasm_env)
             .await
             .unwrap();
@@ -431,9 +435,9 @@ mod test {
             dnas: vec![dna],
             app_id: "test app".to_string(),
             agent_key,
+            proofs: HashMap::new(),
         };
-        let proofs = MembraneProofs::empty();
-        let msg = AdminRequest::InstallApp { app_paths, proofs };
+        let msg = AdminRequest::InstallApp { app_paths };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -485,6 +489,10 @@ mod test {
             .expect_get()
             .with(predicate::eq(dna_hash))
             .returning(move |_| Some(dna.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
         let (_tmpdir, app_api) = setup_app(vec![(cell_id.clone(), None)], dna_store).await;
         let mut request = Box::new(
@@ -540,6 +548,10 @@ mod test {
         dna_store
             .expect_get()
             .returning(move |hash| dna_map.get(&hash).cloned());
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
         let (_tmpdir, handle) = setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
 
         // Activate the app
@@ -635,6 +647,10 @@ mod test {
 
         let mut dna_store = MockDnaStore::new();
         dna_store.expect_get().returning(move |_| Some(dna.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;

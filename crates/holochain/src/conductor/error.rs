@@ -79,6 +79,9 @@ pub enum ConductorError {
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
+    #[error("Wasm code was not found in the wasm store")]
+    WasmMissing,
+
     #[error("Tried to activate an app that was not installed")]
     AppNotInstalled,
 

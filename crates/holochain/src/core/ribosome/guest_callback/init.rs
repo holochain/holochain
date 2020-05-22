@@ -3,7 +3,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::DnaDefFixturator;
 use fixt::prelude::*;
-use holo_hash::EntryHash;
+use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::init::InitCallbackResult;
@@ -79,8 +79,8 @@ pub enum InitResult {
     Fail(ZomeName, String),
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
-    /// Vec<EntryHash> is the list of all missing dependency addresses
-    UnresolvedDependencies(ZomeName, Vec<EntryHash>),
+    /// Vec<EntryContentHash> is the list of all missing dependency addresses
+    UnresolvedDependencies(ZomeName, Vec<EntryContentHash>),
 }
 
 impl From<Vec<InitCallbackResult>> for InitResult {

@@ -57,7 +57,7 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use derive_more::From;
 use holochain_types::{
-    app::{App, AppId},
+    app::{AppId, InstalledApp},
     autonomic::AutonomicCue,
     cell::CellId,
     dna::DnaFile,
@@ -104,6 +104,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
+
+    /// Add the [DnaFile]s from the wasm and dna_def databases into memory
+    async fn add_dnas(&self) -> ConductorResult<()>;
 
     /// Invoke a zome function on a Cell
     async fn call_zome(
@@ -191,10 +194,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        {
-            self.0.write().await.put_wasm(dna.clone()).await?;
-        }
+        self.0.read().await.put_wasm(dna.clone()).await?;
         Ok(self.0.write().await.dna_store_mut().add(dna)?)
+    }
+
+    async fn add_dnas(&self) -> ConductorResult<()> {
+        let dnas = self.0.read().await.load_wasms_into_dna_files().await?;
+        self.0.write().await.dna_store_mut().add_dnas(dnas);
+        Ok(())
     }
 
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
@@ -253,7 +260,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .genesis_cells(cells_ids_with_proofs, self.clone())
                 .await?
         };
-        let app = App { app_id, cell_ids };
+        let app = InstalledApp { app_id, cell_ids };
         // Update the db
         self.0.write().await.add_inactive_app_to_db(app).await
     }
@@ -338,6 +345,8 @@ pub mod mock {
 
             fn sync_list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
+            fn sync_add_dnas(&self) -> ConductorResult<()>;
+
             fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
             fn sync_call_zome(
@@ -396,6 +405,10 @@ pub mod mock {
 
         async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
             self.sync_add_app_interface(port)
+        }
+
+        async fn add_dnas(&self) -> ConductorResult<()> {
+            self.sync_add_dnas()
         }
 
         async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {

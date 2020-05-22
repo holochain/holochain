@@ -1,6 +1,6 @@
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::{app::Apps, cell::CellId, dna::error::DnaError};
+use holochain_types::{app::InstalledApps, cell::CellId, dna::error::DnaError};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -13,10 +13,10 @@ use std::collections::HashMap;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: Apps,
+    pub inactive_apps: InstalledApps,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: Apps,
+    pub active_apps: InstalledApps,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub interfaces: HashMap<InterfaceId, InterfaceConfig>,

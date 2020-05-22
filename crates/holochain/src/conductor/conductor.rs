@@ -12,7 +12,7 @@
 use super::{
     api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
-    dna_store::{DnaStore, RealDnaStore},
+    dna_store::{DnaDefBuf, DnaStore, RealDnaStore},
     error::{ConductorError, CreateAppError},
     handle::ConductorHandleImpl,
     interface::{
@@ -54,7 +54,7 @@ use holochain_state::{
     typed::{Kv, UnitDbKey},
 };
 use holochain_types::{
-    app::{App, AppId},
+    app::{AppId, InstalledApp},
     cell::{CellHandle, CellId},
     dna::DnaFile,
 };
@@ -65,6 +65,7 @@ use tracing::*;
 
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
+use holo_hash::{DnaHash, Hashed};
 use holochain_serialized_bytes::SerializedBytes;
 
 #[cfg(test)]
@@ -433,7 +434,10 @@ where
     }
 
     /// Register an app inactive in the database
-    pub(super) async fn add_inactive_app_to_db(&mut self, app: App) -> ConductorResult<()> {
+    pub(super) async fn add_inactive_app_to_db(
+        &mut self,
+        app: InstalledApp,
+    ) -> ConductorResult<()> {
         trace!(?app);
         self.update_state(move |mut state| {
             state.inactive_apps.insert(app.app_id, app.cell_ids);
@@ -495,6 +499,41 @@ where
         }
     }
 
+    pub(super) async fn load_wasms_into_dna_files(
+        &self,
+    ) -> ConductorResult<impl IntoIterator<Item = (DnaHash, DnaFile)>> {
+        let environ = &self.wasm_env;
+        let env = environ.guard().await;
+        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
+        let reader = env.reader()?;
+
+        let wasm_buf = WasmBuf::new(&reader, wasm)?;
+        let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
+        // Load out all dna defs
+        let wasm_tasks = dna_def_buf
+            .iter()?
+            .map(|dna_def| {
+                // Load all wasms for each dna_def from the wasm db into memory
+                let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {
+                    wasm_buf
+                        .get(&zome.wasm_hash.into())
+                        .await?
+                        .map(|hashed| hashed.into_inner().0)
+                        .ok_or(ConductorError::WasmMissing)
+                });
+                async move {
+                    let wasms = futures::future::try_join_all(wasms).await?;
+                    let dna_file = DnaFile::new(dna_def, wasms).await?;
+                    Ok((dna_file.dna_hash().clone(), dna_file))
+                }
+            })
+            // This needs to happen due to the environment not being Send
+            .collect::<Vec<_>>();
+        // try to join all the tasks and return the list of dna files
+        futures::future::try_join_all(wasm_tasks).await
+    }
+
     /// Remove cells from the cell map in the Conductor
     pub(super) fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
         for cell_id in cell_ids {
@@ -502,22 +541,30 @@ where
         }
     }
 
-    pub(super) async fn put_wasm(&mut self, dna: DnaFile) -> ConductorResult<()> {
+    pub(super) async fn put_wasm(&self, dna: DnaFile) -> ConductorResult<()> {
         let environ = &self.wasm_env;
         let env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let reader = env.reader()?;
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
+        let mut dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
             if let None = wasm_buf.get(&wasm_hash.into()).await? {
                 wasm_buf.put(dna_wasm).await?;
             }
         }
+        if let None = dna_def_buf.get(dna.dna_hash())? {
+            dna_def_buf.put(dna.dna().clone()).await?;
+        }
 
-        // write the db
+        // write the wasm db
         env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
+
+        // write the dna_def db
+        env.with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
         Ok(())
     }
@@ -757,6 +804,8 @@ mod builder {
                 RwLock::new(conductor),
                 keystore,
             )));
+
+            handle.add_dnas().await?;
 
             let cell_startup_errors = handle.clone().setup_cells().await?;
 

@@ -14,7 +14,7 @@ use crate::{
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    app::{AppId, AppPaths, MembraneProofs},
+    app::{AppId, AppPaths},
     cell::{CellHandle, CellId},
     dna::{DnaFile, Properties},
 };
@@ -131,14 +131,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .add_admin_interfaces(configs)
                     .await?,
             )),
-            InstallApp { app_paths, proofs } => {
+            InstallApp { app_paths } => {
                 trace!(?app_paths.dnas);
                 let AppPaths {
                     app_id,
                     agent_key,
                     dnas,
+                    proofs,
                 } = app_paths;
-                let proofs = proofs.proofs;
 
                 // Install Dnas
                 let install_dna_tasks = dnas.into_iter().map(|(dna_path, properties)| async {
@@ -396,8 +396,6 @@ pub enum AdminRequest {
     InstallApp {
         /// App Id, [AgentPubKey] and paths to Dnas
         app_paths: AppPaths,
-        /// Optional membrane proofs for Dnas
-        proofs: MembraneProofs,
     },
     /// List all installed [Dna]s
     ListDnas,
@@ -459,6 +457,7 @@ mod test {
         test_utils::{fake_agent_pubkey_1, fake_dna_file, write_fake_dna_file},
     };
     use matches::assert_matches;
+    use std::collections::HashMap;
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
@@ -477,14 +476,15 @@ mod test {
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_hash = dna.dna_hash().clone();
         let agent_key = fake_agent_pubkey_1();
+        let proofs = HashMap::new();
         let app_paths = AppPaths {
             dnas: vec![(dna_path, None)],
             app_id: "test".to_string(),
             agent_key,
+            proofs,
         };
-        let proofs = MembraneProofs::empty();
         let install_response = admin_api
-            .handle_admin_request(AdminRequest::InstallApp { app_paths, proofs })
+            .handle_admin_request(AdminRequest::InstallApp { app_paths })
             .await;
         assert_matches!(install_response, AdminResponse::AppInstalled);
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
