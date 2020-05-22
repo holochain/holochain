@@ -21,10 +21,10 @@ pub async fn fake_unique_element(
         author: agent_key,
         timestamp: Timestamp::now(),
         header_seq: 0,
-        prev_header: fake_header_hash("1").into(),
+        prev_header: fake_header_hash("1"),
 
         entry_type: EntryType::App(fake_app_entry_type(1, visibility)),
-        entry_address: entry.as_hash().to_owned(),
+        entry_hash: entry.as_hash().to_owned(),
     });
 
     Ok((

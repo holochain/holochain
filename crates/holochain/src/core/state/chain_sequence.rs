@@ -14,7 +14,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Readable, Writer},
 };
-use holochain_types::address::HeaderAddress;
+use holochain_types::composite_hash::HeaderAddress;
 use serde::{Deserialize, Serialize};
 use tracing::*;
 

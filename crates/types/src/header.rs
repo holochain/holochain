@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::address::{DhtAddress, EntryAddress, HeaderAddress};
+use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
 
 /// Header contains variants for each type of header.
 ///
@@ -79,18 +79,18 @@ impl Header {
     /// Returns the address and entry type of the Entry, if applicable.
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
     // EntryCreate and EntryUpdate
-    pub fn entry_data(&self) -> Option<(&EntryAddress, &EntryType)> {
+    pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
         match self {
             Self::EntryCreate(EntryCreate {
-                entry_address,
+                entry_hash,
                 entry_type,
                 ..
-            }) => Some((entry_address, entry_type)),
+            }) => Some((entry_hash, entry_type)),
             Self::EntryUpdate(EntryUpdate {
-                entry_address,
+                entry_hash,
                 entry_type,
                 ..
-            }) => Some((entry_address, entry_type)),
+            }) => Some((entry_hash, entry_type)),
             _ => None,
         }
     }
@@ -131,7 +131,7 @@ make_hashed_base! {
     Visibility(pub),
     HashedName(HeaderHashed),
     ContentType(Header),
-    HashType(HeaderAddress),
+    HashType(HeaderHash),
 }
 
 impl HeaderHashed {
@@ -139,7 +139,7 @@ impl HeaderHashed {
         let sb = SerializedBytes::try_from(&header)?;
         Ok(HeaderHashed::with_pre_hashed(
             header,
-            HeaderAddress::Header(HeaderHash::with_data(sb.bytes()).await),
+            HeaderHash::with_data(sb.bytes()).await,
         ))
     }
 }
@@ -187,8 +187,8 @@ pub struct LinkAdd {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub base_address: DhtAddress,
-    pub target_address: DhtAddress,
+    pub base_address: AnyDhtHash,
+    pub target_address: AnyDhtHash,
     pub tag: SerializedBytes,
     pub link_type: SerializedBytes,
 }
@@ -231,7 +231,7 @@ pub struct EntryCreate {
     pub prev_header: HeaderAddress,
 
     pub entry_type: EntryType,
-    pub entry_address: EntryAddress,
+    pub entry_hash: EntryHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -241,10 +241,10 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub replaces_address: DhtAddress,
+    pub replaces_address: AnyDhtHash,
 
     pub entry_type: EntryType,
-    pub entry_address: EntryAddress,
+    pub entry_hash: EntryHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -255,7 +255,7 @@ pub struct EntryDelete {
     pub prev_header: HeaderAddress,
 
     /// Address of the Element being deleted
-    pub removes_address: DhtAddress,
+    pub removes_address: AnyDhtHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
