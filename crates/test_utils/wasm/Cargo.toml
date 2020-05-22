@@ -17,3 +17,6 @@ strum_macros = "0.18.0"
 rand = "0.7"
 fixt = { path = "../../fixt" }
 holo_hash = { path = "../../holo_hash" }
+
+[build-dependencies]
+toml = "0.5"

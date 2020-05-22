@@ -1265,6 +1265,7 @@ dependencies = [
  "rand 0.7.3",
  "strum",
  "strum_macros",
+ "toml",
 ]
 
 [[package]]
