@@ -33,7 +33,7 @@ pub enum EntryHash {
 }
 
 /// utility macro to make it more ergonomic to access the enum variants
-macro_rules! match_entry_addr {
+macro_rules! match_entry_hash {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
             EntryHash::Entry($i) => {
@@ -48,43 +48,43 @@ macro_rules! match_entry_addr {
 
 impl holo_hash_core::HoloHashCoreHash for EntryHash {
     fn get_raw(&self) -> &[u8] {
-        match_entry_addr!(self => |i| { i.get_raw() })
+        match_entry_hash!(self => |i| { i.get_raw() })
     }
 
     fn get_bytes(&self) -> &[u8] {
-        match_entry_addr!(self => |i| { i.get_bytes() })
+        match_entry_hash!(self => |i| { i.get_bytes() })
     }
 
     fn get_loc(&self) -> u32 {
-        match_entry_addr!(self => |i| { i.get_loc() })
+        match_entry_hash!(self => |i| { i.get_loc() })
     }
 
     fn into_inner(self) -> std::vec::Vec<u8> {
-        match_entry_addr!(self => |i| { i.into_inner() })
+        match_entry_hash!(self => |i| { i.into_inner() })
     }
 }
 
 impl From<EntryHash> for holo_hash_core::HoloHashCore {
     fn from(entry_hash: EntryHash) -> holo_hash_core::HoloHashCore {
-        match_entry_addr!(entry_hash => |i| { i.into() })
+        match_entry_hash!(entry_hash => |i| { i.into() })
     }
 }
 
 impl From<EntryHash> for HoloHash {
     fn from(entry_hash: EntryHash) -> HoloHash {
-        match_entry_addr!(entry_hash => |i| { i.into() })
+        match_entry_hash!(entry_hash => |i| { i.into() })
     }
 }
 
 impl std::fmt::Display for EntryHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match_entry_addr!(self => |i| { i.fmt(f) })
+        match_entry_hash!(self => |i| { i.fmt(f) })
     }
 }
 
 /// address type for hashes that can be used to retrieve anything that can be stored on the dht
 #[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum DhtAddress {
+pub enum AnyDhtHash {
     /// standard entry content hash
     EntryContent(EntryContentHash),
     /// agents can be stored
@@ -97,33 +97,33 @@ pub enum DhtAddress {
 macro_rules! match_dht_addr {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
-            DhtAddress::EntryContent($i) => {
+            AnyDhtHash::EntryContent($i) => {
                 $($t)*
             }
-            DhtAddress::Agent($i) => {
+            AnyDhtHash::Agent($i) => {
                 $($t)*
             }
-            DhtAddress::Header($i) => {
+            AnyDhtHash::Header($i) => {
                 $($t)*
             }
         }
     };
 }
 
-impl From<DhtAddress> for HoloHash {
-    fn from(dht_address: DhtAddress) -> HoloHash {
+impl From<AnyDhtHash> for HoloHash {
+    fn from(dht_address: AnyDhtHash) -> HoloHash {
         match_dht_addr!(dht_address => |i| { i.into() })
     }
 }
 
-impl TryFrom<&AgentPubKey> for DhtAddress {
+impl TryFrom<&AgentPubKey> for AnyDhtHash {
     type Error = SerializedBytesError;
     fn try_from(agent: &AgentPubKey) -> Result<Self, Self::Error> {
-        Ok(DhtAddress::Agent(agent.to_owned()))
+        Ok(AnyDhtHash::Agent(agent.to_owned()))
     }
 }
 
-impl std::fmt::Display for DhtAddress {
+impl std::fmt::Display for AnyDhtHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match_dht_addr!(self => |i| { i.fmt(f) })
     }

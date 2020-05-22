@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::composite_hash::{DhtAddress, EntryHash, HeaderAddress};
+use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
 
 /// Header contains variants for each type of header.
 ///
@@ -187,8 +187,8 @@ pub struct LinkAdd {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub base_address: DhtAddress,
-    pub target_address: DhtAddress,
+    pub base_address: AnyDhtHash,
+    pub target_address: AnyDhtHash,
     pub tag: SerializedBytes,
     pub link_type: SerializedBytes,
 }
@@ -241,7 +241,7 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub replaces_address: DhtAddress,
+    pub replaces_address: AnyDhtHash,
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
@@ -255,7 +255,7 @@ pub struct EntryDelete {
     pub prev_header: HeaderAddress,
 
     /// Address of the Element being deleted
-    pub removes_address: DhtAddress,
+    pub removes_address: AnyDhtHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
