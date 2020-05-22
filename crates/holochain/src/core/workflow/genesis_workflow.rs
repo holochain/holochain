@@ -82,7 +82,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 header_seq: 2,
                 prev_header: avh_addr,
                 entry_type: header::EntryType::AgentPubKey,
-                entry_address: agent_pubkey.clone().into(),
+                entry_hash: agent_pubkey.clone().into(),
             });
             workspace
                 .source_chain
@@ -191,7 +191,7 @@ pub mod tests {
             header_seq: 2,
             prev_header: avh_hash,
             entry_type: header::EntryType::AgentPubKey,
-            entry_address: agent_pubkey.clone().into(),
+            entry_hash: agent_pubkey.clone().into(),
         });
         source_chain
             .put(agent_header.clone(), Some(agent_entry))

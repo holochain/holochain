@@ -3,8 +3,8 @@ extern crate wee_alloc;
 extern crate lazy_static;
 
 use holochain_wasmer_guest::*;
-use holochain_zome_types::*;
 use holochain_zome_types::globals::ZomeGlobals;
+use holochain_zome_types::*;
 
 // Use `wee_alloc` as the global allocator.
 #[global_allocator]
@@ -42,31 +42,76 @@ macro_rules! guest_functions {
 }
 
 guest_functions!(
-    [ __globals, globals, GlobalsInput, GlobalsOutput ],
-    [ __call, call, CallInput, CallOutput ],
-    [ __capability, capability, CapabilityInput, CapabilityOutput ],
-    [ __commit_entry, commit_entry, CommitEntryInput, CommitEntryOutput ],
-    [ __decrypt, decrypt, DecryptInput, DecryptOutput ],
-    [ __encrypt, encrypt, EncryptInput, EncryptOutput ],
-    [ __show_env, show_env, ShowEnvInput, ShowEnvOutput ],
-    [ __property, property, PropertyInput, PropertyOutput ],
-    [ __query, query, QueryInput, QueryOutput ],
-    [ __remove_link, remove_link, RemoveLinkInput, RemoveLinkOutput ],
-    [ __send, send, SendInput, SendOutput ],
-    [ __sign, sign, SignInput, SignOutput ],
-    [ __schedule, schedule, ScheduleInput, ScheduleOutput ],
-    [ __update_entry, update_entry, UpdateEntryInput, UpdateEntryOutput ],
-    [ __emit_signal, emit_signal, EmitSignalInput, EmitSignalOutput ],
-    [ __remove_entry, remove_entry, RemoveEntryInput, RemoveEntryOutput ],
-    [ __link_entries, link_entries, LinkEntriesInput, LinkEntriesOutput ],
-    [ __keystore, keystore, KeystoreInput, KeystoreOutput ],
-    [ __get_links, get_links, GetLinksInput, GetLinksOutput ],
-    [ __get_entry, get_entry, GetEntryInput, GetEntryOutput ],
-    [ __entry_type_properties, entry_type_properties, EntryTypePropertiesInput, EntryTypePropertiesOutput ],
-    [ __entry_address, entry_address, EntryAddressInput, EntryAddressOutput ],
-    [ __sys_time, sys_time, SysTimeInput, SysTimeOutput ],
-    [ __debug, debug, DebugInput, DebugOutput ],
-    [ __unreachable, unreachable, UnreachableInput, UnreachableOutput ]
+    [__globals, globals, GlobalsInput, GlobalsOutput],
+    [__call, call, CallInput, CallOutput],
+    [__capability, capability, CapabilityInput, CapabilityOutput],
+    [
+        __commit_entry,
+        commit_entry,
+        CommitEntryInput,
+        CommitEntryOutput
+    ],
+    [__decrypt, decrypt, DecryptInput, DecryptOutput],
+    [__encrypt, encrypt, EncryptInput, EncryptOutput],
+    [__show_env, show_env, ShowEnvInput, ShowEnvOutput],
+    [__property, property, PropertyInput, PropertyOutput],
+    [__query, query, QueryInput, QueryOutput],
+    [
+        __remove_link,
+        remove_link,
+        RemoveLinkInput,
+        RemoveLinkOutput
+    ],
+    [__send, send, SendInput, SendOutput],
+    [__sign, sign, SignInput, SignOutput],
+    [__schedule, schedule, ScheduleInput, ScheduleOutput],
+    [
+        __update_entry,
+        update_entry,
+        UpdateEntryInput,
+        UpdateEntryOutput
+    ],
+    [
+        __emit_signal,
+        emit_signal,
+        EmitSignalInput,
+        EmitSignalOutput
+    ],
+    [
+        __remove_entry,
+        remove_entry,
+        RemoveEntryInput,
+        RemoveEntryOutput
+    ],
+    [
+        __link_entries,
+        link_entries,
+        LinkEntriesInput,
+        LinkEntriesOutput
+    ],
+    [__keystore, keystore, KeystoreInput, KeystoreOutput],
+    [__get_links, get_links, GetLinksInput, GetLinksOutput],
+    [__get_entry, get_entry, GetEntryInput, GetEntryOutput],
+    [
+        __entry_type_properties,
+        entry_type_properties,
+        EntryTypePropertiesInput,
+        EntryTypePropertiesOutput
+    ],
+    [
+        __entry_address,
+        entry_address,
+        EntryHashInput,
+        EntryHashOutput
+    ],
+    [__sys_time, sys_time, SysTimeInput, SysTimeOutput],
+    [__debug, debug, DebugInput, DebugOutput],
+    [
+        __unreachable,
+        unreachable,
+        UnreachableInput,
+        UnreachableOutput
+    ]
 );
 
 // this is the type of thing you'd expect to see in an HDK to cache the global constants

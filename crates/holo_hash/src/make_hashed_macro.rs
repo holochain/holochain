@@ -10,7 +10,7 @@
 ///     Visibility(pub),
 ///     HashedName(MyTypeHashed),
 ///     ContentType(MyType),
-///     HashType(holo_hash::EntryHash),
+///     HashType(holo_hash::EntryContentHash),
 /// }
 /// ```
 macro_rules! make_hashed_base {
@@ -132,7 +132,7 @@ macro_rules! make_hashed_base {
 ///     Visibility(pub),
 ///     HashedName(MyTypeHashed),
 ///     ContentType(MyType),
-///     HashType(holo_hash::EntryHash),
+///     HashType(holo_hash::EntryContentHash),
 /// }
 /// ```
 macro_rules! make_hashed {
