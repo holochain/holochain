@@ -3,6 +3,7 @@ pub mod curve;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContextFixturator;
 use fixt::prelude::*;
+use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
 use holo_hash::HeaderHashFixturator;
 use holo_hash::WasmHash;
@@ -16,6 +17,12 @@ use holochain_types::dna::Zomes;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::capability::CapAccess;
+use holochain_zome_types::capability::CapClaim;
+use holochain_zome_types::capability::CapGrant;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::capability::GrantedFunctions;
+use holochain_zome_types::capability::ZomeCallCapGrant;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
@@ -25,6 +32,7 @@ use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 wasm_io_fixturator!(HostInput<SerializedBytes>);
@@ -53,14 +61,352 @@ fixturator!(
 );
 
 fixturator!(
-    Entry,
-    Entry::App(SerializedBytesFixturator::new(Empty).next().unwrap()),
-    Entry::App(
-        SerializedBytesFixturator::new(Unpredictable)
+    ZomeCallCapGrant,
+    {
+        match CapGrant::zome_call(
+            StringFixturator::new(Empty).next().unwrap(),
+            CapAccessFixturator::new(Empty).next().unwrap(),
+            {
+                let mut rng = rand::thread_rng();
+                let number_of_zomes = rng.gen_range(0, 5);
+
+                let mut granted_functions: GrantedFunctions = BTreeMap::new();
+                for _ in 0..number_of_zomes {
+                    let number_of_functions = rng.gen_range(0, 5);
+                    let mut zome_functions = vec![];
+                    for _ in 0..number_of_functions {
+                        zome_functions.push(StringFixturator::new(Empty).next().unwrap());
+                    }
+                    granted_functions.insert(
+                        ZomeNameFixturator::new(Empty).next().unwrap(),
+                        zome_functions,
+                    );
+                }
+                granted_functions
+            },
+        ) {
+            CapGrant::ZomeCall(zome_call) => zome_call,
+            _ => unreachable!(),
+        }
+    },
+    {
+        match CapGrant::zome_call(
+            StringFixturator::new(Unpredictable).next().unwrap(),
+            CapAccessFixturator::new(Unpredictable).next().unwrap(),
+            {
+                let mut rng = rand::thread_rng();
+                let number_of_zomes = rng.gen_range(0, 5);
+
+                let mut granted_functions: GrantedFunctions = BTreeMap::new();
+                for _ in 0..number_of_zomes {
+                    let number_of_functions = rng.gen_range(0, 5);
+                    let mut zome_functions = vec![];
+                    for _ in 0..number_of_functions {
+                        zome_functions.push(StringFixturator::new(Unpredictable).next().unwrap());
+                    }
+                    granted_functions.insert(
+                        ZomeNameFixturator::new(Unpredictable).next().unwrap(),
+                        zome_functions,
+                    );
+                }
+                granted_functions
+            },
+        ) {
+            CapGrant::ZomeCall(zome_call) => zome_call,
+            _ => unreachable!(),
+        }
+    },
+    {
+        let ret = match CapGrant::zome_call(
+            StringFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            CapAccessFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            {
+                let mut granted_functions: GrantedFunctions = BTreeMap::new();
+                for _ in 0..self.0.index % 3 {
+                    let number_of_functions = self.0.index % 3;
+                    let mut zome_functions = vec![];
+                    for _ in 0..number_of_functions {
+                        zome_functions.push(StringFixturator::new(Predictable).next().unwrap());
+                    }
+                    granted_functions.insert(
+                        ZomeNameFixturator::new(Predictable).next().unwrap(),
+                        zome_functions,
+                    );
+                }
+                granted_functions
+            },
+        ) {
+            CapGrant::ZomeCall(zome_call) => zome_call,
+            _ => unreachable!(),
+        };
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
+
+fixturator!(
+    CapSecret,
+    CapSecret::from(StringFixturator::new(Empty).next().unwrap()),
+    CapSecret::from(StringFixturator::new(Unpredictable).next().unwrap()),
+    CapSecret::from(StringFixturator::new(Predictable).next().unwrap())
+);
+
+#[derive(EnumIter)]
+enum CapAccessEnumEnum {
+    Unrestricted,
+    Transferable,
+    Assigned,
+}
+
+impl From<CapAccess> for CapAccessEnumEnum {
+    fn from(cap_access: CapAccess) -> Self {
+        match cap_access {
+            CapAccess::Unrestricted => Self::Unrestricted,
+            CapAccess::Transferable { .. } => Self::Transferable,
+            CapAccess::Assigned { .. } => Self::Assigned,
+        }
+    }
+}
+
+fixturator!(
+    CapAccess,
+    {
+        match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+            CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
+            CapAccessEnumEnum::Transferable => CapAccess::transferable(),
+            CapAccessEnumEnum::Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(AgentPubKeyFixturator::new(Empty).next().unwrap().into());
+                set
+            }),
+        }
+    },
+    {
+        match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+            CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
+            CapAccessEnumEnum::Transferable => CapAccess::transferable(),
+            CapAccessEnumEnum::Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(
+                    AgentPubKeyFixturator::new(Unpredictable)
+                        .next()
+                        .unwrap()
+                        .into(),
+                );
+                set
+            }),
+        }
+    },
+    {
+        let ret = match CapAccessEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
+            CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
+            CapAccessEnumEnum::Transferable => CapAccess::transferable(),
+            CapAccessEnumEnum::Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(
+                    AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+                        .next()
+                        .unwrap()
+                        .into(),
+                );
+                set
+            }),
+        };
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
+
+/// dummy to allow us to randomly select a cap grant variant inside the fixturator
+#[derive(EnumIter)]
+enum CapGrantEnumEnum {
+    Authorship,
+    ZomeCall,
+}
+
+/// never do this
+/// tricks the compiler into complaining about variant mismatch via the match
+impl From<CapGrant> for CapGrantEnumEnum {
+    fn from(cap_grant: CapGrant) -> Self {
+        match cap_grant {
+            CapGrant::Authorship(_) => Self::Authorship,
+            CapGrant::ZomeCall(_) => Self::ZomeCall,
+        }
+    }
+}
+
+fixturator!(
+    CapGrant,
+    {
+        match CapGrantEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+            CapGrantEnumEnum::Authorship => {
+                CapGrant::Authorship(AgentPubKeyFixturator::new(Empty).next().unwrap().into())
+            }
+            CapGrantEnumEnum::ZomeCall => {
+                CapGrant::ZomeCall(ZomeCallCapGrantFixturator::new(Empty).next().unwrap())
+            }
+        }
+    },
+    {
+        match CapGrantEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+            CapGrantEnumEnum::Authorship => CapGrant::Authorship(
+                AgentPubKeyFixturator::new(Unpredictable)
+                    .next()
+                    .unwrap()
+                    .into(),
+            ),
+            CapGrantEnumEnum::ZomeCall => CapGrant::ZomeCall(
+                ZomeCallCapGrantFixturator::new(Unpredictable)
+                    .next()
+                    .unwrap(),
+            ),
+        }
+    },
+    {
+        let ret = match CapGrantEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
+            CapGrantEnumEnum::Authorship => CapGrant::Authorship(
+                AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap()
+                    .into(),
+            ),
+            CapGrantEnumEnum::ZomeCall => CapGrant::ZomeCall(
+                ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap(),
+            ),
+        };
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
+
+fixturator!(
+    CapClaim,
+    CapClaim::new(
+        StringFixturator::new(Empty).next().unwrap(),
+        AgentPubKeyFixturator::new(Empty).next().unwrap().into(),
+        CapSecretFixturator::new(Empty).next().unwrap()
+    ),
+    CapClaim::new(
+        StringFixturator::new(Unpredictable).next().unwrap(),
+        AgentPubKeyFixturator::new(Unpredictable)
             .next()
             .unwrap()
+            .into(),
+        CapSecretFixturator::new(Unpredictable).next().unwrap(),
     ),
-    Entry::App(SerializedBytesFixturator::new(Predictable).next().unwrap())
+    {
+        let ret = CapClaim::new(
+            StringFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap()
+                .into(),
+            CapSecretFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+        );
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
+
+/// dummy to let us randomly select an entry variant inside the fixturator
+#[derive(EnumIter)]
+enum EntryEnumEnum {
+    Agent,
+    App,
+    CapClaim,
+    CapGrant,
+}
+
+/// never do this
+/// this exists to trick the compiler into complaining if the enum variants ever fall out of sync
+/// due to the inner match
+impl From<Entry> for EntryEnumEnum {
+    fn from(entry: Entry) -> Self {
+        match entry {
+            Entry::Agent(_) => EntryEnumEnum::Agent,
+            Entry::App(_) => EntryEnumEnum::App,
+            Entry::CapClaim(_) => EntryEnumEnum::CapClaim,
+            Entry::CapGrant(_) => EntryEnumEnum::CapGrant,
+        }
+    }
+}
+
+fixturator!(
+    Entry,
+    {
+        match EntryEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+            EntryEnumEnum::Agent => {
+                Entry::Agent(AgentPubKeyFixturator::new(Empty).next().unwrap().into())
+            }
+            EntryEnumEnum::App => Entry::App(SerializedBytesFixturator::new(Empty).next().unwrap()),
+            EntryEnumEnum::CapClaim => {
+                Entry::CapClaim(CapClaimFixturator::new(Empty).next().unwrap())
+            }
+            EntryEnumEnum::CapGrant => {
+                Entry::CapGrant(ZomeCallCapGrantFixturator::new(Empty).next().unwrap())
+            }
+        }
+    },
+    {
+        match EntryEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+            EntryEnumEnum::Agent => Entry::Agent(
+                AgentPubKeyFixturator::new(Unpredictable)
+                    .next()
+                    .unwrap()
+                    .into(),
+            ),
+            EntryEnumEnum::App => Entry::App(
+                SerializedBytesFixturator::new(Unpredictable)
+                    .next()
+                    .unwrap(),
+            ),
+            EntryEnumEnum::CapClaim => {
+                Entry::CapClaim(CapClaimFixturator::new(Unpredictable).next().unwrap())
+            }
+            EntryEnumEnum::CapGrant => Entry::CapGrant(
+                ZomeCallCapGrantFixturator::new(Unpredictable)
+                    .next()
+                    .unwrap(),
+            ),
+        }
+    },
+    {
+        let ret = match EntryEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
+            EntryEnumEnum::Agent => Entry::Agent(
+                AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap()
+                    .into(),
+            ),
+            EntryEnumEnum::App => Entry::App(
+                SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap(),
+            ),
+            EntryEnumEnum::CapClaim => Entry::CapClaim(
+                CapClaimFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap(),
+            ),
+            EntryEnumEnum::CapGrant => Entry::CapGrant(
+                ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
+                    .next()
+                    .unwrap(),
+            ),
+        };
+        self.0.index = self.0.index + 1;
+        ret
+    }
 );
 
 fixturator!(

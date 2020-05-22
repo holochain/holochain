@@ -4,6 +4,10 @@
 #[macro_use]
 mod fatal;
 
+extern crate strum;
+#[macro_use]
+extern crate strum_macros;
+
 pub mod conductor;
 pub mod core;
 pub mod fixt;

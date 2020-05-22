@@ -135,14 +135,171 @@ mod test {
 
     use super::ValidateInvocationFixturator;
     use super::ValidateResult;
+    use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallCapGrantFixturator;
+    use fixt::prelude::*;
     use holo_hash::AgentPubKeyFixturator;
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_types::fixt::CapClaimFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
+    use holochain_zome_types::validate::ValidateCallbackResult;
+    use holochain_zome_types::HostInput;
+    use rand::prelude::*;
+    use rand::seq::SliceRandom;
     use std::sync::Arc;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validate_callback_result_fold() {
+        let mut rng = thread_rng();
+        for (mut results, expected) in vec![
+            (vec![], ValidateResult::Valid),
+            (vec![ValidateCallbackResult::Valid], ValidateResult::Valid),
+            (
+                vec![ValidateCallbackResult::Invalid("".into())],
+                ValidateResult::Invalid("".into()),
+            ),
+            (
+                vec![ValidateCallbackResult::UnresolvedDependencies(vec![])],
+                ValidateResult::UnresolvedDependencies(vec![]),
+            ),
+            (
+                vec![
+                    ValidateCallbackResult::Invalid("".into()),
+                    ValidateCallbackResult::Valid,
+                ],
+                ValidateResult::Invalid("".into()),
+            ),
+            (
+                vec![
+                    ValidateCallbackResult::Invalid("".into()),
+                    ValidateCallbackResult::UnresolvedDependencies(vec![]),
+                ],
+                ValidateResult::Invalid("".into()),
+            ),
+            (
+                vec![
+                    ValidateCallbackResult::Valid,
+                    ValidateCallbackResult::UnresolvedDependencies(vec![]),
+                ],
+                ValidateResult::UnresolvedDependencies(vec![]),
+            ),
+            (
+                vec![
+                    ValidateCallbackResult::Valid,
+                    ValidateCallbackResult::UnresolvedDependencies(vec![]),
+                    ValidateCallbackResult::Invalid("".into()),
+                ],
+                ValidateResult::Invalid("".into()),
+            ),
+        ] {
+            // order of the results should not change the final result
+            results.shuffle(&mut rng);
+
+            // number of times a callback result appears should not change the final result
+            let number_of_extras = rng.gen_range(0, 5);
+            for _ in 0..number_of_extras {
+                let maybe_extra = results.choose(&mut rng).cloned();
+                match maybe_extra {
+                    Some(extra) => results.push(extra),
+                    _ => {}
+                };
+            }
+
+            assert_eq!(expected, results.into(),);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validate_invocation_allow_side_effects() {
+        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        assert!(!validate_invocation.allow_side_effects());
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validate_invocation_zomes() {
+        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        let zome_name = validate_invocation.zome_name.clone();
+        assert_eq!(ZomesToInvoke::One(zome_name), validate_invocation.zomes(),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validate_invocation_fn_components() {
+        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+
+        let agent_entry = Entry::Agent(
+            AgentPubKeyFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap()
+                .into(),
+        );
+        validate_invocation.entry = Arc::new(agent_entry);
+        let mut expected = vec!["validate", "validate_agent"];
+        for fn_component in validate_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap(),);
+        }
+
+        let agent_entry = Entry::App(
+            SerializedBytesFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap()
+                .into(),
+        );
+        validate_invocation.entry = Arc::new(agent_entry);
+        let mut expected = vec!["validate", "validate_entry"];
+        for fn_component in validate_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap(),);
+        }
+
+        let agent_entry = Entry::CapClaim(
+            CapClaimFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap()
+                .into(),
+        );
+        validate_invocation.entry = Arc::new(agent_entry);
+        let mut expected = vec!["validate", "validate_cap_claim"];
+        for fn_component in validate_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap(),);
+        }
+
+        let agent_entry = Entry::CapGrant(
+            ZomeCallCapGrantFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap()
+                .into(),
+        );
+        validate_invocation.entry = Arc::new(agent_entry);
+        let mut expected = vec!["validate", "validate_cap_grant"];
+        for fn_component in validate_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap(),);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validate_invocation_host_input() {
+        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+
+        let host_input = validate_invocation.clone().host_input().unwrap();
+
+        assert_eq!(
+            host_input,
+            HostInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
+        );
+    }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]

@@ -4,6 +4,8 @@
 
 use crate::header::{AppEntryType, EntryVisibility};
 use fixt::prelude::*;
+use holo_hash::AgentPubKeyFixturator;
+use holochain_zome_types::capability::CapClaim;
 use holochain_zome_types::capability::CapSecret;
 use rand;
 
@@ -21,6 +23,31 @@ fixturator!(
         self.0.index = self.0.index + 1;
         v
     }
+);
+
+fixturator!(
+    CapClaim,
+    CapClaim::new(
+        StringFixturator::new(Empty).next().unwrap(),
+        AgentPubKeyFixturator::new(Empty).next().unwrap().into(),
+        CapSecretFixturator::new(Empty).next().unwrap(),
+    ),
+    CapClaim::new(
+        StringFixturator::new(Unpredictable).next().unwrap(),
+        AgentPubKeyFixturator::new(Unpredictable)
+            .next()
+            .unwrap()
+            .into(),
+        CapSecretFixturator::new(Unpredictable).next().unwrap(),
+    ),
+    CapClaim::new(
+        StringFixturator::new(Predictable).next().unwrap(),
+        AgentPubKeyFixturator::new(Predictable)
+            .next()
+            .unwrap()
+            .into(),
+        CapSecretFixturator::new(Predictable).next().unwrap(),
+    )
 );
 
 fixturator!(
