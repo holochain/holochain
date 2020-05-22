@@ -12,8 +12,8 @@
 use super::{
     api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
-    dna_store::{DnaStore, RealDnaStore},
-    error::ConductorError,
+    dna_store::{DnaDefBuf, DnaStore, RealDnaStore},
+    error::{ConductorError, CreateAppError},
     handle::ConductorHandleImpl,
     interface::{
         error::InterfaceResult,
@@ -54,16 +54,18 @@ use holochain_state::{
     typed::{Kv, UnitDbKey},
 };
 use holochain_types::{
+    app::{AppId, InstalledApp},
     cell::{CellHandle, CellId},
     dna::DnaFile,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
+use holo_hash::{DnaHash, Hashed};
 use holochain_serialized_bytes::SerializedBytes;
 
 #[cfg(test)]
@@ -321,8 +323,7 @@ where
                 ))
                 .map_err(|e| CellError::from(e))
                 .and_then(|result| async { result.map(|env| (cell_id, env)) })
-            })
-            .collect::<Vec<_>>();
+            });
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
             .await
             .into_iter()
@@ -354,79 +355,138 @@ where
     }
 
     /// Create the cells from the db
-    pub(super) async fn create_cells(
+    pub(super) async fn create_active_app_cells(
         &self,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<Cell>> {
-        let cell_ids = self.get_state().await?.cell_ids;
+    ) -> ConductorResult<Vec<Result<Vec<Cell>, CreateAppError>>> {
+        // Only create the active apps
+        let active_apps = self.get_state().await?.active_apps;
+
+        // Data required to create apps
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
 
-        // Only create cells not already created
-        let cells_to_create = cell_ids
-            .into_iter()
-            .filter(|cell_id| !self.cells.contains_key(cell_id));
+        // Closure for creating all cells in an app
+        let create_app_cells = move |(app_id, cell_ids): (AppId, Vec<CellId>)| {
+            // Clone data for async block
+            let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
+            let conductor_handle = conductor_handle.clone();
+            let keystore = keystore.clone();
 
-        let cells_tasks = cells_to_create
-            .map(move |cell_id| {
-                let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-                Cell::create(
-                    cell_id,
-                    conductor_handle.clone(),
-                    root_env_dir,
-                    keystore.clone(),
-                )
-            })
-            .collect::<Vec<_>>();
-        let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
-            .await
-            .into_iter()
-            .partition(Result::is_ok);
+            // Task that creates the cells
+            async move {
+                // Only create cells not already created
+                let cells_to_create = cell_ids
+                    .into_iter()
+                    .filter(|cell_id| !self.cells.contains_key(cell_id));
 
-        // unwrap safe because of the partition
-        let success = success.into_iter().map(Result::unwrap);
-        // If there was errors, cleanup and return the errors
-        if !errors.is_empty() {
-            for cell in success {
-                cell.cleanup().await?;
+                // Create each cell
+                let cells_tasks = cells_to_create.map(move |cell_id| {
+                    Cell::create(
+                        cell_id,
+                        conductor_handle.clone(),
+                        root_env_dir.clone(),
+                        keystore.clone(),
+                    )
+                });
+
+                // Join all the cell create tasks for this app
+                // and seperate any errors
+                let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
+                    .await
+                    .into_iter()
+                    .partition(Result::is_ok);
+                // unwrap safe because of the partition
+                let success = success.into_iter().map(Result::unwrap);
+
+                // If there was errors, cleanup and return the errors
+                if !errors.is_empty() {
+                    for cell in success {
+                        // Error needs to capture which app failed
+                        cell.cleanup().await.map_err(|e| CreateAppError::Failed {
+                            app_id: app_id.clone(),
+                            errors: vec![e],
+                        })?;
+                    }
+                    // match needed to avoid Debug requirement on unwrap_err
+                    let errors = errors
+                        .into_iter()
+                        .map(|e| match e {
+                            Err(e) => e,
+                            Ok(_) => unreachable!("Safe because of the partition"),
+                        })
+                        .collect();
+                    Err(CreateAppError::Failed { app_id, errors })
+                } else {
+                    // No errors so return the cells
+                    Ok(success.collect())
+                }
             }
-            // match needed to avoid Debug requirement on unwrap_err
-            let errors = errors
-                .into_iter()
-                .map(|e| match e {
-                    Err(e) => e,
-                    Ok(_) => unreachable!("Safe because of the partition"),
-                })
-                .collect();
-            Err(ConductorError::CreateCellsFailed { errors })
-        } else {
-            // No errors so return the cells
-            Ok(success.collect())
-        }
+        };
+
+        // Create cells for every active app
+        let app_tasks = active_apps.into_iter().map(create_app_cells);
+
+        // Join on all apps and return a list of
+        // apps that had succelly created cells
+        // and any apps that encounted errors
+        Ok(futures::future::join_all(app_tasks).await)
     }
 
-    /// Register CellIds in the database
-    pub(super) async fn add_cell_ids_to_db(
+    /// Register an app inactive in the database
+    pub(super) async fn add_inactive_app_to_db(
         &mut self,
-        mut cell_ids: Vec<CellId>,
+        app: InstalledApp,
     ) -> ConductorResult<()> {
+        trace!(?app);
         self.update_state(move |mut state| {
-            state.cell_ids.append(&mut cell_ids);
-            // Make sure they are unique
-            state.cell_ids = state
-                .cell_ids
-                .iter()
-                .cloned()
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect();
+            state.inactive_apps.insert(app.app_id, app.cell_ids);
             Ok(state)
         })
         .await?;
         Ok(())
     }
 
-    /// Add fully constructed cells to to the cell map in the Conductor
+    /// Activate an app in the database
+    pub(super) async fn activate_app_in_db(&mut self, app_id: AppId) -> ConductorResult<()> {
+        self.update_state(move |mut state| {
+            let cell_ids = state
+                .inactive_apps
+                .remove(&app_id)
+                .ok_or(ConductorError::AppNotInstalled)?;
+            state.active_apps.insert(app_id, cell_ids);
+            Ok(state)
+        })
+        .await?;
+        Ok(())
+    }
+
+    /// Deactivate an app in the database
+    pub(super) async fn deactivate_app_in_db(
+        &mut self,
+        app_id: AppId,
+    ) -> ConductorResult<Vec<CellId>> {
+        let state = self
+            .update_state({
+                let app_id = app_id.clone();
+                move |mut state| {
+                    let cell_ids = state
+                        .active_apps
+                        .remove(&app_id)
+                        .ok_or(ConductorError::AppNotActive)?;
+                    state.inactive_apps.insert(app_id, cell_ids);
+                    Ok(state)
+                }
+            })
+            .await?;
+        Ok(state
+            .inactive_apps
+            .get(&app_id)
+            .expect("This app was just put here")
+            .clone())
+    }
+
+    /// Add fully constructed cells to the cell map in the Conductor
     pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
             self.cells.insert(
@@ -439,22 +499,72 @@ where
         }
     }
 
-    pub(super) async fn put_wasm(&mut self, dna: DnaFile) -> ConductorResult<()> {
+    pub(super) async fn load_wasms_into_dna_files(
+        &self,
+    ) -> ConductorResult<impl IntoIterator<Item = (DnaHash, DnaFile)>> {
         let environ = &self.wasm_env;
         let env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
+        let reader = env.reader()?;
+
+        let wasm_buf = WasmBuf::new(&reader, wasm)?;
+        let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
+        // Load out all dna defs
+        let wasm_tasks = dna_def_buf
+            .iter()?
+            .map(|dna_def| {
+                // Load all wasms for each dna_def from the wasm db into memory
+                let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {
+                    wasm_buf
+                        .get(&zome.wasm_hash.into())
+                        .await?
+                        .map(|hashed| hashed.into_inner().0)
+                        .ok_or(ConductorError::WasmMissing)
+                });
+                async move {
+                    let wasms = futures::future::try_join_all(wasms).await?;
+                    let dna_file = DnaFile::new(dna_def, wasms).await?;
+                    Ok((dna_file.dna_hash().clone(), dna_file))
+                }
+            })
+            // This needs to happen due to the environment not being Send
+            .collect::<Vec<_>>();
+        // try to join all the tasks and return the list of dna files
+        futures::future::try_join_all(wasm_tasks).await
+    }
+
+    /// Remove cells from the cell map in the Conductor
+    pub(super) fn remove_cells(&mut self, cell_ids: Vec<CellId>) {
+        for cell_id in cell_ids {
+            self.cells.remove(&cell_id);
+        }
+    }
+
+    pub(super) async fn put_wasm(&self, dna: DnaFile) -> ConductorResult<()> {
+        let environ = &self.wasm_env;
+        let env = environ.guard().await;
+        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let reader = env.reader()?;
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
+        let mut dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
             if let None = wasm_buf.get(&wasm_hash.into()).await? {
                 wasm_buf.put(dna_wasm).await?;
             }
         }
+        if let None = dna_def_buf.get(dna.dna_hash())? {
+            dna_def_buf.put(dna.dna().clone()).await?;
+        }
 
-        // write the db
+        // write the wasm db
         env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
+
+        // write the dna_def db
+        env.with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
         Ok(())
     }
@@ -695,7 +805,17 @@ mod builder {
                 keystore,
             )));
 
-            handle.clone().setup_cells().await?;
+            handle.add_dnas().await?;
+
+            let cell_startup_errors = handle.clone().setup_cells().await?;
+
+            // TODO: This should probably be emitted over the admin interface
+            if !cell_startup_errors.is_empty() {
+                error!(
+                    msg = "Failed to create the following active apps",
+                    ?cell_startup_errors
+                );
+            }
 
             // Create admin interfaces
             if let Some(configs) = conductor_config.admin_interfaces {
@@ -795,13 +915,18 @@ pub mod tests {
 
         conductor
             .update_state(|mut state| {
-                state.cell_ids.push(cell_id.clone());
+                state
+                    .inactive_apps
+                    .insert("fake app".to_string(), vec![cell_id.clone()]);
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
-        assert_eq!(state.cell_ids, [cell_id]);
+        assert_eq!(
+            state.inactive_apps.values().collect::<Vec<_>>()[0].as_slice(),
+            &[cell_id]
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

@@ -4,8 +4,8 @@ use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::{future::BoxFuture, FutureExt};
 use holochain_types::{
-    address::HeaderAddress, entry::Entry, header, header::Header, test_utils::fake_agent_pubkey_1,
-    Timestamp,
+    composite_hash::HeaderAddress, entry::Entry, header, header::Header,
+    test_utils::fake_agent_pubkey_1, Timestamp,
 };
 use holochain_zome_types::CommitEntryInput;
 use holochain_zome_types::CommitEntryOutput;
@@ -30,7 +30,7 @@ pub async fn commit_entry<'a>(
                 header_seq: 0,
                 prev_header: source_chain.chain_head().unwrap().clone(),
                 entry_type: header::EntryType::AgentPubKey,
-                entry_address: agent_pubkey.clone().into(),
+                entry_hash: agent_pubkey.clone().into(),
             });
             source_chain.put(agent_header, Some(agent_entry)).await
         }

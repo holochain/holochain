@@ -1,0 +1,130 @@
+//! wraps holo_hashes for the use of those hashes as storage addresses, either CAS or DHT
+
+use holo_hash::*;
+use holochain_serialized_bytes::prelude::*;
+
+/// address type for header hash to promote it to an "address" e.g. for use when getting a header
+/// from a CAS or the DHT.  This is similar to EntryHash which promotes and entry hash to a
+/// retrievable entity.
+// TODO: Temporary alias, in case we decide again that we want to differentiate
+// Address from Hash. Otherwise, this can be removed and all references of
+// HeaderAddress can be renamed to HeaderHash
+pub type HeaderAddress = HeaderHash;
+
+/// address type for entry hashes that can be used to retrieve entries from the cas or dht
+#[derive(
+    Debug,
+    Clone,
+    derive_more::From,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+)]
+pub enum EntryHash {
+    /// standard entry hash
+    Entry(EntryContentHash),
+    /// agents are entries too
+    Agent(AgentPubKey),
+}
+
+/// utility macro to make it more ergonomic to access the enum variants
+macro_rules! match_entry_hash {
+    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+        match $h {
+            EntryHash::Entry($i) => {
+                $($t)*
+            }
+            EntryHash::Agent($i) => {
+                $($t)*
+            }
+        }
+    };
+}
+
+impl holo_hash_core::HoloHashCoreHash for EntryHash {
+    fn get_raw(&self) -> &[u8] {
+        match_entry_hash!(self => |i| { i.get_raw() })
+    }
+
+    fn get_bytes(&self) -> &[u8] {
+        match_entry_hash!(self => |i| { i.get_bytes() })
+    }
+
+    fn get_loc(&self) -> u32 {
+        match_entry_hash!(self => |i| { i.get_loc() })
+    }
+
+    fn into_inner(self) -> std::vec::Vec<u8> {
+        match_entry_hash!(self => |i| { i.into_inner() })
+    }
+}
+
+impl From<EntryHash> for holo_hash_core::HoloHashCore {
+    fn from(entry_hash: EntryHash) -> holo_hash_core::HoloHashCore {
+        match_entry_hash!(entry_hash => |i| { i.into() })
+    }
+}
+
+impl From<EntryHash> for HoloHash {
+    fn from(entry_hash: EntryHash) -> HoloHash {
+        match_entry_hash!(entry_hash => |i| { i.into() })
+    }
+}
+
+impl std::fmt::Display for EntryHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match_entry_hash!(self => |i| { i.fmt(f) })
+    }
+}
+
+/// address type for hashes that can be used to retrieve anything that can be stored on the dht
+#[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AnyDhtHash {
+    /// standard entry content hash
+    EntryContent(EntryContentHash),
+    /// agents can be stored
+    Agent(AgentPubKey),
+    /// headers can be stored
+    Header(HeaderHash),
+}
+
+/// utility macro to make it more ergonomic to access the enum variants
+macro_rules! match_dht_addr {
+    ($h:ident => |$i:ident| { $($t:tt)* }) => {
+        match $h {
+            AnyDhtHash::EntryContent($i) => {
+                $($t)*
+            }
+            AnyDhtHash::Agent($i) => {
+                $($t)*
+            }
+            AnyDhtHash::Header($i) => {
+                $($t)*
+            }
+        }
+    };
+}
+
+impl From<AnyDhtHash> for HoloHash {
+    fn from(dht_address: AnyDhtHash) -> HoloHash {
+        match_dht_addr!(dht_address => |i| { i.into() })
+    }
+}
+
+impl TryFrom<&AgentPubKey> for AnyDhtHash {
+    type Error = SerializedBytesError;
+    fn try_from(agent: &AgentPubKey) -> Result<Self, Self::Error> {
+        Ok(AnyDhtHash::Agent(agent.to_owned()))
+    }
+}
+
+impl std::fmt::Display for AnyDhtHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match_dht_addr!(self => |i| { i.fmt(f) })
+    }
+}

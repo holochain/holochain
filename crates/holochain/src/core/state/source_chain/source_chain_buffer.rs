@@ -11,7 +11,7 @@ use holochain_state::{
     prelude::{Readable, Writer},
 };
 use holochain_types::{
-    address::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,
+    composite_hash::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,
 };
 use holochain_zome_types::entry::Entry;
 use tracing::*;
@@ -50,9 +50,16 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.len()
     }
 
-    /*pub fn get_entry(&self, k: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        self.cas.get_entry(k)
-    }*/
+    pub async fn get_index(&self, i: u32) -> DatabaseResult<Option<Header>> {
+        if let Some(address) = self.sequence.get(i)? {
+            self.cas
+                .get_header(&address)
+                .await
+                .map(|h| h.map(|h| h.header().clone()))
+        } else {
+            Ok(None)
+        }
+    }
 
     pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
         debug!("GET {:?}", k);
@@ -258,7 +265,7 @@ pub mod tests {
                     header_seq: 0,
                     prev_header: dna_header.as_hash().to_owned().into(),
                     entry_type: header::EntryType::AgentPubKey,
-                    entry_address: agent_pubkey.clone().into(),
+                    entry_hash: agent_pubkey.clone().into(),
                 });
                 let agent_header = HeaderHashed::with_data(agent_header).await.unwrap();
 
@@ -389,8 +396,8 @@ pub mod tests {
                     let header = element.get("header").unwrap();
                     let header_type = header.get("type").unwrap().as_str().unwrap();
 
-                    /*let _entry_address = header
-                        .get("entry_address")
+                    /*let _entry_hash = header
+                        .get("entry_hash")
                         .unwrap()
                         .get("Entry")
                         .unwrap()
@@ -411,7 +418,7 @@ pub mod tests {
                     };*/
                     // FIXME: this test is very specific; commenting out the specifics for now
                     // until we finalize the Entry and Header format
-                    // serde_json::json!([entry_type, entry_address, entry_data])
+                    // serde_json::json!([entry_type, entry_hash, entry_data])
                     serde_json::json!(header_type)
                 })
                 .collect::<Vec<_>>();
