@@ -221,11 +221,16 @@ impl Cell {
                         .get_dna(id.dna_hash())
                         .await
                         .ok_or(CellError::DnaMissing)?;
+                    let dna_def = dna_file.dna().clone();
+
+                    // Get the ribosome
+                    let ribosome = WasmRibosome::new(dna_file);
 
                     // Create the workflow and run it
                     let workflow = InitializeZomesWorkflow {
                         agent_key: id.agent_pubkey().clone(),
-                        dna_file,
+                        dna_def,
+                        ribosome,
                     };
                     run_workflow(state_env.clone(), workflow, workspace).await
                 }
