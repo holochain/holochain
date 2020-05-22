@@ -57,7 +57,7 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use derive_more::From;
 use holochain_types::{
-    app::{App, AppId},
+    app::{AppId, InstalledApp},
     autonomic::AutonomicCue,
     cell::CellId,
     dna::DnaFile,
@@ -253,7 +253,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 .genesis_cells(cells_ids_with_proofs, self.clone())
                 .await?
         };
-        let app = App { app_id, cell_ids };
+        let app = InstalledApp { app_id, cell_ids };
         // Update the db
         self.0.write().await.add_inactive_app_to_db(app).await
     }

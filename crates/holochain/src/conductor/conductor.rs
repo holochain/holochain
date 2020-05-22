@@ -54,7 +54,7 @@ use holochain_state::{
     typed::{Kv, UnitDbKey},
 };
 use holochain_types::{
-    app::{App, AppId},
+    app::{AppId, InstalledApp},
     cell::{CellHandle, CellId},
     dna::DnaFile,
 };
@@ -433,7 +433,10 @@ where
     }
 
     /// Register an app inactive in the database
-    pub(super) async fn add_inactive_app_to_db(&mut self, app: App) -> ConductorResult<()> {
+    pub(super) async fn add_inactive_app_to_db(
+        &mut self,
+        app: InstalledApp,
+    ) -> ConductorResult<()> {
         trace!(?app);
         self.update_state(move |mut state| {
             state.inactive_apps.insert(app.app_id, app.cell_ids);

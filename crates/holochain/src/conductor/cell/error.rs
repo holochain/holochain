@@ -16,7 +16,7 @@ pub enum CellError {
     Genesis(#[from] Box<ConductorApiError>),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
-    #[error("The cell failed to cleanup it's environment because: {0}. Recommend manually deleting the database at: {1}")]
+    #[error("The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}")]
     Cleanup(String, PathBuf),
 }
 

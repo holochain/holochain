@@ -11,7 +11,7 @@ use holochain_2020::core::ribosome::NamedInvocation;
 use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
 use holochain_2020::core::ribosome::ZomeCallInvocationResponse;
 use holochain_types::{
-    app::{AppPaths, MembraneProofs},
+    app::AppPaths,
     cell::CellId,
     dna::{DnaFile, Properties},
     observability,
@@ -23,7 +23,7 @@ use holochain_websocket::*;
 use holochain_zome_types::*;
 use matches::assert_matches;
 use std::sync::Arc;
-use std::{path::PathBuf, process::Stdio, time::Duration};
+use std::{collections::HashMap, path::PathBuf, process::Stdio, time::Duration};
 use tempdir::TempDir;
 use test_wasm_common::TestString;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -171,9 +171,9 @@ async fn call_admin() {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
+        proofs: HashMap::new(),
     };
-    let proofs = MembraneProofs::empty();
-    let request = AdminRequest::InstallApp { app_paths, proofs };
+    let request = AdminRequest::InstallApp { app_paths };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
     assert_matches!(response, AdminResponse::AppInstalled);
@@ -241,9 +241,9 @@ async fn call_zome() {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
+        proofs: HashMap::new(),
     };
-    let proofs = MembraneProofs::empty();
-    let request = AdminRequest::InstallApp { app_paths, proofs };
+    let request = AdminRequest::InstallApp { app_paths };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
     assert_matches!(response, AdminResponse::AppInstalled);
@@ -322,9 +322,9 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
+        proofs: HashMap::new(),
     };
-    let proofs = MembraneProofs::empty();
-    let request = AdminRequest::InstallApp { app_paths, proofs };
+    let request = AdminRequest::InstallApp { app_paths };
     let response = client.request(request).await;
     assert_matches!(response, Ok(AdminResponse::AppInstalled));
     conductor_handle.shutdown().await;
@@ -376,9 +376,9 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
+        proofs: HashMap::new(),
     };
-    let proofs = MembraneProofs::empty();
-    let request = AdminRequest::InstallApp { app_paths, proofs };
+    let request = AdminRequest::InstallApp { app_paths };
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =

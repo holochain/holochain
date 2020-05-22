@@ -22,7 +22,7 @@ use url2::url2;
 // TODO: This is arbitrary, choose reasonable size.
 /// Number of signals in buffer before applying
 /// back pressure.
-pub(crate) const SIGNAL_BUFFER_SIZE: usize = 1000;
+pub(crate) const SIGNAL_BUFFER_SIZE: usize = 5;
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
@@ -252,7 +252,7 @@ mod test {
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
-        app::{AppPaths, MembraneProofs},
+        app::AppPaths,
         cell::CellId,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
@@ -384,9 +384,9 @@ mod test {
             dnas: vec![dna],
             app_id: "test app".to_string(),
             agent_key,
+            proofs: HashMap::new(),
         };
-        let proofs = MembraneProofs::empty();
-        let msg = AdminRequest::InstallApp { app_paths, proofs };
+        let msg = AdminRequest::InstallApp { app_paths };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -431,9 +431,9 @@ mod test {
             dnas: vec![dna],
             app_id: "test app".to_string(),
             agent_key,
+            proofs: HashMap::new(),
         };
-        let proofs = MembraneProofs::empty();
-        let msg = AdminRequest::InstallApp { app_paths, proofs };
+        let msg = AdminRequest::InstallApp { app_paths };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
