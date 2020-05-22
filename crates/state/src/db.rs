@@ -38,6 +38,8 @@ pub enum DbName {
     ConductorState,
     /// database that stores wasm bytecode
     Wasm,
+    /// database to store the [DnaDef]
+    DnaDef,
 }
 
 impl std::fmt::Display for DbName {
@@ -54,6 +56,7 @@ impl std::fmt::Display for DbName {
             CacheChainMeta => write!(f, "CacheChainMeta"),
             ConductorState => write!(f, "ConductorState"),
             Wasm => write!(f, "Wasm"),
+            DnaDef => write!(f, "DnaDef"),
         }
     }
 }
@@ -74,6 +77,7 @@ impl DbName {
             CacheChainMeta => Multi,
             ConductorState => Single,
             Wasm => Single,
+            DnaDef => Single,
         }
     }
 }
@@ -125,6 +129,8 @@ lazy_static! {
     pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
     /// The key to access the Wasm database
     pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
+    /// The key to access the DnaDef database
+    pub static ref DNA_DEF: DbKey<SingleStore> = DbKey::new(DbName::DnaDef);
 }
 
 lazy_static! {
@@ -182,6 +188,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
         }
         EnvironmentKind::Wasm => {
             register_db(env, um, &*WASM)?;
+            register_db(env, um, &*DNA_DEF)?;
         }
     }
     Ok(())

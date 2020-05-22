@@ -4,7 +4,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::EntryFixturator;
 use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
-use holo_hash::EntryHash;
+use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
@@ -109,7 +109,7 @@ pub enum ValidateResult {
     Invalid(String),
     /// subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have
-    UnresolvedDependencies(Vec<EntryHash>),
+    UnresolvedDependencies(Vec<EntryContentHash>),
 }
 
 impl From<Vec<ValidateCallbackResult>> for ValidateResult {

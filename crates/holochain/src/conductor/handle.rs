@@ -46,14 +46,23 @@
 //! code which interacted with the Conductor would also have to be highly generic.
 
 use super::{
-    api::error::ConductorApiResult, config::AdminInterfaceConfig, dna_store::DnaStore,
-    error::ConductorResult, manager::TaskManagerRunHandle, Cell, Conductor,
+    api::error::ConductorApiResult,
+    config::AdminInterfaceConfig,
+    dna_store::DnaStore,
+    error::{ConductorResult, CreateAppError},
+    manager::TaskManagerRunHandle,
+    Cell, Conductor,
 };
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use derive_more::From;
-use holochain_types::dna::DnaFile;
-use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::*};
+use holochain_types::{
+    app::{AppId, InstalledApp},
+    autonomic::AutonomicCue,
+    cell::CellId,
+    dna::DnaFile,
+    prelude::*,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
@@ -96,6 +105,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
+    /// Add the [DnaFile]s from the wasm and dna_def databases into memory
+    async fn add_dnas(&self) -> ConductorResult<()>;
+
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
@@ -124,12 +136,19 @@ pub trait ConductorHandleT: Send + Sync {
     /// Run genesis on [CellId]s and add them to the db
     async fn genesis_cells(
         self: Arc<Self>,
-        cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        app_id: AppId,
+        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()>;
 
     /// Setup the cells from the database
     /// Only creates any cells that are not already created
-    async fn setup_cells(self: Arc<Self>) -> ConductorResult<()>;
+    async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
+
+    /// Activate an app
+    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()>;
+
+    /// Deactivate an app
+    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -175,10 +194,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        {
-            self.0.write().await.put_wasm(dna.clone()).await?;
-        }
+        self.0.read().await.put_wasm(dna.clone()).await?;
         Ok(self.0.write().await.dna_store_mut().add(dna)?)
+    }
+
+    async fn add_dnas(&self) -> ConductorResult<()> {
+        let dnas = self.0.read().await.load_wasms_into_dna_files().await?;
+        self.0.write().await.dna_store_mut().add_dnas(dnas);
+        Ok(())
     }
 
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
@@ -227,25 +250,52 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn genesis_cells(
         self: Arc<Self>,
+        app_id: AppId,
         cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()> {
-        let cells = {
+        let cell_ids = {
             self.0
                 .read()
                 .await
                 .genesis_cells(cells_ids_with_proofs, self.clone())
                 .await?
         };
+        let app = InstalledApp { app_id, cell_ids };
         // Update the db
-        self.0.write().await.add_cell_ids_to_db(cells).await
+        self.0.write().await.add_inactive_app_to_db(app).await
     }
 
-    async fn setup_cells(self: Arc<Self>) -> ConductorResult<()> {
+    async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
         let cells = {
             let lock = self.0.read().await;
-            lock.create_cells(self.clone()).await?
+            lock.create_active_app_cells(self.clone())
+                .await?
+                .into_iter()
         };
-        self.0.write().await.add_cells(cells);
+        let add_cells_tasks = cells.map(|result| async {
+            match result {
+                Ok(cells) => {
+                    self.0.write().await.add_cells(cells);
+                    None
+                }
+                Err(e) => Some(e),
+            }
+        });
+        Ok(futures::future::join_all(add_cells_tasks)
+            .await
+            .into_iter()
+            // Remove successful and collect the errors
+            .filter_map(|r| r)
+            .collect())
+    }
+
+    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
+        self.0.write().await.activate_app_in_db(app_id).await
+    }
+
+    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()> {
+        let cell_ids_to_remove = self.0.write().await.deactivate_app_in_db(app_id).await?;
+        self.0.write().await.remove_cells(cell_ids_to_remove);
         Ok(())
     }
 
@@ -295,6 +345,8 @@ pub mod mock {
 
             fn sync_list_dnas(&self) -> ConductorResult<Vec<DnaHash>>;
 
+            fn sync_add_dnas(&self) -> ConductorResult<()>;
+
             fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
             fn sync_call_zome(
@@ -314,10 +366,15 @@ pub mod mock {
 
             fn sync_genesis_cells(
                 &self,
+                app_id: AppId,
                 cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
             ) -> ConductorResult<()>;
 
-            fn sync_setup_cells(&self) -> ConductorResult<()>;
+            fn sync_setup_cells(&self) -> ConductorResult<Vec<CreateAppError>>;
+
+            fn sync_activate_app(&self, app_id: AppId) -> ConductorResult<()>;
+
+            fn sync_deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
             fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
@@ -348,6 +405,10 @@ pub mod mock {
 
         async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
             self.sync_add_app_interface(port)
+        }
+
+        async fn add_dnas(&self) -> ConductorResult<()> {
+            self.sync_add_dnas()
         }
 
         async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
@@ -395,15 +456,24 @@ pub mod mock {
 
         async fn genesis_cells(
             self: Arc<Self>,
+            app_id: AppId,
             cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         ) -> ConductorResult<()> {
-            self.sync_genesis_cells(cell_ids_with_proofs)
+            self.sync_genesis_cells(app_id, cell_ids_with_proofs)
         }
 
         /// Setup the cells from the database
         /// Only creates any cells that are not already created
-        async fn setup_cells(self: Arc<Self>) -> ConductorResult<()> {
+        async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
             self.sync_setup_cells()
+        }
+
+        async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
+            self.sync_activate_app(app_id)
+        }
+
+        async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()> {
+            self.sync_deactivate_app(app_id)
         }
 
         /// Dump the cells state

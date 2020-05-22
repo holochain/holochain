@@ -111,7 +111,7 @@ mod tests {
     use crate::core::state::source_chain::{ChainElement, SignedHeaderHashed};
     use holo_hash::HeaderHash;
     use holochain_types::{
-        address::HeaderAddress, header::InitZomesComplete, test_utils::fake_agent_pubkey_1,
+        composite_hash::HeaderAddress, header::InitZomesComplete, test_utils::fake_agent_pubkey_1,
         Timestamp,
     };
     use std::convert::TryInto;
