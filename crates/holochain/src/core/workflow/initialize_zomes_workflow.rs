@@ -13,6 +13,7 @@ use crate::core::{
 };
 use futures::FutureExt;
 use holo_hash::AgentPubKey;
+use holochain_state::buffer::BufferedStore;
 use holochain_state::prelude::Writer;
 use holochain_types::{dna::DnaFile, header::InitZomesComplete, Header, Timestamp};
 use must_future::MustBoxFuture;
@@ -76,7 +77,11 @@ impl<'env> Workflow<'env> for InitializeZomesWorkflow {
 pub(crate) struct InitializeZomesWorkspace<'env>(pub(crate) InvokeZomeWorkspace<'env>);
 
 impl<'env> Workspace<'env> for InitializeZomesWorkspace<'env> {
-    fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError> {
+    fn commit_txn(self, mut writer: Writer) -> Result<(), WorkspaceError> {
+        self.0.source_chain.into_inner().flush_to_txn(&mut writer)?;
+        self.0.meta.flush_to_txn(&mut writer)?;
+        self.0.cache_cas.flush_to_txn(&mut writer)?;
+        self.0.cache_meta.flush_to_txn(&mut writer)?;
         Ok(writer.commit()?)
     }
 }

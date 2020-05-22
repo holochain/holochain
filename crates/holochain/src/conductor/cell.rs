@@ -9,7 +9,7 @@ use crate::{
     },
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
-        state::source_chain::SourceChainBuf,
+        state::source_chain::{SourceChain, SourceChainBuf},
         workflow::{
             run_workflow, GenesisWorkflow, GenesisWorkspace, InitializeZomesWorkflow,
             InitializeZomesWorkspace, InvokeZomeWorkflow, InvokeZomeWorkspace,
@@ -22,11 +22,12 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo, Header};
+use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo};
 use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
+use tracing::*;
 
 pub mod error;
 
@@ -80,60 +81,21 @@ impl Cell {
         )?;
 
         // check if genesis has been run
-        let source_chain_len = {
+        let has_genesis = {
             // check if genesis ran on source chain buf
             let env_ref = state_env.guard().await;
             let reader = env_ref.reader()?;
-            let source_chain = SourceChainBuf::new(&reader, &env_ref)?;
-
-            // Check if initialization has run
-            if let Some(Header::InitZomesComplete(_)) = source_chain.get_index(4).await? {
-            } else {
-                // If not run it
-                // TODO: TK-01852 Run this when initializa zomes is complete
-                let run_init = tokio::spawn({
-                    let state_env = state_env.clone();
-                    let id = id.clone();
-                    async move {
-                        let env_ref = state_env.guard().await;
-                        let reader = env_ref.reader()?;
-                        // Create the workspace
-                        let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)?;
-                        let workspace = InitializeZomesWorkspace(workspace);
-
-                        // get the dna
-                        let dna_file = conductor_handle
-                            .get_dna(id.dna_hash())
-                            .await
-                            .ok_or(CellError::DnaMissing)?;
-
-                        // Create the workflow and run it
-                        let workflow = InitializeZomesWorkflow {
-                            agent_key: id.agent_pubkey().clone(),
-                            dna_file,
-                        };
-                        run_workflow(state_env.clone(), workflow, workspace).await
-                    }
-                });
-                let init_result = run_init.await?.map_err(Box::new)??;
-                match init_result {
-                    InitResult::Pass => (),
-                    r @ _ => return Err(CellError::InitFailed(r)),
-                }
-            }
-
-            source_chain.len()
+            SourceChainBuf::new(&reader, &env_ref)?.has_genesis()
         };
 
-        // TODO: TK-01747: Make this check more robust
-        if source_chain_len == 4 {
-            Err(CellError::CellWithoutGenesis(id))
-        } else {
+        if has_genesis {
             Ok(Self {
                 id,
                 conductor_api,
                 state_env,
             })
+        } else {
+            Err(CellError::CellWithoutGenesis(id))
         }
     }
 
@@ -216,10 +178,13 @@ impl Cell {
         &self,
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult> {
+        self.check_or_run_init().await?;
+
         let arc = self.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
         let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
+
         let workflow = InvokeZomeWorkflow {
             ribosome: self.get_ribosome().await?,
             invocation,
@@ -227,6 +192,52 @@ impl Cell {
         Ok(run_workflow(self.state_env().clone(), workflow, workspace)
             .await
             .map_err(Box::new)?)
+    }
+
+    async fn check_or_run_init(&self) -> CellResult<()> {
+        // Check if initialization has run
+        let has_init = {
+            let arc = self.state_env();
+            let env = arc.guard().await;
+            let reader = env.reader()?;
+            SourceChain::new(&reader, &env)?.has_initialized()
+        };
+        if !has_init {
+            trace!("running init");
+            // If not run it
+            let run_init = tokio::spawn({
+                let state_env = self.state_env.clone();
+                let id = self.id.clone();
+                let conductor_api = self.conductor_api.clone();
+                async move {
+                    let env_ref = state_env.guard().await;
+                    let reader = env_ref.reader()?;
+                    // Create the workspace
+                    let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)?;
+                    let workspace = InitializeZomesWorkspace(workspace);
+
+                    // get the dna
+                    let dna_file = conductor_api
+                        .get_dna(id.dna_hash())
+                        .await
+                        .ok_or(CellError::DnaMissing)?;
+
+                    // Create the workflow and run it
+                    let workflow = InitializeZomesWorkflow {
+                        agent_key: id.agent_pubkey().clone(),
+                        dna_file,
+                    };
+                    run_workflow(state_env.clone(), workflow, workspace).await
+                }
+            });
+            let init_result = run_init.await?.map_err(Box::new)??;
+            trace!(?init_result);
+            match init_result {
+                InitResult::Pass => (),
+                r @ _ => return Err(CellError::InitFailed(r)),
+            }
+        }
+        Ok(())
     }
 
     pub async fn cleanup(self) -> CellResult<()> {

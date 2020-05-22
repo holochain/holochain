@@ -50,6 +50,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.len()
     }
 
+    // TODO: TK-01747: Make this check more robust maybe?
+    pub fn has_genesis(&self) -> bool {
+        self.sequence.len() >= 3
+    }
+
     pub async fn get_index(&self, i: u32) -> DatabaseResult<Option<Header>> {
         if let Some(address) = self.sequence.get(i)? {
             self.cas
