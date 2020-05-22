@@ -111,11 +111,119 @@ mod test {
 
     use super::InitInvocationFixturator;
     use super::InitResult;
+    use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeNameFixturator;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::init::InitCallbackResult;
+    use holochain_zome_types::HostInput;
+    use rand::prelude::*;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn init_callback_result_fold() {
+        let mut rng = thread_rng();
+
+        let result_pass = || InitResult::Pass;
+        let result_ud = || {
+            InitResult::UnresolvedDependencies(
+                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                vec![],
+            )
+        };
+        let result_fail = || {
+            InitResult::Fail(
+                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                "".into(),
+            )
+        };
+
+        let cb_pass = || InitCallbackResult::Pass;
+        let cb_ud = || {
+            InitCallbackResult::UnresolvedDependencies(
+                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                vec![],
+            )
+        };
+        let cb_fail = || {
+            InitCallbackResult::Fail(
+                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                "".into(),
+            )
+        };
+
+        for (mut results, expected) in vec![
+            (vec![], result_pass()),
+            (vec![cb_pass()], result_pass()),
+            (vec![cb_fail()], result_fail()),
+            (vec![cb_ud()], result_ud()),
+            (vec![cb_fail(), cb_pass()], result_fail()),
+            (vec![cb_fail(), cb_ud()], result_fail()),
+            (vec![cb_pass(), cb_ud()], result_ud()),
+            (vec![cb_pass(), cb_fail(), cb_ud()], result_fail()),
+        ] {
+            // order of the results should not change the final result
+            results.shuffle(&mut rng);
+
+            // number of times a callback result appears should not change the final result
+            let number_of_extras = rng.gen_range(0, 5);
+            for _ in 0..number_of_extras {
+                let maybe_extra = results.choose(&mut rng).cloned();
+                match maybe_extra {
+                    Some(extra) => results.push(extra),
+                    _ => {}
+                };
+            }
+
+            assert_eq!(expected, results.into(),);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn init_invocation_allow_side_effects() {
+        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        assert!(init_invocation.allow_side_effects());
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn init_invocation_zomes() {
+        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn init_invocation_fn_components() {
+        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+
+        let mut expected = vec!["init"];
+        for fn_component in init_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap());
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn init_invocation_host_input() {
+        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+
+        let host_input = init_invocation.clone().host_input().unwrap();
+
+        assert_eq!(
+            host_input,
+            HostInput::new(SerializedBytes::try_from(()).unwrap()),
+        );
+    }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
