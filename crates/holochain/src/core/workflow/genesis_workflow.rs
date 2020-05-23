@@ -13,9 +13,8 @@ use crate::conductor::api::CellConductorApiT;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
+use holochain_types::dna::DnaFile;
 use holochain_types::prelude::*;
-use holochain_types::{dna::DnaFile, header, Header};
-use holochain_zome_types::entry::Entry;
 use must_future::MustBoxFuture;
 
 /// The struct which implements the genesis Workflow

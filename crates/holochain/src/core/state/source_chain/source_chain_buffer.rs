@@ -1,4 +1,3 @@
-use super::SourceChain;
 use crate::core::state::{
     chain_cas::{ChainCasBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
@@ -14,14 +13,11 @@ use holochain_state::{
 use holochain_types::{
     composite_hash::HeaderAddress,
     entry::EntryHashed,
-    header::{self, EntryType, HeaderBuilder, HeaderCommon},
+    header::{self, HeaderBuilder, HeaderCommon},
     prelude::*,
     Header, HeaderHashed,
 };
-use holochain_zome_types::{
-    capability::{CapClaim, CapGrant, CapSecret},
-    entry::{CapClaimEntry, CapGrantEntry, Entry},
-};
+use holochain_zome_types::entry::Entry;
 use tracing::*;
 
 pub struct SourceChainBuf<'env, R: Readable> {
@@ -302,11 +298,7 @@ pub mod tests {
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
         Header, HeaderHashed,
     };
-    use holochain_zome_types::{
-        capability::{CapAccess, CapClaim, CapGrant, CapSecret, ZomeCallCapGrant},
-        entry::Entry,
-    };
-    use std::collections::HashMap;
+    use holochain_zome_types::entry::Entry;
 
     fn fixtures() -> (
         AgentPubKey,
