@@ -1,3 +1,4 @@
+use header::HeaderBuilder;
 use holochain_2020::core::state::{
     cascade::Cascade,
     chain_meta::ChainMetaBuf,
@@ -15,10 +16,10 @@ use holochain_zome_types::entry::Entry;
 
 fn fixtures() -> (
     AgentPubKey,
-    Header,
+    HeaderBuilder,
     EntryHashed,
     AgentPubKey,
-    Header,
+    HeaderBuilder,
     EntryHashed,
 ) {
     let previous_header = fake_header_hash("previous");
@@ -60,10 +61,10 @@ fn fixtures() -> (
     });
     (
         jimbo_id,
-        jimbo_header,
+        jimbo_header.into(),
         jimbo_entry,
         jessy_id,
-        jessy_header,
+        jessy_header.into(),
         jessy_entry,
     )
 }

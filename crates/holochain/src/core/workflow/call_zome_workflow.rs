@@ -288,7 +288,7 @@ pub mod tests {
                     async move {
                         workspace
                             .source_chain
-                            .put(agent_header.clone(), Some(agent_entry))
+                            .put(agent_header.clone().into(), Some(agent_entry))
                             .await
                             .unwrap();
                     }

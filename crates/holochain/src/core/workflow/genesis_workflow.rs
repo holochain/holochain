@@ -60,7 +60,10 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 header_seq: 0,
                 hash: dna_file.dna_hash().clone(),
             });
-            let dna_header_address = workspace.source_chain.put(dna_header.clone(), None).await?;
+            let dna_header_address = workspace
+                .source_chain
+                .put(dna_header.clone().into(), None)
+                .await?;
 
             // create the agent validation entry and add it directly to the store
             let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
@@ -72,7 +75,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             });
             let avh_addr = workspace
                 .source_chain
-                .put(agent_validation_header.clone(), None)
+                .put(agent_validation_header.clone().into(), None)
                 .await?;
 
             // create a agent chain element and add it directly to the store
@@ -86,7 +89,7 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
             });
             workspace
                 .source_chain
-                .put(agent_header, Some(Entry::Agent(agent_pubkey.into())))
+                .put(agent_header.into(), Some(Entry::Agent(agent_pubkey.into())))
                 .await?;
 
             let fx = WorkflowEffects {
@@ -170,7 +173,7 @@ pub mod tests {
             header_seq: 0,
             hash: dna.dna_hash().clone(),
         });
-        let dna_hash = source_chain.put(dna_header, None).await.unwrap();
+        let dna_hash = source_chain.put(dna_header.into(), None).await.unwrap();
 
         // create the agent validation entry and add it directly to the store
         let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
@@ -181,7 +184,7 @@ pub mod tests {
             membrane_proof: None,
         });
         let avh_hash = source_chain
-            .put(agent_validation_header, None)
+            .put(agent_validation_header.into(), None)
             .await
             .unwrap();
 
@@ -194,7 +197,7 @@ pub mod tests {
             entry_hash: agent_pubkey.clone().into(),
         });
         source_chain
-            .put(agent_header.clone(), Some(agent_entry))
+            .put(agent_header.clone().into(), Some(agent_entry))
             .await
             .unwrap();
 
