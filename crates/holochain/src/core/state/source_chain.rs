@@ -13,7 +13,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
-    header::{EntryType, EntryVisibility, HeaderBuilder},
+    header::{EntryType, EntryVisibility, HeaderBuilder, HeaderCommon},
     prelude::*,
     Header, HeaderHashed,
 };
@@ -54,6 +54,21 @@ impl<'env, R: Readable> SourceChain<'env, R> {
 
     pub fn into_inner(self) -> SourceChainBuf<'env, R> {
         self.0
+    }
+
+    pub async fn put(
+        &mut self,
+        header_builder: HeaderBuilder,
+        maybe_entry: Option<Entry>,
+    ) -> SourceChainResult<HeaderAddress> {
+        let header = header_builder.build(HeaderCommon {
+            author: self.agent_pubkey()?,
+            timestamp: Timestamp::now(),
+            header_seq: self.len() as u32,
+            prev_header: self.chain_head()?.to_owned(),
+        });
+
+        self.put_raw(header, maybe_entry).await
     }
 
     pub async fn put_cap_grant(

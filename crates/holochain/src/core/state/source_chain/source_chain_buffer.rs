@@ -13,7 +13,7 @@ use holochain_state::{
 use holochain_types::{
     composite_hash::HeaderAddress,
     entry::EntryHashed,
-    header::{self, HeaderBuilder, HeaderCommon},
+    header::{self},
     prelude::*,
     Header, HeaderHashed,
 };
@@ -87,17 +87,11 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &self.cas
     }
 
-    pub async fn put(
+    pub async fn put_raw(
         &mut self,
-        header_builder: HeaderBuilder,
+        header: Header,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderAddress> {
-        let header = header_builder.build(HeaderCommon {
-            author: self.agent_pubkey()?,
-            timestamp: Timestamp::now(),
-            header_seq: self.sequence.len() as u32,
-            prev_header: self.sequence.chain_head().cloned(),
-        });
         let header = HeaderHashed::with_data(header).await?;
         let header_address = header.as_hash().to_owned();
         let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
@@ -212,7 +206,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             header_seq: 0,
             hash: dna_hash,
         });
-        let dna_header_address = self.put(dna_header.clone().into(), None).await?;
+        let dna_header_address = self.put_raw(dna_header, None).await?;
 
         // create the agent validation entry and add it directly to the store
         let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
@@ -222,9 +216,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             prev_header: dna_header_address,
             membrane_proof,
         });
-        let avh_addr = self
-            .put(agent_validation_header.clone().into(), None)
-            .await?;
+        let avh_addr = self.put_raw(agent_validation_header, None).await?;
 
         // create a agent chain element and add it directly to the store
         let agent_header = Header::EntryCreate(header::EntryCreate {
@@ -235,7 +227,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             entry_type: header::EntryType::AgentPubKey,
             entry_hash: agent_pubkey.clone().into(),
         });
-        self.put(agent_header.into(), Some(Entry::Agent(agent_pubkey.into())))
+        self.put_raw(agent_header, Some(Entry::Agent(agent_pubkey.into())))
             .await?;
 
         Ok(())
@@ -370,13 +362,10 @@ pub mod tests {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
             store
-                .put(dna_header.as_content().clone().into(), dna_entry.clone())
+                .put_raw(dna_header.as_content().clone(), dna_entry.clone())
                 .await?;
             store
-                .put(
-                    agent_header.as_content().clone().into(),
-                    agent_entry.clone(),
-                )
+                .put_raw(agent_header.as_content().clone(), agent_entry.clone())
                 .await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         };
@@ -445,10 +434,10 @@ pub mod tests {
 
             let mut store = SourceChainBuf::new(&reader, &env)?;
             store
-                .put(dna_header.as_content().clone().into(), dna_entry)
+                .put_raw(dna_header.as_content().clone(), dna_entry)
                 .await?;
             store
-                .put(agent_header.as_content().clone().into(), agent_entry)
+                .put_raw(agent_header.as_content().clone(), agent_entry)
                 .await?;
 
             env.with_commit(|writer| store.flush_to_txn(writer))?;

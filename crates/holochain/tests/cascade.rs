@@ -1,4 +1,3 @@
-use header::HeaderBuilder;
 use holochain_2020::core::state::{
     cascade::Cascade,
     chain_meta::ChainMetaBuf,
@@ -16,10 +15,10 @@ use holochain_zome_types::entry::Entry;
 
 fn fixtures() -> (
     AgentPubKey,
-    HeaderBuilder,
+    Header,
     EntryHashed,
     AgentPubKey,
-    HeaderBuilder,
+    Header,
     EntryHashed,
 ) {
     let previous_header = fake_header_hash("previous");
@@ -61,10 +60,10 @@ fn fixtures() -> (
     });
     (
         jimbo_id,
-        jimbo_header.into(),
+        jimbo_header,
         jimbo_entry,
         jessy_id,
-        jessy_header.into(),
+        jessy_header,
         jessy_entry,
     )
 }
@@ -87,10 +86,10 @@ async fn get_links() -> SourceChainResult<()> {
 
     let base = jimbo_entry.as_hash().clone();
     source_chain
-        .put(jimbo_header, Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header, Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header, Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header, Some(jessy_entry.as_content().clone()))
         .await?;
 
     // Pass in stores as references

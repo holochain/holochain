@@ -5,7 +5,7 @@ use crate::{
 };
 use rkv::SingleStore;
 
-use std::collections::{hash_map, HashMap};
+use std::collections::HashMap;
 use tracing::*;
 
 /// Transactional operations on a KV store

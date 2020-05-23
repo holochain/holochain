@@ -3,7 +3,6 @@ use crate::core::state::{
     chain_meta::{EntryDhtStatus, MockChainMetaBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
-use header::HeaderBuilder;
 use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
@@ -25,10 +24,10 @@ struct Chains<'env> {
     source_chain: SourceChainBuf<'env, Reader<'env>>,
     cache: SourceChainBuf<'env, Reader<'env>>,
     jimbo_id: AgentPubKey,
-    jimbo_header: HeaderBuilder,
+    jimbo_header: Header,
     jimbo_entry: EntryHashed,
     jessy_id: AgentPubKey,
-    jessy_header: HeaderBuilder,
+    jessy_header: Header,
     jessy_entry: EntryHashed,
     mock_primary_meta: MockChainMetaBuf,
     mock_cache_meta: MockChainMetaBuf,
@@ -61,8 +60,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_hash: jimbo_entry.as_hash().clone(),
-    })
-    .into();
+    });
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
         author: jessy_id.clone(),
@@ -71,8 +69,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
         entry_hash: jessy_entry.as_hash().clone(),
-    })
-    .into();
+    });
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
     let cache = SourceChainBuf::cache(reader, dbs)?;
@@ -109,7 +106,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     let address = jimbo_entry.as_hash().clone();
 
@@ -153,7 +150,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     let address = jimbo_entry.as_hash().clone();
 
@@ -197,7 +194,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     cache
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     let address = jimbo_entry.as_hash().clone();
 
@@ -280,10 +277,10 @@ async fn links_local_return() -> SourceChainResult<()> {
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
@@ -334,10 +331,10 @@ async fn links_cache_return() -> SourceChainResult<()> {
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();

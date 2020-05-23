@@ -8,33 +8,25 @@ use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
 
 pub struct HeaderCommon {
-    pub author: Option<AgentPubKey>,
+    pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: Option<HeaderAddress>,
+    pub prev_header: HeaderAddress,
 }
 
+/// Builder for non-genesis Headers
+///
+/// SourceChain::put takes one of these rather than a raw Header, so that it
+/// can inject the proper values via `HeaderCommon`, rather than requiring
+/// surrounding code to construct a proper Header outside of the context of
+/// the SourceChain.
+///
+/// This builder does not build pre-genesis Headers, because prior to genesis
+/// there is no Agent associated with the source chain, and also the fact that
+/// the Dna header has no prev_entry causes a special case that need not be
+/// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HeaderBuilder {
-    // The first three builder variants need to include the AgentPubKey
-    // because it has not been committed to the source chain and must come
-    // from outside (during genesis)
-    // TODO: consider just putting genesis into SourceChainBuf so that
-    // SourceChainBuf::put cannot be used to create Genesis headers.
-    Dna {
-        hash: DnaHash,
-        agent_pubkey: AgentPubKey,
-    },
-    AgentValidationPkg {
-        membrane_proof: Option<SerializedBytes>,
-        agent_pubkey: AgentPubKey,
-    },
-    AgentEntry {
-        agent_pubkey: AgentPubKey,
-    },
-
-    // After this point, we have committed the Agent entry, so we can pull
-    // the AgentPubKey from the source chain when building the Header
     InitZomesComplete {},
     LinkAdd {
         base_address: AnyDhtHash,
@@ -64,15 +56,7 @@ pub enum HeaderBuilder {
     EntryDelete {
         removes_address: AnyDhtHash,
     },
-
-    // bypass builder, just use raw header, for backwards compatibilty
-    // with already-written tests and fixtures
-    RawHeader(Header),
 }
-
-const AUTHOR_MISSING: &'static str = "Must have injected an author into HeaderCommon";
-const PREV_HEADER_MISSING: &'static str =
-    "Must have injected a prev_header into HeaderCommon for a non-Dna header";
 
 impl HeaderBuilder {
     pub fn build(self, common: HeaderCommon) -> Header {
@@ -84,42 +68,11 @@ impl HeaderBuilder {
             prev_header,
         } = common;
         match self {
-            Dna { hash, agent_pubkey } => header::Dna {
-                author: agent_pubkey,
-                timestamp,
-                header_seq,
-                // NB: you're forced to pass in a nonsense prev_header for Dna,
-                // and it just gets thrown away
-                hash,
-            }
-            .into(),
-            AgentValidationPkg {
-                membrane_proof,
-                agent_pubkey,
-            } => header::AgentValidationPkg {
-                author: agent_pubkey,
-                timestamp,
-                header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
-
-                membrane_proof,
-            }
-            .into(),
-            AgentEntry { agent_pubkey } => header::EntryCreate {
-                author: agent_pubkey.clone(),
-                timestamp,
-                header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
-
-                entry_type: EntryType::AgentPubKey,
-                entry_hash: agent_pubkey.into(),
-            }
-            .into(),
             InitZomesComplete {} => header::InitZomesComplete {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
             }
             .into(),
             LinkAdd {
@@ -128,10 +81,10 @@ impl HeaderBuilder {
                 tag,
                 link_type,
             } => header::LinkAdd {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
 
                 base_address,
                 target_address,
@@ -140,28 +93,28 @@ impl HeaderBuilder {
             }
             .into(),
             LinkRemove { link_add_address } => header::LinkRemove {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
 
                 link_add_address,
             }
             .into(),
             ChainOpen { prev_dna_hash } => header::ChainOpen {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
 
                 prev_dna_hash,
             }
             .into(),
             ChainClose { new_dna_hash } => header::ChainClose {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
 
                 new_dna_hash,
             }
@@ -170,10 +123,10 @@ impl HeaderBuilder {
                 entry_type,
                 entry_hash,
             } => header::EntryCreate {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
 
                 entry_type,
                 entry_hash,
@@ -184,10 +137,10 @@ impl HeaderBuilder {
                 entry_type,
                 entry_hash,
             } => header::EntryUpdate {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
 
                 replaces_address,
                 entry_type,
@@ -195,24 +148,14 @@ impl HeaderBuilder {
             }
             .into(),
             EntryDelete { removes_address } => header::EntryDelete {
-                author: author.expect(AUTHOR_MISSING),
+                author,
                 timestamp,
                 header_seq,
-                prev_header: prev_header.expect(PREV_HEADER_MISSING),
+                prev_header,
 
                 removes_address,
             }
             .into(),
-
-            // bypass builder, just use raw header, for backwards compatibilty
-            // with already-written tests and fixtures
-            RawHeader(header) => header,
         }
-    }
-}
-
-impl From<Header> for HeaderBuilder {
-    fn from(header: Header) -> HeaderBuilder {
-        HeaderBuilder::RawHeader(header)
     }
 }
