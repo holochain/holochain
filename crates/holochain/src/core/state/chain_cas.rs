@@ -226,6 +226,10 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     pub fn public_entries(&self) -> &EntryCas<'env, R> {
         &self.public_entries
     }
+
+    pub fn private_entries(&self) -> Option<&EntryCas<'env, R>> {
+        self.private_entries.as_ref()
+    }
 }
 
 impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuf<'env, R> {

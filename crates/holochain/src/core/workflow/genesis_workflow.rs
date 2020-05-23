@@ -53,43 +53,13 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
             }
 
-            // create a DNA chain element and add it directly to the store
-            let dna_header = Header::Dna(header::Dna {
-                author: agent_pubkey.clone(),
-                timestamp: Timestamp::now(),
-                header_seq: 0,
-                hash: dna_file.dna_hash().clone(),
-            });
-            let dna_header_address = workspace
-                .source_chain
-                .put(dna_header.clone().into(), None)
-                .await?;
-
-            // create the agent validation entry and add it directly to the store
-            let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
-                author: agent_pubkey.clone(),
-                timestamp: Timestamp::now(),
-                header_seq: 1,
-                prev_header: dna_header_address,
-                membrane_proof,
-            });
-            let avh_addr = workspace
-                .source_chain
-                .put(agent_validation_header.clone().into(), None)
-                .await?;
-
-            // create a agent chain element and add it directly to the store
-            let agent_header = Header::EntryCreate(header::EntryCreate {
-                author: agent_pubkey.clone(),
-                timestamp: Timestamp::now(),
-                header_seq: 2,
-                prev_header: avh_addr,
-                entry_type: header::EntryType::AgentPubKey,
-                entry_hash: agent_pubkey.clone().into(),
-            });
             workspace
                 .source_chain
-                .put(agent_header.into(), Some(Entry::Agent(agent_pubkey.into())))
+                .genesis(
+                    dna_file.dna_hash().clone(),
+                    agent_pubkey.clone(),
+                    membrane_proof,
+                )
                 .await?;
 
             let fx = WorkflowEffects {
