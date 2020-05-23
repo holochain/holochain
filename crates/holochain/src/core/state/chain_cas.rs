@@ -11,7 +11,7 @@ use crate::core::state::source_chain::{
     ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
 use header::EntryVisibility;
-use holo_hash::{EntryHash, Hashed, HeaderHash};
+use holo_hash::{Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -23,7 +23,7 @@ use holochain_state::{
     prelude::{Readable, Reader, Writer},
 };
 use holochain_types::{
-    address::{EntryAddress, HeaderAddress},
+    composite_hash::{EntryHash, HeaderAddress},
     entry::EntryHashed,
     header,
     prelude::Signature,
@@ -89,12 +89,12 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     ///
     /// First attempt to get from the public entry DB. If not present, and
     /// private DB access is specified, attempt to get as a private entry.
-    pub fn get_entry(&self, entry_address: EntryAddress) -> DatabaseResult<Option<Entry>> {
-        match self.public_entries.get(&entry_address.clone().into())? {
+    pub fn get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+        match self.public_entries.get(&entry_hash.clone().into())? {
             Some(entry) => Ok(Some(entry)),
             None => {
                 if let Some(ref db) = self.private_entries {
-                    db.get(&entry_address.into())
+                    db.get(&entry_hash.into())
                 } else {
                     Ok(None)
                 }
@@ -102,8 +102,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn contains(&self, entry_address: EntryAddress) -> DatabaseResult<bool> {
-        self.get_entry(entry_address).map(|e| e.is_some())
+    pub fn contains(&self, entry_hash: EntryHash) -> DatabaseResult<bool> {
+        self.get_entry(entry_hash).map(|e| e.is_some())
     }
 
     pub async fn get_header(
@@ -133,24 +133,24 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     fn get_entry_from_header(&self, header: &Header) -> SourceChainResult<Option<Entry>> {
         Ok(match header.entry_data() {
             None => None,
-            Some((entry_address, entry_type)) => {
+            Some((entry_hash, entry_type)) => {
                 match entry_type.visibility() {
                     // if the header references an entry and the database is
                     // available, it better have been stored!
                     EntryVisibility::Public => Some(
                         self.public_entries
-                            .get(&entry_address.clone().into())?
+                            .get(&entry_hash.clone().into())?
                             .ok_or_else(|| {
                                 SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                    entry_address.clone(),
+                                    entry_hash.clone(),
                                 ))
                             })?,
                     ),
                     EntryVisibility::Private => {
                         if let Some(ref db) = self.private_entries {
-                            Some(db.get(&entry_address.clone().into())?.ok_or_else(|| {
+                            Some(db.get(&entry_hash.clone().into())?.ok_or_else(|| {
                                 SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                    entry_address.clone(),
+                                    entry_hash.clone(),
                                 ))
                             })?)
                         } else {
@@ -187,15 +187,15 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         let (header, header_address) = header.into_inner();
 
         if let Some(entry) = maybe_entry {
-            let (entry, entry_address) = entry.into_inner();
+            let (entry, entry_hash) = entry.into_inner();
             if let Some((_, entry_type)) = header.entry_data() {
                 match entry_type.visibility() {
-                    EntryVisibility::Public => self.public_entries.put(entry_address.into(), entry),
+                    EntryVisibility::Public => self.public_entries.put(entry_hash.into(), entry),
                     EntryVisibility::Private => {
                         if let Some(db) = self.private_entries.as_mut() {
-                            db.put(entry_address.into(), entry);
+                            db.put(entry_hash.into(), entry);
                         } else {
-                            error!("Attempted ChainCasBuf::put on a private entry with a disabled private DB: {}", entry_address);
+                            error!("Attempted ChainCasBuf::put on a private entry with a disabled private DB: {}", entry_hash);
                         }
                     }
                 }
