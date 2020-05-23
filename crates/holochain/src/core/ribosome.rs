@@ -97,8 +97,8 @@ impl HostContext {
     }
 }
 
-#[derive(Debug)]
-pub struct FnComponents(Vec<String>);
+#[derive(Clone, Debug)]
+pub struct FnComponents(pub Vec<String>);
 
 /// iterating over FnComponents isn't as simple as returning the inner Vec iterator
 /// we return the fully joined vector in specificity order
@@ -128,7 +128,7 @@ impl From<Vec<String>> for FnComponents {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ZomesToInvoke {
     All,
     One(ZomeName),
@@ -171,6 +171,19 @@ pub trait Invocation: Clone {
     /// this is intentionally NOT a reference to self because HostInput may be huge we want to be
     /// careful about cloning invocations
     fn host_input(self) -> Result<HostInput, SerializedBytesError>;
+}
+
+mockall::mock! {
+    Invocation {}
+    trait Invocation {
+        fn allow_side_effects(&self) -> bool;
+        fn zomes(&self) -> ZomesToInvoke;
+        fn fn_components(&self) -> FnComponents;
+        fn host_input(self) -> Result<HostInput, SerializedBytesError>;
+    }
+    trait Clone {
+        fn clone(&self) -> Self;
+    }
 }
 
 /// A top-level call into a zome function,
@@ -435,10 +448,9 @@ pub mod wasm_test {
     #[test]
     fn fn_components_iterate() {
         let fn_components = FnComponents::from(vec!["foo".into(), "bar".into(), "baz".into()]);
-        let mut expected = vec!["foo", "foo_bar", "foo_bar_baz"];
-        for fn_component in fn_components {
-            assert_eq!(fn_component, expected.pop().unwrap(),)
-        }
+        let expected = vec!["foo_bar_baz", "foo_bar", "foo"];
+
+        assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
     }
 
     #[tokio::test(threaded_scheduler)]

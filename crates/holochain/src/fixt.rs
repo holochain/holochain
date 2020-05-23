@@ -1,6 +1,7 @@
 pub mod curve;
 
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
@@ -38,6 +39,8 @@ use std::sync::Arc;
 wasm_io_fixturator!(HostInput<SerializedBytes>);
 
 newtype_fixturator!(ZomeName<String>);
+
+newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
     MigrateAgent,
@@ -340,6 +343,32 @@ impl From<Entry> for EntryEnumEnum {
         }
     }
 }
+
+// enum_fixturator!(Entry::Agent(AgentPubKey), Entry::App(SerializedBytes), Entry::CapClaim(CapClaim), Entry::CapGrant(ZomeCallCapGrant));
+
+// {
+//     #[derive(EnumIter)]
+//     <$enum>FixturatorEnum {
+//         $( $variant ),*
+//     }
+//
+//     fixturator!(
+//         $enum,
+//         {
+//             match <$enum>FixturatorEnum::iter().choose(&mut thread_rng()).unwrap() {
+//                 <$enum>FixturatorEnum::Agent => {
+//                     Entry::Agent(AgentPubKeyFixturator::new(Empty).next().unwrap().into())
+//                 }
+//                 <$enum>FixturatorEnum::App => Entry::App(SerializedBytesFixturator::new(Empty).next().unwrap()),
+//                 <$enum>FixturatorEnum::CapClaim => {
+//                     Entry::CapClaim(CapClaimFixturator::new(Empty).next().unwrap())
+//                 }
+//                 <$enum>FixturatorEnum::CapGrant => {
+//                     Entry::CapGrant(ZomeCallCapGrantFixturator::new(Empty).next().unwrap())
+//                 }
+//             }
+//         },
+// }
 
 fixturator!(
     Entry,

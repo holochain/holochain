@@ -10,9 +10,9 @@ use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InitInvocation {
-    dna_def: DnaDef,
+    pub dna_def: DnaDef,
 }
 
 fixturator!(

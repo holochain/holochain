@@ -250,6 +250,36 @@ pub struct Empty;
 #[macro_export]
 /// a direct delegation of fixtures to the inner type for new types
 macro_rules! newtype_fixturator {
+    ( $outer:ident<Vec<$inner:ty>> ) => {
+        fixturator!(
+            $outer,
+            $outer(vec![]),
+            {
+                let mut rng = thread_rng();
+                let vec_len = rng.gen_range(0, 5);
+                let mut ret = vec![];
+                let mut inner_fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
+                for _ in 0..vec_len {
+                    ret.push(inner_fixturator.next().unwrap());
+                }
+                self.0.index = self.0.index + 1;
+                $outer(ret)
+            },
+            {
+                let mut rng = thread_rng();
+                let vec_len = rng.gen_range(0, 5);
+                let mut ret = vec![];
+                let mut inner_fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
+                for _ in 0..vec_len {
+                    ret.push(inner_fixturator.next().unwrap());
+                }
+                self.0.index = self.0.index + 1;
+                $outer(ret)
+            }
+        );
+    };
     ( $outer:ident<$inner:ty> ) => {
         fixturator!(
             $outer,

@@ -340,7 +340,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    // #[serial_test::serial]
+    #[serial_test::serial]
     async fn test_validate_implemented_multi() {
         let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
             .next()

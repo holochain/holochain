@@ -2,12 +2,37 @@
 
 // FIXME (aka fixtme, haha, get it?) move other fixturators from this crate into this module
 
+use crate::dna::zome::Zome;
 use crate::header::{AppEntryType, EntryVisibility};
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
+use holo_hash::WasmHashFixturator;
 use holochain_zome_types::capability::CapClaim;
 use holochain_zome_types::capability::CapSecret;
 use rand;
+
+fixturator!(
+    Zome,
+    Zome {
+        wasm_hash: WasmHashFixturator::new(Empty).next().unwrap().into()
+    },
+    Zome {
+        wasm_hash: WasmHashFixturator::new(Unpredictable)
+            .next()
+            .unwrap()
+            .into()
+    },
+    {
+        let ret = Zome {
+            wasm_hash: WasmHashFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap()
+                .into(),
+        };
+        self.0.index = self.0.index + 1;
+        ret
+    }
+);
 
 // This technically belongs in holochain_zome_types, but we want to keep the size down
 fixturator!(
