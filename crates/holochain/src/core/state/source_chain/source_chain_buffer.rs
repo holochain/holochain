@@ -136,7 +136,15 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             .cas
             .public_entries()
             .iter_raw()?
-            .filter_map(|(_, e)| match e {
+            .map(|(_, e)| e)
+            .chain(
+                // Add in values from the scratch space, to be comprehensive
+                self.cas
+                    .public_entries()
+                    .iter_scratch_puts()
+                    .map(|(_, e)| (**e).clone()),
+            )
+            .filter_map(|e| match e {
                 Entry::Agent(agent_pubkey) => Some(agent_pubkey),
                 _ => None,
             })
