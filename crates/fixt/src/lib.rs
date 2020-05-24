@@ -148,7 +148,33 @@ macro_rules! basic_test {
 /// and Predictable, in order
 #[macro_export]
 macro_rules! fixturator {
-    ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
+        (
+            enum $name:ident( $( $variant:tt) ,* )
+        ) => {
+            item! {
+                #[derive(EnumIter)]
+                enum [<$name:camel Iter>] {
+                    $( $variant ),*
+                }
+
+                impl [<$name:camel Iter>] {
+                    fn random() -> Self {
+                        [<$name:camel Iter>]::iter().choose(&mut thread_rng()).unwrap()
+                    }
+                    fn indexed(index: usize) -> Self {
+                        expr! {
+                            [<$name:camel Iter>]::iter().cycle().nth(index).unwrap()
+                        }
+                    }
+                }
+
+                $( use [<$name:camel Iter>]::$variant; )*
+            }
+
+            fixturator!($name);
+    };
+
+    ( $type:ident ) => {
         item! {
             #[allow(missing_docs)]
             pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
@@ -162,14 +188,24 @@ macro_rules! fixturator {
                     [<$type:camel Fixturator>](Fixturator::<$type, Curve>::new(curve, start))
                 }
             }
+        }
+    };
 
+    ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
+        fixturator!($type);
+        item! {
             #[allow(missing_docs)]
             impl Iterator for [<$type:camel Fixturator>]<Empty> {
                 type Item = $type;
 
-                /// false has an empty ring to it
                 fn next(&mut self) -> Option<Self::Item> {
-                    Some($empty)
+                    // bump the index if $empty doesn't change it
+                    let original_index = self.0.index;
+                    let ret = $empty;
+                    if original_index == self.0.index {
+                        self.0.index = self.0.index + 1;
+                    }
+                    Some(ret)
                 }
             }
 
@@ -177,9 +213,14 @@ macro_rules! fixturator {
             impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
                 type Item = $type;
 
-                /// fallback to default rust randomness
                 fn next(&mut self) -> Option<Self::Item> {
-                    Some($unpredictable)
+                    // bump the index if $unpredictable doesn't change it
+                    let original_index = self.0.index;
+                    let ret = $unpredictable;
+                    if original_index == self.0.index {
+                        self.0.index = self.0.index + 1;
+                    }
+                    Some(ret)
                 }
             }
 
@@ -187,12 +228,48 @@ macro_rules! fixturator {
             impl Iterator for [<$type:camel Fixturator>]<Predictable> {
                 type Item = $type;
 
-                /// simple alternation between true/false vals starting with true
                 fn next(&mut self) -> Option<Self::Item> {
-                    Some($predictable)
+                    // bump the index if $predictable doesn't change it
+                    let original_index = self.0.index;
+                    let ret = $predictable;
+                    if original_index == self.0.index {
+                        self.0.index = self.0.index + 1;
+                    }
+                    Some(ret)
                 }
             }
         }
+    };
+}
+
+#[macro_export]
+macro_rules! curve {
+    ( $type:ident, $curve:ident, $e:expr ) => {
+        item! {
+            #[allow(missing_docs)]
+            impl Iterator for [< $type:camel Fixturator >]<$curve> {
+                type Item = $type;
+
+                fn next(&mut self) -> Option<Self::Item> {
+                    let original_index = self.0.index;
+                    let ret = $e;
+                    if original_index == self.0.index {
+                        self.0.index = self.0.index + 1;
+                    }
+                    Some(ret)
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! fixt {
+    ( $name:tt ) => {
+        fixt!($name, Unpredictable)
+    };
+    ( $name:tt, $curve:expr ) => {
+        expr! { [< $name:camel Fixturator>]::new($curve).next().unwrap() }
     };
 }
 

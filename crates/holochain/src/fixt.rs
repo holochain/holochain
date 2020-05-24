@@ -158,71 +158,116 @@ fixturator!(
     CapSecret::from(StringFixturator::new(Predictable).next().unwrap())
 );
 
-#[derive(EnumIter)]
-enum CapAccessEnumEnum {
-    Unrestricted,
-    Transferable,
-    Assigned,
-}
-
-impl From<CapAccess> for CapAccessEnumEnum {
-    fn from(cap_access: CapAccess) -> Self {
-        match cap_access {
-            CapAccess::Unrestricted => Self::Unrestricted,
-            CapAccess::Transferable { .. } => Self::Transferable,
-            CapAccess::Assigned { .. } => Self::Assigned,
-        }
-    }
-}
-
 fixturator!(
-    CapAccess,
-    {
-        match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-            CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
-            CapAccessEnumEnum::Transferable => CapAccess::transferable(),
-            CapAccessEnumEnum::Assigned => CapAccess::assigned({
+    enum CapAccess( Unrestricted, Transferable, Assigned );
+
+    curve Empty {
+        match CapAccessIter::random() {
+            Unrestricted => CapAccess::unrestricted(),
+            Transferable => CapAccess::transferable(),
+            Assigned => CapAccess::assigned({
                 let mut set = HashSet::new();
-                set.insert(AgentPubKeyFixturator::new(Empty).next().unwrap().into());
+                set.insert(fixt!(AgentPubKey, Empty).into());
                 set
-            }),
+            })
         }
-    },
-    {
-        match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-            CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
-            CapAccessEnumEnum::Transferable => CapAccess::transferable(),
-            CapAccessEnumEnum::Assigned => CapAccess::assigned({
-                let mut set = HashSet::new();
-                set.insert(
-                    AgentPubKeyFixturator::new(Unpredictable)
-                        .next()
-                        .unwrap()
-                        .into(),
-                );
-                set
-            }),
-        }
-    },
-    {
-        let ret = match CapAccessEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
-            CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
-            CapAccessEnumEnum::Transferable => CapAccess::transferable(),
-            CapAccessEnumEnum::Assigned => CapAccess::assigned({
-                let mut set = HashSet::new();
-                set.insert(
-                    AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-                        .next()
-                        .unwrap()
-                        .into(),
-                );
-                set
-            }),
-        };
-        self.0.index = self.0.index + 1;
-        ret
+    };
+
+    curve Unpredictable {
+
     }
 );
+curve!(
+    CapAccess,
+    Empty,
+
+);
+curve!(
+    CapAccess,
+    Unpredictable,
+
+);
+curve!(
+    CapAccess,
+    Predictable,
+    {
+        match CapAccessIter::indexed(self.0.index) {
+            Unrestricted => CapAccess::unrestricted(),
+            Transferable => CapAccess::transferable(),
+            Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into());
+                set
+            })
+        }
+    }
+);
+
+// #[derive(EnumIter)]
+// enum CapAccessEnumEnum {
+//     Unrestricted,
+//     Transferable,
+//     Assigned,
+// }
+//
+// impl From<CapAccess> for CapAccessEnumEnum {
+//     fn from(cap_access: CapAccess) -> Self {
+//         match cap_access {
+//             CapAccess::Unrestricted => Self::Unrestricted,
+//             CapAccess::Transferable { .. } => Self::Transferable,
+//             CapAccess::Assigned { .. } => Self::Assigned,
+//         }
+//     }
+// }
+//
+// fixturator!(
+//     CapAccess,
+//     {
+//         match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+//             CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
+//             CapAccessEnumEnum::Transferable => CapAccess::transferable(),
+//             CapAccessEnumEnum::Assigned => CapAccess::assigned({
+//                 let mut set = HashSet::new();
+//                 set.insert(AgentPubKeyFixturator::new(Empty).next().unwrap().into());
+//                 set
+//             }),
+//         }
+//     },
+//     {
+//         match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
+//             CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
+//             CapAccessEnumEnum::Transferable => CapAccess::transferable(),
+//             CapAccessEnumEnum::Assigned => CapAccess::assigned({
+//                 let mut set = HashSet::new();
+//                 set.insert(
+//                     AgentPubKeyFixturator::new(Unpredictable)
+//                         .next()
+//                         .unwrap()
+//                         .into(),
+//                 );
+//                 set
+//             }),
+//         }
+//     },
+//     {
+//         let ret = match CapAccessEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
+//             CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
+//             CapAccessEnumEnum::Transferable => CapAccess::transferable(),
+//             CapAccessEnumEnum::Assigned => CapAccess::assigned({
+//                 let mut set = HashSet::new();
+//                 set.insert(
+//                     AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+//                         .next()
+//                         .unwrap()
+//                         .into(),
+//                 );
+//                 set
+//             }),
+//         };
+//         self.0.index = self.0.index + 1;
+//         ret
+//     }
+// );
 
 /// dummy to allow us to randomly select a cap grant variant inside the fixturator
 #[derive(EnumIter)]

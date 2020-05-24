@@ -73,20 +73,20 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
 mod tests {
 
     use super::CallIterator;
+    use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::MockRibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+    use crate::fixt::FnComponentsFixturator;
     use crate::fixt::ZomeNameFixturator;
     use fallible_iterator::FallibleIterator;
-    use crate::core::ribosome::FnComponents;
-    use crate::core::ribosome::ZomesToInvoke;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::zome::ZomeName;
     use holochain_zome_types::GuestOutput;
     use mockall::predicate::*;
     use mockall::Sequence;
     use std::convert::TryInto;
-    use crate::fixt::FnComponentsFixturator;
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
