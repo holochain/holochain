@@ -174,23 +174,18 @@ fixturator!(
     };
 
     curve Unpredictable {
+        match CapAccessIter::random() {
+            Unrestricted => CapAccess::unrestricted(),
+            Transferable => CapAccess::transferable(),
+            Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(fixt!(AgentPubKey).into());
+                set
+            })
+        }
+    };
 
-    }
-);
-curve!(
-    CapAccess,
-    Empty,
-
-);
-curve!(
-    CapAccess,
-    Unpredictable,
-
-);
-curve!(
-    CapAccess,
-    Predictable,
-    {
+    curve Predictable {
         match CapAccessIter::indexed(self.0.index) {
             Unrestricted => CapAccess::unrestricted(),
             Transferable => CapAccess::transferable(),
@@ -200,7 +195,7 @@ curve!(
                 set
             })
         }
-    }
+    };
 );
 
 // #[derive(EnumIter)]
