@@ -270,57 +270,6 @@ macro_rules! fixturator {
             curve Unpredictable $unpredictable;
             curve Predictable $predictable;
         );
-        // fixturator!($type;);
-        // curve!( $type, Empty, $empty );
-        // curve!( $type, Unpredictable, $unpredictable );
-        // curve!( $type, Predictable, $predictable );
-
-        // item! {
-        //     #[allow(missing_docs)]
-        //     impl Iterator for [<$type:camel Fixturator>]<Empty> {
-        //         type Item = $type;
-        //
-        //         fn next(&mut self) -> Option<Self::Item> {
-        //             // bump the index if $empty doesn't change it
-        //             let original_index = self.0.index;
-        //             let ret = $empty;
-        //             if original_index == self.0.index {
-        //                 self.0.index = self.0.index + 1;
-        //             }
-        //             Some(ret)
-        //         }
-        //     }
-        //
-        //     #[allow(missing_docs)]
-        //     impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
-        //         type Item = $type;
-        //
-        //         fn next(&mut self) -> Option<Self::Item> {
-        //             // bump the index if $unpredictable doesn't change it
-        //             let original_index = self.0.index;
-        //             let ret = $unpredictable;
-        //             if original_index == self.0.index {
-        //                 self.0.index = self.0.index + 1;
-        //             }
-        //             Some(ret)
-        //         }
-        //     }
-        //
-        //     #[allow(missing_docs)]
-        //     impl Iterator for [<$type:camel Fixturator>]<Predictable> {
-        //         type Item = $type;
-        //
-        //         fn next(&mut self) -> Option<Self::Item> {
-        //             // bump the index if $predictable doesn't change it
-        //             let original_index = self.0.index;
-        //             let ret = $predictable;
-        //             if original_index == self.0.index {
-        //                 self.0.index = self.0.index + 1;
-        //             }
-        //             Some(ret)
-        //         }
-        //     }
-        // }
     };
 }
 
