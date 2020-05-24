@@ -1,9 +1,9 @@
 pub use crate::basic_test;
 pub use crate::bool::BoolFixturator;
 pub use crate::bytes::BytesFixturator;
+pub use crate::curve;
 pub use crate::enum_fixturator;
 pub use crate::fixt;
-pub use crate::curve;
 pub use crate::fixturator;
 pub use crate::newtype_fixturator;
 pub use crate::number::*;

@@ -149,32 +149,104 @@ macro_rules! basic_test {
 #[macro_export]
 macro_rules! fixturator {
         (
-            enum $name:ident( $( $variant:tt) ,* )
+            $type:ident;
+            variants [ $( $variant:tt) ,* ];
+            $($munch:tt)*
         ) => {
             item! {
                 #[derive(EnumIter)]
-                enum [<$name:camel Iter>] {
+                enum [<$type:camel Variant>] {
                     $( $variant ),*
                 }
 
-                impl [<$name:camel Iter>] {
+                impl [<$type:camel Variant>] {
                     fn random() -> Self {
-                        [<$name:camel Iter>]::iter().choose(&mut thread_rng()).unwrap()
+                        [<$type:camel Variant>]::iter().choose(&mut thread_rng()).unwrap()
                     }
-                    fn indexed(index: usize) -> Self {
+                    fn nth(index: usize) -> Self {
                         expr! {
-                            [<$name:camel Iter>]::iter().cycle().nth(index).unwrap()
+                            [<$type:camel Variant>]::iter().cycle().nth(index).unwrap()
                         }
                     }
                 }
-
-                $( use [<$name:camel Iter>]::$variant; )*
             }
 
-            fixturator!($name);
+            fixturator!($type; $($munch)* );
     };
 
-    ( $type:ident ) => {
+    ( $type:ident; from $from:ty; $($munch:tt)* ) => {
+        fixturator!(
+            $type;
+
+            curve Empty {
+                $type::from(
+                    expr! {
+                        [< $from:camel Fixturator >]::new_indexed(Empty, self.0.index).next().unwrap()
+                    }
+                )
+            };
+            curve Unpredictable {
+                $type::from(
+                    expr! {
+                        [< $from:camel Fixturator >]::new_indexed(Unpredictable, self.0.index).next().unwrap()
+                    }
+                )
+            };
+            curve Predictable {
+                $type::from(
+                    expr! {
+                        [< $from:camel Fixturator >]::new_indexed(Predictable, self.0.index).next().unwrap()
+                    }
+                )
+            };
+        );
+    };
+
+    ( $type:ident; constructor fn $fn:tt( $( $newtype:ty ),* ); $($munch:tt)* ) => {
+        fixturator!(
+            $type;
+
+            curve Empty {
+                $type::$fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Empty, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+
+            curve Unpredictable {
+                $type::$fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Unpredictable, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+            curve Predictable {
+                $type::$fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Predictable, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+
+            $($munch)*
+        );
+    };
+
+    ( $type:ident; curve $curve:ident $e:expr; $($munch:tt)* ) => {
+        curve!( $type, $curve, $e);
+
+        fixturator!( $type; $($munch)* );
+    };
+
+
+    ( $type:ident; $($munch:tt)* ) => {
         item! {
             #[allow(missing_docs)]
             pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
@@ -192,53 +264,63 @@ macro_rules! fixturator {
     };
 
     ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
-        fixturator!($type);
-        item! {
-            #[allow(missing_docs)]
-            impl Iterator for [<$type:camel Fixturator>]<Empty> {
-                type Item = $type;
+        fixturator!(
+            $type;
+            curve Empty $empty;
+            curve Unpredictable $unpredictable;
+            curve Predictable $predictable;
+        );
+        // fixturator!($type;);
+        // curve!( $type, Empty, $empty );
+        // curve!( $type, Unpredictable, $unpredictable );
+        // curve!( $type, Predictable, $predictable );
 
-                fn next(&mut self) -> Option<Self::Item> {
-                    // bump the index if $empty doesn't change it
-                    let original_index = self.0.index;
-                    let ret = $empty;
-                    if original_index == self.0.index {
-                        self.0.index = self.0.index + 1;
-                    }
-                    Some(ret)
-                }
-            }
-
-            #[allow(missing_docs)]
-            impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
-                type Item = $type;
-
-                fn next(&mut self) -> Option<Self::Item> {
-                    // bump the index if $unpredictable doesn't change it
-                    let original_index = self.0.index;
-                    let ret = $unpredictable;
-                    if original_index == self.0.index {
-                        self.0.index = self.0.index + 1;
-                    }
-                    Some(ret)
-                }
-            }
-
-            #[allow(missing_docs)]
-            impl Iterator for [<$type:camel Fixturator>]<Predictable> {
-                type Item = $type;
-
-                fn next(&mut self) -> Option<Self::Item> {
-                    // bump the index if $predictable doesn't change it
-                    let original_index = self.0.index;
-                    let ret = $predictable;
-                    if original_index == self.0.index {
-                        self.0.index = self.0.index + 1;
-                    }
-                    Some(ret)
-                }
-            }
-        }
+        // item! {
+        //     #[allow(missing_docs)]
+        //     impl Iterator for [<$type:camel Fixturator>]<Empty> {
+        //         type Item = $type;
+        //
+        //         fn next(&mut self) -> Option<Self::Item> {
+        //             // bump the index if $empty doesn't change it
+        //             let original_index = self.0.index;
+        //             let ret = $empty;
+        //             if original_index == self.0.index {
+        //                 self.0.index = self.0.index + 1;
+        //             }
+        //             Some(ret)
+        //         }
+        //     }
+        //
+        //     #[allow(missing_docs)]
+        //     impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
+        //         type Item = $type;
+        //
+        //         fn next(&mut self) -> Option<Self::Item> {
+        //             // bump the index if $unpredictable doesn't change it
+        //             let original_index = self.0.index;
+        //             let ret = $unpredictable;
+        //             if original_index == self.0.index {
+        //                 self.0.index = self.0.index + 1;
+        //             }
+        //             Some(ret)
+        //         }
+        //     }
+        //
+        //     #[allow(missing_docs)]
+        //     impl Iterator for [<$type:camel Fixturator>]<Predictable> {
+        //         type Item = $type;
+        //
+        //         fn next(&mut self) -> Option<Self::Item> {
+        //             // bump the index if $predictable doesn't change it
+        //             let original_index = self.0.index;
+        //             let ret = $predictable;
+        //             if original_index == self.0.index {
+        //                 self.0.index = self.0.index + 1;
+        //             }
+        //             Some(ret)
+        //         }
+        //     }
+        // }
     };
 }
 

@@ -43,24 +43,25 @@ newtype_fixturator!(ZomeName<String>);
 newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
-    MigrateAgent,
-    MigrateAgent::Close,
-    {
-        if rand::random() {
-            MigrateAgent::Close
-        } else {
-            MigrateAgent::Open
+    MigrateAgent;
+
+    variants [ Open, Close ];
+
+    curve Empty MigrateAgent::Close;
+
+    curve Unpredictable {
+        match MigrateAgentVariant::random() {
+            Open => MigrateAgent::Open,
+            Close => MigrateAgent::Close,
         }
-    },
-    {
-        let ret = if self.0.index % 2 == 0 {
-            MigrateAgent::Close
-        } else {
-            MigrateAgent::Open
-        };
-        self.0.index = self.0.index + 1;
-        ret
-    }
+    };
+
+    curve Predictable {
+        match MigrateAgentVariant::nth(self.0.index) {
+            Open => MigrateAgent::Open,
+            Close => MigrateAgent::Close,
+        }
+    };
 );
 
 fixturator!(
@@ -120,7 +121,7 @@ fixturator!(
         }
     },
     {
-        let ret = match CapGrant::zome_call(
+        match CapGrant::zome_call(
             StringFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -145,24 +146,22 @@ fixturator!(
         ) {
             CapGrant::ZomeCall(zome_call) => zome_call,
             _ => unreachable!(),
-        };
-        self.0.index = self.0.index + 1;
-        ret
+        }
     }
 );
 
 fixturator!(
-    CapSecret,
-    CapSecret::from(StringFixturator::new(Empty).next().unwrap()),
-    CapSecret::from(StringFixturator::new(Unpredictable).next().unwrap()),
-    CapSecret::from(StringFixturator::new(Predictable).next().unwrap())
+    CapSecret;
+    from String;
 );
 
 fixturator!(
-    enum CapAccess( Unrestricted, Transferable, Assigned );
+    CapAccess;
+
+    variants [ Unrestricted, Transferable, Assigned ];
 
     curve Empty {
-        match CapAccessIter::random() {
+        match CapAccessVariant::random() {
             Unrestricted => CapAccess::unrestricted(),
             Transferable => CapAccess::transferable(),
             Assigned => CapAccess::assigned({
@@ -174,7 +173,7 @@ fixturator!(
     };
 
     curve Unpredictable {
-        match CapAccessIter::random() {
+        match CapAccessVariant::random() {
             Unrestricted => CapAccess::unrestricted(),
             Transferable => CapAccess::transferable(),
             Assigned => CapAccess::assigned({
@@ -186,7 +185,7 @@ fixturator!(
     };
 
     curve Predictable {
-        match CapAccessIter::indexed(self.0.index) {
+        match CapAccessVariant::nth(self.0.index) {
             Unrestricted => CapAccess::unrestricted(),
             Transferable => CapAccess::transferable(),
             Assigned => CapAccess::assigned({
@@ -198,284 +197,96 @@ fixturator!(
     };
 );
 
-// #[derive(EnumIter)]
-// enum CapAccessEnumEnum {
-//     Unrestricted,
-//     Transferable,
-//     Assigned,
-// }
-//
-// impl From<CapAccess> for CapAccessEnumEnum {
-//     fn from(cap_access: CapAccess) -> Self {
-//         match cap_access {
-//             CapAccess::Unrestricted => Self::Unrestricted,
-//             CapAccess::Transferable { .. } => Self::Transferable,
-//             CapAccess::Assigned { .. } => Self::Assigned,
-//         }
-//     }
-// }
-//
-// fixturator!(
-//     CapAccess,
-//     {
-//         match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-//             CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
-//             CapAccessEnumEnum::Transferable => CapAccess::transferable(),
-//             CapAccessEnumEnum::Assigned => CapAccess::assigned({
-//                 let mut set = HashSet::new();
-//                 set.insert(AgentPubKeyFixturator::new(Empty).next().unwrap().into());
-//                 set
-//             }),
-//         }
-//     },
-//     {
-//         match CapAccessEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-//             CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
-//             CapAccessEnumEnum::Transferable => CapAccess::transferable(),
-//             CapAccessEnumEnum::Assigned => CapAccess::assigned({
-//                 let mut set = HashSet::new();
-//                 set.insert(
-//                     AgentPubKeyFixturator::new(Unpredictable)
-//                         .next()
-//                         .unwrap()
-//                         .into(),
-//                 );
-//                 set
-//             }),
-//         }
-//     },
-//     {
-//         let ret = match CapAccessEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
-//             CapAccessEnumEnum::Unrestricted => CapAccess::unrestricted(),
-//             CapAccessEnumEnum::Transferable => CapAccess::transferable(),
-//             CapAccessEnumEnum::Assigned => CapAccess::assigned({
-//                 let mut set = HashSet::new();
-//                 set.insert(
-//                     AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-//                         .next()
-//                         .unwrap()
-//                         .into(),
-//                 );
-//                 set
-//             }),
-//         };
-//         self.0.index = self.0.index + 1;
-//         ret
-//     }
-// );
-
-/// dummy to allow us to randomly select a cap grant variant inside the fixturator
-#[derive(EnumIter)]
-enum CapGrantEnumEnum {
-    Authorship,
-    ZomeCall,
-}
-
-/// never do this
-/// tricks the compiler into complaining about variant mismatch via the match
-impl From<CapGrant> for CapGrantEnumEnum {
-    fn from(cap_grant: CapGrant) -> Self {
-        match cap_grant {
-            CapGrant::Authorship(_) => Self::Authorship,
-            CapGrant::ZomeCall(_) => Self::ZomeCall,
-        }
-    }
-}
-
 fixturator!(
-    CapGrant,
-    {
-        match CapGrantEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-            CapGrantEnumEnum::Authorship => {
-                CapGrant::Authorship(AgentPubKeyFixturator::new(Empty).next().unwrap().into())
-            }
-            CapGrantEnumEnum::ZomeCall => {
-                CapGrant::ZomeCall(ZomeCallCapGrantFixturator::new(Empty).next().unwrap())
-            }
+    CapGrant;
+
+    variants [ Authorship, ZomeCall ];
+
+    curve Empty {
+        match CapGrantVariant::random() {
+            Authorship => CapGrant::Authorship(fixt!(AgentPubKey, Empty).into()),
+            ZomeCall => CapGrant::ZomeCall(fixt!(ZomeCallCapGrant, Empty).into()),
         }
-    },
-    {
-        match CapGrantEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-            CapGrantEnumEnum::Authorship => CapGrant::Authorship(
-                AgentPubKeyFixturator::new(Unpredictable)
-                    .next()
-                    .unwrap()
-                    .into(),
-            ),
-            CapGrantEnumEnum::ZomeCall => CapGrant::ZomeCall(
-                ZomeCallCapGrantFixturator::new(Unpredictable)
-                    .next()
-                    .unwrap(),
-            ),
+    };
+
+    curve Unpredictable {
+        match CapGrantVariant::random() {
+            Authorship => CapGrant::Authorship(fixt!(AgentPubKey).into()),
+            ZomeCall => CapGrant::ZomeCall(fixt!(ZomeCallCapGrant).into()),
         }
-    },
-    {
-        let ret = match CapGrantEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
-            CapGrantEnumEnum::Authorship => CapGrant::Authorship(
+    };
+
+    curve Predictable {
+        match CapGrantVariant::nth(self.0.index) {
+            Authorship => CapGrant::Authorship(
                 AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap()
                     .into(),
             ),
-            CapGrantEnumEnum::ZomeCall => CapGrant::ZomeCall(
+            ZomeCall => CapGrant::ZomeCall(
                 ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap(),
             ),
-        };
-        self.0.index = self.0.index + 1;
-        ret
-    }
+        }
+    };
 );
 
 fixturator!(
-    CapClaim,
-    CapClaim::new(
-        StringFixturator::new(Empty).next().unwrap(),
-        AgentPubKeyFixturator::new(Empty).next().unwrap().into(),
-        CapSecretFixturator::new(Empty).next().unwrap()
-    ),
-    CapClaim::new(
-        StringFixturator::new(Unpredictable).next().unwrap(),
-        AgentPubKeyFixturator::new(Unpredictable)
-            .next()
-            .unwrap()
-            .into(),
-        CapSecretFixturator::new(Unpredictable).next().unwrap(),
-    ),
-    {
-        let ret = CapClaim::new(
-            StringFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap()
-                .into(),
-            CapSecretFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        );
-        self.0.index = self.0.index + 1;
-        ret
-    }
+    CapClaim;
+
+    constructor fn new(String, AgentPubKey, CapSecret);
 );
 
-/// dummy to let us randomly select an entry variant inside the fixturator
-#[derive(EnumIter)]
-enum EntryEnumEnum {
-    Agent,
-    App,
-    CapClaim,
-    CapGrant,
-}
-
-/// never do this
-/// this exists to trick the compiler into complaining if the enum variants ever fall out of sync
-/// due to the inner match
-impl From<Entry> for EntryEnumEnum {
-    fn from(entry: Entry) -> Self {
-        match entry {
-            Entry::Agent(_) => EntryEnumEnum::Agent,
-            Entry::App(_) => EntryEnumEnum::App,
-            Entry::CapClaim(_) => EntryEnumEnum::CapClaim,
-            Entry::CapGrant(_) => EntryEnumEnum::CapGrant,
-        }
-    }
-}
-
-// enum_fixturator!(Entry::Agent(AgentPubKey), Entry::App(SerializedBytes), Entry::CapClaim(CapClaim), Entry::CapGrant(ZomeCallCapGrant));
-
-// {
-//     #[derive(EnumIter)]
-//     <$enum>FixturatorEnum {
-//         $( $variant ),*
-//     }
-//
-//     fixturator!(
-//         $enum,
-//         {
-//             match <$enum>FixturatorEnum::iter().choose(&mut thread_rng()).unwrap() {
-//                 <$enum>FixturatorEnum::Agent => {
-//                     Entry::Agent(AgentPubKeyFixturator::new(Empty).next().unwrap().into())
-//                 }
-//                 <$enum>FixturatorEnum::App => Entry::App(SerializedBytesFixturator::new(Empty).next().unwrap()),
-//                 <$enum>FixturatorEnum::CapClaim => {
-//                     Entry::CapClaim(CapClaimFixturator::new(Empty).next().unwrap())
-//                 }
-//                 <$enum>FixturatorEnum::CapGrant => {
-//                     Entry::CapGrant(ZomeCallCapGrantFixturator::new(Empty).next().unwrap())
-//                 }
-//             }
-//         },
-// }
-
 fixturator!(
-    Entry,
-    {
-        match EntryEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-            EntryEnumEnum::Agent => {
-                Entry::Agent(AgentPubKeyFixturator::new(Empty).next().unwrap().into())
-            }
-            EntryEnumEnum::App => Entry::App(SerializedBytesFixturator::new(Empty).next().unwrap()),
-            EntryEnumEnum::CapClaim => {
-                Entry::CapClaim(CapClaimFixturator::new(Empty).next().unwrap())
-            }
-            EntryEnumEnum::CapGrant => {
-                Entry::CapGrant(ZomeCallCapGrantFixturator::new(Empty).next().unwrap())
-            }
+    Entry;
+
+    variants [ Agent, App, CapClaim, CapGrant ];
+
+    curve Empty {
+        match EntryVariant::random() {
+            EntryVariant::Agent => Entry::Agent(fixt!(AgentPubKey, Empty).into()),
+            EntryVariant::App => Entry::App(fixt!(SerializedBytes, Empty)),
+            EntryVariant::CapClaim => Entry::CapClaim(fixt!(CapClaim, Empty)),
+            EntryVariant::CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Empty)),
         }
-    },
-    {
-        match EntryEnumEnum::iter().choose(&mut thread_rng()).unwrap() {
-            EntryEnumEnum::Agent => Entry::Agent(
-                AgentPubKeyFixturator::new(Unpredictable)
-                    .next()
-                    .unwrap()
-                    .into(),
-            ),
-            EntryEnumEnum::App => Entry::App(
-                SerializedBytesFixturator::new(Unpredictable)
-                    .next()
-                    .unwrap(),
-            ),
-            EntryEnumEnum::CapClaim => {
-                Entry::CapClaim(CapClaimFixturator::new(Unpredictable).next().unwrap())
-            }
-            EntryEnumEnum::CapGrant => Entry::CapGrant(
-                ZomeCallCapGrantFixturator::new(Unpredictable)
-                    .next()
-                    .unwrap(),
-            ),
+    };
+
+    curve Unpredictable {
+        match EntryVariant::random() {
+            EntryVariant::Agent => Entry::Agent(fixt!(AgentPubKey, Unpredictable).into()),
+            EntryVariant::App => Entry::App(fixt!(SerializedBytes, Unpredictable)),
+            EntryVariant::CapClaim => Entry::CapClaim(fixt!(CapClaim, Unpredictable)),
+            EntryVariant::CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Unpredictable)),
         }
-    },
-    {
-        let ret = match EntryEnumEnum::iter().cycle().nth(self.0.index).unwrap() {
-            EntryEnumEnum::Agent => Entry::Agent(
+    };
+
+    curve Predictable {
+        match EntryVariant::nth(self.0.index) {
+            EntryVariant::Agent => Entry::Agent(
                 AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap()
                     .into(),
             ),
-            EntryEnumEnum::App => Entry::App(
+            EntryVariant::App => Entry::App(
                 SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap(),
             ),
-            EntryEnumEnum::CapClaim => Entry::CapClaim(
+            EntryVariant::CapClaim => Entry::CapClaim(
                 CapClaimFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap(),
             ),
-            EntryEnumEnum::CapGrant => Entry::CapGrant(
+            EntryVariant::CapGrant => Entry::CapGrant(
                 ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap(),
             ),
-        };
-        self.0.index = self.0.index + 1;
-        ret
-    }
+        }
+    };
 );
 
 fixturator!(
@@ -499,7 +310,6 @@ fixturator!(
         for _ in 0..3 {
             hashes.push(header_hash_fixturator.next().unwrap().into());
         }
-        self.0.index = self.0.index + 1;
         hashes.into()
     }
 );
@@ -542,14 +352,13 @@ fixturator!(
                 wasm,
             );
         }
-        self.0.index = self.0.index + 1;
         wasms
     }
 );
 
 fixturator!(
     Zomes,
-    { Vec::new() },
+    Vec::new(),
     {
         // @todo implement unpredictable zomes
         ZomesFixturator::new(Empty).next().unwrap()
@@ -573,69 +382,55 @@ fixturator!(
         let mut rng = thread_rng();
         TestWasm::iter().choose(&mut rng).unwrap().into()
     },
-    {
-        let wasm = TestWasm::iter().cycle().nth(self.0.index).unwrap();
-        self.0.index = self.0.index + 1;
-        wasm.into()
-    }
+    { TestWasm::iter().cycle().nth(self.0.index).unwrap().into() }
 );
 
 fixturator!(
-    DnaDef,
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            uuid: StringFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            zomes: ZomesFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    },
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            uuid: StringFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            zomes: ZomesFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    },
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            uuid: StringFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            zomes: ZomesFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    }
+    DnaDef;
+    curve Empty DnaDef {
+        name: StringFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+        uuid: StringFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+    };
+
+    curve Unpredictable DnaDef {
+        name: StringFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+        uuid: StringFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+    };
+
+    curve Predictable DnaDef {
+        name: StringFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        uuid: StringFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+    };
 );
 
 fixturator!(
@@ -687,7 +482,7 @@ fixturator!(
             .next()
             .unwrap();
         dna_def.zomes = zomes;
-        let dna_file = DnaFile {
+        DnaFile {
             dna: DnaDefFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -697,33 +492,23 @@ fixturator!(
             code: WasmsFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_file
+        }
     }
 );
 
 fixturator!(
-    WasmRibosome,
-    {
-        WasmRibosome {
-            dna_file: DnaFileFixturator::new(Empty).next().unwrap(),
-        }
-    },
-    {
-        WasmRibosome {
-            dna_file: DnaFileFixturator::new(Unpredictable).next().unwrap(),
-        }
-    },
-    {
-        let ribosome = WasmRibosome {
-            dna_file: DnaFileFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        ribosome
-    }
+    WasmRibosome;
+    curve Empty WasmRibosome {
+        dna_file: fixt!(DnaFile, Empty),
+    };
+    curve Unpredictable WasmRibosome {
+        dna_file: fixt!(DnaFile, Unpredictable),
+    };
+    curve Predictable WasmRibosome {
+        dna_file: DnaFileFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+    };
 );
 
 impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
