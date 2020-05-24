@@ -246,41 +246,41 @@ fixturator!(
 
     curve Empty {
         match EntryVariant::random() {
-            EntryVariant::Agent => Entry::Agent(fixt!(AgentPubKey, Empty).into()),
-            EntryVariant::App => Entry::App(fixt!(SerializedBytes, Empty)),
-            EntryVariant::CapClaim => Entry::CapClaim(fixt!(CapClaim, Empty)),
-            EntryVariant::CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Empty)),
+            Agent => Entry::Agent(fixt!(AgentPubKey, Empty).into()),
+            App => Entry::App(fixt!(SerializedBytes, Empty)),
+            CapClaim => Entry::CapClaim(fixt!(CapClaim, Empty)),
+            CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Empty)),
         }
     };
 
     curve Unpredictable {
         match EntryVariant::random() {
-            EntryVariant::Agent => Entry::Agent(fixt!(AgentPubKey, Unpredictable).into()),
-            EntryVariant::App => Entry::App(fixt!(SerializedBytes, Unpredictable)),
-            EntryVariant::CapClaim => Entry::CapClaim(fixt!(CapClaim, Unpredictable)),
-            EntryVariant::CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Unpredictable)),
+            Agent => Entry::Agent(fixt!(AgentPubKey, Unpredictable).into()),
+            App => Entry::App(fixt!(SerializedBytes, Unpredictable)),
+            CapClaim => Entry::CapClaim(fixt!(CapClaim, Unpredictable)),
+            CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Unpredictable)),
         }
     };
 
     curve Predictable {
         match EntryVariant::nth(self.0.index) {
-            EntryVariant::Agent => Entry::Agent(
+            Agent => Entry::Agent(
                 AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap()
                     .into(),
             ),
-            EntryVariant::App => Entry::App(
+            App => Entry::App(
                 SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap(),
             ),
-            EntryVariant::CapClaim => Entry::CapClaim(
+            CapClaim => Entry::CapClaim(
                 CapClaimFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap(),
             ),
-            EntryVariant::CapGrant => Entry::CapGrant(
+            CapGrant => Entry::CapGrant(
                 ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
                     .next()
                     .unwrap(),
