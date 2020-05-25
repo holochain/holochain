@@ -47,12 +47,6 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn into_inner(self) -> SourceChainBuf<'env, R> {
         self.0
     }
-
-    // TODO: TK-01747: Make this check more robust maybe?
-    // PERF: This call must be fast
-    pub fn has_initialized(&self) -> bool {
-        self.0.len() > 3
-    }
 }
 
 impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {

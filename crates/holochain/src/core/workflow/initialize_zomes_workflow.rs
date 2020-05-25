@@ -54,7 +54,7 @@ where
             let header_seq = workspace
                 .0
                 .source_chain
-                .get_element(&prev_header)
+                .get_header(&prev_header)
                 .await?
                 .map(|ph| ph.header().header_seq() + 1)
                 .unwrap_or(0);

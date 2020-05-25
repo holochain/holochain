@@ -112,6 +112,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &self.cas.headers()
     }
 
+    // TODO: TK-01747: Make this check more robust maybe?
+    // PERF: This call must be fast
+    pub fn has_initialized(&self) -> bool {
+        self.len() > 3
+    }
+
     /// Get the AgentPubKey from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
     pub fn agent_pubkey(&self) -> DatabaseResult<Option<AgentPubKey>> {

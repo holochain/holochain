@@ -9,11 +9,11 @@ use crate::{
     },
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
-        state::source_chain::{SourceChain, SourceChainBuf},
+        state::source_chain::SourceChainBuf,
         workflow::{
-            run_workflow, GenesisWorkflow, GenesisWorkspace, InitializeZomesWorkflow,
-            InitializeZomesWorkspace, InvokeZomeWorkflow, InvokeZomeWorkspace,
-            ZomeCallInvocationResult,
+            error::WorkflowRunError, run_workflow, GenesisWorkflow, GenesisWorkspace,
+            InitializeZomesWorkflow, InitializeZomesWorkspace, InvokeZomeWorkflow,
+            InvokeZomeWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -196,52 +196,46 @@ impl Cell {
     }
 
     async fn check_or_run_init(&self) -> CellResult<()> {
+        // If not run it
+        let state_env = self.state_env.clone();
+        let id = self.id.clone();
+        let conductor_api = self.conductor_api.clone();
+        let env_ref = state_env.guard().await;
+        let reader = env_ref.reader()?;
+        // Create the workspace
+        let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)
+            .map_err(|e| WorkflowRunError::from(e))
+            .map_err(Box::new)?;
+        let workspace = InitializeZomesWorkspace(workspace);
+
         // Check if initialization has run
-        let has_init = {
-            let arc = self.state_env();
-            let env = arc.guard().await;
-            let reader = env.reader()?;
-            SourceChain::new(&reader, &env)?.has_initialized()
+        if workspace.0.source_chain.has_initialized() {
+            return Ok(());
+        }
+        trace!("running init");
+
+        // get the dna
+        let dna_file = conductor_api
+            .get_dna(id.dna_hash())
+            .await
+            .ok_or(CellError::DnaMissing)?;
+        let dna_def = dna_file.dna().clone();
+
+        // Get the ribosome
+        let ribosome = WasmRibosome::new(dna_file);
+
+        // Create the workflow and run it
+        let workflow = InitializeZomesWorkflow {
+            agent_key: id.agent_pubkey().clone(),
+            dna_def,
+            ribosome,
         };
-        if !has_init {
-            trace!("running init");
-            // If not run it
-            let run_init = tokio::spawn({
-                let state_env = self.state_env.clone();
-                let id = self.id.clone();
-                let conductor_api = self.conductor_api.clone();
-                async move {
-                    let env_ref = state_env.guard().await;
-                    let reader = env_ref.reader()?;
-                    // Create the workspace
-                    let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)?;
-                    let workspace = InitializeZomesWorkspace(workspace);
-
-                    // get the dna
-                    let dna_file = conductor_api
-                        .get_dna(id.dna_hash())
-                        .await
-                        .ok_or(CellError::DnaMissing)?;
-                    let dna_def = dna_file.dna().clone();
-
-                    // Get the ribosome
-                    let ribosome = WasmRibosome::new(dna_file);
-
-                    // Create the workflow and run it
-                    let workflow = InitializeZomesWorkflow {
-                        agent_key: id.agent_pubkey().clone(),
-                        dna_def,
-                        ribosome,
-                    };
-                    run_workflow(state_env.clone(), workflow, workspace).await
-                }
-            });
-            let init_result = run_init.await?.map_err(Box::new)??;
-            trace!(?init_result);
-            match init_result {
-                InitResult::Pass => (),
-                r @ _ => return Err(CellError::InitFailed(r)),
-            }
+        let run_init = run_workflow(state_env.clone(), workflow, workspace).await;
+        let init_result = run_init.map_err(Box::new)??;
+        trace!(?init_result);
+        match init_result {
+            InitResult::Pass => (),
+            r @ _ => return Err(CellError::InitFailed(r)),
         }
         Ok(())
     }
