@@ -14,11 +14,11 @@ name = "test_wasm_post_commit_fail"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-wee_alloc = "=0.4.5"
-holochain_wasmer_guest = "=0.0.30"
-test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
+holo_hash_core = { path = "../../../holo_hash_core" }
 holochain_serialized_bytes = "=0.0.39"
-serde = "=1.0.104"
+holochain_wasmer_guest = "=0.0.30"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 lazy_static = "1.4.0"
-holo_hash_core = { path = "../../../holo_hash_core" }
+serde = "=1.0.104"
+test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
+wee_alloc = "=0.4.5"
