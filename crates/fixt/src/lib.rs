@@ -377,6 +377,17 @@ macro_rules! fixturator {
         }
     };
 
+    // legacy syntax
+    //
+    // fixturator!(Foo, { /* empty */ }, { /* unpredictable */ }, { /* predictable */ });
+    //
+    // implements both FooFixturator and all the curves from raw expressions passed to the macro
+    //
+    // this syntax has several limitations:
+    // - positional curve definitions are easy to accidentally mix up
+    // - couples all curve definitions together and to FooFixturator creation
+    // - undifferentiated logic forces much boilerplate because the macro knows nothing about Foo
+    // - forces devs to define curves that might not be needed or make sense yet
     ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
         fixturator!(
             $type;
