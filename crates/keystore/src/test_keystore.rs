@@ -35,15 +35,13 @@ pub async fn spawn_test_keystore(
 struct PrivateKey(pub holochain_crypto::DynCryptoBytes);
 
 ghost_actor::ghost_chan! {
-    Visibility(),
-    Name(TestKeystoreInternal),
-    Error(KeystoreError),
-    Api {
-        FinalizeNewKeypair(
-            "we have generated a keypair, now track it",
-            (holo_hash::AgentPubKey, PrivateKey),
-            (),
-        ),
+    /// Internal Channel
+    chan TestKeystoreInternal<KeystoreError> {
+        /// we have generated a keypair, now track it
+        fn finalize_new_keypair(
+            pub_key: holo_hash::AgentPubKey,
+            priv_key: PrivateKey,
+        ) -> ();
     }
 }
 
@@ -85,7 +83,7 @@ impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
             let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key).await;
             let sec_key = PrivateKey(sec_key);
             i_s.ghost_actor_internal()
-                .finalize_new_keypair((agent_pubkey.clone(), sec_key))
+                .finalize_new_keypair(agent_pubkey.clone(), sec_key)
                 .await?;
             Ok(agent_pubkey)
         }
@@ -116,15 +114,9 @@ impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
 
     fn handle_ghost_actor_internal(&mut self, msg: TestKeystoreInternal) -> KeystoreResult<()> {
         match msg {
-            TestKeystoreInternal::FinalizeNewKeypair(msg) => {
-                let ghost_actor::ghost_chan::GhostChanItem {
-                    input,
-                    respond,
-                    span,
-                } = msg;
+            TestKeystoreInternal::FinalizeNewKeypair { span, respond, pub_key, priv_key } => {
                 let _g = span.enter();
-                let (agent_pubkey, sec_key) = input;
-                self.active_keypairs.insert(agent_pubkey, sec_key);
+                self.active_keypairs.insert(pub_key, priv_key);
                 if let Err(e) = respond(Ok(())) {
                     tracing::error!(error = ?e);
                 }
