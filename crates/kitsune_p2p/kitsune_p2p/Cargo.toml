@@ -1,8 +1,8 @@
 [package]
-name = "holochain_p2p"
+name = "kitsune_p2p"
 version = "0.0.1"
-description = "holochain specific wrapper around more generic p2p module"
-license = "CAL-1.0"
+description = "p2p / dht communication framework"
+license = "Apache-2.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -11,10 +11,9 @@ categories = ["network-programming"]
 edition = "2018"
 
 [dependencies]
+derive_more = "0.99.7"
 futures = "0.3"
 ghost_actor = "0.1.0-alpha.9"
-holo_hash = { version = "0.0.1", path = "../holo_hash" }
-holochain_keystore = { version = "0.0.1", path = "../keystore" }
-kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+shrinkwraprs = "0.3.0"
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = ["full"] }
