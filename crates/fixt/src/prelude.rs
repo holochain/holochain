@@ -20,3 +20,4 @@ pub use paste::expr;
 pub use paste::item;
 pub use rand::prelude::*;
 pub use strum::IntoEnumIterator;
+pub use strum_macros;

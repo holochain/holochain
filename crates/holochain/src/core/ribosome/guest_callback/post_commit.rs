@@ -118,7 +118,6 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
     use holochain_zome_types::HostInput;
-    use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn post_commit_callback_result_fold() {

@@ -1070,6 +1070,7 @@ dependencies = [
  "serial_test",
  "shrinkwraprs",
  "structopt",
+ "strum",
  "tempdir",
  "test_wasm_common",
  "thiserror",

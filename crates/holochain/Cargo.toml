@@ -62,6 +62,7 @@ rand = "0.7"
 legacy = { path = "../legacy", package = "holochain_2020_legacy" }
 cfg-if = "0.1"
 nanoid = "0.3"
+strum = "0.18.0"
 
 [dev-dependencies]
 serial_test = "0.4.0"

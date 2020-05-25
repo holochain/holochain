@@ -4,7 +4,6 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
 use fixt::prelude::*;
-use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
 use holo_hash::HeaderHashFixturator;
@@ -45,24 +44,7 @@ newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
     MigrateAgent;
-
-    unit variants [ Open, Close ] empty MigrateAgent::Close;
-
-    // curve Empty MigrateAgent::Close;
-    //
-    // curve Unpredictable {
-    //     match MigrateAgentVariant::random() {
-    //         Open => MigrateAgent::Open,
-    //         Close => MigrateAgent::Close,
-    //     }
-    // };
-    //
-    // curve Predictable {
-    //     match MigrateAgentVariant::nth(self.0.index) {
-    //         Open => MigrateAgent::Open,
-    //         Close => MigrateAgent::Close,
-    //     }
-    // };
+    unit variants [ Open Close ] empty Close;
 );
 
 fixturator!(
@@ -159,7 +141,7 @@ fixturator!(
 fixturator!(
     CapAccess;
 
-    variants [ Unrestricted, Transferable, Assigned ];
+    enum [ Unrestricted Transferable Assigned ];
 
     curve Empty {
         match CapAccessVariant::random() {
@@ -200,99 +182,22 @@ fixturator!(
 
 fixturator!(
     CapGrant;
-
-    variants [ Authorship, ZomeCall ];
-
-    curve Empty {
-        match CapGrantVariant::random() {
-            Authorship => CapGrant::Authorship(fixt!(AgentPubKey, Empty).into()),
-            ZomeCall => CapGrant::ZomeCall(fixt!(ZomeCallCapGrant, Empty).into()),
-        }
-    };
-
-    curve Unpredictable {
-        match CapGrantVariant::random() {
-            Authorship => CapGrant::Authorship(fixt!(AgentPubKey).into()),
-            ZomeCall => CapGrant::ZomeCall(fixt!(ZomeCallCapGrant).into()),
-        }
-    };
-
-    curve Predictable {
-        match CapGrantVariant::nth(self.0.index) {
-            Authorship => CapGrant::Authorship(
-                AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-                    .next()
-                    .unwrap()
-                    .into(),
-            ),
-            ZomeCall => CapGrant::ZomeCall(
-                ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
-                    .next()
-                    .unwrap(),
-            ),
-        }
-    };
+    variants [ Authorship(AgentPubKey) ZomeCall(ZomeCallCapGrant) ];
 );
 
 fixturator!(
     CapClaim;
-
     constructor fn new(String, AgentPubKey, CapSecret);
 );
 
 fixturator!(
     Entry;
-
     variants [
-        Agent<AgentPubKey>,
-        App<SerializedBytes>,
-        CapClaim<CapClaim>,
-        CapGrant<ZomeCallCapGrant>,
+        Agent(AgentPubKey)
+        App(SerializedBytes)
+        CapClaim(CapClaim)
+        CapGrant(ZomeCallCapGrant)
     ];
-
-    // curve Empty {
-    //     match EntryVariant::random() {
-    //         Agent => Entry::Agent(fixt!(AgentPubKey, Empty).into()),
-    //         App => Entry::App(fixt!(SerializedBytes, Empty)),
-    //         CapClaim => Entry::CapClaim(fixt!(CapClaim, Empty)),
-    //         CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Empty)),
-    //     }
-    // };
-    //
-    // curve Unpredictable {
-    //     match EntryVariant::random() {
-    //         Agent => Entry::Agent(fixt!(AgentPubKey, Unpredictable).into()),
-    //         App => Entry::App(fixt!(SerializedBytes, Unpredictable)),
-    //         CapClaim => Entry::CapClaim(fixt!(CapClaim, Unpredictable)),
-    //         CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Unpredictable)),
-    //     }
-    // };
-    //
-    // curve Predictable {
-    //     match EntryVariant::nth(self.0.index) {
-    //         Agent => Entry::Agent(
-    //             AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-    //                 .next()
-    //                 .unwrap()
-    //                 .into(),
-    //         ),
-    //         App => Entry::App(
-    //             SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
-    //                 .next()
-    //                 .unwrap(),
-    //         ),
-    //         CapClaim => Entry::CapClaim(
-    //             CapClaimFixturator::new_indexed(Predictable, self.0.index)
-    //                 .next()
-    //                 .unwrap(),
-    //         ),
-    //         CapGrant => Entry::CapGrant(
-    //             ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
-    //                 .next()
-    //                 .unwrap(),
-    //         ),
-    //     }
-    // };
 );
 
 fixturator!(
@@ -376,19 +281,11 @@ fixturator!(
 );
 
 fixturator!(
-    DnaWasm,
-    {
-        // note that an empty wasm will not compile
-        let code = vec![];
-        DnaWasm {
-            code: Arc::new(code),
-        }
-    },
-    {
-        let mut rng = thread_rng();
-        TestWasm::iter().choose(&mut rng).unwrap().into()
-    },
-    { TestWasm::iter().cycle().nth(self.0.index).unwrap().into() }
+    DnaWasm;
+    // note that an empty wasm will not compile
+    curve Empty DnaWasm { code: Arc::new(vec![]) };
+    curve Unpredictable TestWasm::iter().choose(&mut thread_rng()).unwrap().into();
+    curve Predictable TestWasm::iter().cycle().nth(self.0.index).unwrap().into();
 );
 
 fixturator!(
@@ -504,12 +401,8 @@ fixturator!(
 
 fixturator!(
     WasmRibosome;
-    curve Empty WasmRibosome {
-        dna_file: fixt!(DnaFile, Empty),
-    };
-    curve Unpredictable WasmRibosome {
-        dna_file: fixt!(DnaFile, Unpredictable),
-    };
+    curve Empty WasmRibosome { dna_file: fixt!(DnaFile, Empty) };
+    curve Unpredictable WasmRibosome { dna_file: fixt!(DnaFile, Unpredictable) };
     curve Predictable WasmRibosome {
         dna_file: DnaFileFixturator::new_indexed(Predictable, self.0.index)
             .next()

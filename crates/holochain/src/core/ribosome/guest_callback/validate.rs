@@ -150,7 +150,6 @@ mod test {
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
     use holochain_zome_types::HostInput;
-    use rand::prelude::*;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
