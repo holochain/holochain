@@ -22,50 +22,18 @@ pub struct ValidateInvocation {
     pub entry: Arc<Entry>,
 }
 
-fixturator!(
-    ValidateInvocation,
-    {
-        let validate_invocation = ValidateInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            entry: Arc::new(
-                EntryFixturator::new_indexed(Empty, self.0.index)
-                    .next()
-                    .unwrap(),
-            ),
-        };
-        self.0.index = self.0.index + 1;
-        validate_invocation
-    },
-    {
-        let validate_invocation = ValidateInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            entry: Arc::new(
-                EntryFixturator::new_indexed(Unpredictable, self.0.index)
-                    .next()
-                    .unwrap(),
-            ),
-        };
-        self.0.index = self.0.index + 1;
-        validate_invocation
-    },
-    {
-        let validate_invocation = ValidateInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            entry: Arc::new(
-                EntryFixturator::new_indexed(Predictable, self.0.index)
-                    .next()
-                    .unwrap(),
-            ),
-        };
-        self.0.index = self.0.index + 1;
-        validate_invocation
+impl ValidateInvocation {
+    pub fn new(zome_name: ZomeName, entry: Entry) -> Self {
+        Self {
+            zome_name,
+            entry: Arc::new(entry),
+        }
     }
+}
+
+fixturator!(
+    ValidateInvocation;
+    constructor fn new(ZomeName, Entry);
 );
 
 impl Invocation for ValidateInvocation {

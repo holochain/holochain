@@ -18,44 +18,18 @@ pub struct ValidationPackageInvocation {
     app_entry_type: AppEntryType,
 }
 
-fixturator!(
-    ValidationPackageInvocation,
-    {
-        let validation_package_invocation = ValidationPackageInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        validation_package_invocation
-    },
-    {
-        let validation_package_invocation = ValidationPackageInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        validation_package_invocation
-    },
-    {
-        let validation_package_invocation = ValidationPackageInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        validation_package_invocation
+impl ValidationPackageInvocation {
+    pub fn new(zome_name: ZomeName, app_entry_type: AppEntryType) -> Self {
+        Self {
+            zome_name,
+            app_entry_type,
+        }
     }
+}
+
+fixturator!(
+    ValidationPackageInvocation;
+    constructor fn new(ZomeName, AppEntryType);
 );
 
 impl Invocation for ValidationPackageInvocation {

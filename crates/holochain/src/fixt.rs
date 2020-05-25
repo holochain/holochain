@@ -401,13 +401,7 @@ fixturator!(
 
 fixturator!(
     WasmRibosome;
-    curve Empty WasmRibosome { dna_file: fixt!(DnaFile, Empty) };
-    curve Unpredictable WasmRibosome { dna_file: fixt!(DnaFile, Unpredictable) };
-    curve Predictable WasmRibosome {
-        dna_file: DnaFileFixturator::new_indexed(Predictable, self.0.index)
-            .next()
-            .unwrap(),
-    };
+    constructor fn new(DnaFile);
 );
 
 impl Iterator for WasmRibosomeFixturator<curve::Zomes> {

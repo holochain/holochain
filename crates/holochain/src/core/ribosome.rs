@@ -52,43 +52,23 @@ pub struct HostContext {
 }
 
 fixturator!(
-    HostContext,
-    {
-        HostContext {
-            zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
-                .next()
-                .unwrap(),
-            allow_side_effects: BoolFixturator::new(Empty).next().unwrap(),
-        }
-    },
-    {
-        HostContext {
-            zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new(Unpredictable)
-                .next()
-                .unwrap(),
-            allow_side_effects: BoolFixturator::new(Unpredictable).next().unwrap(),
-        }
-    },
-    {
-        let host_context = HostContext {
-            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            workspace: UnsafeInvokeZomeWorkspaceFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            allow_side_effects: BoolFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        host_context
-    }
+    HostContext;
+    constructor fn new(ZomeName, bool, UnsafeInvokeZomeWorkspace);
 );
 
 impl HostContext {
+    pub fn new(
+        zome_name: ZomeName,
+        allow_side_effects: bool,
+        workspace: UnsafeInvokeZomeWorkspace,
+    ) -> Self {
+        Self {
+            zome_name,
+            allow_side_effects,
+            workspace,
+        }
+    }
+
     pub fn zome_name(&self) -> ZomeName {
         self.zome_name.clone()
     }
@@ -206,51 +186,43 @@ pub struct ZomeCallInvocation {
 }
 
 fixturator!(
-    ZomeCallInvocation,
-    {
-        ZomeCallInvocation {
-            cell_id: CellIdFixturator::new(Empty).next().unwrap(),
-            zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
-            cap: CapSecretFixturator::new(Empty).next().unwrap(),
-            fn_name: StringFixturator::new(Empty).next().unwrap(),
-            payload: HostInputFixturator::new(Empty).next().unwrap(),
-            provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-        }
-    },
-    {
-        ZomeCallInvocation {
-            cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
-            zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
-            cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-            fn_name: StringFixturator::new(Unpredictable).next().unwrap(),
-            payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
-            provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-        }
-    },
-    {
-        let ret = ZomeCallInvocation {
-            cell_id: CellIdFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            cap: CapSecretFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            fn_name: StringFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            payload: HostInputFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            provenance: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        ret
-    }
+    ZomeCallInvocation;
+    curve Empty ZomeCallInvocation {
+        cell_id: CellIdFixturator::new(Empty).next().unwrap(),
+        zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
+        cap: CapSecretFixturator::new(Empty).next().unwrap(),
+        fn_name: StringFixturator::new(Empty).next().unwrap(),
+        payload: HostInputFixturator::new(Empty).next().unwrap(),
+        provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
+    };
+    curve Unpredictable ZomeCallInvocation {
+        cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
+        zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
+        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        fn_name: StringFixturator::new(Unpredictable).next().unwrap(),
+        payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
+        provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+    };
+    curve Predictable ZomeCallInvocation {
+        cell_id: CellIdFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        cap: CapSecretFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        fn_name: StringFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        payload: HostInputFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        provenance: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+    };
 );
 
 /// Fixturator curve for a named zome invocation

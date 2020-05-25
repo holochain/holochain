@@ -17,44 +17,18 @@ pub struct MigrateAgentInvocation {
     migrate_agent: MigrateAgent,
 }
 
-fixturator!(
-    MigrateAgentInvocation,
-    {
-        let migrate_agent_invocation = MigrateAgentInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            migrate_agent: MigrateAgentFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        migrate_agent_invocation
-    },
-    {
-        let migrate_agent_invocation = MigrateAgentInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            migrate_agent: MigrateAgentFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        migrate_agent_invocation
-    },
-    {
-        let migrate_agent_invocation = MigrateAgentInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            migrate_agent: MigrateAgentFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        migrate_agent_invocation
+impl MigrateAgentInvocation {
+    pub fn new(dna_def: DnaDef, migrate_agent: MigrateAgent) -> Self {
+        Self {
+            dna_def,
+            migrate_agent,
+        }
     }
+}
+
+fixturator!(
+    MigrateAgentInvocation;
+    constructor fn new(DnaDef, MigrateAgent);
 );
 
 impl Invocation for MigrateAgentInvocation {

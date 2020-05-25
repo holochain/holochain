@@ -15,35 +15,15 @@ pub struct InitInvocation {
     pub dna_def: DnaDef,
 }
 
-fixturator!(
-    InitInvocation,
-    {
-        let init_invocation = InitInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        init_invocation
-    },
-    {
-        let init_invocation = InitInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        init_invocation
-    },
-    {
-        let init_invocation = InitInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        init_invocation
+impl InitInvocation {
+    pub fn new(dna_def: DnaDef) -> Self {
+        Self { dna_def }
     }
+}
+
+fixturator!(
+    InitInvocation;
+    constructor fn new(DnaDef);
 );
 
 impl Invocation for InitInvocation {

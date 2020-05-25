@@ -16,44 +16,15 @@ pub struct PostCommitInvocation {
     headers: HeaderHashes,
 }
 
-fixturator!(
-    PostCommitInvocation,
-    {
-        let post_commit_invocation = PostCommitInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            headers: HeaderHashesFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        post_commit_invocation
-    },
-    {
-        let post_commit_invocation = PostCommitInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            headers: HeaderHashesFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        post_commit_invocation
-    },
-    {
-        let post_commit_invocation = PostCommitInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            headers: HeaderHashesFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        post_commit_invocation
+impl PostCommitInvocation {
+    pub fn new(zome_name: ZomeName, headers: HeaderHashes) -> Self {
+        Self { zome_name, headers }
     }
+}
+
+fixturator!(
+    PostCommitInvocation;
+    constructor fn new(ZomeName, HeaderHashes);
 );
 
 impl Invocation for PostCommitInvocation {

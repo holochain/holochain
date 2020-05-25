@@ -1235,6 +1235,7 @@ dependencies = [
  "serde_json",
  "shrinkwraprs",
  "snowflake",
+ "strum",
  "tempdir",
  "thiserror",
  "tokio",
