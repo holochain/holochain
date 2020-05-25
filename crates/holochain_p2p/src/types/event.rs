@@ -76,50 +76,32 @@ pub struct SignNetworkDataEvt {
 }
 
 ghost_actor::ghost_chan! {
-    Visibility(pub),
-    Name(HolochainP2pEvent),
-    Error(super::HolochainP2pError),
-    Api {
-        CallRemote(
-            "A remote node is attempting to make a remote call on us.",
-            CallRemoteEvt,
-            (), // TODO - proper return type
-        ),
-        Publish(
-            "A remote node is publishing data in a range we claim to be holding.",
-            PublishEvt,
-            (), // TODO - proper return type
-        ),
-        GetValidationPackage(
-            "A remote node is requesting a validation package.",
-            GetValidationPackageEvt,
-            (), // TODO - proper return type
-        ),
-        Get(
-            "A remote node is requesting entry data from us.",
-            GetEvt,
-            (), // TODO - proper return type
-        ),
-        GetLinks(
-            "A remote node is requesting link data from us.",
-            GetLinksEvt,
-            (), // TODO - proper return type
-        ),
-        ListDhtOpHashes(
-            "The p2p module wishes to query our DhtOpHash store.",
-            ListDhtOpHashesEvt,
-            (), // TODO - proper return type
-        ),
-        FetchDhtOps(
-            "The p2p module needs access to the content for a given set of DhtOpHashes.",
-            FetchDhtOpsEvt,
-            (), // TODO - proper return type
-        ),
-        SignNetworkData(
-            "P2p operations require cryptographic signatures and validation.",
-            SignNetworkDataEvt,
-            Signature,
-        ),
+    /// The HolochainP2pEvent stream allows handling events generated from
+    /// the HolochainP2p actor.
+    pub chan HolochainP2pEvent<super::HolochainP2pError> {
+        /// A remote node is attempting to make a remote call on us.
+        fn call_remote(input: CallRemoteEvt) -> (); // TODO - proper return type
+
+        /// A remote node is publishing data in a range we claim to be holding.
+        fn publish(input: PublishEvt) -> (); // TODO - proper return type
+
+        /// A remote node is requesting a validation package.
+        fn get_validation_package(input: GetValidationPackageEvt) -> (); // TODO - proper return type
+
+        /// A remote node is requesting entry data from us.
+        fn get(input: GetEvt) -> (); // TODO - proper return type
+
+        /// A remote node is requesting link data from us.
+        fn get_links(input: GetLinksEvt) -> (); // TODO - proper return type
+
+        /// The p2p module wishes to query our DhtOpHash store.
+        fn list_dht_op_hashes(input: ListDhtOpHashesEvt) -> (); // TODO - proper return type
+
+        /// The p2p module needs access to the content for a given set of DhtOpHashes.
+        fn fetch_dht_ops(input: FetchDhtOpsEvt) -> (); // TODO - proper return type
+
+        /// P2p operations require cryptographic signatures and validation.
+        fn sign_network_data(input: SignNetworkDataEvt) -> Signature;
     }
 }
 

@@ -9,15 +9,9 @@ mod space;
 use space::*;
 
 ghost_actor::ghost_chan! {
-    Visibility(pub(crate)),
-    Name(Internal),
-    Error(crate::KitsuneP2pError),
-    Api {
-        Ping(
-            "temp because ghost_chan doesn't allow empty Api",
-            (),
-            (),
-        ),
+    pub(crate) chan Internal<crate::KitsuneP2pError> {
+        /// temp because ghost_chan doesn't allow empty Api
+        fn ping() -> ();
     }
 }
 

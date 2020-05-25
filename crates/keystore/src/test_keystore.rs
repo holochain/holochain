@@ -114,7 +114,12 @@ impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
 
     fn handle_ghost_actor_internal(&mut self, msg: TestKeystoreInternal) -> KeystoreResult<()> {
         match msg {
-            TestKeystoreInternal::FinalizeNewKeypair { span, respond, pub_key, priv_key } => {
+            TestKeystoreInternal::FinalizeNewKeypair {
+                span,
+                respond,
+                pub_key,
+                priv_key,
+            } => {
                 let _g = span.enter();
                 self.active_keypairs.insert(pub_key, priv_key);
                 if let Err(e) = respond(Ok(())) {

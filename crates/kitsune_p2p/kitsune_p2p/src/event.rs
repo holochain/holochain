@@ -57,35 +57,23 @@ pub struct SignNetworkDataEvt {
 }
 
 ghost_actor::ghost_chan! {
-    Visibility(pub),
-    Name(KitsuneP2pEvent),
-    Error(super::KitsuneP2pError),
-    Api {
-        Request(
-            "We are receiving a request from a remote node.",
-            RequestEvt,
-            Vec<u8>,
-        ),
-        Broadcast(
-            "We are receiving a broadcast from a remote node.",
-            BroadcastEvt,
-            (),
-        ),
-        FetchOpHashesForConstraints(
-            "Gather a list of op-hashes from our implementor that meet criteria.",
-            FetchOpHashesForConstraintsEvt,
-            Vec<(super::KitsuneDataHash, Vec<super::KitsuneOpHash>)>,
-        ),
-        FetchOpHashData(
-            "Gather all op-hash data for a list of op-hashes from our implementor.",
-            FetchOpHashDataEvt,
-            Vec<(super::KitsuneOpHash, Vec<u8>)>,
-        ),
-        SignNetworkData(
-            "Request that our implementor sign some data on behalf of an agent.",
-            SignNetworkDataEvt,
-            super::KitsuneSignature,
-        ),
+    /// The KitsuneP2pEvent stream allows handling events generated from the
+    /// KitsuneP2p actor.
+    pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
+        /// We are receiving a request from a remote node.
+        fn request(input: RequestEvt) -> Vec<u8>;
+
+        /// We are receiving a broadcast from a remote node.
+        fn broadcast(input: BroadcastEvt) -> ();
+
+        /// Gather a list of op-hashes from our implementor that meet criteria.
+        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<(super::KitsuneDataHash, Vec<super::KitsuneOpHash>)>;
+
+        /// Gather all op-hash data for a list of op-hashes from our implementor.
+        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(super::KitsuneOpHash, Vec<u8>)>;
+
+        /// Request that our implementor sign some data on behalf of an agent.
+        fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;
     }
 }
 

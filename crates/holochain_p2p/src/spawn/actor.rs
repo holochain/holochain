@@ -4,15 +4,9 @@ use crate::holo_hash_core::HoloHashCoreHash;
 use futures::future::FutureExt;
 
 ghost_actor::ghost_chan! {
-    Visibility(pub(crate)),
-    Name(Internal),
-    Error(crate::HolochainP2pError),
-    Api {
-        Ping(
-            "temp because ghost_chan doesn't allow empty Api",
-            (),
-            (),
-        ),
+    pub(crate) chan Internal<crate::HolochainP2pError> {
+        /// temp because ghost_chan doesn't allow empty Api
+        fn ping() -> ();
     }
 }
 
