@@ -730,6 +730,8 @@ dependencies = [
  "paste",
  "rand 0.7.3",
  "serde",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]
@@ -1068,8 +1070,6 @@ dependencies = [
  "serial_test",
  "shrinkwraprs",
  "structopt",
- "strum",
- "strum_macros",
  "tempdir",
  "test_wasm_common",
  "thiserror",

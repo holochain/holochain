@@ -148,13 +148,80 @@ macro_rules! basic_test {
 /// and Predictable, in order
 #[macro_export]
 macro_rules! fixturator {
+    (
+        $type:tt;
+        variants [ $( $variant:tt($variant_inner:ty) ),* ];
+        $($munch:tt)*
+    ) => {
+
+        fixturator!(
+            $type;
+            enum [ $( $variant ),* ];
+
+            curve Empty match expr! { [<$type:camel Variant>]::random() } {
+                $(
+                    $variant => $type::$variant(
+                        expr! {
+                            [<$variant_inner:camel Fixturator>]::new_indexed(Empty, self.0.index).next().unwrap().into()
+                        }
+                    )
+                )*
+            };
+
+            curve Unpredictable match expr! {[<$type:camel Variant>]::random() } {
+                $(
+                    $variant => $type::$variant(
+                        expr! {
+                            [<$variant_inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index).next().unwrap().into()
+                        }
+                    )
+                )*
+            };
+
+            curve Predictable match expr! { [<$type:camel Variant>]::nth(self.0.index) } {
+                $(
+                    $variant => $type::$variant(
+                        expr! {
+                            [<$variant_inner:camel Fixturator>]::new_indexed(Empty, self.0.index).next().unwrap().into()
+                        }
+                    )
+                )*
+            };
+
+            $($munch)*
+        );
+    };
+
+    (
+        $type:tt;
+        unit variants [ $( $variant:tt ),* ] empty $empty:tt;
+        $($munch:tt)*
+    ) => {
+        fixturator!(
+            $type;
+            enum [ $( $variant, )* ];
+            curve Empty expr! { $type::$empty };
+            curve Unpredictable match expr! { [<$type:camel Variant>]::random() } {
+                $(
+                    $variant => $type::$variant
+                )*
+            };
+            curve Predictable match expr! { [<$type:camel Variant>]::nth(self.0.index) } {
+                $(
+                    $variant => $type::$variant
+                )*
+            };
+            $($munch)*
+        );
+    };
+
         (
-            $type:ident;
-            variants [ $( $variant:tt) ,* ];
+            $type:tt;
+            enum [ $( $variant:tt ) ,* ];
             $($munch:tt)*
         ) => {
             item! {
-                #[derive(EnumIter)]
+                #[derive(strum_macros::EnumIter)]
                 enum [<$type:camel Variant>] {
                     $( $variant ),*
                 }
@@ -465,4 +532,76 @@ macro_rules! enum_fixturator {
             }
         );
     };
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::prelude::*;
+
+    // in general enums can have a mix of whatever in their variants
+    // in this case we put it back on the user to define how they want their curves to look
+    #[derive(PartialEq, Debug)]
+    enum Foo {
+        A,
+        B(String),
+    }
+
+    fixturator!(
+        Foo;
+        enum [ A, B ];
+        curve Empty Foo::A;
+        curve Unpredictable match FooVariant::random() {
+            A => Foo::A,
+            B => Foo::B(fixt!(String)),
+        };
+        curve Predictable match FooVariant::nth(self.0.index) {
+            A => Foo::A,
+            B => Foo::B(StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        };
+    );
+
+    #[test]
+    fn enum_test() {
+        assert_eq!(
+            FooFixturator::new(Predictable).next().unwrap(),
+            Foo::A,
+        );
+
+        FooFixturator::new(Unpredictable).next().unwrap();
+
+        assert_eq!(
+            FooFixturator::new(Empty).next().unwrap(),
+            Foo::A,
+        );
+    }
+
+    enum UnitFoo {
+        A,
+        B,
+        C,
+    }
+
+    fixturator!(
+        UnitFoo;
+        unit variants [ A, B, C ] empty B:
+    );
+
+    #[test]
+    fn unit_variants_test() {
+
+        assert_eq!(
+            UnitFooFixturator::new(Predictable).next().unwrap(),
+            UnitFoo::A,
+        );
+
+        // smoke test Unpredictable
+        UnitFooFixturator::new(Unpredictable).next().unwrap();
+
+        assert_eq!(
+            UnitFooFixturator::new(Empty).next().unwrap(),
+            UnitFoo::B,
+        );
+    }
+
 }

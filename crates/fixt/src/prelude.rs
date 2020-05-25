@@ -18,3 +18,5 @@ pub use crate::Unpredictable;
 pub use paste;
 pub use paste::expr;
 pub use paste::item;
+pub use rand::prelude::*;
+pub use strum::IntoEnumIterator;

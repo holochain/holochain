@@ -4,6 +4,7 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
 use fixt::prelude::*;
+use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
 use holo_hash::HeaderHashFixturator;
@@ -45,23 +46,23 @@ newtype_fixturator!(FnComponents<Vec<String>>);
 fixturator!(
     MigrateAgent;
 
-    variants [ Open, Close ];
+    unit variants [ Open, Close ] empty MigrateAgent::Close;
 
-    curve Empty MigrateAgent::Close;
-
-    curve Unpredictable {
-        match MigrateAgentVariant::random() {
-            Open => MigrateAgent::Open,
-            Close => MigrateAgent::Close,
-        }
-    };
-
-    curve Predictable {
-        match MigrateAgentVariant::nth(self.0.index) {
-            Open => MigrateAgent::Open,
-            Close => MigrateAgent::Close,
-        }
-    };
+    // curve Empty MigrateAgent::Close;
+    //
+    // curve Unpredictable {
+    //     match MigrateAgentVariant::random() {
+    //         Open => MigrateAgent::Open,
+    //         Close => MigrateAgent::Close,
+    //     }
+    // };
+    //
+    // curve Predictable {
+    //     match MigrateAgentVariant::nth(self.0.index) {
+    //         Open => MigrateAgent::Open,
+    //         Close => MigrateAgent::Close,
+    //     }
+    // };
 );
 
 fixturator!(
@@ -242,51 +243,56 @@ fixturator!(
 fixturator!(
     Entry;
 
-    variants [ Agent, App, CapClaim, CapGrant ];
+    variants [
+        Agent<AgentPubKey>,
+        App<SerializedBytes>,
+        CapClaim<CapClaim>,
+        CapGrant<ZomeCallCapGrant>,
+    ];
 
-    curve Empty {
-        match EntryVariant::random() {
-            Agent => Entry::Agent(fixt!(AgentPubKey, Empty).into()),
-            App => Entry::App(fixt!(SerializedBytes, Empty)),
-            CapClaim => Entry::CapClaim(fixt!(CapClaim, Empty)),
-            CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Empty)),
-        }
-    };
-
-    curve Unpredictable {
-        match EntryVariant::random() {
-            Agent => Entry::Agent(fixt!(AgentPubKey, Unpredictable).into()),
-            App => Entry::App(fixt!(SerializedBytes, Unpredictable)),
-            CapClaim => Entry::CapClaim(fixt!(CapClaim, Unpredictable)),
-            CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Unpredictable)),
-        }
-    };
-
-    curve Predictable {
-        match EntryVariant::nth(self.0.index) {
-            Agent => Entry::Agent(
-                AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-                    .next()
-                    .unwrap()
-                    .into(),
-            ),
-            App => Entry::App(
-                SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
-                    .next()
-                    .unwrap(),
-            ),
-            CapClaim => Entry::CapClaim(
-                CapClaimFixturator::new_indexed(Predictable, self.0.index)
-                    .next()
-                    .unwrap(),
-            ),
-            CapGrant => Entry::CapGrant(
-                ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
-                    .next()
-                    .unwrap(),
-            ),
-        }
-    };
+    // curve Empty {
+    //     match EntryVariant::random() {
+    //         Agent => Entry::Agent(fixt!(AgentPubKey, Empty).into()),
+    //         App => Entry::App(fixt!(SerializedBytes, Empty)),
+    //         CapClaim => Entry::CapClaim(fixt!(CapClaim, Empty)),
+    //         CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Empty)),
+    //     }
+    // };
+    //
+    // curve Unpredictable {
+    //     match EntryVariant::random() {
+    //         Agent => Entry::Agent(fixt!(AgentPubKey, Unpredictable).into()),
+    //         App => Entry::App(fixt!(SerializedBytes, Unpredictable)),
+    //         CapClaim => Entry::CapClaim(fixt!(CapClaim, Unpredictable)),
+    //         CapGrant => Entry::CapGrant(fixt!(ZomeCallCapGrant, Unpredictable)),
+    //     }
+    // };
+    //
+    // curve Predictable {
+    //     match EntryVariant::nth(self.0.index) {
+    //         Agent => Entry::Agent(
+    //             AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+    //                 .next()
+    //                 .unwrap()
+    //                 .into(),
+    //         ),
+    //         App => Entry::App(
+    //             SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
+    //                 .next()
+    //                 .unwrap(),
+    //         ),
+    //         CapClaim => Entry::CapClaim(
+    //             CapClaimFixturator::new_indexed(Predictable, self.0.index)
+    //                 .next()
+    //                 .unwrap(),
+    //         ),
+    //         CapGrant => Entry::CapGrant(
+    //             ZomeCallCapGrantFixturator::new_indexed(Predictable, self.0.index)
+    //                 .next()
+    //                 .unwrap(),
+    //         ),
+    //     }
+    // };
 );
 
 fixturator!(
