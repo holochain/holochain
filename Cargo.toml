@@ -6,6 +6,7 @@ members = [
   "crates/fixt",
   "crates/fixt/test",
   "crates/keystore",
+  "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
   "crates/holochain",
