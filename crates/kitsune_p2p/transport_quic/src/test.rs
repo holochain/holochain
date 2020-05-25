@@ -2,10 +2,7 @@
 mod tests {
     use crate::*;
     use futures::stream::StreamExt;
-    use kitsune_p2p_types::{
-        dependencies::ghost_actor, transport::transport_connection::*,
-        transport::transport_listener::*,
-    };
+    use kitsune_p2p_types::{transport::transport_connection::*, transport::transport_listener::*};
 
     #[tokio::test(threaded_scheduler)]
     async fn test_message() {
@@ -25,23 +22,25 @@ mod tests {
         tokio::task::spawn(async move {
             while let Some(evt) = events2.next().await {
                 match evt {
-                    TransportListenerEvent::IncomingConnection(
-                        ghost_actor::ghost_chan::GhostChanItem { input, respond, .. },
-                    ) => {
+                    TransportListenerEvent::IncomingConnection {
+                        respond,
+                        sender: mut con,
+                        receiver: mut evt,
+                        ..
+                    } => {
                         let _ = respond(Ok(()));
-                        let (mut con, mut evt) = input;
                         println!(
                             "events2 incoming connection: {}",
                             con.remote_url().await.unwrap(),
                         );
                         while let Some(evt) = evt.next().await {
                             match evt {
-                                TransportConnectionEvent::IncomingRequest(
-                                    ghost_actor::ghost_chan::GhostChanItem {
-                                        input, respond, ..
-                                    },
-                                ) => {
-                                    let (url, data) = input;
+                                TransportConnectionEvent::IncomingRequest {
+                                    respond,
+                                    url,
+                                    data,
+                                    ..
+                                } => {
                                     println!(
                                         "message from {} : {}",
                                         url,

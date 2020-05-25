@@ -7,15 +7,12 @@ use kitsune_p2p_types::{
 };
 
 ghost_actor::ghost_chan! {
-    Visibility(),
-    Name(ListenerInner),
-    Error(TransportError),
-    Api {
-        RegisterIncoming(
-            "our incoming task has produced a connection instance",
-            (TransportConnectionSender, TransportConnectionEventReceiver),
-            (),
-        ),
+    chan ListenerInner<TransportError> {
+        /// our incoming task has produced a connection instance
+        fn register_incoming(
+            sender: TransportConnectionSender,
+            receiver: TransportConnectionEventReceiver,
+        ) -> ();
     }
 }
 
@@ -63,14 +60,15 @@ impl TransportListenerHandler<(), ListenerInner> for TransportListenerQuic {
 
     fn handle_ghost_actor_internal(&mut self, input: ListenerInner) -> TransportListenerResult<()> {
         match input {
-            ListenerInner::RegisterIncoming(ghost_actor::ghost_chan::GhostChanItem {
-                input,
+            ListenerInner::RegisterIncoming {
                 respond,
+                sender,
+                receiver,
                 ..
-            }) => {
+            } => {
                 let mut send_clone = self.incoming_sender.clone();
                 tokio::task::spawn(async move {
-                    let _ = respond(send_clone.incoming_connection(input).await);
+                    let _ = respond(send_clone.incoming_connection(sender, receiver).await);
                 });
             }
         }
@@ -116,7 +114,7 @@ pub async fn spawn_transport_listener_quic(
 
                             if let Err(_) = internal_sender_clone
                                 .ghost_actor_internal()
-                                .register_incoming(r)
+                                .register_incoming(r.0, r.1)
                                 .await
                             {
                                 // TODO - log this?

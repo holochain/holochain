@@ -53,15 +53,10 @@ pub mod transport {
     /// Defines an established connection to a remote peer.
     pub mod transport_connection {
         ghost_actor::ghost_chan! {
-            Visibility(pub),
-            Name(TransportConnectionEvent),
-            Error(super::TransportError),
-            Api {
-                IncomingRequest(
-                    "Event for handling incoming requests from a remote.",
-                    (url2::Url2, Vec<u8>),
-                    Vec<u8>,
-                ),
+            /// Event stream for handling incoming requests from a remote.
+            pub chan TransportConnectionEvent<super::TransportError> {
+                /// Event for handling incoming requests from a remote.
+                fn incoming_request(url: url2::Url2, data: Vec<u8>) -> Vec<u8>;
             }
         }
 
@@ -70,20 +65,13 @@ pub mod transport {
             futures::channel::mpsc::Receiver<TransportConnectionEvent>;
 
         ghost_actor::ghost_actor! {
-            Visibility(pub),
-            Name(TransportConnection),
-            Error(super::TransportError),
-            Api {
-                RemoteUrl(
-                    "Retrieve the current url (address) of the remote end of this connection.",
-                    (),
-                    url2::Url2,
-                ),
-                Request(
-                    "Make a request of the remote end of this connection.",
-                    Vec<u8>,
-                    Vec<u8>,
-                ),
+            /// Represents a connection to a remote node.
+            pub actor TransportConnection<super::TransportError> {
+                /// Retrieve the current url (address) of the remote end of this connection.
+                fn remote_url() -> url2::Url2;
+
+                /// Make a request of the remote end of this connection.
+                fn request(data: Vec<u8>) -> Vec<u8>;
             }
         }
     }
@@ -93,15 +81,13 @@ pub mod transport {
     /// (2) for making outgoing connections.
     pub mod transport_listener {
         ghost_actor::ghost_chan! {
-            Visibility(pub),
-            Name(TransportListenerEvent),
-            Error(super::TransportError),
-            Api {
-                IncomingConnection(
-                    "Event for handling incoming connections from a remote.",
-                    (super::transport_connection::TransportConnectionSender, super::transport_connection::TransportConnectionEventReceiver),
-                    (),
-                ),
+            /// Event stream for handling incoming connections.
+            pub chan TransportListenerEvent<super::TransportError> {
+                /// Event for handling incoming connections from a remote.
+                fn incoming_connection(
+                    sender: super::transport_connection::TransportConnectionSender,
+                    receiver: super::transport_connection::TransportConnectionEventReceiver,
+                ) -> ();
             }
         }
 
@@ -110,23 +96,16 @@ pub mod transport {
             futures::channel::mpsc::Receiver<TransportListenerEvent>;
 
         ghost_actor::ghost_actor! {
-            Visibility(pub),
-            Name(TransportListener),
-            Error(super::TransportError),
-            Api {
-                BoundUrl(
-                    "Retrieve the current url (address) this listener is bound to.",
-                    (),
-                    url2::Url2,
-                ),
-                Connect(
-                    "Attempt to establish an outgoing connection to a remote.",
-                    url2::Url2,
-                    (
-                        super::transport_connection::TransportConnectionSender,
-                        super::transport_connection::TransportConnectionEventReceiver,
-                    ),
-                ),
+            /// Represents a socket binding for establishing connections.
+            pub actor TransportListener<super::TransportError> {
+                /// Retrieve the current url (address) this listener is bound to.
+                fn bound_url() -> url2::Url2;
+
+                /// Attempt to establish an outgoing connection to a remote.
+                fn connect(url: url2::Url2) -> (
+                    super::transport_connection::TransportConnectionSender,
+                    super::transport_connection::TransportConnectionEventReceiver,
+                );
             }
         }
     }

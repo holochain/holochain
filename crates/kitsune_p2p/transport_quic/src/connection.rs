@@ -6,15 +6,9 @@ use kitsune_p2p_types::{
 };
 
 ghost_actor::ghost_chan! {
-    Visibility(),
-    Name(ConnectionInner),
-    Error(TransportError),
-    Api {
-        PublishIncoming(
-            "we received an incoming request - publish it",
-            (Url2, Vec<u8>),
-            Vec<u8>,
-        ),
+    chan ConnectionInner<TransportError> {
+        /// we received an incoming request - publish it
+        fn publish_incoming(url: Url2, data: Vec<u8>) -> Vec<u8>;
     }
 }
 
@@ -61,14 +55,12 @@ impl TransportConnectionHandler<(), ConnectionInner> for TransportConnectionQuic
         input: ConnectionInner,
     ) -> TransportConnectionResult<()> {
         match input {
-            ConnectionInner::PublishIncoming(ghost_actor::ghost_chan::GhostChanItem {
-                input,
-                respond,
-                ..
-            }) => {
+            ConnectionInner::PublishIncoming {
+                respond, url, data, ..
+            } => {
                 let mut send_clone = self.incoming_sender.clone();
                 tokio::task::spawn(async move {
-                    let _ = respond(send_clone.incoming_request(input).await);
+                    let _ = respond(send_clone.incoming_request(url, data).await);
                 });
             }
         }
@@ -113,7 +105,7 @@ pub(crate) async fn spawn_transport_connection_quic(
 
                             let res_data = match internal_sender_clone
                                 .ghost_actor_internal()
-                                .publish_incoming((url, req_data))
+                                .publish_incoming(url, req_data)
                                 .await
                             {
                                 Err(_) => {
