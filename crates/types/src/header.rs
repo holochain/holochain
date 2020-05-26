@@ -187,8 +187,8 @@ pub struct LinkAdd {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub base_address: AnyDhtHash,
-    pub target_address: AnyDhtHash,
+    pub base_address: EntryHash,
+    pub target_address: EntryHash,
     pub tag: SerializedBytes,
     pub link_type: SerializedBytes,
 }

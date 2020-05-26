@@ -3,10 +3,10 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvvBuf,
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
-    error::DatabaseResult,
+    error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::{composite_hash::EntryHash, shims::*};
+use holochain_types::{composite_hash::EntryHash, header::LinkAdd, shims::*};
 use mockall::mock;
 use std::collections::HashSet;
 use std::convert::TryInto;
@@ -77,14 +77,25 @@ pub trait ChainMetaBufT<'env, R = Reader<'env>>
 where
     R: Readable,
 {
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
+    // Links
+    /// Get all te links on this base that match the tag
+    fn get_links<Tag: Into<String>>(
+        &self,
+        base: &EntryHash,
+        tag: Tag,
+    ) -> DatabaseResult<HashSet<EntryHash>>;
+
+    /// Add a link
+    fn add_link(&self, link: LinkAdd) -> DatabaseResult<()>;
+
+    // Sys
     fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
 }
 pub struct ChainMetaBuf<'env, R = Reader<'env>>
 where
     R: Readable,
 {
-    _system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, R>,
+    system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, R>,
     links_meta: KvvBuf<'env, Vec<u8>, LinkMetaVal, R>,
 }
 
@@ -98,7 +109,7 @@ where
         links_meta: MultiStore,
     ) -> DatabaseResult<Self> {
         Ok(Self {
-            _system_meta: KvvBuf::new(reader, system_meta)?,
+            system_meta: KvvBuf::new(reader, system_meta)?,
             links_meta: KvvBuf::new(reader, links_meta)?,
         })
     }
@@ -120,17 +131,25 @@ where
     R: Readable,
 {
     // TODO find out whether we need link_type.
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
+    fn get_links<Tag: Into<String>>(
+        &self,
+        base: &EntryHash,
+        tag: Tag,
+    ) -> DatabaseResult<HashSet<EntryHash>> {
         // TODO get removes
         // TODO get adds
         let key = LinkKey {
             op: Op::Add,
-            base: &base,
-            tag,
+            base,
+            tag: tag.into(),
         };
         let _values = self.links_meta.get(&key.to_key());
         Ok(HashSet::new())
     }
+    fn add_link(&self, link: LinkAdd) -> DatabaseResult<()> {
+        todo!()
+    }
+
     fn get_crud(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
         unimplemented!()
     }
@@ -139,7 +158,8 @@ where
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
+        fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
+        fn add_link(&self, link: LinkAdd) -> DatabaseResult<()>;
         fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
     }
 }
@@ -148,10 +168,103 @@ impl<'env, R> ChainMetaBufT<'env, R> for MockChainMetaBuf
 where
     R: Readable,
 {
-    fn get_links(&self, base: EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>> {
-        self.get_links(base, tag)
+    fn get_links<Tag: Into<String>>(
+        &self,
+        base: &EntryHash,
+        tag: Tag,
+    ) -> DatabaseResult<HashSet<EntryHash>> {
+        self.get_links(base, tag.into())
     }
     fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
         self.get_crud(entry_hash)
+    }
+
+    fn add_link(&self, link: LinkAdd) -> DatabaseResult<()> {
+        self.add_link(link)
+    }
+}
+
+impl<'env, R: Readable> BufferedStore<'env> for ChainMetaBuf<'env, R> {
+    type Error = DatabaseError;
+
+    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+        self.system_meta.flush_to_txn(writer)?;
+        self.links_meta.flush_to_txn(writer)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::fixt::EntryFixturator;
+    use fixt::prelude::*;
+    use holo_hash::{AgentPubKeyFixturator, HeaderHashFixturator};
+    use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
+    use holochain_types::{EntryHashed, Timestamp};
+    use maplit::hashset;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn can_add_and_get_link() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+
+        let (base_hash, target_hash) = tokio_safe_block_on::tokio_safe_block_on(
+            async {
+                let mut entry_fix = EntryFixturator::new(Unpredictable);
+                (
+                    EntryHashed::with_data(entry_fix.next().unwrap())
+                        .await
+                        .unwrap(),
+                    EntryHashed::with_data(entry_fix.next().unwrap())
+                        .await
+                        .unwrap(),
+                )
+            },
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap();
+
+        let mut ser_fix = SerializedBytesFixturator::new(Unpredictable);
+        let base_address: &EntryHash = base_hash.as_ref();
+        let target_address: &EntryHash = target_hash.as_ref();
+        let add_link = LinkAdd {
+            author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+            timestamp: Timestamp::now(),
+            header_seq: 0,
+            prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
+            base_address: base_address.clone(),
+            target_address: target_address.clone(),
+            tag: ser_fix.next().unwrap(),
+            link_type: ser_fix.next().unwrap(),
+        };
+
+        env.with_reader(|reader| {
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            assert!(meta_buf
+                .get_links(base_hash.as_ref(), "")
+                .unwrap()
+                .is_empty());
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+
+        env.with_commit(|writer| {
+            let reader = env.reader().unwrap();
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            meta_buf.add_link(add_link).unwrap();
+            meta_buf.flush_to_txn(writer)
+        })
+        .unwrap();
+
+        env.with_reader(|reader| {
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            assert_eq!(
+                meta_buf.get_links(base_hash.as_ref(), "").unwrap(),
+                hashset! {target_address.clone()}
+            );
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
     }
 }

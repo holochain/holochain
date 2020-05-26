@@ -151,17 +151,17 @@ where
         let tag = tag.into();
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(base.clone(), tag.clone())?;
+            let links = self.primary_meta.get_links(&base, tag.clone())?;
 
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(base, tag)
+                self.cache_meta.get_links(&base, tag)
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            self.cache_meta.get_links(base, tag)
+            self.cache_meta.get_links(&base, tag)
         }
     }
 }
