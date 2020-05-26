@@ -56,6 +56,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         self.0
     }
 
+    /// Add a ChainElement to the source chain, using a HeaderBuilder
     pub async fn put(
         &mut self,
         header_builder: HeaderBuilder,
@@ -71,6 +72,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         self.put_raw(header, maybe_entry).await
     }
 
+    /// Add a CapGrantEntry to the source chain
     pub async fn put_cap_grant(
         &mut self,
         grant_entry: CapGrantEntry,
@@ -86,6 +88,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         self.put(header_builder, Some(entry)).await
     }
 
+    /// Add a CapClaimEntry to the source chain
     pub async fn put_cap_claim(
         &mut self,
         claim_entry: CapClaimEntry,
@@ -101,6 +104,11 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         self.put(header_builder, Some(entry)).await
     }
 
+    /// Fetch a CapGrant from the private entries.
+    ///
+    /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
+    /// proper capability index DB, OR a proper iterator that respects the
+    /// scratch space, that will no longer be the case.
     pub fn get_persisted_cap_grant_by_secret(
         &self,
         query: &CapSecret,
@@ -109,7 +117,9 @@ impl<'env, R: Readable> SourceChain<'env, R> {
             .0
             .cas()
             .private_entries()
-            .expect("SourceChainBuf must have access to private entries")
+            .expect(
+                "SourceChainBuf must have access to private entries in order to access CapGrants",
+            )
             .iter_raw()?
             .filter_map(|(key, entry)| {
                 entry.as_cap_grant().and_then(|grant| {
@@ -133,7 +143,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         } else if hashes_n_grants.len() == 1 {
             hashes_n_grants.first().map(|p| p.1.clone())
         } else {
-            // TODO: we SHOULD iterate through the chain now to find the most
+            // FIXME[B-01676]: we SHOULD iterate through the chain now to find the most
             // recent grant with this secret, in case it was updated.
             // This will be handled in the future with an index, for simple
             // lookup by secret
@@ -142,6 +152,11 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         Ok(answer)
     }
 
+    /// Fetch a CapClaim from the private entries.
+    ///
+    /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
+    /// proper capability index DB, OR a proper iterator that respects the
+    /// scratch space, that will no longer be the case.
     pub fn get_persisted_cap_claim_by_secret(
         &self,
         query: &CapSecret,
@@ -150,7 +165,9 @@ impl<'env, R: Readable> SourceChain<'env, R> {
             .0
             .cas()
             .private_entries()
-            .expect("SourceChainBuf must have access to private entries")
+            .expect(
+                "SourceChainBuf must have access to private entries in order to access CapClaims",
+            )
             .iter_raw()?
             .filter_map(|(key, entry)| {
                 entry.as_cap_claim().and_then(|claim| {
@@ -172,7 +189,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         } else if hashes_n_claims.len() == 1 {
             hashes_n_claims.first().map(|p| p.1.clone())
         } else {
-            // TODO: we SHOULD iterate through the chain now to find the most
+            // FIXME[B-01676]: we SHOULD iterate through the chain now to find the most
             // recent claim with this secret, in case it was updated.
             // This will be handled in the future with an index, for simple
             // lookup by secret
@@ -354,7 +371,7 @@ pub mod tests {
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
@@ -362,7 +379,7 @@ pub mod tests {
         let env = arc.guard().await;
         let access = CapAccess::transferable();
         let secret = access.secret().unwrap();
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashMap::new());
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), BTreeMap::new());
         {
             let reader = env.reader()?;
             let mut store = SourceChainBuf::new(&reader, &env)?;

@@ -87,6 +87,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         &self.cas
     }
 
+    /// Add a ChainElement to the source chain, using a fully-formed Header
     pub async fn put_raw(
         &mut self,
         header: Header,
@@ -193,6 +194,8 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         Ok(serde_json::to_string_pretty(&out)?)
     }
 
+    /// Commit the genesis entries to this source chain, making the chain ready
+    /// to use as a `SourceChain`
     pub async fn genesis(
         &mut self,
         dna_hash: DnaHash,

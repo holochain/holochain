@@ -330,21 +330,6 @@ pub mod tests {
         ribosome
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
-                // let agent_header = agent_header.clone();
-                // let agent_entry = agent_entry.clone();
-                // let _call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, ()> {
-                //     async move {
-                //         workspace
-                //             .source_chain
-                //             .put(agent_header.into(), Some(agent_entry))
-                //             .await
-                //             .unwrap();
-                //     }
-                //     .boxed()
-                // };
-                /* FIXME: Mockall doesn't seem to work with async?
-                unsafe { unsafe_workspace.apply_mut(call).await };
-                */
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
                 Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });

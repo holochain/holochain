@@ -1,7 +1,7 @@
 use holochain_serialized_bytes::prelude::*;
 
 /// ZomeName as a String
-#[derive(Clone, Debug, Serialize, Deserialize, Ord, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
 pub struct ZomeName(pub String);
 
 impl ZomeName {
