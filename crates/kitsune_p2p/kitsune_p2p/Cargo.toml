@@ -1,7 +1,7 @@
 [package]
-name = "kitsune_p2p_types"
+name = "kitsune_p2p"
 version = "0.0.1"
-description = "types subcrate for kitsune-p2p"
+description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
@@ -11,8 +11,9 @@ categories = ["network-programming"]
 edition = "2018"
 
 [dependencies]
+derive_more = "0.99.7"
 futures = "0.3"
 ghost_actor = "0.1.0-alpha.11"
+shrinkwraprs = "0.3.0"
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = ["full"] }
-url2 = "0.0.5"

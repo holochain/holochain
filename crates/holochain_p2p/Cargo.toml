@@ -12,8 +12,9 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3"
-ghost_actor = "0.1.0-alpha.9"
+ghost_actor = "0.1.0-alpha.11"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = ["full"] }
