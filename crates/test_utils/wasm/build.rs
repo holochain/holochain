@@ -1,31 +1,23 @@
 use std::path::Path;
+use toml;
 
 fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
 
-    // HACK(thedavidmeister): We force a rebuild of our included Wasm packages
-    // every time this crate is built.
-    //
-    // Without this hack, changes made to the Wasm's dependencies that live in
-    // this repo wouldn't always trigger a rebuild of the Wasm and we could end
-    // up in inconsistent and confusing states.
-    //
-    // TODO: Investigate options like only rebuilding if a file in `crates/`
-    // has changed.
-    //
-    // See also: https://github.com/rust-lang/cargo/issues/8091
-    let hacky_file_name = "__wasm_test_utils_non-existent_file";
-    let hacky_file_not_found = match std::fs::metadata(hacky_file_name) {
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
-        _ => false,
-    };
-    assert!(
-        hacky_file_not_found,
-        "hack: {} must not exist in package directory for build to continue",
-        hacky_file_name
-    );
-
-    println!("cargo:rerun-if-changed={}", hacky_file_name);
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    println!("cargo:rerun-if-changed=../../../Cargo.lock");
+    // We want to rebuild if anything upstream of the wasms has changed.
+    // Since we use local paths, changes to those crates will not affect the
+    // Cargo.toml, so we check each upstream local source directory directly.
+    for dir in parse_cargo_toml_local_dependency_paths() {
+        println!("cargo:rerun-if-changed={}", dir);
+        for item in walkdir::WalkDir::new(dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            println!("cargo:rerun-if-changed={}", item.path().display());
+        }
+    }
 
     for &m in [
         "debug",
@@ -65,5 +57,56 @@ fn main() {
             .unwrap();
 
         assert!(status.success());
+    }
+}
+
+/// Return the list of local path dependencies specified in the Cargo.toml
+fn parse_cargo_toml_local_dependency_paths() -> Vec<String> {
+    let cargo_toml: toml::Value = std::fs::read_to_string("Cargo.toml")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let mut table = toml_table(cargo_toml);
+
+    let deps: Vec<_> = match (
+        table.remove("dependencies"),
+        table.remove("dev-dependencies"),
+    ) {
+        (Some(deps), Some(dev_deps)) => toml_table(deps)
+            .values()
+            .chain(toml_table(dev_deps).values())
+            .cloned()
+            .collect(),
+        (Some(deps), None) => toml_table(deps).values().cloned().collect(),
+        (None, Some(dev_deps)) => toml_table(dev_deps).values().cloned().collect(),
+        (None, None) => Vec::new(),
+    };
+
+    deps.into_iter()
+        .filter_map(|v| {
+            if let toml::Value::Table(mut table) = v {
+                table.remove("path").map(toml_string)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Interpret toml Value as a String or panic
+fn toml_string(value: toml::Value) -> String {
+    if let toml::Value::String(string) = value {
+        string
+    } else {
+        panic!("Expected TOML string, got: {:?}", value)
+    }
+}
+
+/// Interpret toml Value as a Table or panic
+fn toml_table(value: toml::Value) -> toml::value::Table {
+    if let toml::Value::Table(table) = value {
+        table
+    } else {
+        panic!("Expected TOML table, got: {:?}", value)
     }
 }
