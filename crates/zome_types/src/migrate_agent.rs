@@ -9,7 +9,7 @@ pub enum MigrateAgent {
     Close,
 }
 
-#[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum MigrateAgentCallbackResult {
     Pass,
     Fail(ZomeName, String),

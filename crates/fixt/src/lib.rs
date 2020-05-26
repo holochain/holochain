@@ -148,7 +148,219 @@ macro_rules! basic_test {
 /// and Predictable, in order
 #[macro_export]
 macro_rules! fixturator {
-    ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
+    // for an enum Foo with variants with a single inner type
+    //
+    // fixturator!(Foo; variants [ A(String) B(bool) ];);
+    //
+    // implements all basic curves using fixturators for the variant inner types
+    (
+        $type:tt;
+        variants [ $( $variant:tt($variant_inner:ty) )* ];
+        $($munch:tt)*
+    ) => {
+
+        fixturator!(
+            $type;
+            enum [ $( $variant )* ];
+
+            curve Empty expr! { match [<$type:camel Variant>]::random() {
+                $(
+                    [<$type:camel Variant>]::$variant => $type::$variant(
+                        [<$variant_inner:camel Fixturator>]::new_indexed(Empty, self.0.index).next().unwrap().into()
+                    ),
+                )*
+            }};
+
+            curve Unpredictable expr! { match [<$type:camel Variant>]::random() {
+                $(
+                    [<$type:camel Variant>]::$variant => $type::$variant(
+                        [<$variant_inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index).next().unwrap().into()
+                    ),
+                )*
+            }};
+
+            curve Predictable expr! { match [<$type:camel Variant>]::nth(self.0.index) {
+                $(
+                    [<$type:camel Variant>]::$variant => $type::$variant(
+                        [<$variant_inner:camel Fixturator>]::new_indexed(Predictable, self.0.index).next().unwrap().into()
+                    ),
+                )*
+            }};
+
+            $($munch)*
+        );
+    };
+
+    // for an enum Foo with unit variants with no inner types
+    //
+    // fixturator!(Foo; unit variants [ A B ] empty B;);
+    //
+    // implements all basic curves returning the empty curve passed to the macro, or a random
+    // variant or an iterating variant from the index
+    (
+        $type:tt;
+        unit variants [ $( $variant:tt )* ] empty $empty:tt;
+        $($munch:tt)*
+    ) => {
+        fixturator!(
+            $type;
+            enum [ $( $variant )* ];
+            curve Empty {
+                expr! { $type::$empty }
+            };
+            curve Unpredictable expr! { match [<$type:camel Variant>]::random() {
+                $(
+                        [<$type:camel Variant>]::$variant => $type::$variant,
+                )*
+            }};
+            curve Predictable expr! { match [<$type:camel Variant>]::nth(self.0.index) {
+                $(
+                    [<$type:camel Variant>]::$variant => $type::$variant,
+                )*
+            }};
+            $($munch)*
+        );
+    };
+
+    // for any complex enum
+    //
+    // fixturator!(Foo; enum [ A B ]; curve ...; curve ...; curve ...;);
+    //
+    // implements an enum with variants matching Foo as FooVariant
+    // this enum can be iterated over as per the strum crate EnumIter
+    //
+    // it also has convenience methods to match against:
+    //
+    // - FooVariant::random() for a random variant of Foo
+    // - FooVariant::nth(n) for an indexed variant of Foo
+    //
+    // @see the tests in this file for examples
+        (
+            $type:tt;
+            enum [ $( $variant:tt )* ];
+            $($munch:tt)*
+        ) => {
+            item! {
+                #[derive($crate::prelude::strum_macros::EnumIter)]
+                enum [<$type:camel Variant>] {
+                    $( $variant ),*
+                }
+
+                impl [<$type:camel Variant>] {
+                    fn random() -> Self {
+                        [<$type:camel Variant>]::iter().choose(&mut thread_rng()).unwrap()
+                    }
+                    fn nth(index: usize) -> Self {
+                        expr! {
+                            [<$type:camel Variant>]::iter().cycle().nth(index).unwrap()
+                        }
+                    }
+                }
+            }
+
+            fixturator!($type; $($munch)* );
+    };
+
+    // for any Foo that impl From<Bar>
+    //
+    // fixturator!(Foo; from Bar;);
+    //
+    // implements all the curves by building Foo from a BarFixturator
+    ( $type:ident; from $from:ty; $($munch:tt)* ) => {
+        fixturator!(
+            $type;
+
+            curve Empty {
+                $type::from(
+                    expr! {
+                        [< $from:camel Fixturator >]::new_indexed(Empty, self.0.index).next().unwrap()
+                    }
+                )
+            };
+            curve Unpredictable {
+                $type::from(
+                    expr! {
+                        [< $from:camel Fixturator >]::new_indexed(Unpredictable, self.0.index).next().unwrap()
+                    }
+                )
+            };
+            curve Predictable {
+                $type::from(
+                    expr! {
+                        [< $from:camel Fixturator >]::new_indexed(Predictable, self.0.index).next().unwrap()
+                    }
+                )
+            };
+        );
+    };
+
+    // for any Foo that has a constructor function like Foo::new( ... )
+    //
+    // fixturator!(Foo; constructor fn new(String, String, bool););
+    //
+    // implements all curves by building all the arguments to the named constructor function from
+    // the fixturators of the types specified to the macro
+    ( $type:ident; constructor fn $fn:tt( $( $newtype:ty ),* ); $($munch:tt)* ) => {
+        fixturator!(
+            $type;
+
+            curve Empty {
+                $type::$fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Empty, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+
+            curve Unpredictable {
+                $type::$fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Unpredictable, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+            curve Predictable {
+                $type::$fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Predictable, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+
+            $($munch)*
+        );
+    };
+
+    // implement a single curve for Foo
+    //
+    // fixturator!(Foo; curve MyCurve { ... };);
+    //
+    // uses TT munching for multiple curves
+    // used internally by this macro for all baseline curves
+    // @see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html
+    ( $type:ident; curve $curve:ident $e:expr; $($munch:tt)* ) => {
+        curve!( $type, $curve, $e);
+
+        fixturator!( $type; $($munch)* );
+    };
+
+    // create a FooFixturator for Foo
+    //
+    // fixturator!(Foo;);
+    //
+    // simply creates a newtype around the standard Fixturator struct and implements two methods:
+    // - FooFixturator::new(curve) to construct a FooFixturator with curve at index 0
+    // - FooFixturator::new(curve, index) to construct a FooFixturator with curve at index
+    //
+    // intended to be the TT munch endpoint for all patterns in this macro
+    // @see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html
+    ( $type:ident; $($munch:tt)* ) => {
         item! {
             #[allow(missing_docs)]
             pub struct [<$type:camel Fixturator>]<Curve>(Fixturator<$type, Curve>);
@@ -162,37 +374,70 @@ macro_rules! fixturator {
                     [<$type:camel Fixturator>](Fixturator::<$type, Curve>::new(curve, start))
                 }
             }
+        }
+    };
 
+    // legacy syntax
+    //
+    // fixturator!(Foo, { /* empty */ }, { /* unpredictable */ }, { /* predictable */ });
+    //
+    // implements both FooFixturator and all the curves from raw expressions passed to the macro
+    //
+    // this syntax has several limitations:
+    // - positional curve definitions are easy to accidentally mix up
+    // - couples all curve definitions together and to FooFixturator creation
+    // - undifferentiated logic forces much boilerplate because the macro knows nothing about Foo
+    // - forces devs to define curves that might not be needed or make sense yet
+    ( $type:ident, $empty:expr, $unpredictable:expr, $predictable:expr ) => {
+        fixturator!(
+            $type;
+            curve Empty $empty;
+            curve Unpredictable $unpredictable;
+            curve Predictable $predictable;
+        );
+    };
+}
+
+#[macro_export]
+/// implement Iterator for a FooFixturator for a given curve
+///
+/// curve!(Foo, Unpredictable, /* make an Unpredictable Foo here */ );
+///
+/// simple wrapper around the standard Iterator trait from rust
+/// the expression in the third parameter to curve! is just the body of .next() without the need or
+/// ability to return an Option - i.e. return a value of type Foo _not_ Option<Foo>
+/// if the body of the expression changes the index it will be respected, if not then it will be
+/// incremented by 1 automatically by the macro
+macro_rules! curve {
+    ( $type:ident, $curve:ident, $e:expr ) => {
+        item! {
             #[allow(missing_docs)]
-            impl Iterator for [<$type:camel Fixturator>]<Empty> {
+            impl Iterator for [< $type:camel Fixturator >]<$curve> {
                 type Item = $type;
 
-                /// false has an empty ring to it
                 fn next(&mut self) -> Option<Self::Item> {
-                    Some($empty)
-                }
-            }
-
-            #[allow(missing_docs)]
-            impl Iterator for [<$type:camel Fixturator>]<Unpredictable> {
-                type Item = $type;
-
-                /// fallback to default rust randomness
-                fn next(&mut self) -> Option<Self::Item> {
-                    Some($unpredictable)
-                }
-            }
-
-            #[allow(missing_docs)]
-            impl Iterator for [<$type:camel Fixturator>]<Predictable> {
-                type Item = $type;
-
-                /// simple alternation between true/false vals starting with true
-                fn next(&mut self) -> Option<Self::Item> {
-                    Some($predictable)
+                    let original_index = self.0.index;
+                    let ret = $e;
+                    if original_index == self.0.index {
+                        self.0.index = self.0.index + 1;
+                    }
+                    Some(ret)
                 }
             }
         }
+    };
+}
+
+#[macro_export]
+/// tiny convenience macro to make it easy to get the first Foo from its fixturator without using
+/// the iterator interface to save a little typing
+/// c.f. fixt!(Foo) vs. FooFixturator::new(Unpredictable).next().unwrap();
+macro_rules! fixt {
+    ( $name:tt ) => {
+        fixt!($name, Unpredictable)
+    };
+    ( $name:tt, $curve:expr ) => {
+        expr! { [< $name:camel Fixturator>]::new($curve).next().unwrap() }
     };
 }
 
@@ -250,6 +495,36 @@ pub struct Empty;
 #[macro_export]
 /// a direct delegation of fixtures to the inner type for new types
 macro_rules! newtype_fixturator {
+    ( $outer:ident<Vec<$inner:ty>> ) => {
+        fixturator!(
+            $outer,
+            $outer(vec![]),
+            {
+                let mut rng = thread_rng();
+                let vec_len = rng.gen_range(0, 5);
+                let mut ret = vec![];
+                let mut inner_fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
+                for _ in 0..vec_len {
+                    ret.push(inner_fixturator.next().unwrap());
+                }
+                self.0.index = self.0.index + 1;
+                $outer(ret)
+            },
+            {
+                let mut rng = thread_rng();
+                let vec_len = rng.gen_range(0, 5);
+                let mut ret = vec![];
+                let mut inner_fixturator =
+                    expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
+                for _ in 0..vec_len {
+                    ret.push(inner_fixturator.next().unwrap());
+                }
+                self.0.index = self.0.index + 1;
+                $outer(ret)
+            }
+        );
+    };
     ( $outer:ident<$inner:ty> ) => {
         fixturator!(
             $outer,
@@ -311,8 +586,8 @@ macro_rules! wasm_io_fixturator {
 /// You do still need to BYO "empty" variant as the macro doesn't know what to use there
 macro_rules! enum_fixturator {
     ( $enum:ident, $empty:expr ) => {
-        use crate::strum::IntoEnumIterator;
         use rand::seq::IteratorRandom;
+        use $crate::prelude::strum::IntoEnumIterator;
         fixturator!(
             $enum,
             $empty,
@@ -327,4 +602,187 @@ macro_rules! enum_fixturator {
             }
         );
     };
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::prelude::*;
+    use crate::string::PREDICTABLE_STRS;
+
+    // in general enums can have a mix of whatever in their variants
+    #[derive(PartialEq, Debug)]
+    pub enum Foo {
+        A,
+        B(String),
+    }
+
+    fixturator!(
+        Foo;
+        enum [ A B ];
+        curve Empty Foo::A;
+        curve Unpredictable match FooVariant::random() {
+            FooVariant::A => Foo::A,
+            FooVariant::B => Foo::B(fixt!(String)),
+        };
+        curve Predictable match FooVariant::nth(self.0.index) {
+            FooVariant::A => Foo::A,
+            FooVariant::B => Foo::B(StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        };
+    );
+
+    #[test]
+    fn enum_test() {
+        assert_eq!(FooFixturator::new(Predictable).next().unwrap(), Foo::A,);
+
+        FooFixturator::new(Unpredictable).next().unwrap();
+
+        assert_eq!(FooFixturator::new(Empty).next().unwrap(), Foo::A,);
+    }
+
+    #[derive(PartialEq, Debug)]
+    pub enum UnitFoo {
+        A,
+        B,
+        C,
+    }
+
+    fixturator!(
+        UnitFoo;
+        unit variants [ A B C ] empty B;
+    );
+
+    #[test]
+    fn unit_variants_test() {
+        assert_eq!(
+            UnitFooFixturator::new(Predictable).next().unwrap(),
+            UnitFoo::A,
+        );
+
+        // smoke test Unpredictable
+        UnitFooFixturator::new(Unpredictable).next().unwrap();
+
+        assert_eq!(UnitFooFixturator::new(Empty).next().unwrap(), UnitFoo::B,);
+    }
+
+    #[derive(PartialEq, Debug, Clone)]
+    pub enum VariantFoo {
+        A(String),
+        B(usize),
+        C(bool),
+    }
+
+    fixturator!(
+        VariantFoo;
+        variants [ A(String) B(usize) C(bool) ];
+    );
+
+    #[test]
+    fn variant_variants_test() {
+        let mut predictable_fixturator = VariantFooFixturator::new(Predictable);
+        for expected in [
+            VariantFoo::A("💯".into()),
+            VariantFoo::B(1),
+            VariantFoo::C(true),
+            VariantFoo::A(".".into()),
+            VariantFoo::B(4),
+            VariantFoo::C(false),
+        ]
+        .iter()
+        {
+            assert_eq!(expected.to_owned(), predictable_fixturator.next().unwrap(),);
+        }
+
+        let mut unpredictable_fixturator = VariantFooFixturator::new(Unpredictable);
+        for _ in 0..10 {
+            // smoke test
+            unpredictable_fixturator.next().unwrap();
+        }
+
+        let mut empty_fixturator = VariantFooFixturator::new(Empty);
+        for _ in 0..10 {
+            match empty_fixturator.next().unwrap() {
+                VariantFoo::A(s) => assert_eq!(s, ""),
+                VariantFoo::B(n) => assert_eq!(n, 0),
+                VariantFoo::C(b) => assert_eq!(b, false),
+            }
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    pub struct StringFoo(String);
+
+    impl From<String> for StringFoo {
+        fn from(s: String) -> Self {
+            Self(s)
+        }
+    }
+
+    fixturator!(StringFoo; from String;);
+
+    #[test]
+    fn from_test() {
+        let mut predictable_fixturator = StringFooFixturator::new(Predictable);
+        for expected in PREDICTABLE_STRS.iter() {
+            assert_eq!(
+                StringFoo::from(expected.to_string()),
+                predictable_fixturator.next().unwrap()
+            );
+        }
+
+        let mut unpredictable_fixturator = StringFooFixturator::new(Unpredictable);
+        for _ in 0..10 {
+            // smoke test
+            unpredictable_fixturator.next().unwrap();
+        }
+
+        let mut empty_fixturator = StringFooFixturator::new(Empty);
+        for _ in 0..10 {
+            assert_eq!(
+                StringFoo::from("".to_string()),
+                empty_fixturator.next().unwrap(),
+            );
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    pub struct ConstructedFoo {
+        bar: bool,
+    }
+
+    impl ConstructedFoo {
+        fn from_bar(bar: bool) -> Self {
+            Self { bar }
+        }
+    }
+
+    fixturator!(
+        ConstructedFoo;
+        constructor fn from_bar(bool);
+    );
+
+    #[test]
+    fn constructor_test() {
+        let mut predictable_fixturator = ConstructedFooFixturator::new(Predictable);
+        for expected in [true, false].iter().cycle().take(5) {
+            assert_eq!(
+                ConstructedFoo::from_bar(*expected),
+                predictable_fixturator.next().unwrap(),
+            );
+        }
+
+        let mut unpredictable_fixturator = ConstructedFooFixturator::new(Unpredictable);
+        for _ in 0..10 {
+            // smoke test
+            unpredictable_fixturator.next().unwrap();
+        }
+
+        let mut empty_fixturator = ConstructedFooFixturator::new(Empty);
+        for _ in 0..10 {
+            assert_eq!(
+                ConstructedFoo::from_bar(false),
+                empty_fixturator.next().unwrap(),
+            );
+        }
+    }
 }

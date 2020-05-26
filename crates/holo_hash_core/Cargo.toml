@@ -5,12 +5,12 @@ description = "hashing helpers supporting dht sharding"
 license = "Apache-2.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
-authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
-keywords = ["holochain", "holo", "hash", "blake", "blake2b"]
-categories = ["cryptography"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
+categories = [ "cryptography" ]
 edition = "2018"
 
 [dependencies]
 holochain_serialized_bytes = "=0.0.39"
-serde = { version = "1.0.104", features = ["derive"] }
+serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"

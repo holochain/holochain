@@ -8,7 +8,7 @@ use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
 /// Errors occurring during a [Ribosome] call
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum RibosomeError {
     /// Dna error while working with Ribosome.
     #[error("Dna error while working with Ribosome: {0}")]

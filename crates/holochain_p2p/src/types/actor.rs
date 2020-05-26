@@ -64,44 +64,22 @@ pub struct GetLinks {
 }
 
 ghost_actor::ghost_actor! {
-    Visibility(pub),
-    Name(HolochainP2p),
-    Error(HolochainP2pError),
-    Api {
-        Join(
-            "The p2p module must be informed at runtime which dna/agent pairs it should be tracking.",
-            Join,
-            (),
-        ),
-        Leave(
-            "If a cell is deactivated, we'll need to \"leave\" the network module as well.",
-            Leave,
-            (),
-        ),
-        CallRemote(
-            "Invoke a zome function on a remote node (if you have been granted the capability).",
-            CallRemote,
-            (), // TODO - proper return type
-        ),
-        Publish(
-            "Publish data to the correct neigborhood.",
-            Publish,
-            (), // TODO - proper return type
-        ),
-        GetValidationPackage(
-            "Request a validation package.",
-            GetValidationPackage,
-            (), // TODO - proper return type
-        ),
-        Get(
-            "Get an entry from the DHT.",
-            Get,
-            (), // TODO - proper return type
-        ),
-        GetLinks(
-            "Get links from the DHT.",
-            GetLinks,
-            (), // TODO - proper return type
-        ),
+    /// The HolochainP2pSender struct allows controlling the HolochainP2p
+    /// actor instance.
+    pub actor HolochainP2p<HolochainP2pError> {
+        /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
+        fn join(input: Join) -> ();
+        /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
+        fn leave(input: Leave) -> ();
+        /// Invoke a zome function on a remote node (if you have been granted the capability).
+        fn call_remote(input: CallRemote) -> (); // TODO - proper return type
+        /// Publish data to the correct neigborhood.
+        fn publish(input: Publish) -> (); // TODO - proper return type
+        /// Request a validation package.
+        fn get_validation_package(input: GetValidationPackage) -> (); // TODO - proper return type
+        /// Get an entry from the DHT.
+        fn get(input: Get) -> (); // TODO - proper return type
+        /// Get links from the DHT.
+        fn get_links(input: GetLinks) -> (); // TODO - proper return type
     }
 }
