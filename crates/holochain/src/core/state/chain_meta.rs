@@ -3,7 +3,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvvBuf,
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
-    error::DatabaseResult,
+    error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
 use holochain_types::{composite_hash::EntryHash, shims::*};
@@ -84,7 +84,7 @@ pub struct ChainMetaBuf<'env, R = Reader<'env>>
 where
     R: Readable,
 {
-    _system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, R>,
+    system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, R>,
     links_meta: KvvBuf<'env, Vec<u8>, LinkMetaVal, R>,
 }
 
@@ -98,7 +98,7 @@ where
         links_meta: MultiStore,
     ) -> DatabaseResult<Self> {
         Ok(Self {
-            _system_meta: KvvBuf::new(reader, system_meta)?,
+            system_meta: KvvBuf::new(reader, system_meta)?,
             links_meta: KvvBuf::new(reader, links_meta)?,
         })
     }
@@ -133,6 +133,16 @@ where
     }
     fn get_crud(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
         unimplemented!()
+    }
+}
+
+impl<'env, R: Readable> BufferedStore<'env> for ChainMetaBuf<'env, R> {
+    type Error = DatabaseError;
+
+    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+        self.system_meta.flush_to_txn(writer)?;
+        self.links_meta.flush_to_txn(writer)?;
+        Ok(())
     }
 }
 
