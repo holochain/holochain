@@ -71,36 +71,23 @@ pub struct MultiRequestResponse {
 }
 
 ghost_actor::ghost_actor! {
-    Visibility(pub),
-    Name(KitsuneP2p),
-    Error(super::KitsuneP2pError),
-    Api {
-        Join(
-            "Announce a space/agent pair on this network.",
-            Join,
-            (),
-        ),
-        Leave(
-            "Withdraw this space/agent pair from this network.",
-            Leave,
-            (),
-        ),
-        Request(
-            "Make a request of a remote agent.",
-            Request,
-            Vec<u8>,
-        ),
-        Broadcast(
-            r#"Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
-Returns an approximate number of nodes reached."#,
-            Broadcast,
-            u32,
-        ),
-        MultiRequest(
-            r#"Make a request to multiple destination agents - awaiting/aggregating the responses.
-The remote sides will see these messages as "RequestEvt" events."#,
-            MultiRequest,
-            Vec<MultiRequestResponse>,
-        ),
+    /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
+    pub actor KitsuneP2p<super::KitsuneP2pError> {
+        /// Announce a space/agent pair on this network.
+        fn join(input: Join) -> ();
+
+        /// Withdraw this space/agent pair from this network.
+        fn leave(input: Leave) -> ();
+
+        /// Make a request of a remote agent.
+        fn request(input: Request) -> Vec<u8>;
+
+        /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
+        /// Returns an approximate number of nodes reached.
+        fn broadcast(input: Broadcast) -> u32;
+
+        /// Make a request to multiple destination agents - awaiting/aggregating the responses.
+        /// The remote sides will see these messages as "RequestEvt" events.
+        fn multi_request(input: MultiRequest) -> Vec<MultiRequestResponse>;
     }
 }
