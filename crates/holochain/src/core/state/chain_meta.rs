@@ -8,11 +8,15 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
+use holochain_types::header::{EntryDelete, EntryUpdate};
 use holochain_types::{composite_hash::EntryHash, header::LinkAdd, shims::*, Header, HeaderHashed};
 use mockall::mock;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::Debug;
+
+mod sys_meta;
+pub use sys_meta::*;
 
 type Tag = String;
 
@@ -91,8 +95,14 @@ where
     /// Add a link
     fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>>;
 
-    // Sys
-    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
+    fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
+    fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
+
+    fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
+
+    fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
+
+    fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
 }
 
 pub struct ChainMetaBuf<'env, R = Reader<'env>>
@@ -185,7 +195,24 @@ where
         f.boxed_local()
     }
 
-    fn get_crud(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
+        todo!()
+    }
+
+    fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()> {
+        todo!()
+    }
+
+    // TODO: remove
+    fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        unimplemented!()
+    }
+
+    fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
+        unimplemented!()
+    }
+
+    fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {
         unimplemented!()
     }
 }
@@ -195,7 +222,11 @@ mock! {
     {
         fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
         fn add_link(&mut self, link: LinkAdd) -> DatabaseResult<()>;
-        fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
+        fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
+        fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
+        fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
+        fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
+        fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
     }
 }
 
@@ -210,12 +241,28 @@ where
     ) -> DatabaseResult<HashSet<EntryHash>> {
         self.get_links(base, tag.into())
     }
-    fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
+
+    fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
+        self.get_canonical_entry_hash(entry_hash)
+    }
+
+    fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
         self.get_crud(entry_hash)
+    }
+
+    fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {
+        self.get_canonical_header_hash(header_hash)
     }
 
     fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>> {
         async move { self.add_link(link_add) }.boxed_local()
+    }
+
+    fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
+        self.add_update(update)
+    }
+    fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()> {
+        self.add_delete(delete)
     }
 }
 
@@ -244,6 +291,7 @@ mod test {
         let arc = test_cell_env();
         let env = arc.guard().await;
 
+        // why the block_on here, when we're already in an async fn?
         let (base_hash, target_hash) = tokio_safe_block_on::tokio_safe_block_on(
             async {
                 let mut entry_fix = EntryFixturator::new(Unpredictable);

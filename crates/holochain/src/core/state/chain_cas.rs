@@ -89,12 +89,12 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     ///
     /// First attempt to get from the public entry DB. If not present, and
     /// private DB access is specified, attempt to get as a private entry.
-    pub fn get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub fn get_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<Entry>> {
         match self.public_entries.get(&entry_hash.clone().into())? {
             Some(entry) => Ok(Some(entry)),
             None => {
                 if let Some(ref db) = self.private_entries {
-                    db.get(&entry_hash.into())
+                    db.get(&entry_hash.clone().into())
                 } else {
                     Ok(None)
                 }
@@ -102,7 +102,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn contains(&self, entry_hash: EntryHash) -> DatabaseResult<bool> {
+    pub fn contains(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
         self.get_entry(entry_hash).map(|e| e.is_some())
     }
 
@@ -278,11 +278,11 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, true)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
+                store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.as_content().clone()))
             );
             assert_eq!(
-                store.get_entry(entry_priv.as_hash().clone()),
+                store.get_entry(entry_priv.as_hash()),
                 Ok(Some(entry_priv.as_content().clone()))
             );
         }
@@ -292,10 +292,10 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, false)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
+                store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.as_content().clone()))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()), Ok(None));
         }
 
         Ok(())
@@ -327,10 +327,10 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, true)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
+                store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.as_content().clone()))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()), Ok(None));
         }
 
         // Cannot retrieve private entry when disabled
@@ -338,10 +338,10 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, false)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
+                store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.as_content().clone()))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()), Ok(None));
         }
 
         Ok(())

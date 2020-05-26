@@ -102,28 +102,25 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub async fn dht_get(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<Entry>> {
         // Cas
         let search = self
             .primary
-            .get_entry(entry_hash.clone())?
+            .get_entry(entry_hash)?
             .and_then(|entry| {
-                self.primary_meta
-                    .get_crud(entry_hash.clone())
-                    .ok()
-                    .map(|crud| {
-                        if let EntryDhtStatus::Live = crud {
-                            Search::Found(entry)
-                        } else {
-                            Search::NotInCascade
-                        }
-                    })
+                self.primary_meta.get_crud(entry_hash).ok().map(|crud| {
+                    if let EntryDhtStatus::Live = crud {
+                        Search::Found(entry)
+                    } else {
+                        Search::NotInCascade
+                    }
+                })
             })
             .unwrap_or_else(|| Search::Continue);
 
         // Cache
         match search {
-            Search::Continue => Ok(self.cache.get_entry(entry_hash.clone())?.and_then(|entry| {
+            Search::Continue => Ok(self.cache.get_entry(entry_hash)?.and_then(|entry| {
                 self.cache_meta
                     .get_crud(entry_hash)
                     .ok()
@@ -147,7 +144,7 @@ where
         tag: S,
     ) -> DatabaseResult<HashSet<EntryHash>> {
         // Am I an authority?
-        let authority = self.primary.contains(base.clone())?;
+        let authority = self.primary.contains(&base)?;
         let tag = tag.into();
         if authority {
             // Cas

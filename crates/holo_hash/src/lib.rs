@@ -267,6 +267,7 @@ macro_rules! new_holo_hash {
                 pub async fn with_data(data: &[u8]) -> Self {
                     $name::with_pre_hashed(blake2b_256(data)).await
                 }
+
             }
 
             impl HoloHashCoreHash for $name {

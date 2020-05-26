@@ -23,7 +23,7 @@ pub async fn get_entry<'a>(
         |workspace: &'a InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
                 let cascade = workspace.cascade();
-                cascade.dht_get(agent_pubkey.into()).await
+                cascade.dht_get(&agent_pubkey.into()).await
             }
             .boxed()
         };
