@@ -17,3 +17,7 @@ holochain_zome_types = { path = "../../zome_types" }
 rand = "0.7"
 strum = "0.18.0"
 strum_macros = "0.18.0"
+
+[build-dependencies]
+toml = "0.5"
+walkdir = "2.3.1"
