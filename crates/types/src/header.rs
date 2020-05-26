@@ -189,7 +189,7 @@ pub struct LinkAdd {
 
     pub base_address: EntryHash,
     pub target_address: EntryHash,
-    pub tag: SerializedBytes,
+    pub tag: String,
     pub link_type: SerializedBytes,
 }
 

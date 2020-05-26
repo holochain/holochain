@@ -1,4 +1,6 @@
 #![allow(clippy::ptr_arg)]
+use futures::{future::LocalBoxFuture, FutureExt};
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvvBuf,
@@ -6,9 +8,9 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::{composite_hash::EntryHash, header::LinkAdd, shims::*};
+use holochain_types::{composite_hash::EntryHash, header::LinkAdd, shims::*, Header, HeaderHashed};
 use mockall::mock;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::Debug;
 
@@ -26,16 +28,19 @@ pub enum EntryDhtStatus {
     Purged,
 }
 
-#[allow(dead_code)]
+// TODO Add Op to value
+// Adds have hash of LinkAdd
+// And target
+// Dels have hash of LinkAdd
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 enum Op {
-    Add,
-    Remove,
+    Add(HeaderHash, EntryHash),
+    Remove(HeaderHash),
 }
 
 #[allow(dead_code)]
 struct LinkKey<'a> {
     base: &'a EntryHash,
-    op: Op,
     tag: Tag,
 }
 
@@ -79,24 +84,23 @@ where
 {
     // Links
     /// Get all te links on this base that match the tag
-    fn get_links<Tag: Into<String>>(
-        &self,
-        base: &EntryHash,
-        tag: Tag,
-    ) -> DatabaseResult<HashSet<EntryHash>>;
+    fn get_links<Tag>(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>
+    where
+        Tag: Into<String>;
 
     /// Add a link
-    fn add_link(&self, link: LinkAdd) -> DatabaseResult<()>;
+    fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>>;
 
     // Sys
     fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
 }
+
 pub struct ChainMetaBuf<'env, R = Reader<'env>>
 where
     R: Readable,
 {
     system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, R>,
-    links_meta: KvvBuf<'env, Vec<u8>, LinkMetaVal, R>,
+    links_meta: KvvBuf<'env, Vec<u8>, Op, R>,
 }
 
 impl<'env, R> ChainMetaBuf<'env, R>
@@ -139,15 +143,46 @@ where
         // TODO get removes
         // TODO get adds
         let key = LinkKey {
-            op: Op::Add,
             base,
             tag: tag.into(),
         };
-        let _values = self.links_meta.get(&key.to_key());
-        Ok(HashSet::new())
+        let mut results = HashMap::new();
+        let mut removes = vec![];
+        self.links_meta
+            .get(&key.to_key())?
+            .map(|op| {
+                op.map(|op| match op {
+                    Op::Add(link_add_hash, entry) => {
+                        results.insert(link_add_hash, entry);
+                    }
+                    Op::Remove(link_add_hash) => {
+                        removes.push(link_add_hash);
+                    }
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        for link_add_hash in removes {
+            results.remove(&link_add_hash);
+        }
+        Ok(results.into_iter().map(|(_, v)| v).collect())
     }
-    fn add_link(&self, link: LinkAdd) -> DatabaseResult<()> {
-        todo!()
+
+    // TODO: Figure out how to use this with MustFuture
+    fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>> {
+        let f = async move {
+            let base = &link_add.base_address.clone();
+            let target = link_add.target_address.clone();
+            let tag = link_add.tag.clone();
+            let link_add = HeaderHashed::with_data(Header::LinkAdd(link_add)).await?;
+            let link_address: &HeaderHash = link_add.as_ref();
+            let link_address = link_address.clone();
+            let key = LinkKey { base, tag };
+
+            self.links_meta
+                .insert(key.to_key(), Op::Add(link_address, target));
+            DatabaseResult::Ok(())
+        };
+        f.boxed_local()
     }
 
     fn get_crud(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus> {
@@ -159,7 +194,7 @@ mock! {
     pub ChainMetaBuf
     {
         fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
-        fn add_link(&self, link: LinkAdd) -> DatabaseResult<()>;
+        fn add_link(&mut self, link: LinkAdd) -> DatabaseResult<()>;
         fn get_crud(&self, entry_hash: EntryHash) -> DatabaseResult<EntryDhtStatus>;
     }
 }
@@ -179,8 +214,8 @@ where
         self.get_crud(entry_hash)
     }
 
-    fn add_link(&self, link: LinkAdd) -> DatabaseResult<()> {
-        self.add_link(link)
+    fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>> {
+        async move { self.add_link(link_add) }.boxed_local()
     }
 }
 
@@ -225,7 +260,7 @@ mod test {
         )
         .unwrap();
 
-        let mut ser_fix = SerializedBytesFixturator::new(Unpredictable);
+        let tag = StringFixturator::new(Unpredictable).next().unwrap();
         let base_address: &EntryHash = base_hash.as_ref();
         let target_address: &EntryHash = target_hash.as_ref();
         let add_link = LinkAdd {
@@ -235,32 +270,36 @@ mod test {
             prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
             base_address: base_address.clone(),
             target_address: target_address.clone(),
-            tag: ser_fix.next().unwrap(),
-            link_type: ser_fix.next().unwrap(),
+            tag: tag.clone(),
+            link_type: SerializedBytesFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
         };
 
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
-                .get_links(base_hash.as_ref(), "")
+                .get_links(base_hash.as_ref(), tag.clone())
                 .unwrap()
                 .is_empty());
             DatabaseResult::Ok(())
         })
         .unwrap();
 
-        env.with_commit(|writer| {
+        {
             let reader = env.reader().unwrap();
-            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            meta_buf.add_link(add_link).unwrap();
-            meta_buf.flush_to_txn(writer)
-        })
-        .unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            {
+                let _ = meta_buf.add_link(add_link).await;
+            }
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
 
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
-                meta_buf.get_links(base_hash.as_ref(), "").unwrap(),
+                meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
                 hashset! {target_address.clone()}
             );
             DatabaseResult::Ok(())
