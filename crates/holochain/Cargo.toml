@@ -72,6 +72,7 @@ assert_cmd = "1.0.1"
 test_wasm_common = { path = "../test_utils/wasm_common" }
 maplit = "1.0.2"
 matches = "0.1.8"
+unwrap_to = "0.1.0"
 
 [lib]
 name = "holochain_2020"

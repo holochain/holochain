@@ -1078,6 +1078,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-futures",
+ "unwrap_to",
  "url 1.7.2",
  "url2",
  "url_serde",
@@ -3509,6 +3510,12 @@ name = "unwrap"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e33648dd74328e622c7be51f3b40a303c63f93e6fa5f08778b6203a4c25c20f"
+
+[[package]]
+name = "unwrap_to"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cad414b2eed757c1b6f810f8abc814e298a9c89176b21fae092c7a87756fb839"
 
 [[package]]
 name = "url"
