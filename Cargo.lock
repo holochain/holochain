@@ -721,6 +721,8 @@ dependencies = [
  "paste",
  "rand 0.7.3",
  "serde",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]
@@ -1070,7 +1072,6 @@ dependencies = [
  "shrinkwraprs",
  "structopt",
  "strum",
- "strum_macros",
  "tempdir",
  "test_wasm_common",
  "thiserror",
@@ -1236,6 +1237,7 @@ dependencies = [
  "serde_json",
  "shrinkwraprs",
  "snowflake",
+ "strum",
  "tempdir",
  "thiserror",
  "tokio",

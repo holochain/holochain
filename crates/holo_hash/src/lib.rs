@@ -353,6 +353,34 @@ macro_rules! new_holo_hash {
                     self.get_bytes()
                 }
             }
+
+            fixturator!(
+                $name,
+                {
+                    tokio_safe_block_on::tokio_safe_block_on(
+                        async { $crate::$name::with_pre_hashed(vec![0; 32]).await },
+                        std::time::Duration::from_millis(10),
+                    )
+                    .unwrap()
+                },
+                {
+                    let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
+                    tokio_safe_block_on::tokio_safe_block_on(
+                        async { $crate::$name::with_pre_hashed(random_bytes).await },
+                        std::time::Duration::from_millis(10),
+                    )
+                    .unwrap()
+                },
+                {
+                    let ret = tokio_safe_block_on::tokio_safe_block_on(
+                        async { $crate::$name::with_pre_hashed(vec![self.0.index as _; 32]).await },
+                        std::time::Duration::from_millis(10),
+                    )
+                    .unwrap();
+                    self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
+                    ret
+                }
+            );
         )*
 
         /// An unified enum representing the holo hash types.
@@ -492,90 +520,6 @@ new_holo_hash! {
     DhtOpHash,
     DHTOP_PREFIX,
 }
-
-fixturator!(
-    DnaHash,
-    {
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { DnaHash::with_pre_hashed(vec![0; 32]).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap()
-    },
-    {
-        let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { DnaHash::with_pre_hashed(random_bytes).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap()
-    },
-    {
-        let ret = tokio_safe_block_on::tokio_safe_block_on(
-            async { DnaHash::with_pre_hashed(vec![self.0.index as _; 32]).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap();
-        self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
-        ret
-    }
-);
-
-fixturator!(
-    HeaderHash,
-    {
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { HeaderHash::with_pre_hashed(vec![0; 32]).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap()
-    },
-    {
-        let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { HeaderHash::with_pre_hashed(random_bytes).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap()
-    },
-    {
-        let ret = tokio_safe_block_on::tokio_safe_block_on(
-            async { HeaderHash::with_pre_hashed(vec![self.0.index as _; 32]).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap();
-        self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
-        ret
-    }
-);
-
-fixturator!(
-    AgentPubKey,
-    {
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { AgentPubKey::with_pre_hashed(vec![0; 32]).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap()
-    },
-    {
-        let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-        tokio_safe_block_on::tokio_safe_block_on(
-            async { AgentPubKey::with_pre_hashed(random_bytes).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap()
-    },
-    {
-        let ret = tokio_safe_block_on::tokio_safe_block_on(
-            async { AgentPubKey::with_pre_hashed(vec![self.0.index as _; 32]).await },
-            std::time::Duration::from_millis(10),
-        )
-        .unwrap();
-        self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
-        ret
-    }
-);
 
 mod hashed;
 pub use hashed::*;

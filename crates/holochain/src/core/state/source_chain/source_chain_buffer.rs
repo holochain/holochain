@@ -50,6 +50,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.sequence.len()
     }
 
+    // TODO: TK-01747: Make this check more robust maybe?
+    // PERF: This call must be fast
+    pub fn has_genesis(&self) -> bool {
+        self.sequence.len() >= 3
+    }
+
     pub async fn get_index(&self, i: u32) -> DatabaseResult<Option<Header>> {
         if let Some(address) = self.sequence.get(i)? {
             self.cas
@@ -104,6 +110,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
     pub fn headers(&self) -> &HeaderCas<'env, R> {
         &self.cas.headers()
+    }
+
+    // TODO: TK-01747: Make this check more robust maybe?
+    // PERF: This call must be fast
+    pub fn has_initialized(&self) -> bool {
+        self.len() > 3
     }
 
     /// Get the AgentPubKey from the entry committed to the chain.

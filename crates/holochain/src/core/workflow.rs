@@ -29,7 +29,6 @@ mod genesis_workflow;
 mod initialize_zomes_workflow;
 pub(crate) use call_zome_workflow::unsafe_invoke_zome_workspace;
 pub(crate) use call_zome_workflow::*;
-#[allow(unused_imports)]
 pub(crate) use genesis_workflow::*;
 pub(crate) use initialize_zomes_workflow::*;
 

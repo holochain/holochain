@@ -5,14 +5,14 @@ description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
-authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
-keywords = ["holochain", "holo", "p2p", "dht", "networking"]
-categories = ["network-programming"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
 futures = "0.3"
 ghost_actor = "0.1.0-alpha.11"
 thiserror = "1.0.18"
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "0.2", features = [ "full" ] }
 url2 = "0.0.5"
