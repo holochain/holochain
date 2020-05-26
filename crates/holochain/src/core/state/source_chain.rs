@@ -15,7 +15,7 @@ use holochain_types::{
     composite_hash::HeaderAddress,
     header::{EntryType, EntryVisibility, HeaderBuilder, HeaderCommon},
     prelude::*,
-    Header, HeaderHashed,
+    EntryHashed, Header, HeaderHashed,
 };
 use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
@@ -77,10 +77,9 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         &mut self,
         grant_entry: CapGrantEntry,
     ) -> SourceChainResult<HeaderAddress> {
-        let entry = Entry::CapGrant(grant_entry);
-        let entry_hash = EntryContentHash::with_data(SerializedBytes::try_from(&entry)?.bytes())
-            .await
-            .into();
+        let (entry, entry_hash) = EntryHashed::with_data(Entry::CapGrant(grant_entry))
+            .await?
+            .into_inner();
         let header_builder = HeaderBuilder::EntryCreate {
             entry_type: EntryType::CapGrant,
             entry_hash,
@@ -93,10 +92,9 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         &mut self,
         claim_entry: CapClaimEntry,
     ) -> SourceChainResult<HeaderAddress> {
-        let entry = Entry::CapClaim(claim_entry);
-        let entry_hash = EntryContentHash::with_data(SerializedBytes::try_from(&entry)?.bytes())
-            .await
-            .into();
+        let (entry, entry_hash) = EntryHashed::with_data(Entry::CapClaim(claim_entry))
+            .await?
+            .into_inner();
         let header_builder = HeaderBuilder::EntryCreate {
             entry_type: EntryType::CapClaim,
             entry_hash,
@@ -127,7 +125,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                         if secret == query {
                             let hash = tokio_safe_block_on::tokio_safe_block_on(
                                 async { EntryContentHash::with_pre_hashed(key.to_owned()).await },
-                                std::time::Duration::from_millis(10),
+                                std::time::Duration::from_millis(1000),
                             );
                             Some((hash, grant))
                         } else {
@@ -174,7 +172,7 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                     if claim.secret() == query {
                         let hash = tokio_safe_block_on::tokio_safe_block_on(
                             async { EntryContentHash::with_pre_hashed(key.to_owned()).await },
-                            std::time::Duration::from_millis(10),
+                            std::time::Duration::from_millis(1000),
                         );
                         Some((hash, claim.clone()))
                     } else {

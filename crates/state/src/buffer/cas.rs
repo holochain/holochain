@@ -45,7 +45,9 @@ where
         self.0.iter_raw()
     }
 
-    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
+    /// Iterate over items which are staged for PUTs in the scratch space
+    // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
+    // iteration, by chaining this with an iter_raw
     pub fn iter_scratch_puts(&self) -> impl Iterator<Item = (&HoloHash, &Box<V>)> {
         self.0.iter_scratch_puts()
     }
