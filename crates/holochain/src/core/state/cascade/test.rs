@@ -123,7 +123,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(address.clone().into()).await?;
+    let entry = cascade.dht_get(&address.clone().into()).await?;
     // check it returns
     assert_eq!(&entry.unwrap(), jimbo_entry.as_content());
     // check it doesn't hit the cache
@@ -167,7 +167,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(address.into()).await?;
+    let entry = cascade.dht_get(&address.into()).await?;
     // check it returns none
     assert_eq!(entry, None);
     // check it doesn't hit the cache
@@ -211,7 +211,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let _entry = cascade.dht_get(address).await?;
+    let _entry = cascade.dht_get(&address).await?;
     // check it returns
 
     // FIXME!
@@ -247,7 +247,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(address).await?;
+    let entry = cascade.dht_get(&address).await?;
     // check it returns
     assert_eq!(entry, None);
     // check it doesn't hit the primary
