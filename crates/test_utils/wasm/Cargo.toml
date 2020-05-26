@@ -20,3 +20,4 @@ holo_hash = { path = "../../holo_hash" }
 
 [build-dependencies]
 toml = "0.5"
+walkdir = "2.3.1"
