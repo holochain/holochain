@@ -225,11 +225,7 @@ impl Cell {
         let ribosome = WasmRibosome::new(dna_file);
 
         // Create the workflow and run it
-        let workflow = InitializeZomesWorkflow {
-            agent_key: id.agent_pubkey().clone(),
-            dna_def,
-            ribosome,
-        };
+        let workflow = InitializeZomesWorkflow { dna_def, ribosome };
         let run_init = run_workflow(state_env.clone(), workflow, workspace).await;
         let init_result = run_init.map_err(Box::new)??;
         trace!(?init_result);

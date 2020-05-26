@@ -27,7 +27,7 @@ pub struct HeaderCommon {
 /// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HeaderBuilder {
-    InitZomesComplete {},
+    InitZomesComplete,
     LinkAdd {
         base_address: AnyDhtHash,
         target_address: AnyDhtHash,
@@ -68,7 +68,7 @@ impl HeaderBuilder {
             prev_header,
         } = common;
         match self {
-            InitZomesComplete {} => header::InitZomesComplete {
+            InitZomesComplete => header::InitZomesComplete {
                 author,
                 timestamp,
                 header_seq,

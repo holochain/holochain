@@ -236,11 +236,9 @@ pub mod tests {
         };
         let (_, effects) = workflow.workflow(workspace).await.unwrap();
 
-        // Check the initialize zome was added to a trigger
         assert!(effects.signals.is_empty());
         assert!(effects.callbacks.is_empty());
-        assert!(!effects.triggers.is_empty());
-        assert_matches!(effects.triggers, Some(InitializeZomesWorkflow {}));
+        assert!(effects.triggers.is_empty());
     }
 
     // 1.  Check if there is a Capability token secret in the parameters.
