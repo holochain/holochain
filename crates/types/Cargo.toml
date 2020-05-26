@@ -41,6 +41,7 @@ serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 snowflake = "1.3.0"
+strum = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.10"
 tokio = { version = "0.2", features = [ "blocking" ] }

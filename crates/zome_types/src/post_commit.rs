@@ -3,7 +3,7 @@ use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum PostCommitCallbackResult {
     Success,
     Fail(HeaderHashes, String),

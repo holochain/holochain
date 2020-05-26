@@ -1,7 +1,7 @@
 /// calling into wasm with only one wasm instance involved
 /// e.g. no internal callbacks or additional wasm instances in called host functions
 /// typically takes 1ms or less
-pub const ONE_WASM_CALL: i128 = 3_000_000;
+pub const ONE_WASM_CALL: i128 = 5_000_000;
 /// callint into wasm with multiple wasm instances involved
 /// e.g. calling a wasm call that then triggers a callback with its own wasm instance
 /// typically wasm calls scale linearly as long as they are simple as the wasmer call overhead is
