@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 /// Holochain DnaError type.
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum DnaError {
     /// ZomeNotFound
     #[error("Zome not found: {0}")]
@@ -30,10 +30,17 @@ pub enum DnaError {
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
     /// std::io::Error
+    /// we don't #[from] the std::io::Error directly because it doesn't implement Clone
     #[error("std::io::Error: {0}")]
-    StdIoError(#[from] std::io::Error),
+    StdIoError(String),
 
     /// InvalidWasmHash
     #[error("InvalidWasmHash")]
     InvalidWasmHash,
+}
+
+impl From<std::io::Error> for DnaError {
+    fn from(error: std::io::Error) -> Self {
+        Self::StdIoError(error.to_string())
+    }
 }

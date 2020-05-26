@@ -17,44 +17,18 @@ pub struct MigrateAgentInvocation {
     migrate_agent: MigrateAgent,
 }
 
-fixturator!(
-    MigrateAgentInvocation,
-    {
-        let migrate_agent_invocation = MigrateAgentInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            migrate_agent: MigrateAgentFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        migrate_agent_invocation
-    },
-    {
-        let migrate_agent_invocation = MigrateAgentInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            migrate_agent: MigrateAgentFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        migrate_agent_invocation
-    },
-    {
-        let migrate_agent_invocation = MigrateAgentInvocation {
-            dna_def: DnaDefFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            migrate_agent: MigrateAgentFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        migrate_agent_invocation
+impl MigrateAgentInvocation {
+    pub fn new(dna_def: DnaDef, migrate_agent: MigrateAgent) -> Self {
+        Self {
+            dna_def,
+            migrate_agent,
+        }
     }
+}
+
+fixturator!(
+    MigrateAgentInvocation;
+    constructor fn new(DnaDef, MigrateAgent);
 );
 
 impl Invocation for MigrateAgentInvocation {
@@ -120,11 +94,111 @@ mod test {
 
     use super::MigrateAgentInvocationFixturator;
     use super::MigrateAgentResult;
+    use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::MigrateAgentFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeNameFixturator;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::migrate_agent::MigrateAgent;
+    use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+    use holochain_zome_types::HostInput;
+    use rand::prelude::*;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn migrate_agent_callback_result_fold() {
+        let mut rng = thread_rng();
+
+        let result_pass = || MigrateAgentResult::Pass;
+        let result_fail = || {
+            MigrateAgentResult::Fail(
+                ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
+                "".into(),
+            )
+        };
+
+        let cb_pass = || MigrateAgentCallbackResult::Pass;
+        let cb_fail = || {
+            MigrateAgentCallbackResult::Fail(
+                ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
+                "".into(),
+            )
+        };
+
+        for (mut results, expected) in vec![
+            (vec![], result_pass()),
+            (vec![cb_pass()], result_pass()),
+            (vec![cb_fail()], result_fail()),
+            (vec![cb_fail(), cb_pass()], result_fail()),
+        ] {
+            // order of the results should not change the final result
+            results.shuffle(&mut rng);
+
+            // number of times a callback result appears should not change the final result
+            let number_of_extras = rng.gen_range(0, 5);
+            for _ in 0..number_of_extras {
+                let maybe_extra = results.choose(&mut rng).cloned();
+                match maybe_extra {
+                    Some(extra) => results.push(extra),
+                    _ => {}
+                };
+            }
+
+            assert_eq!(expected, results.into(),);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn migrate_agent_invocation_allow_side_effects() {
+        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        assert!(!migrate_agent_invocation.allow_side_effects());
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn migrate_agent_invocation_zomes() {
+        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        assert_eq!(ZomesToInvoke::All, migrate_agent_invocation.zomes(),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn migrate_agent_invocation_fn_components() {
+        let mut migrate_agent_invocation =
+            MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
+
+        migrate_agent_invocation.migrate_agent = MigrateAgent::Open;
+
+        let mut expected = vec!["migrate_agent", "migrate_agent_open"];
+        for fn_component in migrate_agent_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap());
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn migrate_agent_invocation_host_input() {
+        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+
+        let host_input = migrate_agent_invocation.clone().host_input().unwrap();
+
+        assert_eq!(
+            host_input,
+            HostInput::new(
+                SerializedBytes::try_from(MigrateAgentFixturator::new(fixt::Empty).next().unwrap())
+                    .unwrap()
+            ),
+        );
+    }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]

@@ -16,44 +16,15 @@ pub struct PostCommitInvocation {
     headers: HeaderHashes,
 }
 
-fixturator!(
-    PostCommitInvocation,
-    {
-        let post_commit_invocation = PostCommitInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            headers: HeaderHashesFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        post_commit_invocation
-    },
-    {
-        let post_commit_invocation = PostCommitInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            headers: HeaderHashesFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        post_commit_invocation
-    },
-    {
-        let post_commit_invocation = PostCommitInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            headers: HeaderHashesFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        post_commit_invocation
+impl PostCommitInvocation {
+    pub fn new(zome_name: ZomeName, headers: HeaderHashes) -> Self {
+        Self { zome_name, headers }
     }
+}
+
+fixturator!(
+    PostCommitInvocation;
+    constructor fn new(ZomeName, HeaderHashes);
 );
 
 impl Invocation for PostCommitInvocation {
@@ -105,12 +76,111 @@ mod test {
 
     use super::PostCommitInvocationFixturator;
     use super::PostCommitResult;
+    use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::HeaderHashesFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use fixt::prelude::*;
     use holo_hash::HeaderHashFixturator;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::post_commit::PostCommitCallbackResult;
+    use holochain_zome_types::HostInput;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn post_commit_callback_result_fold() {
+        let mut rng = thread_rng();
+
+        let result_success = || PostCommitResult::Success;
+        let result_fail = || {
+            PostCommitResult::Fail(
+                HeaderHashesFixturator::new(fixt::Empty).next().unwrap(),
+                StringFixturator::new(fixt::Empty).next().unwrap(),
+            )
+        };
+
+        let cb_success = || PostCommitCallbackResult::Success;
+        let cb_fail = || {
+            PostCommitCallbackResult::Fail(
+                HeaderHashesFixturator::new(fixt::Empty).next().unwrap(),
+                StringFixturator::new(fixt::Empty).next().unwrap(),
+            )
+        };
+
+        for (mut results, expected) in vec![
+            (vec![], result_success()),
+            (vec![cb_success()], result_success()),
+            (vec![cb_fail()], result_fail()),
+            (vec![cb_fail(), cb_success()], result_fail()),
+        ] {
+            // order of the results should not change the final result
+            results.shuffle(&mut rng);
+
+            // number of times a callback result appears should not change the final result
+            let number_of_extras = rng.gen_range(0, 5);
+            for _ in 0..number_of_extras {
+                let maybe_extra = results.choose(&mut rng).cloned();
+                match maybe_extra {
+                    Some(extra) => results.push(extra),
+                    _ => {}
+                };
+            }
+
+            assert_eq!(expected, results.into(),);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn post_commit_invocation_allow_side_effects() {
+        let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        assert!(post_commit_invocation.allow_side_effects());
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn post_commit_invocation_zomes() {
+        let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        let zome_name = post_commit_invocation.zome_name.clone();
+        assert_eq!(
+            ZomesToInvoke::One(zome_name),
+            post_commit_invocation.zomes(),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn post_commit_invocation_fn_components() {
+        let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+
+        let mut expected = vec!["post_commit"];
+        for fn_component in post_commit_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap());
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn post_commit_invocation_host_input() {
+        let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+
+        let host_input = post_commit_invocation.clone().host_input().unwrap();
+
+        assert_eq!(
+            host_input,
+            HostInput::new(
+                SerializedBytes::try_from(HeaderHashesFixturator::new(fixt::Empty).next().unwrap())
+                    .unwrap()
+            ),
+        );
+    }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]

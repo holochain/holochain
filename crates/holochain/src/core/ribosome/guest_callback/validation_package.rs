@@ -18,44 +18,18 @@ pub struct ValidationPackageInvocation {
     app_entry_type: AppEntryType,
 }
 
-fixturator!(
-    ValidationPackageInvocation,
-    {
-        let validation_package_invocation = ValidationPackageInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        validation_package_invocation
-    },
-    {
-        let validation_package_invocation = ValidationPackageInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        validation_package_invocation
-    },
-    {
-        let validation_package_invocation = ValidationPackageInvocation {
-            zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            app_entry_type: AppEntryTypeFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        validation_package_invocation
+impl ValidationPackageInvocation {
+    pub fn new(zome_name: ZomeName, app_entry_type: AppEntryType) -> Self {
+        Self {
+            zome_name,
+            app_entry_type,
+        }
     }
+}
+
+fixturator!(
+    ValidationPackageInvocation;
+    constructor fn new(ZomeName, AppEntryType);
 );
 
 impl Invocation for ValidationPackageInvocation {
@@ -134,12 +108,116 @@ mod test {
 
     use super::ValidationPackageInvocationFixturator;
     use super::ValidationPackageResult;
+    use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
+    use holochain_serialized_bytes::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
+    use holochain_zome_types::validate::ValidationPackageCallbackResult;
+    use holochain_zome_types::HostInput;
+    use rand::prelude::*;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validate_package_callback_result_fold() {
+        let mut rng = thread_rng();
+
+        let result_success = || ValidationPackageResult::Success(ValidationPackage);
+        let result_ud = || ValidationPackageResult::UnresolvedDependencies(vec![]);
+        let result_fail = || ValidationPackageResult::Fail("".into());
+        let result_not_implemented = || ValidationPackageResult::NotImplemented;
+
+        let cb_success = || ValidationPackageCallbackResult::Success(ValidationPackage);
+        let cb_ud = || ValidationPackageCallbackResult::UnresolvedDependencies(vec![]);
+        let cb_fail = || ValidationPackageCallbackResult::Fail("".into());
+
+        for (mut results, expected) in vec![
+            (vec![], result_not_implemented()),
+            (vec![cb_success()], result_success()),
+            (vec![cb_fail()], result_fail()),
+            (vec![cb_ud()], result_ud()),
+            (vec![cb_fail(), cb_success()], result_fail()),
+            (vec![cb_fail(), cb_ud()], result_fail()),
+            (vec![cb_success(), cb_ud()], result_ud()),
+            (vec![cb_success(), cb_ud(), cb_fail()], result_fail()),
+        ] {
+            // order of the results should not change the final result
+            results.shuffle(&mut rng);
+
+            // number of times a callback result appears should not change the final result
+            let number_of_extras = rng.gen_range(0, 5);
+            for _ in 0..number_of_extras {
+                let maybe_extra = results.choose(&mut rng).cloned();
+                match maybe_extra {
+                    Some(extra) => results.push(extra),
+                    _ => {}
+                };
+            }
+
+            assert_eq!(expected, results.into(),);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validation_package_invocation_allow_side_effects() {
+        let validation_package_invocation =
+            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
+        assert!(!validation_package_invocation.allow_side_effects());
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validation_package_invocation_zomes() {
+        let validation_package_invocation =
+            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
+        let zome_name = validation_package_invocation.zome_name.clone();
+        assert_eq!(
+            ZomesToInvoke::One(zome_name),
+            validation_package_invocation.zomes(),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validation_package_invocation_fn_components() {
+        let validation_package_invocation =
+            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
+
+        let mut expected = vec![
+            "validation_package".to_string(),
+            format!(
+                "validation_package_{}",
+                validation_package_invocation.app_entry_type.zome_id()
+            ),
+        ];
+        for fn_component in validation_package_invocation.fn_components() {
+            assert_eq!(fn_component, expected.pop().unwrap(),);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn validation_package_invocation_host_input() {
+        let validation_package_invocation =
+            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
+
+        let host_input = validation_package_invocation.clone().host_input().unwrap();
+
+        assert_eq!(
+            host_input,
+            HostInput::new(
+                SerializedBytes::try_from(&validation_package_invocation.app_entry_type).unwrap()
+            ),
+        );
+    }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]

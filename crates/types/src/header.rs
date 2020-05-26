@@ -287,6 +287,14 @@ pub struct AppEntryType {
 }
 
 impl AppEntryType {
+    pub fn new(id: Vec<u8>, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
+        Self {
+            id,
+            zome_id,
+            visibility,
+        }
+    }
+
     pub fn id(&self) -> &[u8] {
         &self.id
     }

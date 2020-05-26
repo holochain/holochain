@@ -40,6 +40,7 @@ holochain_wasmer_common = "=0.0.30"
 holochain_zome_types = { path = "../zome_types" }
 futures = "0.3"
 must_future = "0.1.1"
+strum = "0.18.0"
 
 # for test_utils
 anyhow = "1.0.26"
