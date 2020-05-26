@@ -10,10 +10,10 @@ crate-type = [ "cdylib", "rlib" ]
 path = "./src/lib.rs"
 
 [dependencies]
-holochain_types = { path = "../../types" }
-holochain_zome_types = { path = "../../zome_types" }
-strum = "0.18.0"
-strum_macros = "0.18.0"
-rand = "0.7"
 fixt = { path = "../../fixt" }
 holo_hash = { path = "../../holo_hash" }
+holochain_types = { path = "../../types" }
+holochain_zome_types = { path = "../../zome_types" }
+rand = "0.7"
+strum = "0.18.0"
+strum_macros = "0.18.0"

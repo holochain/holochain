@@ -5,72 +5,72 @@ description = "Holochain, a framework for distributed applications"
 license = "GPL-3.0-only"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
-authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.26"
 async-trait = "0.1.24"
+base64 = "0.10.1"
+boolinator = "2.4.0"
+cfg-if = "0.1"
+chrono = "0.4.6"
 crossbeam-channel = "0.4.0"
-hcid = "0.0.6"
+derive_more = "0.99.3"
+directories = "2.0.2"
+either = "1.5.0"
+fallible-iterator = "0.2.0"
+fixt = { path = "../fixt" }
 futures = "0.3.1"
+hcid = "0.0.6"
+holo_hash = { path = "../holo_hash" }
+holo_hash_core = { path = "../holo_hash_core" }
+holochain_common = "0.0.43-alpha3"
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
+holochain_serialized_bytes = "=0.0.39"
 holochain_state = { path = "../state" }
 holochain_types = { path = "../types" }
+holochain_wasm_test_utils = { path = "../test_utils/wasm" }
+holochain_wasmer_host = "=0.0.30"
 holochain_websocket = { path = "../websocket" }
 holochain_zome_types = { path = "../zome_types" }
-serde = { version = "1.0.104", features = ["derive"] }
-serde_json = { version = "1.0.51", features = ["preserve_order"] }
+human-panic = "1.0.3"
+lazy_static = "1.4.0"
+legacy = { path = "../legacy", package = "holochain_2020_legacy" }
+mockall = "0.6.0"
+must_future = "0.1.1"
+nanoid = "0.3"
+num_cpus = "1.8"
+owning_ref = "0.4.1"
+parking_lot = "0.10.0"
+petgraph = "0.5.0"
+predicates = "1.0.4"
+rand = "0.7"
+serde = { version = "1.0.104", features = [ "derive" ] }
+serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 structopt = "0.3.11"
-holochain_common = "0.0.43-alpha3"
-fallible-iterator = "0.2.0"
-thiserror = "1.0.10"
-lazy_static = "1.4.0"
-chrono = "0.4.6"
+strum = "0.18.0"
 tempdir = "0.3.7"
-mockall = "0.6.0"
-tokio = { version = "0.2.11", features = ["full"] }
+thiserror = "1.0.10"
+tokio = { version = "0.2.11", features = [ "full" ] }
 tokio_safe_block_on = "0.1.1"
-owning_ref = "0.4.1"
-anyhow = "1.0.26"
-parking_lot = "0.10.0"
 toml = "0.5.6"
-petgraph = "0.5.0"
-boolinator = "2.4.0"
-base64 = "0.10.1"
 tracing = "=0.1.13"
 tracing-futures = "0.2.3"
-holochain_wasmer_host = "=0.0.30"
-holochain_serialized_bytes = "=0.0.39"
 url = "1.7.2"
 url2 = "0.0.5"
 url_serde = "0.2.0"
-derive_more = "0.99.3"
-directories = "2.0.2"
-human-panic = "1.0.3"
-num_cpus = "1.8"
-holo_hash_core = { path = "../holo_hash_core" }
-holo_hash = { path = "../holo_hash" }
-uuid = { version = "0.7", features = ["serde", "v4"] }
-predicates = "1.0.4"
-must_future = "0.1.1"
-either = "1.5.0"
-fixt = { path = "../fixt" }
-holochain_wasm_test_utils = { path = "../test_utils/wasm" }
-rand = "0.7"
-legacy = { path = "../legacy", package = "holochain_2020_legacy" }
-cfg-if = "0.1"
-nanoid = "0.3"
-strum = "0.18.0"
+uuid = { version = "0.7", features = [ "serde", "v4" ] }
 
 [dev-dependencies]
-serial_test = "0.4.0"
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-test_wasm_common = { path = "../test_utils/wasm_common" }
 maplit = "1.0.2"
 matches = "0.1.8"
+serial_test = "0.4.0"
+test_wasm_common = { path = "../test_utils/wasm_common" }
 
 [lib]
 name = "holochain_2020"

@@ -1,24 +1,23 @@
 [workspace]
-
 members = [
   "crates/crypto",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
+  "crates/holo_hash",
+  "crates/holo_hash_core",
+  "crates/holochain",
+  "crates/holochain_p2p",
   "crates/keystore",
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
-  "crates/holochain",
-  "crates/holochain_p2p",
-  "crates/holo_hash",
-  "crates/holo_hash_core",
   "crates/legacy",
   "crates/state",
-  "crates/types",
-  "crates/websocket",
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+  "crates/types",
+  "crates/websocket",
 ]
 
 exclude = [
@@ -26,7 +25,6 @@ exclude = [
 ]
 
 [patch.crates-io]
-
 # holochain_serialized_bytes = { version = "=0.0.39", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
 # holochain_wasmer_common = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 # holochain_wasmer_guest = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }

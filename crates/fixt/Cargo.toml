@@ -5,18 +5,18 @@ description = "minimum viable fixtures"
 license = "Apache-2.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
-authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
-keywords = ["holochain", "holo", "test", "fixture"]
-categories = ["fixtures"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "test", "fixture" ]
+categories = [ "fixtures" ]
 edition = "2018"
 
 [dependencies]
-rand = "0.7"
-paste = "=0.1.12"
 holochain_serialized_bytes = "=0.0.39"
-serde = { version = "1.0.104", features = ["derive"] }
+paste = "=0.1.12"
+rand = "0.7"
+serde = { version = "1.0.104", features = [ "derive" ] }
 strum = "0.18.0"
 strum_macros = "0.18.0"
 
 [features]
-fixt = []
+fixt = [ ]

@@ -5,7 +5,7 @@ description = "Holochain utilities for serving and connection with websockets"
 license = "Apache-2.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
-authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 [dependencies]
@@ -13,15 +13,15 @@ futures = "0.3"
 holochain_serialized_bytes = "=0.0.39"
 nanoid = "0.3"
 net2 = "0.2"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = [ "derive" ] }
 serde_bytes = "0.11"
-tokio = { version = "0.2", features = ["full"] }
-tokio-tungstenite = { version = "0.10.1", features = ["tls"] }
+tokio = { version = "0.2", features = [ "full" ] }
+tokio-tungstenite = { version = "0.10.1", features = [ "tls" ] }
 tracing = "0.1"
 tracing-futures = "0.2"
 tungstenite = "0.10"
 url2 = "0.0.5"
 
 [dev-dependencies]
-linefeed = "0.6"
 holochain_types = { version = "=0.0.1", path = "../types" }
+linefeed = "0.6"
