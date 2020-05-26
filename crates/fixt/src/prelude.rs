@@ -1,7 +1,9 @@
 pub use crate::basic_test;
 pub use crate::bool::BoolFixturator;
 pub use crate::bytes::BytesFixturator;
+pub use crate::curve;
 pub use crate::enum_fixturator;
+pub use crate::fixt;
 pub use crate::fixturator;
 pub use crate::newtype_fixturator;
 pub use crate::number::*;
@@ -16,3 +18,6 @@ pub use crate::Unpredictable;
 pub use paste;
 pub use paste::expr;
 pub use paste::item;
+pub use rand::prelude::*;
+pub use strum::IntoEnumIterator;
+pub use strum_macros;

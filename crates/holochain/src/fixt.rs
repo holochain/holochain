@@ -1,8 +1,10 @@
 pub mod curve;
 
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
 use fixt::prelude::*;
+use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
 use holo_hash::HeaderHashFixturator;
 use holo_hash::WasmHash;
@@ -16,6 +18,12 @@ use holochain_types::dna::Zomes;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::capability::CapAccess;
+use holochain_zome_types::capability::CapClaim;
+use holochain_zome_types::capability::CapGrant;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::capability::GrantedFunctions;
+use holochain_zome_types::capability::ZomeCallCapGrant;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
@@ -25,42 +33,171 @@ use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 wasm_io_fixturator!(HostInput<SerializedBytes>);
 
 newtype_fixturator!(ZomeName<String>);
 
+newtype_fixturator!(FnComponents<Vec<String>>);
+
 fixturator!(
-    MigrateAgent,
-    MigrateAgent::Close,
+    MigrateAgent;
+    unit variants [ Open Close ] empty Close;
+);
+
+fixturator!(
+    ZomeCallCapGrant,
     {
-        if rand::random() {
-            MigrateAgent::Close
-        } else {
-            MigrateAgent::Open
+        match CapGrant::zome_call(
+            StringFixturator::new(Empty).next().unwrap(),
+            CapAccessFixturator::new(Empty).next().unwrap(),
+            {
+                let mut rng = rand::thread_rng();
+                let number_of_zomes = rng.gen_range(0, 5);
+
+                let mut granted_functions: GrantedFunctions = BTreeMap::new();
+                for _ in 0..number_of_zomes {
+                    let number_of_functions = rng.gen_range(0, 5);
+                    let mut zome_functions = vec![];
+                    for _ in 0..number_of_functions {
+                        zome_functions.push(StringFixturator::new(Empty).next().unwrap());
+                    }
+                    granted_functions.insert(
+                        ZomeNameFixturator::new(Empty).next().unwrap(),
+                        zome_functions,
+                    );
+                }
+                granted_functions
+            },
+        ) {
+            CapGrant::ZomeCall(zome_call) => zome_call,
+            _ => unreachable!(),
         }
     },
     {
-        let ret = if self.0.index % 2 == 0 {
-            MigrateAgent::Close
-        } else {
-            MigrateAgent::Open
-        };
-        self.0.index = self.0.index + 1;
-        ret
+        match CapGrant::zome_call(
+            StringFixturator::new(Unpredictable).next().unwrap(),
+            CapAccessFixturator::new(Unpredictable).next().unwrap(),
+            {
+                let mut rng = rand::thread_rng();
+                let number_of_zomes = rng.gen_range(0, 5);
+
+                let mut granted_functions: GrantedFunctions = BTreeMap::new();
+                for _ in 0..number_of_zomes {
+                    let number_of_functions = rng.gen_range(0, 5);
+                    let mut zome_functions = vec![];
+                    for _ in 0..number_of_functions {
+                        zome_functions.push(StringFixturator::new(Unpredictable).next().unwrap());
+                    }
+                    granted_functions.insert(
+                        ZomeNameFixturator::new(Unpredictable).next().unwrap(),
+                        zome_functions,
+                    );
+                }
+                granted_functions
+            },
+        ) {
+            CapGrant::ZomeCall(zome_call) => zome_call,
+            _ => unreachable!(),
+        }
+    },
+    {
+        match CapGrant::zome_call(
+            StringFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            CapAccessFixturator::new_indexed(Predictable, self.0.index)
+                .next()
+                .unwrap(),
+            {
+                let mut granted_functions: GrantedFunctions = BTreeMap::new();
+                for _ in 0..self.0.index % 3 {
+                    let number_of_functions = self.0.index % 3;
+                    let mut zome_functions = vec![];
+                    for _ in 0..number_of_functions {
+                        zome_functions.push(StringFixturator::new(Predictable).next().unwrap());
+                    }
+                    granted_functions.insert(
+                        ZomeNameFixturator::new(Predictable).next().unwrap(),
+                        zome_functions,
+                    );
+                }
+                granted_functions
+            },
+        ) {
+            CapGrant::ZomeCall(zome_call) => zome_call,
+            _ => unreachable!(),
+        }
     }
 );
 
 fixturator!(
-    Entry,
-    Entry::App(SerializedBytesFixturator::new(Empty).next().unwrap()),
-    Entry::App(
-        SerializedBytesFixturator::new(Unpredictable)
-            .next()
-            .unwrap()
-    ),
-    Entry::App(SerializedBytesFixturator::new(Predictable).next().unwrap())
+    CapSecret;
+    from String;
+);
+
+fixturator!(
+    CapAccess;
+
+    enum [ Unrestricted Transferable Assigned ];
+
+    curve Empty {
+        match CapAccessVariant::random() {
+            Unrestricted => CapAccess::unrestricted(),
+            Transferable => CapAccess::transferable(),
+            Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(fixt!(AgentPubKey, Empty).into());
+                set
+            })
+        }
+    };
+
+    curve Unpredictable {
+        match CapAccessVariant::random() {
+            Unrestricted => CapAccess::unrestricted(),
+            Transferable => CapAccess::transferable(),
+            Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(fixt!(AgentPubKey).into());
+                set
+            })
+        }
+    };
+
+    curve Predictable {
+        match CapAccessVariant::nth(self.0.index) {
+            Unrestricted => CapAccess::unrestricted(),
+            Transferable => CapAccess::transferable(),
+            Assigned => CapAccess::assigned({
+                let mut set = HashSet::new();
+                set.insert(AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into());
+                set
+            })
+        }
+    };
+);
+
+fixturator!(
+    CapGrant;
+    variants [ Authorship(AgentPubKey) ZomeCall(ZomeCallCapGrant) ];
+);
+
+fixturator!(
+    CapClaim;
+    constructor fn new(String, AgentPubKey, CapSecret);
+);
+
+fixturator!(
+    Entry;
+    variants [
+        Agent(AgentPubKey)
+        App(SerializedBytes)
+        CapClaim(CapClaim)
+        CapGrant(ZomeCallCapGrant)
+    ];
 );
 
 fixturator!(
@@ -84,7 +221,6 @@ fixturator!(
         for _ in 0..3 {
             hashes.push(header_hash_fixturator.next().unwrap().into());
         }
-        self.0.index = self.0.index + 1;
         hashes.into()
     }
 );
@@ -127,14 +263,13 @@ fixturator!(
                 wasm,
             );
         }
-        self.0.index = self.0.index + 1;
         wasms
     }
 );
 
 fixturator!(
     Zomes,
-    { Vec::new() },
+    Vec::new(),
     {
         // @todo implement unpredictable zomes
         ZomesFixturator::new(Empty).next().unwrap()
@@ -146,81 +281,59 @@ fixturator!(
 );
 
 fixturator!(
-    DnaWasm,
-    {
-        // note that an empty wasm will not compile
-        let code = vec![];
-        DnaWasm {
-            code: Arc::new(code),
-        }
-    },
-    {
-        let mut rng = thread_rng();
-        TestWasm::iter().choose(&mut rng).unwrap().into()
-    },
-    {
-        let wasm = TestWasm::iter().cycle().nth(self.0.index).unwrap();
-        self.0.index = self.0.index + 1;
-        wasm.into()
-    }
+    DnaWasm;
+    // note that an empty wasm will not compile
+    curve Empty DnaWasm { code: Arc::new(vec![]) };
+    curve Unpredictable TestWasm::iter().choose(&mut thread_rng()).unwrap().into();
+    curve Predictable TestWasm::iter().cycle().nth(self.0.index).unwrap().into();
 );
 
 fixturator!(
-    DnaDef,
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            uuid: StringFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-            zomes: ZomesFixturator::new_indexed(Empty, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    },
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            uuid: StringFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-            zomes: ZomesFixturator::new_indexed(Unpredictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    },
-    {
-        let dna_def = DnaDef {
-            name: StringFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            uuid: StringFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            properties: SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            zomes: ZomesFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_def
-    }
+    DnaDef;
+    curve Empty DnaDef {
+        name: StringFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+        uuid: StringFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap(),
+    };
+
+    curve Unpredictable DnaDef {
+        name: StringFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+        uuid: StringFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap(),
+    };
+
+    curve Predictable DnaDef {
+        name: StringFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        uuid: StringFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+        zomes: ZomesFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap(),
+    };
 );
 
 fixturator!(
@@ -272,7 +385,7 @@ fixturator!(
             .next()
             .unwrap();
         dna_def.zomes = zomes;
-        let dna_file = DnaFile {
+        DnaFile {
             dna: DnaDefFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -282,33 +395,13 @@ fixturator!(
             code: WasmsFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        dna_file
+        }
     }
 );
 
 fixturator!(
-    WasmRibosome,
-    {
-        WasmRibosome {
-            dna_file: DnaFileFixturator::new(Empty).next().unwrap(),
-        }
-    },
-    {
-        WasmRibosome {
-            dna_file: DnaFileFixturator::new(Unpredictable).next().unwrap(),
-        }
-    },
-    {
-        let ribosome = WasmRibosome {
-            dna_file: DnaFileFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        };
-        self.0.index = self.0.index + 1;
-        ribosome
-    }
+    WasmRibosome;
+    constructor fn new(DnaFile);
 );
 
 impl Iterator for WasmRibosomeFixturator<curve::Zomes> {

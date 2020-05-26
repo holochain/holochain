@@ -13,27 +13,8 @@ use std::fmt;
 pub struct CellId(DnaHash, AgentPubKey);
 
 fixturator!(
-    CellId,
-    CellId(
-        DnaHashFixturator::new(Empty).next().unwrap(),
-        AgentPubKeyFixturator::new(Empty).next().unwrap()
-    ),
-    CellId(
-        DnaHashFixturator::new(Unpredictable).next().unwrap(),
-        AgentPubKeyFixturator::new(Unpredictable).next().unwrap()
-    ),
-    {
-        let ret = CellId(
-            DnaHashFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-            AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
-                .next()
-                .unwrap(),
-        );
-        self.0.index = self.0.index + 1;
-        ret
-    }
+    CellId;
+    constructor fn new(DnaHash, AgentPubKey);
 );
 
 /// A conductor-specific name for a Cell

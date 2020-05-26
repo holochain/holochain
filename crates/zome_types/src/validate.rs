@@ -3,7 +3,7 @@ use crate::CallbackResult;
 use holo_hash_core::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateCallbackResult {
     Valid,
     Invalid(String),
@@ -30,10 +30,10 @@ impl From<GuestOutput> for ValidateCallbackResult {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct ValidationPackage;
 
-#[derive(PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
     Fail(String),

@@ -5,47 +5,46 @@ description = "Abstractions for persistence of Holochain state"
 license = "GPL-3.0-only"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
-authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.26"
+async-trait = "0.1.24"
+derive_more = "0.99.3"
+either = "1.5.0"
+failure = "0.1.6"
+futures = "0.3.1"
+holo_hash = { path = "../holo_hash" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
-holochain_types = { path = "../types"}
-futures = "0.3.1"
-thiserror = "1.0.10"
+holochain_types = { path = "../types" }
+lazy_static = "1.4.0"
 mockall = "0.6.0"
+must_future = "0.1.1"
+nanoid = "0.3.0"
+owning_ref = "0.4.1"
+parking_lot = "0.10.0"
 rkv = "=0.10.4"
 rmp-serde = "0.14.3"
 serde = "1.0.104"
 serde_derive = "1.0.104"
-failure = "0.1.6"
 shrinkwraprs = "0.3.0"
-lazy_static = "1.4.0"
-owning_ref = "0.4.1"
-tempdir = "0.3.7"  # technically a dev-dependency, but is used by code that needs to be accessed by other crates
-parking_lot = "0.10.0"
+tempdir = "0.3.7"
+thiserror = "1.0.10"
+tokio = { version = "0.2.11", features = [ "macros", "rt-threaded", "rt-util", "sync" ] }
+tokio_safe_block_on = "0.1.1"
 tracing = "0.1.13"
 tracing-futures = "0.2.3"
-anyhow = "1.0.26"
-tokio_safe_block_on = "0.1.1"
-tokio = { version = "0.2.11", features = ["macros", "rt-threaded", "rt-util", "sync"] }
-derive_more = "0.99.3"
-async-trait = "0.1.24"
-nanoid = "0.3.0"
-either = "1.5.0"
-holo_hash = { path = "../holo_hash" }
-must_future = "0.1.1"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "0.0.46-alpha1" }
 
 [dev-dependencies]
-
 # TODO: this brings in too many assumptions from the previous version,
 # but there is a lot of useful stuff here, so will have to refactor all of this later
 # holochain_test_utils = { version = "0.0.46-alpha1", path = "../../test_utils" }
 
 [features]
-default = ["lmdb_no_tls"]
-lmdb_no_tls = []
+default = [ "lmdb_no_tls" ]
+lmdb_no_tls = [ ]
