@@ -28,10 +28,7 @@ where
     }
 
     /// Get a value from the underlying [KvBuf]
-    pub fn get<'a>(
-        &'env self,
-        hash: &'env H::HashType,
-    ) -> BoxFuture<'env, DatabaseResult<Option<H>>> {
+    pub fn get(&'env self, hash: &'env H::HashType) -> BoxFuture<'env, DatabaseResult<Option<H>>> {
         async move {
             Ok(if let Some(content) = self.0.get(hash)? {
                 Some(Self::deserialize_and_hash(hash.get_bytes(), content).await)
