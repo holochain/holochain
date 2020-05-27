@@ -87,6 +87,7 @@
 //! ```
 
 use fixt::prelude::*;
+use futures::future::{BoxFuture, FutureExt};
 pub use holo_hash_core;
 pub use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
@@ -246,6 +247,14 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
     }
 }
 
+/// Common methods for all HoloHash hash types
+pub trait HoloHashHash {
+    /// Construct a new hash instance from an already generated hash.
+    fn with_pre_hashed(hash: Vec<u8>) -> BoxFuture<'static, Self>;
+    /// Construct a new hash instance from raw data.
+    fn with_data(data: &[u8]) -> BoxFuture<'static, Self>;
+}
+
 macro_rules! new_holo_hash {
     ( $( $doc:expr , $name:ident , $prefix:expr , )* ) => {
         $(
@@ -253,19 +262,22 @@ macro_rules! new_holo_hash {
             #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
             pub struct $name(holo_hash_core::$name);
 
-            impl $name {
+            impl HoloHashHash for $name {
                 /// Construct a new hash instance from an already generated hash.
-                pub async fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
-                    assert_eq!(32, hash.len(), "only 32 byte hashes supported");
-                    tokio::task::block_in_place(|| {
-                        hash.append(&mut holo_dht_location_bytes(&hash));
-                        Self(holo_hash_core::$name::new(hash))
-                    })
+                fn with_pre_hashed(mut hash: Vec<u8>) -> BoxFuture<'static, Self> {
+                    async {
+                        assert_eq!(32, hash.len(), "only 32 byte hashes supported");
+                        tokio::task::block_in_place(|| {
+                            hash.append(&mut holo_dht_location_bytes(&hash));
+                            Self(holo_hash_core::$name::new(hash))
+                        })
+                    }
+                    .boxed()
                 }
 
                 /// Construct a new hash instance from raw data.
-                pub async fn with_data(data: &[u8]) -> Self {
-                    $name::with_pre_hashed(blake2b_256(data)).await
+                fn with_data(data: &[u8]) -> BoxFuture<'static, Self> {
+                    $name::with_pre_hashed(blake2b_256(data))
                 }
             }
 

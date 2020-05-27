@@ -1002,6 +1002,7 @@ dependencies = [
  "base64 0.12.1",
  "blake2b_simd",
  "fixt",
+ "futures",
  "holo_hash_core",
  "holochain_serialized_bytes",
  "rand 0.7.3",

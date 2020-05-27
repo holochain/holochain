@@ -1,6 +1,7 @@
 //! Traits and types for generating "Hashed" wrappers around `TryInto<SerializedBytes>` items.
 
 use crate::*;
+use futures::future::BoxFuture;
 
 /// Trait representing a type that has been hashed.
 pub trait Hashed {
@@ -18,6 +19,15 @@ pub trait Hashed {
 
     /// Access the already-calculated hash stored in this wrapper type.
     fn as_hash(&self) -> &Self::HashType;
+}
+
+/// Trait representing a type that has been hashed,
+/// and knows how to hash its own content
+pub trait Hashable: Hashed {
+    /// Construct an instance from content
+    fn with_data(content: Self::Content) -> BoxFuture<'static, Result<Self, SerializedBytesError>>
+    where
+        Self: Sized;
 }
 
 /// Generic based "Hashed" struct implementation.

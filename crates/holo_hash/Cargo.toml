@@ -14,6 +14,7 @@ edition = "2018"
 base64 = "0.12.0"
 blake2b_simd = "0.5.10"
 fixt = { path = "../fixt" }
+futures = "0.3.5"
 holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
 holochain_serialized_bytes = "=0.0.39"
 rand = "0.7"
