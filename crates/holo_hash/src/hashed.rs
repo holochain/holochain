@@ -14,6 +14,22 @@ pub trait Hashed {
     /// Unwrap the complete contents of this "Hashed" wrapper.
     fn into_inner(self) -> (Self::Content, Self::HashType);
 
+    /// Convert to the main item stored in this wrapper type.
+    fn into_content(self) -> Self::Content
+    where
+        Self: Sized,
+    {
+        self.into_inner().0
+    }
+
+    /// Convert to the already-calculated hash stored in this wrapper type.
+    fn into_hash(self) -> Self::HashType
+    where
+        Self: Sized,
+    {
+        self.into_inner().1
+    }
+
     /// Access the main item stored in this wrapper type.
     fn as_content(&self) -> &Self::Content;
 

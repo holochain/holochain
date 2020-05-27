@@ -4,6 +4,7 @@ use crate::core::ribosome::HostContext;
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
+use holo_hash::Hashed;
 use holochain_state::error::DatabaseResult;
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_zome_types::Entry;
@@ -23,7 +24,11 @@ pub async fn get_entry<'a>(
         |workspace: &'a InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
                 let cascade = workspace.cascade();
-                cascade.dht_get(agent_pubkey.into()).await
+                let maybe_entry = cascade
+                    .dht_get(&agent_pubkey.into())
+                    .await?
+                    .map(|e| e.into_inner().0);
+                Ok(maybe_entry)
             }
             .boxed()
         };

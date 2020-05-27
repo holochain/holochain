@@ -1,4 +1,4 @@
-/// A convenient composition of CasBufs, representing source chain data.
+/// A convenient composition of CasBufsepresenting source chain data.
 ///
 /// Source chain data is split into three databases: one for headers, and two
 /// for public and private entries. Specifying the private_entries DB in a
@@ -33,20 +33,20 @@ use holochain_zome_types::entry::Entry;
 use tracing::*;
 
 /// A CasBuf with Entries for values
-pub type EntryCas<'env, R> = CasBuf<'env, Entry, R>;
+pub type EntryCas<'env> = CasBuf<'env, EntryHashed>;
 /// A CasBuf with SignedHeaders for values
-pub type HeaderCas<'env, R> = CasBuf<'env, (Header, Signature), R>;
+pub type HeaderCas<'env> = CasBuf<'env, SignedHeaderHashed>;
 
 /// The representation of a chain CAS, using two or three DB references
-pub struct ChainCasBuf<'env, R: Readable = Reader<'env>> {
-    public_entries: EntryCas<'env, R>,
-    private_entries: Option<EntryCas<'env, R>>,
-    headers: HeaderCas<'env, R>,
+pub struct ChainCasBuf<'env> {
+    public_entries: EntryCas<'env>,
+    private_entries: Option<EntryCas<'env>>,
+    headers: HeaderCas<'env>,
 }
 
-impl<'env, R: Readable> ChainCasBuf<'env, R> {
+impl<'env> ChainCasBuf<'env> {
     fn new(
-        reader: &'env R,
+        reader: &'env Reader<'env>,
         public_entries_store: SingleStore,
         private_entries_store: Option<SingleStore>,
         headers_store: SingleStore,
@@ -66,7 +66,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     /// Create a ChainCasBuf using the source chain databases.
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
-    pub fn primary(reader: &'env R, dbs: &impl GetDb, allow_private: bool) -> DatabaseResult<Self> {
+    pub fn primary(
+        reader: &'env Reader<'env>,
+        dbs: &impl GetDb,
+        allow_private: bool,
+    ) -> DatabaseResult<Self> {
         let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
         let entries = dbs.get_db(&*PRIMARY_CHAIN_PUBLIC_ENTRIES)?;
         let private_entries = if allow_private {
@@ -79,7 +83,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
     /// Create a ChainCasBuf using the cache databases.
     /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let entries = dbs.get_db(&*CACHE_CHAIN_ENTRIES)?;
         let headers = dbs.get_db(&*CACHE_CHAIN_HEADERS)?;
         Self::new(reader, entries, None, headers)
@@ -89,12 +93,12 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
     ///
     /// First attempt to get from the public entry DB. If not present, and
     /// private DB access is specified, attempt to get as a private entry.
-    pub fn get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<Entry>> {
-        match self.public_entries.get(&entry_hash.clone().into())? {
+    pub async fn get_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
+        match self.public_entries.get(entry_hash).await? {
             Some(entry) => Ok(Some(entry)),
             None => {
                 if let Some(ref db) = self.private_entries {
-                    db.get(&entry_hash.into())
+                    db.get(entry_hash).await
                 } else {
                     Ok(None)
                 }
@@ -102,53 +106,52 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn contains(&self, entry_hash: EntryHash) -> DatabaseResult<bool> {
-        self.get_entry(entry_hash).map(|e| e.is_some())
+    pub async fn contains(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
+        self.get_entry(entry_hash).await.map(|e| e.is_some())
     }
 
     pub async fn get_header(
         &self,
         header_address: &HeaderAddress,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
-        if let Ok(Some((header, signature))) = self.headers.get(&header_address.to_owned().into()) {
-            let header = fatal_db_deserialize_check!(
-                "ChainCasBuf::get_header",
-                header_address,
-                HeaderHashed::with_data(header).await,
-            );
-            fatal_db_hash_check!("ChainCasBuf::get_header", header_address, header.as_hash());
-            Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
-        } else {
-            Ok(None)
-        }
+        Ok(self.headers.get(header_address).await?)
+        // if let Ok(Some((header, signature))) = self.headers.get(header_address) {
+        //     let header = fatal_db_deserialize_check!(
+        //         "ChainCasBuf::get_header",
+        //         header_address,
+        //         HeaderHashed::with_data(header).await,
+        //     );
+        //     fatal_db_hash_check!("ChainCasBuf::get_header", header_address, header.as_hash());
+        //     Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
+        // } else {
+        //     Ok(None)
+        // }
     }
 
     /// Get the Entry out of Header if it exists.
     ///
-    /// If the header contains no entry data, return None
+    /// If the header contains no entry dataeturn None
     /// If the header contains entry data:
-    /// - if it is a public entry, but the entry cannot be found, return error
-    /// - if it is a private entry and cannot be found, return error
-    /// - if it is a private entry but the private DB is disabled, return None
-    fn get_entry_from_header(&self, header: &Header) -> SourceChainResult<Option<Entry>> {
+    /// - if it is a public entry, but the entry cannot be foundeturn error
+    /// - if it is a private entry and cannot be foundeturn error
+    /// - if it is a private entry but the private DB is disabledeturn None
+    async fn get_entry_from_header(&self, header: &Header) -> SourceChainResult<Option<Entry>> {
         Ok(match header.entry_data() {
             None => None,
             Some((entry_hash, entry_type)) => {
                 match entry_type.visibility() {
                     // if the header references an entry and the database is
                     // available, it better have been stored!
-                    EntryVisibility::Public => Some(
-                        self.public_entries
-                            .get(&entry_hash.clone().into())?
-                            .ok_or_else(|| {
-                                SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                    entry_hash.clone(),
-                                ))
-                            })?,
-                    ),
+                    EntryVisibility::Public => {
+                        Some(self.public_entries.get(entry_hash).await?.ok_or_else(|| {
+                            SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
+                                entry_hash.clone(),
+                            ))
+                        })?)
+                    }
                     EntryVisibility::Private => {
                         if let Some(ref db) = self.private_entries {
-                            Some(db.get(&entry_hash.clone().into())?.ok_or_else(|| {
+                            Some(db.get(entry_hash).await?.ok_or_else(|| {
                                 SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
                                     entry_hash.clone(),
                                 ))
@@ -160,7 +163,8 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                     }
                 }
             }
-        })
+        }
+        .map(|e| e.into_content()))
     }
 
     /// given a header address return the full chain element for that address
@@ -169,7 +173,7 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         header_address: &HeaderAddress,
     ) -> SourceChainResult<Option<ChainElement>> {
         if let Some(signed_header) = self.get_header(header_address).await? {
-            let maybe_entry = self.get_entry_from_header(signed_header.header())?;
+            let maybe_entry = self.get_entry_from_header(signed_header.header()).await?;
             Ok(Some(ChainElement::new(signed_header, maybe_entry)))
         } else {
             Ok(None)
@@ -183,31 +187,31 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         signed_header: SignedHeaderHashed,
         maybe_entry: Option<EntryHashed>,
     ) -> DatabaseResult<()> {
-        let (header, signature) = signed_header.into_inner();
-        let (header, header_address) = header.into_inner();
+        // let (header, signature) = signed_header.into_inner();
+        // let (header, header_address) = header.into_inner();
 
         if let Some(entry) = maybe_entry {
-            let (entry, entry_hash) = entry.into_inner();
-            if let Some((_, entry_type)) = header.entry_data() {
+            // let (entry, entry_hash) = entry.into_inner();
+            if let Some((_, entry_type)) = signed_header.header().entry_data() {
                 match entry_type.visibility() {
-                    EntryVisibility::Public => self.public_entries.put(entry_hash.into(), entry),
+                    EntryVisibility::Public => self.public_entries.put(entry),
                     EntryVisibility::Private => {
                         if let Some(db) = self.private_entries.as_mut() {
-                            db.put(entry_hash.into(), entry);
+                            db.put(entry);
                         } else {
-                            error!("Attempted ChainCasBuf::put on a private entry with a disabled private DB: {}", entry_hash);
+                            error!("Attempted ChainCasBuf::put on a private entry with a disabled private DB: {}", entry.as_hash());
                         }
                     }
                 }
             } else {
                 unreachable!(
                     "Attempting to put an entry, but the header has no entry_type. Header hash: {}",
-                    header_address
+                    signed_header.header_address()
                 );
             }
         }
 
-        self.headers.put(header_address.into(), (header, signature));
+        self.headers.put(signed_header);
         Ok(())
     }
 
@@ -219,16 +223,16 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         }
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env, R> {
+    pub fn headers(&self) -> &HeaderCas<'env> {
         &self.headers
     }
 
-    pub fn public_entries(&self) -> &EntryCas<'env, R> {
+    pub fn public_entries(&self) -> &EntryCas<'env> {
         &self.public_entries
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for ChainCasBuf<'env, R> {
+impl<'env> BufferedStore<'env> for ChainCasBuf<'env> {
     type Error = DatabaseError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
@@ -278,12 +282,12 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, true)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
-                Ok(Some(entry_pub.as_content().clone()))
+                store.get_entry(entry_pub.as_hash()).await,
+                Ok(Some(entry_pub.clone()))
             );
             assert_eq!(
-                store.get_entry(entry_priv.as_hash().clone()),
-                Ok(Some(entry_priv.as_content().clone()))
+                store.get_entry(entry_priv.as_hash()).await,
+                Ok(Some(entry_priv.clone()))
             );
         }
 
@@ -292,10 +296,10 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, false)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
-                Ok(Some(entry_pub.as_content().clone()))
+                store.get_entry(entry_pub.as_hash()).await,
+                Ok(Some(entry_pub.clone()))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()).await, Ok(None));
         }
 
         Ok(())
@@ -327,10 +331,10 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, true)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
-                Ok(Some(entry_pub.as_content().clone()))
+                store.get_entry(entry_pub.as_hash()).await,
+                Ok(Some(entry_pub.clone()))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()).await, Ok(None));
         }
 
         // Cannot retrieve private entry when disabled
@@ -338,10 +342,10 @@ mod tests {
             let reader = env.reader()?;
             let store = ChainCasBuf::primary(&reader, &env, false)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash().clone()),
-                Ok(Some(entry_pub.as_content().clone()))
+                store.get_entry(entry_pub.as_hash()).await,
+                Ok(Some(entry_pub))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash().clone()), Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()).await, Ok(None));
         }
 
         Ok(())

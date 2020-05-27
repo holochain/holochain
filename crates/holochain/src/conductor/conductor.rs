@@ -41,6 +41,7 @@ use crate::{
     },
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
+use holo_hash::Hashable;
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
     KeystoreSender,
@@ -56,7 +57,7 @@ use holochain_state::{
 use holochain_types::{
     app::{AppId, InstalledApp},
     cell::{CellHandle, CellId},
-    dna::DnaFile,
+    dna::{wasm::DnaWasmHashed, DnaFile},
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -514,17 +515,18 @@ where
         let wasm_tasks = dna_def_buf
             .iter()?
             .map(|dna_def| {
+                let dna_def = dna_def.clone();
                 // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {
+                let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| async {
                     wasm_buf
                         .get(&zome.wasm_hash.into())
                         .await?
-                        .map(|hashed| hashed.into_inner().0)
+                        .map(|hashed| hashed.into_content())
                         .ok_or(ConductorError::WasmMissing)
                 });
                 async move {
                     let wasms = futures::future::try_join_all(wasms).await?;
-                    let dna_file = DnaFile::new(dna_def, wasms).await?;
+                    let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
                     Ok((dna_file.dna_hash().clone(), dna_file))
                 }
             })
@@ -553,10 +555,10 @@ where
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
             if let None = wasm_buf.get(&wasm_hash.into()).await? {
-                wasm_buf.put(dna_wasm).await?;
+                wasm_buf.put(DnaWasmHashed::with_data(dna_wasm).await?);
             }
         }
-        if let None = dna_def_buf.get(dna.dna_hash())? {
+        if let None = dna_def_buf.get(dna.dna_hash()).await? {
             dna_def_buf.put(dna.dna().clone()).await?;
         }
 

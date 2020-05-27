@@ -8,7 +8,7 @@ use holochain_state::db::GetDb;
 use holochain_state::{
     buffer::BufferedStore,
     error::DatabaseResult,
-    prelude::{Readable, Writer},
+    prelude::{Readable, Reader, Writer},
 };
 use holochain_types::{
     composite_hash::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,
@@ -16,14 +16,14 @@ use holochain_types::{
 use holochain_zome_types::entry::Entry;
 use tracing::*;
 
-pub struct SourceChainBuf<'env, R: Readable> {
-    cas: ChainCasBuf<'env, R>,
-    sequence: ChainSequenceBuf<'env, R>,
+pub struct SourceChainBuf<'env> {
+    cas: ChainCasBuf<'env>,
+    sequence: ChainSequenceBuf<'env>,
     keystore: KeystoreSender,
 }
 
-impl<'env, R: Readable> SourceChainBuf<'env, R> {
-    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+impl<'env> SourceChainBuf<'env> {
+    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
@@ -34,7 +34,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
@@ -79,7 +79,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_header(k).await
     }
 
-    pub fn cas(&self) -> &ChainCasBuf<R> {
+    pub fn cas(&self) -> &ChainCasBuf {
         &self.cas
     }
 
@@ -108,7 +108,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         Ok(header_address)
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env, R> {
+    pub fn headers(&self) -> &HeaderCas<'env> {
         &self.cas.headers()
     }
 
@@ -126,7 +126,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             .cas
             .public_entries()
             .iter_raw()?
-            .filter_map(|(_, e)| match e {
+            .filter_map(|e| match e.into_content() {
                 Entry::Agent(agent_pubkey) => Some(agent_pubkey),
                 _ => None,
             })
@@ -134,7 +134,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
             .map(|h| h.into()))
     }
 
-    pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env, R> {
+    pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env> {
         SourceChainBackwardIterator::new(self)
     }
 
@@ -182,7 +182,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
+impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
     type Error = SourceChainError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
@@ -194,13 +194,13 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
 
 /// FallibleIterator returning SignedHeaderHashed instances from chain
 /// starting with the head, moving back to the origin (Dna) header.
-pub struct SourceChainBackwardIterator<'env, R: Readable> {
-    store: &'env SourceChainBuf<'env, R>,
+pub struct SourceChainBackwardIterator<'env> {
+    store: &'env SourceChainBuf<'env>,
     current: Option<HeaderAddress>,
 }
 
-impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
-    pub fn new(store: &'env SourceChainBuf<'env, R>) -> Self {
+impl<'env> SourceChainBackwardIterator<'env> {
+    pub fn new(store: &'env SourceChainBuf<'env>) -> Self {
         Self {
             store,
             current: store.chain_head().cloned(),
@@ -208,7 +208,7 @@ impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
     }
 }
 
-impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
+impl<'env> FallibleIterator for SourceChainBackwardIterator<'env> {
     type Item = SignedHeaderHashed;
     type Error = SourceChainError;
 

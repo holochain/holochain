@@ -1,6 +1,7 @@
 //! Sometimes we have fatal errors, and need to halt the system.
 //! This module provides standards for showing these messages to the user.
 
+/// Macro for standard handling of fatal errors
 #[macro_export]
 macro_rules! fatal {
     ($($t:tt)*) => {{
@@ -15,6 +16,7 @@ macro_rules! fatal {
     }};
 }
 
+/// Macro for standard handling of db deserialization fatal errors
 #[macro_export]
 macro_rules! fatal_db_deserialize_check {
     ($hint:expr, $h:expr, $res:expr,) => {
@@ -28,7 +30,7 @@ macro_rules! fatal_db_deserialize_check {
                     r#"Holochain detected database corruption.
 
 Corrupt module: {}
-Expected hash: {}
+Expected hash: {:?}
 Deserialization Error: {:?}
 
 We are shutting down as a precoution to prevent further corruption."#,
@@ -41,6 +43,7 @@ We are shutting down as a precoution to prevent further corruption."#,
     }};
 }
 
+/// Macro for standard handling of db hash integrity check failures
 #[macro_export]
 macro_rules! fatal_db_hash_check {
     ($hint:expr, $h1:expr, $h2:expr,) => {
@@ -52,8 +55,8 @@ macro_rules! fatal_db_hash_check {
                 r#"Holochain detected database corruption.
 
 Corrupt module: {}
-Expected hash: {}
-Actual hash: {}
+Expected hash: {:?}
+Actual hash: {:?}
 
 We are shutting down as a precaution to prevent further corruption."#,
                 $hint,

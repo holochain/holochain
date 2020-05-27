@@ -122,7 +122,7 @@ impl<Api: CellConductorApiT> GenesisWorkflow<Api> {
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuf<'env, Reader<'env>>,
+    source_chain: SourceChainBuf<'env>,
 }
 
 impl<'env> GenesisWorkspace<'env> {
@@ -160,7 +160,7 @@ pub mod tests {
     use holochain_zome_types::entry::Entry;
     use matches::assert_matches;
 
-    pub async fn fake_genesis<R: Readable>(source_chain: &mut SourceChain<'_, R>) -> Header {
+    pub async fn fake_genesis(source_chain: &mut SourceChain<'_>) -> Header {
         let agent_pubkey = fake_agent_pubkey_1();
         let agent_entry = Entry::Agent(agent_pubkey.clone().into());
         let dna = fake_dna_file("cool dna");

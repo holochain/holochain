@@ -3,6 +3,8 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
+use derive_more::{From, Into};
+use futures::future::{BoxFuture, FutureExt};
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{
@@ -26,9 +28,9 @@ mod source_chain_buffer;
 /// i.e. has undergone Genesis.
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
-pub struct SourceChain<'env, R: Readable = Reader<'env>>(pub SourceChainBuf<'env, R>);
+pub struct SourceChain<'env>(pub SourceChainBuf<'env>);
 
-impl<'env, R: Readable> SourceChain<'env, R> {
+impl<'env> SourceChain<'env> {
     pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
         self.0
             .agent_pubkey()?
@@ -40,17 +42,17 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
-    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
     }
 
-    pub fn into_inner(self) -> SourceChainBuf<'env, R> {
+    pub fn into_inner(self) -> SourceChainBuf<'env> {
         self.0
     }
 }
 
-impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {
-    fn from(buffer: SourceChainBuf<'env, R>) -> Self {
+impl<'env> From<SourceChainBuf<'env>> for SourceChain<'env> {
+    fn from(buffer: SourceChainBuf<'env>) -> Self {
         Self(buffer)
     }
 }
@@ -147,11 +149,56 @@ impl<'a> ChainElementEntry<'a> {
     }
 }
 
+#[derive(Clone, Debug, From, Into, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct SignedHeader(Header, Signature);
+
 /// the header and the signature that signed it
 #[derive(Clone, Debug, PartialEq)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
     signature: Signature,
+}
+
+impl Hashed for SignedHeaderHashed {
+    type Content = SignedHeader;
+
+    type HashType = HeaderHash;
+
+    /// Unwrap the complete contents of this "Hashed" wrapper.
+    fn into_inner(self) -> (Self::Content, Self::HashType) {
+        let (header, hash) = self.header.into_inner();
+        ((header, self.signature).into(), hash)
+    }
+
+    /// Access the main item stored in this wrapper type.
+    fn as_content(&self) -> &Self::Content {
+        todo!("figure out")
+        // let header = self.header.as_content();
+        // (header, &self.signature)
+    }
+
+    /// Access the already-calculated hash stored in this wrapper type.
+    fn as_hash(&self) -> &Self::HashType {
+        self.header.as_hash()
+    }
+}
+
+impl Hashable for SignedHeaderHashed {
+    fn with_data(
+        signed_header: Self::Content,
+    ) -> BoxFuture<'static, Result<Self, SerializedBytesError>>
+    where
+        Self: Sized,
+    {
+        async move {
+            let (header, signature) = signed_header.into();
+            Ok(Self {
+                header: HeaderHashed::with_data(header).await?,
+                signature,
+            })
+        }
+        .boxed()
+    }
 }
 
 impl SignedHeaderHashed {
