@@ -43,13 +43,9 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         let agent: kitsune_p2p::KitsuneAgent = agent_pub_key.into_inner().into();
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(async move {
-            Ok(kitsune_p2p
-                .join(kitsune_p2p::actor::Join { space, agent })
-                .await?)
-        }
-        .boxed()
-        .into())
+        Ok(async move { Ok(kitsune_p2p.join(space, agent).await?) }
+            .boxed()
+            .into())
     }
 
     fn handle_leave(&mut self, _input: actor::Leave) -> HolochainP2pHandlerResult<()> {

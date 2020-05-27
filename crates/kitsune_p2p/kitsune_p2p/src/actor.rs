@@ -1,31 +1,5 @@
 //! Definitions related to the KitsuneP2p peer-to-peer / dht communications actor.
 
-/// Announce a space/agent pair on this network.
-pub struct Join {
-    /// The "space" context.
-    pub space: super::KitsuneSpace,
-    /// The "agent" context.
-    pub agent: super::KitsuneAgent,
-}
-
-/// Withdraw this space/agent pair from this network.
-pub struct Leave {
-    /// The "space" context.
-    pub space: super::KitsuneSpace,
-    /// The "agent" context.
-    pub agent: super::KitsuneAgent,
-}
-
-/// Make a request of a remote agent.
-pub struct Request {
-    /// The "space" context.
-    pub space: super::KitsuneSpace,
-    /// The "agent" context.
-    pub agent: super::KitsuneAgent,
-    /// Request data.
-    pub request: Vec<u8>,
-}
-
 /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
 /// Returns an approximate number of nodes reached.
 pub struct Broadcast {
@@ -74,13 +48,13 @@ ghost_actor::ghost_actor! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
     pub actor KitsuneP2p<super::KitsuneP2pError> {
         /// Announce a space/agent pair on this network.
-        fn join(input: Join) -> ();
+        fn join(space: super::KitsuneSpace, agent: super::KitsuneAgent) -> ();
 
         /// Withdraw this space/agent pair from this network.
-        fn leave(input: Leave) -> ();
+        fn leave(space: super::KitsuneSpace, agent: super::KitsuneAgent) -> ();
 
         /// Make a request of a remote agent.
-        fn request(input: Request) -> Vec<u8>;
+        fn request(space: super::KitsuneSpace, agent: super::KitsuneAgent, data: Vec<u8>) -> Vec<u8>;
 
         /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
         /// Returns an approximate number of nodes reached.

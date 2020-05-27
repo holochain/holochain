@@ -37,23 +37,63 @@ impl KitsuneP2pActor {
 }
 
 impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
-    fn handle_join(&mut self, input: actor::Join) -> KitsuneP2pHandlerResult<()> {
-        let actor::Join { space, agent } = input;
+    fn handle_join(
+        &mut self,
+        space: KitsuneSpace,
+        agent: KitsuneAgent,
+    ) -> KitsuneP2pHandlerResult<()> {
         let space = Arc::new(space);
         let agent = Arc::new(agent);
-        let space = match self.spaces.entry(space) {
+        let space = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(Space::new(self.internal_sender.clone())),
+            Entry::Vacant(entry) => entry.insert(Space::new(
+                space,
+                self.internal_sender.clone(),
+                self.evt_sender.clone(),
+            )),
         };
         space.handle_join(agent)
     }
 
-    fn handle_leave(&mut self, _input: actor::Leave) -> KitsuneP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+    fn handle_leave(
+        &mut self,
+        space: KitsuneSpace,
+        agent: KitsuneAgent,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space = Arc::new(space);
+        let agent = Arc::new(agent);
+        let space = match self.spaces.get_mut(&space) {
+            None => return Ok(async move { Ok(()) }.boxed().into()),
+            Some(space) => space,
+        };
+        let space_leave_fut = space.handle_leave(agent)?;
+        Ok(async move {
+            space_leave_fut.await?;
+            // TODO - clean up empty spaces
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 
-    fn handle_request(&mut self, _input: actor::Request) -> KitsuneP2pHandlerResult<Vec<u8>> {
-        Ok(async move { Ok(vec![]) }.boxed().into())
+    fn handle_request(
+        &mut self,
+        space: KitsuneSpace,
+        agent: KitsuneAgent,
+        data: Vec<u8>,
+    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
+        let space = Arc::new(space);
+        let space = match self.spaces.get_mut(&space) {
+            None => {
+                return Err(KitsuneP2pError::RoutingFailure(format!(
+                    "space '{:?}' not joined",
+                    space
+                )))
+            }
+            Some(space) => space,
+        };
+        let space_request_fut = space.handle_request(Arc::new(agent), data)?;
+        Ok(async move { space_request_fut.await }.boxed().into())
     }
 
     fn handle_broadcast(&mut self, _input: actor::Broadcast) -> KitsuneP2pHandlerResult<u32> {
