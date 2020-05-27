@@ -80,13 +80,18 @@ where
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&self) -> DatabaseResult<SingleIter<V>> {
-        Ok(SingleIter::new(self.db.iter_start(self.reader)?))
+    pub fn iter_raw(&self) -> DatabaseResult<SingleIterRaw<V>> {
+        Ok(SingleIterRaw::new(self.db.iter_start(self.reader)?))
+    }
+
+    /// Iterate from a key onwards
+    pub fn iter_from(&self, k: K) -> DatabaseResult<SingleIterRaw<V>> {
+        Ok(SingleIterRaw::new(self.db.iter_from(self.reader, k)?))
     }
 
     /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
-    pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIter<V>> {
-        Ok(SingleIter::new(self.db.iter_end(self.reader)?))
+    pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIterRaw<V>> {
+        Ok(SingleIterRaw::new(self.db.iter_end(self.reader)?))
     }
 }
 
@@ -117,9 +122,39 @@ where
     }
 }
 
-pub struct SingleIter<'env, V>(rkv::store::single::Iter<'env>, std::marker::PhantomData<V>);
+pub struct SingleIter<'env, 'a, K, V> {
+    scratch: &'a HashMap<K, Op<V>>,
+    iter: SingleIterRaw<'env, V>,
+}
 
-impl<'env, V> SingleIter<'env, V> {
+impl<'env, 'a, K, V> SingleIter<'env, 'a, K, V> {
+    fn new(scratch: &'a HashMap<K, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
+        Self { scratch, iter }
+    }
+}
+
+impl<'env, 'a, K, V> Iterator for SingleIter<'env, 'a, K, V>
+where
+    K: BufKey,
+    V: BufVal,
+{
+    type Item = Result<(K, V), DatabaseError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        use Op::*;
+        match self.iter.next() {
+            Some(Ok((k, v))) => Ok(match self.scratch.get(k) {
+                Some(Put(scratch_val)) => Some((k, *scratch_val.clone())),
+                Some(Delete) => None,
+                None => Some((k, v)),
+            }),
+            r => r,
+        }
+    }
+}
+
+pub struct SingleIterRaw<'env, V>(rkv::store::single::Iter<'env>, std::marker::PhantomData<V>);
+
+impl<'env, V> SingleIterRaw<'env, V> {
     pub fn new(iter: rkv::store::single::Iter<'env>) -> Self {
         Self(iter, std::marker::PhantomData)
     }
@@ -130,14 +165,24 @@ impl<'env, V> SingleIter<'env, V> {
 /// This is to enable a wider range of keys, such as String, because there is no uniform trait which
 /// enables conversion from a byte slice to a given type.
 /// FIXME: Use FallibleIterator to prevent panics within iteration
-impl<'env, V> Iterator for SingleIter<'env, V>
+// or just return Option<Result<_>> so we can collect::<Result<Vec<_>>()
+impl<'env, V> Iterator for SingleIterRaw<'env, V>
 where
     V: BufVal,
 {
-    type Item = (&'env [u8], V);
+    type Item = Result<(&'env [u8], V), DatabaseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.0.next() {
+            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some(
+                rmp_serde::from_read_ref(buf)
+                    .map(|v| (k, v))
+                    .map_err(DatabaseError::from),
+            ),
+            None => None,
+            Some(Ok(_)) => Some(Err(DatabaseError::InvalidValue)),
+            Some(Err(e)) => Some(Err(DatabaseError::from(e))),
+            /*
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
                 k,
                 rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
@@ -147,6 +192,7 @@ where
                 error!(?x);
                 panic!("TODO");
             }
+            */
         }
     }
 }
@@ -212,8 +258,16 @@ pub mod tests {
         env.with_reader(|reader| {
             let buf: TestBuf = KvBuf::new(&reader, db)?;
 
-            let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| v).collect();
-            let reverse: Vec<_> = buf.iter_raw_reverse()?.map(|(_, v)| v).collect();
+            let forward: Vec<_> = buf
+                .iter_raw()?
+                .map(Result::unwrap)
+                .map(|(_, v)| v)
+                .collect();
+            let reverse: Vec<_> = buf
+                .iter_raw_reverse()?
+                .map(Result::unwrap)
+                .map(|(_, v)| v)
+                .collect();
 
             assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
             assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
@@ -480,5 +534,58 @@ pub mod tests {
             assert_eq!(n, None);
             Ok(())
         })
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn kv_iter_from_partial() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_single("kv", StoreOptions::create())
+            .unwrap();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut buf: TestBuf = KvBuf::new(&reader, db).unwrap();
+
+            buf.put("a", V(101));
+            buf.put("b", V(102));
+            buf.put("dogs_likes_7", V(1));
+            buf.put("dogs_likes_79", V(2));
+            buf.put("dogs_likes_3", V(3));
+            buf.put("dogs_likes_88", V(4));
+            buf.put("dogs_likes_f", V(5));
+            buf.put("d", V(103));
+            buf.put("e", V(104));
+            buf.put("aaaaaaaaaaaaaaaaaaaa", V(105));
+            buf.put("eeeeeeeeeeeeeeeeeeee", V(106));
+
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+                .unwrap();
+            Ok(())
+        })
+        .unwrap();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let buf: TestBuf = KvBuf::new(&reader, db).unwrap();
+
+            let iter = buf.iter_from("dogs_likes").unwrap();
+            let results = iter.collect::<Vec<_>>();
+            assert_eq!(
+                results,
+                vec![
+                    (&b"dogs_likes_3"[..], V(3)),
+                    (&b"dogs_likes_7"[..], V(1)),
+                    (&b"dogs_likes_79"[..], V(2)),
+                    (&b"dogs_likes_88"[..], V(4)),
+                    (&b"dogs_likes_f"[..], V(5)),
+                    (&b"e"[..], V(104)),
+                    (&b"eeeeeeeeeeeeeeeeeeee"[..], V(106)),
+                ]
+            );
+
+            Ok(())
+        })
+        .unwrap();
     }
 }

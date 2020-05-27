@@ -24,6 +24,8 @@ pub enum DbName {
     PrimaryChainHeaders,
     /// Primary database: KVV store of chain metadata, storing relationships
     PrimaryChainMeta,
+    /// Primary database: Kv store of links 
+    PrimaryLinksMeta,
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
     ChainSequence,
@@ -33,6 +35,8 @@ pub enum DbName {
     CacheChainHeaders,
     /// Cache database: KVV store of chain metadata, storing relationships
     CacheChainMeta,
+    /// Cachedatabase: Kv store of links 
+    CacheLinksMeta,
     /// database which stores a single key-value pair, encoding the
     /// mutable state for the entire Conductor
     ConductorState,
@@ -50,10 +54,12 @@ impl std::fmt::Display for DbName {
             PrimaryChainPrivateEntries => write!(f, "PrimaryChainPrivateEntries"),
             PrimaryChainHeaders => write!(f, "PrimaryChainHeaders"),
             PrimaryChainMeta => write!(f, "PrimaryChainMeta"),
+            PrimaryLinksMeta => write!(f, "PrimaryLinksMeta"),
             ChainSequence => write!(f, "ChainSequence"),
             CacheChainEntries => write!(f, "CacheChainEntries"),
             CacheChainHeaders => write!(f, "CacheChainHeaders"),
             CacheChainMeta => write!(f, "CacheChainMeta"),
+            CacheLinksMeta => write!(f, "CacheLinksMeta"),
             ConductorState => write!(f, "ConductorState"),
             Wasm => write!(f, "Wasm"),
             DnaDef => write!(f, "DnaDef"),
@@ -71,10 +77,12 @@ impl DbName {
             PrimaryChainPrivateEntries => Single,
             PrimaryChainHeaders => Single,
             PrimaryChainMeta => Multi,
+            PrimaryLinksMeta => Single,
             ChainSequence => SingleInt,
             CacheChainEntries => Single,
             CacheChainHeaders => Single,
             CacheChainMeta => Multi,
+            CacheLinksMeta => Single,
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
@@ -111,8 +119,8 @@ lazy_static! {
     DbKey::<SingleStore>::new(DbName::PrimaryChainHeaders);
     /// The key to access the ChainMeta database
     pub static ref PRIMARY_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryChainMeta);
-    /// The key to access the ChainMeta database
-    pub static ref PRIMARY_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryChainMeta);
+    /// The key to access the links database
+    pub static ref PRIMARY_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::PrimaryLinksMeta);
     /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
     /// The key to access the ChainEntries database
@@ -123,8 +131,8 @@ lazy_static! {
     DbKey::<SingleStore>::new(DbName::CacheChainHeaders);
     /// The key to access the ChainMeta database
     pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
-    /// The key to access the ChainMeta database
-    pub static ref CACHE_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
+    /// The key to access the cache links database
+    pub static ref CACHE_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::CacheLinksMeta);
     /// The key to access the ConductorState database
     pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
     /// The key to access the Wasm database

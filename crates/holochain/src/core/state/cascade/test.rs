@@ -15,9 +15,7 @@ use holochain_types::{
     Header,
 };
 use holochain_zome_types::entry::Entry;
-use maplit::hashset;
 use mockall::*;
-use std::collections::HashSet;
 
 #[allow(dead_code)]
 struct Chains<'env> {
@@ -293,7 +291,7 @@ async fn links_local_return() -> SourceChainResult<()> {
             predicate::eq(EntryHash::from(base.clone())),
             predicate::eq("".to_string()),
         )
-        .returning(move |_, _| Ok(hashset! {target.clone()}));
+        .returning(move |_, _| Ok(vec![target.clone()]));
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -304,7 +302,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     );
     let links = cascade.dht_get_links(base.into(), "").await?;
     // check it returns
-    assert_eq!(links, hashset! {result.into()});
+    assert_eq!(links, vec![result.into()]);
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -344,12 +342,12 @@ async fn links_cache_return() -> SourceChainResult<()> {
     mock_primary_meta
         .expect_get_links()
         .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| Ok(HashSet::new()));
+        .returning(move |_, _| Ok(Vec::new()));
     // Return a link between entries
     mock_cache_meta
         .expect_get_links()
         .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| Ok(hashset! {target.clone().into()}));
+        .returning(move |_, _| Ok(vec![target.clone().into()]));
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -360,7 +358,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     );
     let links = cascade.dht_get_links(base.into(), "").await?;
     // check it returns
-    assert_eq!(links, hashset! {result.into()});
+    assert_eq!(links, vec![result.into()]);
     Ok(())
 }
 
@@ -393,7 +391,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     mock_cache_meta
         .expect_get_links()
         .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| Ok(hashset! {target.clone().into()}));
+        .returning(move |_, _| Ok(vec![target.clone().into()]));
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -404,7 +402,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     );
     let links = cascade.dht_get_links(base.into(), "").await?;
     // check it returns
-    assert_eq!(links, hashset! {result.into()});
+    assert_eq!(links, vec![result.into()]);
     // check it doesn't hit the primary
     // this is implied by the mock not expecting calls
     Ok(())

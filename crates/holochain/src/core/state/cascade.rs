@@ -45,7 +45,6 @@ use super::{
 use holochain_state::{error::DatabaseResult, prelude::Reader};
 use holochain_types::composite_hash::EntryHash;
 use holochain_zome_types::entry::Entry;
-use std::collections::HashSet;
 use tracing::*;
 
 #[cfg(test)]
@@ -142,7 +141,7 @@ where
         &self,
         base: EntryHash,
         tag: S,
-    ) -> DatabaseResult<HashSet<EntryHash>> {
+    ) -> DatabaseResult<Vec<EntryHash>> {
         // Am I an authority?
         let authority = self.primary.contains(&base)?;
         let tag = tag.into();

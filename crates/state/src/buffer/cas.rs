@@ -1,5 +1,5 @@
 use super::{
-    kv::{KvBuf, SingleIter},
+    kv::{KvBuf, SingleIterRaw},
     BufVal, BufferedStore,
 };
 use crate::{
@@ -41,7 +41,7 @@ where
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&self) -> DatabaseResult<SingleIter<V>> {
+    pub fn iter_raw(&self) -> DatabaseResult<SingleIterRaw<V>> {
         self.0.iter_raw()
     }
 }

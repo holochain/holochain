@@ -2,7 +2,7 @@
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::KvvBuf,
+    buffer::{KvBuf, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
@@ -15,7 +15,6 @@ use holochain_types::{
     Header, HeaderHashed,
 };
 use mockall::mock;
-use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::Debug;
 
@@ -46,9 +45,19 @@ enum Op {
     Remove(HeaderHash),
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+struct Link {
+    link_add_hash: HeaderHash,
+    target: EntryHash,
+}
+
+/// Key for finding a link
+/// Must have add_link_hash for inserts
+/// but is optional if you want all links on a get
 struct LinkKey<'a> {
     base: &'a EntryHash,
     tag: Tag,
+    link_add_hash: Option<HeaderHash>,
 }
 
 impl<'a> LinkKey<'a> {
@@ -60,36 +69,28 @@ impl<'a> LinkKey<'a> {
             .expect("entry addresses don't have the unserialize problem");
         let mut vec: Vec<u8> = sb.bytes().to_vec();
         vec.extend_from_slice(self.tag.as_ref());
+        if let Some(ref link_add_hash) = self.link_add_hash {
+            vec.extend_from_slice(link_add_hash.as_ref());
+        }
         vec
     }
 }
 
-/*
-TODO impliment these types
-AddLink:
-Base: hash
-Target: hash
-Type: (maybe?)
-Tag: string
-Addlink_Time: timestamp
-Addlink_Action: hash
-
-RemoveLink:
-Base:
-Target:
-Type:
-Tag:
-AddLink_Time: timestamp
-AddLink_Action: hash
-RemoveLink_Action: timestamp
-RemoveLink_Action: hash
-*/
+impl<'a> From<(&'a LinkAdd, HeaderHash)> for LinkKey<'a> {
+    fn from((link_add, hash): (&'a LinkAdd, HeaderHash)) -> Self {
+        Self {
+            base: &link_add.base_address,
+            tag: link_add.tag.clone(),
+            link_add_hash: Some(hash),
+        }
+    }
+}
 
 #[async_trait::async_trait]
 pub trait ChainMetaBufT {
     // Links
     /// Get all te links on this base that match the tag
-    fn get_links<Tag>(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>
+    fn get_links<Tag>(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<Vec<EntryHash>>
     where
         Tag: Into<String>;
 
@@ -116,18 +117,18 @@ pub trait ChainMetaBufT {
 
 pub struct ChainMetaBuf<'env> {
     system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, Reader<'env>>,
-    links_meta: KvvBuf<'env, Vec<u8>, Op, Reader<'env>>,
+    links_meta: KvBuf<'env, Vec<u8>, Link, Reader<'env>>,
 }
 
 impl<'env> ChainMetaBuf<'env> {
     pub(crate) fn new(
         reader: &'env Reader<'env>,
         system_meta: MultiStore,
-        links_meta: MultiStore,
+        links_meta: SingleStore,
     ) -> DatabaseResult<Self> {
         Ok(Self {
             system_meta: KvvBuf::new(reader, system_meta)?,
-            links_meta: KvvBuf::new(reader, links_meta)?,
+            links_meta: KvBuf::new(reader, links_meta)?,
         })
     }
     pub fn primary(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
@@ -146,49 +147,51 @@ impl<'env> ChainMetaBuf<'env> {
 #[async_trait::async_trait]
 impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     // TODO find out whether we need link_type.
+    // FIXME: The KvBuf SingleIter only checks the db not the scratch
+    // we need to change itto use the scratch
     fn get_links<Tag: Into<String>>(
         &self,
         base: &EntryHash,
         tag: Tag,
-    ) -> DatabaseResult<HashSet<EntryHash>> {
-        // TODO get removes
-        // TODO get adds
+    ) -> DatabaseResult<Vec<EntryHash>> {
         let key = LinkKey {
             base,
             tag: tag.into(),
+            link_add_hash: None,
         };
-        let mut results = HashMap::new();
-        let mut removes = vec![];
-        self.links_meta
-            .get(&key.to_key())?
-            .map(|op| {
-                op.map(|op| match op {
-                    Op::Add(link_add_hash, entry) => {
-                        results.insert(link_add_hash, entry);
-                    }
-                    Op::Remove(link_add_hash) => {
-                        removes.push(link_add_hash);
-                    }
-                })
+        let k_bytes = key.to_key();
+        let key_len = k_bytes.len();
+        // TODO: Internalizethis abstraction to KvBuf
+        Ok(self
+            .links_meta
+            .iter_from(k_bytes.clone())?
+            .take_while(|(k, _)| {
+                k.get(0..key_len)
+                    .map(|a| a == &k_bytes[..])
+                    .unwrap_or(false)
             })
-            .collect::<Result<_, _>>()?;
-        for link_add_hash in removes {
-            results.remove(&link_add_hash);
-        }
-        Ok(results.into_iter().map(|(_, v)| v).collect())
+            .map(|l| l.1.target)
+            .collect())
     }
 
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
-        let base = &link_add.base_address.clone();
-        let target = link_add.target_address.clone();
-        let tag = link_add.tag.clone();
-        let link_add = HeaderHashed::with_data(Header::LinkAdd(link_add)).await?;
-        let link_address: &HeaderHash = link_add.as_ref();
-        let link_address = link_address.clone();
-        let key = LinkKey { base, tag };
+        let (link_add, link_add_hash): (Header, HeaderHash) =
+            HeaderHashed::with_data(Header::LinkAdd(link_add))
+                .await?
+                .into();
+        let link_add = match link_add {
+            Header::LinkAdd(link_add) => link_add,
+            _ => unreachable!("BUG: Was hashed as LinkAdd but is not anymore"),
+        };
+        let key = LinkKey::from((&link_add, link_add_hash.clone()));
 
-        self.links_meta
-            .insert(key.to_key(), Op::Add(link_address, target));
+        self.links_meta.put(
+            key.to_key(),
+            Link {
+                link_add_hash,
+                target: link_add.target_address,
+            },
+        );
         DatabaseResult::Ok(())
     }
 
@@ -201,9 +204,9 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         let key = LinkKey {
             base,
             tag: tag.into(),
+            link_add_hash: Some(link_remove.link_add_address),
         };
-        self.links_meta
-            .insert(key.to_key(), Op::Remove(link_remove.link_add_address));
+        self.links_meta.delete(key.to_key());
         DatabaseResult::Ok(())
     }
 
@@ -232,7 +235,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
+        fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<Vec<EntryHash>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, tag: Tag) -> DatabaseResult<()>;
         fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
@@ -249,7 +252,7 @@ impl ChainMetaBufT for MockChainMetaBuf {
         &self,
         base: &EntryHash,
         tag: Tag,
-    ) -> DatabaseResult<HashSet<EntryHash>> {
+    ) -> DatabaseResult<Vec<EntryHash>> {
         self.get_links(base, tag.into())
     }
 
@@ -304,7 +307,6 @@ mod test {
     use holo_hash::{AgentPubKeyFixturator, EntryContentHashFixturator, HeaderHashFixturator};
     use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
     use holochain_types::{EntryHashed, Timestamp};
-    use maplit::hashset;
 
     fixturator!(
         LinkAdd;
@@ -452,7 +454,7 @@ mod test {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
                 meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
-                hashset! {target_address.clone()}
+                vec![target_address.clone()]
             );
             DatabaseResult::Ok(())
         })
@@ -514,7 +516,7 @@ mod test {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
                 meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
-                hashset! {target_address.clone()}
+                vec![target_address.clone()]
             );
             DatabaseResult::Ok(())
         })
