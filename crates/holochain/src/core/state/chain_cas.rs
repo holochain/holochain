@@ -111,12 +111,16 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
         header_address: &HeaderAddress,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         if let Ok(Some((header, signature))) = self.headers.get(&header_address.to_owned().into()) {
-            let header = fatal_db_deserialize_check!(
+            let header = fatal_db_hash_construction_check!(
                 "ChainCasBuf::get_header",
                 header_address,
                 HeaderHashed::with_data(header).await,
             );
-            fatal_db_hash_check!("ChainCasBuf::get_header", header_address, header.as_hash());
+            fatal_db_hash_integrity_check!(
+                "ChainCasBuf::get_header",
+                header_address,
+                header.as_hash()
+            );
             Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
         } else {
             Ok(None)
@@ -225,6 +229,10 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
 
     pub fn public_entries(&self) -> &EntryCas<'env, R> {
         &self.public_entries
+    }
+
+    pub fn private_entries(&self) -> Option<&EntryCas<'env, R>> {
+        self.private_entries.as_ref()
     }
 }
 

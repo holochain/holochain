@@ -44,6 +44,13 @@ where
     pub fn iter_raw(&self) -> DatabaseResult<SingleIter<V>> {
         self.0.iter_raw()
     }
+
+    /// Iterate over items which are staged for PUTs in the scratch space
+    // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
+    // iteration, by chaining this with an iter_raw
+    pub fn iter_scratch_puts(&self) -> impl Iterator<Item = (&HoloHash, &Box<V>)> {
+        self.0.iter_scratch_puts()
+    }
 }
 
 impl<'env, V, R> BufferedStore<'env> for CasBuf<'env, V, R>
