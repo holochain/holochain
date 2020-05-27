@@ -11,7 +11,7 @@ pub use types::*;
 mod spawn;
 pub use spawn::*;
 
-/// A wrapper around HolochainP2pSender that memoizes the dna_hash / agent_pub_key.
+/// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
 #[derive(Clone)]
 pub struct HolochainP2pCell {

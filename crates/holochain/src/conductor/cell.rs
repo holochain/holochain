@@ -162,7 +162,7 @@ impl Cell {
         &self.id
     }
 
-    /// Access a network sender that is memoized to this cell's DnaHash/AgentPubKey
+    /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey
     pub fn holochain_p2p_cell(&self) -> &holochain_p2p::HolochainP2pCell {
         &self.holochain_p2p_cell
     }

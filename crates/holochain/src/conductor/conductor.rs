@@ -914,6 +914,7 @@ async fn p2p_event_task(
             );
         }
     }
+    tracing::warn!("p2p_event_task has ended");
 }
 
 #[cfg(test)]

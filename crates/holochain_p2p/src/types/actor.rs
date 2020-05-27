@@ -85,7 +85,8 @@ ghost_actor::ghost_actor! {
 }
 
 impl HolochainP2pSender {
-    /// Memoize this sender to a specific cell context.
+    /// Partially apply dna_hash && agent_pub_key to this sender,
+    /// binding it to a specific cell context.
     pub fn into_cell(
         self,
         dna_hash: DnaHash,
@@ -98,7 +99,8 @@ impl HolochainP2pSender {
         }
     }
 
-    /// Clone and memoize this sender to a specific cell context.
+    /// Clone and partially apply dna_hash && agent_pub_key to this sender,
+    /// binding it to a specific cell context.
     pub fn to_cell(
         &self,
         dna_hash: DnaHash,
