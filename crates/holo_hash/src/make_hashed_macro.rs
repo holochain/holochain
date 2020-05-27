@@ -126,6 +126,7 @@ macro_rules! make_hashed_base {
 ///
 /// ```
 /// # use holochain_serialized_bytes::prelude::*;
+/// # use holo_hash::HoloHashHash;
 /// # #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// # pub struct MyType;
 /// holo_hash::make_hashed! {

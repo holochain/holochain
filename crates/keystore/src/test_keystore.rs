@@ -2,7 +2,7 @@
 
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
-use holo_hash::HoloHashHash;
+use holo_hash::HoloHashHashBase;
 use holochain_crypto::*;
 use std::collections::HashMap;
 
