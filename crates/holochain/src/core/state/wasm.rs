@@ -1,4 +1,4 @@
-use holo_hash::{Hashed, WasmHash};
+use holo_hash::{Hashable, Hashed, WasmHash};
 use holochain_state::buffer::{BufferedStore, CasBuf};
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;

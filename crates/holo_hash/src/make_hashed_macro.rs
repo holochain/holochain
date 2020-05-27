@@ -150,12 +150,18 @@ macro_rules! make_hashed {
             HashType($h),
         }
 
-        impl $n {
+        impl $crate::Hashable for $n {
+
             /// Serialize and hash the given item, producing a "Hashed" wrapper.
-            pub async fn with_data(t: $t) -> Result<Self, ::holochain_serialized_bytes::SerializedBytesError> {
+            fn with_data(content: Self::Content) -> futures::future::BoxFuture<'static, Result<Self, SerializedBytesError>>
+            where Self: Sized {
                 use ::std::convert::TryFrom;
-                let sb = ::holochain_serialized_bytes::SerializedBytes::try_from(&t)?;
-                Ok(Self::with_pre_hashed(t, <$h>::with_data(sb.bytes()).await))
+                use futures::future::FutureExt;
+                async {
+                    let sb = ::holochain_serialized_bytes::SerializedBytes::try_from(&content)?;
+                    Ok(Self::with_pre_hashed(content, Self::HashType::with_data(sb.bytes()).await))
+                }
+                .boxed()
             }
         }
     };
