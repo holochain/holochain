@@ -108,6 +108,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// Add the [DnaFile]s from the wasm and dna_def databases into memory
     async fn add_dnas(&self) -> ConductorResult<()>;
 
+    /// Dispatch a network event to the correct cell.
+    async fn dispatch_holochain_p2p_event(
+        &self,
+        cell_id: &CellId,
+        event: holochain_p2p::event::HolochainP2pEvent,
+    ) -> ConductorResult<()>;
+
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
@@ -132,6 +139,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
+
+    /// Request access to this conductor's networking handle
+    fn holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender;
 
     /// Run genesis on [CellId]s and add them to the db
     async fn genesis_cells(
@@ -170,46 +180,66 @@ pub trait ConductorHandleT: Send + Sync {
 /// this could be swapped out with, e.g. a channel Sender/Receiver pair
 /// using an actor model.
 #[derive(From)]
-pub struct ConductorHandleImpl<DS: DnaStore + 'static>(RwLock<Conductor<DS>>, KeystoreSender);
+pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
+    pub(crate) conductor: RwLock<Conductor<DS>>,
+    pub(crate) keystore: KeystoreSender,
+    pub(crate) holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
+}
 
 #[async_trait::async_trait]
 impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     /// Check that shutdown has not been called
     async fn check_running(&self) -> ConductorResult<()> {
-        self.0.read().await.check_running()
+        self.conductor.read().await.check_running()
     }
 
     async fn add_admin_interfaces(
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
     ) -> ConductorResult<()> {
-        let mut lock = self.0.write().await;
+        let mut lock = self.conductor.write().await;
         lock.add_admin_interfaces_via_handle(configs, self.clone())
             .await
     }
 
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
-        let mut lock = self.0.write().await;
+        let mut lock = self.conductor.write().await;
         lock.add_app_interface_via_handle(port, self.clone()).await
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-        self.0.read().await.put_wasm(dna.clone()).await?;
-        Ok(self.0.write().await.dna_store_mut().add(dna)?)
+        self.conductor.read().await.put_wasm(dna.clone()).await?;
+        Ok(self.conductor.write().await.dna_store_mut().add(dna)?)
     }
 
     async fn add_dnas(&self) -> ConductorResult<()> {
-        let dnas = self.0.read().await.load_wasms_into_dna_files().await?;
-        self.0.write().await.dna_store_mut().add_dnas(dnas);
+        let dnas = self
+            .conductor
+            .read()
+            .await
+            .load_wasms_into_dna_files()
+            .await?;
+        self.conductor.write().await.dna_store_mut().add_dnas(dnas);
         Ok(())
     }
 
     async fn list_dnas(&self) -> ConductorResult<Vec<DnaHash>> {
-        Ok(self.0.read().await.dna_store().list())
+        Ok(self.conductor.read().await.dna_store().list())
     }
 
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
-        self.0.read().await.dna_store().get(hash)
+        self.conductor.read().await.dna_store().get(hash)
+    }
+
+    async fn dispatch_holochain_p2p_event(
+        &self,
+        cell_id: &CellId,
+        event: holochain_p2p::event::HolochainP2pEvent,
+    ) -> ConductorResult<()> {
+        let lock = self.conductor.read().await;
+        let cell: &Cell = lock.cell_by_id(cell_id)?;
+        cell.handle_holochain_p2p_event(event).await?;
+        Ok(())
     }
 
     async fn call_zome(
@@ -219,33 +249,40 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         // FIXME: D-01058: We are holding this read lock for
         // the entire call to call_zome and blocking
         // any writes to the conductor
-        let lock = self.0.read().await;
+        let lock = self.conductor.read().await;
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
         cell.call_zome(invocation).await.map_err(Into::into)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
-        let lock = self.0.write().await;
+        let lock = self.conductor.write().await;
         let cell = lock.cell_by_id(cell_id)?;
         let _ = cell.handle_autonomic_process(cue.into()).await;
         Ok(())
     }
 
     async fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
-        self.0.write().await.take_shutdown_handle()
+        self.conductor.write().await.take_shutdown_handle()
     }
 
     async fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
-        self.0.read().await.get_arbitrary_admin_websocket_port()
+        self.conductor
+            .read()
+            .await
+            .get_arbitrary_admin_websocket_port()
     }
 
     async fn shutdown(&self) {
-        self.0.write().await.shutdown()
+        self.conductor.write().await.shutdown()
     }
 
     fn keystore(&self) -> &KeystoreSender {
-        &self.1
+        &self.keystore
+    }
+
+    fn holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender {
+        &self.holochain_p2p
     }
 
     async fn genesis_cells(
@@ -254,7 +291,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
     ) -> ConductorResult<()> {
         let cell_ids = {
-            self.0
+            self.conductor
                 .read()
                 .await
                 .genesis_cells(cells_ids_with_proofs, self.clone())
@@ -262,12 +299,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         };
         let app = InstalledApp { app_id, cell_ids };
         // Update the db
-        self.0.write().await.add_inactive_app_to_db(app).await
+        self.conductor
+            .write()
+            .await
+            .add_inactive_app_to_db(app)
+            .await
     }
 
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>> {
         let cells = {
-            let lock = self.0.read().await;
+            let lock = self.conductor.read().await;
             lock.create_active_app_cells(self.clone())
                 .await?
                 .into_iter()
@@ -275,7 +316,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let add_cells_tasks = cells.map(|result| async {
             match result {
                 Ok(cells) => {
-                    self.0.write().await.add_cells(cells);
+                    self.conductor.write().await.add_cells(cells);
                     None
                 }
                 Err(e) => Some(e),
@@ -290,29 +331,41 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
-        self.0.write().await.activate_app_in_db(app_id).await
+        self.conductor
+            .write()
+            .await
+            .activate_app_in_db(app_id)
+            .await
     }
 
     async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()> {
-        let cell_ids_to_remove = self.0.write().await.deactivate_app_in_db(app_id).await?;
-        self.0.write().await.remove_cells(cell_ids_to_remove);
+        let cell_ids_to_remove = self
+            .conductor
+            .write()
+            .await
+            .deactivate_app_in_db(app_id)
+            .await?;
+        self.conductor
+            .write()
+            .await
+            .remove_cells(cell_ids_to_remove);
         Ok(())
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-        self.0.read().await.dump_cell_state(cell_id).await
+        self.conductor.read().await.dump_cell_state(cell_id).await
     }
 
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
-        let lock = self.0.read().await;
+        let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.state_env().clone())
     }
 
     #[cfg(test)]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
-        let lock = self.0.read().await;
+        let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
     }
 }
@@ -349,6 +402,8 @@ pub mod mock {
 
             fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
+            fn sync_dispatch_holochain_p2p_event(&self, cell_id: &CellId, event: holochain_p2p::event::HolochainP2pEvent) -> ConductorResult<()>;
+
             fn sync_call_zome(
                 &self,
                 invocation: ZomeCallInvocation,
@@ -363,6 +418,8 @@ pub mod mock {
             fn sync_shutdown(&self);
 
             fn sync_keystore(&self) -> &KeystoreSender;
+
+            fn sync_holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender;
 
             fn sync_genesis_cells(
                 &self,
@@ -423,6 +480,14 @@ pub mod mock {
             self.sync_get_dna(hash)
         }
 
+        async fn dispatch_holochain_p2p_event(
+            &self,
+            cell_id: &CellId,
+            event: holochain_p2p::event::HolochainP2pEvent,
+        ) -> ConductorResult<()> {
+            self.sync_dispatch_holochain_p2p_event(cell_id, event)
+        }
+
         async fn call_zome(
             &self,
             invocation: ZomeCallInvocation,
@@ -452,6 +517,10 @@ pub mod mock {
 
         fn keystore(&self) -> &KeystoreSender {
             self.sync_keystore()
+        }
+
+        fn holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender {
+            self.sync_holochain_p2p()
         }
 
         async fn genesis_cells(
