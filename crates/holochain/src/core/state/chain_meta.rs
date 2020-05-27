@@ -46,7 +46,6 @@ enum Op {
     Remove(HeaderHash),
 }
 
-#[allow(dead_code)]
 struct LinkKey<'a> {
     base: &'a EntryHash,
     tag: Tag,
@@ -98,7 +97,12 @@ pub trait ChainMetaBufT {
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
     /// Remove a link
-    fn remove_link<'a>(&'a mut self, link_add: LinkRemove) -> DatabaseResult<()>;
+    fn remove_link<Tag: Into<String>>(
+        &mut self,
+        link_remove: LinkRemove,
+        base: &EntryHash,
+        tag: Tag,
+    ) -> DatabaseResult<()>;
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
     fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
@@ -188,8 +192,19 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         DatabaseResult::Ok(())
     }
 
-    fn remove_link<'a>(&'a mut self, link_add: LinkRemove) -> DatabaseResult<()> {
-        todo!()
+    fn remove_link<Tag: Into<String>>(
+        &mut self,
+        link_remove: LinkRemove,
+        base: &EntryHash,
+        tag: Tag,
+    ) -> DatabaseResult<()> {
+        let key = LinkKey {
+            base,
+            tag: tag.into(),
+        };
+        self.links_meta
+            .insert(key.to_key(), Op::Remove(link_remove.link_add_address));
+        DatabaseResult::Ok(())
     }
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
@@ -219,7 +234,7 @@ mock! {
     {
         fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
-        fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+        fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, tag: Tag) -> DatabaseResult<()>;
         fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
         fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
         fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -254,8 +269,13 @@ impl ChainMetaBufT for MockChainMetaBuf {
         self.add_link(link_add)
     }
 
-    fn remove_link<'a>(&'a mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
-        self.remove_link(link_remove)
+    fn remove_link<Tag: Into<String>>(
+        &mut self,
+        link_remove: LinkRemove,
+        base: &EntryHash,
+        tag: Tag,
+    ) -> DatabaseResult<()> {
+        self.remove_link(link_remove, base, tag.into())
     }
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
@@ -320,10 +340,39 @@ mod test {
         };
     );
 
+    fixturator!(
+        LinkRemove;
+        curve Empty LinkRemove {
+            author: AgentPubKeyFixturator::new(Empty).next().unwrap(),
+            timestamp: Timestamp::now(),
+            header_seq: U32Fixturator::new(Empty).next().unwrap(),
+            prev_header: HeaderHashFixturator::new(Empty).next().unwrap(),
+            link_add_address: HeaderHashFixturator::new(Empty).next().unwrap(),
+        };
+        curve Unpredictable LinkRemove {
+            author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+            timestamp: Timestamp::now(),
+            header_seq: U32Fixturator::new(Unpredictable).next().unwrap(),
+            prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
+            link_add_address: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
+        };
+        curve Predictable LinkRemove {
+            author: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            timestamp: Timestamp::now(),
+            header_seq: U32Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            prev_header: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            link_add_address: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+        };
+    );
+
     struct KnownLinkAdd {
         base_address: EntryHash,
         target_address: EntryHash,
         tag: String,
+    }
+
+    struct KnownLinkRemove {
+        link_add_address: HeaderHash,
     }
 
     impl Iterator for LinkAddFixturator<KnownLinkAdd> {
@@ -333,6 +382,15 @@ mod test {
             f.base_address = self.0.curve.base_address.clone();
             f.target_address = self.0.curve.target_address.clone();
             f.tag = self.0.curve.tag.clone();
+            Some(f)
+        }
+    }
+
+    impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
+        type Item = LinkRemove;
+        fn next(&mut self) -> Option<Self::Item> {
+            let mut f = LinkRemoveFixturator::new(Unpredictable).next().unwrap();
+            f.link_add_address = self.0.curve.link_add_address.clone();
             Some(f)
         }
     }
@@ -402,7 +460,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn can_add_and_delete_link() {
+    async fn can_add_and_remove_link() {
         let arc = test_cell_env();
         let env = arc.guard().await;
 
@@ -422,7 +480,14 @@ mod test {
         let link_add = LinkAddFixturator::new(link_add).next().unwrap();
 
         // Create a known link remove
-        let link_remove = todo!();
+        let link_add_address = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
+            .await
+            .unwrap();
+        let link_add_address: &HeaderHash = link_add_address.as_ref();
+        let link_remove = KnownLinkRemove {
+            link_add_address: link_add_address.clone(),
+        };
+        let link_remove = LinkRemoveFixturator::new(link_remove).next().unwrap();
 
         // Check it's empty
         env.with_reader(|reader| {
@@ -459,7 +524,9 @@ mod test {
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            meta_buf.remove_link(link_remove).unwrap();
+            meta_buf
+                .remove_link(link_remove, base_address, tag.clone())
+                .unwrap();
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
