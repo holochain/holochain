@@ -1,5 +1,4 @@
 #![allow(clippy::ptr_arg)]
-use futures::{future::LocalBoxFuture, FutureExt};
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
@@ -82,10 +81,8 @@ RemoveLink_Action: timestamp
 RemoveLink_Action: hash
 */
 
-pub trait ChainMetaBufT<'env, R = Reader<'env>>
-where
-    R: Readable,
-{
+#[async_trait::async_trait]
+pub trait ChainMetaBufT {
     // Links
     /// Get all te links on this base that match the tag
     fn get_links<Tag>(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>
@@ -93,7 +90,7 @@ where
         Tag: Into<String>;
 
     /// Add a link
-    fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>>;
+    async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
     fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
@@ -105,20 +102,14 @@ where
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
 }
 
-pub struct ChainMetaBuf<'env, R = Reader<'env>>
-where
-    R: Readable,
-{
-    system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, R>,
-    links_meta: KvvBuf<'env, Vec<u8>, Op, R>,
+pub struct ChainMetaBuf<'env> {
+    system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, Reader<'env>>,
+    links_meta: KvvBuf<'env, Vec<u8>, Op, Reader<'env>>,
 }
 
-impl<'env, R> ChainMetaBuf<'env, R>
-where
-    R: Readable,
-{
+impl<'env> ChainMetaBuf<'env> {
     pub(crate) fn new(
-        reader: &'env R,
+        reader: &'env Reader<'env>,
         system_meta: MultiStore,
         links_meta: MultiStore,
     ) -> DatabaseResult<Self> {
@@ -127,23 +118,21 @@ where
             links_meta: KvvBuf::new(reader, links_meta)?,
         })
     }
-    pub fn primary(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn primary(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*PRIMARY_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*PRIMARY_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 
-    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
         Self::new(reader, system_meta, links_meta)
     }
 }
 
-impl<'env, R> ChainMetaBufT<'env, R> for ChainMetaBuf<'env, R>
-where
-    R: Readable,
-{
+#[async_trait::async_trait]
+impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     // TODO find out whether we need link_type.
     fn get_links<Tag: Into<String>>(
         &self,
@@ -178,21 +167,18 @@ where
     }
 
     // TODO: Figure out how to use this with MustFuture
-    fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>> {
-        let f = async move {
-            let base = &link_add.base_address.clone();
-            let target = link_add.target_address.clone();
-            let tag = link_add.tag.clone();
-            let link_add = HeaderHashed::with_data(Header::LinkAdd(link_add)).await?;
-            let link_address: &HeaderHash = link_add.as_ref();
-            let link_address = link_address.clone();
-            let key = LinkKey { base, tag };
+    async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+        let base = &link_add.base_address.clone();
+        let target = link_add.target_address.clone();
+        let tag = link_add.tag.clone();
+        let link_add = HeaderHashed::with_data(Header::LinkAdd(link_add)).await?;
+        let link_address: &HeaderHash = link_add.as_ref();
+        let link_address = link_address.clone();
+        let key = LinkKey { base, tag };
 
-            self.links_meta
-                .insert(key.to_key(), Op::Add(link_address, target));
-            DatabaseResult::Ok(())
-        };
-        f.boxed_local()
+        self.links_meta
+            .insert(key.to_key(), Op::Add(link_address, target));
+        DatabaseResult::Ok(())
     }
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
@@ -230,10 +216,8 @@ mock! {
     }
 }
 
-impl<'env, R> ChainMetaBufT<'env, R> for MockChainMetaBuf
-where
-    R: Readable,
-{
+#[async_trait::async_trait]
+impl ChainMetaBufT for MockChainMetaBuf {
     fn get_links<Tag: Into<String>>(
         &self,
         base: &EntryHash,
@@ -254,8 +238,8 @@ where
         self.get_canonical_header_hash(header_hash)
     }
 
-    fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> LocalBoxFuture<'a, DatabaseResult<()>> {
-        async move { self.add_link(link_add) }.boxed_local()
+    async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+        self.add_link(link_add)
     }
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
@@ -266,7 +250,7 @@ where
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for ChainMetaBuf<'env, R> {
+impl<'env> BufferedStore<'env> for ChainMetaBuf<'env> {
     type Error = DatabaseError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {

@@ -53,7 +53,7 @@ mod test;
 
 pub struct Cascade<'env, C = ChainMetaBuf<'env>>
 where
-    C: ChainMetaBufT<'env>,
+    C: ChainMetaBufT,
 {
     primary: &'env ChainCasBuf<'env, Reader<'env>>,
     primary_meta: &'env C,
@@ -80,7 +80,7 @@ enum Search {
 /// Depends on how much computation, and if writes are involved
 impl<'env, C> Cascade<'env, C>
 where
-    C: ChainMetaBufT<'env>,
+    C: ChainMetaBufT,
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
