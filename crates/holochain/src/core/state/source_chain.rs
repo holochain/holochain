@@ -125,12 +125,12 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                         if secret == query {
                             tokio_safe_block_on::tokio_safe_block_on(
                                 async {
-                                    let entry = fatal_db_deserialize_check!(
+                                    let entry = fatal_db_hash_construction_check!(
                                         "SourceChain::get_persisted_cap_grant_by_secret",
                                         hash_bytes,
                                         EntryHashed::with_data(entry).await,
                                     );
-                                    fatal_db_hash_check!(
+                                    fatal_db_hash_integrity_check!(
                                         "SourceChain::get_persisted_cap_grant_by_secret",
                                         hash_bytes,
                                         entry.as_hash().get_bytes()
@@ -185,12 +185,12 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                     if claim.secret() == query {
                         tokio_safe_block_on::tokio_safe_block_on(
                             async move {
-                                let entry = fatal_db_deserialize_check!(
+                                let entry = fatal_db_hash_construction_check!(
                                     "SourceChain::get_persisted_cap_claim_by_secret",
                                     hash_bytes,
                                     EntryHashed::with_data(entry).await,
                                 );
-                                fatal_db_hash_check!(
+                                fatal_db_hash_integrity_check!(
                                     "SourceChain::get_persisted_cap_claim_by_secret",
                                     hash_bytes,
                                     entry.as_hash().get_bytes()
