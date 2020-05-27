@@ -8,7 +8,12 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::header::{EntryDelete, EntryUpdate};
-use holochain_types::{composite_hash::EntryHash, header::LinkAdd, shims::*, Header, HeaderHashed};
+use holochain_types::{
+    composite_hash::EntryHash,
+    header::{LinkAdd, LinkRemove},
+    shims::*,
+    Header, HeaderHashed,
+};
 use mockall::mock;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
@@ -92,6 +97,9 @@ pub trait ChainMetaBufT {
     /// Add a link
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
+    /// Remove a link
+    fn remove_link<'a>(&'a mut self, link_add: LinkRemove) -> DatabaseResult<()>;
+
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
     fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
 
@@ -166,7 +174,6 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         Ok(results.into_iter().map(|(_, v)| v).collect())
     }
 
-    // TODO: Figure out how to use this with MustFuture
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         let base = &link_add.base_address.clone();
         let target = link_add.target_address.clone();
@@ -179,6 +186,10 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         self.links_meta
             .insert(key.to_key(), Op::Add(link_address, target));
         DatabaseResult::Ok(())
+    }
+
+    fn remove_link<'a>(&'a mut self, link_add: LinkRemove) -> DatabaseResult<()> {
+        todo!()
     }
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
@@ -207,7 +218,8 @@ mock! {
     pub ChainMetaBuf
     {
         fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<HashSet<EntryHash>>;
-        fn add_link(&mut self, link: LinkAdd) -> DatabaseResult<()>;
+        fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
+        fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
         fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
         fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -242,6 +254,10 @@ impl ChainMetaBufT for MockChainMetaBuf {
         self.add_link(link_add)
     }
 
+    fn remove_link<'a>(&'a mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+        self.remove_link(link_remove)
+    }
+
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
         self.add_update(update)
     }
@@ -265,49 +281,95 @@ mod test {
     use super::*;
     use crate::fixt::EntryFixturator;
     use fixt::prelude::*;
-    use holo_hash::{AgentPubKeyFixturator, HeaderHashFixturator};
+    use holo_hash::{AgentPubKeyFixturator, EntryContentHashFixturator, HeaderHashFixturator};
     use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
     use holochain_types::{EntryHashed, Timestamp};
     use maplit::hashset;
+
+    fixturator!(
+        LinkAdd;
+        curve Empty LinkAdd {
+            author: AgentPubKeyFixturator::new(Empty).next().unwrap(),
+            timestamp: Timestamp::now(),
+            header_seq: U32Fixturator::new(Empty).next().unwrap(),
+            prev_header: HeaderHashFixturator::new(Empty).next().unwrap(),
+            base_address: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
+            target_address: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
+            tag: StringFixturator::new(Empty).next().unwrap(),
+            link_type: SerializedBytesFixturator::new(Empty).next().unwrap(),
+        };
+        curve Unpredictable LinkAdd {
+            author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+            timestamp: Timestamp::now(),
+            header_seq: U32Fixturator::new(Unpredictable).next().unwrap(),
+            prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
+            base_address: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
+            target_address: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
+            tag: StringFixturator::new(Unpredictable).next().unwrap(),
+            link_type: SerializedBytesFixturator::new(Unpredictable).next().unwrap(),
+        };
+        curve Predictable LinkAdd {
+            author: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            timestamp: Timestamp::now(),
+            header_seq: U32Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            prev_header: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            base_address: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
+            target_address: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
+            tag: StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            link_type: SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+        };
+    );
+
+    struct KnownLinkAdd {
+        base_address: EntryHash,
+        target_address: EntryHash,
+        tag: String,
+    }
+
+    impl Iterator for LinkAddFixturator<KnownLinkAdd> {
+        type Item = LinkAdd;
+        fn next(&mut self) -> Option<Self::Item> {
+            let mut f = LinkAddFixturator::new(Unpredictable).next().unwrap();
+            f.base_address = self.0.curve.base_address.clone();
+            f.target_address = self.0.curve.target_address.clone();
+            f.tag = self.0.curve.tag.clone();
+            Some(f)
+        }
+    }
+
+    async fn entries() -> (EntryHashed, EntryHashed) {
+        let mut entry_fix = EntryFixturator::new(Unpredictable);
+        (
+            EntryHashed::with_data(entry_fix.next().unwrap())
+                .await
+                .unwrap(),
+            EntryHashed::with_data(entry_fix.next().unwrap())
+                .await
+                .unwrap(),
+        )
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn can_add_and_get_link() {
         let arc = test_cell_env();
         let env = arc.guard().await;
 
-        // why the block_on here, when we're already in an async fn?
-        let (base_hash, target_hash) = tokio_safe_block_on::tokio_safe_block_on(
-            async {
-                let mut entry_fix = EntryFixturator::new(Unpredictable);
-                (
-                    EntryHashed::with_data(entry_fix.next().unwrap())
-                        .await
-                        .unwrap(),
-                    EntryHashed::with_data(entry_fix.next().unwrap())
-                        .await
-                        .unwrap(),
-                )
-            },
-            std::time::Duration::from_secs(1),
-        )
-        .unwrap();
+        // Create a known link add
+        let (base_hash, target_hash) = entries().await;
 
         let tag = StringFixturator::new(Unpredictable).next().unwrap();
         let base_address: &EntryHash = base_hash.as_ref();
         let target_address: &EntryHash = target_hash.as_ref();
-        let add_link = LinkAdd {
-            author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-            timestamp: Timestamp::now(),
-            header_seq: 0,
-            prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
+
+        let link_add = KnownLinkAdd {
             base_address: base_address.clone(),
             target_address: target_address.clone(),
             tag: tag.clone(),
-            link_type: SerializedBytesFixturator::new(Unpredictable)
-                .next()
-                .unwrap(),
         };
 
+        let link_add = LinkAddFixturator::new(link_add).next().unwrap();
+
+        // Check it's empty
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
@@ -318,22 +380,97 @@ mod test {
         })
         .unwrap();
 
+        // Add a link
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            {
-                let _ = meta_buf.add_link(add_link).await;
-            }
+            meta_buf.add_link(link_add).await.unwrap();
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
 
+        // Check it's there
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
                 meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
                 hashset! {target_address.clone()}
             );
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn can_add_and_delete_link() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+
+        // Create a known link add
+        let (base_hash, target_hash) = entries().await;
+
+        let tag = StringFixturator::new(Unpredictable).next().unwrap();
+        let base_address: &EntryHash = base_hash.as_ref();
+        let target_address: &EntryHash = target_hash.as_ref();
+
+        let link_add = KnownLinkAdd {
+            base_address: base_address.clone(),
+            target_address: target_address.clone(),
+            tag: tag.clone(),
+        };
+
+        let link_add = LinkAddFixturator::new(link_add).next().unwrap();
+
+        // Create a known link remove
+        let link_remove = todo!();
+
+        // Check it's empty
+        env.with_reader(|reader| {
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            assert!(meta_buf
+                .get_links(base_hash.as_ref(), tag.clone())
+                .unwrap()
+                .is_empty());
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+
+        // Add a link
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            meta_buf.add_link(link_add).await.unwrap();
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+
+        // Check it's there
+        env.with_reader(|reader| {
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            assert_eq!(
+                meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
+                hashset! {target_address.clone()}
+            );
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+
+        // Remove the link
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            meta_buf.remove_link(link_remove).unwrap();
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+
+        // Check it's empty
+        env.with_reader(|reader| {
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            assert!(meta_buf
+                .get_links(base_hash.as_ref(), tag.clone())
+                .unwrap()
+                .is_empty());
             DatabaseResult::Ok(())
         })
         .unwrap();
