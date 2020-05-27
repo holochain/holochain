@@ -24,20 +24,14 @@ impl HolochainP2pCell {
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     pub async fn join(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender
-            .join(actor::Join {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
-            })
+            .join((*self.dna_hash).clone(), (*self.agent_pub_key).clone())
             .await
     }
 
     /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
     pub async fn leave(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender
-            .leave(actor::Leave {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
-            })
+            .leave((*self.dna_hash).clone(), (*self.agent_pub_key).clone())
             .await
     }
 

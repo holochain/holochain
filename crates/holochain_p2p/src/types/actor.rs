@@ -2,22 +2,6 @@
 
 use crate::*;
 
-/// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-pub struct Join {
-    /// The dna_hash / space_hash context.
-    pub dna_hash: DnaHash,
-    /// The agent_id / agent_pub_key context.
-    pub agent_pub_key: AgentPubKey,
-}
-
-/// If a cell is deactivated, we'll need to "leave" the network module as well.
-pub struct Leave {
-    /// The dna_hash / space_hash context.
-    pub dna_hash: DnaHash,
-    /// The agent_id / agent_pub_key context.
-    pub agent_pub_key: AgentPubKey,
-}
-
 /// Invoke a zome function on a remote node (if you have been granted the capability).
 pub struct CallRemote {
     /// The dna_hash / space_hash context.
@@ -68,9 +52,9 @@ ghost_actor::ghost_actor! {
     /// actor instance.
     pub actor HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-        fn join(input: Join) -> ();
+        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
         /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
-        fn leave(input: Leave) -> ();
+        fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
         /// Invoke a zome function on a remote node (if you have been granted the capability).
         fn call_remote(input: CallRemote) -> (); // TODO - proper return type
         /// Publish data to the correct neigborhood.

@@ -10,8 +10,9 @@ use space::*;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
-        /// temp because ghost_chan doesn't allow empty Api
-        fn ping() -> ();
+        /// Make a remote request right-now if we have an open connection,
+        /// otherwise, return an error.
+        fn immediate_request(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Arc<Vec<u8>>;
     }
 }
 
@@ -34,16 +35,33 @@ impl KitsuneP2pActor {
             spaces: HashMap::new(),
         })
     }
+
+    fn handle_internal_immediate_request(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        data: Arc<Vec<u8>>,
+    ) -> KitsuneP2pHandlerResult<Arc<Vec<u8>>> {
+        let space = match self.spaces.get_mut(&space) {
+            None => {
+                return Err(KitsuneP2pError::RoutingFailure(format!(
+                    "space '{:?}' not joined",
+                    space
+                )))
+            }
+            Some(space) => space,
+        };
+        let space_request_fut = space.handle_internal_immediate_request(agent, data)?;
+        Ok(async move { space_request_fut.await }.boxed().into())
+    }
 }
 
 impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
     fn handle_join(
         &mut self,
-        space: KitsuneSpace,
-        agent: KitsuneAgent,
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
-        let space = Arc::new(space);
-        let agent = Arc::new(agent);
         let space = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(Space::new(
@@ -57,11 +75,9 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
 
     fn handle_leave(
         &mut self,
-        space: KitsuneSpace,
-        agent: KitsuneAgent,
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
-        let space = Arc::new(space);
-        let agent = Arc::new(agent);
         let space = match self.spaces.get_mut(&space) {
             None => return Ok(async move { Ok(()) }.boxed().into()),
             Some(space) => space,
@@ -78,11 +94,10 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
 
     fn handle_request(
         &mut self,
-        space: KitsuneSpace,
-        agent: KitsuneAgent,
-        data: Vec<u8>,
-    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
-        let space = Arc::new(space);
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        data: Arc<Vec<u8>>,
+    ) -> KitsuneP2pHandlerResult<Arc<Vec<u8>>> {
         let space = match self.spaces.get_mut(&space) {
             None => {
                 return Err(KitsuneP2pError::RoutingFailure(format!(
@@ -92,7 +107,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
             }
             Some(space) => space,
         };
-        let space_request_fut = space.handle_request(Arc::new(agent), data)?;
+        let space_request_fut = space.handle_request(agent, data)?;
         Ok(async move { space_request_fut.await }.boxed().into())
     }
 
@@ -105,5 +120,30 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         _input: actor::MultiRequest,
     ) -> KitsuneP2pHandlerResult<Vec<actor::MultiRequestResponse>> {
         Ok(async move { Ok(vec![]) }.boxed().into())
+    }
+
+    fn handle_ghost_actor_internal(&mut self, input: Internal) -> KitsuneP2pResult<()> {
+        match input {
+            Internal::ImmediateRequest {
+                span,
+                respond,
+                space,
+                agent,
+                data,
+            } => {
+                let _g = span.enter();
+                let res_fut = match self.handle_internal_immediate_request(space, agent, data) {
+                    Err(e) => {
+                        let _ = respond(Err(e));
+                        return Ok(());
+                    }
+                    Ok(f) => f,
+                };
+                tokio::task::spawn(async move {
+                    let _ = respond(res_fut.await);
+                });
+            }
+        }
+        Ok(())
     }
 }
