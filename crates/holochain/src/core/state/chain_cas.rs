@@ -116,7 +116,11 @@ impl<'env, R: Readable> ChainCasBuf<'env, R> {
                 header_address,
                 HeaderHashed::with_data(header).await,
             );
-            fatal_db_hash_integrity_check!("ChainCasBuf::get_header", header_address, header.as_hash());
+            fatal_db_hash_integrity_check!(
+                "ChainCasBuf::get_header",
+                header_address,
+                header.as_hash()
+            );
             Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
         } else {
             Ok(None)
