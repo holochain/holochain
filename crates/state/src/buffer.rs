@@ -16,7 +16,7 @@ pub use kv::KvBuf;
 pub use kv_int::IntKvBuf;
 pub use kvv::KvvBuf;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Display, hash::Hash};
+use std::hash::Hash;
 
 /// General trait for transactional stores, exposing only the method which
 /// adds changes to the write transaction. This generalization is not really used,

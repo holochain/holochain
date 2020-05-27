@@ -3,7 +3,7 @@ use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
-    prelude::{Readable, Reader, Writer},
+    prelude::{Reader, Writer},
 };
 use holochain_types::{
     dna::{DnaDef, DnaDefHashed, DnaFile},

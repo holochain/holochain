@@ -1,16 +1,12 @@
-use super::{
-    kv::{KvBuf, SingleIter},
-    BufKey, BufVal, BufferedStore,
-};
+use super::{kv::KvBuf, BufKey, BufVal, BufferedStore};
 use crate::{
     error::{DatabaseError, DatabaseResult},
     fatal_db_deserialize_check, fatal_db_hash_check,
     prelude::{Reader, Writer},
-    transaction::Readable,
 };
-use futures::future::{BoxFuture, FutureExt, OptionFuture};
+use futures::future::{BoxFuture, FutureExt};
 use holo_hash::Hashable;
-use must_future::MustBoxFuture;
+use holo_hash_core::HoloHashCoreHash;
 
 /// A wrapper around a KvBuf where keys are always Addresses,
 /// and values are always AddressableContent.
@@ -32,13 +28,13 @@ where
     }
 
     /// Get a value from the underlying [KvBuf]
-    pub fn get<'a>(&'env self, k: &'env H::HashType) -> BoxFuture<'env, DatabaseResult<Option<H>>> {
+    pub fn get<'a>(
+        &'env self,
+        hash: &'env H::HashType,
+    ) -> BoxFuture<'env, DatabaseResult<Option<H>>> {
         async move {
-            Ok(if let Some(content) = self.0.get(k)? {
-                let data =
-                    fatal_db_deserialize_check!("CasBuf::get", k, H::with_data(content).await);
-                fatal_db_hash_check!("CasBuf::get", k, data.as_hash());
-                Some(data)
+            Ok(if let Some(content) = self.0.get(hash)? {
+                Some(Self::deserialize_and_hash(hash.get_bytes(), content).await)
             } else {
                 None
             })
@@ -58,9 +54,22 @@ where
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&self) -> DatabaseResult<Box<dyn Iterator<Item = H>>> {
-        todo!("hook up")
-        // self.0.iter_raw()
+    pub fn iter_raw(&'env self) -> DatabaseResult<Box<dyn Iterator<Item = H> + 'env>> {
+        Ok(Box::new(self.0.iter_raw()?.map(|(hash, content)| {
+            // FIXME: make this a stream
+            tokio_safe_block_on::tokio_safe_block_on(
+                Self::deserialize_and_hash(hash, content),
+                std::time::Duration::from_millis(500),
+            )
+            .expect("TODO: make into stream")
+        })))
+    }
+
+    async fn deserialize_and_hash(hash_bytes: &[u8], content: H::Content) -> H {
+        let data =
+            fatal_db_deserialize_check!("CasBuf::get", hash_bytes, H::with_data(content).await);
+        fatal_db_hash_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
+        data
     }
 }
 

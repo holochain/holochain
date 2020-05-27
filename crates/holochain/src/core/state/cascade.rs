@@ -42,9 +42,8 @@ use super::{
     chain_cas::ChainCasBuf,
     chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus},
 };
-use holochain_state::{error::DatabaseResult, prelude::Reader};
+use holochain_state::error::DatabaseResult;
 use holochain_types::{composite_hash::EntryHash, EntryHashed};
-use holochain_zome_types::entry::Entry;
 use std::collections::HashSet;
 use tracing::*;
 

@@ -1181,6 +1181,7 @@ dependencies = [
  "failure",
  "futures",
  "holo_hash",
+ "holo_hash_core",
  "holochain_crypto",
  "holochain_keystore",
  "holochain_types",

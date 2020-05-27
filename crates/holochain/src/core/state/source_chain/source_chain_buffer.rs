@@ -8,7 +8,7 @@ use holochain_state::db::GetDb;
 use holochain_state::{
     buffer::BufferedStore,
     error::DatabaseResult,
-    prelude::{Readable, Reader, Writer},
+    prelude::{Reader, Writer},
 };
 use holochain_types::{
     composite_hash::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,

@@ -1,10 +1,9 @@
-use holo_hash::{Hashable, Hashed, WasmHash};
+use holo_hash::WasmHash;
 use holochain_state::buffer::{BufferedStore, CasBuf};
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
-use holochain_state::transaction::Readable;
 use holochain_state::transaction::{Reader, Writer};
-use holochain_types::dna::wasm::{DnaWasm, DnaWasmHashed};
+use holochain_types::dna::wasm::DnaWasmHashed;
 
 pub type WasmCas<'env> = CasBuf<'env, DnaWasmHashed>;
 
@@ -34,31 +33,39 @@ impl<'env> BufferedStore<'env> for WasmBuf<'env> {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
-async fn wasm_store_round_trip() -> DatabaseResult<()> {
-    use holochain_state::env::ReadManager;
-    use holochain_state::prelude::*;
-    holochain_types::observability::test_run().ok();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use holo_hash::{Hashable, Hashed};
+    use holochain_types::dna::wasm::DnaWasm;
 
-    // all the stuff needed to have a WasmBuf
-    let env = holochain_state::test_utils::test_wasm_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    let reader = env_ref.reader()?;
-    let mut wasm_buf =
-        WasmBuf::new(&reader, dbs.get_db(&*holochain_state::db::WASM).unwrap()).unwrap();
+    #[tokio::test(threaded_scheduler)]
+    async fn wasm_store_round_trip() -> DatabaseResult<()> {
+        use holochain_state::env::ReadManager;
+        use holochain_state::prelude::*;
+        holochain_types::observability::test_run().ok();
 
-    // a wasm
-    let wasm =
-        DnaWasmHashed::with_data(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo)).await?;
+        // all the stuff needed to have a WasmBuf
+        let env = holochain_state::test_utils::test_wasm_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = env_ref.reader()?;
+        let mut wasm_buf =
+            WasmBuf::new(&reader, dbs.get_db(&*holochain_state::db::WASM).unwrap()).unwrap();
 
-    // a wasm in the WasmBuf
-    wasm_buf.put(wasm.clone());
-    // a wasm from the WasmBuf
-    let ret = wasm_buf.get(&wasm.as_hash()).await.unwrap().unwrap();
+        // a wasm
+        let wasm =
+            DnaWasmHashed::with_data(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo))
+                .await?;
 
-    // assert the round trip
-    assert_eq!(ret, wasm);
+        // a wasm in the WasmBuf
+        wasm_buf.put(wasm.clone());
+        // a wasm from the WasmBuf
+        let ret = wasm_buf.get(&wasm.as_hash()).await.unwrap().unwrap();
 
-    Ok(())
+        // assert the round trip
+        assert_eq!(ret, wasm);
+
+        Ok(())
+    }
 }

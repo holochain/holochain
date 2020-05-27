@@ -151,7 +151,7 @@ pub mod tests {
     use crate::{conductor::api::MockCellConductorApi, core::state::source_chain::SourceChain};
     use fallible_iterator::FallibleIterator;
     use holo_hash::Hashed;
-    use holochain_state::{env::*, prelude::Readable, test_utils::test_cell_env};
+    use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
         header, observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},

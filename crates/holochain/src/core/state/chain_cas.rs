@@ -20,14 +20,12 @@ use holochain_state::{
     },
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
-    prelude::{Readable, Reader, Writer},
+    prelude::{Reader, Writer},
 };
 use holochain_types::{
     composite_hash::{EntryHash, HeaderAddress},
     entry::EntryHashed,
-    header,
-    prelude::Signature,
-    Header, HeaderHashed,
+    header, Header,
 };
 use holochain_zome_types::entry::Entry;
 use tracing::*;

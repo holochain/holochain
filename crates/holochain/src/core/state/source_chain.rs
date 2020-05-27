@@ -7,11 +7,7 @@ use derive_more::{From, Into};
 use futures::future::{BoxFuture, FutureExt};
 use holo_hash::*;
 use holochain_keystore::Signature;
-use holochain_state::{
-    db::GetDb,
-    error::DatabaseResult,
-    prelude::{Readable, Reader},
-};
+use holochain_state::{db::GetDb, error::DatabaseResult, prelude::Reader};
 use holochain_types::{
     composite_hash::HeaderAddress, header::EntryVisibility, prelude::*, Header, HeaderHashed,
 };

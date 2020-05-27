@@ -33,7 +33,7 @@ Corrupt module: {}
 Expected hash: {:?}
 Deserialization Error: {:?}
 
-We are shutting down as a precoution to prevent further corruption."#,
+We are shutting down as a precaution to prevent further corruption."#,
                     $hint,
                     $h,
                     e,
@@ -50,7 +50,7 @@ macro_rules! fatal_db_hash_check {
         fatal_db_hash_check!($hint, $h1, $h2);
     };
     ($hint:expr, $h1:expr, $h2:expr) => {
-        if $h1 != $h2 {
+        if *$h1 != *$h2 {
             $crate::fatal!(
                 r#"Holochain detected database corruption.
 

@@ -26,7 +26,7 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'env, R: Readable = Reader<'env>> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
+type Store<'env, R = Reader<'env>> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
 
 /// A BufferedStore for interacting with the ChainSequence database
 pub struct ChainSequenceBuf<'env, R: Readable = Reader<'env>> {
