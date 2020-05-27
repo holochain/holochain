@@ -119,15 +119,28 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
             .iter_raw()?
-            .filter_map(|(key, entry)| {
+            .filter_map(|(hash_bytes, entry)| {
                 entry.as_cap_grant().and_then(|grant| {
                     grant.access().secret().and_then(|secret| {
                         if secret == query {
-                            let hash = tokio_safe_block_on::tokio_safe_block_on(
-                                async { EntryContentHash::with_pre_hashed(key.to_owned()).await },
+                            tokio_safe_block_on::tokio_safe_block_on(
+                                async {
+                                    let entry = fatal_db_deserialize_check!(
+                                        "SourceChain::get_persisted_cap_grant_by_secret",
+                                        hash_bytes,
+                                        EntryHashed::with_data(entry).await,
+                                    );
+                                    fatal_db_hash_check!(
+                                        "SourceChain::get_persisted_cap_grant_by_secret",
+                                        hash_bytes,
+                                        entry.as_hash().get_bytes()
+                                    );
+                                    let hash = entry.as_hash().clone();
+                                    Some((hash, grant.clone()))
+                                },
                                 std::time::Duration::from_millis(1000),
-                            );
-                            Some((hash, grant))
+                            )
+                            .expect("Hashing took too long")
                         } else {
                             None
                         }
@@ -167,14 +180,27 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                 "SourceChainBuf must have access to private entries in order to access CapClaims",
             )
             .iter_raw()?
-            .filter_map(|(key, entry)| {
-                entry.as_cap_claim().and_then(|claim| {
+            .filter_map(|(hash_bytes, entry)| {
+                entry.clone().as_cap_claim().and_then(|claim| {
                     if claim.secret() == query {
-                        let hash = tokio_safe_block_on::tokio_safe_block_on(
-                            async { EntryContentHash::with_pre_hashed(key.to_owned()).await },
+                        tokio_safe_block_on::tokio_safe_block_on(
+                            async move {
+                                let entry = fatal_db_deserialize_check!(
+                                    "SourceChain::get_persisted_cap_claim_by_secret",
+                                    hash_bytes,
+                                    EntryHashed::with_data(entry).await,
+                                );
+                                fatal_db_hash_check!(
+                                    "SourceChain::get_persisted_cap_claim_by_secret",
+                                    hash_bytes,
+                                    entry.as_hash().get_bytes()
+                                );
+                                let hash = entry.as_hash().clone();
+                                Some((hash, claim.clone()))
+                            },
                             std::time::Duration::from_millis(1000),
-                        );
-                        Some((hash, claim.clone()))
+                        )
+                        .expect("Hashing took too long")
                     } else {
                         None
                     }
