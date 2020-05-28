@@ -174,7 +174,6 @@ impl<'env> ChainCasBuf<'env> {
         signed_header: SignedHeaderHashed,
         maybe_entry: Option<EntryHashed>,
     ) -> DatabaseResult<()> {
-
         if let Some(entry) = maybe_entry {
             if let Some((_, entry_type)) = signed_header.header().entry_data() {
                 match entry_type.visibility() {
