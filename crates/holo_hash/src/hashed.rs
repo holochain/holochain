@@ -39,11 +39,9 @@ pub trait Hashed {
 
 /// Trait representing a type that has been hashed,
 /// and knows how to hash its own content
-pub trait Hashable: Hashed {
+pub trait Hashable: Hashed + Sized {
     /// Construct an instance from content
-    fn with_data(content: Self::Content) -> BoxFuture<'static, Result<Self, SerializedBytesError>>
-    where
-        Self: Sized;
+    fn with_data(content: Self::Content) -> BoxFuture<'static, Result<Self, SerializedBytesError>>;
 }
 
 /// Generic based "Hashed" struct implementation.
