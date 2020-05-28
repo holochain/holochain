@@ -214,11 +214,11 @@ impl<'env> ChainCasBuf<'env> {
     }
 
     pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
-        self.headers.delete(header_hash.into());
-        self.public_entries.delete(entry_hash.clone().into());
+        self.headers.delete(header_hash);
         if let Some(db) = self.private_entries.as_mut() {
-            db.delete(entry_hash.into())
+            db.delete(entry_hash.clone())
         }
+        self.public_entries.delete(entry_hash);
     }
 
     pub fn headers(&self) -> &HeaderCas<'env> {

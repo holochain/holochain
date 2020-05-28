@@ -64,11 +64,12 @@ impl<'env> DnaDefBuf<'env> {
     }
 
     pub async fn get(&self, dna_hash: &DnaHash) -> DatabaseResult<Option<DnaDefHashed>> {
-        self.dna_defs.get(&dna_hash.clone().into()).await
+        self.dna_defs.get(dna_hash).await
     }
 
     pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        Ok(self.dna_defs.put(DnaDefHashed::with_data(dna_def).await?))
+        self.dna_defs.put(DnaDefHashed::with_data(dna_def).await?);
+        Ok(())
     }
 
     pub fn iter(&'env self) -> DatabaseResult<impl Iterator<Item = DnaDefHashed> + 'env> {

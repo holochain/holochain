@@ -515,7 +515,6 @@ where
         let wasm_tasks = dna_def_buf
             .iter()?
             .map(|dna_def| {
-                let dna_def = dna_def.clone();
                 // Load all wasms for each dna_def from the wasm db into memory
                 let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| async {
                     wasm_buf
