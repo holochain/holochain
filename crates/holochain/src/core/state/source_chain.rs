@@ -302,29 +302,48 @@ impl<'a> ChainElementEntry<'a> {
 #[derive(Clone, Debug, From, Into, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct SignedHeader(Header, Signature);
 
+impl SignedHeader {
+    pub fn header(&self) -> &Header {
+        &self.0
+    }
+
+    pub fn signature(&self) -> &Signature {
+        &self.1
+    }
+}
+
+// HACK: In this representation, we have to clone the Header and store it twice,
+// once in the HeaderHashed, and once in the SignedHeader. The reason is that
+// the API currently requires references to both types, and it was easier to
+// to a simple clone than to refactor the entire struct and API to remove the
+// need for one of those references. We probably SHOULD do that refactor at
+// some point.
+// FIXME: refactor so that HeaderHashed is not stored, and then remove the
+// header_hashed method which returns a reference to HeaderHashed.
+// BTW, I tried to think about the possibility of the following, but none were easy:
+// - Having a lazily instantiable SignedHeader, so we only have to clone if needed
+// - Having HeaderHashed take AsRefs for its arguments, so you can have a
+//    HeaderHashed of references instead of values
 /// the header and the signature that signed it
 #[derive(Clone, Debug, PartialEq)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
-    signature: Signature,
+    signed_header: SignedHeader,
 }
 
 impl Hashed for SignedHeaderHashed {
     type Content = SignedHeader;
-
     type HashType = HeaderHash;
 
     /// Unwrap the complete contents of this "Hashed" wrapper.
     fn into_inner(self) -> (Self::Content, Self::HashType) {
         let (header, hash) = self.header.into_inner();
-        ((header, self.signature).into(), hash)
+        ((header, self.signed_header.1).into(), hash)
     }
 
     /// Access the main item stored in this wrapper type.
     fn as_content(&self) -> &Self::Content {
-        todo!("figure out")
-        // let header = self.header.as_content();
-        // (header, &self.signature)
+        &self.signed_header
     }
 
     /// Access the already-calculated hash stored in this wrapper type.
@@ -343,8 +362,8 @@ impl Hashable for SignedHeaderHashed {
         async move {
             let (header, signature) = signed_header.into();
             Ok(Self {
-                header: HeaderHashed::with_data(header).await?,
-                signature,
+                header: HeaderHashed::with_data(header.clone()).await?,
+                signed_header: SignedHeader(header, signature),
             })
         }
         .boxed()
@@ -361,11 +380,15 @@ impl SignedHeaderHashed {
 
     /// Constructor for an already signed header
     pub fn with_presigned(header: HeaderHashed, signature: Signature) -> Self {
-        Self { header, signature }
+        let signed_header = SignedHeader(header.as_content().clone(), signature);
+        Self {
+            header,
+            signed_header,
+        }
     }
 
-    pub fn into_inner(self) -> (HeaderHashed, Signature) {
-        (self.header, self.signature)
+    pub fn into_header_and_signature(self) -> (HeaderHashed, Signature) {
+        (self.header, self.signed_header.1)
     }
 
     /// Access the Header Hash.
@@ -375,7 +398,7 @@ impl SignedHeaderHashed {
 
     /// Access the Header portion.
     pub fn header(&self) -> &Header {
-        &*self.header
+        &self.header
     }
 
     /// Access the HeaderHashed portion.
@@ -385,7 +408,7 @@ impl SignedHeaderHashed {
 
     /// Access the signature portion.
     pub fn signature(&self) -> &Signature {
-        &self.signature
+        self.signed_header.signature()
     }
 
     /// Validates a signed header
@@ -393,7 +416,7 @@ impl SignedHeaderHashed {
         if !self
             .header
             .author()
-            .verify_signature(&self.signature, &*self.header)
+            .verify_signature(self.signature(), self.header())
             .await?
         {
             return Err(SourceChainError::InvalidSignature);

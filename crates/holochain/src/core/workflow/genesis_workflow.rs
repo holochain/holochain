@@ -177,7 +177,7 @@ pub mod tests {
             let mut headers = Vec::new();
 
             while let Some(h) = iter.next().unwrap() {
-                let (h, _) = h.into_inner();
+                let (h, _) = h.into_header_and_signature();
                 let (h, _) = h.into_inner();
                 headers.push(h);
             }
