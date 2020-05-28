@@ -248,13 +248,13 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
 }
 
 /// Common methods for all HoloHash base hash types
-pub trait HoloHashHashBase {
+pub trait HoloHashBaseExt {
     /// Construct a new hash instance from an already generated hash.
     fn with_pre_hashed(hash: Vec<u8>) -> BoxFuture<'static, Self>;
 }
 
 /// Common methods for all HoloHash hash types
-pub trait HoloHashHash: HoloHashHashBase {
+pub trait HoloHashExt: HoloHashBaseExt {
     /// Construct a new hash instance from raw data.
     fn with_data(data: &[u8]) -> BoxFuture<'static, Self>;
 }
@@ -266,7 +266,7 @@ macro_rules! new_holo_hash {
             #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
             pub struct $name(holo_hash_core::$name);
 
-            impl HoloHashHashBase for $name {
+            impl HoloHashBaseExt for $name {
                 /// Construct a new hash instance from an already generated hash.
                 fn with_pre_hashed(mut hash: Vec<u8>) -> BoxFuture<'static, Self> {
                     async {
@@ -280,7 +280,7 @@ macro_rules! new_holo_hash {
                 }
             }
 
-            impl HoloHashHash for $name {
+            impl HoloHashExt for $name {
 
                 /// Construct a new hash instance from raw data.
                 fn with_data(data: &[u8]) -> BoxFuture<'static, Self> {

@@ -2,7 +2,7 @@
 //!  - within the in-memory dna struct
 //!  - and serialized to json
 use backtrace::Backtrace;
-use holo_hash::HoloHashHash;
+use holo_hash::HoloHashExt;
 use holochain_serialized_bytes::prelude::*;
 use serde::{self, Deserialize, Serialize};
 use std::{
