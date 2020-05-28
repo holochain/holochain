@@ -249,19 +249,15 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
 }
 
 /// Common methods for all HoloHash base hash types
-pub trait HoloHashBaseExt {
+pub trait HoloHashBaseExt: Sized {
     /// Construct a new hash instance from an already generated hash.
-    fn with_pre_hashed(hash: Vec<u8>) -> MustBoxFuture<'static, Self>
-    where
-        Self: Sized;
+    fn with_pre_hashed(hash: Vec<u8>) -> MustBoxFuture<'static, Self>;
 }
 
 /// Common methods for all HoloHash hash types
-pub trait HoloHashExt: HoloHashBaseExt {
+pub trait HoloHashExt: HoloHashBaseExt + Sized {
     /// Construct a new hash instance from raw data.
-    fn with_data(data: &[u8]) -> MustBoxFuture<'static, Self>
-    where
-        Self: Sized;
+    fn with_data(data: &[u8]) -> MustBoxFuture<'static, Self>;
 }
 
 macro_rules! new_holo_hash {
