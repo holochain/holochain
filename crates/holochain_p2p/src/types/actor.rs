@@ -83,3 +83,29 @@ ghost_actor::ghost_actor! {
         fn get_links(input: GetLinks) -> (); // TODO - proper return type
     }
 }
+
+impl HolochainP2pSender {
+    /// Partially apply dna_hash && agent_pub_key to this sender,
+    /// binding it to a specific cell context.
+    pub fn into_cell(
+        self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+    ) -> crate::HolochainP2pCell {
+        crate::HolochainP2pCell {
+            sender: self,
+            dna_hash: Arc::new(dna_hash),
+            agent_pub_key: Arc::new(agent_pub_key),
+        }
+    }
+
+    /// Clone and partially apply dna_hash && agent_pub_key to this sender,
+    /// binding it to a specific cell context.
+    pub fn to_cell(
+        &self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+    ) -> crate::HolochainP2pCell {
+        self.clone().into_cell(dna_hash, agent_pub_key)
+    }
+}

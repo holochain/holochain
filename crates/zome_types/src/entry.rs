@@ -41,11 +41,18 @@ pub enum Entry {
 
 impl Entry {
     /// If this entry represents a capability grant, return a `CapGrant`.
-    #[allow(dead_code)]
-    pub(crate) fn cap_grant(&self) -> Option<CapGrant> {
+    pub fn as_cap_grant(&self) -> Option<CapGrant> {
         match self {
             Entry::Agent(key) => Some(CapGrant::Authorship(key.clone())),
             Entry::CapGrant(data) => Some(CapGrant::ZomeCall(data.clone())),
+            _ => None,
+        }
+    }
+
+    /// If this entry represents a capability claim, return a `CapClaim`.
+    pub fn as_cap_claim(&self) -> Option<&CapClaim> {
+        match self {
+            Entry::CapClaim(claim) => Some(claim),
             _ => None,
         }
     }

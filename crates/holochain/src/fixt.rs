@@ -51,7 +51,7 @@ fixturator!(
 fixturator!(
     ZomeCallCapGrant,
     {
-        match CapGrant::zome_call(
+        ZomeCallCapGrant::new(
             StringFixturator::new(Empty).next().unwrap(),
             CapAccessFixturator::new(Empty).next().unwrap(),
             {
@@ -72,13 +72,10 @@ fixturator!(
                 }
                 granted_functions
             },
-        ) {
-            CapGrant::ZomeCall(zome_call) => zome_call,
-            _ => unreachable!(),
-        }
+        )
     },
     {
-        match CapGrant::zome_call(
+        ZomeCallCapGrant::new(
             StringFixturator::new(Unpredictable).next().unwrap(),
             CapAccessFixturator::new(Unpredictable).next().unwrap(),
             {
@@ -99,13 +96,10 @@ fixturator!(
                 }
                 granted_functions
             },
-        ) {
-            CapGrant::ZomeCall(zome_call) => zome_call,
-            _ => unreachable!(),
-        }
+        )
     },
     {
-        match CapGrant::zome_call(
+        ZomeCallCapGrant::new(
             StringFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -127,10 +121,7 @@ fixturator!(
                 }
                 granted_functions
             },
-        ) {
-            CapGrant::ZomeCall(zome_call) => zome_call,
-            _ => unreachable!(),
-        }
+        )
     }
 );
 

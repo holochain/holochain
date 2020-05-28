@@ -1,7 +1,7 @@
 use super::{kv::KvBuf, BufKey, BufVal, BufferedStore};
 use crate::{
     error::{DatabaseError, DatabaseResult},
-    fatal_db_deserialize_check, fatal_db_hash_check,
+    fatal_db_hash_construction_check, fatal_db_hash_integrity_check,
     prelude::{Reader, Writer},
 };
 use futures::future::{BoxFuture, FutureExt};
@@ -63,10 +63,26 @@ where
     }
 
     async fn deserialize_and_hash(hash_bytes: &[u8], content: H::Content) -> H {
-        let data =
-            fatal_db_deserialize_check!("CasBuf::get", hash_bytes, H::with_data(content).await);
-        fatal_db_hash_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
+        let data = fatal_db_hash_construction_check!(
+            "CasBuf::get",
+            hash_bytes,
+            H::with_data(content).await
+        );
+        fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
         data
+    }
+
+    /// Iterate over items which are staged for PUTs in the scratch space
+    // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
+    // iteration, by chaining this with an iter_raw
+    pub fn iter_scratch_puts(&'env self) -> impl Iterator<Item = H> + 'env {
+        self.0.iter_scratch_puts().map(|(hash, content)| {
+            tokio_safe_block_on::tokio_safe_block_on(
+                Self::deserialize_and_hash(hash.clone().get_bytes(), (**content).clone()),
+                std::time::Duration::from_millis(500),
+            )
+            .expect("TODO: make into stream")
+        })
     }
 }
 

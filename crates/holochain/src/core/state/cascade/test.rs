@@ -106,7 +106,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     let address = jimbo_entry.as_hash();
 
@@ -150,7 +150,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     let address = jimbo_entry.as_hash();
 
@@ -194,7 +194,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     cache
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     let address = jimbo_entry.as_hash();
 
@@ -277,10 +277,10 @@ async fn links_local_return() -> SourceChainResult<()> {
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
@@ -331,10 +331,10 @@ async fn links_cache_return() -> SourceChainResult<()> {
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();

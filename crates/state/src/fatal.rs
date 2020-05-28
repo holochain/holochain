@@ -18,11 +18,11 @@ macro_rules! fatal {
 
 /// Macro for standard handling of db deserialization fatal errors
 #[macro_export]
-macro_rules! fatal_db_deserialize_check {
-    ($hint:expr, $h:expr, $res:expr,) => {
-        fatal_db_deserialize_check!($hint, $h, $res);
+macro_rules! fatal_db_hash_construction_check {
+    ($hint:expr, $hash:expr, $res:expr,) => {
+        fatal_db_hash_construction_check!($hint, $hash, $res);
     };
-    ($hint:expr, $h:expr, $res:expr) => {{
+    ($hint:expr, $hash:expr, $res:expr) => {{
         match $res {
             Ok(res) => res,
             Err(e) => {
@@ -35,7 +35,7 @@ Deserialization Error: {:?}
 
 We are shutting down as a precaution to prevent further corruption."#,
                     $hint,
-                    $h,
+                    $hash,
                     e,
                 );
             }
@@ -45,12 +45,12 @@ We are shutting down as a precaution to prevent further corruption."#,
 
 /// Macro for standard handling of db hash integrity check failures
 #[macro_export]
-macro_rules! fatal_db_hash_check {
-    ($hint:expr, $h1:expr, $h2:expr,) => {
-        fatal_db_hash_check!($hint, $h1, $h2);
+macro_rules! fatal_db_hash_integrity_check {
+    ($hint:expr, $expected_hash:expr, $actual_hash:expr,) => {
+        fatal_db_hash_integrity_check!($hint, $expected_hash, $actual_hash);
     };
-    ($hint:expr, $h1:expr, $h2:expr) => {
-        if *$h1 != *$h2 {
+    ($hint:expr, $expected_hash:expr, $actual_hash:expr) => {
+        if *$expected_hash != *$actual_hash {
             $crate::fatal!(
                 r#"Holochain detected database corruption.
 
@@ -60,8 +60,8 @@ Actual hash: {:?}
 
 We are shutting down as a precaution to prevent further corruption."#,
                 $hint,
-                $h1,
-                $h2,
+                $expected_hash,
+                $actual_hash,
             );
         }
     };

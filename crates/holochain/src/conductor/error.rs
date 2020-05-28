@@ -87,6 +87,9 @@ pub enum ConductorError {
 
     #[error("Tried to deactivate an app that was not active")]
     AppNotActive,
+
+    #[error(transparent)]
+    HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 }
 
 #[derive(Error, Debug)]

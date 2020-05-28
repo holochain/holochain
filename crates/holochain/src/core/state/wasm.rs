@@ -16,7 +16,7 @@ impl<'env> WasmBuf<'env> {
     }
 
     pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
-        self.0.get(wasm_hash).await
+        self.0.get(&wasm_hash.clone().into()).await
     }
 
     pub fn put(&mut self, v: DnaWasmHashed) {

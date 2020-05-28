@@ -95,7 +95,7 @@ impl<'env> ChainCasBuf<'env> {
         match self.public_entries.get(entry_hash).await? {
             Some(entry) => Ok(Some(entry)),
             None => {
-                if let Some(ref db) = self.private_entries {
+                if let Some(ref db) = (self).private_entries {
                     db.get(entry_hash).await
                 } else {
                     Ok(None)
@@ -113,17 +113,6 @@ impl<'env> ChainCasBuf<'env> {
         header_address: &HeaderAddress,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         Ok(self.headers.get(header_address).await?)
-        // if let Ok(Some((header, signature))) = self.headers.get(header_address) {
-        //     let header = fatal_db_deserialize_check!(
-        //         "ChainCasBuf::get_header",
-        //         header_address,
-        //         HeaderHashed::with_data(header).await,
-        //     );
-        //     fatal_db_hash_check!("ChainCasBuf::get_header", header_address, header.as_hash());
-        //     Ok(Some(SignedHeaderHashed::with_presigned(header, signature)))
-        // } else {
-        //     Ok(None)
-        // }
     }
 
     /// Get the Entry out of Header if it exists.
@@ -227,6 +216,10 @@ impl<'env> ChainCasBuf<'env> {
 
     pub fn public_entries(&self) -> &EntryCas<'env> {
         &self.public_entries
+    }
+
+    pub fn private_entries(&self) -> Option<&EntryCas<'env>> {
+        self.private_entries.as_ref()
     }
 }
 
