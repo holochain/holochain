@@ -117,11 +117,11 @@ impl<'env> ChainCasBuf<'env> {
 
     /// Get the Entry out of Header if it exists.
     ///
-    /// If the header contains no entry dataeturn None
+    /// If the header contains no entry data, return None
     /// If the header contains entry data:
-    /// - if it is a public entry, but the entry cannot be foundeturn error
-    /// - if it is a private entry and cannot be foundeturn error
-    /// - if it is a private entry but the private DB is disabledeturn None
+    /// - if it is a public entry, but the entry cannot be found, return error
+    /// - if it is a private entry and cannot be found, return error
+    /// - if it is a private entry but the private DB is disabled, return None
     async fn get_entry_from_header(&self, header: &Header) -> SourceChainResult<Option<Entry>> {
         Ok(match header.entry_data() {
             None => None,
@@ -178,7 +178,6 @@ impl<'env> ChainCasBuf<'env> {
         // let (header, header_address) = header.into_inner();
 
         if let Some(entry) = maybe_entry {
-            // let (entry, entry_hash) = entry.into_inner();
             if let Some((_, entry_type)) = signed_header.header().entry_data() {
                 match entry_type.visibility() {
                     EntryVisibility::Public => self.public_entries.put(entry),
