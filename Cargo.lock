@@ -1141,7 +1141,10 @@ dependencies = [
  "ghost_actor",
  "holo_hash",
  "holochain_keystore",
+ "holochain_serialized_bytes",
  "kitsune_p2p",
+ "serde",
+ "serde_bytes",
  "thiserror",
  "tokio",
 ]

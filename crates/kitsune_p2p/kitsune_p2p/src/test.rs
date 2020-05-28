@@ -37,7 +37,7 @@ mod tests {
                         if &*data != b"hello" {
                             panic!("unexpected request");
                         }
-                        let _ = respond(Ok(Arc::new(b"echo: hello".to_vec())));
+                        let _ = respond(Ok(b"echo: hello".to_vec()));
                     }
                     _ => panic!("unexpected event"),
                 }
@@ -51,6 +51,6 @@ mod tests {
             .request(space1, a2, Arc::new(b"hello".to_vec()))
             .await
             .unwrap();
-        assert_eq!(b"echo: hello".to_vec(), *res);
+        assert_eq!(b"echo: hello".to_vec(), res);
     }
 }

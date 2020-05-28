@@ -11,6 +11,10 @@ pub enum HolochainP2pError {
     #[error(transparent)]
     KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),
 
+    /// SerializedBytesError
+    #[error(transparent)]
+    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+
     /// Custom
     #[error("Custom: {0}")]
     Custom(Box<dyn std::error::Error + Send + Sync>),
@@ -25,6 +29,8 @@ impl HolochainP2pError {
 
 pub mod actor;
 pub mod event;
+
+pub(crate) mod wire;
 
 macro_rules! to_kitsune {
     ($($i:ident<$h:ty, $hc:ty> -> $k:ty,)*) => {

@@ -3,6 +3,7 @@
 
 use holo_hash::*;
 use holochain_keystore::*;
+use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
 
 mod types;
@@ -36,12 +37,16 @@ impl HolochainP2pCell {
     }
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
-    pub async fn call_remote(&mut self) -> actor::HolochainP2pResult<()> {
+    pub async fn call_remote(
+        &mut self,
+        request: SerializedBytes,
+    ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
-            .call_remote(actor::CallRemote {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
-            })
+            .call_remote(
+                (*self.dna_hash).clone(),
+                (*self.agent_pub_key).clone(),
+                request,
+            )
             .await
     }
 
@@ -85,3 +90,5 @@ impl HolochainP2pCell {
             .await
     }
 }
+
+mod test;

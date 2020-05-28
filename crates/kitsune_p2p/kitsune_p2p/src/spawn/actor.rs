@@ -12,7 +12,7 @@ ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
         /// otherwise, return an error.
-        fn immediate_request(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Arc<Vec<u8>>;
+        fn immediate_request(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
     }
 }
 
@@ -41,7 +41,7 @@ impl KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
-    ) -> KitsuneP2pHandlerResult<Arc<Vec<u8>>> {
+    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = match self.spaces.get_mut(&space) {
             None => {
                 return Err(KitsuneP2pError::RoutingFailure(format!(
@@ -97,7 +97,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
-    ) -> KitsuneP2pHandlerResult<Arc<Vec<u8>>> {
+    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = match self.spaces.get_mut(&space) {
             None => {
                 return Err(KitsuneP2pError::RoutingFailure(format!(

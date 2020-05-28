@@ -59,7 +59,7 @@ ghost_actor::ghost_actor! {
         fn leave(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
 
         /// Make a request of a remote agent.
-        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Arc<Vec<u8>>) -> Arc<Vec<u8>>;
+        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
 
         /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
         /// Returns an approximate number of nodes reached.

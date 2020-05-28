@@ -1,9 +1,9 @@
-use crate::{actor, actor::*, event::*};
+use crate::{actor::*, event::*, *};
 
-use crate::types::*;
 use futures::future::FutureExt;
-use holo_hash::*;
 use std::sync::Arc;
+
+use crate::types::AgentPubKeyExt;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::HolochainP2pError> {
@@ -82,14 +82,25 @@ impl HolochainP2pActor {
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         agent: Arc<kitsune_p2p::KitsuneAgent>,
-        _data: Arc<Vec<u8>>,
-    ) -> HolochainP2pHandlerResult<Arc<Vec<u8>>> {
-        let _space = DnaHash::from_kitsune(&space);
-        let _agent = AgentPubKey::from_kitsune(&agent);
-        // TODO - translate this to holochain types - i.e. `call_remote`
-        //let mut evt_sender = self.evt_sender.clone();
-        //Ok(async move { evt_sender.call_remote(space, agent).await.map(Arc::new) }.boxed().into())
-        Ok(async move { Ok(Arc::new(vec![])) }.boxed().into())
+        data: Arc<Vec<u8>>,
+    ) -> HolochainP2pHandlerResult<Vec<u8>> {
+        let space = DnaHash::from_kitsune(&space);
+        let agent = AgentPubKey::from_kitsune(&agent);
+        let request: SerializedBytes = UnsafeBytes::from((*data).clone()).into();
+        let request: crate::wire::WireMessage = request.try_into()?;
+
+        match request {
+            crate::wire::WireMessage::CallRemote { data } => {
+                let data: SerializedBytes = UnsafeBytes::from(data).into();
+                let mut evt_sender = self.evt_sender.clone();
+                Ok(async move {
+                    let res = evt_sender.call_remote(space, agent, data).await;
+                    res.map(|res| UnsafeBytes::from(res).into())
+                }
+                .boxed()
+                .into())
+            }
+        }
     }
 }
 
@@ -122,8 +133,26 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
             .into())
     }
 
-    fn handle_call_remote(&mut self, _input: actor::CallRemote) -> HolochainP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+    fn handle_call_remote(
+        &mut self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+        request: SerializedBytes,
+    ) -> HolochainP2pHandlerResult<SerializedBytes> {
+        let space = dna_hash.into_kitsune();
+        let agent = agent_pub_key.into_kitsune();
+        let data = UnsafeBytes::from(request).into();
+        let req = crate::wire::WireMessage::CallRemote { data };
+        let req = Arc::new(UnsafeBytes::from(SerializedBytes::try_from(req)?).into());
+
+        let mut kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            let result = kitsune_p2p.request(space, agent, req).await?;
+            let result = UnsafeBytes::from(result).into();
+            Ok(result)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_publish(&mut self, _input: actor::Publish) -> HolochainP2pHandlerResult<()> {

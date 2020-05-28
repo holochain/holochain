@@ -2,15 +2,6 @@
 
 use crate::*;
 
-/// Invoke a zome function on a remote node (if you have been granted the capability).
-pub struct CallRemote {
-    /// The dna_hash / space_hash context.
-    pub dna_hash: DnaHash,
-    /// The agent_id / agent_pub_key context.
-    pub agent_pub_key: AgentPubKey,
-    // TODO - parameters
-}
-
 /// Publish data to the correct neigborhood.
 pub struct Publish {
     /// The dna_hash / space_hash context.
@@ -53,16 +44,22 @@ ghost_actor::ghost_actor! {
     pub actor HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
         fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
+
         /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
+
         /// Invoke a zome function on a remote node (if you have been granted the capability).
-        fn call_remote(input: CallRemote) -> (); // TODO - proper return type
+        fn call_remote(dna_hash: DnaHash, agent_pub_key: AgentPubKey, request: SerializedBytes) -> SerializedBytes;
+
         /// Publish data to the correct neigborhood.
         fn publish(input: Publish) -> (); // TODO - proper return type
+
         /// Request a validation package.
         fn get_validation_package(input: GetValidationPackage) -> (); // TODO - proper return type
+
         /// Get an entry from the DHT.
         fn get(input: Get) -> (); // TODO - proper return type
+
         /// Get links from the DHT.
         fn get_links(input: GetLinks) -> (); // TODO - proper return type
     }

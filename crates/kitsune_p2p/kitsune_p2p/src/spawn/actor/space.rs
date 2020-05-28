@@ -54,7 +54,7 @@ impl Space {
         &mut self,
         agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
-    ) -> KitsuneP2pHandlerResult<Arc<Vec<u8>>> {
+    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         // right now we are only implementing the "short-circuit"
         // that routes messages to other agents joined on this same system.
         if !self.agents.contains_key(&agent) {
@@ -79,7 +79,7 @@ impl Space {
         &mut self,
         agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
-    ) -> KitsuneP2pHandlerResult<Arc<Vec<u8>>> {
+    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let mut internal_sender = self.internal_sender.clone();
         Ok(async move {

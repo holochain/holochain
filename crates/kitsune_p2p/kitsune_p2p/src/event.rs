@@ -63,19 +63,19 @@ ghost_actor::ghost_chan! {
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
         /// We are receiving a request from a remote node.
-        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Arc<Vec<u8>>) -> Arc<Vec<u8>>;
+        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
 
         /// We are receiving a broadcast from a remote node.
         fn broadcast(input: BroadcastEvt) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
-        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<(Arc<super::KitsuneDataHash>, Arc<Vec<Arc<super::KitsuneOpHash>>>)>;
+        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<(super::KitsuneDataHash, Vec<super::KitsuneOpHash>)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
-        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Arc<Vec<(Arc<super::KitsuneOpHash>, Arc<Vec<u8>>)>>;
+        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(super::KitsuneOpHash, Vec<u8>)>;
 
         /// Request that our implementor sign some data on behalf of an agent.
-        fn sign_network_data(input: SignNetworkDataEvt) -> Arc<super::KitsuneSignature>;
+        fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;
     }
 }
 
