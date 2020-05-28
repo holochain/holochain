@@ -15,6 +15,7 @@ pub use cas::CasBuf;
 pub use kv::KvBuf;
 pub use kv_int::IntKvBuf;
 pub use kvv::KvvBuf;
+pub use kv::partial_key_match;
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 

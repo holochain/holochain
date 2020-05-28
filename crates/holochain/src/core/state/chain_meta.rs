@@ -2,7 +2,7 @@
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{KvBuf, KvvBuf},
+    buffer::{KvBuf, KvvBuf, partial_key_match},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
@@ -147,8 +147,6 @@ impl<'env> ChainMetaBuf<'env> {
 #[async_trait::async_trait]
 impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     // TODO find out whether we need link_type.
-    // FIXME: The KvBuf SingleIter only checks the db not the scratch
-    // we need to change itto use the scratch
     fn get_links<Tag: Into<String>>(
         &self,
         base: &EntryHash,
@@ -160,14 +158,12 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             link_add_hash: None,
         };
         let k_bytes = key.to_key();
-        let key_len = k_bytes.len();
         // TODO: Internalizethis abstraction to KvBuf
         // TODO: PERF: with_capacity
         let mut links = Vec::new();
         for link in self.links_meta.iter_from(k_bytes.clone())? {
             let (k, link) = link?;
-            // Avoid slice panic
-            if k.get(0..key_len).map(|a| a == &k_bytes[..]).unwrap_or(false) {
+            if partial_key_match(&k_bytes[..], &k) {
                 links.push(link.target)
             } else {
                 break;
@@ -513,6 +509,10 @@ mod test {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             meta_buf.add_link(link_add).await.unwrap();
+            assert_eq!(
+                meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
+                vec![target_address.clone()]
+            );
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }

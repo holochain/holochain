@@ -5,7 +5,11 @@ use crate::{
 };
 use rkv::SingleStore;
 
-use std::{collections::HashMap, marker::PhantomData};
+use std::{
+    collections::{BTreeMap, HashMap},
+    iter::Peekable,
+    marker::PhantomData,
+};
 
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
@@ -29,7 +33,7 @@ where
 {
     db: SingleStore,
     reader: &'env R,
-    scratch: HashMap<Vec<u8>, Op<V>>,
+    scratch: BTreeMap<Vec<u8>, Op<V>>,
     __key: PhantomData<K>,
 }
 
@@ -44,7 +48,7 @@ where
         Ok(Self {
             db,
             reader,
-            scratch: HashMap::new(),
+            scratch: BTreeMap::new(),
             __key: PhantomData,
         })
     }
@@ -87,8 +91,12 @@ where
     }
 
     /// Iterate from a key onwards
-    pub fn iter_from(&self, k: K) -> DatabaseResult<SingleIter<V>> {
-        Ok(SingleIter::new(&self.scratch, self.iter_raw_from(k)?))
+    pub fn iter_from(&self, k: K) -> DatabaseResult<SingleFromIter<V>> {
+        let key = k.as_ref().to_vec();
+        Ok(SingleFromIter::new(
+            SingleIter::new(&self.scratch, self.iter_raw_from(k)?),
+            key,
+        ))
     }
 
     /// Iterate over the data in reverse
@@ -139,13 +147,102 @@ where
     }
 }
 
+/// Match a key on another partial key
+pub fn partial_key_match(partial_key: &[u8], key: &[u8]) -> bool {
+    let len = partial_key.len();
+    // Avoid slice panic
+    key.get(0..len)
+        .map(|a| a == &partial_key[..])
+        .unwrap_or(false)
+}
+type KeyVal<'a, V> = (&'a Vec<u8>, V);
+type KeyValSlice<'env, V> = (&'env [u8], V);
+pub struct SingleFromIter<'env, 'a, V> {
+    partial_matches: std::collections::btree_map::IntoIter<&'a Vec<u8>, V>,
+    iter: SingleIter<'env, 'a, V>,
+    current: Option<DatabaseResult<KeyValSlice<'env, V>>>,
+    current_scratch: Option<KeyVal<'a, V>>,
+}
+
+impl<'env, 'a, V> SingleFromIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    fn new(iter: SingleIter<'env, 'a, V>, key: Vec<u8>) -> Self {
+        let mut deletes = Vec::new();
+        let mut partial_matches: BTreeMap<_, V> = iter
+            .scratch
+            .iter()
+            .skip_while(|(k, _)| !partial_key_match(&key[..], k))
+            .take_while(|(k, _)| partial_key_match(&key[..], k))
+            .filter_map(|(k, v)| match v {
+                Op::Put(v) => Some((k, (**v).clone())),
+                Op::Delete => {
+                    deletes.push(k);
+                    None
+                }
+            })
+            .collect();
+        for delete in deletes {
+            partial_matches.remove(delete);
+        }
+        Self {
+            iter,
+            partial_matches: partial_matches.into_iter(),
+            current: None,
+            current_scratch: None,
+        }
+    }
+}
+
+impl<'env, 'a, V> Iterator for SingleFromIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    type Item = Result<(Vec<u8>, V), DatabaseError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = match self.current.take() {
+            Some(s) => Some(s),
+            None => self.iter.next(),
+        };
+        let current_scratch = match self.current_scratch.take() {
+            Some(s) => Some(s),
+            None => self.partial_matches.next(),
+        };
+
+        match (current, current_scratch) {
+            // Both Db and Scratch have value
+            (Some(Ok(current)), Some(scratch)) => {
+                if current.0 < &scratch.0[..] {
+                    // Different key, db first, keep the scratch
+                    self.current_scratch = Some(scratch);
+                    Some(Ok((current.0.to_vec(), current.1)))
+                } else {
+                    // Different key, scratch first, keep the db
+                    self.current = Some(Ok(current));
+                    Some(Ok((scratch.0.to_vec(), scratch.1)))
+                }
+            }
+            // Scratch is empty return db
+            (Some(Ok(current)), None) => Some(Ok((current.0.to_vec(), current.1))),
+            // Db is empty return scratch
+            (None, Some(scratch)) => Some(Ok((scratch.0.to_vec(), scratch.1))),
+            (Some(Err(e)), scratch) => {
+                self.current_scratch = scratch;
+                Some(Err(e))
+            }
+            (None, None) => None,
+        }
+    }
+}
+
 pub struct SingleIter<'env, 'a, V> {
-    scratch: &'a HashMap<Vec<u8>, Op<V>>,
+    scratch: &'a BTreeMap<Vec<u8>, Op<V>>,
     iter: SingleIterRaw<'env, V>,
 }
 
 impl<'env, 'a, V> SingleIter<'env, 'a, V> {
-    fn new(scratch: &'a HashMap<Vec<u8>, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
+    fn new(scratch: &'a BTreeMap<Vec<u8>, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
         Self { scratch, iter }
     }
 }
@@ -217,7 +314,7 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap};
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
@@ -238,7 +335,7 @@ pub mod tests {
         };
     }
 
-    fn test_buf(a: &HashMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str, Op<V>)>) {
+    fn test_buf(a: &BTreeMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str, Op<V>)>) {
         for (k, v) in b {
             let val = a.get(k.as_bytes()).expect("Missing key");
             assert_eq!(*val, v);
