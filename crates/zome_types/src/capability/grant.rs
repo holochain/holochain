@@ -29,16 +29,24 @@ pub struct ZomeCallCapGrant {
     functions: GrantedFunctions,
 }
 
-impl CapGrant {
-    /// Create a new ZomeCall capability grant
-    pub fn zome_call(tag: String, access: CapAccess, functions: GrantedFunctions) -> Self {
-        CapGrant::ZomeCall(ZomeCallCapGrant {
+impl ZomeCallCapGrant {
+    pub fn new(tag: String, access: CapAccess, functions: GrantedFunctions) -> Self {
+        Self {
             tag,
             access,
             functions,
-        })
+        }
     }
+}
 
+impl From<ZomeCallCapGrant> for CapGrant {
+    /// Create a new ZomeCall capability grant
+    fn from(zccg: ZomeCallCapGrant) -> Self {
+        CapGrant::ZomeCall(zccg)
+    }
+}
+
+impl CapGrant {
     /// Check if a tag matches this grant.
     /// An Authorship grant has no tag, thus will never match any tag
     pub fn tag_matches(&self, query: &str) -> bool {
@@ -108,6 +116,13 @@ impl CapAccess {
             CapAccess::Assigned { secret, assignees } => {
                 Some(secret) == maybe_secret && assignees.contains(agent_key)
             }
+        }
+    }
+
+    pub fn secret(&self) -> Option<&CapSecret> {
+        match self {
+            CapAccess::Transferable { secret } | CapAccess::Assigned { secret, .. } => Some(secret),
+            CapAccess::Unrestricted => None,
         }
     }
 }

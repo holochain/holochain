@@ -11,16 +11,14 @@ use crate::core::{
     state::workspace::{Workspace, WorkspaceError},
 };
 use futures::FutureExt;
-use holo_hash::AgentPubKey;
 use holochain_state::buffer::BufferedStore;
 use holochain_state::prelude::Writer;
-use holochain_types::{dna::DnaDef, header::InitZomesComplete, Header, Timestamp};
+use holochain_types::{dna::DnaDef, header::HeaderBuilder};
 use must_future::MustBoxFuture;
 
 pub(crate) struct InitializeZomesWorkflow<Ribosome: RibosomeT> {
     pub dna_def: DnaDef,
     pub ribosome: Ribosome,
-    pub agent_key: AgentPubKey,
 }
 
 impl<'env, Ribosome> Workflow<'env> for InitializeZomesWorkflow<Ribosome>
@@ -36,11 +34,7 @@ where
         mut workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
         async {
-            let Self {
-                dna_def,
-                agent_key: author,
-                ribosome,
-            } = self;
+            let Self { dna_def, ribosome } = self;
             // Call the init callback
             let result = {
                 // TODO: We need a better solution then reusung the InvokeZomeWorkspace (i.e. ghost actor)
@@ -50,21 +44,11 @@ where
             };
 
             // Insert the init marker
-            let prev_header = workspace.0.source_chain.chain_head()?;
-            let header_seq = workspace
+            workspace
                 .0
                 .source_chain
-                .get_header(&prev_header)
-                .await?
-                .map(|ph| ph.header().header_seq() + 1)
-                .unwrap_or(0);
-            let init_header = Header::InitZomesComplete(InitZomesComplete {
-                author,
-                timestamp: Timestamp::now(),
-                header_seq,
-                prev_header: prev_header.clone(),
-            });
-            workspace.0.source_chain.put(init_header, None).await?;
+                .put(HeaderBuilder::InitZomesComplete, None)
+                .await?;
 
             let fx = WorkflowEffects {
                 workspace,
@@ -100,7 +84,7 @@ pub mod tests {
     use crate::fixt::DnaDefFixturator;
     use fixt::Unpredictable;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::Header;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
@@ -119,16 +103,11 @@ pub mod tests {
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
 
         // Genesis
-        fake_genesis(&mut workspace.0.source_chain).await;
+        fake_genesis(&mut workspace.0.source_chain).await.unwrap();
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        let agent_key = fake_agent_pubkey_1();
 
-        let workflow = InitializeZomesWorkflow {
-            ribosome,
-            dna_def,
-            agent_key,
-        };
+        let workflow = InitializeZomesWorkflow { ribosome, dna_def };
         let (_, effects) = workflow.workflow(workspace).await.unwrap();
 
         // Check the initialize zome was added to a trigger
