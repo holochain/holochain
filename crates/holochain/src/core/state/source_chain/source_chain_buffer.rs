@@ -121,17 +121,13 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     /// Get the AgentPubKey from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
     pub fn agent_pubkey(&self) -> DatabaseResult<Option<AgentPubKey>> {
-        // TODO: rewrite in terms of just getting the correct Header
-        Ok(self
-            .cas
-            .public_entries()
-            .iter_raw()?
-            .filter_map(|(_, e)| match e {
-                Entry::Agent(agent_pubkey) => Some(agent_pubkey),
-                _ => None,
-            })
-            .next()
-            .map(|h| h.into()))
+        // TODO: Should this be using the scratch instead? iter() vs iter_raw()
+        for entry in self.cas.public_entries().iter_raw()? {
+            if let (_, Entry::Agent(agent_pubkey)) = entry? {
+                return Ok(Some(agent_pubkey.into()));
+            }
+        }
+        Ok(None)
     }
 
     pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env, R> {

@@ -73,9 +73,11 @@ impl<'env, R: Readable> DnaDefBuf<'env, R> {
         Ok(dna_hash)
     }
 
-    pub fn iter(&'env self) -> DatabaseResult<impl Iterator<Item = DnaDef> + 'env> {
-        // Don't want to pay for deserializing the keys
-        Ok(self.dna_defs.iter_raw()?.map(|(_, dna_def)| dna_def))
+    pub fn get_all(&'env self) -> DatabaseResult<Vec<DnaDef>> {
+        self.dna_defs
+            .iter_raw()?
+            .map(|r| r.map(|(_, dna_def)| dna_def))
+            .collect()
     }
 }
 

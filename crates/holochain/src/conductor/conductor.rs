@@ -512,7 +512,8 @@ where
         let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .iter()?
+            .get_all()?
+            .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
                 let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {

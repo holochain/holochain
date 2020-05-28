@@ -162,16 +162,19 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         let k_bytes = key.to_key();
         let key_len = k_bytes.len();
         // TODO: Internalizethis abstraction to KvBuf
-        Ok(self
-            .links_meta
-            .iter_from(k_bytes.clone())?
-            .take_while(|(k, _)| {
-                k.get(0..key_len)
-                    .map(|a| a == &k_bytes[..])
-                    .unwrap_or(false)
-            })
-            .map(|l| l.1.target)
-            .collect())
+        // TODO: PERF: with_capacity
+        let mut links = Vec::new();
+        for link in self.links_meta.iter_from(k_bytes.clone())? {
+            let (k, link) = link?;
+            // Avoid slice panic
+            if k.get(0..key_len).map(|a| a == &k_bytes[..]).unwrap_or(false) {
+                links.push(link.target)
+            } else {
+                break;
+            }
+
+        }
+        Ok(links)
     }
 
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
@@ -206,6 +209,9 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             tag: tag.into(),
             link_add_hash: Some(link_remove.link_add_address),
         };
+        // TODO: It should be impossible to ever remove a Link that wasn't already added
+        // because of the validation dependency on LinkAdd from LinkRemove
+        // but do we want some kind of warning or panic here incase we mssed up?
         self.links_meta.delete(key.to_key());
         DatabaseResult::Ok(())
     }

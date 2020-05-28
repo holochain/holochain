@@ -5,8 +5,7 @@ use crate::{
 };
 use rkv::SingleStore;
 
-use std::collections::HashMap;
-use tracing::*;
+use std::{collections::HashMap, marker::PhantomData};
 
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
@@ -30,7 +29,8 @@ where
 {
     db: SingleStore,
     reader: &'env R,
-    scratch: HashMap<K, Op<V>>,
+    scratch: HashMap<Vec<u8>, Op<V>>,
+    __key: PhantomData<K>,
 }
 
 impl<'env, K, V, R> KvBuf<'env, K, V, R>
@@ -45,6 +45,7 @@ where
             db,
             reader,
             scratch: HashMap::new(),
+            __key: PhantomData,
         })
     }
 
@@ -52,7 +53,7 @@ where
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         use Op::*;
-        let val = match self.scratch.get(k) {
+        let val = match self.scratch.get(k.as_ref()) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Delete) => None,
             None => self.get_persisted(k)?,
@@ -62,12 +63,13 @@ where
 
     /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) {
-        self.scratch.insert(k, Op::Put(Box::new(v)));
+        self.scratch
+            .insert(k.as_ref().to_vec(), Op::Put(Box::new(v)));
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) {
-        self.scratch.insert(k, Op::Delete);
+        self.scratch.insert(k.as_ref().to_vec(), Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -79,13 +81,28 @@ where
         }
     }
 
+    /// Iterator that checks the scratch space
+    pub fn iter(&self) -> DatabaseResult<SingleIter<V>> {
+        Ok(SingleIter::new(&self.scratch, self.iter_raw()?))
+    }
+
+    /// Iterate from a key onwards
+    pub fn iter_from(&self, k: K) -> DatabaseResult<SingleIter<V>> {
+        Ok(SingleIter::new(&self.scratch, self.iter_raw_from(k)?))
+    }
+
+    /// Iterate over the data in reverse
+    pub fn iter_reverse(&self) -> DatabaseResult<SingleIter<V>> {
+        Ok(SingleIter::new(&self.scratch, self.iter_raw_reverse()?))
+    }
+
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
     pub fn iter_raw(&self) -> DatabaseResult<SingleIterRaw<V>> {
         Ok(SingleIterRaw::new(self.db.iter_start(self.reader)?))
     }
 
-    /// Iterate from a key onwards
-    pub fn iter_from(&self, k: K) -> DatabaseResult<SingleIterRaw<V>> {
+    /// Iterate from a key onwards without scratch space
+    pub fn iter_raw_from(&self, k: K) -> DatabaseResult<SingleIterRaw<V>> {
         Ok(SingleIterRaw::new(self.db.iter_from(self.reader, k)?))
     }
 
@@ -122,23 +139,22 @@ where
     }
 }
 
-pub struct SingleIter<'env, 'a, K, V> {
-    scratch: &'a HashMap<K, Op<V>>,
+pub struct SingleIter<'env, 'a, V> {
+    scratch: &'a HashMap<Vec<u8>, Op<V>>,
     iter: SingleIterRaw<'env, V>,
 }
 
-impl<'env, 'a, K, V> SingleIter<'env, 'a, K, V> {
-    fn new(scratch: &'a HashMap<K, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
+impl<'env, 'a, V> SingleIter<'env, 'a, V> {
+    fn new(scratch: &'a HashMap<Vec<u8>, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
         Self { scratch, iter }
     }
 }
 
-impl<'env, 'a, K, V> Iterator for SingleIter<'env, 'a, K, V>
+impl<'env, 'a, V> Iterator for SingleIter<'env, 'a, V>
 where
-    K: BufKey,
     V: BufVal,
 {
-    type Item = Result<(K, V), DatabaseError>;
+    type Item = Result<(&'env [u8], V), DatabaseError>;
     fn next(&mut self) -> Option<Self::Item> {
         use Op::*;
         match self.iter.next() {
@@ -146,7 +162,8 @@ where
                 Some(Put(scratch_val)) => Some((k, *scratch_val.clone())),
                 Some(Delete) => None,
                 None => Some((k, v)),
-            }),
+            })
+            .transpose(),
             r => r,
         }
     }
@@ -174,25 +191,17 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.0.next() {
-            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some(
-                rmp_serde::from_read_ref(buf)
-                    .map(|v| (k, v))
-                    .map_err(DatabaseError::from),
-            ),
-            None => None,
-            Some(Ok(_)) => Some(Err(DatabaseError::InvalidValue)),
-            Some(Err(e)) => Some(Err(DatabaseError::from(e))),
-            /*
-            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
+            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some(Ok((
                 k,
-                rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
-            )),
+                rmp_serde::from_read_ref(buf).expect(
+                    "Failed to deserialize data from database. Database might be corrupted",
+                ),
+            ))),
             None => None,
-            x => {
-                error!(?x);
-                panic!("TODO");
-            }
-            */
+            // TODO: Should this panic aswell?
+            Some(Ok(_)) => Some(Err(DatabaseError::InvalidValue)),
+            // This could be a IO error so returning it makes sense
+            Some(Err(e)) => Some(Err(DatabaseError::from(e))),
         }
     }
 }
@@ -229,9 +238,9 @@ pub mod tests {
         };
     }
 
-    fn test_buf(a: &HashMap<&str, Op<V>>, b: impl Iterator<Item = (&'static str, Op<V>)>) {
+    fn test_buf(a: &HashMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str, Op<V>)>) {
         for (k, v) in b {
-            let val = a.get(&k).expect("Missing key");
+            let val = a.get(k.as_bytes()).expect("Missing key");
             assert_eq!(*val, v);
         }
     }
@@ -389,7 +398,11 @@ pub mod tests {
         env.with_reader(|reader| {
             let buf: KvBuf<&str, _> = KvBuf::new(&reader, db).unwrap();
 
-            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            let forward = buf
+                .iter_raw()
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
             debug!(?forward);
             assert_eq!(forward, vec![(&b"a"[..], V(1)), (&b"c"[..], V(3))],);
             Ok(())
@@ -428,7 +441,7 @@ pub mod tests {
         env.with_reader(|reader| {
             let buf: KvBuf<&str, _> = KvBuf::new(&reader, db).unwrap();
 
-            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect::<Result<_, _>>().unwrap();
             assert_eq!(forward, vec![(&b"a"[..], V(5)), (&b"c"[..], V(9))]);
             Ok(())
         })
@@ -569,8 +582,8 @@ pub mod tests {
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let buf: TestBuf = KvBuf::new(&reader, db).unwrap();
 
-            let iter = buf.iter_from("dogs_likes").unwrap();
-            let results = iter.collect::<Vec<_>>();
+            let iter = buf.iter_raw_from("dogs_likes").unwrap();
+            let results = iter.collect::<Result<Vec<_>, _>>().unwrap();
             assert_eq!(
                 results,
                 vec![
