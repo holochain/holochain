@@ -6,10 +6,11 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use crate::composite_hash::EntryHash;
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::entry::Entry;
+use must_future::MustBoxFuture;
 
 make_hashed_base! {
     Visibility(pub),
@@ -20,7 +21,7 @@ make_hashed_base! {
 
 impl Hashable for EntryHashed {
     /// Construct (and hash) a new EntryHashed with given Entry.
-    fn with_data(entry: Entry) -> BoxFuture<'static, Result<Self, SerializedBytesError>> {
+    fn with_data(entry: Entry) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>> {
         async move {
             let hash = match &entry {
                 Entry::Agent(key) => EntryHash::Agent(key.to_owned().into()),
@@ -32,5 +33,6 @@ impl Hashable for EntryHashed {
             Ok(EntryHashed::with_pre_hashed(entry, hash))
         }
         .boxed()
+        .into()
     }
 }

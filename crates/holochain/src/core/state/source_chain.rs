@@ -4,7 +4,7 @@
 //! cannot fail, so the function return types reflect that.
 
 use derive_more::{From, Into};
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{
@@ -23,6 +23,7 @@ use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
     entry::{CapClaimEntry, CapGrantEntry, Entry},
 };
+use must_future::MustBoxFuture;
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
@@ -335,7 +336,7 @@ impl Hashed for SignedHeaderHashed {
 impl Hashable for SignedHeaderHashed {
     fn with_data(
         signed_header: Self::Content,
-    ) -> BoxFuture<'static, Result<Self, SerializedBytesError>>
+    ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
     where
         Self: Sized,
     {
@@ -347,6 +348,7 @@ impl Hashable for SignedHeaderHashed {
             })
         }
         .boxed()
+        .into()
     }
 }
 

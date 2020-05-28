@@ -1005,6 +1005,7 @@ dependencies = [
  "futures",
  "holo_hash_core",
  "holochain_serialized_bytes",
+ "must_future",
  "rand 0.7.3",
  "serde",
  "serde_bytes",

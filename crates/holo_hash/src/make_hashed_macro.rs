@@ -153,7 +153,7 @@ macro_rules! make_hashed {
         impl $crate::Hashable for $n {
 
             /// Serialize and hash the given item, producing a "Hashed" wrapper.
-            fn with_data(content: Self::Content) -> futures::future::BoxFuture<'static, Result<Self, SerializedBytesError>>
+            fn with_data(content: Self::Content) -> must_future::MustBoxFuture<'static, Result<Self, SerializedBytesError>>
             where Self: Sized {
                 use ::std::convert::TryFrom;
                 use futures::future::FutureExt;
@@ -161,7 +161,7 @@ macro_rules! make_hashed {
                     let sb = ::holochain_serialized_bytes::SerializedBytes::try_from(&content)?;
                     Ok(Self::with_pre_hashed(content, Self::HashType::with_data(sb.bytes()).await))
                 }
-                .boxed()
+                .boxed().into()
             }
         }
     };

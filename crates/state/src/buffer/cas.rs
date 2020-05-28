@@ -4,9 +4,10 @@ use crate::{
     fatal_db_hash_construction_check, fatal_db_hash_integrity_check,
     prelude::{Reader, Writer},
 };
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::FutureExt;
 use holo_hash::Hashable;
 use holo_hash_core::HoloHashCoreHash;
+use must_future::MustBoxFuture;
 
 /// A wrapper around a KvBuf where keys are always Addresses,
 /// and values are always AddressableContent.
@@ -28,7 +29,10 @@ where
     }
 
     /// Get a value from the underlying [KvBuf]
-    pub fn get(&'env self, hash: &'env H::HashType) -> BoxFuture<'env, DatabaseResult<Option<H>>> {
+    pub fn get(
+        &'env self,
+        hash: &'env H::HashType,
+    ) -> MustBoxFuture<'env, DatabaseResult<Option<H>>> {
         async move {
             Ok(if let Some(content) = self.0.get(hash)? {
                 Some(Self::deserialize_and_hash(hash.get_bytes(), content).await)
@@ -37,6 +41,7 @@ where
             })
         }
         .boxed()
+        .into()
     }
 
     /// Put a value into the underlying [KvBuf]
