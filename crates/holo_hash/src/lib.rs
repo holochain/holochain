@@ -250,13 +250,17 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
 /// Common methods for all HoloHash base hash types
 pub trait HoloHashBaseExt {
     /// Construct a new hash instance from an already generated hash.
-    fn with_pre_hashed(hash: Vec<u8>) -> BoxFuture<'static, Self>;
+    fn with_pre_hashed(hash: Vec<u8>) -> BoxFuture<'static, Self>
+    where
+        Self: Sized;
 }
 
 /// Common methods for all HoloHash hash types
 pub trait HoloHashExt: HoloHashBaseExt {
     /// Construct a new hash instance from raw data.
-    fn with_data(data: &[u8]) -> BoxFuture<'static, Self>;
+    fn with_data(data: &[u8]) -> BoxFuture<'static, Self>
+    where
+        Self: Sized;
 }
 
 macro_rules! new_holo_hash {
