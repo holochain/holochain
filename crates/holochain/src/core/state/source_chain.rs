@@ -15,7 +15,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
-    header::{EntryType, EntryVisibility, HeaderBuilder, HeaderCommon},
+    header::{builder, EntryType, EntryVisibility, HeaderBuilderCommon, HeaderInner},
     prelude::*,
     EntryHashed, Header, HeaderHashed,
 };
@@ -26,6 +26,7 @@ use holochain_zome_types::{
 use must_future::MustBoxFuture;
 use shrinkwraprs::Shrinkwrap;
 
+use builder::HeaderBuilder;
 pub use error::*;
 pub use source_chain_buffer::*;
 
@@ -61,18 +62,18 @@ impl<'env> SourceChain<'env> {
     }
 
     /// Add a ChainElement to the source chain, using a HeaderBuilder
-    pub async fn put(
+    pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
         &mut self,
-        header_builder: HeaderBuilder,
+        header_builder: B,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderAddress> {
-        let header = header_builder.build(HeaderCommon {
+        let common = HeaderBuilderCommon {
             author: self.agent_pubkey()?,
             timestamp: Timestamp::now(),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
-        });
-
+        };
+        let header = header_builder.build_header(common);
         self.put_raw(header, maybe_entry).await
     }
 
@@ -84,7 +85,7 @@ impl<'env> SourceChain<'env> {
         let (entry, entry_hash) = EntryHashed::with_data(Entry::CapGrant(grant_entry))
             .await?
             .into_inner();
-        let header_builder = HeaderBuilder::EntryCreate {
+        let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapGrant,
             entry_hash,
         };
@@ -99,7 +100,7 @@ impl<'env> SourceChain<'env> {
         let (entry, entry_hash) = EntryHashed::with_data(Entry::CapClaim(claim_entry))
             .await?
             .into_inner();
-        let header_builder = HeaderBuilder::EntryCreate {
+        let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapClaim,
             entry_hash,
         };
