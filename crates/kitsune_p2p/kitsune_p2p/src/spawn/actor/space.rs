@@ -35,6 +35,10 @@ impl Space {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.agents.len()
+    }
+
     pub fn handle_join(&mut self, agent: Arc<KitsuneAgent>) -> KitsuneP2pHandlerResult<()> {
         match self.agents.entry(agent.clone()) {
             Entry::Occupied(_) => (),

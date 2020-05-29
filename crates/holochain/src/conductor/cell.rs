@@ -247,8 +247,10 @@ impl Cell {
         Ok(())
     }
 
-    async fn handle_call_remote(&self, _request: SerializedBytes) -> CellResult<SerializedBytes> {
-        unimplemented!()
+    async fn handle_call_remote(&self, request: SerializedBytes) -> CellResult<SerializedBytes> {
+        // This is a stub call remote handler that just
+        // echoes whatever is sent to it
+        Ok(request)
     }
 
     async fn handle_publish(&self) -> CellResult<()> {

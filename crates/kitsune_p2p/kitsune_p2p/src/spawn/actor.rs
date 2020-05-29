@@ -13,6 +13,9 @@ ghost_actor::ghost_chan! {
         /// Make a remote request right-now if we have an open connection,
         /// otherwise, return an error.
         fn immediate_request(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
+
+        /// Prune space if the agent count it is handling has dropped to zero.
+        fn check_prune_space(space: Arc<KitsuneSpace>) -> ();
     }
 }
 
@@ -51,6 +54,18 @@ impl KitsuneP2pActor {
         let space_request_fut = space.handle_internal_immediate_request(agent, data)?;
         Ok(async move { space_request_fut.await }.boxed().into())
     }
+
+    fn handle_check_prune_space(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        if let std::collections::hash_map::Entry::Occupied(entry) = self.spaces.entry(space) {
+            if entry.get().len() == 0 {
+                entry.remove();
+            }
+        }
+        Ok(async move { Ok(()) }.boxed().into())
+    }
 }
 
 impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
@@ -75,14 +90,19 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
+        let kspace = space.clone();
         let space = match self.spaces.get_mut(&space) {
             None => return Ok(async move { Ok(()) }.boxed().into()),
             Some(space) => space,
         };
         let space_leave_fut = space.handle_leave(agent)?;
+        let mut internal_sender = self.internal_sender.clone();
         Ok(async move {
             space_leave_fut.await?;
-            // TODO - clean up empty spaces
+            internal_sender
+                .ghost_actor_internal()
+                .check_prune_space(kspace)
+                .await?;
             Ok(())
         }
         .boxed()
@@ -127,6 +147,23 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
             } => {
                 let _g = span.enter();
                 let res_fut = match self.handle_internal_immediate_request(space, agent, data) {
+                    Err(e) => {
+                        let _ = respond(Err(e));
+                        return Ok(());
+                    }
+                    Ok(f) => f,
+                };
+                tokio::task::spawn(async move {
+                    let _ = respond(res_fut.await);
+                });
+            }
+            Internal::CheckPruneSpace {
+                span,
+                respond,
+                space,
+            } => {
+                let _g = span.enter();
+                let res_fut = match self.handle_check_prune_space(space) {
                     Err(e) => {
                         let _ = respond(Err(e));
                         return Ok(());
