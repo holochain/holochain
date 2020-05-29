@@ -88,10 +88,10 @@ async fn get_links() -> SourceChainResult<()> {
 
     let base = jimbo_entry.as_hash().clone();
     source_chain
-        .put(jimbo_header, Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header, Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header, Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header, Some(jessy_entry.as_content().clone()))
         .await?;
 
     // Pass in stores as references

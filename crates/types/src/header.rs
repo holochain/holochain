@@ -8,6 +8,9 @@
 
 use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
 
+mod builder;
+pub use builder::{HeaderBuilder, HeaderCommon};
+
 /// Header contains variants for each type of header.
 ///
 /// This struct really defines a local source chain, in the sense that it

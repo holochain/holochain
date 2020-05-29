@@ -42,9 +42,8 @@ use super::{
     chain_cas::ChainCasBuf,
     chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus, Link},
 };
-use holochain_state::{error::DatabaseResult, prelude::Reader};
-use holochain_types::{composite_hash::EntryHash, header::ZomeId, link::Tag};
-use holochain_zome_types::entry::Entry;
+use holochain_state::error::DatabaseResult;
+use holochain_types::{composite_hash::EntryHash, header::ZomeId, link::Tag, EntryHashed};
 use tracing::*;
 
 #[cfg(test)]
@@ -54,17 +53,17 @@ pub struct Cascade<'env, C = ChainMetaBuf<'env>>
 where
     C: ChainMetaBufT,
 {
-    primary: &'env ChainCasBuf<'env, Reader<'env>>,
+    primary: &'env ChainCasBuf<'env>,
     primary_meta: &'env C,
 
-    cache: &'env ChainCasBuf<'env, Reader<'env>>,
+    cache: &'env ChainCasBuf<'env>,
     cache_meta: &'env C,
 }
 
 /// The state of the cascade search
 enum Search {
     /// The entry is found and we can stop
-    Found(Entry),
+    Found(EntryHashed),
     /// We haven't found the entry yet and should
     /// continue searching down the cascade
     Continue,
@@ -83,9 +82,9 @@ where
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
-        primary: &'env ChainCasBuf<'env, Reader<'env>>,
+        primary: &'env ChainCasBuf<'env>,
         primary_meta: &'env C,
-        cache: &'env ChainCasBuf<'env, Reader<'env>>,
+        cache: &'env ChainCasBuf<'env>,
         cache_meta: &'env C,
     ) -> Self {
         Cascade {
@@ -101,11 +100,12 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<Entry>> {
+    pub async fn dht_get(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
         // Cas
         let search = self
             .primary
-            .get_entry(entry_hash)?
+            .get_entry(entry_hash)
+            .await?
             .and_then(|entry| {
                 self.primary_meta.get_crud(entry_hash).ok().map(|crud| {
                     if let EntryDhtStatus::Live = crud {
@@ -119,7 +119,7 @@ where
 
         // Cache
         match search {
-            Search::Continue => Ok(self.cache.get_entry(entry_hash)?.and_then(|entry| {
+            Search::Continue => Ok(self.cache.get_entry(entry_hash).await?.and_then(|entry| {
                 self.cache_meta
                     .get_crud(entry_hash)
                     .ok()
@@ -144,7 +144,7 @@ where
         tag: Tag,
     ) -> DatabaseResult<Vec<Link>> {
         // Am I an authority?
-        let authority = self.primary.contains(&base)?;
+        let authority = self.primary.contains(&base).await?;
         if authority {
             // Cas
             let links = self.primary_meta.get_links(&base, zome_id, tag.clone())?;

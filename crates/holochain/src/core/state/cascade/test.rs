@@ -22,8 +22,8 @@ use mockall::*;
 
 #[allow(dead_code)]
 struct Chains<'env> {
-    source_chain: SourceChainBuf<'env, Reader<'env>>,
-    cache: SourceChainBuf<'env, Reader<'env>>,
+    source_chain: SourceChainBuf<'env>,
+    cache: SourceChainBuf<'env>,
     jimbo_id: AgentPubKey,
     jimbo_header: Header,
     jimbo_entry: EntryHashed,
@@ -107,9 +107,9 @@ async fn live_local_return() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
-    let address = jimbo_entry.as_hash().clone();
+    let address = jimbo_entry.as_hash();
 
     // set it's metadata to LIVE
     mock_primary_meta
@@ -124,9 +124,9 @@ async fn live_local_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(&address.clone().into()).await?;
+    let entry = cascade.dht_get(address).await?;
     // check it returns
-    assert_eq!(&entry.unwrap(), jimbo_entry.as_content());
+    assert_eq!(entry.unwrap(), jimbo_entry);
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -151,9 +151,9 @@ async fn dead_local_none() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
-    let address = jimbo_entry.as_hash().clone();
+    let address = jimbo_entry.as_hash();
 
     // set it's metadata to Dead
     mock_primary_meta
@@ -168,7 +168,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let entry = cascade.dht_get(&address.into()).await?;
+    let entry = cascade.dht_get(address).await?;
     // check it returns none
     assert_eq!(entry, None);
     // check it doesn't hit the cache
@@ -195,9 +195,9 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         ..
     } = setup_env(&reader, &dbs)?;
     cache
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
-    let address = jimbo_entry.as_hash().clone();
+    let address = jimbo_entry.as_hash();
 
     // set it's metadata to Live
     mock_cache_meta
@@ -239,7 +239,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    let address = jimbo_entry.as_hash().clone();
+    let address = jimbo_entry.as_hash();
 
     // call dht_get with above address
     let cascade = Cascade::new(
@@ -278,10 +278,10 @@ async fn links_local_return() -> SourceChainResult<()> {
         mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
@@ -342,10 +342,10 @@ async fn links_cache_return() -> SourceChainResult<()> {
         mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
-        .put(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
+        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
     source_chain
-        .put(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
+        .put_raw(jessy_header.clone(), Some(jessy_entry.as_content().clone()))
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();

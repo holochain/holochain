@@ -62,6 +62,7 @@ where
     id: CellId,
     conductor_api: CA,
     state_env: EnvironmentWrite,
+    holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
 }
 
 impl Cell {
@@ -70,6 +71,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
+        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
@@ -93,6 +95,7 @@ impl Cell {
                 id,
                 conductor_api,
                 state_env,
+                holochain_p2p_cell,
             })
         } else {
             Err(CellError::CellWithoutGenesis(id))
@@ -159,8 +162,115 @@ impl Cell {
         &self.id
     }
 
+    /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey
+    pub fn holochain_p2p_cell(&self) -> &holochain_p2p::HolochainP2pCell {
+        &self.holochain_p2p_cell
+    }
+
     /// Entry point for incoming messages from the network that need to be handled
-    pub async fn handle_network_message(&self, _msg: Todo) -> CellResult<Option<Todo>> {
+    pub async fn handle_holochain_p2p_event(
+        &self,
+        evt: holochain_p2p::event::HolochainP2pEvent,
+    ) -> CellResult<()> {
+        use holochain_p2p::event::HolochainP2pEvent::*;
+        match evt {
+            CallRemote { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_call_remote()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+            Publish { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_publish()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+            GetValidationPackage { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_get_validation_package()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+            Get { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_get()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+            GetLinks { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_get_links()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+            ListDhtOpHashes { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_list_dht_op_hashes()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+            FetchDhtOps { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_fetch_dht_ops()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+            SignNetworkData { span, respond, .. } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_sign_network_data()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_call_remote(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    async fn handle_publish(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    async fn handle_get_validation_package(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    async fn handle_get(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    async fn handle_get_links(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    async fn handle_list_dht_op_hashes(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    async fn handle_fetch_dht_ops(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    async fn handle_sign_network_data(&self) -> CellResult<holochain_keystore::Signature> {
         unimplemented!()
     }
 
@@ -225,11 +335,7 @@ impl Cell {
         let ribosome = WasmRibosome::new(dna_file);
 
         // Create the workflow and run it
-        let workflow = InitializeZomesWorkflow {
-            agent_key: id.agent_pubkey().clone(),
-            dna_def,
-            ribosome,
-        };
+        let workflow = InitializeZomesWorkflow { dna_def, ribosome };
         let run_init = run_workflow(state_env.clone(), workflow, workspace).await;
         let init_result = run_init.map_err(Box::new)??;
         trace!(?init_result);

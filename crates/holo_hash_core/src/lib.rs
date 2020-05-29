@@ -74,6 +74,7 @@ macro_rules! core_holo_hash {
             }
 
             impl HoloHashCoreHash for $name {
+
                 fn get_raw(&self) -> &[u8] {
                     &self.0
                 }
