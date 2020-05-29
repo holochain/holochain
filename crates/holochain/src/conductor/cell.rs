@@ -174,10 +174,15 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
-            CallRemote { span, respond, .. } => {
+            CallRemote {
+                span,
+                respond,
+                request,
+                ..
+            } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_call_remote()
+                    self.handle_call_remote(request)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::custom),
                 );
@@ -242,7 +247,7 @@ impl Cell {
         Ok(())
     }
 
-    async fn handle_call_remote(&self) -> CellResult<()> {
+    async fn handle_call_remote(&self, _request: SerializedBytes) -> CellResult<SerializedBytes> {
         unimplemented!()
     }
 
