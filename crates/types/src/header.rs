@@ -146,9 +146,10 @@ impl HeaderHashed {
 
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
+// FIXME: Probably should be atleast u16? 255 seems arbitrarily low
 pub type ZomeId = u8;
 
-use crate::prelude::*;
+use crate::{link::Tag, prelude::*};
 
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -189,8 +190,8 @@ pub struct LinkAdd {
 
     pub base_address: EntryHash,
     pub target_address: EntryHash,
-    pub tag: String,
-    pub link_type: SerializedBytes,
+    pub zome_id: ZomeId,
+    pub tag: Tag,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

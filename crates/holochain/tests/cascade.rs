@@ -1,3 +1,4 @@
+use fixt::prelude::*;
 use holochain_2020::core::state::{
     cascade::Cascade,
     chain_meta::ChainMetaBuf,
@@ -7,6 +8,7 @@ use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
     header,
+    link::Tag,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
@@ -99,7 +101,9 @@ async fn get_links() -> SourceChainResult<()> {
         &cache.cas(),
         &cache_meta,
     );
-    let links = cascade.dht_get_links(base.into(), "").await?;
+    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+    let links = cascade.dht_get_links(base.into(), zome_id, tag).await?;
     let link = links.into_iter().next();
     assert_eq!(link, None);
     Ok(())

@@ -3,7 +3,14 @@
 use crate::composite_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use regex::Regex;
+use shrinkwraprs::Shrinkwrap;
 
+#[derive(Shrinkwrap, Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[shrinkwrap(mutable)]
+/// Opaque Tag for the link type
+pub struct Tag(pub Vec<u8>);
+
+// TODO: reove these?
 type LinkType = String;
 type LinkTag = String;
 
@@ -45,6 +52,16 @@ impl Link {
     /// Get the tag of this link.
     pub fn tag(&self) -> &LinkTag {
         &self.tag
+    }
+}
+
+impl Tag {
+    /// New tag from bytes
+    pub fn new<T>(t: T) -> Self
+    where
+        T: Into<Vec<u8>>,
+    {
+        Self(t.into())
     }
 }
 

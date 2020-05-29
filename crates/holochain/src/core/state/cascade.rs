@@ -40,10 +40,10 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus},
+    chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus, Link},
 };
 use holochain_state::{error::DatabaseResult, prelude::Reader};
-use holochain_types::composite_hash::EntryHash;
+use holochain_types::{composite_hash::EntryHash, header::ZomeId, link::Tag};
 use holochain_zome_types::entry::Entry;
 use tracing::*;
 
@@ -137,27 +137,27 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get_links<S: Into<String>>(
+    pub async fn dht_get_links(
         &self,
         base: EntryHash,
-        tag: S,
-    ) -> DatabaseResult<Vec<EntryHash>> {
+        zome_id: ZomeId,
+        tag: Tag,
+    ) -> DatabaseResult<Vec<Link>> {
         // Am I an authority?
         let authority = self.primary.contains(&base)?;
-        let tag = tag.into();
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(&base, tag.clone())?;
+            let links = self.primary_meta.get_links(&base, zome_id, tag.clone())?;
 
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(&base, tag)
+                self.cache_meta.get_links(&base, zome_id, tag)
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            self.cache_meta.get_links(&base, tag)
+            self.cache_meta.get_links(&base, zome_id, tag)
         }
     }
 }

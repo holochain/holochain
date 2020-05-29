@@ -1,15 +1,18 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_meta::{EntryDhtStatus, MockChainMetaBuf},
+    chain_meta::{test::LinkFixturator, EntryDhtStatus, MockChainMetaBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
+use fixt::prelude::*;
 use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
 use holochain_types::{
     composite_hash::EntryHash,
     entry::EntryHashed,
-    header, observability,
+    header,
+    link::Tag,
+    observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
@@ -282,16 +285,26 @@ async fn links_local_return() -> SourceChainResult<()> {
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
-    let result = target.clone();
+
+    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+
+    let link = LinkFixturator::new((target.clone(), tag.clone()))
+        .next()
+        .unwrap();
 
     // Return a link between entries
     mock_primary_meta
         .expect_get_links()
         .with(
             predicate::eq(EntryHash::from(base.clone())),
-            predicate::eq("".to_string()),
+            predicate::eq(zome_id),
+            predicate::eq(tag.clone()),
         )
-        .returning(move |_, _| Ok(vec![target.clone()]));
+        .returning({
+            let link = link.clone();
+            move |_, _, _| Ok(vec![link.clone()])
+        });
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -300,9 +313,9 @@ async fn links_local_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade.dht_get_links(base.into(), "").await?;
+    let links = cascade.dht_get_links(base.into(), zome_id, tag).await?;
     // check it returns
-    assert_eq!(links, vec![result.into()]);
+    assert_eq!(links, vec![link]);
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -336,18 +349,35 @@ async fn links_cache_return() -> SourceChainResult<()> {
         .await?;
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
-    let result = target.clone();
+
+    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+
+    let link = LinkFixturator::new((target.clone(), tag.clone()))
+        .next()
+        .unwrap();
 
     // Return empty links
     mock_primary_meta
         .expect_get_links()
-        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| Ok(Vec::new()));
+        .with(
+            predicate::eq(base.clone()),
+            predicate::eq(zome_id),
+            predicate::eq(tag.clone()),
+        )
+        .returning(move |_, _, _| Ok(Vec::new()));
     // Return a link between entries
     mock_cache_meta
         .expect_get_links()
-        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| Ok(vec![target.clone().into()]));
+        .with(
+            predicate::eq(base.clone()),
+            predicate::eq(zome_id),
+            predicate::eq(tag.clone()),
+        )
+        .returning({
+            let link = link.clone();
+            move |_, _, _| Ok(vec![link.clone()])
+        });
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -356,9 +386,9 @@ async fn links_cache_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade.dht_get_links(base.into(), "").await?;
+    let links = cascade.dht_get_links(base.into(), zome_id, tag).await?;
     // check it returns
-    assert_eq!(links, vec![result.into()]);
+    assert_eq!(links, vec![link.clone()]);
     Ok(())
 }
 
@@ -385,13 +415,26 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
 
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
-    let result = target.clone();
+
+    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+
+    let link = LinkFixturator::new((target.clone(), tag.clone()))
+        .next()
+        .unwrap();
 
     // Return empty links
     mock_cache_meta
         .expect_get_links()
-        .with(predicate::eq(base.clone()), predicate::eq("".to_string()))
-        .returning(move |_, _| Ok(vec![target.clone().into()]));
+        .with(
+            predicate::eq(base.clone()),
+            predicate::eq(zome_id),
+            predicate::eq(tag.clone()),
+        )
+        .returning({
+            let link = link.clone();
+            move |_, _, _| Ok(vec![link.clone()])
+        });
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
@@ -400,9 +443,11 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade.dht_get_links(base.into(), "").await?;
+    let links = cascade
+        .dht_get_links(base.into(), zome_id, tag.clone())
+        .await?;
     // check it returns
-    assert_eq!(links, vec![result.into()]);
+    assert_eq!(links, vec![link]);
     // check it doesn't hit the primary
     // this is implied by the mock not expecting calls
     Ok(())

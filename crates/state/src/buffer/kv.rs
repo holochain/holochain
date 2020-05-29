@@ -5,11 +5,7 @@ use crate::{
 };
 use rkv::SingleStore;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    iter::Peekable,
-    marker::PhantomData,
-};
+use std::{collections::BTreeMap, marker::PhantomData};
 
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
@@ -314,7 +310,7 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    use std::collections::{BTreeMap};
+    use std::collections::BTreeMap;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {

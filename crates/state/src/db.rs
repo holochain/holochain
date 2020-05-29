@@ -24,7 +24,7 @@ pub enum DbName {
     PrimaryChainHeaders,
     /// Primary database: KVV store of chain metadata, storing relationships
     PrimaryChainMeta,
-    /// Primary database: Kv store of links 
+    /// Primary database: Kv store of links
     PrimaryLinksMeta,
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
@@ -35,7 +35,7 @@ pub enum DbName {
     CacheChainHeaders,
     /// Cache database: KVV store of chain metadata, storing relationships
     CacheChainMeta,
-    /// Cachedatabase: Kv store of links 
+    /// Cachedatabase: Kv store of links
     CacheLinksMeta,
     /// database which stores a single key-value pair, encoding the
     /// mutable state for the entire Conductor

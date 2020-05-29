@@ -2,7 +2,7 @@
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{KvBuf, KvvBuf, partial_key_match},
+    buffer::{partial_key_match, KvBuf, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
@@ -10,9 +10,10 @@ use holochain_state::{
 use holochain_types::header::{EntryDelete, EntryUpdate};
 use holochain_types::{
     composite_hash::EntryHash,
-    header::{LinkAdd, LinkRemove},
+    header::{LinkAdd, LinkRemove, ZomeId},
+    link::Tag,
     shims::*,
-    Header, HeaderHashed,
+    Header, HeaderHashed, Timestamp,
 };
 use mockall::mock;
 use std::convert::TryInto;
@@ -20,8 +21,6 @@ use std::fmt::Debug;
 
 mod sys_meta;
 pub use sys_meta::*;
-
-type Tag = String;
 
 #[derive(Debug)]
 pub enum EntryDhtStatus {
@@ -35,20 +34,13 @@ pub enum EntryDhtStatus {
     Purged,
 }
 
-// TODO Add Op to value
-// Adds have hash of LinkAdd
-// And target
-// Dels have hash of LinkAdd
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-enum Op {
-    Add(HeaderHash, EntryHash),
-    Remove(HeaderHash),
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-struct Link {
-    link_add_hash: HeaderHash,
-    target: EntryHash,
+pub struct Link {
+    pub link_add_hash: HeaderHash,
+    pub target: EntryHash,
+    pub timestamp: Timestamp,
+    pub zome_id: ZomeId,
+    pub tag: Tag,
 }
 
 /// Key for finding a link
@@ -56,6 +48,7 @@ struct Link {
 /// but is optional if you want all links on a get
 struct LinkKey<'a> {
     base: &'a EntryHash,
+    zome_id: ZomeId,
     tag: Tag,
     link_add_hash: Option<HeaderHash>,
 }
@@ -68,6 +61,7 @@ impl<'a> LinkKey<'a> {
             .try_into()
             .expect("entry addresses don't have the unserialize problem");
         let mut vec: Vec<u8> = sb.bytes().to_vec();
+        vec.push(self.zome_id);
         vec.extend_from_slice(self.tag.as_ref());
         if let Some(ref link_add_hash) = self.link_add_hash {
             vec.extend_from_slice(link_add_hash.as_ref());
@@ -80,6 +74,7 @@ impl<'a> From<(&'a LinkAdd, HeaderHash)> for LinkKey<'a> {
     fn from((link_add, hash): (&'a LinkAdd, HeaderHash)) -> Self {
         Self {
             base: &link_add.base_address,
+            zome_id: link_add.zome_id,
             tag: link_add.tag.clone(),
             link_add_hash: Some(hash),
         }
@@ -90,18 +85,17 @@ impl<'a> From<(&'a LinkAdd, HeaderHash)> for LinkKey<'a> {
 pub trait ChainMetaBufT {
     // Links
     /// Get all te links on this base that match the tag
-    fn get_links<Tag>(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<Vec<EntryHash>>
-    where
-        Tag: Into<String>;
+    fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>>;
 
     /// Add a link
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
     /// Remove a link
-    fn remove_link<Tag: Into<String>>(
+    fn remove_link(
         &mut self,
         link_remove: LinkRemove,
         base: &EntryHash,
+        zome_id: ZomeId,
         tag: Tag,
     ) -> DatabaseResult<()>;
 
@@ -147,28 +141,24 @@ impl<'env> ChainMetaBuf<'env> {
 #[async_trait::async_trait]
 impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     // TODO find out whether we need link_type.
-    fn get_links<Tag: Into<String>>(
-        &self,
-        base: &EntryHash,
-        tag: Tag,
-    ) -> DatabaseResult<Vec<EntryHash>> {
+    fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>> {
         let key = LinkKey {
             base,
-            tag: tag.into(),
+            zome_id,
+            tag,
             link_add_hash: None,
         };
         let k_bytes = key.to_key();
-        // TODO: Internalizethis abstraction to KvBuf
+        // TODO: Internalize this abstraction to KvBuf?
         // TODO: PERF: with_capacity
         let mut links = Vec::new();
         for link in self.links_meta.iter_from(k_bytes.clone())? {
             let (k, link) = link?;
             if partial_key_match(&k_bytes[..], &k) {
-                links.push(link.target)
+                links.push(link)
             } else {
                 break;
             }
-
         }
         Ok(links)
     }
@@ -189,20 +179,25 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             Link {
                 link_add_hash,
                 target: link_add.target_address,
+                timestamp: link_add.timestamp,
+                zome_id: link_add.zome_id,
+                tag: link_add.tag,
             },
         );
         DatabaseResult::Ok(())
     }
 
-    fn remove_link<Tag: Into<String>>(
+    fn remove_link(
         &mut self,
         link_remove: LinkRemove,
         base: &EntryHash,
+        zome_id: ZomeId,
         tag: Tag,
     ) -> DatabaseResult<()> {
         let key = LinkKey {
             base,
-            tag: tag.into(),
+            zome_id,
+            tag,
             link_add_hash: Some(link_remove.link_add_address),
         };
         // TODO: It should be impossible to ever remove a Link that wasn't already added
@@ -237,9 +232,9 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: &EntryHash, tag: Tag) -> DatabaseResult<Vec<EntryHash>>;
+        fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
-        fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, tag: Tag) -> DatabaseResult<()>;
+        fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<()>;
         fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
         fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
         fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -250,12 +245,8 @@ mock! {
 
 #[async_trait::async_trait]
 impl ChainMetaBufT for MockChainMetaBuf {
-    fn get_links<Tag: Into<String>>(
-        &self,
-        base: &EntryHash,
-        tag: Tag,
-    ) -> DatabaseResult<Vec<EntryHash>> {
-        self.get_links(base, tag.into())
+    fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>> {
+        self.get_links(base, zome_id, tag)
     }
 
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
@@ -274,13 +265,14 @@ impl ChainMetaBufT for MockChainMetaBuf {
         self.add_link(link_add)
     }
 
-    fn remove_link<Tag: Into<String>>(
+    fn remove_link(
         &mut self,
         link_remove: LinkRemove,
         base: &EntryHash,
+        zome_id: ZomeId,
         tag: Tag,
     ) -> DatabaseResult<()> {
-        self.remove_link(link_remove, base, tag.into())
+        self.remove_link(link_remove, base, zome_id, tag)
     }
 
     fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
@@ -302,7 +294,7 @@ impl<'env> BufferedStore<'env> for ChainMetaBuf<'env> {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
     use crate::fixt::EntryFixturator;
     use fixt::prelude::*;
@@ -319,8 +311,8 @@ mod test {
             prev_header: HeaderHashFixturator::new(Empty).next().unwrap(),
             base_address: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
             target_address: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
-            tag: StringFixturator::new(Empty).next().unwrap(),
-            link_type: SerializedBytesFixturator::new(Empty).next().unwrap(),
+            zome_id: U8Fixturator::new(Empty).next().unwrap(),
+            tag: Tag::new(BytesFixturator::new(Empty).next().unwrap()),
         };
         curve Unpredictable LinkAdd {
             author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -329,8 +321,8 @@ mod test {
             prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
             base_address: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
             target_address: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
-            tag: StringFixturator::new(Unpredictable).next().unwrap(),
-            link_type: SerializedBytesFixturator::new(Unpredictable).next().unwrap(),
+            zome_id: U8Fixturator::new(Unpredictable).next().unwrap(),
+            tag: Tag::new(BytesFixturator::new(Unpredictable).next().unwrap()),
         };
         curve Predictable LinkAdd {
             author: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
@@ -339,8 +331,8 @@ mod test {
             prev_header: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
             base_address: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
             target_address: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
-            tag: StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-            link_type: SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            zome_id: U8Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            tag: Tag::new(BytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
         };
     );
 
@@ -369,13 +361,39 @@ mod test {
         };
     );
 
-    struct KnownLinkAdd {
+    fixturator!(
+        Link;
+        curve Empty Link {
+            timestamp: Timestamp::now(),
+            link_add_hash: HeaderHashFixturator::new(Empty).next().unwrap(),
+            target: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
+            zome_id: U8Fixturator::new(Empty).next().unwrap(),
+            tag: Tag::new(BytesFixturator::new(Empty).next().unwrap()),
+        };
+        curve Unpredictable Link {
+            timestamp: Timestamp::now(),
+            link_add_hash: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
+            target: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
+            zome_id: U8Fixturator::new(Unpredictable).next().unwrap(),
+            tag: Tag::new(BytesFixturator::new(Unpredictable).next().unwrap()),
+        };
+        curve Predictable Link {
+            timestamp: Timestamp::now(),
+            link_add_hash: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            target: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
+            zome_id: U8Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+            tag: Tag::new(BytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        };
+    );
+
+    pub struct KnownLinkAdd {
         base_address: EntryHash,
         target_address: EntryHash,
-        tag: String,
+        tag: Tag,
+        zome_id: ZomeId,
     }
 
-    struct KnownLinkRemove {
+    pub struct KnownLinkRemove {
         link_add_address: HeaderHash,
     }
 
@@ -386,6 +404,7 @@ mod test {
             f.base_address = self.0.curve.base_address.clone();
             f.target_address = self.0.curve.target_address.clone();
             f.tag = self.0.curve.tag.clone();
+            f.zome_id = self.0.curve.zome_id.clone();
             Some(f)
         }
     }
@@ -395,6 +414,16 @@ mod test {
         fn next(&mut self) -> Option<Self::Item> {
             let mut f = LinkRemoveFixturator::new(Unpredictable).next().unwrap();
             f.link_add_address = self.0.curve.link_add_address.clone();
+            Some(f)
+        }
+    }
+
+    impl Iterator for LinkFixturator<(EntryHash, Tag)> {
+        type Item = Link;
+        fn next(&mut self) -> Option<Self::Item> {
+            let mut f = LinkFixturator::new(Unpredictable).next().unwrap();
+            f.target = self.0.curve.0.clone();
+            f.tag = self.0.curve.1.clone();
             Some(f)
         }
     }
@@ -420,22 +449,40 @@ mod test {
         let (base_hash, target_hash) = entries().await;
 
         let tag = StringFixturator::new(Unpredictable).next().unwrap();
+        let tag = Tag::new(tag);
+        let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
         let base_address: &EntryHash = base_hash.as_ref();
         let target_address: &EntryHash = target_hash.as_ref();
 
         let link_add = KnownLinkAdd {
             base_address: base_address.clone(),
             target_address: target_address.clone(),
+            zome_id,
             tag: tag.clone(),
         };
 
         let link_add = LinkAddFixturator::new(link_add).next().unwrap();
 
+        // Create the expected link result
+        let (_, link_add_hash): (_, HeaderHash) =
+            HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
+                .await
+                .unwrap()
+                .into();
+
+        let expected_link = Link {
+            link_add_hash,
+            target: target_address.clone(),
+            timestamp: link_add.timestamp.clone(),
+            zome_id,
+            tag: tag.clone(),
+        };
+
         // Check it's empty
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
-                .get_links(base_hash.as_ref(), tag.clone())
+                .get_links(base_hash.as_ref(), zome_id, tag.clone())
                 .unwrap()
                 .is_empty());
             DatabaseResult::Ok(())
@@ -455,8 +502,10 @@ mod test {
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
-                meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
-                vec![target_address.clone()]
+                meta_buf
+                    .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                    .unwrap(),
+                vec![expected_link]
             );
             DatabaseResult::Ok(())
         })
@@ -471,17 +520,34 @@ mod test {
         // Create a known link add
         let (base_hash, target_hash) = entries().await;
 
-        let tag = StringFixturator::new(Unpredictable).next().unwrap();
+        let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+        let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
         let base_address: &EntryHash = base_hash.as_ref();
         let target_address: &EntryHash = target_hash.as_ref();
 
         let link_add = KnownLinkAdd {
             base_address: base_address.clone(),
             target_address: target_address.clone(),
+            zome_id,
             tag: tag.clone(),
         };
 
         let link_add = LinkAddFixturator::new(link_add).next().unwrap();
+
+        // Create the expected link result
+        let (_, link_add_hash): (_, HeaderHash) =
+            HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
+                .await
+                .unwrap()
+                .into();
+
+        let expected_link = Link {
+            link_add_hash,
+            target: target_address.clone(),
+            timestamp: link_add.timestamp.clone(),
+            zome_id,
+            tag: tag.clone(),
+        };
 
         // Create a known link remove
         let link_add_address = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
@@ -497,7 +563,7 @@ mod test {
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
-                .get_links(base_hash.as_ref(), tag.clone())
+                .get_links(base_hash.as_ref(), zome_id, tag.clone())
                 .unwrap()
                 .is_empty());
             DatabaseResult::Ok(())
@@ -510,8 +576,10 @@ mod test {
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             meta_buf.add_link(link_add).await.unwrap();
             assert_eq!(
-                meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
-                vec![target_address.clone()]
+                meta_buf
+                    .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                    .unwrap(),
+                vec![expected_link.clone()]
             );
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -521,8 +589,10 @@ mod test {
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
-                meta_buf.get_links(base_hash.as_ref(), tag.clone()).unwrap(),
-                vec![target_address.clone()]
+                meta_buf
+                    .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                    .unwrap(),
+                vec![expected_link]
             );
             DatabaseResult::Ok(())
         })
@@ -533,7 +603,7 @@ mod test {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             meta_buf
-                .remove_link(link_remove, base_address, tag.clone())
+                .remove_link(link_remove, base_address, zome_id, tag.clone())
                 .unwrap();
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -543,7 +613,7 @@ mod test {
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
-                .get_links(base_hash.as_ref(), tag.clone())
+                .get_links(base_hash.as_ref(), zome_id, tag.clone())
                 .unwrap()
                 .is_empty());
             DatabaseResult::Ok(())
