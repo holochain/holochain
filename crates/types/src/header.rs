@@ -8,8 +8,8 @@
 
 use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
 
-mod builder;
-pub use builder::{HeaderBuilder, HeaderCommon};
+pub mod builder;
+pub use builder::{HeaderBuilder, HeaderBuilderCommon};
 
 /// Header contains variants for each type of header.
 ///

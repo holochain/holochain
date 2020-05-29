@@ -15,7 +15,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
-    header::{EntryType, EntryVisibility, HeaderBuilder, HeaderCommon},
+    header::{builder, EntryType, EntryVisibility, HeaderBuilderCommon},
     prelude::*,
     EntryHashed, Header, HeaderHashed,
 };
@@ -62,10 +62,10 @@ impl<'env> SourceChain<'env> {
     /// Add a ChainElement to the source chain, using a HeaderBuilder
     pub async fn put(
         &mut self,
-        header_builder: HeaderBuilder,
+        header_builder: builder::HeaderBuilder,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderAddress> {
-        let header = header_builder.build(HeaderCommon {
+        let header = header_builder.build(HeaderBuilderCommon {
             author: self.agent_pubkey()?,
             timestamp: Timestamp::now(),
             header_seq: self.len() as u32,
@@ -83,10 +83,11 @@ impl<'env> SourceChain<'env> {
         let (entry, entry_hash) = EntryHashed::with_data(Entry::CapGrant(grant_entry))
             .await?
             .into_inner();
-        let header_builder = HeaderBuilder::EntryCreate {
+        let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapGrant,
             entry_hash,
-        };
+        }
+        .into();
         self.put(header_builder, Some(entry)).await
     }
 
@@ -98,10 +99,11 @@ impl<'env> SourceChain<'env> {
         let (entry, entry_hash) = EntryHashed::with_data(Entry::CapClaim(claim_entry))
             .await?
             .into_inner();
-        let header_builder = HeaderBuilder::EntryCreate {
+        let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapClaim,
             entry_hash,
-        };
+        }
+        .into();
         self.put(header_builder, Some(entry)).await
     }
 

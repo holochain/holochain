@@ -4,10 +4,12 @@ use crate::{
     composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
     Header, Timestamp,
 };
+use derive_more::{Constructor, From};
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
 
-pub struct HeaderCommon {
+#[derive(Constructor)]
+pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -17,7 +19,7 @@ pub struct HeaderCommon {
 /// Builder for non-genesis Headers
 ///
 /// SourceChain::put takes one of these rather than a raw Header, so that it
-/// can inject the proper values via `HeaderCommon`, rather than requiring
+/// can inject the proper values via `HeaderBuilderCommon`, rather than requiring
 /// surrounding code to construct a proper Header outside of the context of
 /// the SourceChain.
 ///
@@ -25,62 +27,83 @@ pub struct HeaderCommon {
 /// there is no Agent associated with the source chain, and also the fact that
 /// the Dna header has no prev_entry causes a special case that need not be
 /// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, From, PartialEq, Eq)]
 pub enum HeaderBuilder {
     InitZomesComplete,
-    LinkAdd {
-        base_address: AnyDhtHash,
-        target_address: AnyDhtHash,
-        tag: SerializedBytes,
-        link_type: SerializedBytes,
-    },
-    LinkRemove {
-        link_add_address: HeaderAddress,
-    },
-    ChainOpen {
-        prev_dna_hash: DnaHash,
-    },
-    ChainClose {
-        new_dna_hash: DnaHash,
-    },
-    EntryCreate {
-        entry_type: EntryType,
-        entry_hash: EntryHash,
-    },
-    EntryUpdate {
-        replaces_address: AnyDhtHash,
+    LinkAdd(LinkAdd),
+    LinkRemove(LinkRemove),
+    ChainOpen(ChainOpen),
+    ChainClose(ChainClose),
+    EntryCreate(EntryCreate),
+    EntryUpdate(EntryUpdate),
+    EntryDelete(EntryDelete),
+}
 
-        entry_type: EntryType,
-        entry_hash: EntryHash,
-    },
-    EntryDelete {
-        removes_address: AnyDhtHash,
-    },
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinkAdd {
+    pub base_address: AnyDhtHash,
+    pub target_address: AnyDhtHash,
+    pub tag: SerializedBytes,
+    pub link_type: SerializedBytes,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinkRemove {
+    pub link_add_address: HeaderAddress,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChainOpen {
+    pub prev_dna_hash: DnaHash,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChainClose {
+    pub new_dna_hash: DnaHash,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntryCreate {
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntryUpdate {
+    pub replaces_address: AnyDhtHash,
+
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntryDelete {
+    pub removes_address: AnyDhtHash,
 }
 
 impl HeaderBuilder {
-    pub fn build(self, common: HeaderCommon) -> Header {
-        use HeaderBuilder::*;
-        let HeaderCommon {
+    pub fn build(self, common: HeaderBuilderCommon) -> Header {
+        let HeaderBuilderCommon {
             author,
             timestamp,
             header_seq,
             prev_header,
         } = common;
         match self {
-            InitZomesComplete => header::InitZomesComplete {
+            HeaderBuilder::InitZomesComplete => header::InitZomesComplete {
                 author,
                 timestamp,
                 header_seq,
                 prev_header,
             }
             .into(),
-            LinkAdd {
+
+            HeaderBuilder::LinkAdd(LinkAdd {
                 base_address,
                 target_address,
                 tag,
                 link_type,
-            } => header::LinkAdd {
+            }) => header::LinkAdd {
                 author,
                 timestamp,
                 header_seq,
@@ -92,7 +115,8 @@ impl HeaderBuilder {
                 link_type,
             }
             .into(),
-            LinkRemove { link_add_address } => header::LinkRemove {
+
+            HeaderBuilder::LinkRemove(LinkRemove { link_add_address }) => header::LinkRemove {
                 author,
                 timestamp,
                 header_seq,
@@ -101,7 +125,8 @@ impl HeaderBuilder {
                 link_add_address,
             }
             .into(),
-            ChainOpen { prev_dna_hash } => header::ChainOpen {
+
+            HeaderBuilder::ChainOpen(ChainOpen { prev_dna_hash }) => header::ChainOpen {
                 author,
                 timestamp,
                 header_seq,
@@ -110,7 +135,8 @@ impl HeaderBuilder {
                 prev_dna_hash,
             }
             .into(),
-            ChainClose { new_dna_hash } => header::ChainClose {
+
+            HeaderBuilder::ChainClose(ChainClose { new_dna_hash }) => header::ChainClose {
                 author,
                 timestamp,
                 header_seq,
@@ -119,10 +145,11 @@ impl HeaderBuilder {
                 new_dna_hash,
             }
             .into(),
-            EntryCreate {
+
+            HeaderBuilder::EntryCreate(EntryCreate {
                 entry_type,
                 entry_hash,
-            } => header::EntryCreate {
+            }) => header::EntryCreate {
                 author,
                 timestamp,
                 header_seq,
@@ -132,11 +159,12 @@ impl HeaderBuilder {
                 entry_hash,
             }
             .into(),
-            EntryUpdate {
+
+            HeaderBuilder::EntryUpdate(EntryUpdate {
                 replaces_address,
                 entry_type,
                 entry_hash,
-            } => header::EntryUpdate {
+            }) => header::EntryUpdate {
                 author,
                 timestamp,
                 header_seq,
@@ -147,7 +175,8 @@ impl HeaderBuilder {
                 entry_hash,
             }
             .into(),
-            EntryDelete { removes_address } => header::EntryDelete {
+
+            HeaderBuilder::EntryDelete(EntryDelete { removes_address }) => header::EntryDelete {
                 author,
                 timestamp,
                 header_seq,
