@@ -86,8 +86,8 @@ impl HolochainP2pActor {
     ) -> HolochainP2pHandlerResult<Vec<u8>> {
         let space = DnaHash::from_kitsune(&space);
         let agent = AgentPubKey::from_kitsune(&agent);
-        let request: SerializedBytes = UnsafeBytes::from((*data).clone()).into();
-        let request: crate::wire::WireMessage = request.try_into()?;
+
+        let request = crate::wire::WireMessage::decode((*data).clone())?;
 
         match request {
             crate::wire::WireMessage::CallRemote { data } => {
@@ -141,13 +141,12 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();
-        let data = UnsafeBytes::from(request).into();
-        let req = crate::wire::WireMessage::CallRemote { data };
-        let req = Arc::new(UnsafeBytes::from(SerializedBytes::try_from(req)?).into());
+
+        let req = crate::wire::WireMessage::call_remote(request).encode()?;
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            let result = kitsune_p2p.request(space, agent, req).await?;
+            let result = kitsune_p2p.request(space, agent, Arc::new(req)).await?;
             let result = UnsafeBytes::from(result).into();
             Ok(result)
         }
