@@ -2,7 +2,7 @@
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{KvBuf, KvvBuf, partial_key_match},
+    buffer::{partial_key_match, KvBuf, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
@@ -168,7 +168,6 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             } else {
                 break;
             }
-
         }
         Ok(links)
     }
@@ -306,7 +305,9 @@ mod test {
     use super::*;
     use crate::fixt::EntryFixturator;
     use fixt::prelude::*;
-    use holo_hash::{AgentPubKeyFixturator, EntryContentHashFixturator, HeaderHashFixturator};
+    use holo_hash::{
+        AgentPubKeyFixturator, EntryContentHashFixturator, Hashable, HeaderHashFixturator,
+    };
     use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
     use holochain_types::{EntryHashed, Timestamp};
 

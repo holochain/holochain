@@ -174,8 +174,6 @@ pub mod tests {
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::GuestOutput;
     use holochain_zome_types::HostInput;
-
-    use futures::{future::BoxFuture, FutureExt};
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -273,30 +271,15 @@ pub mod tests {
         let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         // Genesis
-        let agent_header = fake_genesis(&mut workspace.source_chain).await;
+        fake_genesis(&mut workspace.source_chain).await.unwrap();
 
         let agent_pubkey = fake_agent_pubkey_1();
-        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
+        let _agent_entry = Entry::Agent(agent_pubkey.clone().into());
         let mut ribosome = MockRibosomeT::new();
         // Call zome mock that it writes to source chain
         ribosome
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
-                let agent_header = agent_header.clone();
-                let agent_entry = agent_entry.clone();
-                let _call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, ()> {
-                    async move {
-                        workspace
-                            .source_chain
-                            .put(agent_header.clone(), Some(agent_entry))
-                            .await
-                            .unwrap();
-                    }
-                    .boxed()
-                };
-                /* FIXME: Mockall doesn't seem to work with async?
-                unsafe { unsafe_workspace.apply_mut(call).await };
-                */
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
                 Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
             });

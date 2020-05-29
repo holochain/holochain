@@ -8,22 +8,26 @@ use holochain_state::db::GetDb;
 use holochain_state::{
     buffer::BufferedStore,
     error::DatabaseResult,
-    prelude::{Readable, Writer},
+    prelude::{Reader, Writer},
 };
 use holochain_types::{
-    composite_hash::HeaderAddress, entry::EntryHashed, prelude::*, Header, HeaderHashed,
+    composite_hash::HeaderAddress,
+    entry::EntryHashed,
+    header::{self},
+    prelude::*,
+    Header, HeaderHashed,
 };
 use holochain_zome_types::entry::Entry;
 use tracing::*;
 
-pub struct SourceChainBuf<'env, R: Readable> {
-    cas: ChainCasBuf<'env, R>,
-    sequence: ChainSequenceBuf<'env, R>,
+pub struct SourceChainBuf<'env> {
+    cas: ChainCasBuf<'env>,
+    sequence: ChainSequenceBuf<'env>,
     keystore: KeystoreSender,
 }
 
-impl<'env, R: Readable> SourceChainBuf<'env, R> {
-    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+impl<'env> SourceChainBuf<'env> {
+    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::primary(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
@@ -34,7 +38,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             cas: ChainCasBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
@@ -79,11 +83,12 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         self.cas.get_header(k).await
     }
 
-    pub fn cas(&self) -> &ChainCasBuf<R> {
+    pub fn cas(&self) -> &ChainCasBuf {
         &self.cas
     }
 
-    pub async fn put(
+    /// Add a ChainElement to the source chain, using a fully-formed Header
+    pub async fn put_raw(
         &mut self,
         header: Header,
         maybe_entry: Option<Entry>,
@@ -108,7 +113,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
         Ok(header_address)
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env, R> {
+    pub fn headers(&self) -> &HeaderCas<'env> {
         &self.cas.headers()
     }
 
@@ -121,16 +126,24 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
     /// Get the AgentPubKey from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
     pub fn agent_pubkey(&self) -> DatabaseResult<Option<AgentPubKey>> {
-        // TODO: Should this be using the scratch instead? iter() vs iter_raw()
-        for entry in self.cas.public_entries().iter_raw()? {
-            if let (_, Entry::Agent(agent_pubkey)) = entry? {
-                return Ok(Some(agent_pubkey.into()));
-            }
-        }
-        Ok(None)
+        // TODO: rewrite in terms of just getting the correct Header
+        Ok(self
+            .cas
+            .public_entries()
+            .iter_raw()?
+            .chain(
+                // Add in values from the scratch space, to be comprehensive
+                self.cas.public_entries().iter_scratch_puts(),
+            )
+            .filter_map(|e| match e.into_content() {
+                Entry::Agent(agent_pubkey) => Some(agent_pubkey),
+                _ => None,
+            })
+            .next()
+            .map(|h| h.into()))
     }
 
-    pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env, R> {
+    pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env> {
         SourceChainBackwardIterator::new(self)
     }
 
@@ -160,7 +173,7 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
                 None => out.push(JsonChainDump { element: None }),
                 Some(element) => {
                     let (signed, entry) = element.into_inner();
-                    let (header, signature) = signed.into_inner();
+                    let (header, signature) = signed.into_header_and_signature();
                     let (header, header_address) = header.into_inner();
                     out.push(JsonChainDump {
                         element: Some(JsonChainElement {
@@ -176,9 +189,51 @@ impl<'env, R: Readable> SourceChainBuf<'env, R> {
 
         Ok(serde_json::to_string_pretty(&out)?)
     }
+
+    /// Commit the genesis entries to this source chain, making the chain ready
+    /// to use as a `SourceChain`
+    pub async fn genesis(
+        &mut self,
+        dna_hash: DnaHash,
+        agent_pubkey: AgentPubKey,
+        membrane_proof: Option<SerializedBytes>,
+    ) -> SourceChainResult<()> {
+        // create a DNA chain element and add it directly to the store
+        let dna_header = Header::Dna(header::Dna {
+            author: agent_pubkey.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 0,
+            hash: dna_hash,
+        });
+        let dna_header_address = self.put_raw(dna_header, None).await?;
+
+        // create the agent validation entry and add it directly to the store
+        let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
+            author: agent_pubkey.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 1,
+            prev_header: dna_header_address,
+            membrane_proof,
+        });
+        let avh_addr = self.put_raw(agent_validation_header, None).await?;
+
+        // create a agent chain element and add it directly to the store
+        let agent_header = Header::EntryCreate(header::EntryCreate {
+            author: agent_pubkey.clone(),
+            timestamp: Timestamp::now(),
+            header_seq: 2,
+            prev_header: avh_addr,
+            entry_type: header::EntryType::AgentPubKey,
+            entry_hash: agent_pubkey.clone().into(),
+        });
+        self.put_raw(agent_header, Some(Entry::Agent(agent_pubkey.into())))
+            .await?;
+
+        Ok(())
+    }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
+impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
     type Error = SourceChainError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
@@ -190,13 +245,13 @@ impl<'env, R: Readable> BufferedStore<'env> for SourceChainBuf<'env, R> {
 
 /// FallibleIterator returning SignedHeaderHashed instances from chain
 /// starting with the head, moving back to the origin (Dna) header.
-pub struct SourceChainBackwardIterator<'env, R: Readable> {
-    store: &'env SourceChainBuf<'env, R>,
+pub struct SourceChainBackwardIterator<'env> {
+    store: &'env SourceChainBuf<'env>,
     current: Option<HeaderAddress>,
 }
 
-impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
-    pub fn new(store: &'env SourceChainBuf<'env, R>) -> Self {
+impl<'env> SourceChainBackwardIterator<'env> {
+    pub fn new(store: &'env SourceChainBuf<'env>) -> Self {
         Self {
             store,
             current: store.chain_head().cloned(),
@@ -204,7 +259,7 @@ impl<'env, R: Readable> SourceChainBackwardIterator<'env, R> {
     }
 }
 
-impl<'env, R: Readable> FallibleIterator for SourceChainBackwardIterator<'env, R> {
+impl<'env> FallibleIterator for SourceChainBackwardIterator<'env> {
     type Item = SignedHeaderHashed;
     type Error = SourceChainError;
 
@@ -306,10 +361,10 @@ pub mod tests {
             let mut store = SourceChainBuf::new(&reader, &dbs)?;
             assert!(store.chain_head().is_none());
             store
-                .put(dna_header.as_content().clone(), dna_entry.clone())
+                .put_raw(dna_header.as_content().clone(), dna_entry.clone())
                 .await?;
             store
-                .put(agent_header.as_content().clone(), agent_entry.clone())
+                .put_raw(agent_header.as_content().clone(), agent_entry.clone())
                 .await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         };
@@ -370,19 +425,18 @@ pub mod tests {
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let dbs = arc.dbs().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
             let reader = env.reader()?;
 
-            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            let mut store = SourceChainBuf::new(&reader, &env)?;
             store
-                .put(dna_header.as_content().clone(), dna_entry)
+                .put_raw(dna_header.as_content().clone(), dna_entry)
                 .await?;
             store
-                .put(agent_header.as_content().clone(), agent_entry)
+                .put_raw(agent_header.as_content().clone(), agent_entry)
                 .await?;
 
             env.with_commit(|writer| store.flush_to_txn(writer))?;
@@ -391,50 +445,20 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let store = SourceChainBuf::new(&reader, &dbs)?;
+            let store = SourceChainBuf::new(&reader, &env)?;
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-            let parsed = parsed
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|item| {
-                    let item = item.as_object().unwrap();
-                    let element = item.get("element").unwrap();
-                    let header = element.get("header").unwrap();
-                    let header_type = header.get("type").unwrap().as_str().unwrap();
 
-                    /*let _entry_hash = header
-                        .get("entry_hash")
-                        .unwrap()
-                        .get("Entry")
-                        .unwrap()
-                        .as_array()
-                        .unwrap();
-                    let entry_type = entry.get("entry_type").unwrap().as_str().unwrap();
-                    let _entry_data: serde_json::Value = match entry_type {
-                        "AgentPubKey" => entry.get("entry").unwrap().clone(),
-                        "Dna" => entry
-                            .get("entry")
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .get("uuid")
-                            .unwrap()
-                            .clone(),
-                        _ => serde_json::Value::Null,
-                    };*/
-                    // FIXME: this test is very specific; commenting out the specifics for now
-                    // until we finalize the Entry and Header format
-                    // serde_json::json!([entry_type, entry_hash, entry_data])
-                    serde_json::json!(header_type)
-                })
-                .collect::<Vec<_>>();
-
-            assert_eq!(
-                "[\"EntryCreate\",\"Dna\"]",
-                &serde_json::to_string(&parsed).unwrap(),
+            assert_eq!(parsed[0]["element"]["header"]["type"], "EntryCreate");
+            assert_eq!(parsed[0]["element"]["header"]["entry_type"], "AgentPubKey");
+            assert_eq!(parsed[0]["element"]["entry"]["entry_type"], "Agent");
+            assert_ne!(
+                parsed[0]["element"]["entry"]["entry"],
+                serde_json::Value::Null
             );
+
+            assert_eq!(parsed[1]["element"]["header"]["type"], "Dna");
+            assert_eq!(parsed[1]["element"]["entry"], serde_json::Value::Null);
         }
 
         Ok(())

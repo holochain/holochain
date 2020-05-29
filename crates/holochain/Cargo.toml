@@ -20,21 +20,22 @@ derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
-fixt = { path = "../fixt" }
+fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
 hcid = "0.0.6"
-holo_hash = { path = "../holo_hash" }
-holo_hash_core = { path = "../holo_hash_core" }
+holo_hash = { version = "0.0.1", path = "../holo_hash" }
+holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
 holochain_common = "0.0.43-alpha3"
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
+holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.39"
-holochain_state = { path = "../state" }
-holochain_types = { path = "../types" }
-holochain_wasm_test_utils = { path = "../test_utils/wasm" }
+holochain_state = { version = "0.0.1", path = "../state" }
+holochain_types = { version = "0.0.1", path = "../types" }
+holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
 holochain_wasmer_host = "=0.0.30"
-holochain_websocket = { path = "../websocket" }
-holochain_zome_types = { path = "../zome_types" }
+holochain_websocket = { version = "0.0.1", path = "../websocket" }
+holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
 legacy = { path = "../legacy", package = "holochain_2020_legacy" }
@@ -70,7 +71,7 @@ assert_cmd = "1.0.1"
 maplit = "1.0.2"
 matches = "0.1.8"
 serial_test = "0.4.0"
-test_wasm_common = { path = "../test_utils/wasm_common" }
+test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common" }
 unwrap_to = "0.1.0"
 
 [lib]

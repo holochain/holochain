@@ -37,6 +37,7 @@
 //!     (`dna_util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
 //! ```
 
+use holo_hash::HoloHashExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
 use holochain_zome_types::zome::ZomeName;

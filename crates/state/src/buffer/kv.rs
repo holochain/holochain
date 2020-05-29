@@ -118,6 +118,19 @@ where
     pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIterRaw<V>> {
         Ok(SingleIterRaw::new(self.db.iter_end(self.reader)?))
     }
+
+    /// Iterate over items which are staged for PUTs in the scratch space
+    // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
+    // iteration, by chaining this with an iter_raw
+    pub fn iter_scratch_puts(&self) -> impl Iterator<Item = (&Vec<u8>, &Box<V>)> {
+        self.scratch.iter().filter_map(|(k, op)| {
+            if let Op::Put(v) = op {
+                Some((k, v))
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl<'env, K, V, R> BufferedStore<'env> for KvBuf<'env, K, V, R>
@@ -314,7 +327,7 @@ pub mod tests {
     };
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
-    use std::collections::{BTreeMap};
+    use std::collections::BTreeMap;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {

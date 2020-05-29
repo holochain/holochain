@@ -62,6 +62,13 @@ impl DnaDef {
     }
 }
 
+make_hashed! {
+    Visibility(pub),
+    HashedName(DnaDefHashed),
+    ContentType(DnaDef),
+    HashType(holo_hash::DnaHash),
+}
+
 /// Wasms need to be an ordered map from WasmHash to a DnaWasm
 pub type Wasms = BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>;
 

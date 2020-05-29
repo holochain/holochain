@@ -13,9 +13,8 @@ use crate::conductor::api::CellConductorApiT;
 use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
 use futures::future::FutureExt;
 use holochain_state::prelude::*;
+use holochain_types::dna::DnaFile;
 use holochain_types::prelude::*;
-use holochain_types::{dna::DnaFile, header, Header};
-use holochain_zome_types::entry::Entry;
 use must_future::MustBoxFuture;
 
 /// The struct which implements the genesis Workflow
@@ -53,40 +52,13 @@ impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for Genes
                 return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
             }
 
-            // create a DNA chain element and add it directly to the store
-            let dna_header = Header::Dna(header::Dna {
-                author: agent_pubkey.clone(),
-                timestamp: Timestamp::now(),
-                header_seq: 0,
-                hash: dna_file.dna_hash().clone(),
-            });
-            let dna_header_address = workspace.source_chain.put(dna_header.clone(), None).await?;
-
-            // create the agent validation entry and add it directly to the store
-            let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
-                author: agent_pubkey.clone(),
-                timestamp: Timestamp::now(),
-                header_seq: 1,
-                prev_header: dna_header_address,
-                membrane_proof,
-            });
-            let avh_addr = workspace
-                .source_chain
-                .put(agent_validation_header.clone(), None)
-                .await?;
-
-            // create a agent chain element and add it directly to the store
-            let agent_header = Header::EntryCreate(header::EntryCreate {
-                author: agent_pubkey.clone(),
-                timestamp: Timestamp::now(),
-                header_seq: 2,
-                prev_header: avh_addr,
-                entry_type: header::EntryType::AgentPubKey,
-                entry_hash: agent_pubkey.clone().into(),
-            });
             workspace
                 .source_chain
-                .put(agent_header, Some(Entry::Agent(agent_pubkey.into())))
+                .genesis(
+                    dna_file.dna_hash().clone(),
+                    agent_pubkey.clone(),
+                    membrane_proof,
+                )
                 .await?;
 
             let fx = WorkflowEffects {
@@ -122,7 +94,7 @@ impl<Api: CellConductorApiT> GenesisWorkflow<Api> {
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuf<'env, Reader<'env>>,
+    source_chain: SourceChainBuf<'env>,
 }
 
 impl<'env> GenesisWorkspace<'env> {
@@ -148,57 +120,26 @@ pub mod tests {
 
     use super::{GenesisWorkflow, GenesisWorkspace};
     use crate::core::workflow::run_workflow;
-    use crate::{conductor::api::MockCellConductorApi, core::state::source_chain::SourceChain};
+    use crate::{
+        conductor::api::MockCellConductorApi,
+        core::{state::source_chain::SourceChain, SourceChainResult},
+    };
     use fallible_iterator::FallibleIterator;
     use holo_hash::Hashed;
-    use holochain_state::{env::*, prelude::Readable, test_utils::test_cell_env};
+    use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
-        header, observability,
+        observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        Header, Timestamp,
+        Header,
     };
-    use holochain_zome_types::entry::Entry;
     use matches::assert_matches;
 
-    pub async fn fake_genesis<R: Readable>(source_chain: &mut SourceChain<'_, R>) -> Header {
-        let agent_pubkey = fake_agent_pubkey_1();
-        let agent_entry = Entry::Agent(agent_pubkey.clone().into());
+    pub async fn fake_genesis(source_chain: &mut SourceChain<'_>) -> SourceChainResult<()> {
         let dna = fake_dna_file("cool dna");
-        let dna_header = Header::Dna(header::Dna {
-            author: agent_pubkey.clone(),
-            timestamp: Timestamp::now(),
-            header_seq: 0,
-            hash: dna.dna_hash().clone(),
-        });
-        let dna_hash = source_chain.put(dna_header, None).await.unwrap();
+        let dna_hash = dna.dna_hash().clone();
+        let agent_pubkey = fake_agent_pubkey_1();
 
-        // create the agent validation entry and add it directly to the store
-        let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
-            author: agent_pubkey.clone(),
-            timestamp: Timestamp::now(),
-            header_seq: 1,
-            prev_header: dna_hash,
-            membrane_proof: None,
-        });
-        let avh_hash = source_chain
-            .put(agent_validation_header, None)
-            .await
-            .unwrap();
-
-        let agent_header = Header::EntryCreate(header::EntryCreate {
-            author: agent_pubkey.clone(),
-            timestamp: Timestamp::now(),
-            header_seq: 2,
-            prev_header: avh_hash,
-            entry_type: header::EntryType::AgentPubKey,
-            entry_hash: agent_pubkey.clone().into(),
-        });
-        source_chain
-            .put(agent_header.clone(), Some(agent_entry))
-            .await
-            .unwrap();
-
-        agent_header
+        source_chain.genesis(dna_hash, agent_pubkey, None).await
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -236,7 +177,7 @@ pub mod tests {
             let mut headers = Vec::new();
 
             while let Some(h) = iter.next().unwrap() {
-                let (h, _) = h.into_inner();
+                let (h, _) = h.into_header_and_signature();
                 let (h, _) = h.into_inner();
                 headers.push(h);
             }
