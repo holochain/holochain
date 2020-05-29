@@ -109,7 +109,7 @@ pub async fn sys_validate_header(
 mod tests {
     use super::*;
     use crate::core::state::source_chain::{ChainElement, SignedHeaderHashed};
-    use holo_hash::HeaderHash;
+    use holo_hash::{HeaderHash, HoloHashExt};
     use holochain_types::{
         composite_hash::HeaderAddress, header::InitZomesComplete, test_utils::fake_agent_pubkey_1,
         Timestamp,

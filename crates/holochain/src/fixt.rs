@@ -7,6 +7,7 @@ use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
 use holo_hash::HeaderHashFixturator;
+use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
 use holochain_types::dna::wasm::DnaWasm;

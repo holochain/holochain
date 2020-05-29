@@ -3,13 +3,15 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
+use derive_more::{From, Into};
+use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
     db::GetDb,
     error::DatabaseResult,
-    prelude::{Readable, Reader, Writer},
+    prelude::{Reader, Writer},
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
@@ -21,6 +23,7 @@ use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
     entry::{CapClaimEntry, CapGrantEntry, Entry},
 };
+use must_future::MustBoxFuture;
 use shrinkwraprs::Shrinkwrap;
 
 pub use error::*;
@@ -33,9 +36,9 @@ mod source_chain_buffer;
 /// i.e. has undergone Genesis.
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
-pub struct SourceChain<'env, R: Readable = Reader<'env>>(pub SourceChainBuf<'env, R>);
+pub struct SourceChain<'env>(pub SourceChainBuf<'env>);
 
-impl<'env, R: Readable> SourceChain<'env, R> {
+impl<'env> SourceChain<'env> {
     pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
         self.0
             .agent_pubkey()?
@@ -48,11 +51,11 @@ impl<'env, R: Readable> SourceChain<'env, R> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
     }
 
-    pub fn into_inner(self) -> SourceChainBuf<'env, R> {
+    pub fn into_inner(self) -> SourceChainBuf<'env> {
         self.0
     }
 
@@ -119,28 +122,11 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
             .iter_raw()?
-            .filter_map(|(hash_bytes, entry)| {
+            .filter_map(|entry| {
                 entry.as_cap_grant().and_then(|grant| {
                     grant.access().secret().and_then(|secret| {
                         if secret == query {
-                            tokio_safe_block_on::tokio_safe_block_on(
-                                async {
-                                    let entry = fatal_db_hash_construction_check!(
-                                        "SourceChain::get_persisted_cap_grant_by_secret",
-                                        hash_bytes,
-                                        EntryHashed::with_data(entry).await,
-                                    );
-                                    fatal_db_hash_integrity_check!(
-                                        "SourceChain::get_persisted_cap_grant_by_secret",
-                                        hash_bytes,
-                                        entry.as_hash().get_bytes()
-                                    );
-                                    let hash = entry.as_hash().clone();
-                                    Some((hash, grant.clone()))
-                                },
-                                std::time::Duration::from_millis(1000),
-                            )
-                            .expect("Hashing took too long")
+                            Some((entry.into_hash(), grant.clone()))
                         } else {
                             None
                         }
@@ -180,27 +166,10 @@ impl<'env, R: Readable> SourceChain<'env, R> {
                 "SourceChainBuf must have access to private entries in order to access CapClaims",
             )
             .iter_raw()?
-            .filter_map(|(hash_bytes, entry)| {
+            .filter_map(|entry| {
                 entry.clone().as_cap_claim().and_then(|claim| {
                     if claim.secret() == query {
-                        tokio_safe_block_on::tokio_safe_block_on(
-                            async move {
-                                let entry = fatal_db_hash_construction_check!(
-                                    "SourceChain::get_persisted_cap_claim_by_secret",
-                                    hash_bytes,
-                                    EntryHashed::with_data(entry).await,
-                                );
-                                fatal_db_hash_integrity_check!(
-                                    "SourceChain::get_persisted_cap_claim_by_secret",
-                                    hash_bytes,
-                                    entry.as_hash().get_bytes()
-                                );
-                                let hash = entry.as_hash().clone();
-                                Some((hash, claim.clone()))
-                            },
-                            std::time::Duration::from_millis(1000),
-                        )
-                        .expect("Hashing took too long")
+                        Some((entry.into_hash(), claim.clone()))
                     } else {
                         None
                     }
@@ -223,13 +192,13 @@ impl<'env, R: Readable> SourceChain<'env, R> {
     }
 }
 
-impl<'env, R: Readable> From<SourceChainBuf<'env, R>> for SourceChain<'env, R> {
-    fn from(buffer: SourceChainBuf<'env, R>) -> Self {
+impl<'env> From<SourceChainBuf<'env>> for SourceChain<'env> {
+    fn from(buffer: SourceChainBuf<'env>) -> Self {
         Self(buffer)
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for SourceChain<'env, R> {
+impl<'env> BufferedStore<'env> for SourceChain<'env> {
     type Error = SourceChainError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
@@ -330,11 +299,76 @@ impl<'a> ChainElementEntry<'a> {
     }
 }
 
+#[derive(Clone, Debug, From, Into, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct SignedHeader(Header, Signature);
+
+impl SignedHeader {
+    pub fn header(&self) -> &Header {
+        &self.0
+    }
+
+    pub fn signature(&self) -> &Signature {
+        &self.1
+    }
+}
+
+// HACK: In this representation, we have to clone the Header and store it twice,
+// once in the HeaderHashed, and once in the SignedHeader. The reason is that
+// the API currently requires references to both types, and it was easier to
+// to a simple clone than to refactor the entire struct and API to remove the
+// need for one of those references. We probably SHOULD do that refactor at
+// some point.
+// FIXME: refactor so that HeaderHashed is not stored, and then remove the
+// header_hashed method which returns a reference to HeaderHashed.
+// BTW, I tried to think about the possibility of the following, but none were easy:
+// - Having a lazily instantiable SignedHeader, so we only have to clone if needed
+// - Having HeaderHashed take AsRefs for its arguments, so you can have a
+//    HeaderHashed of references instead of values
 /// the header and the signature that signed it
 #[derive(Clone, Debug, PartialEq)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
-    signature: Signature,
+    signed_header: SignedHeader,
+}
+
+impl Hashed for SignedHeaderHashed {
+    type Content = SignedHeader;
+    type HashType = HeaderHash;
+
+    /// Unwrap the complete contents of this "Hashed" wrapper.
+    fn into_inner(self) -> (Self::Content, Self::HashType) {
+        let (header, hash) = self.header.into_inner();
+        ((header, self.signed_header.1).into(), hash)
+    }
+
+    /// Access the main item stored in this wrapper type.
+    fn as_content(&self) -> &Self::Content {
+        &self.signed_header
+    }
+
+    /// Access the already-calculated hash stored in this wrapper type.
+    fn as_hash(&self) -> &Self::HashType {
+        self.header.as_hash()
+    }
+}
+
+impl Hashable for SignedHeaderHashed {
+    fn with_data(
+        signed_header: Self::Content,
+    ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
+    where
+        Self: Sized,
+    {
+        async move {
+            let (header, signature) = signed_header.into();
+            Ok(Self {
+                header: HeaderHashed::with_data(header.clone()).await?,
+                signed_header: SignedHeader(header, signature),
+            })
+        }
+        .boxed()
+        .into()
+    }
 }
 
 impl SignedHeaderHashed {
@@ -346,11 +380,15 @@ impl SignedHeaderHashed {
 
     /// Constructor for an already signed header
     pub fn with_presigned(header: HeaderHashed, signature: Signature) -> Self {
-        Self { header, signature }
+        let signed_header = SignedHeader(header.as_content().clone(), signature);
+        Self {
+            header,
+            signed_header,
+        }
     }
 
-    pub fn into_inner(self) -> (HeaderHashed, Signature) {
-        (self.header, self.signature)
+    pub fn into_header_and_signature(self) -> (HeaderHashed, Signature) {
+        (self.header, self.signed_header.1)
     }
 
     /// Access the Header Hash.
@@ -360,7 +398,7 @@ impl SignedHeaderHashed {
 
     /// Access the Header portion.
     pub fn header(&self) -> &Header {
-        &*self.header
+        &self.header
     }
 
     /// Access the HeaderHashed portion.
@@ -370,7 +408,7 @@ impl SignedHeaderHashed {
 
     /// Access the signature portion.
     pub fn signature(&self) -> &Signature {
-        &self.signature
+        self.signed_header.signature()
     }
 
     /// Validates a signed header
@@ -378,7 +416,7 @@ impl SignedHeaderHashed {
         if !self
             .header
             .author()
-            .verify_signature(&self.signature, &*self.header)
+            .verify_signature(self.signature(), self.header())
             .await?
         {
             return Err(SourceChainError::InvalidSignature);
