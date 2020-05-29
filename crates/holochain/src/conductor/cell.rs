@@ -184,7 +184,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_call_remote(request)
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             Publish { span, respond, .. } => {
@@ -192,7 +192,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_publish()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             GetValidationPackage { span, respond, .. } => {
@@ -200,7 +200,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_get_validation_package()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             Get { span, respond, .. } => {
@@ -208,7 +208,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_get()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             GetLinks { span, respond, .. } => {
@@ -216,7 +216,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_get_links()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             ListDhtOpHashes { span, respond, .. } => {
@@ -224,7 +224,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_list_dht_op_hashes()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             FetchDhtOps { span, respond, .. } => {
@@ -232,7 +232,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_fetch_dht_ops()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             SignNetworkData { span, respond, .. } => {
@@ -240,7 +240,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_sign_network_data()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
         }

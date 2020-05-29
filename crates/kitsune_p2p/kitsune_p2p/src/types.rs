@@ -1,33 +1,44 @@
+use std::sync::Arc;
+
 /// KitsuneP2p Error Type.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum KitsuneP2pError {
     /// GhostError
     #[error(transparent)]
     GhostError(#[from] ghost_actor::GhostError),
 
-    /// Routing Failure
-    #[error("Routing Failure: {0}")]
-    RoutingFailure(String),
+    /// RoutingSpaceError
+    #[error("Routing Space Error: {0:?}")]
+    RoutingSpaceError(Arc<KitsuneSpace>),
 
-    /// Custom
-    #[error("Custom: {0}")]
-    Custom(Box<dyn std::error::Error + Send + Sync>),
+    /// RoutingAgentError
+    #[error("Routing Agent Error: {0:?}")]
+    RoutingAgentError(Arc<KitsuneAgent>),
 
     /// Other
     #[error("Other: {0}")]
-    Other(String),
+    Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl KitsuneP2pError {
     /// promote a custom error type to a KitsuneP2pError
-    pub fn custom(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
-        Self::Custom(e.into())
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
     }
 }
 
 impl From<String> for KitsuneP2pError {
     fn from(s: String) -> Self {
-        Self::Other(s)
+        #[derive(Debug, thiserror::Error)]
+        struct OtherError(String);
+        impl std::fmt::Display for OtherError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
+        KitsuneP2pError::other(OtherError(s))
     }
 }
 

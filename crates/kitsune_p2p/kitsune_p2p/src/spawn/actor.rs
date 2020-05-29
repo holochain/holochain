@@ -44,10 +44,7 @@ impl KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = match self.spaces.get_mut(&space) {
             None => {
-                return Err(KitsuneP2pError::RoutingFailure(format!(
-                    "space '{:?}' not joined",
-                    space
-                )))
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
             }
             Some(space) => space,
         };
@@ -100,10 +97,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = match self.spaces.get_mut(&space) {
             None => {
-                return Err(KitsuneP2pError::RoutingFailure(format!(
-                    "space '{:?}' not joined",
-                    space
-                )))
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
             }
             Some(space) => space,
         };

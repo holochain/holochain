@@ -64,13 +64,13 @@ impl HolochainP2pActor {
                 let _g = span.enter();
                 let res_fut = match self.handle_incoming_request(space, agent, data) {
                     Err(e) => {
-                        let _ = respond(Err(kitsune_p2p::KitsuneP2pError::custom(e)));
+                        let _ = respond(Err(e.into()));
                         return Ok(async move { Ok(()) }.boxed().into());
                     }
                     Ok(f) => f,
                 };
                 tokio::task::spawn(async move {
-                    let _ = respond(res_fut.await.map_err(kitsune_p2p::KitsuneP2pError::custom));
+                    let _ = respond(res_fut.await.map_err(Into::into));
                 });
             }
             _ => (),

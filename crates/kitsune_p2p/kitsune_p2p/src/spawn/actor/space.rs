@@ -58,10 +58,7 @@ impl Space {
         // right now we are only implementing the "short-circuit"
         // that routes messages to other agents joined on this same system.
         if !self.agents.contains_key(&agent) {
-            return Err(KitsuneP2pError::RoutingFailure(format!(
-                "agent '{:?}' not joined",
-                agent
-            )));
+            return Err(KitsuneP2pError::RoutingAgentError(agent));
         }
 
         // that agent *is* joined - let's forward the request
