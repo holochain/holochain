@@ -147,17 +147,17 @@ where
         let authority = self.primary.contains(&base).await?;
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(&base, zome_id, tag.clone())?;
+            let links = self.primary_meta.get_links(&base, Some(zome_id), Some(tag.clone()))?;
 
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(&base, zome_id, tag)
+                self.cache_meta.get_links(&base, Some(zome_id), Some(tag))
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            self.cache_meta.get_links(&base, zome_id, tag)
+            self.cache_meta.get_links(&base, Some(zome_id), Some(tag))
         }
     }
 }

@@ -298,8 +298,8 @@ async fn links_local_return() -> SourceChainResult<()> {
         .expect_get_links()
         .with(
             predicate::eq(EntryHash::from(base.clone())),
-            predicate::eq(zome_id),
-            predicate::eq(tag.clone()),
+            predicate::eq(Some(zome_id)),
+            predicate::eq(Some(tag.clone())),
         )
         .returning({
             let link = link.clone();
@@ -362,8 +362,8 @@ async fn links_cache_return() -> SourceChainResult<()> {
         .expect_get_links()
         .with(
             predicate::eq(base.clone()),
-            predicate::eq(zome_id),
-            predicate::eq(tag.clone()),
+            predicate::eq(Some(zome_id)),
+            predicate::eq(Some(tag.clone())),
         )
         .returning(move |_, _, _| Ok(Vec::new()));
     // Return a link between entries
@@ -371,8 +371,8 @@ async fn links_cache_return() -> SourceChainResult<()> {
         .expect_get_links()
         .with(
             predicate::eq(base.clone()),
-            predicate::eq(zome_id),
-            predicate::eq(tag.clone()),
+            predicate::eq(Some(zome_id)),
+            predicate::eq(Some(tag.clone())),
         )
         .returning({
             let link = link.clone();
@@ -428,8 +428,8 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         .expect_get_links()
         .with(
             predicate::eq(base.clone()),
-            predicate::eq(zome_id),
-            predicate::eq(tag.clone()),
+            predicate::eq(Some(zome_id)),
+            predicate::eq(Some(tag.clone())),
         )
         .returning({
             let link = link.clone();

@@ -48,8 +48,8 @@ pub struct Link {
 /// but is optional if you want all links on a get
 struct LinkKey<'a> {
     base: &'a EntryHash,
-    zome_id: ZomeId,
-    tag: Tag,
+    zome_id: Option<ZomeId>,
+    tag: Option<Tag>,
     link_add_hash: Option<HeaderHash>,
 }
 
@@ -61,8 +61,12 @@ impl<'a> LinkKey<'a> {
             .try_into()
             .expect("entry addresses don't have the unserialize problem");
         let mut vec: Vec<u8> = sb.bytes().to_vec();
-        vec.push(self.zome_id);
-        vec.extend_from_slice(self.tag.as_ref());
+        if let Some(zome_id) = self.zome_id {
+            vec.push(zome_id);
+        }
+        if let Some(ref tag) = self.tag {
+            vec.extend_from_slice(tag.as_ref());
+        }
         if let Some(ref link_add_hash) = self.link_add_hash {
             vec.extend_from_slice(link_add_hash.as_ref());
         }
@@ -74,8 +78,8 @@ impl<'a> From<(&'a LinkAdd, HeaderHash)> for LinkKey<'a> {
     fn from((link_add, hash): (&'a LinkAdd, HeaderHash)) -> Self {
         Self {
             base: &link_add.base_address,
-            zome_id: link_add.zome_id,
-            tag: link_add.tag.clone(),
+            zome_id: Some(link_add.zome_id),
+            tag: Some(link_add.tag.clone()),
             link_add_hash: Some(hash),
         }
     }
@@ -85,7 +89,12 @@ impl<'a> From<(&'a LinkAdd, HeaderHash)> for LinkKey<'a> {
 pub trait ChainMetaBufT {
     // Links
     /// Get all te links on this base that match the tag
-    fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>>;
+    fn get_links(
+        &self,
+        base: &EntryHash,
+        zome_id: Option<ZomeId>,
+        tag: Option<Tag>,
+    ) -> DatabaseResult<Vec<Link>>;
 
     /// Add a link
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()>;
@@ -141,7 +150,12 @@ impl<'env> ChainMetaBuf<'env> {
 #[async_trait::async_trait]
 impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     // TODO find out whether we need link_type.
-    fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>> {
+    fn get_links(
+        &self,
+        base: &EntryHash,
+        zome_id: Option<ZomeId>,
+        tag: Option<Tag>,
+    ) -> DatabaseResult<Vec<Link>> {
         let key = LinkKey {
             base,
             zome_id,
@@ -196,8 +210,8 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     ) -> DatabaseResult<()> {
         let key = LinkKey {
             base,
-            zome_id,
-            tag,
+            zome_id: Some(zome_id),
+            tag: Some(tag),
             link_add_hash: Some(link_remove.link_add_address),
         };
         // TODO: It should be impossible to ever remove a Link that wasn't already added
@@ -232,7 +246,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>>;
+        fn get_links(&self, base: &EntryHash, zome_id: Option<ZomeId>, tag: Option<Tag>) -> DatabaseResult<Vec<Link>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<()>;
         fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
@@ -245,7 +259,12 @@ mock! {
 
 #[async_trait::async_trait]
 impl ChainMetaBufT for MockChainMetaBuf {
-    fn get_links(&self, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<Vec<Link>> {
+    fn get_links(
+        &self,
+        base: &EntryHash,
+        zome_id: Option<ZomeId>,
+        tag: Option<Tag>,
+    ) -> DatabaseResult<Vec<Link>> {
         self.get_links(base, zome_id, tag)
     }
 
@@ -484,7 +503,7 @@ pub mod test {
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
-                .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
                 .unwrap()
                 .is_empty());
             DatabaseResult::Ok(())
@@ -505,7 +524,7 @@ pub mod test {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
                 meta_buf
-                    .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
                     .unwrap(),
                 vec![expected_link]
             );
@@ -565,7 +584,7 @@ pub mod test {
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
-                .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
                 .unwrap()
                 .is_empty());
             DatabaseResult::Ok(())
@@ -576,10 +595,34 @@ pub mod test {
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            meta_buf.add_link(link_add).await.unwrap();
+            // Add
+            meta_buf.add_link(link_add.clone()).await.unwrap();
+            // Is in scratch
             assert_eq!(
                 meta_buf
-                    .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
+                    .unwrap(),
+                vec![expected_link.clone()]
+            );
+
+            // Remove from scratch
+            meta_buf
+                .remove_link(link_remove.clone(), base_address, zome_id, tag.clone())
+                .unwrap();
+
+            // Is empty
+            assert!(meta_buf
+                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
+                .unwrap()
+                .is_empty());
+
+            // Add again
+            meta_buf.add_link(link_add.clone()).await.unwrap();
+
+            // Is in scratch again
+            assert_eq!(
+                meta_buf
+                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
                     .unwrap(),
                 vec![expected_link.clone()]
             );
@@ -587,14 +630,14 @@ pub mod test {
                 .unwrap();
         }
 
-        // Check it's there
+        // Check it's in db
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert_eq!(
                 meta_buf
-                    .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
                     .unwrap(),
-                vec![expected_link]
+                vec![expected_link.clone()]
             );
             DatabaseResult::Ok(())
         })
@@ -615,9 +658,57 @@ pub mod test {
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             assert!(meta_buf
-                .get_links(base_hash.as_ref(), zome_id, tag.clone())
+                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
                 .unwrap()
                 .is_empty());
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+        
+        // Add a link
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            // Add
+            meta_buf.add_link(link_add.clone()).await.unwrap();
+            // Is in scratch
+            assert_eq!(
+                meta_buf
+                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
+                    .unwrap(),
+                vec![expected_link.clone()]
+            );
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+
+        // Partial matching
+        env.with_reader(|reader| {
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            // No zome, no tag
+            assert_eq!(
+                meta_buf
+                    .get_links(base_hash.as_ref(), None, None)
+                    .unwrap(),
+                vec![expected_link.clone()]
+            );
+            // No tag
+            assert_eq!(
+                meta_buf
+                    .get_links(base_hash.as_ref(), Some(zome_id), None)
+                    .unwrap(),
+                vec![expected_link.clone()]
+            );
+            // Half the tag
+            let tag_len = tag.len();
+            let half_tag = tag_len / 2;
+            let half_tag = Tag::new(&tag[..half_tag]);
+            assert_eq!(
+                meta_buf
+                    .get_links(base_hash.as_ref(), Some(zome_id), Some(half_tag))
+                    .unwrap(),
+                vec![expected_link]
+            );
             DatabaseResult::Ok(())
         })
         .unwrap();
