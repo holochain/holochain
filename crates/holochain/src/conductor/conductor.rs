@@ -32,15 +32,12 @@ use super::{
 };
 use crate::{
     conductor::{
-        api::error::{ConductorApiError, ConductorApiResult},
-        cell::Cell,
-        config::ConductorConfig,
-        dna_store::MockDnaStore,
-        error::ConductorResult,
-        handle::ConductorHandle,
+        api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
+        dna_store::MockDnaStore, error::ConductorResult, handle::ConductorHandle,
     },
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
+use holo_hash::Hashable;
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
     KeystoreSender,
@@ -56,7 +53,7 @@ use holochain_state::{
 use holochain_types::{
     app::{AppId, InstalledApp},
     cell::{CellHandle, CellId},
-    dna::DnaFile,
+    dna::{wasm::DnaWasmHashed, DnaFile},
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -140,6 +137,9 @@ where
 
     /// The root environment directory where all environments are created
     root_env_dir: EnvironmentRootPath,
+
+    /// Handle to the network actor.
+    holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
 }
 
 impl Conductor {
@@ -170,12 +170,12 @@ impl<DS> Conductor<DS>
 where
     DS: DnaStore + 'static,
 {
-    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorApiResult<&Cell> {
+    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
         debug!(cells_map = ?self.cells.keys().collect::<Vec<_>>());
         let item = self
             .cells
             .get(cell_id)
-            .ok_or_else(|| ConductorApiError::CellMissing(cell_id.clone()))?;
+            .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
         Ok(&item.cell)
     }
 
@@ -382,11 +382,16 @@ where
 
                 // Create each cell
                 let cells_tasks = cells_to_create.map(move |cell_id| {
+                    let holochain_p2p_cell = self
+                        .holochain_p2p
+                        .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+
                     Cell::create(
                         cell_id,
                         conductor_handle.clone(),
                         root_env_dir.clone(),
                         keystore.clone(),
+                        holochain_p2p_cell,
                     )
                 });
 
@@ -515,16 +520,16 @@ where
             .iter()?
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.clone().zomes.into_iter().map(|(_, zome)| async {
+                let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| async {
                     wasm_buf
                         .get(&zome.wasm_hash.into())
                         .await?
-                        .map(|hashed| hashed.into_inner().0)
+                        .map(|hashed| hashed.into_content())
                         .ok_or(ConductorError::WasmMissing)
                 });
                 async move {
                     let wasms = futures::future::try_join_all(wasms).await?;
-                    let dna_file = DnaFile::new(dna_def, wasms).await?;
+                    let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
                     Ok((dna_file.dna_hash().clone(), dna_file))
                 }
             })
@@ -553,10 +558,10 @@ where
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
             if let None = wasm_buf.get(&wasm_hash.into()).await? {
-                wasm_buf.put(dna_wasm).await?;
+                wasm_buf.put(DnaWasmHashed::with_data(dna_wasm).await?);
             }
         }
-        if let None = dna_def_buf.get(dna.dna_hash())? {
+        if let None = dna_def_buf.get(dna.dna_hash()).await? {
             dna_def_buf.put(dna.dna().clone()).await?;
         }
 
@@ -647,6 +652,7 @@ where
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
+        holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
     ) -> ConductorResult<Self> {
         let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
@@ -666,6 +672,7 @@ where
             dna_store,
             keystore,
             root_env_dir,
+            holochain_p2p,
         })
     }
 
@@ -782,28 +789,39 @@ mod builder {
                 dna_store, config, ..
             } = self;
 
-            let conductor =
-                Conductor::new(environment, wasm_environment, dna_store, keystore, env_path)
-                    .await?;
+            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
+
+            let conductor = Conductor::new(
+                environment,
+                wasm_environment,
+                dna_store,
+                keystore,
+                env_path,
+                holochain_p2p,
+            )
+            .await?;
 
             #[cfg(test)]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
-            Self::finish(conductor, config).await
+            Self::finish(conductor, config, p2p_evt).await
         }
 
         async fn finish(
             conductor: Conductor<DS>,
             conductor_config: ConductorConfig,
+            p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         ) -> ConductorResult<ConductorHandle> {
             // Get data before handle
             let keystore = conductor.keystore.clone();
+            let holochain_p2p = conductor.holochain_p2p.clone();
 
             // Create handle
-            let handle: ConductorHandle = Arc::new(ConductorHandleImpl::from((
-                RwLock::new(conductor),
+            let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
+                conductor: RwLock::new(conductor),
                 keystore,
-            )));
+                holochain_p2p,
+            });
 
             handle.add_dnas().await?;
 
@@ -821,6 +839,8 @@ mod builder {
             if let Some(configs) = conductor_config.admin_interfaces {
                 handle.clone().add_admin_interfaces(configs).await?;
             }
+
+            tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
             Ok(handle)
         }
@@ -862,21 +882,40 @@ mod builder {
                 tmpdir,
             } = test_env;
             let keystore = environment.keystore();
+            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
             let conductor = Conductor::new(
                 environment,
                 test_wasm_env,
                 self.dna_store,
                 keystore,
                 tmpdir.path().to_path_buf().into(),
+                holochain_p2p,
             )
             .await?;
 
             #[cfg(test)]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
-            Self::finish(conductor, self.config).await
+            Self::finish(conductor, self.config, p2p_evt).await
         }
     }
+}
+
+async fn p2p_event_task(
+    mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+    handle: ConductorHandle,
+) {
+    use tokio::stream::StreamExt;
+    while let Some(evt) = p2p_evt.next().await {
+        let cell_id = CellId::new(evt.dna_hash().clone(), evt.agent_pub_key().clone());
+        if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+            tracing::error!(
+                message = "error dispatching network event",
+                error = ?e,
+            );
+        }
+    }
+    tracing::warn!("p2p_event_task has ended");
 }
 
 #[cfg(test)]
@@ -899,12 +938,14 @@ pub mod tests {
         } = test_wasm_env();
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
+        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
         let conductor = Conductor::new(
             environment,
             wasm_env,
             dna_store,
             keystore,
             tmpdir.path().to_path_buf().into(),
+            holochain_p2p,
         )
         .await
         .unwrap();

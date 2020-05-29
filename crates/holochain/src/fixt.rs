@@ -7,6 +7,7 @@ use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
 use holo_hash::HeaderHashFixturator;
+use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
 use holochain_types::dna::wasm::DnaWasm;
@@ -50,7 +51,7 @@ fixturator!(
 fixturator!(
     ZomeCallCapGrant,
     {
-        match CapGrant::zome_call(
+        ZomeCallCapGrant::new(
             StringFixturator::new(Empty).next().unwrap(),
             CapAccessFixturator::new(Empty).next().unwrap(),
             {
@@ -71,13 +72,10 @@ fixturator!(
                 }
                 granted_functions
             },
-        ) {
-            CapGrant::ZomeCall(zome_call) => zome_call,
-            _ => unreachable!(),
-        }
+        )
     },
     {
-        match CapGrant::zome_call(
+        ZomeCallCapGrant::new(
             StringFixturator::new(Unpredictable).next().unwrap(),
             CapAccessFixturator::new(Unpredictable).next().unwrap(),
             {
@@ -98,13 +96,10 @@ fixturator!(
                 }
                 granted_functions
             },
-        ) {
-            CapGrant::ZomeCall(zome_call) => zome_call,
-            _ => unreachable!(),
-        }
+        )
     },
     {
-        match CapGrant::zome_call(
+        ZomeCallCapGrant::new(
             StringFixturator::new_indexed(Predictable, self.0.index)
                 .next()
                 .unwrap(),
@@ -126,10 +121,7 @@ fixturator!(
                 }
                 granted_functions
             },
-        ) {
-            CapGrant::ZomeCall(zome_call) => zome_call,
-            _ => unreachable!(),
-        }
+        )
     }
 );
 

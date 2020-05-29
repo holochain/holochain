@@ -12,7 +12,7 @@ use holochain_state::{
     buffer::{BufferedStore, IntKvBuf},
     db::{GetDb, CHAIN_SEQUENCE},
     error::DatabaseResult,
-    prelude::{Readable, Writer},
+    prelude::{Readable, Reader, Writer},
 };
 use holochain_types::composite_hash::HeaderAddress;
 use serde::{Deserialize, Serialize};
@@ -26,10 +26,10 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'env, R> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
+type Store<'env, R = Reader<'env>> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
 
 /// A BufferedStore for interacting with the ChainSequence database
-pub struct ChainSequenceBuf<'env, R: Readable> {
+pub struct ChainSequenceBuf<'env, R: Readable = Reader<'env>> {
     db: Store<'env, R>,
     next_index: u32,
     tx_seq: u32,
@@ -38,19 +38,14 @@ pub struct ChainSequenceBuf<'env, R: Readable> {
 }
 
 impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
-    /// Create a new instance from a read-only transaction and a database reference
-    pub fn new(reader: &'env R, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let db: Store<'env, R> = IntKvBuf::new(reader, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
-        Self::from_db(db)
-    }
-
-    /// Create a new instance from a new read-only transaction, using the same database
-    /// as an existing instance. Useful for getting a fresh read-only snapshot of a database.
+    /// Create a new instance from a new transaction, using the same database
+    /// as an existing instance. Useful for basing an existing BufStore on
+    /// a different transaction.
     pub fn with_reader<RR: Readable>(
         &self,
-        reader: &'env RR,
+        txn: &'env RR,
     ) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
-        Self::from_db(self.db.with_reader(reader))
+        Self::from_db(self.db.with_reader(txn))
     }
 
     fn from_db<RR: Readable>(db: Store<'env, RR>) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
@@ -68,6 +63,14 @@ impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
             current_head,
             persisted_head,
         })
+    }
+}
+
+impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
+    /// Create a new instance from a read-only transaction and a database reference
+    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let db: Store<'env> = IntKvBuf::new(reader, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
+        Self::from_db(db)
     }
 
     /// Get the chain head, AKA top chain header. None if the chain is empty.
