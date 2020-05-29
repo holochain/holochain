@@ -664,7 +664,7 @@ pub mod test {
             DatabaseResult::Ok(())
         })
         .unwrap();
-        
+
         // Add a link
         {
             let reader = env.reader().unwrap();
@@ -678,6 +678,28 @@ pub mod test {
                     .unwrap(),
                 vec![expected_link.clone()]
             );
+            // No zome, no tag
+            assert_eq!(
+                meta_buf.get_links(base_hash.as_ref(), None, None).unwrap(),
+                vec![expected_link.clone()]
+            );
+            // No tag
+            assert_eq!(
+                meta_buf
+                    .get_links(base_hash.as_ref(), Some(zome_id), None)
+                    .unwrap(),
+                vec![expected_link.clone()]
+            );
+            // Half the tag
+            let tag_len = tag.len();
+            let half_tag = tag_len / 2;
+            let half_tag = Tag::new(&tag[..half_tag]);
+            assert_eq!(
+                meta_buf
+                    .get_links(base_hash.as_ref(), Some(zome_id), Some(half_tag))
+                    .unwrap(),
+                vec![expected_link.clone()]
+            );
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
@@ -687,9 +709,7 @@ pub mod test {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             // No zome, no tag
             assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), None, None)
-                    .unwrap(),
+                meta_buf.get_links(base_hash.as_ref(), None, None).unwrap(),
                 vec![expected_link.clone()]
             );
             // No tag
