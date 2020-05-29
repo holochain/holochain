@@ -38,13 +38,23 @@ pub enum Header {
 macro_rules! write_into_header {
     ($($n:ident),*,) => {
         $(
-            impl From<$n> for Header {
-                fn from(n: $n) -> Self {
-                    Self::$n(n)
+            impl HeaderInner for $n {
+                fn into_header(self) -> Header {
+                    Header::$n(self)
                 }
             }
         )*
     };
+}
+
+pub trait HeaderInner {
+    fn into_header(self) -> Header;
+}
+
+impl<I: HeaderInner> From<I> for Header {
+    fn from(i: I) -> Self {
+        i.into_header()
+    }
 }
 
 write_into_header! {
