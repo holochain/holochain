@@ -1,8 +1,8 @@
-use crate::core::state::source_chain::SignedHeaderHashed;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
+    element::SignedHeaderHashed,
     header::{EntryCreate, EntryType, EntryVisibility},
     test_utils::{fake_app_entry_type, fake_header_hash},
     Entry, EntryHashed, Header, HeaderHashed, Timestamp,
