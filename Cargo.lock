@@ -1183,6 +1183,7 @@ dependencies = [
  "derive_more",
  "either",
  "failure",
+ "fallible-iterator",
  "futures",
  "holo_hash",
  "holo_hash_core",
