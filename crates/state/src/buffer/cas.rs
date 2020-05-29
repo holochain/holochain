@@ -4,6 +4,7 @@ use crate::{
     fatal_db_hash_construction_check, fatal_db_hash_integrity_check,
     prelude::{Reader, Writer},
 };
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holo_hash::Hashable;
 use holo_hash_core::HoloHashCoreHash;
@@ -56,19 +57,31 @@ where
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&'env self) -> DatabaseResult<Box<dyn Iterator<Item = H> + 'env>> {
-        Ok(Box::new(self.0.iter_raw()?.map(|result| match result {
-            Ok((hash, content)) => {
-                tokio_safe_block_on::tokio_safe_block_on(
-                    Self::deserialize_and_hash(hash, content),
-                    std::time::Duration::from_millis(500),
-                )
-                .expect("TODO: make into stream")
-                // TODO: make this a stream?
-            }
-            // FIXME
-            Err(_) => todo!("Properly handle or go back to fallible_iterator"),
+    pub fn iter_fail(
+        &'env self,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
+        Ok(Box::new(FallibleIterator::map(self.0.iter()?, |(h, c)| {
+            Ok(Self::deserialize_and_hash_blocking(h, c))
         })))
+    }
+
+    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
+    pub fn iter_fail_raw(
+        &'env self,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
+        Ok(Box::new(FallibleIterator::map(
+            self.0.iter_raw()?,
+            |(h, c)| Ok(Self::deserialize_and_hash_blocking(h, c)),
+        )))
+    }
+
+    fn deserialize_and_hash_blocking(hash: &[u8], content: H::Content) -> H {
+        tokio_safe_block_on::tokio_safe_block_on(
+            Self::deserialize_and_hash(hash, content),
+            std::time::Duration::from_millis(500),
+        )
+        .expect("TODO: make into stream")
+        // TODO: make this a stream?
     }
 
     async fn deserialize_and_hash(hash_bytes: &[u8], content: H::Content) -> H {

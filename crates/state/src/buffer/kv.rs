@@ -7,6 +7,8 @@ use rkv::SingleStore;
 
 use std::{collections::BTreeMap, marker::PhantomData};
 
+use fallible_iterator::FallibleIterator;
+
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
 /// Delete: remove the KV
@@ -212,7 +214,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let current = match self.current.take() {
             Some(s) => Some(s),
-            None => self.iter.next(),
+            None => Iterator::next(&mut self.iter),
         };
         let current_scratch = match self.current_scratch.take() {
             Some(s) => Some(s),
@@ -263,7 +265,7 @@ where
     type Item = Result<(&'env [u8], V), DatabaseError>;
     fn next(&mut self) -> Option<Self::Item> {
         use Op::*;
-        match self.iter.next() {
+        match Iterator::next(&mut self.iter) {
             Some(Ok((k, v))) => Ok(match self.scratch.get(k) {
                 Some(Put(scratch_val)) => Some((k, *scratch_val.clone())),
                 Some(Delete) => None,
@@ -287,8 +289,6 @@ impl<'env, V> SingleIterRaw<'env, V> {
 /// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
 /// This is to enable a wider range of keys, such as String, because there is no uniform trait which
 /// enables conversion from a byte slice to a given type.
-/// FIXME: Use FallibleIterator to prevent panics within iteration
-// or just return Option<Result<_>> so we can collect::<Result<Vec<_>>()
 impl<'env, V> Iterator for SingleIterRaw<'env, V>
 where
     V: BufVal,
@@ -309,6 +309,28 @@ where
             // This could be a IO error so returning it makes sense
             Some(Err(e)) => Some(Err(DatabaseError::from(e))),
         }
+    }
+}
+
+impl<'env, 'a, V> FallibleIterator for SingleIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    type Item = (&'env [u8], V);
+    type Error = DatabaseError;
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        Iterator::next(self).transpose()
+    }
+}
+
+impl<'env, V> FallibleIterator for SingleIterRaw<'env, V>
+where
+    V: BufVal,
+{
+    type Item = (&'env [u8], V);
+    type Error = DatabaseError;
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        Iterator::next(self).transpose()
     }
 }
 

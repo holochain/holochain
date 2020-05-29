@@ -130,16 +130,14 @@ impl<'env> SourceChainBuf<'env> {
         Ok(self
             .cas
             .public_entries()
-            .iter_raw()?
-            .chain(
-                // Add in values from the scratch space, to be comprehensive
-                self.cas.public_entries().iter_scratch_puts(),
-            )
-            .filter_map(|e| match e.into_content() {
-                Entry::Agent(agent_pubkey) => Some(agent_pubkey),
-                _ => None,
+            .iter_fail()?
+            .filter_map(|e| {
+                Ok(match e.into_content() {
+                    Entry::Agent(agent_pubkey) => Some(agent_pubkey),
+                    _ => None,
+                })
             })
-            .next()
+            .next()?
             .map(|h| h.into()))
     }
 

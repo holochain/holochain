@@ -1,4 +1,5 @@
 use error::DnaStoreResult;
+use fallible_iterator::FallibleIterator;
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     error::{DatabaseError, DatabaseResult},
@@ -73,12 +74,7 @@ impl<'env> DnaDefBuf<'env> {
     }
 
     pub fn get_all(&'env self) -> DatabaseResult<Vec<DnaDefHashed>> {
-        Ok(self.dna_defs.iter_raw()?.collect())
-    }
-
-    pub fn iter(&'env self) -> DatabaseResult<impl Iterator<Item = DnaDefHashed> + 'env> {
-        // Don't want to pay for deserializing the keys
-        Ok(self.dna_defs.iter_raw()?)
+        self.dna_defs.iter_fail_raw()?.collect()
     }
 }
 

@@ -2,10 +2,11 @@ use super::EntryType;
 use crate::header;
 use crate::{
     composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
-    Header, Timestamp, link::Tag,
+    link::Tag,
+    Header, Timestamp,
 };
-use holo_hash::*;
 use header::ZomeId;
+use holo_hash::*;
 
 pub struct HeaderCommon {
     pub author: AgentPubKey,

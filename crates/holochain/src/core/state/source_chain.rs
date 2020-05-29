@@ -31,6 +31,7 @@ pub use source_chain_buffer::*;
 
 mod error;
 mod source_chain_buffer;
+use fallible_iterator::FallibleIterator;
 
 /// A wrapper around [SourceChainBuf] with the assumption that the source chain has been initialized,
 /// i.e. has undergone Genesis.
@@ -121,9 +122,9 @@ impl<'env> SourceChain<'env> {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
-            .iter_raw()?
+            .iter_fail_raw()?
             .filter_map(|entry| {
-                entry.as_cap_grant().and_then(|grant| {
+                Ok(entry.as_cap_grant().and_then(|grant| {
                     grant.access().secret().and_then(|secret| {
                         if secret == query {
                             Some((entry.into_hash(), grant.clone()))
@@ -131,9 +132,9 @@ impl<'env> SourceChain<'env> {
                             None
                         }
                     })
-                })
+                }))
             })
-            .collect();
+            .collect()?;
 
         let answer = if hashes_n_grants.len() == 0 {
             None
@@ -165,17 +166,17 @@ impl<'env> SourceChain<'env> {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapClaims",
             )
-            .iter_raw()?
+            .iter_fail_raw()?
             .filter_map(|entry| {
-                entry.clone().as_cap_claim().and_then(|claim| {
+                Ok(entry.clone().as_cap_claim().and_then(|claim| {
                     if claim.secret() == query {
                         Some((entry.into_hash(), claim.clone()))
                     } else {
                         None
                     }
-                })
+                }))
             })
-            .collect();
+            .collect()?;
 
         let answer = if hashes_n_claims.len() == 0 {
             None
