@@ -461,76 +461,156 @@ pub mod test {
         )
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn can_add_and_get_link() {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-
-        // Create a known link add
-        let (base_hash, target_hash) = entries().await;
-
-        let tag = StringFixturator::new(Unpredictable).next().unwrap();
-        let tag = Tag::new(tag);
-        let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
-        let base_address: &EntryHash = base_hash.as_ref();
-        let target_address: &EntryHash = target_hash.as_ref();
-
-        let link_add = KnownLinkAdd {
-            base_address: base_address.clone(),
-            target_address: target_address.clone(),
-            zome_id,
-            tag: tag.clone(),
+    macro_rules! here {
+        ($test: expr) => {
+            concat!($test, " !!!_LOOK HERE:---> ", file!(), line!())
         };
+    }
 
-        let link_add = LinkAddFixturator::new(link_add).next().unwrap();
+    struct TestData {
+        link_add: LinkAdd,
+        link_remove: LinkRemove,
+        base_hash: EntryHash,
+        zome_id: ZomeId,
+        tag: Tag,
+        expected_link: Link,
+    }
 
-        // Create the expected link result
-        let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
+    async fn fixtures(n: usize) -> Vec<TestData> {
+        let data = (0..n).map(|_| async {
+            // Create a known link add
+            let (base_hash, target_hash) = entries().await;
+
+            let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+            let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+            let base_address: &EntryHash = base_hash.as_ref();
+            let target_address: &EntryHash = target_hash.as_ref();
+
+            let link_add = KnownLinkAdd {
+                base_address: base_address.clone(),
+                target_address: target_address.clone(),
+                zome_id,
+                tag: tag.clone(),
+            };
+
+            let link_add = LinkAddFixturator::new(link_add).next().unwrap();
+
+            // Create the expected link result
+            let (_, link_add_hash): (_, HeaderHash) =
+                HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
+                    .await
+                    .unwrap()
+                    .into();
+
+            let expected_link = Link {
+                link_add_hash,
+                target: target_address.clone(),
+                timestamp: link_add.timestamp.clone(),
+                zome_id,
+                tag: tag.clone(),
+            };
+
+            // Create a known link remove
+            let link_add_address = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
                 .await
-                .unwrap()
-                .into();
-
-        let expected_link = Link {
-            link_add_hash,
-            target: target_address.clone(),
-            timestamp: link_add.timestamp.clone(),
-            zome_id,
-            tag: tag.clone(),
-        };
-
-        // Check it's empty
-        env.with_reader(|reader| {
-            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            assert!(meta_buf
-                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                .unwrap()
-                .is_empty());
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
-
-        // Add a link
-        {
-            let reader = env.reader().unwrap();
-            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            meta_buf.add_link(link_add).await.unwrap();
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
+            let link_add_address: &HeaderHash = link_add_address.as_ref();
+            let link_remove = KnownLinkRemove {
+                link_add_address: link_add_address.clone(),
+            };
+            let link_remove = LinkRemoveFixturator::new(link_remove).next().unwrap();
+            TestData {
+                link_add,
+                link_remove,
+                base_hash: base_address.clone(),
+                zome_id,
+                tag,
+                expected_link,
+            }
+        });
+        futures::future::join_all(data).await.into()
+    }
+
+    impl TestData {
+        fn empty(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+            assert!(
+                meta_buf
+                    .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
+                    .unwrap()
+                    .is_empty(),
+                test
+            );
         }
 
-        // Check it's there
-        env.with_reader(|reader| {
-            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        fn present(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
             assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                    .unwrap(),
-                vec![expected_link]
+                &meta_buf
+                    .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
+                    .unwrap()[..],
+                &[self.expected_link.clone()],
+                "{}",
+                test
             );
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+        }
+
+        fn not_present(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+            assert!(
+                !meta_buf
+                    .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
+                    .unwrap().contains(&self.expected_link),
+                "Link: {:?} should not be present {}",
+                self.expected_link,
+                test
+            );
+        }
+
+        fn base(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+            assert_eq!(
+                &meta_buf.get_links(&self.base_hash, None, None).unwrap()[..],
+                &[self.expected_link.clone()],
+                "{}",
+                test
+            );
+        }
+
+        fn zome_id(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+            assert_eq!(
+                &meta_buf
+                    .get_links(&self.base_hash, Some(self.zome_id), None)
+                    .unwrap()[..],
+                &[self.expected_link.clone()],
+                "{}",
+                test
+            );
+        }
+
+        fn half_tag(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+            let tag_len = self.tag.len();
+            let half_tag = tag_len / 2;
+            let half_tag = Tag::new(&self.tag[..half_tag]);
+            assert_eq!(
+                &meta_buf
+                    .get_links(&self.base_hash, Some(self.zome_id), Some(half_tag))
+                    .unwrap()[..],
+                &[self.expected_link.clone()],
+                "{}",
+                test
+            );
+        }
+
+        async fn add_link(&self, meta_buf: &mut ChainMetaBuf<'_>) {
+            meta_buf.add_link(self.link_add.clone()).await.unwrap();
+        }
+        async fn remove_link(&self, meta_buf: &mut ChainMetaBuf<'_>) {
+            meta_buf
+                .remove_link(
+                    self.link_remove.clone(),
+                    &self.base_hash,
+                    self.zome_id,
+                    self.tag.clone(),
+                )
+                .unwrap();
+        }
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -538,55 +618,12 @@ pub mod test {
         let arc = test_cell_env();
         let env = arc.guard().await;
 
-        // Create a known link add
-        let (base_hash, target_hash) = entries().await;
-
-        let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
-        let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
-        let base_address: &EntryHash = base_hash.as_ref();
-        let target_address: &EntryHash = target_hash.as_ref();
-
-        let link_add = KnownLinkAdd {
-            base_address: base_address.clone(),
-            target_address: target_address.clone(),
-            zome_id,
-            tag: tag.clone(),
-        };
-
-        let link_add = LinkAddFixturator::new(link_add).next().unwrap();
-
-        // Create the expected link result
-        let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
-                .await
-                .unwrap()
-                .into();
-
-        let expected_link = Link {
-            link_add_hash,
-            target: target_address.clone(),
-            timestamp: link_add.timestamp.clone(),
-            zome_id,
-            tag: tag.clone(),
-        };
-
-        // Create a known link remove
-        let link_add_address = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
-            .await
-            .unwrap();
-        let link_add_address: &HeaderHash = link_add_address.as_ref();
-        let link_remove = KnownLinkRemove {
-            link_add_address: link_add_address.clone(),
-        };
-        let link_remove = LinkRemoveFixturator::new(link_remove).next().unwrap();
+        let td = fixtures(1).await.into_iter().next().unwrap();
 
         // Check it's empty
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            assert!(meta_buf
-                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                .unwrap()
-                .is_empty());
+            td.empty(here!("empty at start"), &meta_buf);
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -596,36 +633,22 @@ pub mod test {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             // Add
-            meta_buf.add_link(link_add.clone()).await.unwrap();
+            td.add_link(&mut meta_buf).await;
             // Is in scratch
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                    .unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.present(here!("add link in scratch"), &meta_buf);
 
             // Remove from scratch
-            meta_buf
-                .remove_link(link_remove.clone(), base_address, zome_id, tag.clone())
-                .unwrap();
+            td.remove_link(&mut meta_buf).await;
 
             // Is empty
-            assert!(meta_buf
-                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                .unwrap()
-                .is_empty());
+            td.empty(here!("empty after remove"), &meta_buf);
 
             // Add again
-            meta_buf.add_link(link_add.clone()).await.unwrap();
+            td.add_link(&mut meta_buf).await;
 
             // Is in scratch again
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                    .unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.present(here!("Is still in the scratch"), &meta_buf);
+
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
@@ -633,12 +656,7 @@ pub mod test {
         // Check it's in db
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                    .unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.present(here!("It's in the db"), &meta_buf);
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -647,9 +665,9 @@ pub mod test {
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            meta_buf
-                .remove_link(link_remove, base_address, zome_id, tag.clone())
-                .unwrap();
+            td.remove_link(&mut meta_buf).await;
+            // Is empty
+            td.empty(here!("empty after remove"), &meta_buf);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
@@ -657,10 +675,8 @@ pub mod test {
         // Check it's empty
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-            assert!(meta_buf
-                .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                .unwrap()
-                .is_empty());
+            // Is empty
+            td.empty(here!("empty after remove in db"), &meta_buf);
             DatabaseResult::Ok(())
         })
         .unwrap();
@@ -670,36 +686,15 @@ pub mod test {
             let reader = env.reader().unwrap();
             let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
             // Add
-            meta_buf.add_link(link_add.clone()).await.unwrap();
+            td.add_link(&mut meta_buf).await;
             // Is in scratch
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), Some(tag.clone()))
-                    .unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.present(here!("add link in scratch"), &meta_buf);
             // No zome, no tag
-            assert_eq!(
-                meta_buf.get_links(base_hash.as_ref(), None, None).unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.base(here!("scratch"), &meta_buf);
             // No tag
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), None)
-                    .unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.zome_id(here!("scratch"), &meta_buf);
             // Half the tag
-            let tag_len = tag.len();
-            let half_tag = tag_len / 2;
-            let half_tag = Tag::new(&tag[..half_tag]);
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), Some(half_tag))
-                    .unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.half_tag(here!("scratch"), &meta_buf);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
         }
@@ -707,30 +702,128 @@ pub mod test {
         // Partial matching
         env.with_reader(|reader| {
             let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            td.present(here!("db"), &meta_buf);
             // No zome, no tag
-            assert_eq!(
-                meta_buf.get_links(base_hash.as_ref(), None, None).unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.base(here!("db"), &meta_buf);
             // No tag
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), None)
-                    .unwrap(),
-                vec![expected_link.clone()]
-            );
+            td.zome_id(here!("db"), &meta_buf);
             // Half the tag
-            let tag_len = tag.len();
-            let half_tag = tag_len / 2;
-            let half_tag = Tag::new(&tag[..half_tag]);
-            assert_eq!(
-                meta_buf
-                    .get_links(base_hash.as_ref(), Some(zome_id), Some(half_tag))
-                    .unwrap(),
-                vec![expected_link]
-            );
+            td.half_tag(here!("db"), &meta_buf);
             DatabaseResult::Ok(())
         })
         .unwrap();
+    }
+    
+    #[tokio::test(threaded_scheduler)]
+    async fn multiple_links() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        
+        let td = fixtures(10).await;
+
+        // Add links
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            // Add
+            for d in td.iter() {
+                d.add_link(&mut meta_buf).await;
+            }
+            // Is in scratch
+            for d in td.iter() {
+                d.present(here!("add link in scratch"), &meta_buf);
+            }
+
+            // Remove from scratch
+            td[5].remove_link(&mut meta_buf).await;
+
+            td[5].not_present(here!("removed in scratch"), &meta_buf);
+
+            for d in td[0..5].iter().chain(&td[6..]) {
+                d.present(here!("all except 5 scratch"), &meta_buf);
+            }
+            // Add again
+            td[5].add_link(&mut meta_buf).await;
+
+            // Is in scratch again
+            td[5].present(here!("Is back in the scratch"), &meta_buf);
+            
+            for d in td.iter() {
+                d.present(here!("add link in scratch"), &meta_buf);
+            }
+
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            for d in td.iter() {
+                d.present(here!("all in db"), &meta_buf);
+            }
+            td[0].remove_link(&mut meta_buf).await;
+
+            for d in &td[1..] {
+                d.present(here!("all except 0 scratch"), &meta_buf);
+            }
+
+            td[0].not_present(here!("removed in scratch"), &meta_buf);
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+
+        env.with_reader(|reader| {
+            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            for d in &td[1..] {
+                d.present(here!("all except 0"), &meta_buf);
+            }
+            td[0].not_present(here!("removed in db"), &meta_buf);
+            DatabaseResult::Ok(())
+        })
+        .unwrap();
+
+    }
+    #[tokio::test(threaded_scheduler)]
+    async fn duplicate_links() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        
+        let td = fixtures(10).await;
+        // Add to db then the same to scratch and expect on one result
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            // Add
+            for d in td.iter() {
+                d.add_link(&mut meta_buf).await;
+            }
+            // Is in scratch
+            for d in td.iter() {
+                d.present(here!("add link in scratch"), &meta_buf);
+            }
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            // Add
+            for d in td.iter() {
+                d.add_link(&mut meta_buf).await;
+            }
+            // Is in scratch
+            for d in td.iter() {
+                d.present(here!("re add"), &meta_buf);
+                // No zome, no tag
+                d.base(here!("re add"), &meta_buf);
+                // No tag
+                d.zome_id(here!("re add"), &meta_buf);
+                // Half the tag
+                d.half_tag(here!("re add"), &meta_buf);
+            }
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
     }
 }
