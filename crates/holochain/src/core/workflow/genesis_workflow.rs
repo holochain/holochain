@@ -94,7 +94,7 @@ impl<Api: CellConductorApiT> GenesisWorkflow<Api> {
 
 /// The workspace for Genesis
 pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuf<'env, Reader<'env>>,
+    source_chain: SourceChainBuf<'env>,
 }
 
 impl<'env> GenesisWorkspace<'env> {
@@ -126,7 +126,7 @@ pub mod tests {
     };
     use fallible_iterator::FallibleIterator;
     use holo_hash::Hashed;
-    use holochain_state::{env::*, prelude::Readable, test_utils::test_cell_env};
+    use holochain_state::{env::*, test_utils::test_cell_env};
     use holochain_types::{
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
@@ -134,9 +134,7 @@ pub mod tests {
     };
     use matches::assert_matches;
 
-    pub async fn fake_genesis<R: Readable>(
-        source_chain: &mut SourceChain<'_, R>,
-    ) -> SourceChainResult<()> {
+    pub async fn fake_genesis(source_chain: &mut SourceChain<'_>) -> SourceChainResult<()> {
         let dna = fake_dna_file("cool dna");
         let dna_hash = dna.dna_hash().clone();
         let agent_pubkey = fake_agent_pubkey_1();
@@ -179,7 +177,7 @@ pub mod tests {
             let mut headers = Vec::new();
 
             while let Some(h) = iter.next().unwrap() {
-                let (h, _) = h.into_inner();
+                let (h, _) = h.into_header_and_signature();
                 let (h, _) = h.into_inner();
                 headers.push(h);
             }

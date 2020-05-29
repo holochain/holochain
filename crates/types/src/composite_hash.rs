@@ -82,6 +82,12 @@ impl std::fmt::Display for EntryHash {
     }
 }
 
+impl AsRef<[u8]> for EntryHash {
+    fn as_ref(&self) -> &[u8] {
+        self.get_bytes()
+    }
+}
+
 /// address type for hashes that can be used to retrieve anything that can be stored on the dht
 #[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AnyDhtHash {

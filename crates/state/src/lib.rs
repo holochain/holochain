@@ -56,6 +56,7 @@ pub mod db;
 pub mod env;
 pub mod error;
 pub mod exports;
+pub mod fatal;
 pub mod prelude;
 pub mod transaction;
 pub mod typed;
