@@ -6,17 +6,26 @@ There are two big differences between this kit and previous kits.
 
 This kit:
 
-1. The DSL is designed to progressively _enhance_ "raw" wasm development
+1. The DSL is ergonomic and composable, so optional if you want more control
 2. It is compatible with the cell-driven version of holochain
+3. Differentiates between the holochain API/interface and "sugar" macros
 
 Old kits:
 
-1. The DSL is generally monolithic and tries to _hide_ wasm development details
+1. The DSL is monolithic and so a bit fragile off the beaten track
 2. Only compatible with the redux version of holochain
+3. Requires all holochain interactions to be routed through the HDK
 
-## Progressive wasm enhancement
+## Composable concepts
 
-One of the main design goals of this HDK is to make it _progressive_.
+One of the main design goals of this HDK is to make it composable.
+
+The macros mostly just remove boilerplate that tends to obfuscate core holochain
+concepts and allow for bugs to sneak in.
+
+These macros are designed to be largely "mechanical" though, if you want to do
+something a little bespoke then there is always a more verbose option to fall
+back on.
 
 This means the abstractions provided by the HDK are optional and composable so
 a developer can opt in to only the functionality that is useful to their app.
@@ -28,6 +37,13 @@ crate https://github.com/holochain/holochain-wasmer. These mandatory components
 exist because there needs to be a basic protocol that holochain can implement
 to co-ordinate memory and callbacks with the wasm.
 
+The `holochain-wasmer` repository contains 3 main crates:
+
+- `holochain_wasmer_common`: shared abstractions for both the host and guest
+- `holochain_wasmer_host`: implements wasm for holochain itself
+- `holochain_wasmer_guest`: abstractions for _you_ to write wasm with, that also
+  power the HDK under the hood
+
 It is important that it is possible to write minimal wasms that are compatible
 with holochain without pulling in "the kitchen sink" of irrelevant Rust
 dependencies or hiding so many details behind a DSL that developers really have
@@ -35,6 +51,148 @@ no idea what is going on and end up "cargo culting" solutions wholesale.
 
 The `holochain-wasmer` crate has its own detailed documentation but relevant
 high level details will be included here.
+
+## Holochain overview
+
+Holochain has several high-level components:
+
+- A DHT network that shares, validates and stores data
+- WASM & DNA files that are executed to provide application specific logic
+- A user-facing websockets interface that enables interactive clients
+- The holochain binary that co-ordinates all these components
+
+Depending on which component(s) you are working with, the key concepts and
+documentation may look very different.
+
+This documentation describes how to write WASM files that are compatible with
+the holochain core binary.
+
+If this is your first time writing WASM, or even Rust code, don't worry!
+
+The ocean of WASM and Rust development is vast and deep, but you only need to
+dip your toes in to effectively write wasm for holochain.
+
+- Holochain core handles many of the tough edge-cases for you, like checking
+  cryptographic proofs and detecting common "bad behaviour" on the network
+- The HDK (holochain development kit) provides a DSL (domain specific language)
+  to remove most or all boilerplate
+- Most of the low-level wasm limitations have been abstracted away, so you can
+  mostly just write vanilla rust, using all the standard language features
+- Most of the advanced functionality in Rust is not required, there is
+  little or no need for multithreading, channels, locks, complex traits,
+  lifetimes, etc. etc.
+
+Every holochain wasm works in the same basic way. The application developer
+writes some Rust code using the functionality exposed by holochain. As long as
+the rust code can be compiled to wasm and exposes the interface that holochain
+expects, then holochain can run it to manage a p2p DHT network.
+
+There are three things that make a wasm holochain-compatible:
+
+- It must use only the host functionality that holochain provides
+- It must expose callback functions that holochain expects
+- Memory handling and (de)serialization must be compatible with holochain
+
+### Holochain functionality
+
+Holochain exposes a list of holochain-specific things that a wasm can do.
+
+For detailed documentation of the full list, see the `core/ribosome` module
+inside core, but some illustrative examples include:
+
+- `emit_signal`: publish data to subscribed clients
+- `encrypt` & `decrypt`: use the agent's keypair to encrypt and decrypt data
+- `sign`: use the agent's keypair to sign some data
+- `commit_entry`: save some data to the local source chain and broadcast it to
+  the DHT to be redundantly validated and stored
+- `get_entry`: retrieve some data from local or the network given its hash
+- `link_entries`: create graph style relationships (links) between entries
+- `get_links`: retrive links between entries using the DHT as a graph database
+- `send`: send data directly to a known peer on the network
+
+This toolkit of functionality is available to the wasm as a list of "extern"
+functions that are all injected into the wasm by holochain - i.e. these
+functions are all provided by holochain to be used by every wasm.
+
+All of this functionality is enabled on the wasm guest by the
+`holochain_externs!` macro in the `holochain_wasmer_guest` crate. It just needs
+to be called once somewhere in the wasm.
+
+### Holochain interface
+
+Holochain drives all of the wasms it has installed in the same way.
+
+Internally holochain handles all the multi-threading, co-ordination between the
+network and websocket RPC connections to any interactive client (e.g. like an
+ electron app).
+
+Whenever holochain reaches some point where it needs to execute application
+specific logic it will call one of the functions in the wasm directly.
+
+This is analagous to how standalone binaries in Rust (and other languages)
+start by running the `main` function by convention.
+
+It is also similar to how "handler" functions are configured in common
+"serverless" platforms like AWS lambda.
+
+There are broadly two types of exposed functions:
+
+- well defined callbacks that specific functionality e.g. "validate this entry"
+- arbitrary functions that handle serialized data from the interactive client
+
+Both work in the same way technically but they have different responsibilities.
+Callbacks extend holochain itself whereas other extern functions extend the
+interactive client that is sending requests via. holochain.
+
+All the extern functions are run in a newly built, sandboxed wasm instance, so
+there are no long-running processes and it is not possible for callbacks to
+interact with each other directly or share data in memory.
+
+Because all functionality is based on simple, sandboxed callbacks, there is no
+need for the application developer to handle threading or other complexities.
+Even minor memory leaks are relatively harmless as the wasm memory is dropped
+wholesale after every extern function call.
+
+### Holochain serialization and memory
+
+Due to wasm limitations (see below) holochain must BYO some process to share
+complex data types between the host and the guest.
+
+The full process is documented in detail in the `holochain-wasmer` repository.
+
+https://github.com/holochain/holochain-wasmer
+
+In short, there are a few functions that the guest needs to expose to the host
+that the host will use to request safe memory allocations and deallocations from
+the guest.
+
+This allows the host to repect the guest's own memory allocation logic, and so
+provides support for alternative allocators such as the wasm-friendly wee alloc.
+
+https://github.com/rustwasm/wee_alloc
+
+Exposing these functions is as simple as calling the `holochain_externs!` macro
+in the `holochain_wasmer_guest` crate.
+
+Once the host and guest can share memory safely, they need to decide on a
+serialization format that data can be shared across the wasm boundary as.
+
+Holochain uses the messagepack serialization format as it has several benefits:
+
+- It is not tied to the rust compiler
+- It is reasonably fast and compact
+- It supports binary data natively (e.g. JSON does not)
+- It is reasonably human readable and can even be automatically JSONified
+
+If you aren't familiar with `serde`, messagepack and/or
+`holochain_serialized_bytes` then its worth at least skim reading the
+documentation.
+
+- Messagepack: https://msgpack.org/index.html
+- Serde: https://github.com/serde-rs/serde
+- Serde messagepack: https://github.com/3Hren/msgpack-rust
+- Holochain serialized bytes: https://github.com/holochain/holochain-serialization/tree/develop/crates/holochain_serialized_bytes
+
 
 ## Wasm overview
 
@@ -231,15 +389,6 @@ The easiest way to make a struct do this is by deriving the traits:
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
 struct Foo;
 ```
-
-If you aren't familiar with `serde`, messagepack and/or
-`holochain_serialized_bytes` then its worth at least skim reading the
-documentation.
-
-- Messagepack: https://msgpack.org/index.html
-- Serde: https://github.com/serde-rs/serde
-- Serde messagepack: https://github.com/3Hren/msgpack-rust
-- Holochain serialized bytes: https://github.com/holochain/holochain-serialization/tree/develop/crates/holochain_serialized_bytes
 
 Note in the example the usage of `ret!()` and `GuestOutput` exactly as in the
 `init` example.
@@ -528,10 +677,8 @@ out a few macros to input/output data for the host. They also offer some
 convenience wrappers around `host_call!()` that do exactly what you'd expect,
 e.g. `commit_entry!( ... )` vs. `host_call!(__commit_entry, ... )`.
 
-We don't want to discourage you from using the HDK, and we don't want to ship
-opaque DSLs that disempower you by hiding trivial details behind scare macros.
-Think of the HDK as a tool and safety net rather than a reason to not learn how
-things work, because knowing is always better than not knowing :)
+Think of the HDK as a tool and safety net but also don't feel you can't peek
+under the hood to see what is there.
 
 ```rust
 use holochain_wasmer_guest::*;
@@ -597,3 +744,9 @@ fn _validate_entry(input: HostInput) -> Result<GuestOutput, String> {
  }.try_into()?))
 }
 ```
+
+## HDK
+
+@TODO
+
+we don't have an HDK yet but it would need docs here
