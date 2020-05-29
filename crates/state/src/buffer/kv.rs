@@ -8,6 +8,7 @@ use rkv::SingleStore;
 use std::{collections::BTreeMap, marker::PhantomData};
 
 use fallible_iterator::FallibleIterator;
+use tracing::*;
 
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
@@ -214,11 +215,23 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let current = match self.current.take() {
             Some(s) => Some(s),
-            None => Iterator::next(&mut self.iter),
+            None => {
+                let r = Iterator::next(&mut self.iter);
+                if r.is_some() {
+                    trace!("new db");
+                }
+                r
+            }
         };
         let current_scratch = match self.current_scratch.take() {
             Some(s) => Some(s),
-            None => self.partial_matches.next(),
+            None => {
+                let r = self.partial_matches.next();
+                if r.is_some() {
+                    trace!("new scratch");
+                }
+                r
+            }
         };
 
         match (current, current_scratch) {
@@ -226,23 +239,38 @@ where
             (Some(Ok(current)), Some(scratch)) => {
                 if current.0 < &scratch.0[..] {
                     // Different key, db first, keep the scratch
+                    trace!("Different key, db first, keep the scratch");
                     self.current_scratch = Some(scratch);
                     Some(Ok((current.0.to_vec(), current.1)))
-                } else {
+                } else if current.0 > &scratch.0[..] {
                     // Different key, scratch first, keep the db
+                    trace!("Different key, scratch first, keep the db");
                     self.current = Some(Ok(current));
                     Some(Ok((scratch.0.to_vec(), scratch.1)))
+                } else {
+                    trace!("Both the same use db, throw away scratch");
+                    Some(Ok((current.0.to_vec(), current.1)))
                 }
             }
             // Scratch is empty return db
-            (Some(Ok(current)), None) => Some(Ok((current.0.to_vec(), current.1))),
+            (Some(Ok(current)), None) => {
+                trace!("Scratch is empty return db");
+                Some(Ok((current.0.to_vec(), current.1)))
+            }
             // Db is empty return scratch
-            (None, Some(scratch)) => Some(Ok((scratch.0.to_vec(), scratch.1))),
+            (None, Some(scratch)) => {
+                trace!("Db is empty return scratch");
+                Some(Ok((scratch.0.to_vec(), scratch.1)))
+            }
             (Some(Err(e)), scratch) => {
+                trace!("db error");
                 self.current_scratch = scratch;
                 Some(Err(e))
             }
-            (None, None) => None,
+            (None, None) => {
+                trace!("Done");
+                None
+            }
         }
     }
 }
