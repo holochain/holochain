@@ -3,6 +3,7 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
+use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{
     buffer::BufferedStore,
@@ -12,7 +13,9 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
-    header::{builder, EntryType, HeaderBuilderCommon, HeaderInner},
+    header::{
+        builder, EntryType, EntryVisibility, HeaderBuilder, HeaderBuilderCommon, HeaderInner,
+    },
     prelude::*,
     EntryHashed,
 };
@@ -22,13 +25,11 @@ use holochain_zome_types::{
 };
 use shrinkwraprs::Shrinkwrap;
 
-use builder::HeaderBuilder;
 pub use error::*;
 pub use source_chain_buffer::*;
 
 mod error;
 mod source_chain_buffer;
-use fallible_iterator::FallibleIterator;
 
 /// A wrapper around [SourceChainBuf] with the assumption that the source chain has been initialized,
 /// i.e. has undergone Genesis.

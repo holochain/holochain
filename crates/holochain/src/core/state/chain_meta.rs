@@ -7,7 +7,7 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::header::{EntryDelete, EntryUpdate};
+use holochain_types::header::{self, builder};
 use holochain_types::{
     composite_hash::EntryHash,
     header::{LinkAdd, LinkRemove, ZomeId},
@@ -110,8 +110,8 @@ pub trait ChainMetaBufT {
         tag: Tag,
     ) -> DatabaseResult<()>;
 
-    fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
-    fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
+    fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<HeaderHash>;
+    fn add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<HeaderHash>;
 
     fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
 
@@ -224,11 +224,11 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         DatabaseResult::Ok(())
     }
 
-    fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
+    fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<HeaderHash> {
         todo!()
     }
 
-    fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()> {
+    fn add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<HeaderHash> {
         todo!()
     }
 
@@ -252,8 +252,8 @@ mock! {
         fn get_links(&self, base: &EntryHash, zome_id: Option<ZomeId>, tag: Option<Tag>) -> DatabaseResult<Vec<Link>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<()>;
-        fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()>;
-        fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()>;
+        fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<()>;
+        fn add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
         fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
@@ -297,11 +297,11 @@ impl ChainMetaBufT for MockChainMetaBuf {
         self.remove_link(link_remove, base, zome_id, tag)
     }
 
-    fn add_update(&self, update: EntryUpdate) -> DatabaseResult<()> {
-        self.add_update(update)
+    fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<HeaderHash> {
+        todo!()
     }
-    fn add_delete(&self, delete: EntryDelete) -> DatabaseResult<()> {
-        self.add_delete(delete)
+    fn add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<HeaderHash> {
+        todo!()
     }
 }
 
