@@ -39,12 +39,6 @@ fn main() {
     {
         let cargo_toml = Path::new(m).join("Cargo.toml");
 
-        // Set the opt-level for wasm
-        let rustflags = std::env::var_os("RUSTFLAGS")
-            .and_then(|s| s.to_str().map(|s| s.to_string()))
-            .unwrap_or_else(|| "".into());
-        std::env::set_var("RUSTFLAGS", format!("{} {}", rustflags, "-C opt-level=z"));
-
         let cargo_command = std::env::var_os("CARGO");
         let cargo_command = cargo_command
             .as_ref()
