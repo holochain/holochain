@@ -30,13 +30,7 @@ pub struct HeaderBuilderCommon {
 /// the Dna header has no prev_entry causes a special case that need not be
 /// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
 pub trait HeaderBuilder<H: HeaderInner>: Sized {
-    fn build_inner(self, common: HeaderBuilderCommon) -> H;
-    fn build(self, common: HeaderBuilderCommon) -> H {
-        self.build_inner(common)
-    }
-    fn build_header(self, common: HeaderBuilderCommon) -> Header {
-        self.build_inner(common).into()
-    }
+    fn build(self, common: HeaderBuilderCommon) -> H;
 }
 
 macro_rules! builder_variant {
@@ -48,7 +42,7 @@ macro_rules! builder_variant {
         }
 
         impl HeaderBuilder<header::$name> for $name {
-            fn build_inner(self, common: HeaderBuilderCommon) -> header::$name {
+            fn build(self, common: HeaderBuilderCommon) -> header::$name {
                 let HeaderBuilderCommon {
                     author,
                     timestamp,

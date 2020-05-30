@@ -120,6 +120,9 @@ pub trait ChainMetaBufT {
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum SysMetaVal {}
+
 pub struct ChainMetaBuf<'env> {
     system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, Reader<'env>>,
     links_meta: KvBuf<'env, Vec<u8>, Link, Reader<'env>>,

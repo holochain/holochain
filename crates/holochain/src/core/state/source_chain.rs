@@ -70,7 +70,7 @@ impl<'env> SourceChain<'env> {
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
         };
-        let header = header_builder.build_header(common);
+        let header = header_builder.build(common).into();
         self.put_raw(header, maybe_entry).await
     }
 
