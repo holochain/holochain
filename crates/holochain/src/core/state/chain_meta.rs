@@ -483,12 +483,15 @@ pub mod test {
     }
 
     async fn fixtures(n: usize) -> Vec<TestData> {
-        let data = (0..n).map(|_| async {
+        let mut tag_fix = BytesFixturator::new(Unpredictable);
+        let mut zome_id = U8Fixturator::new(Predictable);
+        let mut data = Vec::new();
+        for _ in 0..n {
             // Create a known link add
             let (base_hash, target_hash) = entries().await;
 
-            let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
-            let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+            let tag = Tag::new(tag_fix.next().unwrap());
+            let zome_id = zome_id.next().unwrap();
             let base_address: &EntryHash = base_hash.as_ref();
             let target_address: &EntryHash = target_hash.as_ref();
 
@@ -520,16 +523,17 @@ pub mod test {
                 link_add_address: link_add_hash,
             };
             let link_remove = LinkRemoveFixturator::new(link_remove).next().unwrap();
-            TestData {
+            let td = TestData {
                 link_add,
                 link_remove,
                 base_hash: base_address.clone(),
                 zome_id,
                 tag,
                 expected_link,
-            }
-        });
-        futures::future::join_all(data).await.into()
+            };
+            data.push(td);
+        }
+        data
     }
 
     impl TestData {
