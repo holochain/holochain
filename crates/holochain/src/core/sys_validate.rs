@@ -116,7 +116,7 @@ mod tests {
     use std::convert::TryInto;
 
     async fn fake_addr(n: &str) -> HeaderAddress {
-        HeaderHash::with_data(n.as_bytes()).await.into()
+        HeaderHash::with_data(n.as_bytes().to_vec()).await.into()
     }
 
     async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderAddress) -> ChainElement {

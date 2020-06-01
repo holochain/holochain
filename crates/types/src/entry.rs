@@ -27,7 +27,9 @@ impl Hashable for EntryHashed {
                 Entry::Agent(key) => EntryHash::Agent(key.to_owned().into()),
                 entry => {
                     let sb = SerializedBytes::try_from(entry)?;
-                    EntryHash::Entry(EntryContentHash::with_data(sb.bytes()).await)
+                    EntryHash::Entry(
+                        EntryContentHash::with_data(UnsafeBytes::from(sb).into()).await,
+                    )
                 }
             };
             Ok(EntryHashed::with_pre_hashed(entry, hash))
