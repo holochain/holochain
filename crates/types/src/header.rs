@@ -142,7 +142,7 @@ impl HeaderHashed {
         let sb = SerializedBytes::try_from(&header)?;
         Ok(HeaderHashed::with_pre_hashed(
             header,
-            HeaderHash::with_data(sb.bytes()).await,
+            HeaderHash::with_data(UnsafeBytes::from(sb).into()).await,
         ))
     }
 }

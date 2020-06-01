@@ -159,7 +159,7 @@ macro_rules! make_hashed {
                 use futures::future::FutureExt;
                 async {
                     let sb = ::holochain_serialized_bytes::SerializedBytes::try_from(&content)?;
-                    Ok(Self::with_pre_hashed(content, Self::HashType::with_data(sb.bytes()).await))
+                    Ok(Self::with_pre_hashed(content, Self::HashType::with_data(::holochain_serialized_bytes::UnsafeBytes::from(sb).into()).await))
                 }
                 .boxed().into()
             }
