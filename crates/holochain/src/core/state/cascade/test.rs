@@ -1,6 +1,6 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_meta::{test::LinkFixturator, EntryDhtStatus, MockChainMetaBuf},
+    chain_meta::{links_test::LinkFixturator, EntryDhtStatus, MockChainMetaBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use fixt::prelude::*;
