@@ -14,7 +14,7 @@ use crate::{
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    app::{AppId, AppPaths},
+    app::{AppId, InstallAppPayload},
     cell::{CellHandle, CellId},
     dna::{DnaFile, Properties},
 };
@@ -131,14 +131,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .add_admin_interfaces(configs)
                     .await?,
             )),
-            InstallApp { app_paths } => {
-                trace!(?app_paths.dnas);
-                let AppPaths {
+            InstallApp(payload) => {
+                trace!(?payload.dnas);
+                let InstallAppPayload {
                     app_id,
                     agent_key,
                     dnas,
                     proofs,
-                } = app_paths;
+                } = payload;
 
                 // Install Dnas
                 let install_dna_tasks = dnas.into_iter().map(|(dna_path, properties)| async {
@@ -393,10 +393,7 @@ pub enum AdminRequest {
     /// Install an app from a list of Dna paths
     /// Triggers genesis to be run on all cells and
     /// Dnas to be stored
-    InstallApp {
-        /// App Id, [AgentPubKey] and paths to Dnas
-        app_paths: AppPaths,
-    },
+    InstallApp(InstallAppPayload),
     /// List all installed [Dna]s
     ListDnas,
     /// Generate a new AgentPubKey
@@ -477,14 +474,14 @@ mod test {
         let dna_hash = dna.dna_hash().clone();
         let agent_key = fake_agent_pubkey_1();
         let proofs = HashMap::new();
-        let app_paths = AppPaths {
+        let payload = InstallAppPayload {
             dnas: vec![(dna_path, None)],
             app_id: "test".to_string(),
             agent_key,
             proofs,
         };
         let install_response = admin_api
-            .handle_admin_request(AdminRequest::InstallApp { app_paths })
+            .handle_admin_request(AdminRequest::InstallApp(payload))
             .await;
         assert_matches!(install_response, AdminResponse::AppInstalled);
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;

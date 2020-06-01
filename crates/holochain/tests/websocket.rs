@@ -11,7 +11,7 @@ use holochain_2020::core::ribosome::NamedInvocation;
 use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
 use holochain_2020::core::ribosome::ZomeCallInvocationResponse;
 use holochain_types::{
-    app::AppPaths,
+    app::InstallAppPayload,
     cell::CellId,
     dna::{DnaFile, Properties},
     observability,
@@ -72,9 +72,9 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         encryption_service_uri: None,
         decryption_service_uri: None,
         dpki: None,
-        passphrase_service: PassphraseServiceConfig::Mock {
+        passphrase_service: Some(PassphraseServiceConfig::Mock {
             passphrase: "password".into(),
-        },
+        }),
     }
 }
 
@@ -167,13 +167,13 @@ async fn call_admin() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let dna_props = (fake_dna_path, properties.clone());
     let agent_key = fake_agent_pubkey_1();
-    let app_paths = AppPaths {
+    let payload = InstallAppPayload {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp { app_paths };
+    let request = AdminRequest::InstallApp(payload);
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
     assert_matches!(response, AdminResponse::AppInstalled);
@@ -306,13 +306,13 @@ async fn call_zome() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let dna_props = (fake_dna_path, None);
     let agent_key = fake_agent_pubkey_1();
-    let app_paths = AppPaths {
+    let payload = InstallAppPayload {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp { app_paths };
+    let request = AdminRequest::InstallApp(payload);
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
     assert_matches!(response, AdminResponse::AppInstalled);
@@ -370,13 +370,13 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
     let dna_props = (fake_dna_path, None);
     let agent_key = fake_agent_pubkey_1();
-    let app_paths = AppPaths {
+    let payload = InstallAppPayload {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp { app_paths };
+    let request = AdminRequest::InstallApp(payload);
     let response = client.request(request).await;
     assert_matches!(response, Ok(AdminResponse::AppInstalled));
     conductor_handle.shutdown().await;
@@ -424,13 +424,13 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
     let dna_props = (fake_dna_path, None);
     let agent_key = fake_agent_pubkey_1();
-    let app_paths = AppPaths {
+    let payload = InstallAppPayload {
         dnas: vec![dna_props],
         app_id: "test".to_string(),
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp { app_paths };
+    let request = AdminRequest::InstallApp(payload);
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =

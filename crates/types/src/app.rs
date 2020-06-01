@@ -9,7 +9,7 @@ pub type AppId = String;
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct AppPaths {
+pub struct InstallAppPayload {
     /// Placeholder to find the app
     pub app_id: AppId,
     /// The agent that installed this app
