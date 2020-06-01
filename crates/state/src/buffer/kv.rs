@@ -195,9 +195,12 @@ where
                 }
             })
             .collect();
+        trace!(pm_before = partial_matches.len());
+        trace!(deletes = deletes.len());
         for delete in deletes {
             partial_matches.remove(delete);
         }
+        trace!(pm_after = partial_matches.len());
         Self {
             iter,
             partial_matches: partial_matches.into_iter(),
@@ -291,16 +294,32 @@ where
     V: BufVal,
 {
     type Item = Result<(&'env [u8], V), DatabaseError>;
+    #[instrument(skip(self))]
     fn next(&mut self) -> Option<Self::Item> {
         use Op::*;
-        match Iterator::next(&mut self.iter) {
-            Some(Ok((k, v))) => Ok(match self.scratch.get(k) {
-                Some(Put(scratch_val)) => Some((k, *scratch_val.clone())),
-                Some(Delete) => None,
-                None => Some((k, v)),
-            })
-            .transpose(),
-            r => r,
+        loop {
+            let r = match Iterator::next(&mut self.iter) {
+                Some(Ok((k, v))) => Ok(match self.scratch.get(k) {
+                    Some(Put(scratch_val)) => {
+                        trace!("in scratch");
+                        Some((k, *scratch_val.clone()))
+                    }
+                    Some(Delete) => {
+                        trace!("deleted");
+                        continue;
+                    }
+                    None => {
+                        trace!("scratch doesn't contain");
+                        Some((k, v))
+                    }
+                })
+                .transpose(),
+                r => {
+                    trace!("db doesn't contain");
+                    r
+                }
+            };
+            return r;
         }
     }
 }

@@ -22,9 +22,9 @@ use std::fmt::Debug;
 pub use sys_meta::*;
 use tracing::*;
 
-mod sys_meta;
 #[cfg(test)]
 pub mod links_test;
+mod sys_meta;
 
 #[derive(Debug)]
 pub enum EntryDhtStatus {
@@ -223,6 +223,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             tag: Some(tag),
             link_add_hash: Some(link_remove.link_add_address),
         };
+        debug!(removing_key = ?key);
         // TODO: It should be impossible to ever remove a Link that wasn't already added
         // because of the validation dependency on LinkAdd from LinkRemove
         // but do we want some kind of warning or panic here incase we mssed up?

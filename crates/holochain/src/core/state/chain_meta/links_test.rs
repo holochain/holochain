@@ -91,6 +91,14 @@ fixturator!(
     };
 );
 
+fixturator!(
+    EntryHash;
+    variants [
+        Entry(EntryContentHash)
+        Agent(AgentPubKey)
+    ];
+);
+
 pub struct KnownLinkAdd {
     base_address: EntryHash,
     target_address: EntryHash,
@@ -133,24 +141,13 @@ impl Iterator for LinkFixturator<(EntryHash, Tag)> {
     }
 }
 
-async fn entries() -> (EntryHashed, EntryHashed) {
-    let mut entry_fix = EntryFixturator::new(Unpredictable);
-    (
-        EntryHashed::with_data(entry_fix.next().unwrap())
-            .await
-            .unwrap(),
-        EntryHashed::with_data(entry_fix.next().unwrap())
-            .await
-            .unwrap(),
-    )
-}
-
 macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
 }
 
+#[derive(Clone)]
 struct TestData {
     link_add: LinkAdd,
     link_remove: LinkRemove,
@@ -161,17 +158,18 @@ struct TestData {
 }
 
 async fn fixtures(n: usize) -> Vec<TestData> {
-    let mut tag_fix = BytesFixturator::new(Unpredictable);
+    let mut tag_fix = BytesFixturator::new(Predictable);
     let mut zome_id = U8Fixturator::new(Predictable);
     let mut data = Vec::new();
+    let mut base_hash_fixt = EntryHashFixturator::new(Predictable);
+    let mut target_hash_fixt = EntryHashFixturator::new(Unpredictable);
     for _ in 0..n {
         // Create a known link add
-        let (base_hash, target_hash) = entries().await;
+        let base_address = base_hash_fixt.next().unwrap();
+        let target_address = target_hash_fixt.next().unwrap();
 
         let tag = Tag::new(tag_fix.next().unwrap());
         let zome_id = zome_id.next().unwrap();
-        let base_address: &EntryHash = base_hash.as_ref();
-        let target_address: &EntryHash = target_hash.as_ref();
 
         let link_add = KnownLinkAdd {
             base_address: base_address.clone(),
@@ -214,6 +212,7 @@ async fn fixtures(n: usize) -> Vec<TestData> {
     data
 }
 
+#[allow(dead_code)]
 impl TestData {
     fn empty(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
         assert!(
@@ -225,7 +224,18 @@ impl TestData {
         );
     }
 
-    fn present(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+    fn is_on_full_key(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        assert!(
+            meta_buf
+                .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
+                .unwrap()
+                .contains(&self.expected_link),
+            "{}",
+            test
+        );
+    }
+
+    fn only_on_full_key(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
         assert_eq!(
             &meta_buf
                 .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
@@ -236,7 +246,7 @@ impl TestData {
         );
     }
 
-    fn not_present(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+    fn not_on_full_key(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
         assert!(
             !meta_buf
                 .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
@@ -248,7 +258,19 @@ impl TestData {
         );
     }
 
-    fn base(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+    fn is_on_base(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        assert!(
+            meta_buf
+                .get_links(&self.base_hash, None, None)
+                .unwrap()
+                .contains(&self.expected_link),
+            "Results should contain Link: {:?} in test: {}",
+            self.expected_link,
+            test
+        );
+    }
+
+    fn only_on_base(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
         assert_eq!(
             &meta_buf.get_links(&self.base_hash, None, None).unwrap()[..],
             &[self.expected_link.clone()],
@@ -257,7 +279,19 @@ impl TestData {
         );
     }
 
-    fn zome_id(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+    fn is_on_zome_id(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        assert!(
+            meta_buf
+                .get_links(&self.base_hash, Some(self.zome_id), None)
+                .unwrap()
+                .contains(&self.expected_link),
+            "Results should contain Link: {:?} in test: {}",
+            self.expected_link,
+            test
+        );
+    }
+
+    fn only_on_zome_id(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
         assert_eq!(
             &meta_buf
                 .get_links(&self.base_hash, Some(self.zome_id), None)
@@ -268,9 +302,10 @@ impl TestData {
         );
     }
 
-    fn half_tag(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+    fn only_on_half_tag(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
         let tag_len = self.tag.len();
-        let half_tag = tag_len / 2;
+        // Make sure there is at least some tag
+        let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = Tag::new(&self.tag[..half_tag]);
         assert_eq!(
             &meta_buf
@@ -278,6 +313,22 @@ impl TestData {
                 .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
+            test
+        );
+    }
+
+    fn is_on_half_tag(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let tag_len = self.tag.len();
+        // Make sure there is at least some tag
+        let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
+        let half_tag = Tag::new(&self.tag[..half_tag]);
+        assert!(
+            meta_buf
+                .get_links(&self.base_hash, Some(self.zome_id), Some(half_tag))
+                .unwrap()
+                .contains(&self.expected_link),
+            "Results should contain Link: {:?} in test: {}",
+            self.expected_link,
             test
         );
     }
@@ -294,6 +345,104 @@ impl TestData {
                 self.tag.clone(),
             )
             .unwrap();
+    }
+
+    #[instrument(skip(td, meta_buf))]
+    fn only_these_on_base(td: &[Self], test: &'static str, meta_buf: &ChainMetaBuf) {
+        // Check all base hash are the same
+        for d in td {
+            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
+        }
+        let base_hash = &td[0].base_hash;
+        let mut expected = td
+            .iter()
+            .map(|d| (d.link_add.clone(), d.expected_link.clone()))
+            .collect::<Vec<_>>();
+        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        assert_eq!(
+            &meta_buf.get_links(base_hash, None, None).unwrap()[..],
+            &expected[..],
+            "{}",
+            test
+        );
+    }
+
+    fn only_these_on_zome_id(td: &[Self], test: &'static str, meta_buf: &ChainMetaBuf) {
+        // Check all base hash, zome_id are the same
+        for d in td {
+            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
+            assert_eq!(d.zome_id, td[0].zome_id, "{}", test);
+        }
+        let base_hash = &td[0].base_hash;
+        let zome_id = td[0].zome_id;
+        let mut expected = td
+            .iter()
+            .map(|d| (d.link_add.clone(), d.expected_link.clone()))
+            .collect::<Vec<_>>();
+        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        assert_eq!(
+            &meta_buf.get_links(base_hash, Some(zome_id), None).unwrap()[..],
+            &expected[..],
+            "{}",
+            test
+        );
+    }
+
+    fn only_these_on_full_key(td: &[Self], test: &'static str, meta_buf: &ChainMetaBuf) {
+        // Check all base hash, zome_id, tag are the same
+        for d in td {
+            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
+            assert_eq!(d.zome_id, td[0].zome_id, "{}", test);
+            assert_eq!(d.tag, td[0].tag, "{}", test);
+        }
+        let base_hash = &td[0].base_hash;
+        let zome_id = td[0].zome_id;
+        let tag = &td[0].tag;
+        let mut expected = td
+            .iter()
+            .map(|d| (d.link_add.clone(), d.expected_link.clone()))
+            .collect::<Vec<_>>();
+        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        assert_eq!(
+            &meta_buf
+                .get_links(base_hash, Some(zome_id), Some(tag.clone()))
+                .unwrap()[..],
+            &expected[..],
+            "{}",
+            test
+        );
+    }
+
+    fn only_these_on_half_key(td: &[Self], test: &'static str, meta_buf: &ChainMetaBuf) {
+        let tag_len = td[0].tag.len();
+        // Make sure there is at least some tag
+        let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };
+        let half_tag = Tag::new(&td[0].tag[..tag_len]);
+        // Check all base hash, zome_id, half tag are the same
+        for d in td {
+            assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
+            assert_eq!(d.zome_id, td[0].zome_id, "{}", test);
+            assert_eq!(&d.tag[..tag_len], &half_tag[..], "{}", test);
+        }
+        let base_hash = &td[0].base_hash;
+        let zome_id = td[0].zome_id;
+        let mut expected = td
+            .iter()
+            .map(|d| (d.link_add.clone(), d.expected_link.clone()))
+            .collect::<Vec<_>>();
+        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        assert_eq!(
+            &meta_buf
+                .get_links(base_hash, Some(zome_id), Some(half_tag))
+                .unwrap()[..],
+            &expected[..],
+            "{}",
+            test
+        );
     }
 }
 
@@ -319,7 +468,7 @@ async fn can_add_and_remove_link() {
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
-        td.present(here!("add link in scratch"), &meta_buf);
+        td.only_on_full_key(here!("add link in scratch"), &meta_buf);
 
         // Remove from scratch
         td.remove_link(&mut meta_buf).await;
@@ -331,7 +480,7 @@ async fn can_add_and_remove_link() {
         td.add_link(&mut meta_buf).await;
 
         // Is in scratch again
-        td.present(here!("Is still in the scratch"), &meta_buf);
+        td.only_on_full_key(here!("Is still in the scratch"), &meta_buf);
 
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
@@ -340,7 +489,7 @@ async fn can_add_and_remove_link() {
     // Check it's in db
     env.with_reader(|reader| {
         let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-        td.present(here!("It's in the db"), &meta_buf);
+        td.only_on_full_key(here!("It's in the db"), &meta_buf);
         DatabaseResult::Ok(())
     })
     .unwrap();
@@ -372,13 +521,13 @@ async fn can_add_and_remove_link() {
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
-        td.present(here!("add link in scratch"), &meta_buf);
+        td.only_on_full_key(here!("add link in scratch"), &meta_buf);
         // No zome, no tag
-        td.base(here!("scratch"), &meta_buf);
+        td.only_on_base(here!("scratch"), &meta_buf);
         // No tag
-        td.zome_id(here!("scratch"), &meta_buf);
+        td.only_on_zome_id(here!("scratch"), &meta_buf);
         // Half the tag
-        td.half_tag(here!("scratch"), &meta_buf);
+        td.only_on_half_tag(here!("scratch"), &meta_buf);
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -386,13 +535,13 @@ async fn can_add_and_remove_link() {
     // Partial matching
     env.with_reader(|reader| {
         let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
-        td.present(here!("db"), &meta_buf);
+        td.only_on_full_key(here!("db"), &meta_buf);
         // No zome, no tag
-        td.base(here!("db"), &meta_buf);
+        td.only_on_base(here!("db"), &meta_buf);
         // No tag
-        td.zome_id(here!("db"), &meta_buf);
+        td.only_on_zome_id(here!("db"), &meta_buf);
         // Half the tag
-        td.half_tag(here!("db"), &meta_buf);
+        td.only_on_half_tag(here!("db"), &meta_buf);
         DatabaseResult::Ok(())
     })
     .unwrap();
@@ -415,25 +564,25 @@ async fn multiple_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.present(here!("add link in scratch"), &meta_buf);
+            d.only_on_full_key(here!("add link in scratch"), &meta_buf);
         }
 
         // Remove from scratch
         td[5].remove_link(&mut meta_buf).await;
 
-        td[5].not_present(here!("removed in scratch"), &meta_buf);
+        td[5].not_on_full_key(here!("removed in scratch"), &meta_buf);
 
         for d in td[0..5].iter().chain(&td[6..]) {
-            d.present(here!("all except 5 scratch"), &meta_buf);
+            d.only_on_full_key(here!("all except 5 scratch"), &meta_buf);
         }
         // Add again
         td[5].add_link(&mut meta_buf).await;
 
         // Is in scratch again
-        td[5].present(here!("Is back in the scratch"), &meta_buf);
+        td[5].only_on_full_key(here!("Is back in the scratch"), &meta_buf);
 
         for d in td.iter() {
-            d.present(here!("add link in scratch"), &meta_buf);
+            d.only_on_full_key(here!("add link in scratch"), &meta_buf);
         }
 
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
@@ -444,15 +593,15 @@ async fn multiple_links() {
         let reader = env.reader().unwrap();
         let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
         for d in td.iter() {
-            d.present(here!("all in db"), &meta_buf);
+            d.only_on_full_key(here!("all in db"), &meta_buf);
         }
         td[0].remove_link(&mut meta_buf).await;
 
         for d in &td[1..] {
-            d.present(here!("all except 0 scratch"), &meta_buf);
+            d.only_on_full_key(here!("all except 0 scratch"), &meta_buf);
         }
 
-        td[0].not_present(here!("removed in scratch"), &meta_buf);
+        td[0].not_on_full_key(here!("removed in scratch"), &meta_buf);
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -460,9 +609,9 @@ async fn multiple_links() {
     env.with_reader(|reader| {
         let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
         for d in &td[1..] {
-            d.present(here!("all except 0"), &meta_buf);
+            d.only_on_full_key(here!("all except 0"), &meta_buf);
         }
-        td[0].not_present(here!("removed in db"), &meta_buf);
+        td[0].not_on_full_key(here!("removed in db"), &meta_buf);
         DatabaseResult::Ok(())
     })
     .unwrap();
@@ -484,13 +633,13 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.present(here!("re add"), &meta_buf);
+            d.only_on_full_key(here!("re add"), &meta_buf);
             // No zome, no tag
-            d.base(here!("re add"), &meta_buf);
+            d.only_on_base(here!("re add"), &meta_buf);
             // No tag
-            d.zome_id(here!("re add"), &meta_buf);
+            d.only_on_zome_id(here!("re add"), &meta_buf);
             // Half the tag
-            d.half_tag(here!("re add"), &meta_buf);
+            d.is_on_half_tag(here!("re add"), &meta_buf);
         }
         // Add Again
         for d in td.iter() {
@@ -498,13 +647,13 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.present(here!("re add"), &meta_buf);
+            d.only_on_full_key(here!("re add"), &meta_buf);
             // No zome, no tag
-            d.base(here!("re add"), &meta_buf);
+            d.only_on_base(here!("re add"), &meta_buf);
             // No tag
-            d.zome_id(here!("re add"), &meta_buf);
+            d.only_on_zome_id(here!("re add"), &meta_buf);
             // Half the tag
-            d.half_tag(here!("re add"), &meta_buf);
+            d.is_on_half_tag(here!("re add"), &meta_buf);
         }
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
@@ -518,13 +667,13 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.present(here!("re add"), &meta_buf);
+            d.only_on_full_key(here!("re add"), &meta_buf);
             // No zome, no tag
-            d.base(here!("re add"), &meta_buf);
+            d.only_on_base(here!("re add"), &meta_buf);
             // No tag
-            d.zome_id(here!("re add"), &meta_buf);
+            d.only_on_zome_id(here!("re add"), &meta_buf);
             // Half the tag
-            d.half_tag(here!("re add"), &meta_buf);
+            d.is_on_half_tag(here!("re add"), &meta_buf);
         }
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
@@ -533,18 +682,19 @@ async fn duplicate_links() {
         let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
         // Is in db
         for d in td.iter() {
-            d.present(here!("re add"), &meta_buf);
+            d.only_on_full_key(here!("re add"), &meta_buf);
             // No zome, no tag
-            d.base(here!("re add"), &meta_buf);
+            d.only_on_base(here!("re add"), &meta_buf);
             // No tag
-            d.zome_id(here!("re add"), &meta_buf);
+            d.only_on_zome_id(here!("re add"), &meta_buf);
             // Half the tag
-            d.half_tag(here!("re add"), &meta_buf);
+            d.is_on_half_tag(here!("re add"), &meta_buf);
         }
         DatabaseResult::Ok(())
     })
     .unwrap();
 }
+
 #[tokio::test(threaded_scheduler)]
 async fn links_on_same_base() {
     observability::test_run().ok();
@@ -575,14 +725,12 @@ async fn links_on_same_base() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.present(here!("same base"), &meta_buf);
-            // No tag
-            // FIXME: This test is failing because the zome_ids, aren't unique
-            d.zome_id(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_zome_id(here!("same base"), &meta_buf);
             // Half the tag
-            d.half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf);
         }
-        // TODO: Check they all return off the same base
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -590,15 +738,272 @@ async fn links_on_same_base() {
         let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
         // In db
         for d in td.iter() {
-            d.present(here!("same base"), &meta_buf);
-            // No tag
-            d.zome_id(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_zome_id(here!("same base"), &meta_buf);
             // Half the tag
-            d.half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf);
         }
-        // TODO: Check they all return off the same base
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
         DatabaseResult::Ok(())
     })
     .unwrap();
-    // TODO Check removes etc.
+    // Check removes etc.
+    {
+        let span = debug_span!("check_remove");
+        let _g = span.enter();
+        let reader = env.reader().unwrap();
+        let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        td[0].remove_link(&mut meta_buf).await;
+        for d in &td[1..] {
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_zome_id(here!("same base"), &meta_buf);
+            // Half the tag
+            d.is_on_half_tag(here!("same base"), &meta_buf);
+        }
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf);
+        td[0].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            .unwrap();
+    }
+    env.with_reader(|reader| {
+        let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        for d in &td[1..] {
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_zome_id(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf);
+        }
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf);
+        td[0].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        DatabaseResult::Ok(())
+    })
+    .unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn links_on_same_zome_id() {
+    observability::test_run().ok();
+    let arc = test_cell_env();
+    let env = arc.guard().await;
+
+    let mut td = fixtures(10).await;
+    let base_hash = td[0].base_hash.clone();
+    let zome_id = td[0].zome_id;
+    let base_hash = &base_hash;
+    for d in td.iter_mut() {
+        d.base_hash = base_hash.clone();
+        d.zome_id = zome_id;
+        d.link_add.base_address = base_hash.clone();
+        d.link_add.zome_id = zome_id;
+        // Create the new hash
+        let (_, link_add_hash): (_, HeaderHash) =
+            HeaderHashed::with_data(Header::LinkAdd(d.link_add.clone()))
+                .await
+                .unwrap()
+                .into();
+        d.expected_link.link_add_hash = link_add_hash.clone();
+        d.expected_link.zome_id = zome_id;
+        d.link_remove.link_add_address = link_add_hash;
+    }
+    {
+        let span = debug_span!("check_zome_id");
+        let _g = span.enter();
+        let reader = env.reader().unwrap();
+        let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        // Add
+        for d in td.iter() {
+            d.add_link(&mut meta_buf).await;
+        }
+        // Is in scratch
+        for d in td.iter() {
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            // Half the tag
+            d.is_on_half_tag(here!("same base"), &meta_buf);
+        }
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
+        env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            .unwrap();
+    }
+    env.with_reader(|reader| {
+        let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        // In db
+        for d in td.iter() {
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            // Half the tag
+            d.is_on_half_tag(here!("same base"), &meta_buf);
+        }
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
+        DatabaseResult::Ok(())
+    })
+    .unwrap();
+    // Check removes etc.
+    {
+        let span = debug_span!("check_remove");
+        let _g = span.enter();
+        let reader = env.reader().unwrap();
+        let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        td[9].remove_link(&mut meta_buf).await;
+        for d in &td[..9] {
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            // Half the tag
+            d.is_on_half_tag(here!("same base"), &meta_buf);
+        }
+        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(
+            &td[..9],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        td[9].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            .unwrap();
+    }
+    env.with_reader(|reader| {
+        let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        for d in &td[..9] {
+            d.only_on_full_key(here!("same base"), &meta_buf);
+            // Half the tag
+            d.is_on_half_tag(here!("same base"), &meta_buf);
+        }
+        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(
+            &td[..9],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        td[9].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        DatabaseResult::Ok(())
+    })
+    .unwrap();
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn links_on_same_tag() {
+    observability::test_run().ok();
+    let arc = test_cell_env();
+    let env = arc.guard().await;
+
+    let mut td = fixtures(10).await;
+    let base_hash = td[0].base_hash.clone();
+    let zome_id = td[0].zome_id;
+    let tag = td[0].tag.clone();
+
+    for d in td.iter_mut() {
+        d.base_hash = base_hash.clone();
+        d.zome_id = zome_id;
+        d.tag = tag.clone();
+        d.link_add.base_address = base_hash.clone();
+        d.link_add.zome_id = zome_id;
+        d.link_add.tag = tag.clone();
+
+        // Create the new hash
+        let (_, link_add_hash): (_, HeaderHash) =
+            HeaderHashed::with_data(Header::LinkAdd(d.link_add.clone()))
+                .await
+                .unwrap()
+                .into();
+        d.expected_link.link_add_hash = link_add_hash.clone();
+        d.expected_link.zome_id = zome_id;
+        d.expected_link.tag = tag.clone();
+        d.link_remove.link_add_address = link_add_hash;
+    }
+    {
+        let reader = env.reader().unwrap();
+        let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        // Add
+        for d in td.iter() {
+            d.add_link(&mut meta_buf).await;
+        }
+        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_full_key(
+            &td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_half_key(
+            &td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            .unwrap();
+    }
+    env.with_reader(|reader| {
+        let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        // In db
+        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_full_key(
+            &td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_half_key(
+            &td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        DatabaseResult::Ok(())
+    })
+    .unwrap();
+    // Check removes etc.
+    {
+        let span = debug_span!("check_remove");
+        let _g = span.enter();
+        let reader = env.reader().unwrap();
+        let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        td[5].remove_link(&mut meta_buf).await;
+        td[6].remove_link(&mut meta_buf).await;
+        let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
+        TestData::only_these_on_base(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_zome_id(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_full_key(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_half_key(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+            .unwrap();
+    }
+    env.with_reader(|reader| {
+        let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+        let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
+        TestData::only_these_on_base(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_zome_id(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_full_key(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        TestData::only_these_on_half_key(
+            &partial_td[..],
+            here!("check all return on same base"),
+            &meta_buf,
+        );
+        DatabaseResult::Ok(())
+    })
+    .unwrap();
 }
