@@ -72,7 +72,7 @@ pub mod tests {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
-        let addr1 = EntryContentHash::with_data("hello".as_bytes()).await;
+        let addr1 = EntryContentHash::with_data("hello".as_bytes().to_vec()).await;
         let addr2 = "hi".to_string();
         {
             let reader = env.reader()?;
