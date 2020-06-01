@@ -81,7 +81,7 @@ impl KeystoreHandler<(), TestKeystoreInternal> for TestKeystore {
         Ok(async move {
             let (pub_key, sec_key) = crypto_sign_keypair(None).await?;
             let pub_key = pub_key.read().to_vec();
-            let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key).await;
+            let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key);
             let sec_key = PrivateKey(sec_key);
             i_s.ghost_actor_internal()
                 .finalize_new_keypair(agent_pubkey.clone(), sec_key)

@@ -49,7 +49,7 @@ impl DnaDef {
     /// Calculate DnaHash for DnaDef
     pub async fn dna_hash(&self) -> DnaHash {
         let sb: SerializedBytes = self.try_into().expect("failed to hash DnaDef");
-        DnaHash::with_data(&sb.bytes()).await
+        DnaHash::with_data(UnsafeBytes::from(sb).into()).await
     }
 
     /// Return a Zome
@@ -103,12 +103,12 @@ impl DnaFile {
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
+            let wasm_hash = holo_hash::WasmHash::with_data(wasm.code().to_vec()).await;
             let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             code.insert(wasm_hash, wasm);
         }
         let dna_sb: SerializedBytes = (&dna).try_into()?;
-        let dna_hash = holo_hash::DnaHash::with_data(dna_sb.bytes()).await;
+        let dna_hash = holo_hash::DnaHash::with_data(UnsafeBytes::from(dna_sb).into()).await;
         Ok(Self {
             dna,
             dna_hash,
