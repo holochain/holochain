@@ -12,8 +12,16 @@ pub struct Broadcast {
     pub agent: Arc<super::KitsuneAgent>,
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
-    /// The timeout to await responses - set to zero if you don't care
-    /// to get a count.
+    /// The desired count of remote nodes to reach.
+    /// Kitsune will keep searching for new nodes to broadcast to until:
+    ///  - (A) this target count is reached, or
+    ///  - (B) the below timeout is exceeded.
+    /// Set to zero if you just want a default best-effort.
+    pub remote_agent_count: u8,
+    /// The timeout to await for sucessful broadcasts.
+    /// Set to zero if you don't care to get a count -
+    /// broadcast will immediately return 0, but give a best effort to meet
+    /// remote_agent_count.
     pub timeout_ms: u64,
     /// Broadcast data.
     pub broadcast: Arc<Vec<u8>>,
@@ -29,12 +37,9 @@ pub struct MultiRequest {
     pub agent: Arc<super::KitsuneAgent>,
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
-    /// Target remote agent count.
-    /// Set to zero for "a reasonable amount".
-    /// Set to std::u32::MAX for "as many as possible".
-    pub remote_agent_count: u32,
-    /// The timeout to await responses.
-    /// Don't set to zero - use Broadcast instead.
+    /// See docs on Broadcast
+    pub remote_agent_count: u8,
+    /// See docs on Broadcast
     pub timeout_ms: u64,
     /// Request data.
     pub request: Arc<Vec<u8>>,
@@ -63,7 +68,7 @@ ghost_actor::ghost_actor! {
 
         /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
         /// Returns an approximate number of nodes reached.
-        fn broadcast(input: Broadcast) -> u32;
+        fn broadcast(input: Broadcast) -> u8;
 
         /// Make a request to multiple destination agents - awaiting/aggregating the responses.
         /// The remote sides will see these messages as "RequestEvt" events.

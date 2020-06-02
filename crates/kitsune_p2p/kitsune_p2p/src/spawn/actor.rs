@@ -8,6 +8,12 @@ use std::{
 mod space;
 use space::*;
 
+/// if the user specifies zero (0) for remote_agent_count
+const DEFAULT_BROADCAST_REMOTE_AGENT_COUNT: u8 = 5;
+
+/// if the user specifies zero (0) for timeout_ms
+const DEFAULT_BROADCAST_TIMEOUT_MS: u64 = 1000;
+
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
@@ -65,6 +71,12 @@ impl KitsuneP2pActor {
             }
         }
         Ok(async move { Ok(()) }.boxed().into())
+    }
+
+    /// actual logic for handle_broadcast ...
+    /// the top-level handler may or may not spawn a task for this
+    fn handle_broadcast_inner(&mut self, _input: actor::Broadcast) -> KitsuneP2pHandlerResult<u8> {
+        Ok(async move { Ok(0) }.boxed().into())
     }
 }
 
@@ -125,8 +137,35 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         Ok(async move { space_request_fut.await }.boxed().into())
     }
 
-    fn handle_broadcast(&mut self, _input: actor::Broadcast) -> KitsuneP2pHandlerResult<u32> {
-        Ok(async move { Ok(0) }.boxed().into())
+    fn handle_broadcast(&mut self, mut input: actor::Broadcast) -> KitsuneP2pHandlerResult<u8> {
+        // if the user doesn't care about remote_agent_count, apply default
+        if input.remote_agent_count == 0 {
+            input.remote_agent_count = DEFAULT_BROADCAST_REMOTE_AGENT_COUNT;
+        }
+
+        // if the user doesn't care about timeout_ms, apply default
+        // also - if set to 0, we want to return immediately, but
+        // spawn a task with that default timeout.
+        let do_spawn = if input.timeout_ms == 0 {
+            input.timeout_ms = DEFAULT_BROADCAST_TIMEOUT_MS;
+            true
+        } else {
+            false
+        };
+
+        // gather the inner future
+        let inner_fut = match self.handle_broadcast_inner(input) {
+            Err(e) => return Err(e),
+            Ok(f) => f,
+        };
+
+        // either spawn or return the future depending on timeout_ms logic
+        if do_spawn {
+            tokio::task::spawn(inner_fut);
+            Ok(async move { Ok(0) }.boxed().into())
+        } else {
+            Ok(inner_fut)
+        }
     }
 
     fn handle_multi_request(
