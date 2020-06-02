@@ -386,7 +386,7 @@ mod test {
             agent_key,
             proofs: HashMap::new(),
         };
-        let msg = AdminRequest::InstallApp(payload);
+        let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -437,7 +437,7 @@ mod test {
             agent_key,
             proofs: HashMap::new(),
         };
-        let msg = AdminRequest::InstallApp(payload);
+        let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -508,7 +508,7 @@ mod test {
             .unwrap(),
         );
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocationRequest { request };
+        let msg = AppRequest::ZomeCallInvocationRequest(request);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
@@ -668,7 +668,9 @@ mod test {
         };
 
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
-        let msg = AdminRequest::DumpState(cell_id);
+        let msg = AdminRequest::DumpState {
+            cell_id: Box::new(cell_id),
+        };
         let msg = msg.try_into().unwrap();
         let respond = move |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();

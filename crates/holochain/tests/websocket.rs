@@ -173,10 +173,10 @@ async fn call_admin() {
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp(payload);
+    let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
-    assert_matches!(response, AdminResponse::AppInstalled);
+    assert_matches!(response, AdminResponse::AppInstalled(_));
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -232,7 +232,7 @@ async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut 
         .next()
         .unwrap(),
     );
-    let request = AppRequest::ZomeCallInvocationRequest { request };
+    let request = AppRequest::ZomeCallInvocationRequest(request);
     let response = app_interface.request(request);
     let call_response = check_timeout(holochain, response, 2000).await;
     let foo = TestString::from(String::from("foo"));
@@ -312,10 +312,10 @@ async fn call_zome() {
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp(payload);
+    let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 3000).await;
-    assert_matches!(response, AdminResponse::AppInstalled);
+    assert_matches!(response, AdminResponse::AppInstalled(_));
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -376,9 +376,9 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp(payload);
+    let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request).await;
-    assert_matches!(response, Ok(AdminResponse::AppInstalled));
+    assert_matches!(response, Ok(AdminResponse::AppInstalled(_)));
     conductor_handle.shutdown().await;
 
     Ok(())
@@ -430,7 +430,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
         agent_key,
         proofs: HashMap::new(),
     };
-    let request = AdminRequest::InstallApp(payload);
+    let request = AdminRequest::InstallApp(Box::new(payload));
 
     // send a request after the conductor has shutdown
     let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
