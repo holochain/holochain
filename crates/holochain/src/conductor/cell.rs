@@ -219,6 +219,19 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
+            SendValidationReceipt {
+                span,
+                respond,
+                receipt,
+                ..
+            } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_send_validation_receipt(receipt)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other),
+                );
+            }
             ListDhtOpHashes { span, respond, .. } => {
                 let _g = span.enter();
                 let _ = respond(
@@ -272,6 +285,11 @@ impl Cell {
 
     /// a remote node is asking us for links
     async fn handle_get_links(&self) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    /// a remote agent is sending us a validation receipt.
+    async fn handle_send_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
         unimplemented!()
     }
 

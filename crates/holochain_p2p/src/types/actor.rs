@@ -62,6 +62,9 @@ ghost_actor::ghost_actor! {
 
         /// Get links from the DHT.
         fn get_links(input: GetLinks) -> (); // TODO - proper return type
+
+        /// Send a validation receipt to a remote node.
+        fn send_validation_receipt(dna_hash: DnaHash, agent_pub_key: AgentPubKey, receipt: SerializedBytes) -> ();
     }
 }
 
