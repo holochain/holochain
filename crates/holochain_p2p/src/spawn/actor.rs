@@ -21,6 +21,7 @@ pub(crate) struct HolochainP2pActor {
 }
 
 impl HolochainP2pActor {
+    /// constructor
     pub async fn new(
         internal_sender: HolochainP2pInternalSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
@@ -48,6 +49,7 @@ impl HolochainP2pActor {
         })
     }
 
+    /// ghost actor glue that translates kitsune events into local handlers (step 2)
     fn handle_internal_kitsune_p2p_event(
         &mut self,
         event: kitsune_p2p::event::KitsuneP2pEvent,
@@ -78,6 +80,7 @@ impl HolochainP2pActor {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    /// receiving an incoming request from a remote node
     fn handle_incoming_request(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -173,6 +176,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    /// ghost actor glue that translates kitsune events into local handlers (step 1)
     fn handle_ghost_actor_internal(&mut self, input: Internal) -> HolochainP2pResult<()> {
         match input {
             Internal::KitsuneP2pEvent {

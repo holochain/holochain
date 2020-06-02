@@ -9,11 +9,14 @@ const NET_CONNECT_INTERVAL_MS: u64 = 20;
 /// Max amount of time we should wait for connections to be established.
 const NET_CONNECT_MAX_MS: u64 = 2000;
 
+/// Local helper struct for associating info with a connected agent.
 struct AgentInfo {
     #[allow(dead_code)]
     agent: Arc<KitsuneAgent>,
 }
 
+/// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
+/// areas that share common transport infrastructure for communication.
 pub(crate) struct Space {
     space: Arc<KitsuneSpace>,
     internal_sender: KitsuneP2pInternalSender<Internal>,
@@ -22,6 +25,7 @@ pub(crate) struct Space {
 }
 
 impl Space {
+    /// space constructor
     pub fn new(
         space: Arc<KitsuneSpace>,
         internal_sender: KitsuneP2pInternalSender<Internal>,
@@ -35,10 +39,12 @@ impl Space {
         }
     }
 
+    /// how many agents are connected to this space
     pub fn len(&self) -> usize {
         self.agents.len()
     }
 
+    /// process an incoming join request for an agent -- add them to the space
     pub fn handle_join(&mut self, agent: Arc<KitsuneAgent>) -> KitsuneP2pHandlerResult<()> {
         match self.agents.entry(agent.clone()) {
             Entry::Occupied(_) => (),
@@ -49,18 +55,24 @@ impl Space {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    /// process an incoming leave request for an agent -- remove them from the space
     pub fn handle_leave(&mut self, agent: Arc<KitsuneAgent>) -> KitsuneP2pHandlerResult<()> {
         self.agents.remove(&agent);
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    /// process an "immediate" request
+    /// that is - attempt to send a request and return an error on failure
+    /// this helper doesn't do any waiting / retrying.
     pub fn handle_internal_immediate_request(
         &mut self,
         agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
-        // right now we are only implementing the "short-circuit"
+        // Right now we are only implementing the "short-circuit"
         // that routes messages to other agents joined on this same system.
+        // I.e. we don't bother with peer discovery because we know the
+        // remote is local.
         if !self.agents.contains_key(&agent) {
             return Err(KitsuneP2pError::RoutingAgentError(agent));
         }
@@ -76,6 +88,7 @@ impl Space {
             .into())
     }
 
+    /// send / process a request - waiting / retrying as appropriate
     pub fn handle_request(
         &mut self,
         agent: Arc<KitsuneAgent>,
