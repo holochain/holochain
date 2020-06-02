@@ -55,6 +55,10 @@ where
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
+        // Empty keys break lmdb
+        if k.as_ref().len() < 1 {
+            return Ok(None);
+        }
         use Op::*;
         let val = match self.scratch.get(k.as_ref()) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
@@ -66,13 +70,22 @@ where
 
     /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) {
-        self.scratch
-            .insert(k.as_ref().to_vec(), Op::Put(Box::new(v)));
+        let k = k.as_ref().to_vec();
+        // Empty keys break lmdb
+        if k.len() < 1 {
+            return;
+        }
+        self.scratch.insert(k, Op::Put(Box::new(v)));
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) {
-        self.scratch.insert(k.as_ref().to_vec(), Op::Delete);
+        let k = k.as_ref().to_vec();
+        // Empty keys break lmdb
+        if k.len() < 1 {
+            return;
+        }
+        self.scratch.insert(k, Op::Delete);
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -86,21 +99,30 @@ where
 
     /// Iterator that checks the scratch space
     pub fn iter(&self) -> DatabaseResult<SingleIter<V>> {
-        Ok(SingleIter::new(&self.scratch, self.iter_raw()?))
+        Ok(SingleIter::new(
+            &self.scratch,
+            self.scratch.iter(),
+            self.iter_raw()?,
+        ))
     }
 
     /// Iterate from a key onwards
     pub fn iter_from(&self, k: K) -> DatabaseResult<SingleFromIter<V>> {
         let key = k.as_ref().to_vec();
         Ok(SingleFromIter::new(
-            SingleIter::new(&self.scratch, self.iter_raw_from(k)?),
+            &self.scratch,
+            self.iter_raw_from(k)?,
             key,
         ))
     }
 
     /// Iterate over the data in reverse
     pub fn iter_reverse(&self) -> DatabaseResult<SingleIter<V>> {
-        Ok(SingleIter::new(&self.scratch, self.iter_raw_reverse()?))
+        Ok(SingleIter::new(
+            &self.scratch,
+            self.scratch.iter().rev(),
+            self.iter_raw_reverse()?,
+        ))
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
@@ -167,160 +189,143 @@ pub fn partial_key_match(partial_key: &[u8], key: &[u8]) -> bool {
         .map(|a| a == &partial_key[..])
         .unwrap_or(false)
 }
-type KeyVal<'a, V> = (&'a Vec<u8>, V);
-type KeyValSlice<'env, V> = (&'env [u8], V);
-pub struct SingleFromIter<'env, 'a, V> {
-    partial_matches: std::collections::btree_map::IntoIter<&'a Vec<u8>, V>,
+pub struct SingleFromIter<'env, 'a, V>
+where
+    V: BufVal,
+{
     iter: SingleIter<'env, 'a, V>,
-    current: Option<DatabaseResult<KeyValSlice<'env, V>>>,
-    current_scratch: Option<KeyVal<'a, V>>,
 }
 
-impl<'env, 'a, V> SingleFromIter<'env, 'a, V>
+impl<'env, 'a: 'env, V> SingleFromIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    fn new(iter: SingleIter<'env, 'a, V>, key: Vec<u8>) -> Self {
-        let mut deletes = Vec::new();
-        let mut partial_matches: BTreeMap<_, V> = iter
-            .scratch
-            .iter()
-            .skip_while(|(k, _)| !partial_key_match(&key[..], k))
-            .take_while(|(k, _)| partial_key_match(&key[..], k))
-            .filter_map(|(k, v)| match v {
-                Op::Put(v) => Some((k, (**v).clone())),
-                Op::Delete => {
-                    deletes.push(k);
-                    None
-                }
-            })
-            .collect();
-        trace!(pm_before = partial_matches.len());
-        trace!(deletes = deletes.len());
-        for delete in deletes {
-            partial_matches.remove(delete);
-        }
-        trace!(pm_after = partial_matches.len());
-        Self {
-            iter,
-            partial_matches: partial_matches.into_iter(),
-            current: None,
-            current_scratch: None,
-        }
+    fn new(
+        scratch: &'a BTreeMap<Vec<u8>, Op<V>>,
+        iter: SingleIterRaw<'env, V>,
+        key: Vec<u8>,
+    ) -> Self {
+        let iter = SingleIter::new(&scratch, scratch.range(key..), iter);
+        Self { iter }
     }
 }
 
-impl<'env, 'a, V> Iterator for SingleFromIter<'env, 'a, V>
+impl<'env, 'a: 'env, V> FallibleIterator for SingleFromIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    type Item = Result<(Vec<u8>, V), DatabaseError>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let current = match self.current.take() {
-            Some(s) => Some(s),
-            None => {
-                let r = Iterator::next(&mut self.iter);
-                if r.is_some() {
-                    trace!("new db");
-                }
-                r
-            }
-        };
-        let current_scratch = match self.current_scratch.take() {
-            Some(s) => Some(s),
-            None => {
-                let r = self.partial_matches.next();
-                if r.is_some() {
-                    trace!("new scratch");
-                }
-                r
-            }
-        };
-
-        match (current, current_scratch) {
-            // Both Db and Scratch have value
-            (Some(Ok(current)), Some(scratch)) => {
-                if current.0 < &scratch.0[..] {
-                    // Different key, db first, keep the scratch
-                    trace!("Different key, db first, keep the scratch");
-                    self.current_scratch = Some(scratch);
-                    Some(Ok((current.0.to_vec(), current.1)))
-                } else if current.0 > &scratch.0[..] {
-                    // Different key, scratch first, keep the db
-                    trace!("Different key, scratch first, keep the db");
-                    self.current = Some(Ok(current));
-                    Some(Ok((scratch.0.to_vec(), scratch.1)))
-                } else {
-                    trace!("Both the same use db, throw away scratch");
-                    Some(Ok((current.0.to_vec(), current.1)))
-                }
-            }
-            // Scratch is empty return db
-            (Some(Ok(current)), None) => {
-                trace!("Scratch is empty return db");
-                Some(Ok((current.0.to_vec(), current.1)))
-            }
-            // Db is empty return scratch
-            (None, Some(scratch)) => {
-                trace!("Db is empty return scratch");
-                Some(Ok((scratch.0.to_vec(), scratch.1)))
-            }
-            (Some(Err(e)), scratch) => {
-                trace!("db error");
-                self.current_scratch = scratch;
-                Some(Err(e))
-            }
-            (None, None) => {
-                trace!("Done");
-                None
-            }
-        }
-    }
-}
-
-pub struct SingleIter<'env, 'a, V> {
-    scratch: &'a BTreeMap<Vec<u8>, Op<V>>,
-    iter: SingleIterRaw<'env, V>,
-}
-
-impl<'env, 'a, V> SingleIter<'env, 'a, V> {
-    fn new(scratch: &'a BTreeMap<Vec<u8>, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
-        Self { scratch, iter }
-    }
-}
-
-impl<'env, 'a, V> Iterator for SingleIter<'env, 'a, V>
-where
-    V: BufVal,
-{
-    type Item = Result<(&'env [u8], V), DatabaseError>;
+    type Error = DatabaseError;
+    type Item = (&'env [u8], V);
     #[instrument(skip(self))]
-    fn next(&mut self) -> Option<Self::Item> {
-        use Op::*;
-        loop {
-            let r = match Iterator::next(&mut self.iter) {
-                Some(Ok((k, v))) => Ok(match self.scratch.get(k) {
-                    Some(Put(scratch_val)) => {
-                        trace!("in scratch");
-                        Some((k, *scratch_val.clone()))
-                    }
-                    Some(Delete) => {
-                        trace!("deleted");
-                        continue;
-                    }
-                    None => {
-                        trace!("scratch doesn't contain");
-                        Some((k, v))
-                    }
-                })
-                .transpose(),
-                r => {
-                    trace!("db doesn't contain");
-                    r
-                }
-            };
-            return r;
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        self.iter.next()
+    }
+}
+
+pub struct SingleIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    scratch_iter: Box<dyn Iterator<Item = (&'a [u8], V)> + 'a>,
+    iter: Box<dyn FallibleIterator<Item = (&'env [u8], V), Error = DatabaseError> + 'env>,
+    scratch_current: Option<(&'a [u8], V)>,
+    current: Option<(&'env [u8], V)>,
+}
+
+impl<'env, 'a: 'env, V> SingleIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    fn new(
+        scratch: &'a BTreeMap<Vec<u8>, Op<V>>,
+        scratch_iter: impl Iterator<Item = (&'a Vec<u8>, &'a Op<V>)> + 'a,
+        iter: SingleIterRaw<'env, V>,
+    ) -> Self {
+        let scratch_iter = scratch_iter
+            .inspect(|(k, v)| {
+                let span = trace_span!("scratch < filter", key = %String::from_utf8_lossy(k));
+                let _g = span.enter();
+                trace!(k = %String::from_utf8_lossy(k), ?v)
+            })
+            .filter_map(|(k, v)| match v {
+                Op::Put(v) => Some((&k[..], *v.clone())),
+                Op::Delete => None,
+            })
+            .inspect(|(k, v)| {
+                let span = trace_span!("scratch > filter", key = %String::from_utf8_lossy(k));
+                let _g = span.enter();
+                trace!(k = %String::from_utf8_lossy(k), ?v)
+            });
+        let iter = iter
+            .inspect(|(k, v)| {
+                let span = trace_span!("db < filter", key = %String::from_utf8_lossy(k));
+                let _g = span.enter();
+                trace!(k = %String::from_utf8_lossy(k), ?v);
+                Ok(())
+            })
+            .filter_map(move |(k, v)| match scratch.get(k) {
+                Some(Op::Put(sv)) => Ok(Some((k, *sv.clone()))),
+                Some(Op::Delete) => Ok(None),
+                None => Ok(Some((k, v))),
+            })
+            .inspect(|(k, v)| {
+                let span = trace_span!("db > filter", key = %String::from_utf8_lossy(k));
+                let _g = span.enter();
+                trace!(k = %String::from_utf8_lossy(k), ?v);
+                Ok(())
+            });
+        Self {
+            scratch_iter: Box::new(scratch_iter),
+            iter: Box::new(iter),
+            current: None,
+            scratch_current: None,
         }
+    }
+}
+
+impl<'env, 'a: 'env, V> FallibleIterator for SingleIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    type Error = DatabaseError;
+    type Item = (&'env [u8], V);
+    #[instrument(skip(self))]
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        let current = match self.current.take() {
+            Some(c) => Some(c),
+            None => self.iter.next()?,
+        };
+        let scratch_current = match self.scratch_current.take() {
+            Some(c) => Some(c),
+            None => self.scratch_iter.next(),
+        };
+        let r = match current {
+            Some(db) => match scratch_current {
+                Some(scratch) if scratch.0 < db.0 => {
+                    trace!(msg = "r scratch key <", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                    self.current = Some(db);
+                    Some(scratch)
+                }
+                Some(scratch) if scratch.0 == db.0 => {
+                    trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                    Some(scratch)
+                }
+                _ => {
+                    trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
+                    self.scratch_current = scratch_current;
+                    Some(db)
+                }
+            },
+            None => {
+                if let Some((k, v)) = &scratch_current {
+                    trace!(msg = "r scratch no db", k = %String::from_utf8_lossy(k), ?v);
+                } else {
+                    trace!("r None")
+                }
+                scratch_current
+            }
+        };
+        Ok(r)
     }
 }
 
@@ -336,48 +341,27 @@ impl<'env, V> SingleIterRaw<'env, V> {
 /// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
 /// This is to enable a wider range of keys, such as String, because there is no uniform trait which
 /// enables conversion from a byte slice to a given type.
-impl<'env, V> Iterator for SingleIterRaw<'env, V>
+impl<'env, V> FallibleIterator for SingleIterRaw<'env, V>
 where
     V: BufVal,
 {
-    type Item = Result<(&'env [u8], V), DatabaseError>;
+    type Error = DatabaseError;
+    type Item = (&'env [u8], V);
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         match self.0.next() {
-            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some(Ok((
+            Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Ok(Some((
                 k,
                 rmp_serde::from_read_ref(buf).expect(
                     "Failed to deserialize data from database. Database might be corrupted",
                 ),
             ))),
-            None => None,
+            None => Ok(None),
             // TODO: Should this panic aswell?
-            Some(Ok(_)) => Some(Err(DatabaseError::InvalidValue)),
+            Some(Ok(_)) => Err(DatabaseError::InvalidValue),
             // This could be a IO error so returning it makes sense
-            Some(Err(e)) => Some(Err(DatabaseError::from(e))),
+            Some(Err(e)) => Err(DatabaseError::from(e)),
         }
-    }
-}
-
-impl<'env, 'a, V> FallibleIterator for SingleIter<'env, 'a, V>
-where
-    V: BufVal,
-{
-    type Item = (&'env [u8], V);
-    type Error = DatabaseError;
-    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        Iterator::next(self).transpose()
-    }
-}
-
-impl<'env, V> FallibleIterator for SingleIterRaw<'env, V>
-where
-    V: BufVal,
-{
-    type Item = (&'env [u8], V);
-    type Error = DatabaseError;
-    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        Iterator::next(self).transpose()
     }
 }
 
@@ -390,9 +374,12 @@ pub mod tests {
         error::{DatabaseError, DatabaseResult},
         test_utils::test_cell_env,
     };
+    use fallible_iterator::FallibleIterator;
+    use fixt::prelude::*;
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
     use std::collections::BTreeMap;
+    use tracing::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct TestVal {
@@ -400,7 +387,15 @@ pub mod tests {
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-    struct V(u32);
+    pub struct V(u32);
+
+    impl From<u32> for V {
+        fn from(s: u32) -> Self {
+            Self(s)
+        }
+    }
+
+    fixturator!(V; from u32;);
 
     type TestBuf<'a> = KvBuf<'a, &'a str, V>;
 
@@ -442,16 +437,12 @@ pub mod tests {
         env.with_reader(|reader| {
             let buf: TestBuf = KvBuf::new(&reader, db)?;
 
-            let forward: Vec<_> = buf
-                .iter_raw()?
-                .map(Result::unwrap)
-                .map(|(_, v)| v)
-                .collect();
+            let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| Ok(v)).collect().unwrap();
             let reverse: Vec<_> = buf
                 .iter_raw_reverse()?
-                .map(Result::unwrap)
-                .map(|(_, v)| v)
-                .collect();
+                .map(|(_, v)| Ok(v))
+                .collect()
+                .unwrap();
 
             assert_eq!(forward, vec![V(1), V(2), V(3), V(4), V(5)]);
             assert_eq!(reverse, vec![V(5), V(4), V(3), V(2), V(1)]);
@@ -471,8 +462,8 @@ pub mod tests {
         env.with_reader(|reader| {
             let buf: TestBuf = KvBuf::new(&reader, db).unwrap();
 
-            let forward: Vec<_> = buf.iter_raw().unwrap().collect();
-            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect();
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect().unwrap();
+            let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect().unwrap();
 
             assert_eq!(forward, vec![]);
             assert_eq!(reverse, vec![]);
@@ -573,11 +564,7 @@ pub mod tests {
         env.with_reader(|reader| {
             let buf: KvBuf<&str, _> = KvBuf::new(&reader, db).unwrap();
 
-            let forward = buf
-                .iter_raw()
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+            let forward = buf.iter_raw().unwrap().collect::<Vec<_>>().unwrap();
             debug!(?forward);
             assert_eq!(forward, vec![(&b"a"[..], V(1)), (&b"c"[..], V(3))],);
             Ok(())
@@ -616,7 +603,7 @@ pub mod tests {
         env.with_reader(|reader| {
             let buf: KvBuf<&str, _> = KvBuf::new(&reader, db).unwrap();
 
-            let forward: Vec<_> = buf.iter_raw().unwrap().collect::<Result<_, _>>().unwrap();
+            let forward: Vec<_> = buf.iter_raw().unwrap().collect().unwrap();
             assert_eq!(forward, vec![(&b"a"[..], V(5)), (&b"c"[..], V(9))]);
             Ok(())
         })
@@ -758,7 +745,7 @@ pub mod tests {
             let buf: TestBuf = KvBuf::new(&reader, db).unwrap();
 
             let iter = buf.iter_raw_from("dogs_likes").unwrap();
-            let results = iter.collect::<Result<Vec<_>, _>>().unwrap();
+            let results = iter.collect::<Vec<_>>().unwrap();
             assert_eq!(
                 results,
                 vec![
@@ -772,6 +759,405 @@ pub mod tests {
                 ]
             );
 
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    enum TestData {
+        Put((String, V)),
+        Del(String),
+    }
+
+    fn do_test(
+        buf: &mut KvBuf<String, V>,
+        puts_dels_iter: &mut impl Iterator<Item = TestData>,
+        expected_state: &mut BTreeMap<String, V>,
+        runs: &mut Vec<String>,
+        reproduce: &mut Vec<String>,
+        from_key: &String,
+    ) {
+        let mut rng = rand::thread_rng();
+        for _ in 0..rng.gen_range(1, 300) {
+            match puts_dels_iter.next() {
+                Some(TestData::Put((key, value))) => {
+                    runs.push(format!("Put: key: {}, val: {:?} -> ", key, value));
+                    reproduce.push(format!(
+                        "TestData::Put(({:?}.to_string(), {:?})), ",
+                        key, value
+                    ));
+                    buf.put(key.clone(), value.clone());
+                    expected_state.insert(key, value);
+                }
+                Some(TestData::Del(key)) => {
+                    runs.push(format!("Del: key: {} -> ", key));
+                    reproduce.push(format!("TestData::Del({:?}.to_string()), ", key));
+                    buf.delete(key.clone());
+                    expected_state.remove(&key);
+                }
+                None => break,
+            }
+        }
+        expected_state.remove("");
+        assert_eq!(
+            buf.iter()
+                .unwrap()
+                .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+                .inspect(|(k, v)| Ok(trace!(?k, ?v)))
+                .collect::<Vec<_>>()
+                .unwrap(),
+            expected_state
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Vec<_>>(),
+            "{}\n{}];",
+            runs.concat(),
+            reproduce.concat()
+        );
+        assert_eq!(
+            buf.iter_from(from_key.clone())
+                .unwrap()
+                .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+                .inspect(|(k, v)| Ok(trace!(?k, ?v)))
+                .collect::<Vec<_>>()
+                .unwrap(),
+            expected_state
+                .range::<String, _>(from_key..)
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Vec<_>>(),
+            "{}\n{}];",
+            runs.concat(),
+            reproduce.concat()
+        );
+    }
+
+    fn re_do_test(
+        buf: &mut KvBuf<String, V>,
+        puts_dels_iter: &mut impl Iterator<Item = TestData>,
+        expected_state: &mut BTreeMap<String, V>,
+        runs: &mut Vec<String>,
+    ) {
+        while let Some(td) = puts_dels_iter.next() {
+            match td {
+                TestData::Put((key, value)) => {
+                    runs.push(format!("Put: key: {}, val: {:?} -> ", key, value));
+                    buf.put(key.clone(), value.clone());
+                    expected_state.insert(key, value);
+                }
+                TestData::Del(key) => {
+                    runs.push(format!("Del: key: {} -> ", key));
+                    buf.delete(key.clone());
+                    expected_state.remove(&key);
+                }
+            }
+        }
+        expected_state.remove("");
+        assert_eq!(
+            buf.iter()
+                .unwrap()
+                .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+                .inspect(|(k, v)| Ok(trace!(?k, ?v)))
+                .collect::<Vec<_>>()
+                .unwrap(),
+            expected_state
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Vec<_>>(),
+            "{}",
+            runs.concat(),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn kv_single_iter() {
+        holochain_types::observability::test_run().ok();
+        let mut rng = rand::thread_rng();
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_single("kv", StoreOptions::create())
+            .unwrap();
+        let td = StringFixturator::new(Unpredictable)
+            .zip(VFixturator::new(Unpredictable))
+            .take(300)
+            .collect::<BTreeMap<_, _>>();
+        let td_vec = td.into_iter().collect::<Vec<_>>();
+        let mut puts = rng
+            .sample_iter(rand::distributions::Uniform::new(0, td_vec.len()))
+            .map(|i| td_vec[i].clone());
+        let from_key = puts.next().unwrap().0;
+        let mut dels = rng
+            .sample_iter(rand::distributions::Uniform::new(0, td_vec.len()))
+            .map(|i| td_vec[i].0.clone());
+        let puts_dels = puts
+            .map(|p| {
+                if rng.gen() {
+                    TestData::Put(p)
+                } else {
+                    TestData::Del(dels.next().unwrap())
+                }
+            })
+            .take(1000)
+            .collect::<Vec<_>>();
+        let mut puts_dels = puts_dels.into_iter();
+        let mut expected_state: BTreeMap<String, V> = BTreeMap::new();
+
+        let span = trace_span!("kv_single_iter");
+        let _g = span.enter();
+
+        let mut runs = vec!["Start | ".to_string()];
+        let mut reproduce = vec!["\nReproduce:\n".to_string()];
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+            let span = trace_span!("in_scratch");
+            let _g = span.enter();
+            runs.push(format!(
+                "{} | ",
+                span.metadata().map(|m| m.name()).unwrap_or("")
+            ));
+            reproduce.push(format!(
+                "let {} = [",
+                span.metadata().map(|f| f.name()).unwrap_or("")
+            ));
+            do_test(
+                &mut buf,
+                &mut puts_dels,
+                &mut expected_state,
+                &mut runs,
+                &mut reproduce,
+                &from_key,
+            );
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+                .unwrap();
+            Ok(())
+        })
+        .unwrap();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+            let span = trace_span!("in_db_first");
+            let _g = span.enter();
+            runs.push(format!(
+                "{} | ",
+                span.metadata().map(|m| m.name()).unwrap_or("")
+            ));
+            reproduce.push(format!(
+                "]; \n\nlet {} = [",
+                span.metadata().map(|f| f.name()).unwrap_or("")
+            ));
+            do_test(
+                &mut buf,
+                &mut puts_dels,
+                &mut expected_state,
+                &mut runs,
+                &mut reproduce,
+                &from_key,
+            );
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+                .unwrap();
+            Ok(())
+        })
+        .unwrap();
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+            let span = trace_span!("in_db_second");
+            let _g = span.enter();
+            runs.push(format!(
+                "{} | ",
+                span.metadata().map(|m| m.name()).unwrap_or("")
+            ));
+            reproduce.push(format!(
+                "]; \n\nlet {} = [",
+                span.metadata().map(|f| f.name()).unwrap_or("")
+            ));
+            do_test(
+                &mut buf,
+                &mut puts_dels,
+                &mut expected_state,
+                &mut runs,
+                &mut reproduce,
+                &from_key,
+            );
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+                .unwrap();
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn kv_single_iter_found_1() {
+        holochain_types::observability::test_run().ok();
+        let in_scratch = vec![
+            TestData::Del(".".to_string()),
+            TestData::Put(("bar".to_string(), V(0))),
+            TestData::Put(("!".to_string(), V(0))),
+            TestData::Put(("💯".to_string(), V(889149878))),
+            TestData::Put(("bing".to_string(), V(823748021))),
+            TestData::Put(("foo".to_string(), V(3698192405))),
+            TestData::Del("💯".to_string()),
+            TestData::Del("bing".to_string()),
+            TestData::Put(("baz".to_string(), V(3224166057))),
+            TestData::Del("💩".to_string()),
+            TestData::Put(("baz".to_string(), V(3224166057))),
+            TestData::Put((".".to_string(), V(0))),
+            TestData::Del("❤".to_string()),
+            TestData::Put(("💯".to_string(), V(889149878))),
+            TestData::Put((".".to_string(), V(0))),
+            TestData::Del("bing".to_string()),
+            TestData::Put(("!".to_string(), V(0))),
+            TestData::Del("!".to_string()),
+            TestData::Del(".".to_string()),
+        ];
+        let in_db_first = vec![
+            TestData::Del("!".to_string()),
+            TestData::Del("foo".to_string()),
+            TestData::Del("foo".to_string()),
+            TestData::Put(("foo".to_string(), V(3698192405))),
+            TestData::Put(("bar".to_string(), V(0))),
+            TestData::Del("!".to_string()),
+            TestData::Del("💩".to_string()),
+            TestData::Put(("bar".to_string(), V(0))),
+        ];
+        let in_db_second = vec![];
+        let span = trace_span!("kv_single_iter_found_1");
+        let _g = span.enter();
+        kv_single_iter_runner(
+            in_scratch.into_iter(),
+            in_db_first.into_iter(),
+            in_db_second.into_iter(),
+        )
+        .await;
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn kv_single_iter_found_2() {
+        holochain_types::observability::test_run().ok();
+        let in_scratch = vec![
+            TestData::Del("".to_string()),
+            TestData::Put(("".to_string(), V(0))),
+        ];
+        let in_db_first = vec![
+            TestData::Del("".to_string()),
+            TestData::Put(("".to_string(), V(2))),
+        ];
+        let in_db_second = vec![
+            TestData::Del("".to_string()),
+            TestData::Put(("".to_string(), V(2))),
+        ];
+        let span = trace_span!("kv_single_iter_found_2");
+        let _g = span.enter();
+        kv_single_iter_runner(
+            in_scratch.into_iter(),
+            in_db_first.into_iter(),
+            in_db_second.into_iter(),
+        )
+        .await;
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn kv_single_iter_found_3() {
+        holochain_types::observability::test_run().ok();
+        let in_scratch = vec![
+            TestData::Put(("m".to_string(), V(0))),
+            TestData::Put(("n".to_string(), V(0))),
+            TestData::Put(("o".to_string(), V(0))),
+            TestData::Put(("o".to_string(), V(0))),
+            TestData::Put(("p".to_string(), V(0))),
+        ];
+        let in_db_first = vec![
+            TestData::Put(("o".to_string(), V(2))),
+            TestData::Put(("o".to_string(), V(2))),
+            TestData::Put(("o".to_string(), V(2))),
+        ];
+        let in_db_second = vec![
+            TestData::Put(("o".to_string(), V(2))),
+            TestData::Del("o".to_string()),
+            TestData::Put(("o".to_string(), V(2))),
+        ];
+        let span = trace_span!("kv_single_iter_found_3");
+        let _g = span.enter();
+        kv_single_iter_runner(
+            in_scratch.into_iter(),
+            in_db_first.into_iter(),
+            in_db_second.into_iter(),
+        )
+        .await;
+    }
+
+    async fn kv_single_iter_runner(
+        in_scratch: impl Iterator<Item = TestData> + Send,
+        in_db_first: impl Iterator<Item = TestData> + Send,
+        in_db_second: impl Iterator<Item = TestData> + Send,
+    ) {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let db = env
+            .inner()
+            .open_single("kv", StoreOptions::create())
+            .unwrap();
+
+        let mut runs = vec!["Start | ".to_string()];
+        let mut expected_state: BTreeMap<String, V> = BTreeMap::new();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+            let span = trace_span!("in_scratch");
+            let _g = span.enter();
+            runs.push(format!(
+                "{} | ",
+                span.metadata().map(|m| m.name()).unwrap_or("in_scratch")
+            ));
+            re_do_test(
+                &mut buf,
+                &mut in_scratch.into_iter(),
+                &mut expected_state,
+                &mut runs,
+            );
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+                .unwrap();
+            Ok(())
+        })
+        .unwrap();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+            let span = trace_span!("in_db_first");
+            let _g = span.enter();
+            runs.push(format!(
+                "{} | ",
+                span.metadata().map(|m| m.name()).unwrap_or("in_db_first")
+            ));
+            re_do_test(
+                &mut buf,
+                &mut in_db_first.into_iter(),
+                &mut expected_state,
+                &mut runs,
+            );
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+                .unwrap();
+            Ok(())
+        })
+        .unwrap();
+
+        env.with_reader::<DatabaseError, _, _>(|reader| {
+            let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+            let span = trace_span!("in_db_second");
+            let _g = span.enter();
+            runs.push(format!(
+                "{} | ",
+                span.metadata().map(|m| m.name()).unwrap_or("in_db_second")
+            ));
+            re_do_test(
+                &mut buf,
+                &mut in_db_second.into_iter(),
+                &mut expected_state,
+                &mut runs,
+            );
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+                .unwrap();
             Ok(())
         })
         .unwrap();

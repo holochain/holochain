@@ -1,11 +1,8 @@
 use super::*;
-use crate::fixt::EntryFixturator;
 use fixt::prelude::*;
-use holo_hash::{
-    AgentPubKeyFixturator, EntryContentHashFixturator, Hashable, HeaderHashFixturator,
-};
+use holo_hash::{AgentPubKeyFixturator, EntryContentHashFixturator, HeaderHashFixturator};
 use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
-use holochain_types::{observability, EntryHashed, Timestamp};
+use holochain_types::{observability, Timestamp};
 
 fixturator!(
     LinkAdd;

@@ -61,7 +61,7 @@ where
         &'env self,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
         Ok(Box::new(FallibleIterator::map(self.0.iter()?, |(h, c)| {
-            Ok(Self::deserialize_and_hash_blocking(h, c))
+            Ok(Self::deserialize_and_hash_blocking(&h[..], c))
         })))
     }
 
@@ -69,10 +69,9 @@ where
     pub fn iter_fail_raw(
         &'env self,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
-        Ok(Box::new(FallibleIterator::map(
-            self.0.iter_raw()?,
-            |(h, c)| Ok(Self::deserialize_and_hash_blocking(h, c)),
-        )))
+        Ok(Box::new(self.0.iter_raw()?.map(|(h, c)| {
+            Ok(Self::deserialize_and_hash_blocking(h, c))
+        })))
     }
 
     fn deserialize_and_hash_blocking(hash: &[u8], content: H::Content) -> H {

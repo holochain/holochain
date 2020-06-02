@@ -1,4 +1,5 @@
 #![allow(clippy::ptr_arg)]
+use fallible_iterator::FallibleIterator;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
@@ -173,17 +174,11 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         debug!(?key);
         let k_bytes = key.to_key();
         // TODO: Internalize this abstraction to KvBuf?
-        // TODO: PERF: with_capacity
-        let mut links = Vec::new();
-        for link in self.links_meta.iter_from(k_bytes.clone())? {
-            let (k, link) = link?;
-            if partial_key_match(&k_bytes[..], &k) {
-                links.push(link)
-            } else {
-                break;
-            }
-        }
-        Ok(links)
+        self.links_meta
+            .iter_from(k_bytes.clone())?
+            .take_while(|(k, _)| Ok(partial_key_match(&k_bytes[..], k)))
+            .map(|(_, v)| Ok(v))
+            .collect()
     }
 
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
