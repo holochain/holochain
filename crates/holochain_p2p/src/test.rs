@@ -12,7 +12,7 @@ mod tests {
         )
         .into();
         let a2: holo_hash::AgentPubKey = crate::holo_hash_core::AgentPubKey::new(
-            b"111111111111111111111111111111111111".to_vec(),
+            b"222222222222222222222222222222222222".to_vec(),
         )
         .into();
 
