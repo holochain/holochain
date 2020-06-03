@@ -3,7 +3,7 @@ use crate::header;
 use crate::{
     composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
     link::Tag,
-    Header, Timestamp,
+    Timestamp,
 };
 use derive_more::Constructor;
 use header::HeaderInner;

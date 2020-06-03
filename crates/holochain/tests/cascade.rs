@@ -103,7 +103,9 @@ async fn get_links() -> SourceChainResult<()> {
     );
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
-    let links = cascade.dht_get_links(base.into(), zome_id, tag).await?;
+    let links = cascade
+        .dht_get_links(base.into(), Some(zome_id), Some(tag))
+        .await?;
     let link = links.into_iter().next();
     assert_eq!(link, None);
     Ok(())

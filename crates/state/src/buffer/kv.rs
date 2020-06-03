@@ -177,6 +177,7 @@ where
     /// Iterate over items which are staged for PUTs in the scratch space
     // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
     // iteration, by chaining this with an iter_raw
+    // FIXME: Can this be removed now? freesig
     pub fn iter_scratch_puts(&self) -> impl Iterator<Item = (&Vec<u8>, &Box<V>)> {
         self.scratch.iter().filter_map(|(k, op)| {
             if let Op::Put(v) = op {
@@ -260,6 +261,8 @@ pub fn partial_key_match(partial_key: &[u8], key: &[u8]) -> bool {
         .map(|a| a == &partial_key[..])
         .unwrap_or(false)
 }
+
+/// Iterate from a key
 pub struct SingleFromIter<'env, 'a, V>
 where
     V: BufVal,
@@ -293,6 +296,7 @@ where
     }
 }
 
+/// Iterate taking into account the scratch
 pub struct SingleIter<'env, 'a, V>
 where
     V: BufVal,
@@ -314,11 +318,17 @@ where
         iter: SingleIterRaw<'env, V>,
     ) -> Self {
         let scratch_iter = scratch_iter
+            // TODO: These inspects should be eventally removed
+            // but I'm tempted to included them for a while
+            // incase any bugs are found in the iterator.
+            // They make debugging a lot easier.
             .inspect(|(k, v)| {
                 let span = trace_span!("scratch < filter", key = %String::from_utf8_lossy(k));
                 let _g = span.enter();
                 trace!(k = %String::from_utf8_lossy(k), ?v)
             })
+            // Don't include deletes because they are handled
+            // in the next db iterator
             .filter_map(|(k, v)| match v {
                 Op::Put(v) => Some((&k[..], *v.clone())),
                 Op::Delete => None,
@@ -335,6 +345,10 @@ where
                 trace!(k = %String::from_utf8_lossy(k), ?v);
                 Ok(())
             })
+            // Remove an items that match a delete in the scratch.
+            // If there is a put in the scratch we want to return
+            // that instead of this matching item as the scratch
+            // is more up to date
             .filter_map(move |(k, v)| match scratch.get(k) {
                 Some(Op::Put(sv)) => Ok(Some((k, *sv.clone()))),
                 Some(Op::Delete) => Ok(None),
@@ -354,66 +368,29 @@ where
         }
     }
 
-    #[instrument(skip(self))]
-    fn next_forward(
-        &mut self,
-        db: IterItem<'env, V>,
-        scratch_current: Option<IterItem<'a, V>>,
-    ) -> Option<IterItem<'env, V>> {
-        match scratch_current {
-            Some(scratch) if scratch.0 < db.0 => {
-                trace!(msg = "r scratch key <", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                self.current = Some(db);
-                Some(scratch)
-            }
-            Some(scratch) if scratch.0 == db.0 => {
-                trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                Some(scratch)
-            }
-            _ => {
-                trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
-                self.scratch_current = scratch_current;
-                Some(db)
-            }
-        }
-    }
-
-    #[instrument(skip(self))]
-    fn next_rev(
-        &mut self,
-        db: IterItem<'env, V>,
-        scratch_current: Option<IterItem<'a, V>>,
-    ) -> Option<IterItem<'env, V>> {
-        match scratch_current {
-            Some(scratch) if scratch.0 > db.0 => {
-                trace!(msg = "r scratch key >", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                self.current = Some(db);
-                Some(scratch)
-            }
-            Some(scratch) if scratch.0 == db.0 => {
-                trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                Some(scratch)
-            }
-            _ => {
-                trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
-                self.scratch_current = scratch_current;
-                Some(db)
-            }
-        }
-    }
-
     fn next_inner(
         &mut self,
         current: Option<IterItem<'env, V>>,
         scratch_current: Option<IterItem<'a, V>>,
-        next: fn(
-            &mut Self,
-            db: IterItem<'env, V>,
-            scratch_current: Option<IterItem<'a, V>>,
-        ) -> Option<IterItem<'env, V>>,
+        compare: fn(scratch: &[u8], db: &[u8]) -> bool,
     ) -> Result<Option<IterItem<'env, V>>, IterError> {
         let r = match current {
-            Some(db) => next(self, db, scratch_current),
+            Some(db) => match scratch_current {
+                Some(scratch) if compare(scratch.0, db.0) => {
+                    trace!(msg = "r scratch key first", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                    self.current = Some(db);
+                    Some(scratch)
+                }
+                Some(scratch) if scratch.0 == db.0 => {
+                    trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                    Some(scratch)
+                }
+                _ => {
+                    trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
+                    self.scratch_current = scratch_current;
+                    Some(db)
+                }
+            },
             None => {
                 if let Some((k, v)) = &scratch_current {
                     trace!(msg = "r scratch no db", k = %String::from_utf8_lossy(k), ?v);
@@ -433,6 +410,7 @@ where
 {
     type Error = IterError;
     type Item = IterItem<'env, V>;
+
     #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let current = match self.current.take() {
@@ -443,7 +421,7 @@ where
             Some(c) => Some(c),
             None => self.scratch_iter.next(),
         };
-        self.next_inner(current, scratch_current, Self::next_forward)
+        self.next_inner(current, scratch_current, |scratch, db| scratch < db)
     }
 }
 
@@ -461,7 +439,7 @@ where
             Some(c) => Some(c),
             None => self.scratch_iter.next_back(),
         };
-        self.next_inner(current, scratch_current, Self::next_rev)
+        self.next_inner(current, scratch_current, |scratch, db| scratch > db)
     }
 }
 

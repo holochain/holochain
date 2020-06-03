@@ -13,9 +13,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
-    header::{
-        builder, EntryType, EntryVisibility, HeaderBuilder, HeaderBuilderCommon, HeaderInner,
-    },
+    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
     prelude::*,
     EntryHashed,
 };

@@ -48,19 +48,21 @@ where
     /// Put a value into the underlying [KvBuf]
     pub fn put(&mut self, h: H) {
         let (content, hash) = h.into_inner();
+        // These expects seem valid as it means the hashing is broken
         self.0.put(hash, content).expect("Hash should not be empty");
     }
 
     /// Delete a value from the underlying [KvBuf]
     pub fn delete(&mut self, k: H::HashType) {
+        // These expects seem valid as it means the hashing is broken
         self.0.delete(k).expect("Hash key is empty");
     }
 
-    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
+    /// Iterate over the underlying persisted data taking the scratch space into consideration
     pub fn iter_fail(
         &'env self,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
-        Ok(Box::new(FallibleIterator::map(self.0.iter()?, |(h, c)| {
+        Ok(Box::new(self.0.iter()?.map(|(h, c)| {
             Ok(Self::deserialize_and_hash_blocking(&h[..], c))
         })))
     }
@@ -96,6 +98,7 @@ where
     /// Iterate over items which are staged for PUTs in the scratch space
     // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
     // iteration, by chaining this with an iter_raw
+    // Maybe this can be removed as well? freesig
     pub fn iter_scratch_puts(&'env self) -> impl Iterator<Item = H> + 'env {
         self.0.iter_scratch_puts().map(|(hash_bytes, content)| {
             tokio_safe_block_on::tokio_safe_block_on(

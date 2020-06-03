@@ -140,26 +140,24 @@ where
     pub async fn dht_get_links(
         &self,
         base: EntryHash,
-        zome_id: ZomeId,
-        tag: Tag,
+        zome_id: Option<ZomeId>,
+        tag: Option<Tag>,
     ) -> DatabaseResult<Vec<Link>> {
         // Am I an authority?
         let authority = self.primary.contains(&base).await?;
         if authority {
             // Cas
-            let links = self
-                .primary_meta
-                .get_links(&base, Some(zome_id), Some(tag.clone()))?;
+            let links = self.primary_meta.get_links(&base, zome_id, tag.clone())?;
 
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(&base, Some(zome_id), Some(tag))
+                self.cache_meta.get_links(&base, zome_id, tag)
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            self.cache_meta.get_links(&base, Some(zome_id), Some(tag))
+            self.cache_meta.get_links(&base, zome_id, tag)
         }
     }
 }

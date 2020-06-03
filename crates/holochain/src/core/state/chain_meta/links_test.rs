@@ -2,13 +2,13 @@ use super::*;
 use fixt::prelude::*;
 use holo_hash::{AgentPubKeyFixturator, EntryContentHashFixturator, HeaderHashFixturator};
 use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
-use holochain_types::{observability, Timestamp};
+use holochain_types::{fixt::TimestampFixturator, observability, Timestamp};
 
 fixturator!(
     LinkAdd;
     curve Empty LinkAdd {
         author: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-        timestamp: Timestamp::now(),
+        timestamp: TimestampFixturator::new(Empty).next().unwrap(),
         header_seq: U32Fixturator::new(Empty).next().unwrap(),
         prev_header: HeaderHashFixturator::new(Empty).next().unwrap(),
         base_address: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
@@ -18,7 +18,7 @@ fixturator!(
     };
     curve Unpredictable LinkAdd {
         author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-        timestamp: Timestamp::now(),
+        timestamp: TimestampFixturator::new(Unpredictable).next().unwrap(),
         header_seq: U32Fixturator::new(Unpredictable).next().unwrap(),
         prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
         base_address: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
@@ -28,7 +28,7 @@ fixturator!(
     };
     curve Predictable LinkAdd {
         author: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        timestamp: Timestamp::now(),
+        timestamp: TimestampFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
         header_seq: U32Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
         prev_header: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
         base_address: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),

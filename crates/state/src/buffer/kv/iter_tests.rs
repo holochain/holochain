@@ -23,17 +23,17 @@ async fn kv_iter_from_partial() {
     env.with_reader::<DatabaseError, _, _>(|reader| {
         let mut buf: TestBuf = KvBuf::new(&reader, db).unwrap();
 
-        buf.put("a", V(101));
-        buf.put("b", V(102));
-        buf.put("dogs_likes_7", V(1));
-        buf.put("dogs_likes_79", V(2));
-        buf.put("dogs_likes_3", V(3));
-        buf.put("dogs_likes_88", V(4));
-        buf.put("dogs_likes_f", V(5));
-        buf.put("d", V(103));
-        buf.put("e", V(104));
-        buf.put("aaaaaaaaaaaaaaaaaaaa", V(105));
-        buf.put("eeeeeeeeeeeeeeeeeeee", V(106));
+        buf.put("a", V(101)).unwrap();
+        buf.put("b", V(102)).unwrap();
+        buf.put("dogs_likes_7", V(1)).unwrap();
+        buf.put("dogs_likes_79", V(2)).unwrap();
+        buf.put("dogs_likes_3", V(3)).unwrap();
+        buf.put("dogs_likes_88", V(4)).unwrap();
+        buf.put("dogs_likes_f", V(5)).unwrap();
+        buf.put("d", V(103)).unwrap();
+        buf.put("e", V(104)).unwrap();
+        buf.put("aaaaaaaaaaaaaaaaaaaa", V(105)).unwrap();
+        buf.put("eeeeeeeeeeeeeeeeeeee", V(106)).unwrap();
 
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
             .unwrap();
@@ -69,6 +69,10 @@ enum TestData {
     Del(String),
 }
 
+// Runs the poor prop test
+// This generates an easy to copy and paste
+// Vec of values to use for a test if a bug is found
+// and prints iton failure
 fn do_test(
     buf: &mut KvBuf<String, V>,
     puts_dels_iter: &mut impl Iterator<Item = TestData>,
@@ -86,19 +90,21 @@ fn do_test(
                     "TestData::Put(({:?}.to_string(), {:?})), ",
                     key, value
                 ));
-                buf.put(key.clone(), value.clone());
+                buf.put(key.clone(), value.clone()).unwrap();
                 expected_state.insert(key, value);
             }
             Some(TestData::Del(key)) => {
                 runs.push(format!("Del: key: {} -> ", key));
                 reproduce.push(format!("TestData::Del({:?}.to_string()), ", key));
-                buf.delete(key.clone());
+                buf.delete(key.clone()).unwrap();
                 expected_state.remove(&key);
             }
             None => break,
         }
     }
+    // Remove any empty keys
     expected_state.remove("");
+    // Check single iter
     assert_eq!(
         buf.iter()
             .unwrap()
@@ -114,6 +120,7 @@ fn do_test(
         runs.concat(),
         reproduce.concat()
     );
+    // Check iter from
     assert_eq!(
         buf.iter_from(from_key.clone())
             .unwrap()
@@ -130,6 +137,7 @@ fn do_test(
         reproduce.concat(),
         from_key,
     );
+    // Check reverse
     assert_eq!(
         buf.iter_reverse()
             .unwrap()
@@ -148,6 +156,7 @@ fn do_test(
     );
 }
 
+// Runs the found bugs tests
 fn re_do_test(
     buf: &mut KvBuf<String, V>,
     puts_dels_iter: &mut impl Iterator<Item = TestData>,
@@ -159,12 +168,12 @@ fn re_do_test(
         match td {
             TestData::Put((key, value)) => {
                 runs.push(format!("Put: key: {}, val: {:?} -> ", key, value));
-                buf.put(key.clone(), value.clone());
+                buf.put(key.clone(), value.clone()).unwrap();
                 expected_state.insert(key, value);
             }
             TestData::Del(key) => {
                 runs.push(format!("Del: key: {} -> ", key));
-                buf.delete(key.clone());
+                buf.delete(key.clone()).unwrap();
                 expected_state.remove(&key);
             }
         }
@@ -215,6 +224,11 @@ fn re_do_test(
     );
 }
 
+// Poor persons proptest.
+// TODO: This should probaly be a real prop test
+// but I couldn't easily figure out how to generate
+// expected values and integrate with our need to
+// test scratch and db
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter() {
     holochain_types::observability::test_run().ok();
@@ -265,7 +279,7 @@ async fn kv_single_iter() {
             span.metadata().map(|m| m.name()).unwrap_or("")
         ));
         reproduce.push(format!(
-            "let {} = [",
+            "let {} = vec![",
             span.metadata().map(|f| f.name()).unwrap_or("")
         ));
         do_test(
@@ -291,7 +305,7 @@ async fn kv_single_iter() {
             span.metadata().map(|m| m.name()).unwrap_or("")
         ));
         reproduce.push(format!(
-            "]; \n\nlet {} = [",
+            "]; \n\nlet {} = vec![",
             span.metadata().map(|f| f.name()).unwrap_or("")
         ));
         do_test(
@@ -316,7 +330,7 @@ async fn kv_single_iter() {
             span.metadata().map(|m| m.name()).unwrap_or("")
         ));
         reproduce.push(format!(
-            "]; \n\nlet {} = [",
+            "]; \n\nlet {} = vec![",
             span.metadata().map(|f| f.name()).unwrap_or("")
         ));
         do_test(

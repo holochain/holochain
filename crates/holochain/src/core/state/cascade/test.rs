@@ -313,7 +313,9 @@ async fn links_local_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade.dht_get_links(base.into(), zome_id, tag).await?;
+    let links = cascade
+        .dht_get_links(base.into(), Some(zome_id), Some(tag))
+        .await?;
     // check it returns
     assert_eq!(links, vec![link]);
     // check it doesn't hit the cache
@@ -386,7 +388,9 @@ async fn links_cache_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade.dht_get_links(base.into(), zome_id, tag).await?;
+    let links = cascade
+        .dht_get_links(base.into(), Some(zome_id), Some(tag))
+        .await?;
     // check it returns
     assert_eq!(links, vec![link.clone()]);
     Ok(())
@@ -444,7 +448,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         &mock_cache_meta,
     );
     let links = cascade
-        .dht_get_links(base.into(), zome_id, tag.clone())
+        .dht_get_links(base.into(), Some(zome_id), Some(tag).clone())
         .await?;
     // check it returns
     assert_eq!(links, vec![link]);

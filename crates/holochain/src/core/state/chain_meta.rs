@@ -3,17 +3,16 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{partial_key_match, KvBuf, KvvBuf},
+    buffer::{KvBuf, KvvBuf},
     db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::header::{self, builder};
+use holochain_types::header::{self};
 use holochain_types::{
     composite_hash::EntryHash,
     header::{LinkAdd, LinkRemove, ZomeId},
     link::Tag,
-    shims::*,
     Header, HeaderHashed, Timestamp,
 };
 use mockall::mock;
@@ -39,6 +38,7 @@ pub enum EntryDhtStatus {
     Purged,
 }
 
+// TODO: Maybe this should be moved to link.rs in types?
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Link {
     pub link_add_hash: HeaderHash,
@@ -158,7 +158,6 @@ impl<'env> ChainMetaBuf<'env> {
 
 #[async_trait::async_trait]
 impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
-    // TODO find out whether we need link_type.
     fn get_links(
         &self,
         base: &EntryHash,
@@ -171,7 +170,6 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             tag,
             link_add_hash: None,
         };
-        debug!(?key);
         self.links_meta
             .iter_all_key_matches(key.to_key())?
             .map(|(_, v)| Ok(v))
@@ -198,8 +196,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
                 zome_id: link_add.zome_id,
                 tag: link_add.tag,
             },
-        );
-        DatabaseResult::Ok(())
+        )
     }
 
     fn remove_link(
@@ -219,8 +216,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         // TODO: It should be impossible to ever remove a Link that wasn't already added
         // because of the validation dependency on LinkAdd from LinkRemove
         // but do we want some kind of warning or panic here incase we mssed up?
-        self.links_meta.delete(key.to_key());
-        DatabaseResult::Ok(())
+        self.links_meta.delete(key.to_key())
     }
 
     fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<HeaderHash> {
