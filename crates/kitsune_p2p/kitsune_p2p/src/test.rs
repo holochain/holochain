@@ -47,10 +47,7 @@ mod tests {
         p2p.join(space1.clone(), a1.clone()).await.unwrap();
         p2p.join(space1.clone(), a2.clone()).await.unwrap();
 
-        let res = p2p
-            .request(space1, a2, Arc::new(b"hello".to_vec()))
-            .await
-            .unwrap();
+        let res = p2p.request(space1, a2, b"hello".to_vec()).await.unwrap();
         assert_eq!(b"echo: hello".to_vec(), res);
     }
 }

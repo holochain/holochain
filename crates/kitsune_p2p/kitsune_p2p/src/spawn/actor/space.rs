@@ -83,9 +83,18 @@ impl Space {
         // clone the event sender
         let mut evt_sender = self.evt_sender.clone();
 
-        Ok(async move { evt_sender.request(space, agent, data).await }
-            .boxed()
-            .into())
+        // as this is a short-circuit - we need to decode the data
+        // inline - here.
+        let data = wire::Wire::decode((*data).clone())?;
+
+        match data {
+            wire::Wire::Request(data) => {
+                Ok(async move { evt_sender.request(space, agent, data).await }
+                    .boxed()
+                    .into())
+            }
+            wire::Wire::Broadcast(_data) => unimplemented!(),
+        }
     }
 
     /// send / process a request - waiting / retrying as appropriate

@@ -24,7 +24,7 @@ pub struct Broadcast {
     /// remote_agent_count.
     pub timeout_ms: u64,
     /// Broadcast data.
-    pub broadcast: Arc<Vec<u8>>,
+    pub broadcast: Vec<u8>,
 }
 
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
@@ -64,7 +64,7 @@ ghost_actor::ghost_actor! {
         fn leave(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
 
         /// Make a request of a remote agent.
-        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
+        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Vec<u8>) -> Vec<u8>;
 
         /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
         /// Returns an approximate number of nodes reached.

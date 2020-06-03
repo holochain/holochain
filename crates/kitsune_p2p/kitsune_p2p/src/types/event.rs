@@ -9,7 +9,7 @@ pub struct RequestEvt {
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
     /// Request data.
-    pub request: Arc<Vec<u8>>,
+    pub request: Vec<u8>,
 }
 
 /// We are receiving a broadcast from a remote node.
@@ -19,7 +19,7 @@ pub struct BroadcastEvt {
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
     /// Broadcast data.
-    pub broadcast: Arc<Vec<u8>>,
+    pub broadcast: Vec<u8>,
 }
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -63,7 +63,7 @@ ghost_actor::ghost_chan! {
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
         /// We are receiving a request from a remote node.
-        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
+        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Vec<u8>) -> Vec<u8>;
 
         /// We are receiving a broadcast from a remote node.
         fn broadcast(input: BroadcastEvt) -> ();

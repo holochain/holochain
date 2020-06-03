@@ -1,7 +1,6 @@
 use crate::{actor::*, event::*, *};
 
 use futures::future::FutureExt;
-use std::sync::Arc;
 
 use crate::types::AgentPubKeyExt;
 
@@ -67,7 +66,7 @@ impl HolochainP2pActor {
                 let space = DnaHash::from_kitsune(&space);
                 let agent = AgentPubKey::from_kitsune(&agent);
 
-                let request = crate::wire::WireMessage::decode((*data).clone())?;
+                let request = crate::wire::WireMessage::decode(data)?;
 
                 match request {
                     crate::wire::WireMessage::CallRemote { data } => {
@@ -186,7 +185,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            let result = kitsune_p2p.request(space, agent, Arc::new(req)).await?;
+            let result = kitsune_p2p.request(space, agent, req).await?;
             let result = UnsafeBytes::from(result).into();
             Ok(result)
         }
@@ -226,7 +225,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            kitsune_p2p.request(space, agent, Arc::new(req)).await?;
+            kitsune_p2p.request(space, agent, req).await?;
             Ok(())
         }
         .boxed()

@@ -125,7 +125,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
-        data: Arc<Vec<u8>>,
+        data: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = match self.spaces.get_mut(&space) {
             None => {
@@ -133,7 +133,12 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
             }
             Some(space) => space,
         };
-        let space_request_fut = space.handle_request(agent, data)?;
+
+        // encode the data to send
+        let data = wire::Wire::request(data).encode();
+
+        let space_request_fut = space.handle_request(agent, Arc::new(data))?;
+
         Ok(async move { space_request_fut.await }.boxed().into())
     }
 
