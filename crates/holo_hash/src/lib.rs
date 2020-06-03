@@ -58,7 +58,7 @@
 //!
 //! let entry_content = b"test entry content";
 //!
-//! let content_hash: HoloHash = EntryContentHash::with_data(entry_content).await.into();
+//! let content_hash: HoloHash = EntryContentHash::with_data(entry_content.to_vec()).await.into();
 //!
 //! assert_eq!(
 //!     "EntryContentHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",
@@ -77,7 +77,7 @@
 //! // pretend our pub key is all 0xdb bytes
 //! let agent_pub_key = vec![0xdb; 32];
 //!
-//! let agent_id: HoloHash = AgentPubKey::with_pre_hashed(agent_pub_key).await.into();
+//! let agent_id: HoloHash = AgentPubKey::with_pre_hashed(agent_pub_key).into();
 //!
 //! assert_eq!(
 //!     "AgentPubKey(uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv)",
@@ -187,6 +187,10 @@ fn blake2b_128(data: &[u8]) -> Vec<u8> {
 
 /// internal compute the holo dht location u32
 fn holo_dht_location_bytes(data: &[u8]) -> Vec<u8> {
+    // Assert the data size is relatively small so we are
+    // comfortable executing this synchronously / blocking tokio thread.
+    assert_eq!(32, data.len(), "only 32 byte hashes supported");
+
     let hash = blake2b_128(data);
     let mut out = vec![hash[0], hash[1], hash[2], hash[3]];
     for i in (4..16).step_by(4) {
@@ -251,13 +255,13 @@ fn holo_hash_parse(s: &str) -> Result<HoloHash, HoloHashError> {
 /// Common methods for all HoloHash base hash types
 pub trait HoloHashBaseExt: Sized {
     /// Construct a new hash instance from an already generated hash.
-    fn with_pre_hashed(hash: Vec<u8>) -> MustBoxFuture<'static, Self>;
+    fn with_pre_hashed(hash: Vec<u8>) -> Self;
 }
 
 /// Common methods for all HoloHash hash types
 pub trait HoloHashExt: HoloHashBaseExt + Sized {
     /// Construct a new hash instance from raw data.
-    fn with_data(data: &[u8]) -> MustBoxFuture<'static, Self>;
+    fn with_data(data: Vec<u8>) -> MustBoxFuture<'static, Self>;
 }
 
 macro_rules! new_holo_hash {
@@ -269,23 +273,27 @@ macro_rules! new_holo_hash {
 
             impl HoloHashBaseExt for $name {
                 /// Construct a new hash instance from an already generated hash.
-                fn with_pre_hashed(mut hash: Vec<u8>) -> MustBoxFuture<'static, Self> {
-                    async {
-                        assert_eq!(32, hash.len(), "only 32 byte hashes supported");
-                        tokio::task::block_in_place(|| {
-                            hash.append(&mut holo_dht_location_bytes(&hash));
-                            Self(holo_hash_core::$name::new(hash))
-                        })
-                    }
-                    .boxed().into()
+                fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
+                    // Assert the data size is relatively small so we are
+                    // comfortable executing this synchronously / blocking
+                    // tokio thread.
+                    assert_eq!(32, hash.len(), "only 32 byte hashes supported");
+
+                    hash.append(&mut holo_dht_location_bytes(&hash));
+                    Self(holo_hash_core::$name::new(hash))
                 }
             }
 
             impl HoloHashExt for $name {
 
                 /// Construct a new hash instance from raw data.
-                fn with_data(data: &[u8]) -> MustBoxFuture<'static, Self> {
-                    $name::with_pre_hashed(blake2b_256(data))
+                fn with_data(data: Vec<u8>) -> MustBoxFuture<'static, Self> {
+                    async move {
+                        tokio::task::spawn_blocking(move || {
+                            use $crate::HoloHashBaseExt;
+                            $name::with_pre_hashed(blake2b_256(&data))
+                        }).await.expect("spawn_blocking thread panic")
+                    }.boxed().into()
                 }
 
             }
@@ -378,26 +386,14 @@ macro_rules! new_holo_hash {
             fixturator!(
                 $name,
                 {
-                    tokio_safe_block_on::tokio_safe_block_on(
-                        async { $crate::$name::with_pre_hashed(vec![0; 32]).await },
-                        std::time::Duration::from_millis(10),
-                    )
-                    .unwrap()
+                    $crate::$name::with_pre_hashed(vec![0; 32])
                 },
                 {
                     let mut random_bytes: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
-                    tokio_safe_block_on::tokio_safe_block_on(
-                        async { $crate::$name::with_pre_hashed(random_bytes).await },
-                        std::time::Duration::from_millis(10),
-                    )
-                    .unwrap()
+                    $crate::$name::with_pre_hashed(random_bytes)
                 },
                 {
-                    let ret = tokio_safe_block_on::tokio_safe_block_on(
-                        async { $crate::$name::with_pre_hashed(vec![self.0.index as _; 32]).await },
-                        std::time::Duration::from_millis(10),
-                    )
-                    .unwrap();
+                    let ret = $crate::$name::with_pre_hashed(vec![self.0.index as _; 32]);
                     self.0.index = (self.0.index as u8).wrapping_add(1) as usize;
                     ret
                 }
@@ -660,7 +656,7 @@ mod tests {
         tokio::task::spawn(async move {
             let hash = vec![0xdb; 32];
             let hash: &[u8] = &hash;
-            let agent_id = AgentPubKey::with_pre_hashed(hash.to_vec()).await;
+            let agent_id = AgentPubKey::with_pre_hashed(hash.to_vec());
             assert_eq!(hash, agent_id.get_bytes());
         })
         .await
@@ -670,7 +666,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_prehash_display() {
         tokio::task::spawn(async move {
-            let agent_id = AgentPubKey::with_pre_hashed(vec![0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_pre_hashed(vec![0xdb; 32]);
             assert_eq!(
                 "uhCAk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv",
                 &format!("{}", agent_id),
@@ -691,7 +687,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_debug() {
         tokio::task::spawn(async move {
-            let agent_id = AgentPubKey::with_data(&[0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_data(vec![0xdb; 32]).await;
             assert_eq!(
                 "AgentPubKey(uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
                 &format!("{:?}", agent_id),
@@ -704,7 +700,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_display() {
         tokio::task::spawn(async move {
-            let agent_id = AgentPubKey::with_data(&[0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_data(vec![0xdb; 32]).await;
             assert_eq!(
                 "uhCAkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm",
                 &format!("{}", agent_id),
@@ -717,7 +713,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn agent_id_loc() {
         tokio::task::spawn(async move {
-            let agent_id = AgentPubKey::with_data(&[0xdb; 32]).await;
+            let agent_id = AgentPubKey::with_data(vec![0xdb; 32]).await;
             assert_eq!(3_860_645_936, agent_id.get_loc());
         })
         .await
