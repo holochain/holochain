@@ -13,7 +13,7 @@ use crate::core::{
 use futures::FutureExt;
 use holochain_state::buffer::BufferedStore;
 use holochain_state::prelude::Writer;
-use holochain_types::{dna::DnaDef, header::HeaderBuilder};
+use holochain_types::{dna::DnaDef, header::builder};
 use must_future::MustBoxFuture;
 
 pub(crate) struct InitializeZomesWorkflow<Ribosome: RibosomeT> {
@@ -47,7 +47,7 @@ where
             workspace
                 .0
                 .source_chain
-                .put(HeaderBuilder::InitZomesComplete, None)
+                .put(builder::InitZomesComplete {}, None)
                 .await?;
 
             let fx = WorkflowEffects {
