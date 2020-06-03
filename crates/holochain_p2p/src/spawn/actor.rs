@@ -55,6 +55,38 @@ impl HolochainP2pActor {
     ) -> HolochainP2pHandlerResult<()> {
         use kitsune_p2p::event::KitsuneP2pEvent::*;
         match event {
+            Broadcast {
+                span,
+                respond,
+                space,
+                agent,
+                data,
+            } => {
+                let _g = span.enter();
+                let space = DnaHash::from_kitsune(&space);
+                let agent = AgentPubKey::from_kitsune(&agent);
+
+                let request = crate::wire::WireMessage::decode(data)?;
+
+                match request {
+                    // this is a request type, not a broadcast
+                    crate::wire::WireMessage::CallRemote { .. } => unreachable!(),
+                    crate::wire::WireMessage::Publish { .. } => {
+                        let res_fut = match self.handle_incoming_publish(space, agent) {
+                            Err(e) => {
+                                let _ = respond(Err(e.into()));
+                                return Ok(async move { Ok(()) }.boxed().into());
+                            }
+                            Ok(f) => f,
+                        };
+                        tokio::task::spawn(async move {
+                            let _ = respond(res_fut.await.map_err(Into::into));
+                        });
+                    }
+                    // this is a request type, not a broadcast
+                    crate::wire::WireMessage::SendValidationReceipt { .. } => unreachable!(),
+                }
+            }
             Request {
                 span,
                 respond,
@@ -81,6 +113,9 @@ impl HolochainP2pActor {
                             let _ = respond(res_fut.await.map_err(Into::into));
                         });
                     }
+                    // holochain_p2p never publishes via request
+                    // these only occur on broadcasts
+                    crate::wire::WireMessage::Publish { .. } => unreachable!(),
                     crate::wire::WireMessage::SendValidationReceipt { receipt } => {
                         let res_fut = match self
                             .handle_incoming_send_validation_receipt(space, agent, receipt)
@@ -119,6 +154,20 @@ impl HolochainP2pActor {
         Ok(async move {
             let res = evt_sender.call_remote(dna_hash, agent_pub_key, data).await;
             res.map(|res| UnsafeBytes::from(res).into())
+        }
+        .boxed()
+        .into())
+    }
+
+    /// receiving an incoming publish from a remote node
+    fn handle_incoming_publish(
+        &mut self,
+        _dna_hash: DnaHash,
+        _agent_pub_key: AgentPubKey,
+    ) -> HolochainP2pHandlerResult<()> {
+        Ok(async move {
+            // TODO - something!
+            Ok(())
         }
         .boxed()
         .into())
@@ -193,8 +242,40 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         .into())
     }
 
-    fn handle_publish(&mut self, _input: actor::Publish) -> HolochainP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+    fn handle_publish(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        request_validation_receipt: bool,
+        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    ) -> HolochainP2pHandlerResult<()> {
+        let space = dna_hash.into_kitsune();
+        let basis = entry_hash.to_kitsune();
+
+        let broadcast = crate::wire::WireMessage::publish(
+            from_agent,
+            request_validation_receipt,
+            entry_hash,
+            ops,
+        )
+        .encode()?;
+
+        let mut kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            kitsune_p2p
+                .broadcast(kitsune_p2p::actor::Broadcast {
+                    space,
+                    basis,
+                    remote_agent_count: 0, // allow default best-effort
+                    timeout_ms: 0,         // allow default best-effort
+                    broadcast,
+                })
+                .await?;
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_get_validation_package(

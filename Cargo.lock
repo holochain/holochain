@@ -1144,6 +1144,7 @@ dependencies = [
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
+ "holochain_types",
  "kitsune_p2p",
  "serde",
  "serde_bytes",
