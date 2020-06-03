@@ -41,6 +41,8 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 use holochain_zome_types::{capability::CapSecret, HostInput};
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -306,6 +308,12 @@ pub trait RibosomeT: Sized {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
+
+    fn run_entry_defs(
+        &self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        invocation: EntryDefsInvocation,
+    ) -> RibosomeResult<EntryDefsResult>;
 
     fn run_validation_package(
         &self,

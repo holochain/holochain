@@ -15,13 +15,14 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
-    header::{EntryType, EntryVisibility, HeaderBuilder, HeaderCommon},
+    header::{EntryType, HeaderBuilder, HeaderCommon},
     prelude::*,
     EntryHashed, Header, HeaderHashed,
 };
 use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
     entry::{CapClaimEntry, CapGrantEntry, Entry},
+    entry_def::EntryVisibility,
 };
 use must_future::MustBoxFuture;
 use shrinkwraprs::Shrinkwrap;

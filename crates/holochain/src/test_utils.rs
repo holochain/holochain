@@ -3,10 +3,11 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
-    header::{EntryCreate, EntryType, EntryVisibility},
+    header::{EntryCreate, EntryType},
     test_utils::{fake_app_entry_type, fake_header_hash},
     Entry, EntryHashed, Header, HeaderHashed, Timestamp,
 };
+use holochain_zome_types::entry_def::EntryVisibility;
 use std::convert::TryInto;
 
 /// Create a fake SignedHeaderHashed and EntryHashed pair with random content

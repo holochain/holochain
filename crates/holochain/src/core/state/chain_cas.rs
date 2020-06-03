@@ -10,7 +10,7 @@
 use crate::core::state::source_chain::{
     ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
-use header::EntryVisibility;
+use holochain_zome_types::entry_def::EntryVisibility;
 use holo_hash::{Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
@@ -25,7 +25,7 @@ use holochain_state::{
 use holochain_types::{
     composite_hash::{EntryHash, HeaderAddress},
     entry::EntryHashed,
-    header, Header,
+    Header,
 };
 use holochain_zome_types::entry::Entry;
 use tracing::*;
@@ -241,7 +241,7 @@ mod tests {
     use holochain_keystore::test_keystore::spawn_test_keystore;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
-    use holochain_types::header::EntryVisibility;
+    use holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {

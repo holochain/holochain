@@ -36,6 +36,11 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::crdt::CrdtType;
 
 wasm_io_fixturator!(HostInput<SerializedBytes>);
 
@@ -218,9 +223,9 @@ fixturator!(
 );
 
 fixturator!(
-    Wasms,
-    { BTreeMap::new() },
-    {
+    Wasms;
+    curve Empty BTreeMap::new();
+    curve Unpredictable {
         let mut rng = rand::thread_rng();
         let number_of_wasms = rng.gen_range(0, 5);
 
@@ -239,8 +244,8 @@ fixturator!(
             );
         }
         wasms
-    },
-    {
+    };
+    curve Predictable {
         let mut wasms: Wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new_indexed(Predictable, self.0.index);
         for _ in (0..3) {
@@ -256,20 +261,83 @@ fixturator!(
             );
         }
         wasms
-    }
+    };
 );
 
 fixturator!(
-    Zomes,
-    Vec::new(),
-    {
+    EntryVisibility;
+    unit variants [ Public Private ] empty Private;
+);
+
+fixturator!(
+    CrdtType;
+    curve Empty CrdtType;
+    curve Unpredictable CrdtType;
+    curve Predictable CrdtType;
+);
+
+fixturator!(
+    EntryDefId;
+    from String;
+);
+
+fixturator!(
+    EntryDef;
+    curve Empty EntryDef {
+        id: EntryDefIdFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
+        visibility: EntryVisibilityFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
+        crdt_type: CrdtTypeFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
+        required_validations: U8Fixturator::new_indexed(Empty, self.0.index).next().unwrap(),
+    };
+    curve Unpredictable EntryDef {
+        id: EntryDefIdFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
+        visibility: EntryVisibilityFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
+        crdt_type: CrdtTypeFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
+        required_validations: U8Fixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
+    };
+    curve Predictable EntryDef {
+        id: EntryDefIdFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+        visibility: EntryVisibilityFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+        crdt_type: CrdtTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+        required_validations: U8Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+    };
+);
+
+fixturator!(
+    EntryDefs;
+    curve Empty Vec::new().into();
+    curve Unpredictable {
+        let mut rng = rand::thread_rng();
+        let number_of_defs = rng.gen_range(0, 5);
+
+        let mut defs = vec![];
+        let mut entry_def_fixturator = EntryDefFixturator::new(Unpredictable);
+        for _ in 0..number_of_defs {
+            defs.push(entry_def_fixturator.next().unwrap());
+        }
+        defs.into()
+    };
+    curve Predictable {
+        let mut defs = vec![];
+        let mut entry_def_fixturator = EntryDefFixturator::new(Predictable);
+        for _ in 0..3 {
+            defs.push(entry_def_fixturator.next().unwrap());
+        }
+        defs.into()
+    };
+);
+
+fixturator!(
+    Zomes;
+    curve Empty Vec::new();
+    curve Unpredictable {
         // @todo implement unpredictable zomes
         ZomesFixturator::new(Empty).next().unwrap()
-    },
-    {
+    };
+    curve Predictable {
         // @todo implement predictable zomes
         ZomesFixturator::new(Empty).next().unwrap()
-    }
+    };
 );
 
 fixturator!(
