@@ -13,7 +13,7 @@ use holochain_2020::core::ribosome::ZomeCallInvocationResponse;
 use holochain_types::{
     app::InstallAppPayload,
     cell::CellId,
-    dna::{DnaFile, Properties},
+    dna::{DnaFile, JsonProperties},
     observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
@@ -157,15 +157,15 @@ async fn call_admin() {
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let json = serde_json::json!({
+    let properties: JsonProperties = serde_json::json!({
         "test": "example",
         "how_many": 42,
-    });
-    let properties = Some(json.clone());
+    })
+    .into();
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_props = (fake_dna_path, properties.clone());
+    let dna_props = (fake_dna_path, Some(properties.clone()));
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_props],
@@ -185,7 +185,7 @@ async fn call_admin() {
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna().clone();
-    tmp_dna.properties = Properties::new(properties.unwrap()).try_into().unwrap();
+    tmp_dna.properties = properties.try_into().unwrap();
     let dna = DnaFile::new(tmp_dna, tmp_wasm).await.unwrap();
 
     assert_ne!(&original_dna_hash, dna.dna_hash());

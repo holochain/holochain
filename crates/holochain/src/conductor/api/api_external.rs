@@ -16,7 +16,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     app::{AppId, InstallAppPayload},
     cell::{CellHandle, CellId},
-    dna::{DnaFile, Properties},
+    dna::{DnaFile, JsonProperties},
 };
 use std::path::PathBuf;
 use tracing::*;
@@ -246,15 +246,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 /// Reads the [Dna] from disk and parses to [SerializedBytes]
 async fn read_parse_dna(
     dna_path: PathBuf,
-    properties: Option<serde_json::Value>,
+    properties: Option<JsonProperties>,
 ) -> ConductorApiResult<DnaFile> {
     let dna_content = tokio::fs::read(dna_path)
         .await
         .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?;
     let mut dna = DnaFile::from_file_content(&dna_content).await?;
     if let Some(properties) = properties {
-        let properties = SerializedBytes::try_from(Properties::new(properties))
-            .map_err(SerializationError::from)?;
+        let properties = SerializedBytes::try_from(properties).map_err(SerializationError::from)?;
         dna = dna.with_properties(properties).await?;
     }
     Ok(dna)
@@ -549,9 +548,9 @@ mod test {
             "test": "example",
             "how_many": 42,
         });
-        let properties = Some(json.clone());
+        let properties = Some(JsonProperties::new(json.clone()));
         let result = read_parse_dna(dna_path, properties).await?;
-        let properties = Properties::new(json);
+        let properties = JsonProperties::new(json);
         let mut dna = dna.dna().clone();
         dna.properties = properties.try_into().unwrap();
         assert_eq!(&dna, result.dna());

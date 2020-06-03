@@ -1,6 +1,6 @@
 //! Workflows are the core building block of Holochain functionality.
 //!
-//! ## Properties
+//! ## JsonProperties
 //!
 //! Workflows are **transactional**, so that if any workflow fails to run to
 //! completion, nothing will happen.
