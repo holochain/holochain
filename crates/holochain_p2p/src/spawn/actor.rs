@@ -64,16 +64,43 @@ impl HolochainP2pActor {
                 data,
             } => {
                 let _g = span.enter();
-                let res_fut = match self.handle_incoming_request(space, agent, data) {
-                    Err(e) => {
-                        let _ = respond(Err(e.into()));
-                        return Ok(async move { Ok(()) }.boxed().into());
+                let space = DnaHash::from_kitsune(&space);
+                let agent = AgentPubKey::from_kitsune(&agent);
+
+                let request = crate::wire::WireMessage::decode((*data).clone())?;
+
+                match request {
+                    crate::wire::WireMessage::CallRemote { data } => {
+                        let res_fut = match self.handle_incoming_call_remote(space, agent, data) {
+                            Err(e) => {
+                                let _ = respond(Err(e.into()));
+                                return Ok(async move { Ok(()) }.boxed().into());
+                            }
+                            Ok(f) => f,
+                        };
+                        tokio::task::spawn(async move {
+                            let _ = respond(res_fut.await.map_err(Into::into));
+                        });
                     }
-                    Ok(f) => f,
-                };
-                tokio::task::spawn(async move {
-                    let _ = respond(res_fut.await.map_err(Into::into));
-                });
+                    crate::wire::WireMessage::ValidationReceipt { receipt } => {
+                        let res_fut =
+                            match self.handle_incoming_validation_receipt(space, agent, receipt) {
+                                Err(e) => {
+                                    let _ = respond(Err(e.into()));
+                                    return Ok(async move { Ok(()) }.boxed().into());
+                                }
+                                Ok(f) => f,
+                            };
+                        tokio::task::spawn(async move {
+                            let _ = match res_fut.await {
+                                Err(e) => respond(Err(e.into())),
+                                // validation receipts don't need a response
+                                // send back an empty vec for now
+                                Ok(_) => respond(Ok(Vec::with_capacity(0))),
+                            };
+                        });
+                    }
+                }
             }
             _ => (),
         }
@@ -81,29 +108,38 @@ impl HolochainP2pActor {
     }
 
     /// receiving an incoming request from a remote node
-    fn handle_incoming_request(
+    fn handle_incoming_call_remote(
         &mut self,
-        space: Arc<kitsune_p2p::KitsuneSpace>,
-        agent: Arc<kitsune_p2p::KitsuneAgent>,
-        data: Arc<Vec<u8>>,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+        data: Vec<u8>,
     ) -> HolochainP2pHandlerResult<Vec<u8>> {
-        let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
-
-        let request = crate::wire::WireMessage::decode((*data).clone())?;
-
-        match request {
-            crate::wire::WireMessage::CallRemote { data } => {
-                let data: SerializedBytes = UnsafeBytes::from(data).into();
-                let mut evt_sender = self.evt_sender.clone();
-                Ok(async move {
-                    let res = evt_sender.call_remote(space, agent, data).await;
-                    res.map(|res| UnsafeBytes::from(res).into())
-                }
-                .boxed()
-                .into())
-            }
+        let data: SerializedBytes = UnsafeBytes::from(data).into();
+        let mut evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let res = evt_sender.call_remote(dna_hash, agent_pub_key, data).await;
+            res.map(|res| UnsafeBytes::from(res).into())
         }
+        .boxed()
+        .into())
+    }
+
+    /// receiving an incoming validation receipt from a remote node
+    fn handle_incoming_validation_receipt(
+        &mut self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+        receipt: Vec<u8>,
+    ) -> HolochainP2pHandlerResult<()> {
+        let receipt: SerializedBytes = UnsafeBytes::from(receipt).into();
+        let mut evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            evt_sender
+                .validation_receipt_received(dna_hash, agent_pub_key, receipt)
+                .await
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -174,6 +210,26 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
 
     fn handle_get_links(&mut self, _input: actor::GetLinks) -> HolochainP2pHandlerResult<()> {
         Ok(async move { Ok(()) }.boxed().into())
+    }
+
+    fn handle_send_validation_receipt(
+        &mut self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+        receipt: SerializedBytes,
+    ) -> HolochainP2pHandlerResult<()> {
+        let space = dna_hash.into_kitsune();
+        let agent = agent_pub_key.into_kitsune();
+
+        let req = crate::wire::WireMessage::validation_receipt(receipt).encode()?;
+
+        let mut kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            kitsune_p2p.request(space, agent, Arc::new(req)).await?;
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 
     /// ghost actor glue that translates kitsune events into local handlers (step 1)

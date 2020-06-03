@@ -89,6 +89,20 @@ impl HolochainP2pCell {
             })
             .await
     }
+
+    /// Send a validation receipt to a remote node.
+    pub async fn send_validation_receipt(
+        &mut self,
+        receipt: SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .send_validation_receipt(
+                (*self.dna_hash).clone(),
+                (*self.agent_pub_key).clone(),
+                receipt,
+            )
+            .await
+    }
 }
 
 mod test;
