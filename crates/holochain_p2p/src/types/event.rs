@@ -8,12 +8,10 @@ ghost_actor::ghost_chan! {
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             agent_pub_key: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            request: SerializedBytes,
+        ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.
         fn publish(
