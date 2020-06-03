@@ -252,7 +252,7 @@ mod test {
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
-        app::InstallAppPayload,
+        app::{InstallAppDnaPayload, InstallAppPayload},
         cell::CellId,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
@@ -260,6 +260,7 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use holochain_zome_types::HostInput;
+    use maplit::hashmap;
     use matches::assert_matches;
     use mockall::predicate;
     use std::{collections::HashMap, convert::TryInto};
@@ -378,13 +379,12 @@ mod test {
     async fn invalid_request() {
         observability::test_run().ok();
         let (_tmpdir, admin_api) = setup_admin().await;
-        let dna = ("some$\\//weird00=-+[] \\Path".into(), None);
+        let dnas = InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into());
         let agent_key = fake_agent_pubkey_1();
         let payload = InstallAppPayload {
-            dnas: vec![dna],
+            dnas: hashmap!("handle".to_string() => dnas),
             app_id: "test app".to_string(),
             agent_key,
-            proofs: HashMap::new(),
         };
         let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
@@ -429,13 +429,12 @@ mod test {
             .await
             .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
-        let dna = (fake_dna_path, None);
+        let dnas = InstallAppDnaPayload::path_only(fake_dna_path);
         let agent_key = fake_agent_pubkey_1();
         let payload = InstallAppPayload {
-            dnas: vec![dna],
+            dnas: hashmap!("handle".to_string() => dnas),
             app_id: "test app".to_string(),
             agent_key,
-            proofs: HashMap::new(),
         };
         let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
