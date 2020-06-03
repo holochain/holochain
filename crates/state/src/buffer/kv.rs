@@ -3,11 +3,11 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Reader, Writer},
 };
-use rkv::SingleStore;
+use rkv::{SingleStore, StoreError};
 
 use std::{collections::BTreeMap, marker::PhantomData};
 
-use fallible_iterator::FallibleIterator;
+use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use tracing::*;
 
 #[cfg(test)]
@@ -36,6 +36,7 @@ where
     db: SingleStore,
     reader: &'env R,
     scratch: BTreeMap<Vec<u8>, Op<V>>,
+    /// Key needs to be the same type for each KvBuf
     __key: PhantomData<K>,
 }
 
@@ -115,7 +116,7 @@ where
         ))
     }
 
-    /// Get all keys that partially match this key
+    /// Iterator that returns all partial matches to this key
     pub fn iter_all_key_matches(&self, k: K) -> DatabaseResult<SingleKeyIter<V>> {
         // Empty keys break lmdb
         if k.as_ref().is_empty() {
@@ -145,27 +146,32 @@ where
     }
 
     /// Iterate over the data in reverse
-    pub fn iter_reverse(&self) -> DatabaseResult<SingleIter<V>> {
-        Ok(SingleIter::new(
-            &self.scratch,
-            self.scratch.iter().rev(),
-            self.iter_raw_reverse()?,
-        ))
+    pub fn iter_reverse(&self) -> DatabaseResult<fallible_iterator::Rev<SingleIter<V>>> {
+        Ok(SingleIter::new(&self.scratch, self.scratch.iter(), self.iter_raw_reverse()?).rev())
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
     pub fn iter_raw(&self) -> DatabaseResult<SingleIterRaw<V>> {
-        Ok(SingleIterRaw::new(self.db.iter_start(self.reader)?))
+        Ok(SingleIterRaw::new(
+            self.db.iter_start(self.reader)?,
+            self.db.iter_end(self.reader)?,
+        ))
     }
 
     /// Iterate from a key onwards without scratch space
     pub fn iter_raw_from(&self, k: K) -> DatabaseResult<SingleIterRaw<V>> {
-        Ok(SingleIterRaw::new(self.db.iter_from(self.reader, k)?))
+        Ok(SingleIterRaw::new(
+            self.db.iter_from(self.reader, k)?,
+            self.db.iter_end(self.reader)?,
+        ))
     }
 
     /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
     pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIterRaw<V>> {
-        Ok(SingleIterRaw::new(self.db.iter_end(self.reader)?))
+        Ok(SingleIterRaw::new(
+            self.db.iter_start(self.reader)?,
+            self.db.iter_end(self.reader)?,
+        ))
     }
 
     /// Iterate over items which are staged for PUTs in the scratch space
@@ -208,6 +214,9 @@ where
         Ok(())
     }
 }
+
+type IterItem<'env, V> = (&'env [u8], V);
+type IterError = DatabaseError;
 
 /// Returns all the elements on this key
 pub struct SingleKeyIter<'env, 'a, V>
@@ -288,10 +297,11 @@ pub struct SingleIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    scratch_iter: Box<dyn Iterator<Item = (&'a [u8], V)> + 'a>,
-    iter: Box<dyn FallibleIterator<Item = (&'env [u8], V), Error = DatabaseError> + 'env>,
-    scratch_current: Option<(&'a [u8], V)>,
+    scratch_iter: Box<dyn DoubleEndedIterator<Item = (&'a [u8], V)> + 'a>,
+    iter:
+        Box<dyn DoubleEndedFallibleIterator<Item = (&'env [u8], V), Error = DatabaseError> + 'env>,
     current: Option<(&'env [u8], V)>,
+    scratch_current: Option<(&'a [u8], V)>,
 }
 
 impl<'env, 'a: 'env, V> SingleIter<'env, 'a, V>
@@ -300,7 +310,7 @@ where
 {
     fn new(
         scratch: &'a BTreeMap<Vec<u8>, Op<V>>,
-        scratch_iter: impl Iterator<Item = (&'a Vec<u8>, &'a Op<V>)> + 'a,
+        scratch_iter: impl DoubleEndedIterator<Item = (&'a Vec<u8>, &'a Op<V>)> + 'a,
         iter: SingleIterRaw<'env, V>,
     ) -> Self {
         let scratch_iter = scratch_iter
@@ -343,41 +353,67 @@ where
             scratch_current: None,
         }
     }
-}
 
-impl<'env, 'a: 'env, V> FallibleIterator for SingleIter<'env, 'a, V>
-where
-    V: BufVal,
-{
-    type Error = DatabaseError;
-    type Item = (&'env [u8], V);
     #[instrument(skip(self))]
-    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let current = match self.current.take() {
-            Some(c) => Some(c),
-            None => self.iter.next()?,
-        };
-        let scratch_current = match self.scratch_current.take() {
-            Some(c) => Some(c),
-            None => self.scratch_iter.next(),
-        };
+    fn next_forward(
+        &mut self,
+        db: IterItem<'env, V>,
+        scratch_current: Option<IterItem<'a, V>>,
+    ) -> Option<IterItem<'env, V>> {
+        match scratch_current {
+            Some(scratch) if scratch.0 < db.0 => {
+                trace!(msg = "r scratch key <", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                self.current = Some(db);
+                Some(scratch)
+            }
+            Some(scratch) if scratch.0 == db.0 => {
+                trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                Some(scratch)
+            }
+            _ => {
+                trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
+                self.scratch_current = scratch_current;
+                Some(db)
+            }
+        }
+    }
+
+    #[instrument(skip(self))]
+    fn next_rev(
+        &mut self,
+        db: IterItem<'env, V>,
+        scratch_current: Option<IterItem<'a, V>>,
+    ) -> Option<IterItem<'env, V>> {
+        match scratch_current {
+            Some(scratch) if scratch.0 > db.0 => {
+                trace!(msg = "r scratch key >", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                self.current = Some(db);
+                Some(scratch)
+            }
+            Some(scratch) if scratch.0 == db.0 => {
+                trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                Some(scratch)
+            }
+            _ => {
+                trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
+                self.scratch_current = scratch_current;
+                Some(db)
+            }
+        }
+    }
+
+    fn next_inner(
+        &mut self,
+        current: Option<IterItem<'env, V>>,
+        scratch_current: Option<IterItem<'a, V>>,
+        next: fn(
+            &mut Self,
+            db: IterItem<'env, V>,
+            scratch_current: Option<IterItem<'a, V>>,
+        ) -> Option<IterItem<'env, V>>,
+    ) -> Result<Option<IterItem<'env, V>>, IterError> {
         let r = match current {
-            Some(db) => match scratch_current {
-                Some(scratch) if scratch.0 < db.0 => {
-                    trace!(msg = "r scratch key <", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                    self.current = Some(db);
-                    Some(scratch)
-                }
-                Some(scratch) if scratch.0 == db.0 => {
-                    trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                    Some(scratch)
-                }
-                _ => {
-                    trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
-                    self.scratch_current = scratch_current;
-                    Some(db)
-                }
-            },
+            Some(db) => next(self, db, scratch_current),
             None => {
                 if let Some((k, v)) = &scratch_current {
                     trace!(msg = "r scratch no db", k = %String::from_utf8_lossy(k), ?v);
@@ -391,27 +427,66 @@ where
     }
 }
 
-pub struct SingleIterRaw<'env, V>(rkv::store::single::Iter<'env>, std::marker::PhantomData<V>);
-
-impl<'env, V> SingleIterRaw<'env, V> {
-    pub fn new(iter: rkv::store::single::Iter<'env>) -> Self {
-        Self(iter, std::marker::PhantomData)
-    }
-}
-
-/// Iterate over key, value pairs in this store using low-level LMDB iterators
-/// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
-/// This is to enable a wider range of keys, such as String, because there is no uniform trait which
-/// enables conversion from a byte slice to a given type.
-impl<'env, V> FallibleIterator for SingleIterRaw<'env, V>
+impl<'env, 'a: 'env, V> FallibleIterator for SingleIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    type Error = DatabaseError;
-    type Item = (&'env [u8], V);
-
+    type Error = IterError;
+    type Item = IterItem<'env, V>;
+    #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        match self.0.next() {
+        let current = match self.current.take() {
+            Some(c) => Some(c),
+            None => self.iter.next()?,
+        };
+        let scratch_current = match self.scratch_current.take() {
+            Some(c) => Some(c),
+            None => self.scratch_iter.next(),
+        };
+        self.next_inner(current, scratch_current, Self::next_forward)
+    }
+}
+
+impl<'env, 'a: 'env, V> DoubleEndedFallibleIterator for SingleIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    #[instrument(skip(self))]
+    fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        let current = match self.current.take() {
+            Some(c) => Some(c),
+            None => self.iter.next_back()?,
+        };
+        let scratch_current = match self.scratch_current.take() {
+            Some(c) => Some(c),
+            None => self.scratch_iter.next_back(),
+        };
+        self.next_inner(current, scratch_current, Self::next_rev)
+    }
+}
+
+pub struct SingleIterRaw<'env, V> {
+    iter: rkv::store::single::Iter<'env>,
+    rev: rkv::store::single::Iter<'env>,
+    __type: std::marker::PhantomData<V>,
+}
+
+impl<'env, V> SingleIterRaw<'env, V>
+where
+    V: BufVal,
+{
+    pub fn new(iter: rkv::store::single::Iter<'env>, rev: rkv::store::single::Iter<'env>) -> Self {
+        Self {
+            iter,
+            rev,
+            __type: std::marker::PhantomData,
+        }
+    }
+
+    fn next_inner(
+        item: Option<Result<(&'env [u8], Option<rkv::Value>), StoreError>>,
+    ) -> Result<Option<IterItem<'env, V>>, IterError> {
+        match item {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Ok(Some((
                 k,
                 rmp_serde::from_read_ref(buf).expect(
@@ -424,6 +499,31 @@ where
             // This could be a IO error so returning it makes sense
             Some(Err(e)) => Err(DatabaseError::from(e)),
         }
+    }
+}
+
+/// Iterate over key, value pairs in this store using low-level LMDB iterators
+/// NOTE: While the value is deserialized to the proper type, the key is returned as raw bytes.
+/// This is to enable a wider range of keys, such as String, because there is no uniform trait which
+/// enables conversion from a byte slice to a given type.
+impl<'env, V> FallibleIterator for SingleIterRaw<'env, V>
+where
+    V: BufVal,
+{
+    type Error = IterError;
+    type Item = IterItem<'env, V>;
+
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        Self::next_inner(self.iter.next())
+    }
+}
+
+impl<'env, V> DoubleEndedFallibleIterator for SingleIterRaw<'env, V>
+where
+    V: BufVal,
+{
+    fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        Self::next_inner(self.rev.next())
     }
 }
 
@@ -485,11 +585,11 @@ pub mod tests {
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut buf: TestBuf = KvBuf::new(&reader, db)?;
 
-            buf.put("a", V(1));
-            buf.put("b", V(2));
-            buf.put("c", V(3));
-            buf.put("d", V(4));
-            buf.put("e", V(5));
+            buf.put("a", V(1)).unwrap();
+            buf.put("b", V(2)).unwrap();
+            buf.put("c", V(3)).unwrap();
+            buf.put("d", V(4)).unwrap();
+            buf.put("e", V(5)).unwrap();
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             Ok(())
@@ -549,8 +649,9 @@ pub mod tests {
             let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2)?;
 
             env.with_commit(|writer| {
-                kv1.put("hi".to_owned(), testval.clone());
-                kv2.put("salutations".to_owned(), "folks".to_owned());
+                kv1.put("hi".to_owned(), testval.clone()).unwrap();
+                kv2.put("salutations".to_owned(), "folks".to_owned())
+                    .unwrap();
                 // Check that the underlying store contains no changes yet
                 assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
                 assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);
@@ -590,9 +691,9 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = KvBuf::new(&reader, db)?;
 
-            buf.put("a", V(1));
+            buf.put("a", V(1)).unwrap();
             assert_eq!(Some(V(1)), buf.get(&"a")?);
-            buf.put("a", V(2));
+            buf.put("a", V(2)).unwrap();
             assert_eq!(Some(V(2)), buf.get(&"a")?);
             Ok(())
         })
@@ -609,16 +710,16 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = KvBuf::new(&reader, db).unwrap();
 
-            buf.put("a", V(1));
-            buf.put("b", V(2));
-            buf.put("c", V(3));
+            buf.put("a", V(1)).unwrap();
+            buf.put("b", V(2)).unwrap();
+            buf.put("c", V(3)).unwrap();
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
         env.with_reader(|reader| {
             let mut buf: KvBuf<_, V> = KvBuf::new(&reader, db).unwrap();
 
-            buf.delete("b");
+            buf.delete("b").unwrap();
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
@@ -642,16 +743,16 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = KvBuf::new(&reader, db).unwrap();
 
-            buf.put("a", V(5));
-            buf.put("b", V(4));
-            buf.put("c", V(9));
+            buf.put("a", V(5)).unwrap();
+            buf.put("b", V(4)).unwrap();
+            buf.put("c", V(9)).unwrap();
             test_buf(
                 &buf.scratch,
                 [res!("a", Put, 5), res!("b", Put, 4), res!("c", Put, 9)]
                     .iter()
                     .cloned(),
             );
-            buf.delete("b");
+            buf.delete("b").unwrap();
             test_buf(
                 &buf.scratch,
                 [res!("a", Put, 5), res!("c", Put, 9), res!("b", Delete)]
@@ -680,9 +781,9 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = KvBuf::new(&reader, db).unwrap();
 
-            buf.put("a", V(5));
-            buf.put("b", V(4));
-            buf.put("c", V(9));
+            buf.put("a", V(5)).unwrap();
+            buf.put("b", V(4)).unwrap();
+            buf.put("c", V(9)).unwrap();
             let n = buf.get(&"b")?;
             assert_eq!(n, Some(V(4)));
 
@@ -700,9 +801,9 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = KvBuf::new(&reader, db).unwrap();
 
-            buf.put("a", V(1));
-            buf.put("b", V(2));
-            buf.put("c", V(3));
+            buf.put("a", V(1)).unwrap();
+            buf.put("b", V(2)).unwrap();
+            buf.put("c", V(3)).unwrap();
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
@@ -726,10 +827,10 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = KvBuf::new(&reader, db).unwrap();
 
-            buf.put("a", V(5));
-            buf.put("b", V(4));
-            buf.put("c", V(9));
-            buf.delete("b");
+            buf.put("a", V(5)).unwrap();
+            buf.put("b", V(4)).unwrap();
+            buf.put("c", V(9)).unwrap();
+            buf.delete("b").unwrap();
             let n = buf.get(&"b")?;
             assert_eq!(n, None);
             Ok(())
@@ -746,9 +847,9 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf = KvBuf::new(&reader, db).unwrap();
 
-            buf.put("a", V(1));
-            buf.put("b", V(2));
-            buf.put("c", V(3));
+            buf.put("a", V(1)).unwrap();
+            buf.put("b", V(2)).unwrap();
+            buf.put("c", V(3)).unwrap();
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
@@ -756,7 +857,7 @@ pub mod tests {
         env.with_reader(|reader| {
             let mut buf: KvBuf<_, V> = KvBuf::new(&reader, db).unwrap();
 
-            buf.delete("b");
+            buf.delete("b").unwrap();
             let n = buf.get(&"b")?;
             assert_eq!(n, None);
 

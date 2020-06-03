@@ -125,6 +125,23 @@ fn do_test(
             .range::<String, _>(from_key..)
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<Vec<_>>(),
+        "{}\n{}];\n from_key: {:?}",
+        runs.concat(),
+        reproduce.concat(),
+        from_key,
+    );
+    assert_eq!(
+        buf.iter_reverse()
+            .unwrap()
+            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .inspect(|(k, v)| Ok(trace!(?k, ?v)))
+            .collect::<Vec<_>>()
+            .unwrap(),
+        expected_state
+            .iter()
+            .rev()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<Vec<_>>(),
         "{}\n{}];",
         runs.concat(),
         reproduce.concat()
@@ -136,6 +153,7 @@ fn re_do_test(
     puts_dels_iter: &mut impl Iterator<Item = TestData>,
     expected_state: &mut BTreeMap<String, V>,
     runs: &mut Vec<String>,
+    from_key: &String,
 ) {
     while let Some(td) = puts_dels_iter.next() {
         match td {
@@ -161,6 +179,35 @@ fn re_do_test(
             .unwrap(),
         expected_state
             .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<Vec<_>>(),
+        "{}",
+        runs.concat(),
+    );
+    assert_eq!(
+        buf.iter_from(from_key.clone())
+            .unwrap()
+            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .inspect(|(k, v)| Ok(trace!(?k, ?v)))
+            .collect::<Vec<_>>()
+            .unwrap(),
+        expected_state
+            .range::<String, _>(from_key..)
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<Vec<_>>(),
+        "{}",
+        runs.concat(),
+    );
+    assert_eq!(
+        buf.iter_reverse()
+            .unwrap()
+            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .inspect(|(k, v)| Ok(trace!(?k, ?v)))
+            .collect::<Vec<_>>()
+            .unwrap(),
+        expected_state
+            .iter()
+            .rev()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<Vec<_>>(),
         "{}",
@@ -321,6 +368,7 @@ async fn kv_single_iter_found_1() {
         TestData::Del("💩".to_string()),
         TestData::Put(("bar".to_string(), V(0))),
     ];
+    let from_key = "foo".to_string();
     let in_db_second = vec![];
     let span = trace_span!("kv_single_iter_found_1");
     let _g = span.enter();
@@ -328,6 +376,7 @@ async fn kv_single_iter_found_1() {
         in_scratch.into_iter(),
         in_db_first.into_iter(),
         in_db_second.into_iter(),
+        from_key,
     )
     .await;
 }
@@ -347,12 +396,14 @@ async fn kv_single_iter_found_2() {
         TestData::Del("".to_string()),
         TestData::Put(("".to_string(), V(2))),
     ];
+    let from_key = "foo".to_string();
     let span = trace_span!("kv_single_iter_found_2");
     let _g = span.enter();
     kv_single_iter_runner(
         in_scratch.into_iter(),
         in_db_first.into_iter(),
         in_db_second.into_iter(),
+        from_key,
     )
     .await;
 }
@@ -377,12 +428,38 @@ async fn kv_single_iter_found_3() {
         TestData::Del("o".to_string()),
         TestData::Put(("o".to_string(), V(2))),
     ];
+    let from_key = "o".to_string();
     let span = trace_span!("kv_single_iter_found_3");
     let _g = span.enter();
     kv_single_iter_runner(
         in_scratch.into_iter(),
         in_db_first.into_iter(),
         in_db_second.into_iter(),
+        from_key,
+    )
+    .await;
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn kv_single_iter_found_4() {
+    holochain_types::observability::test_run().ok();
+    let in_scratch = vec![TestData::Put((".".to_string(), V(0)))];
+
+    let in_db_first = vec![
+        TestData::Del("💯".to_string()),
+        TestData::Del("foo".to_string()),
+        TestData::Put(("bing".to_string(), V(2017453015))),
+        TestData::Del("❤".to_string()),
+    ];
+    let from_key = "foo".to_string();
+    let in_db_second = vec![];
+    let span = trace_span!("kv_single_iter_found_4");
+    let _g = span.enter();
+    kv_single_iter_runner(
+        in_scratch.into_iter(),
+        in_db_first.into_iter(),
+        in_db_second.into_iter(),
+        from_key,
     )
     .await;
 }
@@ -391,6 +468,7 @@ async fn kv_single_iter_runner(
     in_scratch: impl Iterator<Item = TestData> + Send,
     in_db_first: impl Iterator<Item = TestData> + Send,
     in_db_second: impl Iterator<Item = TestData> + Send,
+    from_key: String,
 ) {
     let arc = test_cell_env();
     let env = arc.guard().await;
@@ -415,6 +493,7 @@ async fn kv_single_iter_runner(
             &mut in_scratch.into_iter(),
             &mut expected_state,
             &mut runs,
+            &from_key,
         );
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
             .unwrap();
@@ -435,6 +514,7 @@ async fn kv_single_iter_runner(
             &mut in_db_first.into_iter(),
             &mut expected_state,
             &mut runs,
+            &from_key,
         );
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
             .unwrap();
@@ -455,6 +535,7 @@ async fn kv_single_iter_runner(
             &mut in_db_second.into_iter(),
             &mut expected_state,
             &mut runs,
+            &from_key,
         );
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
             .unwrap();

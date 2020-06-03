@@ -67,7 +67,7 @@ pub enum DatabaseError {
 
     #[error("Failue to remove directory")]
     DirectoryError(#[from] std::io::Error),
-    
+
     #[error("Empty keys cannot be used with lmdb")]
     EmptyKey,
 
