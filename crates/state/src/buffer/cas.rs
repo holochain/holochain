@@ -48,12 +48,12 @@ where
     /// Put a value into the underlying [KvBuf]
     pub fn put(&mut self, h: H) {
         let (content, hash) = h.into_inner();
-        self.0.put(hash, content)
+        self.0.put(hash, content).expect("Hash should not be empty");
     }
 
     /// Delete a value from the underlying [KvBuf]
     pub fn delete(&mut self, k: H::HashType) {
-        self.0.delete(k)
+        self.0.delete(k).expect("Hash key is empty");
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration

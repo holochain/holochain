@@ -172,11 +172,8 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             link_add_hash: None,
         };
         debug!(?key);
-        let k_bytes = key.to_key();
-        // TODO: Internalize this abstraction to KvBuf?
         self.links_meta
-            .iter_from(k_bytes.clone())?
-            .take_while(|(k, _)| Ok(partial_key_match(&k_bytes[..], k)))
+            .iter_all_key_matches(key.to_key())?
             .map(|(_, v)| Ok(v))
             .collect()
     }
