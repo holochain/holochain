@@ -7,7 +7,7 @@ pub(crate) enum WireMessage {
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
-    SendValidationReceipt {
+    ValidationReceipt {
         #[serde(with = "serde_bytes")]
         receipt: Vec<u8>,
     },
@@ -29,8 +29,8 @@ impl WireMessage {
         }
     }
 
-    pub fn send_validation_receipt(receipt: SerializedBytes) -> WireMessage {
-        Self::SendValidationReceipt {
+    pub fn validation_receipt(receipt: SerializedBytes) -> WireMessage {
+        Self::ValidationReceipt {
             receipt: UnsafeBytes::from(receipt).into(),
         }
     }

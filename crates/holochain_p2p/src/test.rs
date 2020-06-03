@@ -70,7 +70,7 @@ mod tests {
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
-                    SendValidationReceipt {
+                    ValidationReceiptReceived {
                         respond,
                         dna_hash: _,
                         agent_pub_key: _,
