@@ -1,7 +1,7 @@
 use crate::core::state::{
     chain_cas::{ChainCasBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
-    source_chain::{ChainElement, SignedHeaderHashed, SourceChainError, SourceChainResult},
+    source_chain::{SourceChainError, SourceChainResult},
 };
 use fallible_iterator::FallibleIterator;
 use holochain_state::db::GetDb;
@@ -12,6 +12,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
+    element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
     header::{self},
     prelude::*,

@@ -1,6 +1,6 @@
-pub use crate::core::state::source_chain::{ChainElement, SourceChainError, SourceChainResult};
+pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 pub use holo_hash::{AgentPubKey, Hashed};
-pub use holochain_types::HeaderHashed;
+pub use holochain_types::{element::ChainElement, HeaderHashed};
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
 ///
@@ -108,11 +108,10 @@ pub async fn sys_validate_header(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::state::source_chain::{ChainElement, SignedHeaderHashed};
     use holo_hash::{HeaderHash, HoloHashExt};
     use holochain_types::{
-        composite_hash::HeaderAddress, header::InitZomesComplete, test_utils::fake_agent_pubkey_1,
-        Timestamp,
+        composite_hash::HeaderAddress, element::SignedHeaderHashed, header::InitZomesComplete,
+        test_utils::fake_agent_pubkey_1, Timestamp,
     };
     use std::convert::TryInto;
 
