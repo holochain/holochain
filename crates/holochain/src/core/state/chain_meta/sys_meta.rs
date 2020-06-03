@@ -6,17 +6,17 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::chain_meta::{ChainMetaBuf, ChainMetaBufT};
+    use crate::core::state::chain_meta::{ChainMetaBuf, ChainMetaBufT, SysMetaVal};
+    use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use header::HeaderBuilderCommon;
     use holo_hash::*;
-    use holochain_serialized_bytes::SerializedBytes;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
         composite_hash::{AnyDhtHash, EntryHash},
         fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},
-        header::{self, builder, EntryType, HeaderBuilder, HeaderInner},
-        HeaderHashed,
+        header::{self, builder, EntryType, HeaderBuilder},
+        Header, HeaderHashed,
     };
     use unwrap_to::unwrap_to;
 
@@ -256,5 +256,49 @@ mod tests {
             assert_eq!(canonical_entry_hash, expected_entry_hash);
         }
         Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn add_entry_get_headers() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let mut fx = TestFixtures::new();
+        let entry_hash = fx.entry_hash();
+        let entry_creates = (0..10)
+            .map(|_| {
+                builder::EntryCreate {
+                    entry_type: fx.entry_type(),
+                    entry_hash: entry_hash.clone(),
+                }
+                .build(fx.common())
+            })
+            .collect::<Vec<_>>();
+        let mut expected = Vec::new();
+        for create in &entry_creates {
+            let (_, hash): (Header, HeaderHash) =
+                HeaderHashed::with_data(Header::EntryCreate(create.clone()))
+                    .await
+                    .unwrap()
+                    .into();
+            expected.push(SysMetaVal::Header(hash));
+        }
+
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            for create in entry_creates {
+                meta_buf.add_entry(create).await.unwrap();
+            }
+            let mut headers = meta_buf
+                .get_headers(&entry_hash)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Header).clone());
+            expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Header).clone());
+            assert_eq!(headers, expected);
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
     }
 }

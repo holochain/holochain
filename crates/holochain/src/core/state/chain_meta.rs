@@ -114,8 +114,15 @@ pub trait ChainMetaBufT {
         tag: Tag,
     ) -> DatabaseResult<()>;
 
+    async fn add_entry(&mut self, create: header::EntryCreate) -> DatabaseResult<()>;
+
     fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<HeaderHash>;
     fn add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<HeaderHash>;
+
+    fn get_headers(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>;
 
     fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
 
@@ -125,10 +132,12 @@ pub trait ChainMetaBufT {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum SysMetaVal {}
+pub enum SysMetaVal {
+    Header(HeaderHash),
+}
 
 pub struct ChainMetaBuf<'env> {
-    system_meta: KvvBuf<'env, Vec<u8>, SysMetaVal, Reader<'env>>,
+    system_meta: KvvBuf<'env, EntryHash, SysMetaVal, Reader<'env>>,
     links_meta: KvBuf<'env, Vec<u8>, Link, Reader<'env>>,
 }
 
@@ -177,14 +186,10 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     }
 
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
-        let (link_add, link_add_hash): (Header, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(link_add))
+        let (_, link_add_hash): (Header, HeaderHash) =
+            HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
                 .await?
                 .into();
-        let link_add = match link_add {
-            Header::LinkAdd(link_add) => link_add,
-            _ => unreachable!("BUG: Was hashed as LinkAdd but is not anymore"),
-        };
         let key = LinkKey::from((&link_add, link_add_hash.clone()));
 
         self.links_meta.put(
@@ -219,12 +224,33 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         self.links_meta.delete(key.to_key())
     }
 
+    async fn add_entry(&mut self, create: header::EntryCreate) -> DatabaseResult<()> {
+        let entry_hash = create.entry_hash.to_owned();
+        let (_, create_hash): (Header, HeaderHash) =
+            HeaderHashed::with_data(Header::EntryCreate(create))
+                .await?
+                .into();
+        self.system_meta
+            .insert(entry_hash, SysMetaVal::Header(create_hash));
+        Ok(())
+    }
+
     fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<HeaderHash> {
         todo!()
     }
 
     fn add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<HeaderHash> {
         todo!()
+    }
+
+    fn get_headers(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(fallible_iterator::convert(
+            self.system_meta.get(entry_hash)?,
+        )))
     }
 
     // TODO: remove
@@ -247,11 +273,16 @@ mock! {
         fn get_links(&self, base: &EntryHash, zome_id: Option<ZomeId>, tag: Option<Tag>) -> DatabaseResult<Vec<Link>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<()>;
+        fn add_entry(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<()>;
         fn add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
         fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
+        fn get_headers(
+            &self,
+            entry_hash: &EntryHash,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError>>>;
     }
 }
 
@@ -278,6 +309,13 @@ impl ChainMetaBufT for MockChainMetaBuf {
         self.get_canonical_header_hash(header_hash)
     }
 
+    fn get_headers(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError>>> {
+        self.get_headers(entry_hash)
+    }
+
     async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         self.add_link(link_add)
     }
@@ -290,6 +328,10 @@ impl ChainMetaBufT for MockChainMetaBuf {
         tag: Tag,
     ) -> DatabaseResult<()> {
         self.remove_link(link_remove, base, zome_id, tag)
+    }
+
+    async fn add_entry(&mut self, create: header::EntryCreate) -> DatabaseResult<()> {
+        self.add_entry(create).await
     }
 
     fn add_update(&self, update: header::EntryUpdate) -> DatabaseResult<HeaderHash> {
