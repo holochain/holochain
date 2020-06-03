@@ -7,9 +7,7 @@
 /// using the ChainCasBuf for caching non-authored data, or for situations where
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
-use crate::core::state::source_chain::{
-    ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
-};
+use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use header::EntryVisibility;
 use holo_hash::{Hashed, HeaderHash};
 use holochain_state::{
@@ -24,6 +22,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::{EntryHash, HeaderAddress},
+    element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
     header, Header,
 };

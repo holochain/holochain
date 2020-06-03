@@ -219,7 +219,7 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
-            SendValidationReceipt {
+            ValidationReceiptReceived {
                 span,
                 respond,
                 receipt,
@@ -227,7 +227,7 @@ impl Cell {
             } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_send_validation_receipt(receipt)
+                    self.handle_validation_receipt(receipt)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
@@ -289,7 +289,7 @@ impl Cell {
     }
 
     /// a remote agent is sending us a validation receipt.
-    async fn handle_send_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
+    async fn handle_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
         unimplemented!()
     }
 

@@ -84,7 +84,7 @@ impl HolochainP2pActor {
                         });
                     }
                     // this is a request type, not a broadcast
-                    crate::wire::WireMessage::SendValidationReceipt { .. } => unreachable!(),
+                    crate::wire::WireMessage::ValidationReceipt { .. } => unreachable!(),
                 }
             }
             Request {
@@ -116,16 +116,15 @@ impl HolochainP2pActor {
                     // holochain_p2p never publishes via request
                     // these only occur on broadcasts
                     crate::wire::WireMessage::Publish { .. } => unreachable!(),
-                    crate::wire::WireMessage::SendValidationReceipt { receipt } => {
-                        let res_fut = match self
-                            .handle_incoming_send_validation_receipt(space, agent, receipt)
-                        {
-                            Err(e) => {
-                                let _ = respond(Err(e.into()));
-                                return Ok(async move { Ok(()) }.boxed().into());
-                            }
-                            Ok(f) => f,
-                        };
+                    crate::wire::WireMessage::ValidationReceipt { receipt } => {
+                        let res_fut =
+                            match self.handle_incoming_validation_receipt(space, agent, receipt) {
+                                Err(e) => {
+                                    let _ = respond(Err(e.into()));
+                                    return Ok(async move { Ok(()) }.boxed().into());
+                                }
+                                Ok(f) => f,
+                            };
                         tokio::task::spawn(async move {
                             let _ = match res_fut.await {
                                 Err(e) => respond(Err(e.into())),
@@ -174,7 +173,7 @@ impl HolochainP2pActor {
     }
 
     /// receiving an incoming validation receipt from a remote node
-    fn handle_incoming_send_validation_receipt(
+    fn handle_incoming_validation_receipt(
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
@@ -184,7 +183,7 @@ impl HolochainP2pActor {
         let mut evt_sender = self.evt_sender.clone();
         Ok(async move {
             evt_sender
-                .send_validation_receipt(dna_hash, agent_pub_key, receipt)
+                .validation_receipt_received(dna_hash, agent_pub_key, receipt)
                 .await
         }
         .boxed()
@@ -302,7 +301,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();
 
-        let req = crate::wire::WireMessage::send_validation_receipt(receipt).encode()?;
+        let req = crate::wire::WireMessage::validation_receipt(receipt).encode()?;
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
