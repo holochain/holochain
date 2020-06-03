@@ -3,6 +3,8 @@
 // The kitsune wire protocol is designed to be very light,
 // both in terms of cpu overhead, and in terms of dependencies.
 
+use crate::types::KitsuneP2pError;
+
 /// The main kitsune wire message enum
 pub enum Wire {
     Request(Vec<u8>),
@@ -10,7 +12,7 @@ pub enum Wire {
 }
 
 impl Wire {
-    pub fn decode(data: Vec<u8>) -> Result<Self, ()> {
+    pub fn decode(data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
         Wire::priv_decode(data)
     }
 
@@ -22,7 +24,6 @@ impl Wire {
         Self::Request(data)
     }
 
-    #[allow(dead_code)]
     pub fn broadcast(data: Vec<u8>) -> Self {
         Self::Broadcast(data)
     }
@@ -66,13 +67,15 @@ impl Wire {
         }
     }
 
-    fn priv_decode(mut data: Vec<u8>) -> Result<Self, ()> {
+    fn priv_decode(mut data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
         if data.len() < 4
             || data[0] != KITSUNE_MAGIC_1
             || data[1] != KITSUNE_MAGIC_2
             || data[2] != KITSUNE_PROTO_VER
         {
-            return Err(());
+            return Err(KitsuneP2pError::decoding_error(
+                "invalid or corrupt kitsune p2p message".to_string(),
+            ));
         }
         data.remove(0);
         data.remove(0);
@@ -80,7 +83,9 @@ impl Wire {
         match data.remove(0) {
             WIRE_REQUEST => Ok(Wire::Request(data)),
             WIRE_BROADCAST => Ok(Wire::Broadcast(data)),
-            _ => Err(()),
+            _ => Err(KitsuneP2pError::decoding_error(
+                "invalid or corrupt kitsune p2p message".to_string(),
+            )),
         }
     }
 }

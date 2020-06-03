@@ -8,8 +8,6 @@ use std::sync::Arc;
 pub struct Broadcast {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
     /// The desired count of remote nodes to reach.

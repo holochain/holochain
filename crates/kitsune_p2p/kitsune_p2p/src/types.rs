@@ -16,6 +16,10 @@ pub enum KitsuneP2pError {
     #[error("Routing Agent Error: {0:?}")]
     RoutingAgentError(Arc<KitsuneAgent>),
 
+    /// DecodingError
+    #[error("Decoding Error: {0}")]
+    DecodingError(Arc<String>),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -25,6 +29,11 @@ impl KitsuneP2pError {
     /// promote a custom error type to a KitsuneP2pError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
+    }
+
+    /// generate a decoding error from a string
+    pub fn decoding_error(s: String) -> Self {
+        Self::DecodingError(Arc::new(s))
     }
 }
 

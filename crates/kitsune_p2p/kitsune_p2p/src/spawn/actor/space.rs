@@ -44,6 +44,10 @@ impl Space {
         self.agents.len()
     }
 
+    pub fn list_agents(&self) -> Vec<Arc<KitsuneAgent>> {
+        self.agents.keys().cloned().collect()
+    }
+
     /// process an incoming join request for an agent -- add them to the space
     pub fn handle_join(&mut self, agent: Arc<KitsuneAgent>) -> KitsuneP2pHandlerResult<()> {
         match self.agents.entry(agent.clone()) {
@@ -93,7 +97,15 @@ impl Space {
                     .boxed()
                     .into())
             }
-            wire::Wire::Broadcast(_data) => unimplemented!(),
+            wire::Wire::Broadcast(data) => {
+                Ok(async move {
+                    evt_sender.broadcast(space, agent, data).await?;
+                    // broadcast doesn't return anything...
+                    Ok(vec![])
+                }
+                .boxed()
+                .into())
+            }
         }
     }
 
