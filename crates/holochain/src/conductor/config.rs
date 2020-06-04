@@ -60,7 +60,7 @@ pub struct ConductorConfig {
     /// The conductor is independent of the specialized implementation of the trait
     /// PassphraseService. It just needs something to provide a passphrase when needed.
     /// This config setting selects one of the available services (i.e. CLI prompt, IPC, mock)
-    pub passphrase_service: PassphraseServiceConfig,
+    pub passphrase_service: Option<PassphraseServiceConfig>,
 
     /// Setup admin interfaces to control this conductor through a websocket connection
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
@@ -139,7 +139,7 @@ pub mod tests {
                 encryption_service_uri: None,
                 decryption_service_uri: None,
                 dpki: None,
-                passphrase_service: PassphraseServiceConfig::Cmd,
+                passphrase_service: Some(PassphraseServiceConfig::Cmd),
                 admin_interfaces: None,
             }
         );
@@ -185,7 +185,7 @@ pub mod tests {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                passphrase_service: PassphraseServiceConfig::Cmd,
+                passphrase_service: Some(PassphraseServiceConfig::Cmd),
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
