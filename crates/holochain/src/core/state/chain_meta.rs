@@ -98,7 +98,7 @@ pub trait ChainMetaBufT {
     ) -> DatabaseResult<Vec<Link>>;
 
     /// Add a link
-    async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()>;
+    async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
     /// Remove a link
     fn remove_link(
@@ -264,6 +264,7 @@ impl<'env> ChainMetaBuf<'env> {
     }
 }
 
+#[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait]
 impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     fn get_links(
@@ -284,7 +285,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             .collect()
     }
 
-    async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         let (_, link_add_hash): (Header, HeaderHash) =
             HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
                 .await?
@@ -371,7 +372,17 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     // TODO: For now this isn't actually checking the meta data.
     // Once the meta data is finished this should be hooked up
     fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        if self.system_meta.get(&entry_hash.clone().into())?.count() > 0 {
+        if fallible_iterator::convert(self.system_meta.get(&entry_hash.clone().into())?)
+            .filter(|sys_val| {
+                if let SysMetaVal::Create(_) = sys_val {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            })
+            .count()?
+            > 0
+        {
             Ok(EntryDhtStatus::Live)
         } else {
             Ok(EntryDhtStatus::Dead)
@@ -461,7 +472,7 @@ impl ChainMetaBufT for MockChainMetaBuf {
         self.get_deletes(header_hash)
     }
 
-    async fn add_link<'a>(&'a mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         self.add_link(link_add)
     }
 

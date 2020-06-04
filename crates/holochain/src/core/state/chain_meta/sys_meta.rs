@@ -28,7 +28,6 @@ mod tests {
             Header(HeaderHash) 
         ];
     );
-
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
         entry_hashes: Box<dyn Iterator<Item = EntryHash>>,

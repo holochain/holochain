@@ -279,7 +279,7 @@ where
         iter: SingleIterRaw<'env, V>,
         key: Vec<u8>,
     ) -> Self {
-        let iter = SingleIter::new(&scratch, scratch.range(key.clone()..), iter);
+        let iter = SingleIter::new(&scratch, scratch.range(key..), iter);
         Self { iter }
     }
 }
@@ -368,6 +368,30 @@ where
         }
     }
 
+    fn check_scratch(
+        &mut self,
+        scratch_current: Option<IterItem<'a, V>>,
+        db: IterItem<'env, V>,
+        compare: fn(scratch: &[u8], db: &[u8]) -> bool,
+    ) -> Option<IterItem<'env, V>> {
+        match scratch_current {
+            Some(scratch) if compare(scratch.0, db.0) => {
+                trace!(msg = "r scratch key first", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                self.current = Some(db);
+                Some(scratch)
+            }
+            Some(scratch) if scratch.0 == db.0 => {
+                trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
+                Some(scratch)
+            }
+            _ => {
+                trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
+                self.scratch_current = scratch_current;
+                Some(db)
+            }
+        }
+    }
+
     fn next_inner(
         &mut self,
         current: Option<IterItem<'env, V>>,
@@ -375,22 +399,7 @@ where
         compare: fn(scratch: &[u8], db: &[u8]) -> bool,
     ) -> Result<Option<IterItem<'env, V>>, IterError> {
         let r = match current {
-            Some(db) => match scratch_current {
-                Some(scratch) if compare(scratch.0, db.0) => {
-                    trace!(msg = "r scratch key first", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                    self.current = Some(db);
-                    Some(scratch)
-                }
-                Some(scratch) if scratch.0 == db.0 => {
-                    trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
-                    Some(scratch)
-                }
-                _ => {
-                    trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
-                    self.scratch_current = scratch_current;
-                    Some(db)
-                }
-            },
+            Some(db) => self.check_scratch(scratch_current, db, compare),
             None => {
                 if let Some((k, v)) = &scratch_current {
                     trace!(msg = "r scratch no db", k = %String::from_utf8_lossy(k), ?v);
@@ -449,6 +458,8 @@ pub struct SingleIterRaw<'env, V> {
     __type: std::marker::PhantomData<V>,
 }
 
+type InnerItem<'env> = (&'env [u8], Option<rkv::Value<'env>>);
+
 impl<'env, V> SingleIterRaw<'env, V>
 where
     V: BufVal,
@@ -462,7 +473,7 @@ where
     }
 
     fn next_inner(
-        item: Option<Result<(&'env [u8], Option<rkv::Value>), StoreError>>,
+        item: Option<Result<InnerItem<'env>, StoreError>>,
     ) -> Result<Option<IterItem<'env, V>>, IterError> {
         match item {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Ok(Some((
