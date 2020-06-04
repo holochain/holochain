@@ -935,9 +935,9 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.1.0-alpha.11"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f99c450f6f0f40aca3f10268cc8894305992a3caba189db5565282ed23e256"
+checksum = "6a238f1532d5b432ff0470966ff539133fac120581d5beaf68c4e4d28312163f"
 dependencies = [
  "futures",
  "must_future",
@@ -1143,7 +1143,10 @@ dependencies = [
  "ghost_actor",
  "holo_hash",
  "holochain_keystore",
+ "holochain_serialized_bytes",
  "kitsune_p2p",
+ "serde",
+ "serde_bytes",
  "thiserror",
  "tokio",
 ]

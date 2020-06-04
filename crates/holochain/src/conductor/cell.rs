@@ -174,12 +174,17 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
-            CallRemote { span, respond, .. } => {
+            CallRemote {
+                span,
+                respond,
+                request,
+                ..
+            } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_call_remote()
+                    self.handle_call_remote(request)
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             Publish { span, respond, .. } => {
@@ -187,7 +192,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_publish()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             GetValidationPackage { span, respond, .. } => {
@@ -195,7 +200,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_get_validation_package()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             Get { span, respond, .. } => {
@@ -203,7 +208,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_get()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             GetLinks { span, respond, .. } => {
@@ -211,7 +216,20 @@ impl Cell {
                 let _ = respond(
                     self.handle_get_links()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
+                );
+            }
+            ValidationReceiptReceived {
+                span,
+                respond,
+                receipt,
+                ..
+            } => {
+                let _g = span.enter();
+                let _ = respond(
+                    self.handle_validation_receipt(receipt)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             ListDhtOpHashes { span, respond, .. } => {
@@ -219,7 +237,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_list_dht_op_hashes()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             FetchDhtOps { span, respond, .. } => {
@@ -227,7 +245,7 @@ impl Cell {
                 let _ = respond(
                     self.handle_fetch_dht_ops()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
             SignNetworkData { span, respond, .. } => {
@@ -235,41 +253,57 @@ impl Cell {
                 let _ = respond(
                     self.handle_sign_network_data()
                         .await
-                        .map_err(holochain_p2p::HolochainP2pError::custom),
+                        .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
         }
         Ok(())
     }
 
-    async fn handle_call_remote(&self) -> CellResult<()> {
-        unimplemented!()
+    /// a remote agent is attempting a "call_remote" on this cell.
+    async fn handle_call_remote(&self, request: SerializedBytes) -> CellResult<SerializedBytes> {
+        // This is a stub call remote handler that just
+        // echoes whatever is sent to it.
+        // TODO - Implement the real call_remote handler.
+        Ok(request)
     }
 
+    /// we are receiving a "publish" event from the network
     async fn handle_publish(&self) -> CellResult<()> {
         unimplemented!()
     }
 
+    /// a remote node is attempting to retreive a validation package
     async fn handle_get_validation_package(&self) -> CellResult<()> {
         unimplemented!()
     }
 
+    /// a remote node is asking us for entry data
     async fn handle_get(&self) -> CellResult<()> {
         unimplemented!()
     }
 
+    /// a remote node is asking us for links
     async fn handle_get_links(&self) -> CellResult<()> {
         unimplemented!()
     }
 
+    /// a remote agent is sending us a validation receipt.
+    async fn handle_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
+        unimplemented!()
+    }
+
+    /// the network module is requesting a list of dht op hashes
     async fn handle_list_dht_op_hashes(&self) -> CellResult<()> {
         unimplemented!()
     }
 
+    /// the network module is requesting the content for dht ops
     async fn handle_fetch_dht_ops(&self) -> CellResult<()> {
         unimplemented!()
     }
 
+    /// the network module would like this cell/agent to sign some data
     async fn handle_sign_network_data(&self) -> CellResult<holochain_keystore::Signature> {
         unimplemented!()
     }

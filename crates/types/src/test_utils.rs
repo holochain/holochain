@@ -82,7 +82,7 @@ pub fn fake_cell_id(name: &str) -> CellId {
 /// A fixture example DnaHash for unit testing.
 pub fn fake_dna_hash(name: &str) -> DnaHash {
     tokio_safe_block_on::tokio_safe_block_on(
-        DnaHash::with_data(name.as_bytes()),
+        DnaHash::with_data(name.as_bytes().to_vec()),
         std::time::Duration::from_secs(1),
     )
     .unwrap()
@@ -103,7 +103,7 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 /// A fixture example HeaderHash for unit testing.
 pub fn fake_header_hash(name: &str) -> HeaderHash {
     tokio_safe_block_on::tokio_safe_block_on(
-        HeaderHash::with_data(name.as_bytes()),
+        HeaderHash::with_data(name.as_bytes().to_vec()),
         std::time::Duration::from_secs(1),
     )
     .unwrap()

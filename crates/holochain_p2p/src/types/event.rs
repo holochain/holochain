@@ -8,12 +8,10 @@ ghost_actor::ghost_chan! {
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             agent_pub_key: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            request: SerializedBytes,
+        ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.
         fn publish(
@@ -50,6 +48,13 @@ ghost_actor::ghost_chan! {
             agent_pub_key: AgentPubKey,
             // TODO - parameters
         ) -> (); // TODO - proper return type
+
+        /// A remote node has sent us a validation receipt.
+        fn validation_receipt_received(
+            dna_hash: DnaHash,
+            agent_pub_key: AgentPubKey,
+            receipt: SerializedBytes,
+        ) -> ();
 
         /// The p2p module wishes to query our DhtOpHash store.
         fn list_dht_op_hashes(
@@ -90,6 +95,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetValidationPackage { $i, .. } => { $($t)* }
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
+            HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::ListDhtOpHashes { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchDhtOps { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }

@@ -3,6 +3,7 @@
 
 use holo_hash::*;
 use holochain_keystore::*;
+use holochain_serialized_bytes::prelude::*;
 use std::sync::Arc;
 
 mod types;
@@ -24,30 +25,28 @@ impl HolochainP2pCell {
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     pub async fn join(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender
-            .join(actor::Join {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
-            })
+            .join((*self.dna_hash).clone(), (*self.agent_pub_key).clone())
             .await
     }
 
     /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
     pub async fn leave(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender
-            .leave(actor::Leave {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
-            })
+            .leave((*self.dna_hash).clone(), (*self.agent_pub_key).clone())
             .await
     }
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
-    pub async fn call_remote(&mut self) -> actor::HolochainP2pResult<()> {
+    pub async fn call_remote(
+        &mut self,
+        request: SerializedBytes,
+    ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
-            .call_remote(actor::CallRemote {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
-            })
+            .call_remote(
+                (*self.dna_hash).clone(),
+                (*self.agent_pub_key).clone(),
+                request,
+            )
             .await
     }
 
@@ -90,4 +89,20 @@ impl HolochainP2pCell {
             })
             .await
     }
+
+    /// Send a validation receipt to a remote node.
+    pub async fn send_validation_receipt(
+        &mut self,
+        receipt: SerializedBytes,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .send_validation_receipt(
+                (*self.dna_hash).clone(),
+                (*self.agent_pub_key).clone(),
+                receipt,
+            )
+            .await
+    }
 }
+
+mod test;

@@ -15,6 +15,10 @@ pub enum KeystoreError {
     #[error("CryptoError: {0}")]
     CryptoError(#[from] holochain_crypto::CryptoError),
 
+    /// Used by dependents to specify an invalid signature of some data
+    #[error("Invalid signature {0:?}, for {1}")]
+    InvalidSignature(Signature, String),
+
     /// Unexpected Internal Error.
     #[error("Other: {0}")]
     Other(String),
