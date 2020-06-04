@@ -3,7 +3,7 @@
 // FIXME (aka fixtme, haha, get it?) move other fixturators from this crate into this module
 
 use crate::dna::zome::Zome;
-use crate::header::{AppEntryType};
+use crate::header::AppEntryType;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::WasmHashFixturator;

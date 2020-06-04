@@ -9,8 +9,8 @@ use crate::{
 };
 use holo_hash::AgentPubKey;
 use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::path::PathBuf;
 

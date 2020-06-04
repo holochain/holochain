@@ -25,6 +25,12 @@ use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::GrantedFunctions;
 use holochain_zome_types::capability::ZomeCallCapGrant;
+use holochain_zome_types::crdt::CrdtType;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
@@ -36,11 +42,6 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::sync::Arc;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::entry_def::EntryDefs;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::crdt::CrdtType;
 
 wasm_io_fixturator!(HostInput<SerializedBytes>);
 
@@ -282,24 +283,29 @@ fixturator!(
 );
 
 fixturator!(
+    RequiredValidations;
+    from u8;
+);
+
+fixturator!(
     EntryDef;
     curve Empty EntryDef {
         id: EntryDefIdFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
         visibility: EntryVisibilityFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
         crdt_type: CrdtTypeFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-        required_validations: U8Fixturator::new_indexed(Empty, self.0.index).next().unwrap(),
+        required_validations: RequiredValidationsFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
     };
     curve Unpredictable EntryDef {
         id: EntryDefIdFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
         visibility: EntryVisibilityFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
         crdt_type: CrdtTypeFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-        required_validations: U8Fixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
+        required_validations: RequiredValidationsFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
     };
     curve Predictable EntryDef {
         id: EntryDefIdFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
         visibility: EntryVisibilityFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
         crdt_type: CrdtTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        required_validations: U8Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
+        required_validations: RequiredValidationsFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
     };
 );
 

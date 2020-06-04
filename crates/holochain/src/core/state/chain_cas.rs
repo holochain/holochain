@@ -10,7 +10,6 @@
 use crate::core::state::source_chain::{
     ChainElement, ChainInvalidReason, SignedHeaderHashed, SourceChainError, SourceChainResult,
 };
-use holochain_zome_types::entry_def::EntryVisibility;
 use holo_hash::{Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
@@ -28,6 +27,7 @@ use holochain_types::{
     Header,
 };
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::entry_def::EntryVisibility;
 use tracing::*;
 
 /// A CasBuf with Entries for values
