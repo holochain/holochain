@@ -28,7 +28,7 @@ pub struct InstallAppDnaPayload {
     /// The path of the DnaFile
     pub path: PathBuf,
     /// The CellNick which will be assigned to this Dna when installed
-    pub handle: CellNick,
+    pub nick: CellNick,
     /// Properties to override when installing this Dna
     pub properties: Option<JsonProperties>,
     /// App-specific proof-of-membrane-membership, if required by this app
@@ -37,10 +37,10 @@ pub struct InstallAppDnaPayload {
 
 impl InstallAppDnaPayload {
     /// Create a payload with no JsonProperties or MembraneProof. Good for tests.
-    pub fn path_only(path: PathBuf, handle: String) -> Self {
+    pub fn path_only(path: PathBuf, nick: CellNick) -> Self {
         Self {
             path,
-            handle,
+            nick,
             properties: None,
             membrane_proof: None,
         }
@@ -66,7 +66,7 @@ impl InstalledCell {
     }
 
     /// Get the CellNick
-    pub fn into_handle(self) -> CellNick {
+    pub fn into_nick(self) -> CellNick {
         self.1
     }
     /// Get the CellId
@@ -75,7 +75,7 @@ impl InstalledCell {
     }
 
     /// Get the CellNick
-    pub fn as_handle(&self) -> &CellNick {
+    pub fn as_nick(&self) -> &CellNick {
         &self.1
     }
 }

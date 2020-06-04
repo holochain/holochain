@@ -92,13 +92,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         path,
                         properties,
                         membrane_proof,
-                        handle,
+                        nick,
                     } = dna_payload;
                     let dna = read_parse_dna(path, properties).await?;
                     let hash = dna.dna_hash().clone();
                     let cell_id = CellId::from((hash.clone(), agent_key.clone()));
                     self.conductor_handle.install_dna(dna).await?;
-                    ConductorApiResult::Ok((InstalledCell::new(cell_id, handle), membrane_proof))
+                    ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
                 });
 
                 // Join all the install tasks

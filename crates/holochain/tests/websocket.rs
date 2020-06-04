@@ -167,7 +167,7 @@ async fn call_admin() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let dna_payload = InstallAppDnaPayload {
         path: fake_dna_path,
-        handle: "handle".into(),
+        nick: "nick".into(),
         properties: Some(properties.clone()),
         membrane_proof: None,
     };
