@@ -185,7 +185,7 @@ Holochain uses the messagepack serialization format as it has several benefits:
 - It is reasonably human readable and can even be automatically JSONified
 
 If you aren't familiar with `serde`, messagepack and/or
-`holochain_serialized_bytes` then its worth at least skim reading the
+`holochain_serialized_bytes`. then it's worth at least skim reading the
 documentation.
 
 - Messagepack: https://msgpack.org/index.html
