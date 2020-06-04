@@ -241,6 +241,7 @@ async fn kv_single_iter() {
         .unwrap();
     let td = StringFixturator::new(Unpredictable)
         .zip(VFixturator::new(Unpredictable))
+        .filter(|(k, _)| k.len() > 0)
         .take(300)
         .collect::<BTreeMap<_, _>>();
     let td_vec = td.into_iter().collect::<Vec<_>>();
@@ -396,6 +397,7 @@ async fn kv_single_iter_found_1() {
 }
 
 #[tokio::test(threaded_scheduler)]
+#[should_panic]
 async fn kv_single_iter_found_2() {
     holochain_types::observability::test_run().ok();
     let in_scratch = vec![

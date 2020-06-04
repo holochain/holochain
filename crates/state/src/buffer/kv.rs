@@ -147,7 +147,7 @@ where
 
     /// Iterate over the data in reverse
     pub fn iter_reverse(&self) -> DatabaseResult<fallible_iterator::Rev<SingleIter<V>>> {
-        Ok(SingleIter::new(&self.scratch, self.scratch.iter(), self.iter_raw_reverse()?).rev())
+        Ok(SingleIter::new(&self.scratch, self.scratch.iter(), self.iter_raw()?).rev())
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
@@ -167,11 +167,12 @@ where
     }
 
     /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
-    pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIterRaw<V>> {
+    pub fn iter_raw_reverse(&self) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<V>>> {
         Ok(SingleIterRaw::new(
             self.db.iter_start(self.reader)?,
             self.db.iter_end(self.reader)?,
-        ))
+        )
+        .rev())
     }
 
     /// Iterate over items which are staged for PUTs in the scratch space
