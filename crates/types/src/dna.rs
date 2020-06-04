@@ -7,6 +7,7 @@ pub mod error;
 pub mod wasm;
 pub mod zome;
 use crate::prelude::*;
+use derive_more::From;
 pub use error::DnaError;
 pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
@@ -16,15 +17,13 @@ use std::collections::BTreeMap;
 pub type Zomes = Vec<(ZomeName, zome::Zome)>;
 
 /// A type to allow json values to be used as [SerializedBtyes]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct Properties {
-    properties: serde_json::Value,
-}
+#[derive(Debug, Clone, From, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct JsonProperties(serde_json::Value);
 
-impl Properties {
+impl JsonProperties {
     /// Create new properties from json value
     pub fn new(properties: serde_json::Value) -> Self {
-        Properties { properties }
+        JsonProperties(properties)
     }
 }
 

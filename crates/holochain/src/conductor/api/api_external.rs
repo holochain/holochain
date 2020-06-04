@@ -14,9 +14,9 @@ use crate::{
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    app::{AppId, AppPaths},
+    app::{AppId, InstallAppPayload},
     cell::{CellHandle, CellId},
-    dna::{DnaFile, Properties},
+    dna::{DnaFile, JsonProperties},
 };
 use std::path::PathBuf;
 use tracing::*;
@@ -72,7 +72,7 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
     async fn handle_request(&self, request: AppRequest) -> AppResponse {
         let res: ConductorApiResult<AppResponse> = async move {
             match request {
-                AppRequest::ZomeCallInvocationRequest { request } => {
+                AppRequest::ZomeCallInvocationRequest(request) => {
                     match self.call_zome(*request).await? {
                         Ok(response) => Ok(AppResponse::ZomeCallInvocationResponse {
                             response: Box::new(response),
@@ -131,14 +131,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .add_admin_interfaces(configs)
                     .await?,
             )),
-            InstallApp { app_paths } => {
-                trace!(?app_paths.dnas);
-                let AppPaths {
+            InstallApp(payload) => {
+                trace!(?payload.dnas);
+                let InstallAppPayload {
                     app_id,
                     agent_key,
                     dnas,
                     proofs,
-                } = app_paths;
+                } = *payload;
 
                 // Install Dnas
                 let install_dna_tasks = dnas.into_iter().map(|(dna_path, properties)| async {
@@ -164,13 +164,18 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     // Check all passed and return the poofs
                     .collect::<Result<Vec<_>, _>>()?;
 
+                let cell_ids = cell_ids_with_proofs
+                    .iter()
+                    .map(|(cell_id, _)| cell_id.clone())
+                    .collect();
+
                 // Call genesis
                 self.conductor_handle
                     .clone()
                     .genesis_cells(app_id, cell_ids_with_proofs)
                     .await?;
 
-                Ok(AdminResponse::AppInstalled)
+                Ok(AdminResponse::AppInstalled(cell_ids))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -230,7 +235,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
-            DumpState(cell_id) => {
+            DumpState { cell_id } => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::JsonState(state))
             }
@@ -241,15 +246,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 /// Reads the [Dna] from disk and parses to [SerializedBytes]
 async fn read_parse_dna(
     dna_path: PathBuf,
-    properties: Option<serde_json::Value>,
+    properties: Option<JsonProperties>,
 ) -> ConductorApiResult<DnaFile> {
     let dna_content = tokio::fs::read(dna_path)
         .await
         .map_err(|e| ConductorApiError::DnaReadError(format!("{:?}", e)))?;
     let mut dna = DnaFile::from_file_content(&dna_content).await?;
     if let Some(properties) = properties {
-        let properties = SerializedBytes::try_from(Properties::new(properties))
-            .map_err(SerializationError::from)?;
+        let properties = SerializedBytes::try_from(properties).map_err(SerializationError::from)?;
         dna = dna.with_properties(properties).await?;
     }
     Ok(dna)
@@ -340,7 +344,7 @@ pub enum AdminResponse {
     /// This response is unimplemented
     Unimplemented(AdminRequest),
     /// hApp [Dna]s have successfully been installed
-    AppInstalled,
+    AppInstalled(Vec<CellId>),
     /// AdminInterfaces have successfully been added
     AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
@@ -369,15 +373,9 @@ pub enum AdminResponse {
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppRequest {
     /// Asks the conductor to do some crypto
-    CryptoRequest {
-        /// The request payload
-        request: Box<CryptoRequest>,
-    },
+    CryptoRequest(Box<CryptoRequest>),
     /// Call a zome function
-    ZomeCallInvocationRequest {
-        /// Information about which zome call you want to make
-        request: Box<ZomeCallInvocation>,
-    },
+    ZomeCallInvocationRequest(Box<ZomeCallInvocation>),
 }
 
 /// The set of messages that a conductor understands how to handle over an Admin interface
@@ -393,10 +391,7 @@ pub enum AdminRequest {
     /// Install an app from a list of Dna paths
     /// Triggers genesis to be run on all cells and
     /// Dnas to be stored
-    InstallApp {
-        /// App Id, [AgentPubKey] and paths to Dnas
-        app_paths: AppPaths,
-    },
+    InstallApp(Box<InstallAppPayload>),
     /// List all installed [Dna]s
     ListDnas,
     /// Generate a new AgentPubKey
@@ -405,12 +400,12 @@ pub enum AdminRequest {
     ListAgentPubKeys,
     /// Activate an app
     ActivateApp {
-        /// The id of the app to activate
+        /// The AppId to activate
         app_id: AppId,
     },
     /// Deactivate an app
     DeactivateApp {
-        /// The id of the app to deactivate
+        /// The AppId to deactivate
         app_id: AppId,
     },
     /// Attach a [AppInterfaceApi]
@@ -420,7 +415,10 @@ pub enum AdminRequest {
         port: Option<u16>,
     },
     /// Dump the state of a cell
-    DumpState(CellId),
+    DumpState {
+        /// The CellId for which to dump state
+        cell_id: Box<CellId>,
+    },
 }
 
 #[allow(missing_docs)]
@@ -476,17 +474,21 @@ mod test {
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_hash = dna.dna_hash().clone();
         let agent_key = fake_agent_pubkey_1();
+        let expected_cell_ids = vec![CellId::new(dna.dna_hash().clone(), agent_key.clone())];
         let proofs = HashMap::new();
-        let app_paths = AppPaths {
+        let payload = InstallAppPayload {
             dnas: vec![(dna_path, None)],
             app_id: "test".to_string(),
             agent_key,
             proofs,
         };
         let install_response = admin_api
-            .handle_admin_request(AdminRequest::InstallApp { app_paths })
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))
             .await;
-        assert_matches!(install_response, AdminResponse::AppInstalled);
+        assert_matches!(
+            install_response,
+            AdminResponse::AppInstalled(cell_ids) if cell_ids == expected_cell_ids
+        );
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
@@ -546,9 +548,9 @@ mod test {
             "test": "example",
             "how_many": 42,
         });
-        let properties = Some(json.clone());
+        let properties = Some(JsonProperties::new(json.clone()));
         let result = read_parse_dna(dna_path, properties).await?;
-        let properties = Properties::new(json);
+        let properties = JsonProperties::new(json);
         let mut dna = dna.dna().clone();
         dna.properties = properties.try_into().unwrap();
         assert_eq!(&dna, result.dna());
