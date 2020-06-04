@@ -28,6 +28,11 @@ use std::{
     path::Path,
 };
 use tracing::*;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::HostInput;
+use crate::core::ribosome::ZomeCallInvocationResponse;
+use crate::core::ribosome::error::RibosomeError;
 
 pub mod error;
 
@@ -176,13 +181,22 @@ impl Cell {
         match evt {
             CallRemote {
                 span,
+                zome_name,
+                fn_name,
+                cap,
                 respond,
                 request,
                 ..
             } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_call_remote(request)
+                    self.handle_call_remote(
+                        evt.agent_pub_key(),
+                        zome_name.into(),
+                        fn_name,
+                        cap.into(),
+                        request
+                    )
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
@@ -260,14 +274,6 @@ impl Cell {
         Ok(())
     }
 
-    /// a remote agent is attempting a "call_remote" on this cell.
-    async fn handle_call_remote(&self, request: SerializedBytes) -> CellResult<SerializedBytes> {
-        // This is a stub call remote handler that just
-        // echoes whatever is sent to it.
-        // TODO - Implement the real call_remote handler.
-        Ok(request)
-    }
-
     /// we are receiving a "publish" event from the network
     async fn handle_publish(&self) -> CellResult<()> {
         unimplemented!()
@@ -314,6 +320,25 @@ impl Cell {
         match process {
             AutonomicProcess::SlowHeal => unimplemented!(),
             AutonomicProcess::HealthCheck => unimplemented!(),
+        }
+    }
+
+    /// a remote agent is attempting a "call_remote" on this cell.
+    async fn handle_call_remote(&self, provenance: AgentPubKey, zome_name: ZomeName, fn_name: String, cap: CapSecret, payload: SerializedBytes) -> CellResult<SerializedBytes> {
+        let invocation = ZomeCallInvocation {
+            cell_id: self.id,
+            zome_name: zome_name.clone(),
+            cap,
+            payload: HostInput::new(payload),
+            provenance,
+            fn_name,
+        };
+        // double ? because
+        // - ConductorApiResult
+        // - ZomeCallInvocationResult
+        match self.call_zome(invocation).await?? {
+            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => Ok(guest_output.into_inner()),
+            _ => Err(RibosomeError::ZomeFnNotExists(zome_name, "A remote zome call failed in a way that should not be possible.".into()))?,
         }
     }
 
