@@ -6,6 +6,7 @@ use super::{
 };
 use holo_hash::*;
 use holochain_types::{
+    app::InstalledCell,
     cell::CellId,
     dna::{DnaError, DnaFile},
 };
@@ -81,7 +82,8 @@ pub async fn load_conductor_from_legacy_config(
             // for now. In the future we can actually pay attention to
             // `i.agent` to get agent info
             let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
-            Ok((cell_id, None))
+            let cell_handle = i.id.clone();
+            Ok((InstalledCell::new(cell_id, cell_handle), None))
         })
         .collect::<Result<Vec<_>, CompatConfigError>>()?;
 
@@ -92,7 +94,7 @@ pub async fn load_conductor_from_legacy_config(
     let app_id = "LEGACY".to_string();
     conductor
         .clone()
-        .genesis_cells(app_id.clone(), cell_ids)
+        .install_app(app_id.clone(), cell_ids)
         .await?;
     conductor.activate_app(app_id.clone()).await?;
     let errors = conductor.clone().setup_cells().await?;
@@ -169,7 +171,10 @@ pub mod tests {
     use crate::conductor::{
         handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
     };
-    use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_file};
+    use holochain_types::{
+        app::MembraneProof,
+        test_utils::{fake_agent_pubkey_1, fake_dna_file},
+    };
     use matches::assert_matches;
     use mockall::predicate;
     use std::path::PathBuf;
@@ -201,13 +206,13 @@ pub mod tests {
             legacy::InstanceConfig {
                 agent: "".to_string(),
                 dna: "a1".to_string(),
-                id: "".to_string(),
+                id: "i1".to_string(),
                 storage: legacy::StorageConfiguration::Memory,
             },
             legacy::InstanceConfig {
                 agent: "".to_string(),
                 dna: "a2".to_string(),
-                id: "".to_string(),
+                id: "i2".to_string(),
                 storage: legacy::StorageConfiguration::Memory,
             },
         ];
@@ -288,13 +293,19 @@ pub mod tests {
             .await
             .unwrap();
 
-        let expected_cell_ids = vec![
+        let expected_cell_data: Vec<(InstalledCell, Option<MembraneProof>)> = vec![
             (
-                CellId::new(dna1.dna_hash().clone(), agent_pubkey.clone()),
+                InstalledCell::new(
+                    CellId::new(dna1.dna_hash().clone(), agent_pubkey.clone()),
+                    "i1".to_string(),
+                ),
                 None,
             ),
             (
-                CellId::new(dna1a.dna_hash().clone(), agent_pubkey.clone()),
+                InstalledCell::new(
+                    CellId::new(dna1a.dna_hash().clone(), agent_pubkey.clone()),
+                    "i2".to_string(),
+                ),
                 None,
             ),
         ];
@@ -316,10 +327,10 @@ pub mod tests {
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_genesis_cells()
+            .expect_sync_install_app()
             .with(
                 predicate::eq("LEGACY".to_string()),
-                predicate::eq(expected_cell_ids),
+                predicate::eq(expected_cell_data),
             )
             .times(1)
             .returning(|_, _| Ok(()));

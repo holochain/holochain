@@ -10,7 +10,7 @@ use holochain_zome_types::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-// define the host functions we require in order to pull/push data across the host/guest boundary
+// only the host functions we require in order to pull/push data across the host/guest boundary
 memory_externs!();
 
 macro_rules! guest_functions {

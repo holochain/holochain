@@ -2,7 +2,7 @@
 
 use crate::{
     cell::CellId,
-    dna::{wasm::DnaWasm, zome::Zome, Properties},
+    dna::{wasm::DnaWasm, zome::Zome, JsonProperties},
     dna::{DnaDef, DnaFile},
     header::{AppEntryType, EntryVisibility, ZomeId},
     prelude::*,
@@ -39,7 +39,7 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
-        properties: Properties::new(serde_json::json!({"p": "hi"}))
+        properties: JsonProperties::new(serde_json::json!({"p": "hi"}))
             .try_into()
             .unwrap(),
         uuid: uuid.to_string(),
