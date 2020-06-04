@@ -269,7 +269,7 @@ pub struct EntryDelete {
     pub prev_header: HeaderAddress,
 
     /// Address of the Element being deleted
-    pub removes_address: AnyDhtHash,
+    pub removes_address: HeaderAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

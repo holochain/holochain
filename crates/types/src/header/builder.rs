@@ -96,5 +96,5 @@ builder_variant!(EntryUpdate {
 });
 
 builder_variant!(EntryDelete {
-    removes_address: AnyDhtHash,
+    removes_address: HeaderAddress,
 });
