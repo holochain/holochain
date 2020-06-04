@@ -57,19 +57,19 @@ high level details will be included here.
 Holochain has several high-level components:
 
 - A DHT network that shares, validates and stores data
-- WASM & DNA files that are executed to provide application specific logic
+- Wasm & DNA files that are executed to provide application specific logic
 - A user-facing websockets interface that enables interactive clients
 - The holochain binary that co-ordinates all these components
 
 Depending on which component(s) you are working with, the key concepts and
 documentation may look very different.
 
-This documentation describes how to write WASM files that are compatible with
+This documentation describes how to write wasm files that are compatible with
 the holochain core binary.
 
-If this is your first time writing WASM, or even Rust code, don't worry!
+If this is your first time writing wasm, or even Rust code, don't worry!
 
-The ocean of WASM and Rust development is vast and deep, but you only need to
+The ocean of wasm and Rust development is vast and deep, but you only need to
 dip your toes in to effectively write wasm for holochain.
 
 - Holochain core handles many of the tough edge-cases for you, like checking
@@ -155,8 +155,8 @@ wholesale after every extern function call.
 
 ### Holochain serialization and memory
 
-Due to wasm limitations (see below) holochain must BYO some process to share
-complex data types between the host and the guest.
+Due to wasm limitations (see below) holochain must implement some process to
+share complex data types between the host and the guest.
 
 The full process is documented in detail in the `holochain-wasmer` repository.
 
