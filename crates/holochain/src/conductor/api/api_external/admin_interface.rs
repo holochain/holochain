@@ -30,7 +30,7 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
     // -- provided -- //
 
-    /// Route the request to be handled
+    /// Deal with error cases produced by `handle_admin_request_inner`
     async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
         let res = self.handle_admin_request_inner(request).await;
 

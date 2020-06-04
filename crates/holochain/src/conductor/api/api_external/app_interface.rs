@@ -1,42 +1,26 @@
 use super::InterfaceApi;
 use crate::conductor::api::error::{ConductorApiResult, ExternalApiWireError, SerializationError};
-use crate::core::ribosome::{ZomeCallInvocation, ZomeCallInvocationResponse};
-use crate::{
-    conductor::{
-        interface::error::{InterfaceError, InterfaceResult},
-        ConductorHandle,
-    },
-    core::workflow::ZomeCallInvocationResult,
+use crate::conductor::{
+    interface::error::{InterfaceError, InterfaceResult},
+    ConductorHandle,
 };
+use crate::core::ribosome::{ZomeCallInvocation, ZomeCallInvocationResponse};
 use holochain_serialized_bytes::prelude::*;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
 pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
-    /// Invoke a zome function on any cell in this conductor.
-    async fn call_zome(
+    /// Call an admin function to modify this Conductor's behavior
+    async fn handle_app_request_inner(
         &self,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+        request: AppRequest,
+    ) -> ConductorApiResult<AppResponse>;
 
     // -- provided -- //
 
-    /// Routes the [AppRequest] to the [AppResponse]
-    async fn handle_request(&self, request: AppRequest) -> AppResponse {
-        let res: ConductorApiResult<AppResponse> = async move {
-            match request {
-                AppRequest::ZomeCallInvocationRequest(request) => {
-                    match self.call_zome(*request).await? {
-                        Ok(response) => Ok(AppResponse::ZomeCallInvocationResponse {
-                            response: Box::new(response),
-                        }),
-                        Err(e) => Ok(AppResponse::Error(e.into())),
-                    }
-                }
-                _ => unimplemented!(),
-            }
-        }
-        .await;
+    /// Deal with error cases produced by `handle_app_request_inner`
+    async fn handle_app_request(&self, request: AppRequest) -> AppResponse {
+        let res = self.handle_app_request_inner(request).await;
 
         match res {
             Ok(response) => response,
@@ -61,11 +45,22 @@ impl RealAppInterfaceApi {
 
 #[async_trait::async_trait]
 impl AppInterfaceApi for RealAppInterfaceApi {
-    async fn call_zome(
+    /// Routes the [AppRequest] to the [AppResponse]
+    async fn handle_app_request_inner(
         &self,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        self.conductor_handle.call_zome(invocation).await
+        request: AppRequest,
+    ) -> ConductorApiResult<AppResponse> {
+        match request {
+            AppRequest::ZomeCallInvocationRequest(request) => {
+                match self.conductor_handle.call_zome(*request).await? {
+                    Ok(response) => Ok(AppResponse::ZomeCallInvocationResponse {
+                        response: Box::new(response),
+                    }),
+                    Err(e) => Ok(AppResponse::Error(e.into())),
+                }
+            }
+            _ => unimplemented!(),
+        }
     }
 }
 
@@ -77,12 +72,14 @@ impl InterfaceApi for RealAppInterfaceApi {
         &self,
         request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse> {
-        self.conductor_handle
-            .check_running()
-            .await
-            .map_err(InterfaceError::RequestHandler)?;
+        {
+            self.conductor_handle
+                .check_running()
+                .await
+                .map_err(InterfaceError::RequestHandler)?;
+        }
         match request {
-            Ok(request) => Ok(AppInterfaceApi::handle_request(self, request).await),
+            Ok(request) => Ok(AppInterfaceApi::handle_app_request(self, request).await),
             Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
         }
     }
