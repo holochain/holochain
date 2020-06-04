@@ -21,7 +21,6 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use holochain_zome_types::*;
-use maplit::hashmap;
 use matches::assert_matches;
 use std::sync::Arc;
 use std::{path::PathBuf, process::Stdio, time::Duration};
@@ -166,14 +165,15 @@ async fn call_admin() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dnas = InstallAppDnaPayload {
+    let dna_payload = InstallAppDnaPayload {
         path: fake_dna_path,
+        handle: "handle".into(),
         properties: Some(properties.clone()),
         membrane_proof: None,
     };
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
-        dnas: hashmap!("handle".to_string() => dnas),
+        dnas: vec![dna_payload],
         app_id: "test".to_string(),
         agent_key,
     };
@@ -308,10 +308,10 @@ async fn call_zome() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dnas = InstallAppDnaPayload::path_only(fake_dna_path);
+    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
-        dnas: hashmap!("handle".to_string() => dnas),
+        dnas: vec![dna_payload],
         app_id: "test".to_string(),
         agent_key,
     };
@@ -371,10 +371,10 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
-    let dnas = InstallAppDnaPayload::path_only(fake_dna_path);
+    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
-        dnas: hashmap!("handle".to_string() => dnas),
+        dnas: vec![dna_payload],
         app_id: "test".to_string(),
         agent_key,
     };
@@ -424,10 +424,10 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     info!("About to make failing request");
 
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
-    let dnas = InstallAppDnaPayload::path_only(fake_dna_path);
+    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
-        dnas: hashmap!("handle".to_string() => dnas),
+        dnas: vec![dna_payload],
         app_id: "test".to_string(),
         agent_key,
     };
