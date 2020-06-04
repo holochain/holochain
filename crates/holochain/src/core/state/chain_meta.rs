@@ -17,7 +17,6 @@ use holochain_types::{
     Header, HeaderHashed, Timestamp,
 };
 use mockall::mock;
-use std::convert::TryInto;
 use std::fmt::Debug;
 
 pub use sys_meta::*;
@@ -62,12 +61,7 @@ struct LinkKey<'a> {
 
 impl<'a> LinkKey<'a> {
     fn to_key(&self) -> Vec<u8> {
-        // Possibly FIXME if this expect is actually not true
-        let sb: SerializedBytes = self
-            .base
-            .try_into()
-            .expect("entry addresses don't have the unserialize problem");
-        let mut vec: Vec<u8> = sb.bytes().to_vec();
+        let mut vec: Vec<u8> = self.base.as_ref().to_vec();
         if let Some(zome_id) = self.zome_id {
             vec.push(zome_id);
         }
@@ -149,11 +143,47 @@ pub enum SysMetaVal {
     Delete(HeaderHash),
 }
 
+enum EntryHeader {
+    Create(Header),
+    Update(Header),
+    Delete(Header),
+}
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 enum SysMetaKey {
     Agent(AgentPubKey),
     EntryContent(EntryContentHash),
     Header(HeaderHash),
+}
+
+impl EntryHeader {
+    async fn into_hash(self) -> Result<HeaderHash, SerializedBytesError> {
+        let header = match self {
+            EntryHeader::Create(h) => h,
+            EntryHeader::Update(h) => h,
+            EntryHeader::Delete(h) => h,
+        };
+        let (_, header_hash): (Header, HeaderHash) = HeaderHashed::with_data(header).await?.into();
+        Ok(header_hash)
+    }
+}
+
+impl From<header::EntryCreate> for EntryHeader {
+    fn from(h: header::EntryCreate) -> Self {
+        EntryHeader::Create(Header::EntryCreate(h))
+    }
+}
+
+impl From<header::EntryUpdate> for EntryHeader {
+    fn from(h: header::EntryUpdate) -> Self {
+        EntryHeader::Update(Header::EntryUpdate(h))
+    }
+}
+
+impl From<header::EntryDelete> for EntryHeader {
+    fn from(h: header::EntryDelete) -> Self {
+        EntryHeader::Delete(Header::EntryDelete(h))
+    }
 }
 
 impl From<AnyDhtHash> for SysMetaKey {
@@ -219,21 +249,15 @@ impl<'env> ChainMetaBuf<'env> {
         Self::new(reader, system_meta, links_meta)
     }
 
-    async fn add_entry_header<K>(&mut self, header: Header, key: K) -> DatabaseResult<()>
+    async fn add_entry_header<K, H>(&mut self, header: H, key: K) -> DatabaseResult<()>
     where
+        H: Into<EntryHeader>,
         K: Into<SysMetaKey>,
     {
-        let (header, header_hash): (Header, HeaderHash) =
-            HeaderHashed::with_data(header).await?.into();
-        let sys_val = match header {
-            Header::EntryCreate(_) => SysMetaVal::Create(header_hash),
-            Header::EntryUpdate(_) => SysMetaVal::Update(header_hash),
-            Header::EntryDelete(_) => SysMetaVal::Delete(header_hash),
-            // FIXME: I wish we could avoid this pattern and
-            // easily create a subset of the Header enum that could be
-            // hashed so the type system could prove that this function
-            // can only be called with the correct entry
-            _ => unreachable!(),
+        let sys_val = match header.into() {
+            h @ EntryHeader::Create(_) => SysMetaVal::Create(h.into_hash().await?),
+            h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash().await?),
+            h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash().await?),
         };
         self.system_meta.insert(key.into(), sys_val);
         Ok(())
@@ -301,20 +325,17 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
 
     async fn add_create(&mut self, create: header::EntryCreate) -> DatabaseResult<()> {
         let entry_hash = create.entry_hash.to_owned();
-        self.add_entry_header(Header::EntryCreate(create), entry_hash)
-            .await
+        self.add_entry_header(create, entry_hash).await
     }
 
     async fn add_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
         let replace = update.replaces_address.to_owned();
-        self.add_entry_header(Header::EntryUpdate(update), replace)
-            .await
+        self.add_entry_header(update, replace).await
     }
 
     async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
-        self.add_entry_header(Header::EntryDelete(delete), remove)
-            .await
+        self.add_entry_header(delete, remove).await
     }
 
     fn get_creates(
@@ -347,9 +368,14 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         )))
     }
 
-    // TODO: remove
-    fn get_crud(&self, _entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        todo!()
+    // TODO: For now this isn't actually checking the meta data.
+    // Once the meta data is finished this should be hooked up
+    fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        if self.system_meta.get(&entry_hash.clone().into())?.count() > 0 {
+            Ok(EntryDhtStatus::Live)
+        } else {
+            Ok(EntryDhtStatus::Dead)
+        }
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
