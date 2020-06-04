@@ -14,7 +14,7 @@ use crate::{
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    app::{AppId, InstallAppPayload},
+    app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},
     cell::{CellHandle, CellId},
     dna::{DnaFile, JsonProperties},
 };
@@ -137,45 +137,42 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     app_id,
                     agent_key,
                     dnas,
-                    proofs,
                 } = *payload;
 
                 // Install Dnas
-                let install_dna_tasks = dnas.into_iter().map(|(dna_path, properties)| async {
-                    let dna = read_parse_dna(dna_path, properties).await?;
+                let tasks = dnas.into_iter().map(|dna_payload| async {
+                    let InstallAppDnaPayload {
+                        path,
+                        properties,
+                        membrane_proof,
+                        handle,
+                    } = dna_payload;
+                    let dna = read_parse_dna(path, properties).await?;
                     let hash = dna.dna_hash().clone();
+                    let cell_id = CellId::from((hash.clone(), agent_key.clone()));
                     self.conductor_handle.install_dna(dna).await?;
-                    ConductorApiResult::Ok(hash)
+                    ConductorApiResult::Ok((InstalledCell::new(cell_id, handle), membrane_proof))
                 });
 
                 // Join all the install tasks
-                let cell_ids_with_proofs = futures::future::join_all(install_dna_tasks)
+                let cell_ids_with_proofs = futures::future::join_all(tasks)
                     .await
                     .into_iter()
-                    // If they are ok create proofs
-                    .map(|result| {
-                        result.map(|hash| {
-                            (
-                                CellId::from((hash.clone(), agent_key.clone())),
-                                proofs.get(&hash).cloned(),
-                            )
-                        })
-                    })
-                    // Check all passed and return the poofs
+                    // Check all passed and return the proofs
                     .collect::<Result<Vec<_>, _>>()?;
-
-                let cell_ids = cell_ids_with_proofs
-                    .iter()
-                    .map(|(cell_id, _)| cell_id.clone())
-                    .collect();
 
                 // Call genesis
                 self.conductor_handle
                     .clone()
-                    .genesis_cells(app_id, cell_ids_with_proofs)
+                    .install_app(app_id.clone(), cell_ids_with_proofs.clone())
                     .await?;
 
-                Ok(AdminResponse::AppInstalled(cell_ids))
+                let cell_data = cell_ids_with_proofs
+                    .into_iter()
+                    .map(|(cell_data, _)| cell_data)
+                    .collect();
+                let app = InstalledApp { app_id, cell_data };
+                Ok(AdminResponse::AppInstalled(app))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -344,7 +341,7 @@ pub enum AdminResponse {
     /// This response is unimplemented
     Unimplemented(AdminRequest),
     /// hApp [Dna]s have successfully been installed
-    AppInstalled(Vec<CellId>),
+    AppInstalled(InstalledApp),
     /// AdminInterfaces have successfully been added
     AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
@@ -451,11 +448,11 @@ mod test {
     use anyhow::Result;
     use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
     use holochain_types::{
+        app::InstallAppDnaPayload,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, write_fake_dna_file},
     };
     use matches::assert_matches;
-    use std::collections::HashMap;
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
@@ -472,15 +469,18 @@ mod test {
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let dna_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
         let dna_hash = dna.dna_hash().clone();
         let agent_key = fake_agent_pubkey_1();
-        let expected_cell_ids = vec![CellId::new(dna.dna_hash().clone(), agent_key.clone())];
-        let proofs = HashMap::new();
+        let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
+        let expected_cell_ids = InstalledApp {
+            app_id: "test".to_string(),
+            cell_data: vec![InstalledCell::new(cell_id, "".to_string())],
+        };
         let payload = InstallAppPayload {
-            dnas: vec![(dna_path, None)],
+            dnas: vec![dna_payload],
             app_id: "test".to_string(),
             agent_key,
-            proofs,
         };
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))
