@@ -19,7 +19,6 @@ use holochain_types::{
 use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
     entry::{CapClaimEntry, CapGrantEntry, Entry},
-    entry_def::EntryVisibility,
 };
 use shrinkwraprs::Shrinkwrap;
 
