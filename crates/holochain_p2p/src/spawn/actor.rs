@@ -71,8 +71,20 @@ impl HolochainP2pActor {
                 match request {
                     // this is a request type, not a broadcast
                     crate::wire::WireMessage::CallRemote { .. } => unreachable!(),
-                    crate::wire::WireMessage::Publish { .. } => {
-                        let res_fut = match self.handle_incoming_publish(space, agent) {
+                    crate::wire::WireMessage::Publish {
+                        from_agent,
+                        request_validation_receipt,
+                        entry_hash,
+                        ops,
+                    } => {
+                        let res_fut = match self.handle_incoming_publish(
+                            space,
+                            agent,
+                            from_agent,
+                            request_validation_receipt,
+                            entry_hash,
+                            ops,
+                        ) {
                             Err(e) => {
                                 let _ = respond(Err(e.into()));
                                 return Ok(async move { Ok(()) }.boxed().into());
@@ -161,11 +173,25 @@ impl HolochainP2pActor {
     /// receiving an incoming publish from a remote node
     fn handle_incoming_publish(
         &mut self,
-        _dna_hash: DnaHash,
-        _agent_pub_key: AgentPubKey,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        from_agent: AgentPubKey,
+        request_validation_receipt: bool,
+        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> HolochainP2pHandlerResult<()> {
+        let mut evt_sender = self.evt_sender.clone();
         Ok(async move {
-            // TODO - something!
+            evt_sender
+                .publish(
+                    dna_hash,
+                    to_agent,
+                    from_agent,
+                    request_validation_receipt,
+                    entry_hash,
+                    ops,
+                )
+                .await?;
             Ok(())
         }
         .boxed()
@@ -248,6 +274,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         request_validation_receipt: bool,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        timeout_ms: u64,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let basis = entry_hash.to_kitsune();
@@ -266,8 +293,8 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
                 .broadcast(kitsune_p2p::actor::Broadcast {
                     space,
                     basis,
-                    remote_agent_count: 0, // allow default best-effort
-                    timeout_ms: 0,         // allow default best-effort
+                    remote_agent_count: 0, // default best-effort
+                    timeout_ms,
                     broadcast,
                 })
                 .await?;

@@ -56,6 +56,7 @@ impl HolochainP2pCell {
         request_validation_receipt: bool,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        timeout_ms: u64,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .publish(
@@ -64,6 +65,7 @@ impl HolochainP2pCell {
                 request_validation_receipt,
                 entry_hash,
                 ops,
+                timeout_ms,
             )
             .await
     }
