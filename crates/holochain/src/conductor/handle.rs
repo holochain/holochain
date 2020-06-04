@@ -291,19 +291,18 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         app_id: AppId,
         cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()> {
-        {
-            self.conductor
-                .read()
-                .await
-                .genesis_cells(
-                    cell_data
-                        .iter()
-                        .map(|(c, p)| (c.as_id().clone(), p.clone()))
-                        .collect(),
-                    self.clone(),
-                )
-                .await?
-        };
+        self.conductor
+            .read()
+            .await
+            .genesis_cells(
+                cell_data
+                    .iter()
+                    .map(|(c, p)| (c.as_id().clone(), p.clone()))
+                    .collect(),
+                self.clone(),
+            )
+            .await?;
+
         let cell_data = cell_data.into_iter().map(|(c, _)| c).collect();
         let app = InstalledApp { app_id, cell_data };
 
