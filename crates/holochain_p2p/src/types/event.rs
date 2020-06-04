@@ -49,6 +49,13 @@ ghost_actor::ghost_chan! {
             // TODO - parameters
         ) -> (); // TODO - proper return type
 
+        /// A remote node has sent us a validation receipt.
+        fn validation_receipt_received(
+            dna_hash: DnaHash,
+            agent_pub_key: AgentPubKey,
+            receipt: SerializedBytes,
+        ) -> ();
+
         /// The p2p module wishes to query our DhtOpHash store.
         fn list_dht_op_hashes(
             // The dna_hash / space_hash context.
@@ -88,6 +95,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetValidationPackage { $i, .. } => { $($t)* }
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
+            HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::ListDhtOpHashes { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchDhtOps { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
