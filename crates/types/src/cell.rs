@@ -1,7 +1,6 @@
 //! A "Cell" represents a DNA/AgentId pair - a space where one dna/agent
 //! can track its source chain and service network requests / responses.
 
-use derive_more::{Display, From, Into};
 use fixt::prelude::*;
 use holo_hash::{AgentPubKey, AgentPubKeyFixturator, DnaHash, DnaHashFixturator};
 use std::fmt;
@@ -16,19 +15,6 @@ fixturator!(
     CellId;
     constructor fn new(DnaHash, AgentPubKey);
 );
-
-/// A conductor-specific name for a Cell
-/// (Used to be instance_id)
-#[derive(
-    Clone, Debug, Display, Hash, PartialEq, Eq, From, Into, serde::Serialize, serde::Deserialize,
-)]
-pub struct CellHandle(String);
-
-impl From<&str> for CellHandle {
-    fn from(s: &str) -> Self {
-        Self(s.to_owned())
-    }
-}
 
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

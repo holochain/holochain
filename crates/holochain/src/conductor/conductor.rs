@@ -52,7 +52,7 @@ use holochain_state::{
 };
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
-    cell::{CellHandle, CellId},
+    cell::CellId,
     dna::{wasm::DnaWasmHashed, DnaFile},
 };
 use std::collections::HashMap;
@@ -114,9 +114,6 @@ where
     /// This exists so that we can run tests and bind to port 0, and find out
     /// the dynamically allocated port later.
     admin_websocket_ports: Vec<u16>,
-
-    /// Placeholder. A way to look up a Cell from its app-specific handle.
-    _handle_map: HashMap<CellHandle, CellId>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
@@ -670,7 +667,6 @@ where
             wasm_env,
             state_db: Kv::new(db)?,
             cells: HashMap::new(),
-            _handle_map: HashMap::new(),
             shutting_down: false,
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
