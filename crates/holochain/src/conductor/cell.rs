@@ -201,10 +201,18 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
-            Publish { span, respond, .. } => {
+            Publish {
+                span,
+                respond,
+                from_agent,
+                request_validation_receipt,
+                entry_hash,
+                ops,
+                ..
+            } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_publish()
+                    self.handle_publish(from_agent, request_validation_receipt, entry_hash, ops)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
@@ -275,7 +283,13 @@ impl Cell {
     }
 
     /// we are receiving a "publish" event from the network
-    async fn handle_publish(&self) -> CellResult<()> {
+    async fn handle_publish(
+        &self,
+        _from_agent: AgentPubKey,
+        _request_validation_receipt: bool,
+        _entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    ) -> CellResult<()> {
         unimplemented!()
     }
 

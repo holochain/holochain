@@ -44,6 +44,10 @@ impl Space {
         self.agents.len()
     }
 
+    pub fn list_agents(&self) -> Vec<Arc<KitsuneAgent>> {
+        self.agents.keys().cloned().collect()
+    }
+
     /// process an incoming join request for an agent -- add them to the space
     pub fn handle_join(&mut self, agent: Arc<KitsuneAgent>) -> KitsuneP2pHandlerResult<()> {
         match self.agents.entry(agent.clone()) {
@@ -83,9 +87,26 @@ impl Space {
         // clone the event sender
         let mut evt_sender = self.evt_sender.clone();
 
-        Ok(async move { evt_sender.request(space, agent, data).await }
-            .boxed()
-            .into())
+        // as this is a short-circuit - we need to decode the data
+        // inline - here.
+        let data = wire::Wire::decode((*data).clone())?;
+
+        match data {
+            wire::Wire::Request(data) => {
+                Ok(async move { evt_sender.request(space, agent, data).await }
+                    .boxed()
+                    .into())
+            }
+            wire::Wire::Broadcast(data) => {
+                Ok(async move {
+                    evt_sender.broadcast(space, agent, data).await?;
+                    // broadcast doesn't return anything...
+                    Ok(vec![])
+                }
+                .boxed()
+                .into())
+            }
+        }
     }
 
     /// send / process a request - waiting / retrying as appropriate

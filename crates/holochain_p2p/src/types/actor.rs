@@ -2,15 +2,6 @@
 
 use crate::*;
 
-/// Publish data to the correct neigborhood.
-pub struct Publish {
-    /// The dna_hash / space_hash context.
-    pub dna_hash: DnaHash,
-    /// The agent_id / agent_pub_key context.
-    pub agent_pub_key: AgentPubKey,
-    // TODO - parameters
-}
-
 /// Request a validation package.
 pub struct GetValidationPackage {
     /// The dna_hash / space_hash context.
@@ -52,7 +43,14 @@ ghost_actor::ghost_actor! {
         fn call_remote(dna_hash: DnaHash, agent_pub_key: AgentPubKey, request: SerializedBytes) -> SerializedBytes;
 
         /// Publish data to the correct neigborhood.
-        fn publish(input: Publish) -> (); // TODO - proper return type
+        fn publish(
+            dna_hash: DnaHash,
+            from_agent: AgentPubKey,
+            request_validation_receipt: bool,
+            entry_hash: holochain_types::composite_hash::AnyDhtHash,
+            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            timeout_ms: u64,
+        ) -> ();
 
         /// Request a validation package.
         fn get_validation_package(input: GetValidationPackage) -> (); // TODO - proper return type
@@ -71,25 +69,17 @@ ghost_actor::ghost_actor! {
 impl HolochainP2pSender {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific cell context.
-    pub fn into_cell(
-        self,
-        dna_hash: DnaHash,
-        agent_pub_key: AgentPubKey,
-    ) -> crate::HolochainP2pCell {
+    pub fn into_cell(self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
         crate::HolochainP2pCell {
             sender: self,
             dna_hash: Arc::new(dna_hash),
-            agent_pub_key: Arc::new(agent_pub_key),
+            from_agent: Arc::new(from_agent),
         }
     }
 
     /// Clone and partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific cell context.
-    pub fn to_cell(
-        &self,
-        dna_hash: DnaHash,
-        agent_pub_key: AgentPubKey,
-    ) -> crate::HolochainP2pCell {
-        self.clone().into_cell(dna_hash, agent_pub_key)
+    pub fn to_cell(&self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
+        self.clone().into_cell(dna_hash, from_agent)
     }
 }
