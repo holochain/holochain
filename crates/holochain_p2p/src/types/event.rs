@@ -10,6 +10,9 @@ ghost_actor::ghost_chan! {
         fn call_remote(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
+            zome_name: ZomeName,
+            fn_name: String,
+            cap: CapSecret,
             request: SerializedBytes,
         ) -> SerializedBytes;
 

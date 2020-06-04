@@ -35,7 +35,15 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
         let res = p2p
-            .call_remote(dna, a2, UnsafeBytes::from(b"yippo".to_vec()).into())
+            .call_remote(
+                dna,
+                a1,
+                a2,
+                "".into(),
+                "".to_string(),
+                "".to_string().into(),
+                UnsafeBytes::from(b"yippo".to_vec()).into(),
+            )
             .await
             .unwrap();
         let res: Vec<u8> = UnsafeBytes::from(res).into();

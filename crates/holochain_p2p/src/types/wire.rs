@@ -4,9 +4,9 @@ use crate::*;
 #[serde(tag = "type", content = "content")]
 pub(crate) enum WireMessage {
     CallRemote {
-        zome_name: String,
+        zome_name: ZomeName,
         fn_name: String,
-        cap: String,
+        cap: CapSecret,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
@@ -32,7 +32,12 @@ impl WireMessage {
         Ok(request.try_into()?)
     }
 
-    pub fn call_remote(zome_name: String, fn_name: String, cap: String, request: SerializedBytes) -> WireMessage {
+    pub fn call_remote(
+        zome_name: ZomeName,
+        fn_name: String,
+        cap: CapSecret,
+        request: SerializedBytes,
+    ) -> WireMessage {
         Self::CallRemote {
             zome_name,
             fn_name,

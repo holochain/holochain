@@ -30,7 +30,6 @@ use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::remove_entry::remove_entry;
 use crate::core::ribosome::host_fn::remove_link::remove_link;
 use crate::core::ribosome::host_fn::schedule::schedule;
-use crate::core::ribosome::host_fn::send::send;
 use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
@@ -189,7 +188,6 @@ impl WasmRibosome {
             ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
             ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
             ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
-            ns.insert("__send", func!(invoke_host_function!(send)));
             ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
             ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
         } else {
@@ -198,7 +196,6 @@ impl WasmRibosome {
             ns.insert("__emit_signal", func!(invoke_host_function!(unreachable)));
             ns.insert("__link_entries", func!(invoke_host_function!(unreachable)));
             ns.insert("__remove_link", func!(invoke_host_function!(unreachable)));
-            ns.insert("__send", func!(invoke_host_function!(unreachable)));
             ns.insert("__update_entry", func!(invoke_host_function!(unreachable)));
             ns.insert("__remove_entry", func!(invoke_host_function!(unreachable)));
         }

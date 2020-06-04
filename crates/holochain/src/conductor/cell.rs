@@ -2,11 +2,9 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::{
-    conductor::{
-        api::{error::ConductorApiResult, CellConductorApi},
-        cell::error::CellResult,
-    },
+    conductor::{api::CellConductorApi, cell::error::CellResult},
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
         state::source_chain::SourceChainBuf,
@@ -23,16 +21,15 @@ use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
 use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo};
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::HostInput;
 use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
 use tracing::*;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::HostInput;
-use crate::core::ribosome::ZomeCallInvocationResponse;
-use crate::core::ribosome::error::RibosomeError;
+//use crate::core::ribosome::error::RibosomeError;
 
 pub mod error;
 
@@ -181,6 +178,7 @@ impl Cell {
         match evt {
             CallRemote {
                 span,
+                to_agent,
                 zome_name,
                 fn_name,
                 cap,
@@ -190,13 +188,7 @@ impl Cell {
             } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_call_remote(
-                        evt.agent_pub_key(),
-                        zome_name.into(),
-                        fn_name,
-                        cap.into(),
-                        request
-                    )
+                    self.handle_call_remote(to_agent, zome_name, fn_name, cap, request)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
@@ -338,9 +330,16 @@ impl Cell {
     }
 
     /// a remote agent is attempting a "call_remote" on this cell.
-    async fn handle_call_remote(&self, provenance: AgentPubKey, zome_name: ZomeName, fn_name: String, cap: CapSecret, payload: SerializedBytes) -> CellResult<SerializedBytes> {
+    async fn handle_call_remote(
+        &self,
+        provenance: AgentPubKey,
+        zome_name: ZomeName,
+        fn_name: String,
+        cap: CapSecret,
+        payload: SerializedBytes,
+    ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCallInvocation {
-            cell_id: self.id,
+            cell_id: self.id.clone(),
             zome_name: zome_name.clone(),
             cap,
             payload: HostInput::new(payload),
@@ -352,7 +351,8 @@ impl Cell {
         // - ZomeCallInvocationResult
         match self.call_zome(invocation).await?? {
             ZomeCallInvocationResponse::ZomeApiFn(guest_output) => Ok(guest_output.into_inner()),
-            _ => Err(RibosomeError::ZomeFnNotExists(zome_name, "A remote zome call failed in a way that should not be possible.".into()))?,
+            //currently unreachable
+            //_ => Err(RibosomeError::ZomeFnNotExists(zome_name, "A remote zome call failed in a way that should not be possible.".into()))?,
         }
     }
 
@@ -360,7 +360,7 @@ impl Cell {
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+    ) -> CellResult<ZomeCallInvocationResult> {
         // Check if init has run if not run it
         self.check_or_run_init().await?;
 
