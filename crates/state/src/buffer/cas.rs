@@ -67,6 +67,7 @@ where
         })))
     }
 
+    #[cfg(test)]
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
     pub fn iter_fail_raw(
         &'env self,

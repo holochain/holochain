@@ -1,7 +1,7 @@
 use fixt::prelude::*;
 use holochain_2020::core::state::{
     cascade::Cascade,
-    chain_meta::ChainMetaBuf,
+    chain_meta::{ChainMetaBuf, LinkMetaKey},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
@@ -103,9 +103,9 @@ async fn get_links() -> SourceChainResult<()> {
     );
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
-    let links = cascade
-        .dht_get_links(base.into(), Some(zome_id), Some(tag))
-        .await?;
+    let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
+
+    let links = cascade.dht_get_links(&key).await?;
     let link = links.into_iter().next();
     assert_eq!(link, None);
     Ok(())

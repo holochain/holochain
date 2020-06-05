@@ -74,7 +74,7 @@ impl<'env> DnaDefBuf<'env> {
     }
 
     pub fn get_all(&'env self) -> DatabaseResult<Vec<DnaDefHashed>> {
-        self.dna_defs.iter_fail_raw()?.collect()
+        self.dna_defs.iter_fail()?.collect()
     }
 }
 

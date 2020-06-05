@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::Zome)>;
 
-/// A type to allow json values to be used as [SerializedBtyes]
+/// A type to allow json values to be used as [SerializedBytes]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct Properties {
     properties: serde_json::Value,

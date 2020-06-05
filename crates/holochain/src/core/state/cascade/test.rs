@@ -1,8 +1,9 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_meta::{links_test::LinkFixturator, EntryDhtStatus, MockChainMetaBuf},
+    chain_meta::{EntryDhtStatus, LinkMetaKey, MockChainMetaBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
+use crate::fixt::LinkMetaValFixturator;
 use fixt::prelude::*;
 use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
@@ -113,7 +114,7 @@ async fn live_local_return() -> SourceChainResult<()> {
 
     // set it's metadata to LIVE
     mock_primary_meta
-        .expect_get_crud()
+        .expect_get_dht_status()
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
 
@@ -157,7 +158,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
 
     // set it's metadata to Dead
     mock_primary_meta
-        .expect_get_crud()
+        .expect_get_dht_status()
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Dead));
 
@@ -201,7 +202,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
 
     // set it's metadata to Live
     mock_cache_meta
-        .expect_get_crud()
+        .expect_get_dht_status()
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
 
@@ -289,21 +290,26 @@ async fn links_local_return() -> SourceChainResult<()> {
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
 
-    let link = LinkFixturator::new((target.clone(), tag.clone()))
+    let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
         .next()
         .unwrap();
+
+    let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
     // Return a link between entries
     mock_primary_meta
         .expect_get_links()
-        .with(
-            predicate::eq(EntryHash::from(base.clone())),
-            predicate::eq(Some(zome_id)),
-            predicate::eq(Some(tag.clone())),
-        )
+        .withf({
+            let base = base.clone();
+            let tag = tag.clone();
+            move |k| {
+                let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
+                k == &key
+            }
+        })
         .returning({
             let link = link.clone();
-            move |_, _, _| Ok(vec![link.clone()])
+            move |_| Ok(vec![link.clone()])
         });
 
     // call dht_get_links with above base
@@ -313,9 +319,7 @@ async fn links_local_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade
-        .dht_get_links(base.into(), Some(zome_id), Some(tag))
-        .await?;
+    let links = cascade.dht_get_links(&key).await?;
     // check it returns
     assert_eq!(links, vec![link]);
     // check it doesn't hit the cache
@@ -355,30 +359,38 @@ async fn links_cache_return() -> SourceChainResult<()> {
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
 
-    let link = LinkFixturator::new((target.clone(), tag.clone()))
+    let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
         .next()
         .unwrap();
+
+    let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
     // Return empty links
     mock_primary_meta
         .expect_get_links()
-        .with(
-            predicate::eq(base.clone()),
-            predicate::eq(Some(zome_id)),
-            predicate::eq(Some(tag.clone())),
-        )
-        .returning(move |_, _, _| Ok(Vec::new()));
+        .withf({
+            let base = base.clone();
+            let tag = tag.clone();
+            move |k| {
+                let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
+                k == &key
+            }
+        })
+        .returning(move |_| Ok(Vec::new()));
     // Return a link between entries
     mock_cache_meta
         .expect_get_links()
-        .with(
-            predicate::eq(base.clone()),
-            predicate::eq(Some(zome_id)),
-            predicate::eq(Some(tag.clone())),
-        )
+        .withf({
+            let base = base.clone();
+            let tag = tag.clone();
+            move |k| {
+                let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
+                k == &key
+            }
+        })
         .returning({
             let link = link.clone();
-            move |_, _, _| Ok(vec![link.clone()])
+            move |_| Ok(vec![link.clone()])
         });
 
     // call dht_get_links with above base
@@ -388,9 +400,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade
-        .dht_get_links(base.into(), Some(zome_id), Some(tag))
-        .await?;
+    let links = cascade.dht_get_links(&key).await?;
     // check it returns
     assert_eq!(links, vec![link.clone()]);
     Ok(())
@@ -423,21 +433,26 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
 
-    let link = LinkFixturator::new((target.clone(), tag.clone()))
+    let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
         .next()
         .unwrap();
+
+    let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
     // Return empty links
     mock_cache_meta
         .expect_get_links()
-        .with(
-            predicate::eq(base.clone()),
-            predicate::eq(Some(zome_id)),
-            predicate::eq(Some(tag.clone())),
-        )
+        .withf({
+            let base = base.clone();
+            let tag = tag.clone();
+            move |k| {
+                let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
+                k == &key
+            }
+        })
         .returning({
             let link = link.clone();
-            move |_, _, _| Ok(vec![link.clone()])
+            move |_| Ok(vec![link.clone()])
         });
 
     // call dht_get_links with above base
@@ -447,9 +462,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         &cache.cas(),
         &mock_cache_meta,
     );
-    let links = cascade
-        .dht_get_links(base.into(), Some(zome_id), Some(tag).clone())
-        .await?;
+    let links = cascade.dht_get_links(&key).await?;
     // check it returns
     assert_eq!(links, vec![link]);
     // check it doesn't hit the primary

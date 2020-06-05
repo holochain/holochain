@@ -133,3 +133,13 @@ impl std::fmt::Display for AnyDhtHash {
         match_dht_addr!(self => |i| { i.fmt(f) })
     }
 }
+
+impl AsRef<[u8]> for AnyDhtHash {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            AnyDhtHash::EntryContent(h) => h.as_ref(),
+            AnyDhtHash::Agent(h) => h.as_ref(),
+            AnyDhtHash::Header(h) => h.as_ref(),
+        }
+    }
+}

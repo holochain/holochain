@@ -40,7 +40,7 @@ pub enum EntryDhtStatus {
 
 // TODO: Maybe this should be moved to link.rs in types?
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct Link {
+pub struct LinkMetaVal {
     pub link_add_hash: HeaderHash,
     pub target: EntryHash,
     pub timestamp: Timestamp,
@@ -48,54 +48,57 @@ pub struct Link {
     pub tag: Tag,
 }
 
-/// Key for finding a link
-/// Must have add_link_hash for inserts
-/// but is optional if you want all links on a get
-#[derive(Debug, Clone)]
-struct LinkKey<'a> {
-    base: &'a EntryHash,
-    zome_id: Option<ZomeId>,
-    tag: Option<Tag>,
-    link_add_hash: Option<HeaderHash>,
+/// Key for the LinkMeta database.
+///
+/// Constructed so that links can be queried by a prefix match
+/// on the key.
+/// Must provide `tag` and `link_add_hash` for inserts,
+/// but both are optional for gets.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum LinkMetaKey<'a> {
+    Base(&'a EntryHash),
+    BaseZome(&'a EntryHash, ZomeId),
+    BaseZomeTag(&'a EntryHash, ZomeId, &'a Tag),
+    Full(&'a EntryHash, ZomeId, &'a Tag, &'a HeaderHash),
 }
 
-impl<'a> LinkKey<'a> {
-    fn to_key(&self) -> Vec<u8> {
-        let mut vec: Vec<u8> = self.base.as_ref().to_vec();
-        if let Some(zome_id) = self.zome_id {
-            vec.push(zome_id);
+type LinkKey = Vec<u8>;
+
+impl<'a> LinkMetaKey<'a> {
+    fn to_key(&self) -> LinkKey {
+        use LinkMetaKey::*;
+        match self {
+            Base(b) => b.as_ref().to_vec(),
+            BaseZome(b, z) => [b.as_ref(), &[*z]].concat(),
+            BaseZomeTag(b, z, t) => [b.as_ref(), &[*z], t.as_ref()].concat(),
+            Full(b, z, t, l) => [b.as_ref(), &[*z], t.as_ref(), l.as_ref()].concat(),
         }
-        if let Some(ref tag) = self.tag {
-            vec.extend_from_slice(tag.as_ref());
+    }
+
+    pub fn base(&self) -> &EntryHash {
+        use LinkMetaKey::*;
+        match self {
+            Base(b) | BaseZome(b, _) | BaseZomeTag(b, _, _) | Full(b, _, _, _) => b,
         }
-        if let Some(ref link_add_hash) = self.link_add_hash {
-            vec.extend_from_slice(link_add_hash.as_ref());
-        }
-        vec
     }
 }
 
-impl<'a> From<(&'a LinkAdd, HeaderHash)> for LinkKey<'a> {
-    fn from((link_add, hash): (&'a LinkAdd, HeaderHash)) -> Self {
-        Self {
-            base: &link_add.base_address,
-            zome_id: Some(link_add.zome_id),
-            tag: Some(link_add.tag.clone()),
-            link_add_hash: Some(hash),
-        }
+impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
+    fn from((link_add, hash): (&'a LinkAdd, &'a HeaderHash)) -> Self {
+        Self::Full(
+            &link_add.base_address,
+            link_add.zome_id,
+            &link_add.tag,
+            hash,
+        )
     }
 }
 
 #[async_trait::async_trait]
 pub trait ChainMetaBufT {
     // Links
-    /// Get all te links on this base that match the tag
-    fn get_links(
-        &self,
-        base: &EntryHash,
-        zome_id: Option<ZomeId>,
-        tag: Option<Tag>,
-    ) -> DatabaseResult<Vec<Link>>;
+    /// Get all the links on this base that match the tag
+    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>>;
 
     /// Add a link
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
@@ -129,7 +132,7 @@ pub trait ChainMetaBufT {
         header_hash: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>;
 
-    fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
+    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
 
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
 
@@ -149,11 +152,24 @@ enum EntryHeader {
     Delete(Header),
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-enum SysMetaKey {
-    Agent(AgentPubKey),
-    EntryContent(EntryContentHash),
-    Header(HeaderHash),
+type SysMetaKey = AnyDhtHash;
+
+impl LinkMetaVal {
+    pub fn new(
+        link_add_hash: HeaderHash,
+        target: EntryHash,
+        timestamp: Timestamp,
+        zome_id: ZomeId,
+        tag: Tag,
+    ) -> Self {
+        Self {
+            link_add_hash,
+            target,
+            timestamp,
+            zome_id,
+            tag,
+        }
+    }
 }
 
 impl EntryHeader {
@@ -186,44 +202,9 @@ impl From<header::EntryDelete> for EntryHeader {
     }
 }
 
-impl From<AnyDhtHash> for SysMetaKey {
-    fn from(hash: AnyDhtHash) -> Self {
-        match hash {
-            AnyDhtHash::EntryContent(h) => SysMetaKey::EntryContent(h),
-            AnyDhtHash::Agent(h) => SysMetaKey::Agent(h),
-            AnyDhtHash::Header(h) => SysMetaKey::Header(h),
-        }
-    }
-}
-
-impl From<EntryHash> for SysMetaKey {
-    fn from(hash: EntryHash) -> Self {
-        match hash {
-            EntryHash::Entry(h) => SysMetaKey::EntryContent(h),
-            EntryHash::Agent(h) => SysMetaKey::Agent(h),
-        }
-    }
-}
-
-impl From<HeaderHash> for SysMetaKey {
-    fn from(hash: HeaderHash) -> Self {
-        SysMetaKey::Header(hash)
-    }
-}
-
-impl AsRef<[u8]> for SysMetaKey {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            SysMetaKey::Agent(h) => h.as_ref(),
-            SysMetaKey::EntryContent(h) => h.as_ref(),
-            SysMetaKey::Header(h) => h.as_ref(),
-        }
-    }
-}
-
 pub struct ChainMetaBuf<'env> {
     system_meta: KvvBuf<'env, SysMetaKey, SysMetaVal, Reader<'env>>,
-    links_meta: KvBuf<'env, Vec<u8>, Link, Reader<'env>>,
+    links_meta: KvBuf<'env, LinkKey, LinkMetaVal, Reader<'env>>,
 }
 
 impl<'env> ChainMetaBuf<'env> {
@@ -267,18 +248,7 @@ impl<'env> ChainMetaBuf<'env> {
 #[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait]
 impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
-    fn get_links(
-        &self,
-        base: &EntryHash,
-        zome_id: Option<ZomeId>,
-        tag: Option<Tag>,
-    ) -> DatabaseResult<Vec<Link>> {
-        let key = LinkKey {
-            base,
-            zome_id,
-            tag,
-            link_add_hash: None,
-        };
+    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
         self.links_meta
             .iter_all_key_matches(key.to_key())?
             .map(|(_, v)| Ok(v))
@@ -290,11 +260,11 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
             HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
                 .await?
                 .into();
-        let key = LinkKey::from((&link_add, link_add_hash.clone()));
+        let key = LinkMetaKey::from((&link_add, &link_add_hash));
 
         self.links_meta.put(
             key.to_key(),
-            Link {
+            LinkMetaVal {
                 link_add_hash,
                 target: link_add.target_address,
                 timestamp: link_add.timestamp,
@@ -311,14 +281,9 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
         zome_id: ZomeId,
         tag: Tag,
     ) -> DatabaseResult<()> {
-        let key = LinkKey {
-            base,
-            zome_id: Some(zome_id),
-            tag: Some(tag),
-            link_add_hash: Some(link_remove.link_add_address),
-        };
+        let key = LinkMetaKey::Full(base, zome_id, &tag, &link_remove.link_add_address);
         debug!(removing_key = ?key);
-        // TODO: It should be impossible to ever remove a Link that wasn't already added
+        // TODO: It should be impossible to ever remove a LinkMetaVal that wasn't already added
         // because of the validation dependency on LinkAdd from LinkRemove
         // but do we want some kind of warning or panic here incase we mssed up?
         self.links_meta.delete(key.to_key())
@@ -371,7 +336,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
 
     // TODO: For now this isn't actually checking the meta data.
     // Once the meta data is finished this should be hooked up
-    fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
         if fallible_iterator::convert(self.system_meta.get(&entry_hash.clone().into())?)
             .filter(|sys_val| {
                 if let SysMetaVal::Create(_) = sys_val {
@@ -401,13 +366,13 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
 mock! {
     pub ChainMetaBuf
     {
-        fn get_links(&self, base: &EntryHash, zome_id: Option<ZomeId>, tag: Option<Tag>) -> DatabaseResult<Vec<Link>>;
+        fn get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<LinkMetaVal>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn sync_add_update(&self, update: header::EntryUpdate) -> DatabaseResult<()>;
         fn sync_add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
-        fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
+        fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
         fn get_creates(
@@ -427,21 +392,16 @@ mock! {
 
 #[async_trait::async_trait]
 impl ChainMetaBufT for MockChainMetaBuf {
-    fn get_links(
-        &self,
-        base: &EntryHash,
-        zome_id: Option<ZomeId>,
-        tag: Option<Tag>,
-    ) -> DatabaseResult<Vec<Link>> {
-        self.get_links(base, zome_id, tag)
+    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
+        self.get_links(key)
     }
 
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
         self.get_canonical_entry_hash(entry_hash)
     }
 
-    fn get_crud(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        self.get_crud(entry_hash)
+    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        self.get_dht_status(entry_hash)
     }
 
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {

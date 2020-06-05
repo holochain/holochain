@@ -118,7 +118,7 @@ impl<'env> SourceChain<'env> {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
-            .iter_fail_raw()?
+            .iter_fail()?
             .filter_map(|entry| {
                 Ok(entry.as_cap_grant().and_then(|grant| {
                     grant.access().secret().and_then(|secret| {
@@ -162,7 +162,7 @@ impl<'env> SourceChain<'env> {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapClaims",
             )
-            .iter_fail_raw()?
+            .iter_fail()?
             .filter_map(|entry| {
                 Ok(entry.clone().as_cap_claim().and_then(|claim| {
                     if claim.secret() == query {

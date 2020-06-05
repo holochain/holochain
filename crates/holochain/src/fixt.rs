@@ -3,19 +3,30 @@ pub mod curve;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
+use crate::core::state::chain_meta::LinkMetaVal;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
+use holo_hash::EntryContentHashFixturator;
 use holo_hash::HeaderHashFixturator;
 use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
+use holochain_types::composite_hash::EntryHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
+use holochain_types::fixt::HeaderBuilderCommonFixturator;
+use holochain_types::fixt::TimestampFixturator;
+use holochain_types::header::builder::HeaderBuilder;
+use holochain_types::header::builder::LinkAdd as LinkAddBuilder;
+use holochain_types::header::builder::LinkRemove as LinkRemoveBuilder;
+use holochain_types::header::LinkAdd;
+use holochain_types::header::{HeaderBuilderCommon, LinkRemove, ZomeId};
+use holochain_types::link::Tag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
@@ -423,5 +434,118 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
         self.0.index = self.0.index + 1;
 
         Some(ribosome)
+    }
+}
+
+fixturator!(
+    EntryHash;
+    variants [
+        Entry(EntryContentHash)
+        Agent(AgentPubKey)
+    ];
+);
+
+fixturator!(
+    Tag; from Bytes;
+);
+
+fixturator!(
+    LinkAddBuilder;
+    constructor fn new(EntryHash, EntryHash, u8, Tag);
+);
+
+fixturator!(
+    LinkAddBuilderCombo;
+    constructor fn new(LinkAddBuilder, HeaderBuilderCommon);
+);
+pub struct LinkAddBuilderCombo(LinkAddBuilder, HeaderBuilderCommon);
+
+impl LinkAddBuilderCombo {
+    fn new(l: LinkAddBuilder, h: HeaderBuilderCommon) -> Self {
+        Self(l, h)
+    }
+}
+
+impl From<LinkAddBuilderCombo> for LinkAdd {
+    fn from(l: LinkAddBuilderCombo) -> Self {
+        l.0.build(l.1)
+    }
+}
+
+fixturator!(
+    LinkAdd; from LinkAddBuilderCombo;
+);
+
+fixturator!(
+    LinkRemoveBuilder;
+    constructor fn new(HeaderHash);
+);
+
+fixturator!(
+    LinkRemoveBuilderCombo;
+    constructor fn new(LinkRemoveBuilder, HeaderBuilderCommon);
+);
+pub struct LinkRemoveBuilderCombo(LinkRemoveBuilder, HeaderBuilderCommon);
+
+impl LinkRemoveBuilderCombo {
+    fn new(l: LinkRemoveBuilder, h: HeaderBuilderCommon) -> Self {
+        Self(l, h)
+    }
+}
+
+impl From<LinkRemoveBuilderCombo> for LinkRemove {
+    fn from(l: LinkRemoveBuilderCombo) -> Self {
+        l.0.build(l.1)
+    }
+}
+
+fixturator!(
+    LinkRemove; from LinkRemoveBuilderCombo;
+);
+
+fixturator!(
+    LinkMetaVal;
+    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, Tag);
+);
+
+pub struct KnownLinkAdd {
+    pub base_address: EntryHash,
+    pub target_address: EntryHash,
+    pub tag: Tag,
+    pub zome_id: ZomeId,
+}
+
+pub struct KnownLinkRemove {
+    pub link_add_address: holo_hash::HeaderHash,
+}
+
+impl Iterator for LinkAddFixturator<KnownLinkAdd> {
+    type Item = LinkAdd;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut f = LinkAddFixturator::new(Unpredictable).next().unwrap();
+        f.base_address = self.0.curve.base_address.clone();
+        f.target_address = self.0.curve.target_address.clone();
+        f.tag = self.0.curve.tag.clone();
+        f.zome_id = self.0.curve.zome_id.clone();
+        Some(f)
+    }
+}
+
+impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
+    type Item = LinkRemove;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut f = LinkRemoveFixturator::new(Unpredictable).next().unwrap();
+        f.link_add_address = self.0.curve.link_add_address.clone();
+        Some(f)
+    }
+}
+
+impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
+    type Item = LinkMetaVal;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut f = LinkMetaValFixturator::new(Unpredictable).next().unwrap();
+        f.target = self.0.curve.0.clone();
+        f.tag = self.0.curve.1.clone();
+        Some(f)
     }
 }

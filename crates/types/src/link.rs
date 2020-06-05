@@ -65,6 +65,12 @@ impl Tag {
     }
 }
 
+impl From<Vec<u8>> for Tag {
+    fn from(b: Vec<u8>) -> Self {
+        Self(b)
+    }
+}
+
 /// How do we match this link in queries?
 pub enum LinkMatch<S: Into<String>> {
     /// Match all/any links.

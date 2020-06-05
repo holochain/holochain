@@ -41,6 +41,14 @@ macro_rules! builder_variant {
             $(pub $field : $t),*
         }
 
+        impl $name {
+            pub fn new($($field : $t),* ) -> Self {
+                Self {
+                    $($field),*
+                }
+            }
+        }
+
         impl HeaderBuilder<header::$name> for $name {
             fn build(self, common: HeaderBuilderCommon) -> header::$name {
                 let HeaderBuilderCommon {
@@ -57,6 +65,12 @@ macro_rules! builder_variant {
                     prev_header,
                     $($field : self.$field),*
                 }
+            }
+        }
+
+        impl From<($name, HeaderBuilderCommon)> for header::$name {
+            fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
+                n.build(h)
             }
         }
     }

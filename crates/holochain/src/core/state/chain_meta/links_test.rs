@@ -1,142 +1,11 @@
 use super::*;
+use crate::fixt::{
+    EntryHashFixturator, KnownLinkAdd, KnownLinkRemove, LinkAddFixturator, LinkRemoveFixturator,
+};
 use fixt::prelude::*;
 use holo_hash::{AgentPubKeyFixturator, EntryContentHashFixturator, HeaderHashFixturator};
 use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
 use holochain_types::{fixt::TimestampFixturator, observability, Timestamp};
-
-fixturator!(
-    LinkAdd;
-    curve Empty LinkAdd {
-        author: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-        timestamp: TimestampFixturator::new(Empty).next().unwrap(),
-        header_seq: U32Fixturator::new(Empty).next().unwrap(),
-        prev_header: HeaderHashFixturator::new(Empty).next().unwrap(),
-        base_address: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
-        target_address: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
-        zome_id: U8Fixturator::new(Empty).next().unwrap(),
-        tag: Tag::new(BytesFixturator::new(Empty).next().unwrap()),
-    };
-    curve Unpredictable LinkAdd {
-        author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-        timestamp: TimestampFixturator::new(Unpredictable).next().unwrap(),
-        header_seq: U32Fixturator::new(Unpredictable).next().unwrap(),
-        prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
-        base_address: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
-        target_address: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
-        zome_id: U8Fixturator::new(Unpredictable).next().unwrap(),
-        tag: Tag::new(BytesFixturator::new(Unpredictable).next().unwrap()),
-    };
-    curve Predictable LinkAdd {
-        author: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        timestamp: TimestampFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        header_seq: U32Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        prev_header: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        base_address: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
-        target_address: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
-        zome_id: U8Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        tag: Tag::new(BytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
-    };
-);
-
-fixturator!(
-    LinkRemove;
-    curve Empty LinkRemove {
-        author: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-        timestamp: Timestamp::now(),
-        header_seq: U32Fixturator::new(Empty).next().unwrap(),
-        prev_header: HeaderHashFixturator::new(Empty).next().unwrap(),
-        link_add_address: HeaderHashFixturator::new(Empty).next().unwrap(),
-    };
-    curve Unpredictable LinkRemove {
-        author: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-        timestamp: Timestamp::now(),
-        header_seq: U32Fixturator::new(Unpredictable).next().unwrap(),
-        prev_header: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
-        link_add_address: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
-    };
-    curve Predictable LinkRemove {
-        author: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        timestamp: Timestamp::now(),
-        header_seq: U32Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        prev_header: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        link_add_address: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-    };
-);
-
-fixturator!(
-    Link;
-    curve Empty Link {
-        timestamp: Timestamp::now(),
-        link_add_hash: HeaderHashFixturator::new(Empty).next().unwrap(),
-        target: EntryContentHashFixturator::new(Empty).next().unwrap().into(),
-        zome_id: U8Fixturator::new(Empty).next().unwrap(),
-        tag: Tag::new(BytesFixturator::new(Empty).next().unwrap()),
-    };
-    curve Unpredictable Link {
-        timestamp: Timestamp::now(),
-        link_add_hash: HeaderHashFixturator::new(Unpredictable).next().unwrap(),
-        target: EntryContentHashFixturator::new(Unpredictable).next().unwrap().into(),
-        zome_id: U8Fixturator::new(Unpredictable).next().unwrap(),
-        tag: Tag::new(BytesFixturator::new(Unpredictable).next().unwrap()),
-    };
-    curve Predictable Link {
-        timestamp: Timestamp::now(),
-        link_add_hash: HeaderHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        target: EntryContentHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap().into(),
-        zome_id: U8Fixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        tag: Tag::new(BytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
-    };
-);
-
-fixturator!(
-    EntryHash;
-    variants [
-        Entry(EntryContentHash)
-        Agent(AgentPubKey)
-    ];
-);
-
-pub struct KnownLinkAdd {
-    base_address: EntryHash,
-    target_address: EntryHash,
-    tag: Tag,
-    zome_id: ZomeId,
-}
-
-pub struct KnownLinkRemove {
-    link_add_address: HeaderHash,
-}
-
-impl Iterator for LinkAddFixturator<KnownLinkAdd> {
-    type Item = LinkAdd;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkAddFixturator::new(Unpredictable).next().unwrap();
-        f.base_address = self.0.curve.base_address.clone();
-        f.target_address = self.0.curve.target_address.clone();
-        f.tag = self.0.curve.tag.clone();
-        f.zome_id = self.0.curve.zome_id.clone();
-        Some(f)
-    }
-}
-
-impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
-    type Item = LinkRemove;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkRemoveFixturator::new(Unpredictable).next().unwrap();
-        f.link_add_address = self.0.curve.link_add_address.clone();
-        Some(f)
-    }
-}
-
-impl Iterator for LinkFixturator<(EntryHash, Tag)> {
-    type Item = Link;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkFixturator::new(Unpredictable).next().unwrap();
-        f.target = self.0.curve.0.clone();
-        f.tag = self.0.curve.1.clone();
-        Some(f)
-    }
-}
 
 macro_rules! here {
     ($test: expr) => {
@@ -151,7 +20,7 @@ struct TestData {
     base_hash: EntryHash,
     zome_id: ZomeId,
     tag: Tag,
-    expected_link: Link,
+    expected_link: LinkMetaVal,
 }
 
 async fn fixtures(n: usize) -> Vec<TestData> {
@@ -184,7 +53,7 @@ async fn fixtures(n: usize) -> Vec<TestData> {
                 .unwrap()
                 .into();
 
-        let expected_link = Link {
+        let expected_link = LinkMetaVal {
             link_add_hash: link_add_hash.clone(),
             target: target_address.clone(),
             timestamp: link_add.timestamp.clone(),
@@ -212,19 +81,15 @@ async fn fixtures(n: usize) -> Vec<TestData> {
 #[allow(dead_code)]
 impl TestData {
     fn empty(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
-        assert!(
-            meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
-                .unwrap()
-                .is_empty(),
-            test
-        );
+        let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
+        assert!(meta_buf.get_links(&key).unwrap().is_empty(), test);
     }
 
     fn is_on_full_key(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
             meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
+                .get_links(&key)
                 .unwrap()
                 .contains(&self.expected_link),
             "{}",
@@ -233,10 +98,9 @@ impl TestData {
     }
 
     fn only_on_full_key(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert_eq!(
-            &meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
-                .unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -244,32 +108,35 @@ impl TestData {
     }
 
     fn not_on_full_key(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
             !meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), Some(self.tag.clone()))
+                .get_links(&key)
                 .unwrap()
                 .contains(&self.expected_link),
-            "Link: {:?} should not be present {}",
+            "LinkMetaVal: {:?} should not be present {}",
             self.expected_link,
             test
         );
     }
 
     fn is_on_base(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let key = LinkMetaKey::Base(&self.base_hash);
         assert!(
             meta_buf
-                .get_links(&self.base_hash, None, None)
+                .get_links(&key)
                 .unwrap()
                 .contains(&self.expected_link),
-            "Results should contain Link: {:?} in test: {}",
+            "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
             test
         );
     }
 
     fn only_on_base(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let key = LinkMetaKey::Base(&self.base_hash);
         assert_eq!(
-            &meta_buf.get_links(&self.base_hash, None, None).unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -277,22 +144,22 @@ impl TestData {
     }
 
     fn is_on_zome_id(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert!(
             meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), None)
+                .get_links(&key)
                 .unwrap()
                 .contains(&self.expected_link),
-            "Results should contain Link: {:?} in test: {}",
+            "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
             test
         );
     }
 
     fn only_on_zome_id(&self, test: &'static str, meta_buf: &ChainMetaBuf) {
+        let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert_eq!(
-            &meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), None)
-                .unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -304,10 +171,9 @@ impl TestData {
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = Tag::new(&self.tag[..half_tag]);
+        let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert_eq!(
-            &meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), Some(half_tag))
-                .unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -319,12 +185,13 @@ impl TestData {
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = Tag::new(&self.tag[..half_tag]);
+        let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert!(
             meta_buf
-                .get_links(&self.base_hash, Some(self.zome_id), Some(half_tag))
+                .get_links(&key)
                 .unwrap()
                 .contains(&self.expected_link),
-            "Results should contain Link: {:?} in test: {}",
+            "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
             test
         );
@@ -355,10 +222,11 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        let key = LinkMetaKey::Base(&base_hash);
         assert_eq!(
-            &meta_buf.get_links(base_hash, None, None).unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &expected[..],
             "{}",
             test
@@ -377,10 +245,11 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        let key = LinkMetaKey::BaseZome(&base_hash, zome_id);
         assert_eq!(
-            &meta_buf.get_links(base_hash, Some(zome_id), None).unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &expected[..],
             "{}",
             test
@@ -401,12 +270,11 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &tag);
         assert_eq!(
-            &meta_buf
-                .get_links(base_hash, Some(zome_id), Some(tag.clone()))
-                .unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &expected[..],
             "{}",
             test
@@ -430,12 +298,11 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkKey::from((&d.0, d.1.link_add_hash.clone())).to_key());
+        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
+        let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &half_tag);
         assert_eq!(
-            &meta_buf
-                .get_links(base_hash, Some(zome_id), Some(half_tag))
-                .unwrap()[..],
+            &meta_buf.get_links(&key).unwrap()[..],
             &expected[..],
             "{}",
             test

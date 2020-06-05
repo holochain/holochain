@@ -40,7 +40,7 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus, Link},
+    chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus, LinkMetaKey, LinkMetaVal},
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{composite_hash::EntryHash, header::ZomeId, link::Tag, EntryHashed};
@@ -107,13 +107,16 @@ where
             .get_entry(entry_hash)
             .await?
             .and_then(|entry| {
-                self.primary_meta.get_crud(entry_hash).ok().map(|crud| {
-                    if let EntryDhtStatus::Live = crud {
-                        Search::Found(entry)
-                    } else {
-                        Search::NotInCascade
-                    }
-                })
+                self.primary_meta
+                    .get_dht_status(entry_hash)
+                    .ok()
+                    .map(|crud| {
+                        if let EntryDhtStatus::Live = crud {
+                            Search::Found(entry)
+                        } else {
+                            Search::NotInCascade
+                        }
+                    })
             })
             .unwrap_or_else(|| Search::Continue);
 
@@ -121,7 +124,7 @@ where
         match search {
             Search::Continue => Ok(self.cache.get_entry(entry_hash).await?.and_then(|entry| {
                 self.cache_meta
-                    .get_crud(entry_hash)
+                    .get_dht_status(entry_hash)
                     .ok()
                     .and_then(|crud| match crud {
                         EntryDhtStatus::Live => Some(entry),
@@ -137,27 +140,25 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get_links(
+    pub async fn dht_get_links<'a>(
         &self,
-        base: EntryHash,
-        zome_id: Option<ZomeId>,
-        tag: Option<Tag>,
-    ) -> DatabaseResult<Vec<Link>> {
+        key: &'a LinkMetaKey<'a>,
+    ) -> DatabaseResult<Vec<LinkMetaVal>> {
         // Am I an authority?
-        let authority = self.primary.contains(&base).await?;
+        let authority = self.primary.contains(&key.base()).await?;
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(&base, zome_id, tag.clone())?;
+            let links = self.primary_meta.get_links(key)?;
 
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(&base, zome_id, tag)
+                self.cache_meta.get_links(key)
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            self.cache_meta.get_links(&base, zome_id, tag)
+            self.cache_meta.get_links(key)
         }
     }
 }
