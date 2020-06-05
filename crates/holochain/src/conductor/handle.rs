@@ -456,6 +456,8 @@ pub mod mock {
 
             fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
+            fn sync_get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
+
             #[cfg(test)]
             fn sync_get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
@@ -569,6 +571,10 @@ pub mod mock {
         /// Dump the cells state
         async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             self.sync_dump_cell_state(cell_id)
+        }
+
+        async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+            self.sync_get_app_info(app_id)
         }
 
         // HACK: remove when B-01593 lands

@@ -518,7 +518,7 @@ mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCallInvocationResponse{ .. });
+            assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
