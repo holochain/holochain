@@ -9,7 +9,6 @@ use holochain_2020::conductor::{
 };
 use holochain_2020::core::ribosome::NamedInvocation;
 use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
-use holochain_2020::core::ribosome::ZomeCallInvocationResponse;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -240,11 +239,9 @@ async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut 
     let response = app_interface.request(request);
     let call_response = check_timeout(holochain, response, 2000).await;
     let foo = TestString::from(String::from("foo"));
-    let expected = Box::new(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(
-        foo.try_into().unwrap(),
-    )));
+    let expected = Box::new(GuestOutput::new(foo.try_into().unwrap()));
     trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeCallInvocationResponse{ response } if response == expected);
+    assert_matches!(call_response, AppResponse::ZomeCallInvocation(response) if response == expected);
     app_interface
         .close(1000, "Shutting down".into())
         .await
