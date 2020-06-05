@@ -80,8 +80,8 @@ impl InstalledCell {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// A collection of [CellIds]s paired with an app id
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledApp {
     /// Placeholder to find the app
     pub app_id: AppId,

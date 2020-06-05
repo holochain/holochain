@@ -1,7 +1,7 @@
 use crate::conductor::interface::InterfaceDriver;
 
 use holochain_types::{
-    app::{AppId, InstalledCell},
+    app::{AppId, InstalledApp, InstalledCell},
     cell::CellId,
     dna::error::DnaError,
 };
@@ -33,6 +33,16 @@ impl ConductorState {
         // FIXME: A huge amount of legacy code for checking the consistency of Dna was ripped out here
         // let's make sure we get that back in once we land the Dna and Zome structure.
         Ok(())
+    }
+
+    pub fn get_app_info(&self, app_id: &AppId) -> Option<InstalledApp> {
+        self.active_apps
+            .get(app_id)
+            .or_else(|| self.inactive_apps.get(app_id))
+            .map(|cell_data| InstalledApp {
+                app_id: app_id.clone(),
+                cell_data: cell_data.clone(),
+            })
     }
 
     /// Returns the interface configuration with the given ID if present

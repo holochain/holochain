@@ -164,6 +164,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
+    /// Get info about an installed App, whether active or inactive
+    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
+
     // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -362,6 +365,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         self.conductor.read().await.dump_cell_state(cell_id).await
+    }
+
+    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+        Ok(self
+            .conductor
+            .read()
+            .await
+            .get_state()
+            .await?
+            .get_app_info(app_id))
     }
 
     #[cfg(test)]

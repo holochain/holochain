@@ -679,7 +679,7 @@ where
         })
     }
 
-    async fn get_state(&self) -> ConductorResult<ConductorState> {
+    pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())

@@ -514,7 +514,7 @@ mod test {
             .unwrap(),
         );
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocationRequest(request);
+        let msg = AppRequest::ZomeCallInvocation(request);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
