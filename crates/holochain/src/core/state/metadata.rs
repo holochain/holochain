@@ -11,7 +11,6 @@ use holochain_state::{
 use holochain_types::header;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
-    dna::{AgentPubKey, EntryContentHash},
     header::{LinkAdd, LinkRemove, ZomeId},
     link::Tag,
     Header, HeaderHashed, Timestamp,
@@ -95,7 +94,7 @@ impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
 }
 
 #[async_trait::async_trait]
-pub trait ChainMetaBufT {
+pub trait MetadataBufT {
     // Links
     /// Get all the links on this base that match the tag
     fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>>;
@@ -202,12 +201,12 @@ impl From<header::EntryDelete> for EntryHeader {
     }
 }
 
-pub struct ChainMetaBuf<'env> {
+pub struct MetadataBuf<'env> {
     system_meta: KvvBuf<'env, SysMetaKey, SysMetaVal, Reader<'env>>,
     links_meta: KvBuf<'env, LinkKey, LinkMetaVal, Reader<'env>>,
 }
 
-impl<'env> ChainMetaBuf<'env> {
+impl<'env> MetadataBuf<'env> {
     pub(crate) fn new(
         reader: &'env Reader<'env>,
         system_meta: MultiStore,
@@ -247,7 +246,7 @@ impl<'env> ChainMetaBuf<'env> {
 
 #[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait]
-impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
+impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
         self.links_meta
             .iter_all_key_matches(key.to_key())?
@@ -320,7 +319,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(fallible_iterator::convert(
-            self.system_meta.get(&hash.into())?,
+            self.system_meta.get(&hash)?,
         )))
     }
 
@@ -364,7 +363,7 @@ impl<'env> ChainMetaBufT for ChainMetaBuf<'env> {
 }
 
 mock! {
-    pub ChainMetaBuf
+    pub MetadataBuf
     {
         fn get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<LinkMetaVal>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
@@ -391,7 +390,7 @@ mock! {
 }
 
 #[async_trait::async_trait]
-impl ChainMetaBufT for MockChainMetaBuf {
+impl MetadataBufT for MockMetadataBuf {
     fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
         self.get_links(key)
     }
@@ -458,7 +457,7 @@ impl ChainMetaBufT for MockChainMetaBuf {
     }
 }
 
-impl<'env> BufferedStore<'env> for ChainMetaBuf<'env> {
+impl<'env> BufferedStore<'env> for MetadataBuf<'env> {
     type Error = DatabaseError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {

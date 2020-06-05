@@ -40,18 +40,18 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus, LinkMetaKey, LinkMetaVal},
+    metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
 use holochain_state::error::DatabaseResult;
-use holochain_types::{composite_hash::EntryHash, header::ZomeId, link::Tag, EntryHashed};
+use holochain_types::{composite_hash::EntryHash, EntryHashed};
 use tracing::*;
 
 #[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, C = ChainMetaBuf<'env>>
+pub struct Cascade<'env, C = MetadataBuf<'env>>
 where
-    C: ChainMetaBufT,
+    C: MetadataBufT,
 {
     primary: &'env ChainCasBuf<'env>,
     primary_meta: &'env C,
@@ -78,7 +78,7 @@ enum Search {
 /// Depends on how much computation, and if writes are involved
 impl<'env, C> Cascade<'env, C>
 where
-    C: ChainMetaBufT,
+    C: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(

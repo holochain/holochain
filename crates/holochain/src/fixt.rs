@@ -3,7 +3,7 @@ pub mod curve;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
-use crate::core::state::chain_meta::LinkMetaVal;
+use crate::core::state::metadata::LinkMetaVal;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
@@ -526,7 +526,7 @@ impl Iterator for LinkAddFixturator<KnownLinkAdd> {
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
-        f.zome_id = self.0.curve.zome_id.clone();
+        f.zome_id = self.0.curve.zome_id;
         Some(f)
     }
 }

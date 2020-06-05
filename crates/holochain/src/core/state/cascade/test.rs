@@ -1,6 +1,6 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_meta::{EntryDhtStatus, LinkMetaKey, MockChainMetaBuf},
+    metadata::{EntryDhtStatus, LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use crate::fixt::LinkMetaValFixturator;
@@ -9,7 +9,6 @@ use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
 use holochain_types::{
-    composite_hash::EntryHash,
     entry::EntryHashed,
     header,
     link::Tag,
@@ -31,8 +30,8 @@ struct Chains<'env> {
     jessy_id: AgentPubKey,
     jessy_header: Header,
     jessy_entry: EntryHashed,
-    mock_primary_meta: MockChainMetaBuf,
-    mock_cache_meta: MockChainMetaBuf,
+    mock_primary_meta: MockMetadataBuf,
+    mock_cache_meta: MockMetadataBuf,
 }
 
 fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Chains<'env>> {
@@ -75,8 +74,8 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
     let cache = SourceChainBuf::cache(reader, dbs)?;
-    let mock_primary_meta = MockChainMetaBuf::new();
-    let mock_cache_meta = MockChainMetaBuf::new();
+    let mock_primary_meta = MockMetadataBuf::new();
+    let mock_cache_meta = MockMetadataBuf::new();
     Ok(Chains {
         source_chain,
         cache,

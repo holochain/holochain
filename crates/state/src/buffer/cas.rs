@@ -95,20 +95,6 @@ where
         fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
         data
     }
-
-    /// Iterate over items which are staged for PUTs in the scratch space
-    // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
-    // iteration, by chaining this with an iter_raw
-    // Maybe this can be removed as well? freesig
-    pub fn iter_scratch_puts(&'env self) -> impl Iterator<Item = H> + 'env {
-        self.0.iter_scratch_puts().map(|(hash_bytes, content)| {
-            tokio_safe_block_on::tokio_safe_block_on(
-                Self::deserialize_and_hash(&hash_bytes, (**content).clone()),
-                std::time::Duration::from_millis(500),
-            )
-            .expect("TODO: make into stream")
-        })
-    }
 }
 
 impl<'env, H> BufferedStore<'env> for CasBuf<'env, H>

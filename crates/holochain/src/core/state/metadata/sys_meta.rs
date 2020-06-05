@@ -6,7 +6,7 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::chain_meta::{ChainMetaBuf, ChainMetaBufT, SysMetaVal};
+    use crate::core::state::metadata::{MetadataBuf, MetadataBufT, SysMetaVal};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use header::HeaderBuilderCommon;
@@ -118,7 +118,8 @@ mod tests {
         (delete, header)
     }
 
-    #[allow(dead_code, unused_variables)]
+    #[tokio::test(threaded_scheduler)]
+    #[ignore]
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
         let arc = test_cell_env();
@@ -126,18 +127,20 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = ChainMetaBuf::primary(&reader, &env)?;
-            let (update, _) = test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
-            let expected = buf.add_update(update.clone()).await?;
+            let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let (update, expected) =
+                test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
+            buf.add_update(update.clone()).await?;
             let original = unwrap_to!(update.replaces_address => AnyDhtHash::Header);
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
-            //assert_eq!(canonical, expected);
+            assert_eq!(&canonical, expected.as_ref());
         }
         Ok(())
     }
 
-    #[allow(dead_code, unused_variables)]
+    #[tokio::test(threaded_scheduler)]
+    #[ignore]
     /// Test that a header can be redirected three hops
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
         let arc = test_cell_env();
@@ -145,26 +148,27 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = ChainMetaBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::primary(&reader, &env)?;
             let (update1, header1) =
                 test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
             let (update2, header2) =
                 test_update(header1.into_hash().into(), fx.entry_hash(), &mut fx).await;
-            let (update3, _) =
+            let (update3, expected) =
                 test_update(header2.into_hash().into(), fx.entry_hash(), &mut fx).await;
             let _ = buf.add_update(update1.clone()).await?;
             let _ = buf.add_update(update2).await?;
-            let expected = buf.add_update(update3.clone()).await?;
+            buf.add_update(update3.clone()).await?;
 
             let original = unwrap_to!(update1.replaces_address => AnyDhtHash::Header);
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
-            //assert_eq!(canonical, expected);
+            assert_eq!(&canonical, expected.as_ref());
         }
         Ok(())
     }
 
-    #[allow(dead_code, unused_variables)]
+    #[tokio::test(threaded_scheduler)]
+    #[ignore]
     /// Test that an entry can be redirected a single hop
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
         let arc = test_cell_env();
@@ -172,7 +176,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = ChainMetaBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::primary(&reader, &env)?;
             let (update, _) = test_update(fx.entry_hash().into(), fx.entry_hash(), &mut fx).await;
             let _ = buf.add_update(update.clone()).await?;
 
@@ -183,12 +187,13 @@ mod tests {
             let canonical = buf.get_canonical_entry_hash(original)?;
 
             let expected = update.entry_hash;
-            //assert_eq!(canonical, expected);
+            assert_eq!(canonical, expected);
         }
         Ok(())
     }
 
-    #[allow(dead_code, unused_variables)]
+    #[tokio::test(threaded_scheduler)]
+    #[ignore]
     /// Test that an entry can be redirected three hops
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
         let arc = test_cell_env();
@@ -196,7 +201,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = ChainMetaBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::primary(&reader, &env)?;
             let (update1, _) = test_update(fx.entry_hash().into(), fx.entry_hash(), &mut fx).await;
             let (update2, _) =
                 test_update(update1.replaces_address.clone(), fx.entry_hash(), &mut fx).await;
@@ -213,12 +218,13 @@ mod tests {
             let canonical = buf.get_canonical_entry_hash(original)?;
 
             let expected = update3.entry_hash;
-            //assert_eq!(canonical, expected);
+            assert_eq!(canonical, expected);
         }
         Ok(())
     }
 
-    #[allow(dead_code, unused_variables)]
+    #[tokio::test(threaded_scheduler)]
+    #[ignore]
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
         let arc = test_cell_env();
@@ -226,13 +232,13 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = ChainMetaBuf::primary(&reader, &env)?;
-            let (update_header, _) =
+            let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let (update_header, expected_header_hash) =
                 test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
             let (update_entry, _) =
                 test_update(fx.entry_hash().into(), fx.entry_hash(), &mut fx).await;
 
-            let expected_header_hash = buf.add_update(update_header.clone()).await?;
+            let _ = buf.add_update(update_header.clone()).await?;
             let _ = buf.add_update(update_entry.clone()).await?;
             let expected_entry_hash = update_entry.entry_hash;
 
@@ -246,8 +252,8 @@ mod tests {
                 buf.get_canonical_header_hash(original_header_hash.clone())?;
             let canonical_entry_hash = buf.get_canonical_entry_hash(original_entry_hash)?;
 
-            //assert_eq!(canonical_header_hash, expected_header_hash);
-            //assert_eq!(canonical_entry_hash, expected_entry_hash);
+            assert_eq!(&canonical_header_hash, expected_header_hash.as_ref());
+            assert_eq!(canonical_entry_hash, expected_entry_hash);
         }
         Ok(())
     }
@@ -270,7 +276,7 @@ mod tests {
         expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Create).clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for create in entry_creates {
                 meta_buf.add_create(create).await.unwrap();
             }
@@ -286,7 +292,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
                 .get_creates(entry_hash.clone())
                 .unwrap()
@@ -315,7 +321,7 @@ mod tests {
         expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for update in entry_updates {
                 meta_buf.add_update(update).await.unwrap();
             }
@@ -331,7 +337,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
                 .get_updates(any_hash.clone())
                 .unwrap()
@@ -360,7 +366,7 @@ mod tests {
         expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Delete).clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for delete in entry_deletes {
                 meta_buf.add_delete(delete).await.unwrap();
             }
@@ -376,7 +382,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = ChainMetaBuf::primary(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
                 .get_deletes(header_hash.clone())
                 .unwrap()

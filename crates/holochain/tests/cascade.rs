@@ -1,7 +1,7 @@
 use fixt::prelude::*;
 use holochain_2020::core::state::{
     cascade::Cascade,
-    chain_meta::{ChainMetaBuf, LinkMetaKey},
+    metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
@@ -81,8 +81,8 @@ async fn get_links() -> SourceChainResult<()> {
     let cache = SourceChainBuf::cache(&reader, &dbs)?;
 
     // create a cache and a cas for store and meta
-    let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
-    let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
+    let primary_meta = MetadataBuf::primary(&reader, &dbs)?;
+    let cache_meta = MetadataBuf::cache(&reader, &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 

@@ -159,7 +159,7 @@ impl HeaderHashed {
 
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
-// FIXME: Probably should be atleast u16? 255 seems arbitrarily low
+// TODO: Check this can never be written to > 255
 pub type ZomeId = u8;
 
 use crate::{link::Tag, prelude::*};
