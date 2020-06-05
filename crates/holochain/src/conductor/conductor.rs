@@ -51,7 +51,7 @@ use holochain_state::{
     typed::{Kv, UnitDbKey},
 };
 use holochain_types::{
-    app::{AppId, InstalledApp},
+    app::{AppId, InstalledApp, InstalledCell, MembraneProof},
     cell::{CellHandle, CellId},
     dna::{wasm::DnaWasmHashed, DnaFile},
 };
@@ -63,7 +63,6 @@ use tracing::*;
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
 use holo_hash::{DnaHash, Hashed};
-use holochain_serialized_bytes::SerializedBytes;
 
 #[cfg(test)]
 use super::handle::mock::MockConductorHandle;
@@ -301,12 +300,15 @@ where
         Ok(port)
     }
 
-    /// Create the cells from the db
+    /// Perform Genesis on the source chains for each of the specified CellIds.
+    ///
+    /// If genesis fails for any cell, this entire function fails, and all other
+    /// partial or complete successes are rolled back.
     pub(super) async fn genesis_cells(
         &self,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
         conductor_handle: ConductorHandle,
-    ) -> ConductorResult<Vec<CellId>> {
+    ) -> ConductorResult<()> {
         let root_env_dir = self.root_env_dir.clone();
         let keystore = self.keystore.clone();
 
@@ -350,11 +352,11 @@ where
             Err(ConductorError::GenesisFailed { errors })
         } else {
             // No errors so return the cells
-            Ok(success.map(|(cell_id, _)| cell_id).collect())
+            Ok(())
         }
     }
 
-    /// Create the cells from the db
+    /// Create Cells for each CellId marked active in the ConductorState db
     pub(super) async fn create_active_app_cells(
         &self,
         conductor_handle: ConductorHandle,
@@ -367,75 +369,77 @@ where
         let keystore = self.keystore.clone();
 
         // Closure for creating all cells in an app
-        let create_app_cells = move |(app_id, cell_ids): (AppId, Vec<CellId>)| {
-            // Clone data for async block
-            let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-            let conductor_handle = conductor_handle.clone();
-            let keystore = keystore.clone();
+        let tasks =
+            active_apps
+                .into_iter()
+                .map(move |(app_id, cells): (AppId, Vec<InstalledCell>)| {
+                    let cell_ids = cells.into_iter().map(|c| c.into_id());
+                    // Clone data for async block
+                    let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
+                    let conductor_handle = conductor_handle.clone();
+                    let keystore = keystore.clone();
 
-            // Task that creates the cells
-            async move {
-                // Only create cells not already created
-                let cells_to_create = cell_ids
-                    .into_iter()
-                    .filter(|cell_id| !self.cells.contains_key(cell_id));
+                    // Task that creates the cells
+                    async move {
+                        // Only create cells not already created
+                        let cells_to_create =
+                            cell_ids.filter(|cell_id| !self.cells.contains_key(cell_id));
 
-                // Create each cell
-                let cells_tasks = cells_to_create.map(move |cell_id| {
-                    let holochain_p2p_cell = self
-                        .holochain_p2p
-                        .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+                        // Create each cell
+                        let cells_tasks = cells_to_create.map(move |cell_id| {
+                            let holochain_p2p_cell = self.holochain_p2p.to_cell(
+                                cell_id.dna_hash().clone(),
+                                cell_id.agent_pubkey().clone(),
+                            );
 
-                    Cell::create(
-                        cell_id,
-                        conductor_handle.clone(),
-                        root_env_dir.clone(),
-                        keystore.clone(),
-                        holochain_p2p_cell,
-                    )
-                });
+                            Cell::create(
+                                cell_id,
+                                conductor_handle.clone(),
+                                root_env_dir.clone(),
+                                keystore.clone(),
+                                holochain_p2p_cell,
+                            )
+                        });
 
-                // Join all the cell create tasks for this app
-                // and seperate any errors
-                let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
-                    .await
-                    .into_iter()
-                    .partition(Result::is_ok);
-                // unwrap safe because of the partition
-                let success = success.into_iter().map(Result::unwrap);
+                        // Join all the cell create tasks for this app
+                        // and seperate any errors
+                        let (success, errors): (Vec<_>, Vec<_>) =
+                            futures::future::join_all(cells_tasks)
+                                .await
+                                .into_iter()
+                                .partition(Result::is_ok);
+                        // unwrap safe because of the partition
+                        let success = success.into_iter().map(Result::unwrap);
 
-                // If there was errors, cleanup and return the errors
-                if !errors.is_empty() {
-                    for cell in success {
-                        // Error needs to capture which app failed
-                        cell.cleanup().await.map_err(|e| CreateAppError::Failed {
-                            app_id: app_id.clone(),
-                            errors: vec![e],
-                        })?;
+                        // If there was errors, cleanup and return the errors
+                        if !errors.is_empty() {
+                            for cell in success {
+                                // Error needs to capture which app failed
+                                cell.cleanup().await.map_err(|e| CreateAppError::Failed {
+                                    app_id: app_id.clone(),
+                                    errors: vec![e],
+                                })?;
+                            }
+                            // match needed to avoid Debug requirement on unwrap_err
+                            let errors = errors
+                                .into_iter()
+                                .map(|e| match e {
+                                    Err(e) => e,
+                                    Ok(_) => unreachable!("Safe because of the partition"),
+                                })
+                                .collect();
+                            Err(CreateAppError::Failed { app_id, errors })
+                        } else {
+                            // No errors so return the cells
+                            Ok(success.collect())
+                        }
                     }
-                    // match needed to avoid Debug requirement on unwrap_err
-                    let errors = errors
-                        .into_iter()
-                        .map(|e| match e {
-                            Err(e) => e,
-                            Ok(_) => unreachable!("Safe because of the partition"),
-                        })
-                        .collect();
-                    Err(CreateAppError::Failed { app_id, errors })
-                } else {
-                    // No errors so return the cells
-                    Ok(success.collect())
-                }
-            }
-        };
-
-        // Create cells for every active app
-        let app_tasks = active_apps.into_iter().map(create_app_cells);
+                });
 
         // Join on all apps and return a list of
         // apps that had succelly created cells
         // and any apps that encounted errors
-        Ok(futures::future::join_all(app_tasks).await)
+        Ok(futures::future::join_all(tasks).await)
     }
 
     /// Register an app inactive in the database
@@ -445,7 +449,7 @@ where
     ) -> ConductorResult<()> {
         trace!(?app);
         self.update_state(move |mut state| {
-            state.inactive_apps.insert(app.app_id, app.cell_ids);
+            state.inactive_apps.insert(app.app_id, app.cell_data);
             Ok(state)
         })
         .await?;
@@ -455,11 +459,11 @@ where
     /// Activate an app in the database
     pub(super) async fn activate_app_in_db(&mut self, app_id: AppId) -> ConductorResult<()> {
         self.update_state(move |mut state| {
-            let cell_ids = state
+            let cell_data = state
                 .inactive_apps
                 .remove(&app_id)
                 .ok_or(ConductorError::AppNotInstalled)?;
-            state.active_apps.insert(app_id, cell_ids);
+            state.active_apps.insert(app_id, cell_data);
             Ok(state)
         })
         .await?;
@@ -488,7 +492,10 @@ where
             .inactive_apps
             .get(&app_id)
             .expect("This app was just put here")
-            .clone())
+            .clone()
+            .into_iter()
+            .map(|c| c.into_id())
+            .collect())
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
@@ -953,19 +960,24 @@ pub mod tests {
         assert_eq!(state, ConductorState::default());
 
         let cell_id = fake_cell_id("dr. cell");
+        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
 
         conductor
             .update_state(|mut state| {
                 state
                     .inactive_apps
-                    .insert("fake app".to_string(), vec![cell_id.clone()]);
+                    .insert("fake app".to_string(), vec![installed_cell]);
                 Ok(state)
             })
             .await
             .unwrap();
         let state = conductor.get_state().await.unwrap();
         assert_eq!(
-            state.inactive_apps.values().collect::<Vec<_>>()[0].as_slice(),
+            state.inactive_apps.values().collect::<Vec<_>>()[0]
+                .into_iter()
+                .map(|c| c.as_id().clone())
+                .collect::<Vec<_>>()
+                .as_slice(),
             &[cell_id]
         );
     }

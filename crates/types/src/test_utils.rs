@@ -2,7 +2,7 @@
 
 use crate::{
     cell::CellId,
-    dna::{wasm::DnaWasm, zome::Zome, Properties},
+    dna::{wasm::DnaWasm, zome::Zome, JsonProperties},
     dna::{DnaDef, DnaFile},
     header::{AppEntryType, EntryVisibility, ZomeId},
     prelude::*,
@@ -39,7 +39,7 @@ pub fn fake_dna_file(uuid: &str) -> DnaFile {
 pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     let mut dna = DnaDef {
         name: "test".to_string(),
-        properties: Properties::new(serde_json::json!({"p": "hi"}))
+        properties: JsonProperties::new(serde_json::json!({"p": "hi"}))
             .try_into()
             .unwrap(),
         uuid: uuid.to_string(),
@@ -82,7 +82,7 @@ pub fn fake_cell_id(name: &str) -> CellId {
 /// A fixture example DnaHash for unit testing.
 pub fn fake_dna_hash(name: &str) -> DnaHash {
     tokio_safe_block_on::tokio_safe_block_on(
-        DnaHash::with_data(name.as_bytes()),
+        DnaHash::with_data(name.as_bytes().to_vec()),
         std::time::Duration::from_secs(1),
     )
     .unwrap()
@@ -103,7 +103,7 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 /// A fixture example HeaderHash for unit testing.
 pub fn fake_header_hash(name: &str) -> HeaderHash {
     tokio_safe_block_on::tokio_safe_block_on(
-        HeaderHash::with_data(name.as_bytes()),
+        HeaderHash::with_data(name.as_bytes().to_vec()),
         std::time::Duration::from_secs(1),
     )
     .unwrap()

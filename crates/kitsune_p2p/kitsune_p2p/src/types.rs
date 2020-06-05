@@ -1,29 +1,44 @@
+use std::sync::Arc;
+
 /// KitsuneP2p Error Type.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum KitsuneP2pError {
     /// GhostError
     #[error(transparent)]
     GhostError(#[from] ghost_actor::GhostError),
 
-    /// Custom
-    #[error("Custom: {0}")]
-    Custom(Box<dyn std::error::Error + Send + Sync>),
+    /// RoutingSpaceError
+    #[error("Routing Space Error: {0:?}")]
+    RoutingSpaceError(Arc<KitsuneSpace>),
+
+    /// RoutingAgentError
+    #[error("Routing Agent Error: {0:?}")]
+    RoutingAgentError(Arc<KitsuneAgent>),
 
     /// Other
     #[error("Other: {0}")]
-    Other(String),
+    Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl KitsuneP2pError {
     /// promote a custom error type to a KitsuneP2pError
-    pub fn custom(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
-        Self::Custom(e.into())
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
     }
 }
 
 impl From<String> for KitsuneP2pError {
     fn from(s: String) -> Self {
-        Self::Other(s)
+        #[derive(Debug, thiserror::Error)]
+        struct OtherError(String);
+        impl std::fmt::Display for OtherError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
+        KitsuneP2pError::other(OtherError(s))
     }
 }
 
@@ -70,7 +85,6 @@ macro_rules! make_kitsune_bin_type {
         $(
             #[doc = $doc]
             #[derive(
-                Debug,
                 Clone,
                 PartialEq,
                 Eq,
@@ -91,6 +105,17 @@ macro_rules! make_kitsune_bin_type {
 
                 fn get_loc(&self) -> u32 {
                     bytes_to_loc(&self.0[self.0.len() - 4..])
+                }
+            }
+
+            impl std::fmt::Debug for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    f.write_fmt(format_args!("{}(0x", stringify!($name)))?;
+                    for byte in &self.0 {
+                        f.write_fmt(format_args!("{:02x}", byte))?;
+                    }
+                    f.write_fmt(format_args!(")"))?;
+                    Ok(())
                 }
             }
         )*
@@ -117,7 +142,6 @@ These metadata "Operations" each also have unique OpHashes."#,
 
 /// A cryptographic signature.
 #[derive(
-    Debug,
     Clone,
     PartialEq,
     Eq,
@@ -130,3 +154,14 @@ These metadata "Operations" each also have unique OpHashes."#,
 )]
 #[shrinkwrap(mutable)]
 pub struct KitsuneSignature(pub Vec<u8>);
+
+impl std::fmt::Debug for KitsuneSignature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Signature(0x"))?;
+        for byte in &self.0 {
+            f.write_fmt(format_args!("{:02x}", byte))?;
+        }
+        f.write_fmt(format_args!(")"))?;
+        Ok(())
+    }
+}

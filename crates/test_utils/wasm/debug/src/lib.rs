@@ -7,9 +7,7 @@ use holochain_zome_types::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-// define the host functions we require in order to pull/push data across the host/guest boundary
-memory_externs!();
-host_externs!(__debug);
+holochain_wasmer_guest::holochain_externs!();
 
 #[no_mangle]
 pub extern "C" fn debug(_: RemotePtr) -> RemotePtr {

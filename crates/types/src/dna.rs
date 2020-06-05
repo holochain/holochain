@@ -7,6 +7,7 @@ pub mod error;
 pub mod wasm;
 pub mod zome;
 use crate::prelude::*;
+use derive_more::From;
 pub use error::DnaError;
 pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
@@ -16,15 +17,13 @@ use std::collections::BTreeMap;
 pub type Zomes = Vec<(ZomeName, zome::Zome)>;
 
 /// A type to allow json values to be used as [SerializedBtyes]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct Properties {
-    properties: serde_json::Value,
-}
+#[derive(Debug, Clone, From, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct JsonProperties(serde_json::Value);
 
-impl Properties {
+impl JsonProperties {
     /// Create new properties from json value
     pub fn new(properties: serde_json::Value) -> Self {
-        Properties { properties }
+        JsonProperties(properties)
     }
 }
 
@@ -49,7 +48,7 @@ impl DnaDef {
     /// Calculate DnaHash for DnaDef
     pub async fn dna_hash(&self) -> DnaHash {
         let sb: SerializedBytes = self.try_into().expect("failed to hash DnaDef");
-        DnaHash::with_data(&sb.bytes()).await
+        DnaHash::with_data(UnsafeBytes::from(sb).into()).await
     }
 
     /// Return a Zome
@@ -103,12 +102,12 @@ impl DnaFile {
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            let wasm_hash = holo_hash::WasmHash::with_data(&wasm.code()).await;
+            let wasm_hash = holo_hash::WasmHash::with_data(wasm.code().to_vec()).await;
             let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             code.insert(wasm_hash, wasm);
         }
         let dna_sb: SerializedBytes = (&dna).try_into()?;
-        let dna_hash = holo_hash::DnaHash::with_data(dna_sb.bytes()).await;
+        let dna_hash = holo_hash::DnaHash::with_data(UnsafeBytes::from(dna_sb).into()).await;
         Ok(Self {
             dna,
             dna_hash,
