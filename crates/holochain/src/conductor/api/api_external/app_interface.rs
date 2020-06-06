@@ -6,6 +6,8 @@ use crate::conductor::{
 };
 use crate::core::ribosome::{ZomeCallInvocation, ZomeCallInvocationResponse};
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::app::{AppId, InstalledApp};
+use holochain_zome_types::GuestOutput;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -51,15 +53,18 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::ZomeCallInvocationRequest(request) => {
+            AppRequest::AppInfo { app_id } => Ok(AppResponse::AppInfo(
+                self.conductor_handle.get_app_info(&app_id).await?,
+            )),
+            AppRequest::ZomeCallInvocation(request) => {
                 match self.conductor_handle.call_zome(*request).await? {
-                    Ok(response) => Ok(AppResponse::ZomeCallInvocationResponse {
-                        response: Box::new(response),
-                    }),
+                    Ok(ZomeCallInvocationResponse::ZomeApiFn(output)) => {
+                        Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
+                    }
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
-            _ => unimplemented!(),
+            AppRequest::Crypto(_) => unimplemented!("Crypto methods currently unimplemented"),
         }
     }
 }
@@ -89,10 +94,17 @@ impl InterfaceApi for RealAppInterfaceApi {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AppRequest {
+    /// Get info about the App
+    AppInfo {
+        /// The AppId for which to get information
+        app_id: AppId,
+    },
+
     /// Asks the conductor to do some crypto
-    CryptoRequest(Box<CryptoRequest>),
+    Crypto(Box<CryptoRequest>),
+
     /// Call a zome function
-    ZomeCallInvocationRequest(Box<ZomeCallInvocation>),
+    ZomeCallInvocation(Box<ZomeCallInvocation>),
 }
 
 /// Responses to requests received on an App interface
@@ -101,11 +113,12 @@ pub enum AppRequest {
 pub enum AppResponse {
     /// There has been an error in the request
     Error(ExternalApiWireError),
+
+    /// The response to an AppInfo request
+    AppInfo(Option<InstalledApp>),
+
     /// The response to a zome call
-    ZomeCallInvocationResponse {
-        /// The data that was returned by this call
-        response: Box<ZomeCallInvocationResponse>,
-    },
+    ZomeCallInvocation(Box<GuestOutput>),
 }
 
 #[allow(missing_docs)]

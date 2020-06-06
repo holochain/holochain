@@ -8,8 +8,8 @@ use std::path::PathBuf;
 /// Placeholder used to identify apps
 pub type AppId = String;
 
-/// A friendly handle used by UIs to refer to the Cells which make up the app
-pub type CellHandle = String;
+/// A friendly (nick)name used by UIs to refer to the Cells which make up the app
+pub type CellNick = String;
 
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -27,8 +27,8 @@ pub struct InstallAppPayload {
 pub struct InstallAppDnaPayload {
     /// The path of the DnaFile
     pub path: PathBuf,
-    /// The CellHandle which will be assigned to this Dna when installed
-    pub handle: CellHandle,
+    /// The CellNick which will be assigned to this Dna when installed
+    pub nick: CellNick,
     /// Properties to override when installing this Dna
     pub properties: Option<JsonProperties>,
     /// App-specific proof-of-membrane-membership, if required by this app
@@ -37,10 +37,10 @@ pub struct InstallAppDnaPayload {
 
 impl InstallAppDnaPayload {
     /// Create a payload with no JsonProperties or MembraneProof. Good for tests.
-    pub fn path_only(path: PathBuf, handle: String) -> Self {
+    pub fn path_only(path: PathBuf, nick: CellNick) -> Self {
         Self {
             path,
-            handle,
+            nick,
             properties: None,
             membrane_proof: None,
         }
@@ -52,11 +52,11 @@ pub type MembraneProof = SerializedBytes;
 
 /// Data about an installed Cell
 #[derive(Clone, Debug, Into, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InstalledCell(CellId, CellHandle);
+pub struct InstalledCell(CellId, CellNick);
 
 impl InstalledCell {
     /// Constructor
-    pub fn new(cell_id: CellId, cell_handle: CellHandle) -> Self {
+    pub fn new(cell_id: CellId, cell_handle: CellNick) -> Self {
         Self(cell_id, cell_handle)
     }
 
@@ -65,8 +65,8 @@ impl InstalledCell {
         self.0
     }
 
-    /// Get the CellHandle
-    pub fn into_handle(self) -> CellHandle {
+    /// Get the CellNick
+    pub fn into_nick(self) -> CellNick {
         self.1
     }
     /// Get the CellId
@@ -74,14 +74,14 @@ impl InstalledCell {
         &self.0
     }
 
-    /// Get the CellHandle
-    pub fn as_handle(&self) -> &CellHandle {
+    /// Get the CellNick
+    pub fn as_nick(&self) -> &CellNick {
         &self.1
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// A collection of [CellIds]s paired with an app id
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledApp {
     /// Placeholder to find the app
     pub app_id: AppId,
