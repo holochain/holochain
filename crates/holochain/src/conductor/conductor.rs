@@ -683,8 +683,6 @@ where
         })
     }
 
-    // FIXME: remove allow once we actually use this function
-    #[allow(dead_code)]
     async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
