@@ -50,13 +50,13 @@ const WIRE_BROADCAST: u8 = 0x20;
 
 impl Wire {
     fn priv_encode_inner(msg_type: u8, mut msg: Vec<u8>) -> Vec<u8> {
-        let mut out = vec![
-            KITSUNE_MAGIC_1,
-            KITSUNE_MAGIC_2,
-            KITSUNE_PROTO_VER,
-            msg_type,
-        ];
-        out.append(&mut msg);
+        let mut out = vec![0; i.len() + 4];
+        out[0] = KITSUNE_MAGIC_1;
+        out[1] = KITSUNE_MAGIC_2;
+        out[2] = KITSUNE_PROTO_VER;
+        out[3] = msg_type;
+
+        out[4..].copy_from_slice(&msg);
         out
     }
 
@@ -68,21 +68,15 @@ impl Wire {
     }
 
     fn priv_decode(mut data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
-        if data.len() < 4
-            || data[0] != KITSUNE_MAGIC_1
-            || data[1] != KITSUNE_MAGIC_2
-            || data[2] != KITSUNE_PROTO_VER
-        {
-            return Err(KitsuneP2pError::decoding_error(
-                "invalid or corrupt kitsune p2p message".to_string(),
-            ));
-        }
-        data.remove(0);
-        data.remove(0);
-        data.remove(0);
-        match data.remove(0) {
-            WIRE_REQUEST => Ok(Wire::Request(data)),
-            WIRE_BROADCAST => Ok(Wire::Broadcast(data)),
+        match &data[..] {
+            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST, ..] => {
+                data.drain(0..4);
+                Ok(Wire::Request(data))
+            }
+            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_BROADCAST, ..] => {
+                data.drain(0..4);
+                Ok(Wire::Broadcast(data))
+            }
             _ => Err(KitsuneP2pError::decoding_error(
                 "invalid or corrupt kitsune p2p message".to_string(),
             )),
