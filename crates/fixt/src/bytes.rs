@@ -28,7 +28,7 @@ fixturator!(
         for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());
         }
-        self.0.index = self.0.index + 1;
+        self.0.index += 1;
         bytes
     }
 );
