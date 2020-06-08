@@ -117,6 +117,8 @@ impl KitsuneP2pActor {
         let mut internal_sender = self.internal_sender.clone();
 
         // check 5(ish) times but with sane min/max
+        // FYI - this strategy will likely change when we are no longer
+        //       purely short-circuit, and we are looping on peer discovery.
         const CHECK_COUNT: u64 = 5;
         let mut check_interval = timeout_ms / CHECK_COUNT;
         if check_interval < 10 {

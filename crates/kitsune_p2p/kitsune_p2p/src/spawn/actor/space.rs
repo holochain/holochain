@@ -87,8 +87,10 @@ impl Space {
         // clone the event sender
         let mut evt_sender = self.evt_sender.clone();
 
-        // as this is a short-circuit - we need to decode the data
-        // inline - here.
+        // As this is a short-circuit - we need to decode the data inline - here.
+        // In the future, we will probably need to branch here, so the real
+        // networking can forward the encoded data. Or, split immediate_request
+        // into two variants, one for short-circuit, and one for real networking.
         let data = wire::Wire::decode((*data).clone())?;
 
         match data {
