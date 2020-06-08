@@ -50,14 +50,13 @@ const WIRE_REQUEST: u8 = 0x10;
 const WIRE_BROADCAST: u8 = 0x20;
 
 impl Wire {
-    fn priv_encode_inner(msg_type: u8, msg: Vec<u8>) -> Vec<u8> {
-        let mut out = vec![0; msg.len() + 4];
-        out[0] = KITSUNE_MAGIC_1;
-        out[1] = KITSUNE_MAGIC_2;
-        out[2] = KITSUNE_PROTO_VER;
-        out[3] = msg_type;
-
-        out[4..].copy_from_slice(&msg);
+    fn priv_encode_inner(msg_type: u8, mut msg: Vec<u8>) -> Vec<u8> {
+        let mut out = Vec::with_capacity(msg.len() + 4);
+        out.push(KITSUNE_MAGIC_1);
+        out.push(KITSUNE_MAGIC_2);
+        out.push(KITSUNE_PROTO_VER);
+        out.push(msg_type);
+        out.append(&mut msg);
         out
     }
 
@@ -69,23 +68,20 @@ impl Wire {
     }
 
     fn priv_decode(mut data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
-        if data.len() >= 4 {
-            match &data[..4] {
-                [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST] => {
-                    data.drain(0..4);
-                    return Ok(Wire::Request(data));
-                }
-                [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_BROADCAST] => {
-                    data.drain(0..4);
-                    return Ok(Wire::Broadcast(data));
-                }
-                _ => (),
+
+        match data.get(..4) {
+            Some([KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST]) => {
+                data.drain(0..4);
+                Ok(Wire::Request(data))
             }
+            Some([KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_BROADCAST]) => {
+                data.drain(0..4);
+                Ok(Wire::Broadcast(data))
+            }
+            _ => Err(KitsuneP2pError::decoding_error(
+                "invalid or corrupt kitsune p2p message".to_string(),
+            )),
         }
-        Err(KitsuneP2pError::decoding_error(
-            "invalid or corrupt kitsune p2p message".to_string(),
-        ))
-    }
 }
 
 #[cfg(test)]
@@ -101,7 +97,7 @@ mod tests {
             KITSUNE_PROTO_VER,
             WIRE_REQUEST,
         ]);
-        assert_matches!(res, Ok(Wire::Request(_)));
+        assert_matches!(res, Ok(Wire::Request(vec)) if vec.is_empty());
     }
 
     #[test]
