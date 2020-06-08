@@ -1,6 +1,10 @@
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::{app::InstalledApps, cell::CellId, dna::error::DnaError};
+use holochain_types::{
+    app::{AppId, InstalledApp, InstalledCell},
+    cell::CellId,
+    dna::error::DnaError,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -13,10 +17,10 @@ use std::collections::HashMap;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: InstalledApps,
+    pub inactive_apps: HashMap<AppId, Vec<InstalledCell>>,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: InstalledApps,
+    pub active_apps: HashMap<AppId, Vec<InstalledCell>>,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub interfaces: HashMap<InterfaceId, InterfaceConfig>,
@@ -31,32 +35,19 @@ impl ConductorState {
         Ok(())
     }
 
+    pub fn get_app_info(&self, app_id: &AppId) -> Option<InstalledApp> {
+        self.active_apps
+            .get(app_id)
+            .or_else(|| self.inactive_apps.get(app_id))
+            .map(|cell_data| InstalledApp {
+                app_id: app_id.clone(),
+                cell_data: cell_data.clone(),
+            })
+    }
+
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfig> {
         self.interfaces.get(id).cloned()
-    }
-
-    /// Removes the cell given by id and all mentions of it in other elements so
-    /// that the config is guaranteed to be valid afterwards if it was before.
-    pub fn save_remove_cell(mut self, id: &CellId) -> Self {
-        for cell_ids in self.active_apps.values_mut() {
-            cell_ids.retain(|cell| cell != id);
-        }
-
-        for cell_ids in self.inactive_apps.values_mut() {
-            cell_ids.retain(|cell| cell != id);
-        }
-
-        self.interfaces = self
-            .interfaces
-            .into_iter()
-            .map(|(interface_id, mut interface)| {
-                interface.cells.retain(|cell_id| cell_id != id);
-                (interface_id, interface)
-            })
-            .collect();
-
-        self
     }
 }
 

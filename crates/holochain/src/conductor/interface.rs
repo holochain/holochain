@@ -130,7 +130,7 @@ pub fn attach_external_conductor_api<A: AppInterfaceApi>(
         while let Some(msg) = recv.next().await {
             match msg {
                 Ok((request, respond)) => {
-                    if let Err(e) = respond(api.handle_request(request).await).await {
+                    if let Err(e) = respond(api.handle_app_request(request).await).await {
                         tracing::error!(error = ?e);
                     }
                 }

@@ -57,7 +57,7 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use derive_more::From;
 use holochain_types::{
-    app::{AppId, InstalledApp},
+    app::{AppId, InstalledApp, InstalledCell, MembraneProof},
     autonomic::AutonomicCue,
     cell::CellId,
     dna::DnaFile,
@@ -143,11 +143,12 @@ pub trait ConductorHandleT: Send + Sync {
     /// Request access to this conductor's networking handle
     fn holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender;
 
-    /// Run genesis on [CellId]s and add them to the db
-    async fn genesis_cells(
+    /// Install Cells into ConductorState based on installation info, and run
+    /// genesis on all new source chains
+    async fn install_app(
         self: Arc<Self>,
         app_id: AppId,
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_data_with_proofs: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()>;
 
     /// Setup the cells from the database
@@ -162,6 +163,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+    /// Get info about an installed App, whether active or inactive
+    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
     // HACK: remove when B-01593 lands
     #[cfg(test)]
@@ -285,19 +289,26 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.holochain_p2p
     }
 
-    async fn genesis_cells(
+    async fn install_app(
         self: Arc<Self>,
         app_id: AppId,
-        cells_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()> {
-        let cell_ids = {
-            self.conductor
-                .read()
-                .await
-                .genesis_cells(cells_ids_with_proofs, self.clone())
-                .await?
-        };
-        let app = InstalledApp { app_id, cell_ids };
+        self.conductor
+            .read()
+            .await
+            .genesis_cells(
+                cell_data
+                    .iter()
+                    .map(|(c, p)| (c.as_id().clone(), p.clone()))
+                    .collect(),
+                self.clone(),
+            )
+            .await?;
+
+        let cell_data = cell_data.into_iter().map(|(c, _)| c).collect();
+        let app = InstalledApp { app_id, cell_data };
+
         // Update the db
         self.conductor
             .write()
@@ -354,6 +365,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         self.conductor.read().await.dump_cell_state(cell_id).await
+    }
+
+    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+        Ok(self
+            .conductor
+            .read()
+            .await
+            .get_state()
+            .await?
+            .get_app_info(app_id))
     }
 
     #[cfg(test)]
@@ -421,10 +442,10 @@ pub mod mock {
 
             fn sync_holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender;
 
-            fn sync_genesis_cells(
+            fn sync_install_app(
                 &self,
                 app_id: AppId,
-                cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+                cell_data_with_proofs: Vec<(InstalledCell, Option<SerializedBytes>)>,
             ) -> ConductorResult<()>;
 
             fn sync_setup_cells(&self) -> ConductorResult<Vec<CreateAppError>>;
@@ -434,6 +455,8 @@ pub mod mock {
             fn sync_deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
             fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+            fn sync_get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
             #[cfg(test)]
             fn sync_get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -523,12 +546,12 @@ pub mod mock {
             self.sync_holochain_p2p()
         }
 
-        async fn genesis_cells(
+        async fn install_app(
             self: Arc<Self>,
             app_id: AppId,
-            cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+            cell_data_with_proofs: Vec<(InstalledCell, Option<SerializedBytes>)>,
         ) -> ConductorResult<()> {
-            self.sync_genesis_cells(app_id, cell_ids_with_proofs)
+            self.sync_install_app(app_id, cell_data_with_proofs)
         }
 
         /// Setup the cells from the database
@@ -548,6 +571,10 @@ pub mod mock {
         /// Dump the cells state
         async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             self.sync_dump_cell_state(cell_id)
+        }
+
+        async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+            self.sync_get_app_info(app_id)
         }
 
         // HACK: remove when B-01593 lands

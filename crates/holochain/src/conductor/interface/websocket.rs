@@ -241,6 +241,7 @@ mod test {
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
         dna_store::{error::DnaStoreError, MockDnaStore},
+        state::ConductorState,
         Conductor, ConductorHandle,
     };
     use crate::core::state::source_chain::SourceChainBuf;
@@ -252,7 +253,7 @@ mod test {
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
-        app::AppPaths,
+        app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
@@ -300,9 +301,14 @@ mod test {
             .await
             .unwrap();
 
+        let cell_data = cell_ids_with_proofs
+            .into_iter()
+            .map(|(c, p)| (InstalledCell::new(c, nanoid::nanoid!()), p))
+            .collect();
+
         conductor_handle
             .clone()
-            .genesis_cells("test app".to_string(), cell_ids_with_proofs)
+            .install_app("test app".to_string(), cell_data)
             .await
             .unwrap();
 
@@ -323,7 +329,7 @@ mod test {
     }
 
     async fn setup_app(
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
+        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi) {
         let test_env = test_conductor_env();
@@ -340,7 +346,7 @@ mod test {
 
         conductor_handle
             .clone()
-            .genesis_cells("test app".to_string(), cell_ids_with_proofs)
+            .install_app("test app".to_string(), cell_data)
             .await
             .unwrap();
 
@@ -378,15 +384,15 @@ mod test {
     async fn invalid_request() {
         observability::test_run().ok();
         let (_tmpdir, admin_api) = setup_admin().await;
-        let dna = ("some$\\//weird00=-+[] \\Path".into(), None);
+        let dna_payload =
+            InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into(), "".to_string());
         let agent_key = fake_agent_pubkey_1();
-        let app_paths = AppPaths {
-            dnas: vec![dna],
+        let payload = InstallAppPayload {
+            dnas: vec![dna_payload],
             app_id: "test app".to_string(),
             agent_key,
-            proofs: HashMap::new(),
         };
-        let msg = AdminRequest::InstallApp { app_paths };
+        let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -429,15 +435,14 @@ mod test {
             .await
             .unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
-        let dna = (fake_dna_path, None);
+        let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
         let agent_key = fake_agent_pubkey_1();
-        let app_paths = AppPaths {
-            dnas: vec![dna],
+        let payload = InstallAppPayload {
+            dnas: vec![dna_payload],
             app_id: "test app".to_string(),
             agent_key,
-            proofs: HashMap::new(),
         };
-        let msg = AdminRequest::InstallApp { app_paths };
+        let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
@@ -482,6 +487,7 @@ mod test {
         let payload = Payload { a: 1 };
         let dna_hash = dna.dna_hash().clone();
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
         let mut dna_store = MockDnaStore::new();
 
@@ -494,7 +500,7 @@ mod test {
             .times(1)
             .return_const(());
 
-        let (_tmpdir, app_api) = setup_app(vec![(cell_id.clone(), None)], dna_store).await;
+        let (_tmpdir, app_api) = setup_app(vec![(installed_cell, None)], dna_store).await;
         let mut request = Box::new(
             crate::core::ribosome::ZomeCallInvocationFixturator::new(
                 crate::core::ribosome::NamedInvocation(
@@ -508,11 +514,11 @@ mod test {
             .unwrap(),
         );
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocationRequest { request };
+        let msg = AppRequest::ZomeCallInvocation(request);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCallInvocationResponse{ .. });
+            assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
@@ -572,14 +578,21 @@ mod test {
             .unwrap();
 
         // Get the state
-        let state = handle.get_state_from_handle().await.unwrap();
+        let state: ConductorState = handle.get_state_from_handle().await.unwrap();
 
         // Check it is not in inactive apps
         let r = state.inactive_apps.get("test app");
         assert_eq!(r, None);
 
         // Check it is in active apps
-        let cells = state.active_apps.get("test app").cloned().unwrap();
+        let cell_ids: Vec<_> = state
+            .active_apps
+            .get("test app")
+            .cloned()
+            .unwrap()
+            .into_iter()
+            .map(|c| c.into_id())
+            .collect();
 
         // Collect the expected result
         let expected = dna_hashes
@@ -587,7 +600,7 @@ mod test {
             .map(|hash| CellId::from((hash, agent_key.clone())))
             .collect::<Vec<_>>();
 
-        assert_eq!(expected, cells);
+        assert_eq!(expected, cell_ids);
 
         // Now deactivate app
         let msg = AdminRequest::DeactivateApp {
@@ -614,9 +627,16 @@ mod test {
         assert_eq!(r, None);
 
         // Check it's added to inactive
-        let cells = state.inactive_apps.get("test app").cloned().unwrap();
+        let cell_ids: Vec<_> = state
+            .inactive_apps
+            .get("test app")
+            .cloned()
+            .unwrap()
+            .into_iter()
+            .map(|c| c.into_id())
+            .collect();
 
-        assert_eq!(expected, cells);
+        assert_eq!(expected, cell_ids);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -668,7 +688,9 @@ mod test {
         };
 
         let admin_api = RealAdminInterfaceApi::new(conductor_handle);
-        let msg = AdminRequest::DumpState(cell_id);
+        let msg = AdminRequest::DumpState {
+            cell_id: Box::new(cell_id),
+        };
         let msg = msg.try_into().unwrap();
         let respond = move |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();

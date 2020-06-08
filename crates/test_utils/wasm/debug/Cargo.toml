@@ -15,7 +15,7 @@ crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
 holochain_serialized_bytes = "=0.0.39"
-holochain_wasmer_guest = "=0.0.30"
+holochain_wasmer_guest = "=0.0.31"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 lazy_static = "1.4.0"
 
@@ -26,7 +26,3 @@ test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 wee_alloc = "=0.4.5"
 
 [patch.crates-io]
-# holochain_serialized_bytes = { version = "=0.0.39", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
-# holochain_wasmer_common = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
-# holochain_wasmer_guest = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
-# holochain_wasmer_host = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
