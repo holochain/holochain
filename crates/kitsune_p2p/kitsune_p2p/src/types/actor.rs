@@ -14,13 +14,13 @@ pub struct Broadcast {
     /// Kitsune will keep searching for new nodes to broadcast to until:
     ///  - (A) this target count is reached, or
     ///  - (B) the below timeout is exceeded.
-    /// Set to zero if you just want a default best-effort.
-    pub remote_agent_count: u8,
+    /// Set to None if you just want a default best-effort.
+    pub remote_agent_count: Option<u8>,
     /// The timeout to await for sucessful broadcasts.
-    /// Set to zero if you don't care to get a count -
+    /// Set to None if you don't care to get a count -
     /// broadcast will immediately return 0, but give a best effort to meet
     /// remote_agent_count.
-    pub timeout_ms: u64,
+    pub timeout_ms: Option<u64>,
     /// Broadcast data.
     pub broadcast: Vec<u8>,
 }

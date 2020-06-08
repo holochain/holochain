@@ -274,7 +274,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         request_validation_receipt: bool,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-        timeout_ms: u64,
+        timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let basis = entry_hash.to_kitsune();
@@ -293,7 +293,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
                 .broadcast(kitsune_p2p::actor::Broadcast {
                     space,
                     basis,
-                    remote_agent_count: 0, // default best-effort
+                    remote_agent_count: None, // default best-effort
                     timeout_ms,
                     broadcast,
                 })

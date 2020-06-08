@@ -105,6 +105,8 @@ impl KitsuneP2pActor {
             broadcast,
         } = input;
 
+        let timeout_ms = timeout_ms.expect("set by handle_broadcast");
+
         if !self.spaces.contains_key(&space) {
             return Err(KitsuneP2pError::RoutingSpaceError(space));
         }
@@ -232,18 +234,22 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
 
     fn handle_broadcast(&mut self, mut input: actor::Broadcast) -> KitsuneP2pHandlerResult<u8> {
         // if the user doesn't care about remote_agent_count, apply default
-        if input.remote_agent_count == 0 {
-            input.remote_agent_count = DEFAULT_BROADCAST_REMOTE_AGENT_COUNT;
+        match input.remote_agent_count {
+            None | Some(0) => {
+                input.remote_agent_count = Some(DEFAULT_BROADCAST_REMOTE_AGENT_COUNT);
+            }
+            _ => (),
         }
 
         // if the user doesn't care about timeout_ms, apply default
         // also - if set to 0, we want to return immediately, but
         // spawn a task with that default timeout.
-        let do_spawn = if input.timeout_ms == 0 {
-            input.timeout_ms = DEFAULT_BROADCAST_TIMEOUT_MS;
-            true
-        } else {
-            false
+        let do_spawn = match input.timeout_ms {
+            None | Some(0) => {
+                input.timeout_ms = Some(DEFAULT_BROADCAST_TIMEOUT_MS);
+                true
+            }
+            _ => false,
         };
 
         // gather the inner future

@@ -137,7 +137,7 @@ mod tests {
             )),
         );
 
-        p2p.publish(dna, a1, true, entry_hash, vec![], 20)
+        p2p.publish(dna, a1, true, entry_hash, vec![], Some(20))
             .await
             .unwrap();
 

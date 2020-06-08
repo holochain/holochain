@@ -105,8 +105,8 @@ mod tests {
                 space: space1,
                 // this is just a dummy value right now
                 basis: Arc::new(b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_vec().into()),
-                remote_agent_count: 42,
-                timeout_ms: 20,
+                remote_agent_count: Some(42),
+                timeout_ms: Some(20),
                 broadcast: b"test-broadcast".to_vec(),
             })
             .await
