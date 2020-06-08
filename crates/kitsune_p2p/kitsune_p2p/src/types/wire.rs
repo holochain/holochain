@@ -68,18 +68,21 @@ impl Wire {
     }
 
     fn priv_decode(mut data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
-        match &data[..4] {
-            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST] => {
-                data.drain(0..4);
-                Ok(Wire::Request(data))
+        if data.len() >= 4 {
+            match &data[..4] {
+                [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST] => {
+                    data.drain(0..4);
+                    return Ok(Wire::Request(data));
+                }
+                [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_BROADCAST] => {
+                    data.drain(0..4);
+                    return Ok(Wire::Broadcast(data));
+                }
+                _ => (),
             }
-            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_BROADCAST] => {
-                data.drain(0..4);
-                Ok(Wire::Broadcast(data))
-            }
-            _ => Err(KitsuneP2pError::decoding_error(
-                "invalid or corrupt kitsune p2p message".to_string(),
-            )),
         }
+        Err(KitsuneP2pError::decoding_error(
+            "invalid or corrupt kitsune p2p message".to_string(),
+        ))
     }
 }
