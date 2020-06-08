@@ -17,3 +17,6 @@ ghost_actor = "0.1.0"
 shrinkwraprs = "0.3.0"
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = [ "full" ] }
+
+[dev-dependencies]
+assert_matches = "1.3"
