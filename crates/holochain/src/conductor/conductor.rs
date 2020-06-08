@@ -908,7 +908,7 @@ async fn p2p_event_task(
 ) {
     use tokio::stream::StreamExt;
     while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.to_agent().clone());
+        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
         if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
             tracing::error!(
                 message = "error dispatching network event",

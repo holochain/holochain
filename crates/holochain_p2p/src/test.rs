@@ -18,7 +18,7 @@ mod tests {
 
         let (mut p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        tokio::task::spawn(async move {
+        let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
@@ -41,6 +41,9 @@ mod tests {
         let res: Vec<u8> = UnsafeBytes::from(res).into();
 
         assert_eq!(b"yada".to_vec(), res);
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -59,7 +62,7 @@ mod tests {
 
         let (mut p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        tokio::task::spawn(async move {
+        let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
@@ -82,6 +85,9 @@ mod tests {
         p2p.send_validation_receipt(dna, a2, UnsafeBytes::from(b"receipt-test".to_vec()).into())
             .await
             .unwrap();
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -107,7 +113,7 @@ mod tests {
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
         let recv_count_clone = recv_count.clone();
-        tokio::task::spawn(async move {
+        let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
@@ -136,5 +142,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
     }
 }

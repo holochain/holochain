@@ -51,7 +51,6 @@ impl From<String> for KitsuneP2pError {
     }
 }
 
-
 impl From<&str> for KitsuneP2pError {
     fn from(s: &str) -> Self {
         s.to_string().into()

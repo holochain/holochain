@@ -16,7 +16,7 @@ mod tests {
 
         let space1_clone = space1.clone();
         let a2_clone = a2.clone();
-        tokio::task::spawn(async move {
+        let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use KitsuneP2pEvent::*;
@@ -49,6 +49,9 @@ mod tests {
 
         let res = p2p.request(space1, a2, b"hello".to_vec()).await.unwrap();
         assert_eq!(b"echo: hello".to_vec(), res);
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -68,7 +71,7 @@ mod tests {
 
         let space1_clone = space1.clone();
         let recv_count_clone = recv_count.clone();
-        tokio::task::spawn(async move {
+        let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {
                 use KitsuneP2pEvent::*;
@@ -111,5 +114,8 @@ mod tests {
 
         assert_eq!(3, res);
         assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
     }
 }

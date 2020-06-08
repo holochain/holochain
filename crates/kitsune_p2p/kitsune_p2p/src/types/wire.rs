@@ -49,8 +49,8 @@ const WIRE_REQUEST: u8 = 0x10;
 const WIRE_BROADCAST: u8 = 0x20;
 
 impl Wire {
-    fn priv_encode_inner(msg_type: u8, mut msg: Vec<u8>) -> Vec<u8> {
-        let mut out = vec![0; i.len() + 4];
+    fn priv_encode_inner(msg_type: u8, msg: Vec<u8>) -> Vec<u8> {
+        let mut out = vec![0; msg.len() + 4];
         out[0] = KITSUNE_MAGIC_1;
         out[1] = KITSUNE_MAGIC_2;
         out[2] = KITSUNE_PROTO_VER;
@@ -68,12 +68,12 @@ impl Wire {
     }
 
     fn priv_decode(mut data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
-        match &data[..] {
-            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST, ..] => {
+        match &data[..4] {
+            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST] => {
                 data.drain(0..4);
                 Ok(Wire::Request(data))
             }
-            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_BROADCAST, ..] => {
+            [KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_BROADCAST] => {
                 data.drain(0..4);
                 Ok(Wire::Broadcast(data))
             }
