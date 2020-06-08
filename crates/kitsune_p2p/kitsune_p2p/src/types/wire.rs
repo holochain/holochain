@@ -6,6 +6,7 @@
 use crate::types::KitsuneP2pError;
 
 /// The main kitsune wire message enum
+#[derive(Debug)]
 pub enum Wire {
     Request(Vec<u8>),
     Broadcast(Vec<u8>),
@@ -84,5 +85,57 @@ impl Wire {
         Err(KitsuneP2pError::decoding_error(
             "invalid or corrupt kitsune p2p message".to_string(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_matches::*;
+
+    #[test]
+    fn ok_decode() {
+        let res = Wire::decode(vec![
+            KITSUNE_MAGIC_1,
+            KITSUNE_MAGIC_2,
+            KITSUNE_PROTO_VER,
+            WIRE_REQUEST,
+        ]);
+        assert_matches!(res, Ok(Wire::Request(_)));
+    }
+
+    #[test]
+    fn bad_decode_size() {
+        let res = Wire::decode(vec![KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER]);
+        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
+    }
+
+    #[test]
+    fn bad_decode_msg_type() {
+        let res = Wire::decode(vec![
+            KITSUNE_MAGIC_1,
+            KITSUNE_MAGIC_2,
+            KITSUNE_PROTO_VER,
+            0xff,
+        ]);
+        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
+    }
+
+    #[test]
+    fn bad_decode_magic_1() {
+        let res = Wire::decode(vec![0xff, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST]);
+        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
+    }
+
+    #[test]
+    fn bad_decode_magic_2() {
+        let res = Wire::decode(vec![KITSUNE_MAGIC_1, 0xff, KITSUNE_PROTO_VER, WIRE_REQUEST]);
+        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
+    }
+
+    #[test]
+    fn bad_decode_proto_ver() {
+        let res = Wire::decode(vec![KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, 0xff, WIRE_REQUEST]);
+        assert_matches!(res, Err(KitsuneP2pError::DecodingError(_)));
     }
 }
