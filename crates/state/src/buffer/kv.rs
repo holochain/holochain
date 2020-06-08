@@ -442,6 +442,8 @@ where
 pub struct SingleIterRaw<'env, V> {
     iter: rkv::store::single::Iter<'env>,
     rev: rkv::store::single::Iter<'env>,
+    key: Option<&'env [u8]>,
+    key_back: Option<&'env [u8]>,
     __type: std::marker::PhantomData<V>,
 }
 
@@ -455,6 +457,8 @@ where
         Self {
             iter,
             rev,
+            key: None,
+            key_back: None,
             __type: std::marker::PhantomData,
         }
     }
@@ -490,7 +494,15 @@ where
     type Item = IterItem<'env, V>;
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        Self::next_inner(self.iter.next())
+        let r = Self::next_inner(self.iter.next());
+        if let Ok(Some((k, _))) = r {
+            self.key = Some(k);
+            match self.key_back {
+                Some(k_back) if k >= k_back => return Ok(None),
+                _ => (),
+            }
+        }
+        r
     }
 }
 
@@ -499,7 +511,15 @@ where
     V: BufVal,
 {
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        Self::next_inner(self.rev.next())
+        let r = Self::next_inner(self.rev.next());
+        if let Ok(Some((k_back, _))) = r {
+            self.key_back = Some(k_back);
+            match self.key {
+                Some(key) if k_back <= key => return Ok(None),
+                _ => (),
+            }
+        }
+        r
     }
 }
 

@@ -5,7 +5,7 @@ use crate::{
     error::DatabaseError,
     test_utils::test_cell_env,
 };
-use fallible_iterator::FallibleIterator;
+use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use fixt::prelude::*;
 use rkv::StoreOptions;
 use std::collections::BTreeMap;
@@ -478,6 +478,97 @@ async fn kv_single_iter_found_4() {
         from_key,
     )
     .await;
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn exhaust_both_ends() {
+    let arc = test_cell_env();
+    let env = arc.guard().await;
+    let db = env
+        .inner()
+        .open_single("kv", StoreOptions::create())
+        .unwrap();
+    let values = (b'a'..=b'z')
+        .map(|a| String::from_utf8_lossy(&[a]).into_owned())
+        .zip((0..).into_iter().map(V))
+        .collect::<Vec<_>>();
+    let expected = [
+        (b"a", V(0)),
+        (b"z", V(25)),
+        (b"b", V(1)),
+        (b"y", V(24)),
+        (b"c", V(2)),
+        (b"x", V(23)),
+        (b"d", V(3)),
+        (b"w", V(22)),
+        (b"e", V(4)),
+        (b"v", V(21)),
+        (b"f", V(5)),
+        (b"u", V(20)),
+        (b"g", V(6)),
+        (b"t", V(19)),
+        (b"h", V(7)),
+        (b"s", V(18)),
+        (b"i", V(8)),
+        (b"r", V(17)),
+        (b"j", V(9)),
+        (b"q", V(16)),
+        (b"k", V(10)),
+        (b"p", V(15)),
+        (b"l", V(11)),
+        (b"o", V(14)),
+        (b"m", V(12)),
+        (b"n", V(13)),
+    ];
+    let expected = expected
+        .iter()
+        .map(|(k, v)| ([k[0]], v.clone()))
+        .collect::<Vec<_>>();
+    env.with_reader::<DatabaseError, _, _>(|reader| {
+        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        for (k, v) in values {
+            buf.put(k, v).unwrap();
+        }
+        {
+            let mut i = buf.iter().unwrap().map(|(k, v)| Ok(([k[0]], v)));
+            let mut result = Vec::new();
+            loop {
+                match (i.next().unwrap(), i.next_back().unwrap()) {
+                    (Some(f), Some(b)) => {
+                        result.push(f);
+                        result.push(b);
+                    }
+                    (Some(f), None) => result.push(f),
+                    (None, Some(b)) => result.push(b),
+                    (None, None) => break,
+                }
+            }
+            assert_eq!(result, expected);
+        }
+        env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+            .unwrap();
+        Ok(())
+    })
+    .unwrap();
+    env.with_reader::<DatabaseError, _, _>(|reader| {
+        let buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut i = buf.iter().unwrap().map(|(k, v)| Ok(([k[0]], v)));
+        let mut result = Vec::new();
+        loop {
+            match (i.next().unwrap(), i.next_back().unwrap()) {
+                (Some(f), Some(b)) => {
+                    result.push(f);
+                    result.push(b);
+                }
+                (Some(f), None) => result.push(f),
+                (None, Some(b)) => result.push(b),
+                (None, None) => break,
+            }
+        }
+        assert_eq!(result, expected);
+        Ok(())
+    })
+    .unwrap();
 }
 
 async fn kv_single_iter_runner(
