@@ -36,9 +36,9 @@ pub struct MultiRequest {
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
     /// See docs on Broadcast
-    pub remote_agent_count: u8,
+    pub remote_agent_count: Option<u8>,
     /// See docs on Broadcast
-    pub timeout_ms: u64,
+    pub timeout_ms: Option<u64>,
     /// Request data.
     pub request: Arc<Vec<u8>>,
 }

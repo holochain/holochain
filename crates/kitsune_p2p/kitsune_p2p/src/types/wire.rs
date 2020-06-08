@@ -68,7 +68,6 @@ impl Wire {
     }
 
     fn priv_decode(mut data: Vec<u8>) -> Result<Self, KitsuneP2pError> {
-
         match data.get(..4) {
             Some([KITSUNE_MAGIC_1, KITSUNE_MAGIC_2, KITSUNE_PROTO_VER, WIRE_REQUEST]) => {
                 data.drain(0..4);
@@ -82,6 +81,7 @@ impl Wire {
                 "invalid or corrupt kitsune p2p message".to_string(),
             )),
         }
+    }
 }
 
 #[cfg(test)]
