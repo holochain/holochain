@@ -7,6 +7,12 @@ pub(crate) enum WireMessage {
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
+    Publish {
+        from_agent: holo_hash::AgentPubKey,
+        request_validation_receipt: bool,
+        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dhtops::DhtOp)>,
+    },
     ValidationReceipt {
         #[serde(with = "serde_bytes")]
         receipt: Vec<u8>,
@@ -26,6 +32,20 @@ impl WireMessage {
     pub fn call_remote(request: SerializedBytes) -> WireMessage {
         Self::CallRemote {
             data: UnsafeBytes::from(request).into(),
+        }
+    }
+
+    pub fn publish(
+        from_agent: holo_hash::AgentPubKey,
+        request_validation_receipt: bool,
+        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dhtops::DhtOp)>,
+    ) -> WireMessage {
+        Self::Publish {
+            from_agent,
+            request_validation_receipt,
+            entry_hash,
+            ops,
         }
     }
 

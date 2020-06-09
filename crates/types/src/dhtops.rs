@@ -17,7 +17,8 @@ pub mod error;
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 //#[derive(Clone, Deserialize, Serialize)]
-#[derive(Clone, Debug)]
+//#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum DhtOp {
     /// Used to notify the authority for a header that it has been created.
     ///
@@ -28,7 +29,7 @@ pub enum DhtOp {
     /// - Store the entry into their CAS.
     ///   - Note: they do not become responsible for keeping the set of
     ///     references from that entry up-to-date.
-    StoreElement(ChainElement),
+    StoreElement(Signature, Header, Option<Entry>),
     /// Used to notify the authority for an entry that it has been created
     /// anew. (The same entry can be created more than once.)
     ///
@@ -73,10 +74,11 @@ pub enum DhtOp {
 
 impl DhtOp {
     /// Find the place to send this op
-    pub fn dht_basis(&self) -> AnyDhtHash {
-        match self {
-            Self::StoreElement(ChainElement { signed_header, .. }) => {
-                signed_header.header_address().clone().into()
+    pub async fn dht_basis(&self) -> DhtOpResult<AnyDhtHash> {
+        Ok(match self {
+            Self::StoreElement(_, header, _) => {
+                let (_, hash): (_, HeaderHash) = header::HeaderHashed::with_data(header.clone()).await?.into();
+                hash.into()
             }
             Self::StoreEntry(_, header, _) => header.entry().clone().into(),
             Self::RegisterAgentActivity(_, header) => header.author().clone().into(),
@@ -86,13 +88,13 @@ impl DhtOp {
             Self::RegisterRemoveLink(_, _header) => {
                 todo!("LinkRemove header doesn't contain the base_address")
             }
-        }
+        })
     }
 
     fn as_unique_form(&self) -> UniqueForm<'_> {
         match self {
-            Self::StoreElement(ChainElement { signed_header, .. }) => {
-                UniqueForm::StoreElement(signed_header.header())
+            Self::StoreElement(_, header, _) => {
+                UniqueForm::StoreElement(header)
             }
             Self::StoreEntry(_, header, _) => UniqueForm::StoreEntry(header),
             Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
@@ -168,7 +170,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
     //
     // Maybe use `ArrayVec`?
     let mut ops = vec![
-        DhtOp::StoreElement(element.clone()),
+        DhtOp::StoreElement(sig.clone(), header.clone(), maybe_entry.clone()),
         DhtOp::RegisterAgentActivity(sig.clone(), header.clone()),
     ];
 

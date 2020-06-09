@@ -18,21 +18,21 @@ pub use spawn::*;
 pub struct HolochainP2pCell {
     sender: actor::HolochainP2pSender,
     dna_hash: Arc<DnaHash>,
-    agent_pub_key: Arc<AgentPubKey>,
+    from_agent: Arc<AgentPubKey>,
 }
 
 impl HolochainP2pCell {
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     pub async fn join(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender
-            .join((*self.dna_hash).clone(), (*self.agent_pub_key).clone())
+            .join((*self.dna_hash).clone(), (*self.from_agent).clone())
             .await
     }
 
     /// If a cell is deactivated, we'll need to \"leave\" the network module as well.
     pub async fn leave(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender
-            .leave((*self.dna_hash).clone(), (*self.agent_pub_key).clone())
+            .leave((*self.dna_hash).clone(), (*self.from_agent).clone())
             .await
     }
 
@@ -44,19 +44,29 @@ impl HolochainP2pCell {
         self.sender
             .call_remote(
                 (*self.dna_hash).clone(),
-                (*self.agent_pub_key).clone(),
+                (*self.from_agent).clone(),
                 request,
             )
             .await
     }
 
     /// Publish data to the correct neigborhood.
-    pub async fn publish(&mut self) -> actor::HolochainP2pResult<()> {
+    pub async fn publish(
+        &mut self,
+        request_validation_receipt: bool,
+        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dhtops::DhtOp)>,
+        timeout_ms: Option<u64>,
+    ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .publish(actor::Publish {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
-            })
+            .publish(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                request_validation_receipt,
+                entry_hash,
+                ops,
+                timeout_ms,
+            )
             .await
     }
 
@@ -65,7 +75,7 @@ impl HolochainP2pCell {
         self.sender
             .get_validation_package(actor::GetValidationPackage {
                 dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
+                agent_pub_key: (*self.from_agent).clone(),
             })
             .await
     }
@@ -75,7 +85,7 @@ impl HolochainP2pCell {
         self.sender
             .get(actor::Get {
                 dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
+                agent_pub_key: (*self.from_agent).clone(),
             })
             .await
     }
@@ -85,7 +95,7 @@ impl HolochainP2pCell {
         self.sender
             .get_links(actor::GetLinks {
                 dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.agent_pub_key).clone(),
+                agent_pub_key: (*self.from_agent).clone(),
             })
             .await
     }
@@ -98,7 +108,7 @@ impl HolochainP2pCell {
         self.sender
             .send_validation_receipt(
                 (*self.dna_hash).clone(),
-                (*self.agent_pub_key).clone(),
+                (*self.from_agent).clone(),
                 receipt,
             )
             .await
