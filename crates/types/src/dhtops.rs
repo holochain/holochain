@@ -5,7 +5,7 @@
 //!
 //! [dhtop]: enum.DhtOp.html
 
-use crate::element::{ChainElement, SignedHeader};
+use crate::element::ChainElement;
 use crate::{composite_hash::AnyDhtHash, header, prelude::*, Header};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
@@ -17,7 +17,7 @@ pub mod error;
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 //#[derive(Clone, Deserialize, Serialize)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum DhtOp {
     /// Used to notify the authority for a header that it has been created.
     ///
@@ -124,6 +124,7 @@ impl PartialEq for DhtOp {
 //impl Eq for DhtOp {}
 
 //#[derive(Eq, Hash, PartialEq)]
+
 enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with headers and therefore would waste hash/comparison time to include.
@@ -137,6 +138,21 @@ enum UniqueForm<'a> {
     // future work: encode idempotency in LinkAdd entries themselves
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
+}
+
+impl<'a> TryFrom<UniqueForm<'a>> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(value: UniqueForm<'a>) -> Result<Self, Self::Error> {
+        match value {
+            UniqueForm::StoreElement(h) => Self::try_from(h),
+            UniqueForm::StoreEntry(h) => Self::try_from(h),
+            UniqueForm::RegisterAgentActivity(h) => Self::try_from(h),
+            UniqueForm::RegisterReplacedBy(h) => Self::try_from(h),
+            UniqueForm::RegisterDeletedBy(h) => Self::try_from(h),
+            UniqueForm::RegisterAddLink(h) => Self::try_from(h),
+            UniqueForm::RegisterRemoveLink(h) => Self::try_from(h),
+        }
+    }
 }
 
 /// Turn a chain element into a DhtOp
@@ -195,4 +211,36 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
         }
     }
     Ok(ops)
+}
+
+impl TryFrom<DhtOp> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(op: DhtOp) -> Result<Self, Self::Error> {
+        Self::try_from(op.as_unique_form())
+    }
+}
+
+impl TryFrom<&DhtOp> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(op: &DhtOp) -> Result<Self, Self::Error> {
+        Self::try_from(op.as_unique_form())
+    }
+}
+
+make_hashed_base! {
+    Visibility(pub),
+    HashedName(DhtOpHashed),
+    ContentType(DhtOp),
+    HashType(DhtOpHash),
+}
+
+impl DhtOpHashed {
+    /// Create a hashed [DhtOp]
+    pub async fn with_data(op: DhtOp) -> Result<Self, SerializedBytesError> {
+        let sb = SerializedBytes::try_from(&op)?;
+        Ok(DhtOpHashed::with_pre_hashed(
+            op,
+            DhtOpHash::with_data(UnsafeBytes::from(sb).into()).await,
+        ))
+    }
 }

@@ -158,7 +158,7 @@ impl HeaderHashed {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 /// Set of headers that can add a new entry
 pub enum NewEntryHeader {
     Create(EntryCreate),
