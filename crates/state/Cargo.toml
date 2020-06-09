@@ -23,7 +23,7 @@ holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_types = { path = "../types" }
 lazy_static = "1.4.0"
-mockall = "0.6.0"
+mockall = "0.7.0"
 must_future = "0.1.1"
 nanoid = "0.3.0"
 owning_ref = "0.4.1"
