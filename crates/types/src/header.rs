@@ -7,6 +7,7 @@
 #![allow(missing_docs)]
 
 use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
+use crate::prelude::*;
 
 pub mod builder;
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
@@ -157,11 +158,26 @@ impl HeaderHashed {
     }
 }
 
+#[derive(Clone)]
+/// Set of headers that can add a new entry
+pub enum NewEntryHeader {
+    Create(EntryCreate),
+    Update(EntryUpdate),
+}
+
+impl NewEntryHeader {
+    /// Get the entry on this header
+    pub fn entry(&self) -> &EntryHash {
+        match self {
+            NewEntryHeader::Create(EntryCreate { entry_hash, .. })
+            | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
+        }
+    }
+}
+
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 pub type ZomeId = u8;
-
-use crate::prelude::*;
 
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

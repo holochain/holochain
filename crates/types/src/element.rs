@@ -13,8 +13,10 @@ use must_future::MustBoxFuture;
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChainElement {
-    signed_header: SignedHeaderHashed,
-    maybe_entry: Option<Entry>,
+    /// The signed header for this element
+    pub signed_header: SignedHeaderHashed,
+    /// If there is an entry with this header it will be here
+    pub maybe_entry: Option<Entry>,
 }
 
 impl ChainElement {

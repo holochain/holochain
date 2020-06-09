@@ -129,6 +129,15 @@ impl TryFrom<&AgentPubKey> for AnyDhtHash {
     }
 }
 
+impl From<EntryHash> for AnyDhtHash {
+    fn from(entry: EntryHash) -> Self {
+        match entry {
+            EntryHash::Entry(e) => AnyDhtHash::EntryContent(e),
+            EntryHash::Agent(a) => AnyDhtHash::Agent(a),
+        }
+    }
+}
+
 impl std::fmt::Display for AnyDhtHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match_dht_addr!(self => |i| { i.fmt(f) })

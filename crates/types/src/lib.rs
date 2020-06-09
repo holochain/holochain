@@ -8,6 +8,7 @@ pub mod autonomic;
 pub mod cell;
 pub mod composite_hash;
 pub mod db;
+pub mod dhtops;
 pub mod dna;
 pub mod element;
 pub mod entry;
