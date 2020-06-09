@@ -7,8 +7,12 @@
 
 use crate::element::{ChainElement, SignedHeader};
 use crate::{composite_hash::AnyDhtHash, header, prelude::*, Header};
+use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
 use holochain_zome_types::Entry;
+
+#[allow(missing_docs)]
+pub mod error;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
@@ -53,7 +57,7 @@ pub enum DhtOp {
     ///
     /// TODO: document how those "agent-activity" references are stored in
     /// reality.
-    RegisterAgentActivity(SignedHeader),
+    RegisterAgentActivity(Signature, Header),
     /// Op for updating an entry
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
@@ -74,14 +78,8 @@ impl DhtOp {
             Self::StoreElement(ChainElement { signed_header, .. }) => {
                 signed_header.header_address().clone().into()
             }
-            Self::StoreEntry(_, header, _) => {
-                // FIXME: Handle error
-                // TODO: This used to be Borrowed but needs to be cloned to into AnyDhtHash
-                header.entry().clone().into()
-            }
-            Self::RegisterAgentActivity(signed_header) => {
-                signed_header.header().author().clone().into()
-            }
+            Self::StoreEntry(_, header, _) => header.entry().clone().into(),
+            Self::RegisterAgentActivity(_, header) => header.author().clone().into(),
             Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone().into(),
             Self::RegisterDeletedBy(_, header) => header.removes_address.clone(),
             Self::RegisterAddLink(_, header) => header.base_address.clone(),
@@ -97,9 +95,7 @@ impl DhtOp {
                 UniqueForm::StoreElement(signed_header.header())
             }
             Self::StoreEntry(_, header, _) => UniqueForm::StoreEntry(header),
-            Self::RegisterAgentActivity(signed_header) => {
-                UniqueForm::RegisterAgentActivity(signed_header.header())
-            }
+            Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
             Self::RegisterReplacedBy(_, header, _) => UniqueForm::RegisterReplacedBy(header),
             Self::RegisterDeletedBy(_, header) => UniqueForm::RegisterDeletedBy(header),
             Self::RegisterAddLink(_, header) => UniqueForm::RegisterAddLink(header),
@@ -144,7 +140,7 @@ enum UniqueForm<'a> {
 }
 
 /// Turn a chain element into a DhtOp
-pub fn ops_from_element(element: &ChainElement) -> Vec<DhtOp> {
+pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
     // TODO: avoid cloning everything
 
     let (signed_header, maybe_entry) = element.clone().into_inner();
@@ -157,7 +153,7 @@ pub fn ops_from_element(element: &ChainElement) -> Vec<DhtOp> {
     // Maybe use `ArrayVec`?
     let mut ops = vec![
         DhtOp::StoreElement(element.clone()),
-        DhtOp::RegisterAgentActivity(SignedHeader::from((header.clone(), sig.clone()))),
+        DhtOp::RegisterAgentActivity(sig.clone(), header.clone()),
     ];
 
     match &header {
@@ -175,10 +171,14 @@ pub fn ops_from_element(element: &ChainElement) -> Vec<DhtOp> {
         Header::EntryCreate(header) => ops.push(DhtOp::StoreEntry(
             sig.clone(),
             NewEntryHeader::Create(header.clone()),
-            maybe_entry.expect("invalid `ChainElement`").clone(),
+            maybe_entry
+                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?
+                .clone(),
         )),
         Header::EntryUpdate(entry_update) => {
-            let entry = maybe_entry.expect("invalid `ChainElement`");
+            let entry = maybe_entry
+                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?
+                .clone();
             ops.push(DhtOp::StoreEntry(
                 sig.clone(),
                 NewEntryHeader::Update(entry_update.clone()),
@@ -194,5 +194,5 @@ pub fn ops_from_element(element: &ChainElement) -> Vec<DhtOp> {
             ops.push(DhtOp::RegisterDeletedBy(sig.clone(), entry_delete.clone()))
         }
     }
-    ops
+    Ok(ops)
 }
