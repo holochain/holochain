@@ -240,6 +240,10 @@ where
                                     rkv::WriteFlags::NO_DUP_DATA,
                                 )
                                 .or_else(|err| {
+                                    // This error is a little misleading...
+                                    // In a MultiStore with NO_DUP_DATA, it is
+                                    // actually returned if there is a duplicate
+                                    // value... which we want to ignore.
                                     if let rkv::StoreError::LmdbError(rkv::LmdbError::KeyExist) =
                                         err
                                     {

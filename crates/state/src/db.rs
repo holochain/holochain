@@ -220,10 +220,10 @@ fn register_db<V: 'static + Send + Sync>(
         DbKind::Multi => {
             let mut opts = StoreOptions::create();
 
-            // This is needed for the optional put flag NO_DUP_DATA
-            // on KvvBuf.
-            // As far as I can tell, it will only affect the sorting if
-            // NOT using NO_DUP_DATA - which should be ok for our usage.
+            // This is needed for the optional put flag NO_DUP_DATA on KvvBuf.
+            // As far as I can tell, if we are not using NO_DUP_DATA, it will
+            // only affect the sorting of the values in case there are dups,
+            // which should be ok for our usage.
             opts.flags.insert(rkv::DatabaseFlags::DUP_SORT);
 
             um.insert(
