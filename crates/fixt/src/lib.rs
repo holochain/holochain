@@ -1,3 +1,5 @@
+#![allow(clippy::assign_op_pattern)]
+
 pub mod bool;
 pub mod bytes;
 pub mod number;
