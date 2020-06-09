@@ -40,6 +40,8 @@ pub enum DbName {
     Wasm,
     /// database to store the [DnaDef]
     DnaDef,
+    /// KVV store to accumulate validation receipts for a published EntryHash
+    ValidationReceipts,
 }
 
 impl std::fmt::Display for DbName {
@@ -57,6 +59,7 @@ impl std::fmt::Display for DbName {
             ConductorState => write!(f, "ConductorState"),
             Wasm => write!(f, "Wasm"),
             DnaDef => write!(f, "DnaDef"),
+            ValidationReceipts => write!(f, "ValidationReceipts"),
         }
     }
 }
@@ -78,6 +81,7 @@ impl DbName {
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
+            ValidationReceipts => Multi,
         }
     }
 }
@@ -131,6 +135,8 @@ lazy_static! {
     pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
     /// The key to access the DnaDef database
     pub static ref DNA_DEF: DbKey<SingleStore> = DbKey::new(DbName::DnaDef);
+    /// The key to access the ValidationReceipts database
+    pub static ref VALIDATION_RECEIPTS: DbKey<MultiStore> = DbKey::new(DbName::ValidationReceipts);
 }
 
 lazy_static! {
@@ -182,6 +188,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*CACHE_CHAIN_HEADERS)?;
             register_db(env, um, &*CACHE_SYSTEM_META)?;
             register_db(env, um, &*CACHE_LINKS_META)?;
+            register_db(env, um, &*VALIDATION_RECEIPTS)?;
         }
         EnvironmentKind::Conductor => {
             register_db(env, um, &*CONDUCTOR_STATE)?;
