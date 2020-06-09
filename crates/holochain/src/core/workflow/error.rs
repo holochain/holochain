@@ -35,6 +35,9 @@ pub enum WorkflowError {
 
     #[error("Capability token missing")]
     CapabilityMissing,
+
+    #[error("A hash failed: {0}")]
+    FailedToHash(#[from] SerializedBytesError),
 }
 
 /// The `Result::Ok` of any workflow function is

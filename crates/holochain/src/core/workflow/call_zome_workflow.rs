@@ -104,6 +104,7 @@ where
                 }
             }
 
+            // TODO: B-01567: Trigger ProduceDhtOps workflow
             let fx = WorkflowEffects {
                 workspace,
                 callbacks: Default::default(),

@@ -95,7 +95,7 @@ where
     }
 
     /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&self) -> DatabaseResult<SingleIntIter<K, V>> {
+    pub fn iter_raw(&self) -> DatabaseResult<SingleIntIter<'env, K, V>> {
         Ok(SingleIntIter::new(self.db.iter_start(self.reader)?))
     }
 

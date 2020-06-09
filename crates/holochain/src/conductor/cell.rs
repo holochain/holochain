@@ -91,6 +91,8 @@ impl Cell {
         };
 
         if has_genesis {
+            // TODO: Trigger produce_dht_ops_workflow here
+            // Are we just triggering for the source chain?
             Ok(Self {
                 id,
                 conductor_api,

@@ -13,7 +13,7 @@ use crate::{
 };
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
-use holochain_zome_types::Entry;
+use holochain_zome_types::{entry_def::EntryVisibility, Entry};
 use serde::{Deserialize, Serialize};
 
 #[allow(missing_docs)]
@@ -21,7 +21,7 @@ pub mod error;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq)]
 pub enum DhtOp {
     /// Used to notify the authority for a header that it has been created.
     ///
@@ -135,8 +135,6 @@ enum UniqueForm<'a> {
 }
 
 impl DhtOpLight {
-    // TODO: Remove when used
-    #[allow(dead_code)]
     /// Convert a [DhtOp] to a [DhtOpLight]
     pub async fn from_op(op: DhtOp) -> Result<Self, SerializedBytesError> {
         match op {
@@ -206,27 +204,46 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
         Header::LinkRemove(link_remove) => {
             ops.push(DhtOp::RegisterRemoveLink(sig, link_remove.clone()))
         }
-        Header::EntryCreate(header) => ops.push(DhtOp::StoreEntry(
-            sig,
-            NewEntryHeader::Create(header.clone()),
-            Box::new(
-                maybe_entry.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
-            ),
-        )),
-        Header::EntryUpdate(entry_update) => {
-            let entry = maybe_entry
-                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?;
-            ops.push(DhtOp::StoreEntry(
-                sig.clone(),
-                NewEntryHeader::Update(entry_update.clone()),
-                Box::new(entry.clone()),
-            ));
-            ops.push(DhtOp::RegisterReplacedBy(
+        Header::EntryCreate(header) => match header.entry_type.visibility() {
+            EntryVisibility::Public => ops.push(DhtOp::StoreEntry(
                 sig,
-                entry_update.clone(),
-                Box::new(entry),
-            ));
-        }
+                NewEntryHeader::Create(header.clone()),
+                Box::new(
+                    maybe_entry
+                        .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
+                ),
+            )),
+            EntryVisibility::Private => {
+                if let Some(DhtOp::StoreElement(_, _, e)) = ops.get_mut(0) {
+                    *e = None;
+                } else {
+                    panic!("First op should always be store element");
+                }
+            }
+        },
+        Header::EntryUpdate(entry_update) => match entry_update.entry_type.visibility() {
+            EntryVisibility::Public => {
+                let entry = maybe_entry
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?;
+                ops.push(DhtOp::StoreEntry(
+                    sig.clone(),
+                    NewEntryHeader::Update(entry_update.clone()),
+                    Box::new(entry.clone()),
+                ));
+                ops.push(DhtOp::RegisterReplacedBy(
+                    sig,
+                    entry_update.clone(),
+                    Box::new(entry),
+                ));
+            }
+            EntryVisibility::Private => {
+                if let Some(DhtOp::StoreElement(_, _, e)) = ops.get_mut(0) {
+                    *e = None;
+                } else {
+                    panic!("First op should always be store element");
+                }
+            }
+        },
         Header::EntryDelete(entry_delete) => {
             ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()))
         }

@@ -12,6 +12,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
+    dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
     header::{self},
@@ -82,6 +83,26 @@ impl<'env> SourceChainBuf<'env> {
         k: &HeaderAddress,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         self.cas.get_header(k).await
+    }
+
+    pub async fn get_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
+        let mut ops = Vec::new();
+        // FIXME: This collect shouldn't need to happen but the iterator to the db is not Send
+        let ops_headers = self.sequence.get_dht_ops()?.collect::<Vec<_>>();
+        for (i, header) in ops_headers {
+            let op = ops_from_element(
+                &self
+                    .get_element(&header)
+                    .await?
+                    .expect("BUG: element in sequence but not cas"),
+            )?;
+            ops.push((i, op));
+        }
+        Ok(ops)
+    }
+
+    pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
+        self.sequence.complete_dht_op(i)
     }
 
     pub fn cas(&self) -> &ChainCasBuf {
