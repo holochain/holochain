@@ -93,13 +93,11 @@ fn dna_file_path_convert(
                 dna_file_path.display()
             )));
         }
-    } else {
-        if !tmp_lossy.ends_with(".dna.workdir") {
-            return Err(DnaUtilError::InvalidInput(format!(
-                "bad compile path, work dirs must end with '.dna.workdir': {}",
-                dna_file_path.display()
-            )));
-        }
+    } else if !tmp_lossy.ends_with(".dna.workdir") {
+        return Err(DnaUtilError::InvalidInput(format!(
+            "bad compile path, work dirs must end with '.dna.workdir': {}",
+            dna_file_path.display()
+        )));
     }
 
     let filename = dna_file_path
