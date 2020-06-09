@@ -1,4 +1,4 @@
-# holochain_serialized_bytes_derive
+# holochain_types
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.net)
@@ -9,17 +9,9 @@
 
 ## Overview
 
-Derive macros for serialized bytes.
+Common types used by other Holochain crates.
 
-## Usage
-
-```rust
-use holochain_serialized_bytes::prelude::*;
-
-#[derive(Serialize, Deserialize, PartialEq, Debug, SerializedBytes)]
-pub struct SomeData(String);
-
-```
+This crate is a complement to the [holochain_zome_types crate](https://crates.io/crates/holochain_zome_types), which contains only the essential types which are used in Holochain DNA code. This crate expands on those types to include all types which Holochain itself depends on.
 
 ## Contribute
 
