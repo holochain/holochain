@@ -1,6 +1,6 @@
 use crate::Header;
-use thiserror::Error;
 use holochain_serialized_bytes::SerializedBytesError;
+use thiserror::Error;
 
 #[derive(Clone, Debug, Error)]
 pub enum DhtOpError {

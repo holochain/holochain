@@ -29,7 +29,7 @@ pub enum DhtOp {
     /// - Store the entry into their CAS.
     ///   - Note: they do not become responsible for keeping the set of
     ///     references from that entry up-to-date.
-    StoreElement(Signature, Header, Option<Entry>),
+    StoreElement(Signature, Header, Option<Box<Entry>>),
     /// Used to notify the authority for an entry that it has been created
     /// anew. (The same entry can be created more than once.)
     ///
@@ -44,7 +44,7 @@ pub enum DhtOp {
     ///
     /// TODO: document how those "created-by" references are stored in
     /// reality.
-    StoreEntry(Signature, NewEntryHeader, Entry),
+    StoreEntry(Signature, NewEntryHeader, Box<Entry>),
     /// Used to notify the authority for an agent's public key that that agent
     /// has commited a new header.
     ///
@@ -63,7 +63,7 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterReplacedBy(Signature, header::EntryUpdate, Entry),
+    RegisterReplacedBy(Signature, header::EntryUpdate, Box<Entry>),
     /// Op for deleting an entry
     RegisterDeletedBy(Signature, header::EntryDelete),
     /// Op for adding a link  
@@ -77,12 +77,14 @@ impl DhtOp {
     pub async fn dht_basis(&self) -> DhtOpResult<AnyDhtHash> {
         Ok(match self {
             Self::StoreElement(_, header, _) => {
-                let (_, hash): (_, HeaderHash) = header::HeaderHashed::with_data(header.clone()).await?.into();
+                let (_, hash): (_, HeaderHash) = header::HeaderHashed::with_data(header.clone())
+                    .await?
+                    .into();
                 hash.into()
             }
             Self::StoreEntry(_, header, _) => header.entry().clone().into(),
             Self::RegisterAgentActivity(_, header) => header.author().clone().into(),
-            Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone().into(),
+            Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone(),
             Self::RegisterDeletedBy(_, header) => header.removes_address.clone(),
             Self::RegisterAddLink(_, header) => header.base_address.clone(),
             Self::RegisterRemoveLink(_, _header) => {
@@ -93,9 +95,7 @@ impl DhtOp {
 
     fn as_unique_form(&self) -> UniqueForm<'_> {
         match self {
-            Self::StoreElement(_, header, _) => {
-                UniqueForm::StoreElement(header)
-            }
+            Self::StoreElement(_, header, _) => UniqueForm::StoreElement(header),
             Self::StoreEntry(_, header, _) => UniqueForm::StoreEntry(header),
             Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
             Self::RegisterReplacedBy(_, header, _) => UniqueForm::RegisterReplacedBy(header),
@@ -170,7 +170,11 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
     //
     // Maybe use `ArrayVec`?
     let mut ops = vec![
-        DhtOp::StoreElement(sig.clone(), header.clone(), maybe_entry.clone()),
+        DhtOp::StoreElement(
+            sig.clone(),
+            header.clone(),
+            maybe_entry.clone().map(Box::new),
+        ),
         DhtOp::RegisterAgentActivity(sig.clone(), header.clone()),
     ];
 
@@ -180,36 +184,33 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
         | Header::ChainClose(_)
         | Header::AgentValidationPkg(_)
         | Header::InitZomesComplete(_) => {}
-        Header::LinkAdd(link_add) => {
-            ops.push(DhtOp::RegisterAddLink(sig.clone(), link_add.clone()))
-        }
+        Header::LinkAdd(link_add) => ops.push(DhtOp::RegisterAddLink(sig, link_add.clone())),
         Header::LinkRemove(link_remove) => {
-            ops.push(DhtOp::RegisterRemoveLink(sig.clone(), link_remove.clone()))
+            ops.push(DhtOp::RegisterRemoveLink(sig, link_remove.clone()))
         }
         Header::EntryCreate(header) => ops.push(DhtOp::StoreEntry(
-            sig.clone(),
+            sig,
             NewEntryHeader::Create(header.clone()),
-            maybe_entry
-                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?
-                .clone(),
+            Box::new(
+                maybe_entry.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
+            ),
         )),
         Header::EntryUpdate(entry_update) => {
             let entry = maybe_entry
-                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?
-                .clone();
+                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?;
             ops.push(DhtOp::StoreEntry(
                 sig.clone(),
                 NewEntryHeader::Update(entry_update.clone()),
-                entry.clone(),
+                Box::new(entry.clone()),
             ));
             ops.push(DhtOp::RegisterReplacedBy(
-                sig.clone(),
+                sig,
                 entry_update.clone(),
-                entry.clone(),
+                Box::new(entry),
             ));
         }
         Header::EntryDelete(entry_delete) => {
-            ops.push(DhtOp::RegisterDeletedBy(sig.clone(), entry_delete.clone()))
+            ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()))
         }
     }
     Ok(ops)
