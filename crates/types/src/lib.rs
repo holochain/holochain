@@ -1,6 +1,5 @@
 //! Common holochain types crate.
 
-#![allow(clippy::cognitive_complexity)]
 #![deny(missing_docs)]
 
 pub mod app;
