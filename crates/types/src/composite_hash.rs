@@ -95,7 +95,19 @@ impl AsRef<[u8]> for EntryHash {
 }
 
 /// address type for hashes that can be used to retrieve anything that can be stored on the dht
-#[derive(Debug, Clone, derive_more::From, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    derive_more::From,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+)]
 pub enum AnyDhtHash {
     /// standard entry content hash
     EntryContent(EntryContentHash),
@@ -106,7 +118,7 @@ pub enum AnyDhtHash {
 }
 
 /// utility macro to make it more ergonomic to access the enum variants
-macro_rules! match_dht_addr {
+macro_rules! match_dht_hash {
     ($h:ident => |$i:ident| { $($t:tt)* }) => {
         match $h {
             AnyDhtHash::EntryContent($i) => {
@@ -122,15 +134,39 @@ macro_rules! match_dht_addr {
     };
 }
 
+impl holo_hash_core::HoloHashCoreHash for AnyDhtHash {
+    fn get_raw(&self) -> &[u8] {
+        match_dht_hash!(self => |i| { i.get_raw() })
+    }
+
+    fn get_bytes(&self) -> &[u8] {
+        match_dht_hash!(self => |i| { i.get_bytes() })
+    }
+
+    fn get_loc(&self) -> u32 {
+        match_dht_hash!(self => |i| { i.get_loc() })
+    }
+
+    fn into_inner(self) -> std::vec::Vec<u8> {
+        match_dht_hash!(self => |i| { i.into_inner() })
+    }
+}
+
+impl From<AnyDhtHash> for holo_hash_core::HoloHashCore {
+    fn from(any_dht_hash: AnyDhtHash) -> holo_hash_core::HoloHashCore {
+        match_dht_hash!(any_dht_hash => |i| { i.into() })
+    }
+}
+
 impl From<AnyDhtHash> for HoloHash {
-    fn from(dht_address: AnyDhtHash) -> HoloHash {
-        match_dht_addr!(dht_address => |i| { i.into() })
+    fn from(any_dht_hash: AnyDhtHash) -> HoloHash {
+        match_dht_hash!(any_dht_hash => |i| { i.into() })
     }
 }
 
 impl std::fmt::Display for AnyDhtHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match_dht_addr!(self => |i| { i.fmt(f) })
+        match_dht_hash!(self => |i| { i.fmt(f) })
     }
 }
 

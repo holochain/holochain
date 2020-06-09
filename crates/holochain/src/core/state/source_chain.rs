@@ -164,14 +164,13 @@ impl<'env> SourceChain<'env> {
             )
             .iter_fail()?
             .filter_map(|entry| {
-                Ok(entry.clone().as_cap_claim().and_then(|claim| {
-                    if claim.secret() == query {
-                        Some((entry.into_hash(), claim.clone()))
-                    } else {
-                        None
-                    }
-                }))
+                if let (Entry::CapClaim(claim), entry_hash) = entry.into_inner() {
+                    Ok(Some((entry_hash, claim)))
+                } else {
+                    Ok(None)
+                }
             })
+            .filter(|(_entry_hash, claim)| Ok(claim.secret() == query))
             .collect()?;
 
         let answer = if hashes_n_claims.len() == 0 {
