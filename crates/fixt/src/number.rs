@@ -187,7 +187,7 @@ macro_rules! fixturator_float {
                 } else {
                     -ret - 0.5
                 };
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 signed_ret
             }
         );
