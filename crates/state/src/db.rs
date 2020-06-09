@@ -217,10 +217,20 @@ fn register_db<V: 'static + Send + Sync>(
             key.with_value_type(),
             env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
         ),
-        DbKind::Multi => um.insert(
-            key.with_value_type(),
-            env.open_multi(db_str.as_str(), StoreOptions::create())?,
-        ),
+        DbKind::Multi => {
+            let mut opts = StoreOptions::create();
+
+            // This is needed for the optional put flag NO_DUP_DATA
+            // on KvvBuf.
+            // As far as I can tell, it will only affect the sorting if
+            // NOT using NO_DUP_DATA - which should be ok for our usage.
+            opts.flags.insert(rkv::DatabaseFlags::DUP_SORT);
+
+            um.insert(
+                key.with_value_type(),
+                env.open_multi(db_str.as_str(), opts)?,
+            )
+        }
     };
     Ok(())
 }

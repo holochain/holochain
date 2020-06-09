@@ -42,7 +42,7 @@ pub mod chain_meta;
 pub mod chain_sequence;
 #[allow(missing_docs)]
 pub mod source_chain;
+pub mod validation_receipts_db;
 #[allow(missing_docs)]
 pub mod wasm;
-pub mod validation_receipts_db;
 pub mod workspace;

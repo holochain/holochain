@@ -67,6 +67,9 @@ pub enum DatabaseError {
 
     #[error("Failue to remove directory")]
     DirectoryError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 }
 
 impl PartialEq for DatabaseError {

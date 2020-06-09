@@ -268,7 +268,7 @@ macro_rules! new_holo_hash {
     ( $( $doc:expr , $name:ident , $prefix:expr , )* ) => {
         $(
             #[doc = $doc]
-            #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+            #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize, SerializedBytes)]
             pub struct $name(holo_hash_core::$name);
 
             impl HoloHashBaseExt for $name {

@@ -57,6 +57,7 @@ where
     db: MultiStore,
     reader: &'env R,
     scratch: HashMap<K, ValuesDelta<V>>,
+    no_dup_data: bool,
 }
 
 impl<'env, K, V, R> KvvBuf<'env, K, V, R>
@@ -67,11 +68,29 @@ where
 {
     /// Create a new KvvBuf from a read-only transaction and a database reference
     pub fn new(reader: &'env R, db: MultiStore) -> DatabaseResult<Self> {
+        Self::new_opts(reader, db, false)
+    }
+
+    /// Create a new KvvBuf from a read-only transaction and a database reference
+    /// also allow switching to no_dup_data mode.
+    pub fn new_opts(reader: &'env R, db: MultiStore, no_dup_data: bool) -> DatabaseResult<Self> {
         Ok(Self {
             db,
             reader,
             scratch: HashMap::new(),
+            no_dup_data,
         })
+    }
+
+    /// Create a new KvvBuf from a new read-only transaction, using the same database
+    /// as an existing KvvBuf. Useful for getting a fresh read-only snapshot of a database.
+    pub fn with_reader<RR: Readable>(&self, reader: &'env RR) -> KvvBuf<'env, K, V, RR> {
+        KvvBuf {
+            db: self.db,
+            reader,
+            scratch: HashMap::new(),
+            no_dup_data: self.no_dup_data,
+        }
     }
 
     /// Get a set of values, taking the scratch space into account,
@@ -165,6 +184,7 @@ where
             Err(e) => Some(Err(e.into())),
         }))
     }
+
     fn check_not_found(
         persisted: DatabaseResult<impl Iterator<Item = DatabaseResult<V>>>,
     ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<V>>> {
@@ -211,7 +231,26 @@ where
                     Insert => {
                         let buf = rmp_serde::to_vec_named(&v)?;
                         let encoded = rkv::Value::Blob(&buf);
-                        self.db.put(writer, k.clone(), &encoded)?;
+                        if self.no_dup_data {
+                            self.db
+                                .put_with_flags(
+                                    writer,
+                                    k.clone(),
+                                    &encoded,
+                                    rkv::WriteFlags::NO_DUP_DATA,
+                                )
+                                .or_else(|err| {
+                                    if let rkv::StoreError::LmdbError(rkv::LmdbError::KeyExist) =
+                                        err
+                                    {
+                                        Ok(())
+                                    } else {
+                                        Err(err)
+                                    }
+                                })?;
+                        } else {
+                            self.db.put(writer, k.clone(), &encoded)?;
+                        }
                     }
                     // Skip deleting unnecessarily if we have already deleted
                     // everything
