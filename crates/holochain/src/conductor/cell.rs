@@ -282,7 +282,7 @@ impl Cell {
         _from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _entry_hash: holochain_types::composite_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dhtops::DhtOp)>,
+        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         unimplemented!()
     }

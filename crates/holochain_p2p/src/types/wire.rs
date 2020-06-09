@@ -11,7 +11,7 @@ pub(crate) enum WireMessage {
         from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dhtops::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     },
     ValidationReceipt {
         #[serde(with = "serde_bytes")]
@@ -39,7 +39,7 @@ impl WireMessage {
         from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dhtops::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> WireMessage {
         Self::Publish {
             from_agent,

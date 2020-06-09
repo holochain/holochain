@@ -20,7 +20,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
             entry_hash: holochain_types::composite_hash::AnyDhtHash,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dhtops::DhtOp)>,
+            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         ) -> ();
 
         /// A remote node is requesting a validation package.
