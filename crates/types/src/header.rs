@@ -228,6 +228,7 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
+    pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderAddress,
 }

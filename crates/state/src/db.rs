@@ -194,7 +194,6 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*CACHE_CHAIN_HEADERS)?;
             register_db(env, um, &*CACHE_SYSTEM_META)?;
             register_db(env, um, &*CACHE_LINKS_META)?;
-            // TODO: Are these per cell or per conductor
             register_db(env, um, &*AUTHORED_DHT_OPS)?;
             register_db(env, um, &*INTEGRATED_DHT_OPS)?;
         }

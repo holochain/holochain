@@ -14,9 +14,9 @@ use must_future::MustBoxFuture;
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChainElement {
     /// The signed header for this element
-    pub signed_header: SignedHeaderHashed,
+    signed_header: SignedHeaderHashed,
     /// If there is an entry associated with this header it will be here
-    pub maybe_entry: Option<Entry>,
+    maybe_entry: Option<Entry>,
 }
 
 impl ChainElement {

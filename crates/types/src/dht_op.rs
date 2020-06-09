@@ -87,9 +87,7 @@ impl DhtOp {
             Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone(),
             Self::RegisterDeletedBy(_, header) => header.removes_address.clone(),
             Self::RegisterAddLink(_, header) => header.base_address.clone(),
-            Self::RegisterRemoveLink(_, _header) => {
-                todo!("LinkRemove header doesn't contain the base_address")
-            }
+            Self::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
         })
     }
 
@@ -106,27 +104,7 @@ impl DhtOp {
     }
 }
 
-/*
-impl Hash for DhtOp {
-    fn hash<H>(&self, hasher: &mut H)
-    where
-        H: Hasher,
-    {
-        self.as_unique_form().hash(hasher)
-    }
-}
-
-impl PartialEq for DhtOp {
-    fn partial_eq(&self, other: &Self) -> Option<bool> {
-        self.as_unique_form().partial_eq(other.as_unique_form())
-    }
-}
-*/
-
-//impl Eq for DhtOp {}
-
-//#[derive(Eq, Hash, PartialEq)]
-
+#[derive(Serialize)]
 enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with headers and therefore would waste hash/comparison time to include.
@@ -140,21 +118,6 @@ enum UniqueForm<'a> {
     // future work: encode idempotency in LinkAdd entries themselves
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
-}
-
-impl<'a> TryFrom<UniqueForm<'a>> for SerializedBytes {
-    type Error = SerializedBytesError;
-    fn try_from(value: UniqueForm<'a>) -> Result<Self, Self::Error> {
-        match value {
-            UniqueForm::StoreElement(h) => Self::try_from(h),
-            UniqueForm::StoreEntry(h) => Self::try_from(h),
-            UniqueForm::RegisterAgentActivity(h) => Self::try_from(h),
-            UniqueForm::RegisterReplacedBy(h) => Self::try_from(h),
-            UniqueForm::RegisterDeletedBy(h) => Self::try_from(h),
-            UniqueForm::RegisterAddLink(h) => Self::try_from(h),
-            UniqueForm::RegisterRemoveLink(h) => Self::try_from(h),
-        }
-    }
 }
 
 /// Turn a chain element into a DhtOp
@@ -216,17 +179,32 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
     Ok(ops)
 }
 
+// This has to be done manually because the macro
+// implements both directions and that isn't possible with references
+// TODO: Maybe add a one-way version to holochain_serialized_bytes?
+impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(u: &UniqueForm<'a>) -> Result<Self, Self::Error> {
+        match holochain_serialized_bytes::to_vec_named(u) {
+            Ok(v) => Ok(SerializedBytes::from(
+                holochain_serialized_bytes::UnsafeBytes::from(v),
+            )),
+            Err(e) => Err(SerializedBytesError::ToBytes(e.to_string())),
+        }
+    }
+}
+
 impl TryFrom<DhtOp> for SerializedBytes {
     type Error = SerializedBytesError;
     fn try_from(op: DhtOp) -> Result<Self, Self::Error> {
-        Self::try_from(op.as_unique_form())
+        Self::try_from(&op.as_unique_form())
     }
 }
 
 impl TryFrom<&DhtOp> for SerializedBytes {
     type Error = SerializedBytesError;
     fn try_from(op: &DhtOp) -> Result<Self, Self::Error> {
-        Self::try_from(op.as_unique_form())
+        Self::try_from(&op.as_unique_form())
     }
 }
 
