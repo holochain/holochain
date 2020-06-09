@@ -22,10 +22,10 @@ mod tests {
 
     fixturator!(
         AnyDhtHash;
-        variants [ 
-            EntryContent(EntryContentHash) 
+        variants [
+            EntryContent(EntryContentHash)
             Agent(AgentPubKey)
-            Header(HeaderHash) 
+            Header(HeaderHash)
         ];
     );
     struct TestFixtures {
