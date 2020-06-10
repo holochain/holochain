@@ -419,7 +419,7 @@ macro_rules! curve {
                     let original_index = self.0.index;
                     let ret = $e;
                     if original_index == self.0.index {
-                        self.0.index = self.0.index + 1;
+                        self.0.index += 1;
                     }
                     Some(ret)
                 }
@@ -508,7 +508,7 @@ macro_rules! newtype_fixturator {
                 for _ in 0..vec_len {
                     ret.push(inner_fixturator.next().unwrap());
                 }
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer(ret)
             },
             {
@@ -520,7 +520,7 @@ macro_rules! newtype_fixturator {
                 for _ in 0..vec_len {
                     ret.push(inner_fixturator.next().unwrap());
                 }
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer(ret)
             }
         );
@@ -531,19 +531,19 @@ macro_rules! newtype_fixturator {
             {
                 let mut fixturator =
                     expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer(fixturator.next().unwrap())
             },
             {
                 let mut fixturator =
                     expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer(fixturator.next().unwrap())
             },
             {
                 let mut fixturator =
                     expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer(fixturator.next().unwrap())
             }
         );
@@ -560,19 +560,19 @@ macro_rules! wasm_io_fixturator {
             {
                 let mut fixturator =
                     expr! { [<$inner:camel Fixturator>]::new_indexed(Empty, self.0.index) };
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer::new(fixturator.next().unwrap())
             },
             {
                 let mut fixturator =
                     expr! { [<$inner:camel Fixturator>]::new_indexed(Unpredictable, self.0.index) };
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer::new(fixturator.next().unwrap())
             },
             {
                 let mut fixturator =
                     expr! { [<$inner:camel Fixturator>]::new_indexed(Predictable, self.0.index) };
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 $outer::new(fixturator.next().unwrap())
             }
         );
@@ -597,7 +597,7 @@ macro_rules! enum_fixturator {
             },
             {
                 let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
-                self.0.index = self.0.index + 1;
+                self.0.index += 1;
                 ret
             }
         );
