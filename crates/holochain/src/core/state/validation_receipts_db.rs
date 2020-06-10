@@ -1,5 +1,6 @@
 //! Module for items related to aggregating validation_receipts
 
+use fallible_iterator::FallibleIterator;
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_keystore::{AgentPubKeyExt, KeystoreSender, Signature};
 use holochain_serialized_bytes::prelude::*;
@@ -83,21 +84,23 @@ impl<'env> ValidationReceiptsBuf<'env> {
     pub fn list_receipts(
         &self,
         dht_op_hash: &DhtOpHash,
-    ) -> DatabaseResult<impl Iterator<Item = DatabaseResult<SignedValidationReceipt>> + '_> {
-        self.0.get(dht_op_hash)
+    ) -> DatabaseResult<
+        impl fallible_iterator::FallibleIterator<
+                Item = SignedValidationReceipt,
+                Error = DatabaseError,
+            > + '_,
+    > {
+        Ok(fallible_iterator::convert(self.0.get(dht_op_hash)?))
     }
 
     /// Get the current valid receipt count for a given hash.
     pub fn count_valid(&self, dht_op_hash: &DhtOpHash) -> DatabaseResult<usize> {
         let mut count = 0;
-        for v in self.list_receipts(dht_op_hash)? {
-            match v {
-                Ok(v) => {
-                    if v.receipt.validation_result == ValidationResult::Valid {
-                        count += 1;
-                    }
-                }
-                Err(e) => return Err(e),
+
+        let mut iter = self.list_receipts(dht_op_hash)?;
+        while let Some(v) = iter.next()? {
+            if v.receipt.validation_result == ValidationResult::Valid {
+                count += 1;
             }
         }
         Ok(count)
@@ -108,14 +111,12 @@ impl<'env> ValidationReceiptsBuf<'env> {
         // early return if
         //  - (A) - this receipt is already tracked or
         //  - (B) - if we get a database error
-        for v in self.list_receipts(&receipt.receipt.dht_op_hash)? {
-            match v {
-                Ok(v) => {
-                    if v == receipt {
-                        return Ok(());
-                    }
+        {
+            let mut iter = self.list_receipts(&receipt.receipt.dht_op_hash)?;
+            while let Some(v) = iter.next()? {
+                if v == receipt {
+                    return Ok(());
                 }
-                Err(e) => return Err(e),
             }
         }
 
@@ -202,10 +203,7 @@ mod tests {
 
         assert_eq!(2, vr_buf.count_valid(&test_op_hash)?);
 
-        let mut list = vr_buf
-            .list_receipts(&test_op_hash)?
-            .map(|x| x.unwrap())
-            .collect::<Vec<_>>();
+        let mut list = vr_buf.list_receipts(&test_op_hash)?.collect::<Vec<_>>()?;
         list.sort_by(|a, b| {
             a.receipt
                 .validator

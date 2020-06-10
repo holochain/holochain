@@ -224,7 +224,14 @@ fn register_db<V: 'static + Send + Sync>(
             // As far as I can tell, if we are not using NO_DUP_DATA, it will
             // only affect the sorting of the values in case there are dups,
             // which should be ok for our usage.
-            opts.flags.insert(rkv::DatabaseFlags::DUP_SORT);
+            //
+            // NOTE - see:
+            // https://github.com/mozilla/rkv/blob/0.10.4/src/env.rs#L122-L131
+            //
+            // Aparently RKV already sets this flag, but it's not mentioned
+            // in the docs anywhere. We're going to set it too, just in case
+            // it is removed out from under us at some point in the future.
+            opts.flags.set(rkv::DatabaseFlags::DUP_SORT, true);
 
             um.insert(
                 key.with_value_type(),
