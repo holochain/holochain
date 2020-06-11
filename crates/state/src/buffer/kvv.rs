@@ -458,6 +458,10 @@ pub mod tests {
         .unwrap();
     }
 
+    /// make sure that even if there are unsorted items both
+    /// before and after our idempotent operation
+    /// both in the actual persistence and in our scratch
+    /// that duplicates are not returned on get
     #[tokio::test(threaded_scheduler)]
     async fn idempotent_inserts() {
         let arc = test_cell_env();
@@ -470,13 +474,22 @@ pub mod tests {
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), []);
+            assert_eq!(collect_sorted(store.get(&"key")), Ok(vec![]));
+
+            store.insert("key", V(2));
+            assert_eq!(collect_sorted(store.get(&"key")), Ok(vec![V(2)]));
+
+            store.insert("key", V(1));
+            assert_eq!(collect_sorted(store.get(&"key")), Ok(vec![V(1), V(2)]));
+
+            store.insert("key", V(1));
+            assert_eq!(collect_sorted(store.get(&"key")), Ok(vec![V(1), V(2)]));
 
             store.insert("key", V(0));
-            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
-
-            store.insert("key", V(0));
-            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
+            assert_eq!(
+                collect_sorted(store.get(&"key")),
+                Ok(vec![V(0), V(1), V(2)])
+            );
 
             env.with_commit(|mut writer| store.flush_to_txn(&mut writer))
                 .unwrap();
@@ -487,10 +500,16 @@ pub mod tests {
 
         env.with_reader::<DatabaseError, _, _>(|reader| {
             let mut store: Store = KvvBuf::new(&reader, multi_store).unwrap();
-            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
+            assert_eq!(
+                collect_sorted(store.get(&"key")),
+                Ok(vec![V(0), V(1), V(2)])
+            );
 
-            store.insert("key", V(0));
-            assert_eq!(store.get(&"key").unwrap().collect::<Vec<_>>(), [Ok(V(0))]);
+            store.insert("key", V(1));
+            assert_eq!(
+                collect_sorted(store.get(&"key")),
+                Ok(vec![V(0), V(1), V(2)])
+            );
 
             Ok(())
         })

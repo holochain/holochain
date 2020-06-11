@@ -108,19 +108,7 @@ impl<'env> ValidationReceiptsBuf<'env> {
 
     /// Add this receipt if it isn't already in the database.
     pub fn add_if_unique(&mut self, receipt: SignedValidationReceipt) -> DatabaseResult<()> {
-        // early return if
-        //  - (A) - this receipt is already tracked or
-        //  - (B) - if we get a database error
-        {
-            let mut iter = self.list_receipts(&receipt.receipt.dht_op_hash)?;
-            while let Some(v) = iter.next()? {
-                if v == receipt {
-                    return Ok(());
-                }
-            }
-        }
-
-        // the receipt is not tracked - let's add it
+        // The underlying KvvBuf manages the uniqueness
         self.0.insert(receipt.receipt.dht_op_hash.clone(), receipt);
 
         Ok(())
