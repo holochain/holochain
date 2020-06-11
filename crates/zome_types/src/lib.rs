@@ -1,7 +1,9 @@
 pub mod capability;
 pub mod commit;
+pub mod crdt;
 pub mod debug;
 pub mod entry;
+pub mod entry_def;
 pub mod globals;
 pub mod hash;
 pub mod header;

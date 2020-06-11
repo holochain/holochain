@@ -42,6 +42,7 @@ pub mod chain_sequence;
 pub mod metadata;
 #[allow(missing_docs)]
 pub mod source_chain;
+pub mod validation_receipts_db;
 #[allow(missing_docs)]
 pub mod wasm;
 pub mod workspace;

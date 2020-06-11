@@ -14,7 +14,7 @@ use crate::{
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
 use holochain_zome_types::Entry;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[allow(missing_docs)]
 pub mod error;
@@ -90,7 +90,7 @@ pub enum DhtOpLight {
 }
 
 impl DhtOp {
-    /// Returns the basis hash which determines which agents will receive this DhtOp 
+    /// Returns the basis hash which determines which agents will receive this DhtOp
     pub async fn dht_basis(&self) -> DhtOpResult<AnyDhtHash> {
         Ok(match self {
             Self::StoreElement(_, header, _) => {
@@ -136,7 +136,6 @@ enum UniqueForm<'a> {
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
-
 
 /// Turn a chain element into a DhtOp
 pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
