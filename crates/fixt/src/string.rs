@@ -9,7 +9,7 @@ fixturator!(char, EMPTY_CHAR, rand::random(), {
         .chars()
         .nth(self.0.index % PREDICTABLE_CHARS.chars().count())
         .unwrap();
-    self.0.index = self.0.index + 1;
+    self.0.index += 1;
     ret
 });
 
@@ -47,7 +47,7 @@ fixturator!(
             .nth(self.0.index)
             .unwrap()
             .to_string();
-        self.0.index = self.0.index + 1;
+        self.0.index += 1;
         ret
     }
 );

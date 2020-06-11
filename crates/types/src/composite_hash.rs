@@ -76,6 +76,12 @@ impl From<EntryHash> for HoloHash {
     }
 }
 
+impl From<EntryHash> for AnyDhtHash {
+    fn from(entry_hash: EntryHash) -> AnyDhtHash {
+        match_entry_hash!(entry_hash => |i| { i.into() })
+    }
+}
+
 impl std::fmt::Display for EntryHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match_entry_hash!(self => |i| { i.fmt(f) })
@@ -158,15 +164,18 @@ impl From<AnyDhtHash> for HoloHash {
     }
 }
 
-impl TryFrom<&AgentPubKey> for AnyDhtHash {
-    type Error = SerializedBytesError;
-    fn try_from(agent: &AgentPubKey) -> Result<Self, Self::Error> {
-        Ok(AnyDhtHash::Agent(agent.to_owned()))
-    }
-}
-
 impl std::fmt::Display for AnyDhtHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match_dht_hash!(self => |i| { i.fmt(f) })
+    }
+}
+
+impl AsRef<[u8]> for AnyDhtHash {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            AnyDhtHash::EntryContent(h) => h.as_ref(),
+            AnyDhtHash::Agent(h) => h.as_ref(),
+            AnyDhtHash::Header(h) => h.as_ref(),
+        }
     }
 }

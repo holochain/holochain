@@ -23,7 +23,9 @@ pub enum DbName {
     /// Primary database: KV store of chain headers, keyed by address
     PrimaryChainHeaders,
     /// Primary database: KVV store of chain metadata, storing relationships
-    PrimaryChainMeta,
+    PrimaryMetadata,
+    /// Primary database: Kv store of links
+    PrimaryLinksMeta,
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
     ChainSequence,
@@ -32,7 +34,9 @@ pub enum DbName {
     /// Cache database: KV store of chain headers, keyed by address
     CacheChainHeaders,
     /// Cache database: KVV store of chain metadata, storing relationships
-    CacheChainMeta,
+    CacheMetadata,
+    /// Cachedatabase: Kv store of links
+    CacheLinksMeta,
     /// database which stores a single key-value pair, encoding the
     /// mutable state for the entire Conductor
     ConductorState,
@@ -40,6 +44,8 @@ pub enum DbName {
     Wasm,
     /// database to store the [DnaDef]
     DnaDef,
+    /// KVV store to accumulate validation receipts for a published EntryHash
+    ValidationReceipts,
 }
 
 impl std::fmt::Display for DbName {
@@ -49,14 +55,17 @@ impl std::fmt::Display for DbName {
             PrimaryChainPublicEntries => write!(f, "PrimaryChainPublicEntries"),
             PrimaryChainPrivateEntries => write!(f, "PrimaryChainPrivateEntries"),
             PrimaryChainHeaders => write!(f, "PrimaryChainHeaders"),
-            PrimaryChainMeta => write!(f, "PrimaryChainMeta"),
+            PrimaryMetadata => write!(f, "PrimaryMetadata"),
+            PrimaryLinksMeta => write!(f, "PrimaryLinksMeta"),
             ChainSequence => write!(f, "ChainSequence"),
             CacheChainEntries => write!(f, "CacheChainEntries"),
             CacheChainHeaders => write!(f, "CacheChainHeaders"),
-            CacheChainMeta => write!(f, "CacheChainMeta"),
+            CacheMetadata => write!(f, "CacheMetadata"),
+            CacheLinksMeta => write!(f, "CacheLinksMeta"),
             ConductorState => write!(f, "ConductorState"),
             Wasm => write!(f, "Wasm"),
             DnaDef => write!(f, "DnaDef"),
+            ValidationReceipts => write!(f, "ValidationReceipts"),
         }
     }
 }
@@ -70,14 +79,17 @@ impl DbName {
             PrimaryChainPublicEntries => Single,
             PrimaryChainPrivateEntries => Single,
             PrimaryChainHeaders => Single,
-            PrimaryChainMeta => Multi,
+            PrimaryMetadata => Multi,
+            PrimaryLinksMeta => Single,
             ChainSequence => SingleInt,
             CacheChainEntries => Single,
             CacheChainHeaders => Single,
-            CacheChainMeta => Multi,
+            CacheMetadata => Multi,
+            CacheLinksMeta => Single,
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
+            ValidationReceipts => Multi,
         }
     }
 }
@@ -109,10 +121,10 @@ lazy_static! {
     /// The key to access the ChainHeaders database
     pub static ref PRIMARY_CHAIN_HEADERS: DbKey<SingleStore> =
     DbKey::<SingleStore>::new(DbName::PrimaryChainHeaders);
-    /// The key to access the ChainMeta database
-    pub static ref PRIMARY_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryChainMeta);
-    /// The key to access the ChainMeta database
-    pub static ref PRIMARY_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryChainMeta);
+    /// The key to access the Metadata database
+    pub static ref PRIMARY_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryMetadata);
+    /// The key to access the links database
+    pub static ref PRIMARY_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::PrimaryLinksMeta);
     /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
     /// The key to access the ChainEntries database
@@ -121,16 +133,18 @@ lazy_static! {
     /// The key to access the ChainHeaders database
     pub static ref CACHE_CHAIN_HEADERS: DbKey<SingleStore> =
     DbKey::<SingleStore>::new(DbName::CacheChainHeaders);
-    /// The key to access the ChainMeta database
-    pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
-    /// The key to access the ChainMeta database
-    pub static ref CACHE_LINKS_META: DbKey<MultiStore> = DbKey::new(DbName::CacheChainMeta);
+    /// The key to access the Metadata database
+    pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::CacheMetadata);
+    /// The key to access the cache links database
+    pub static ref CACHE_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::CacheLinksMeta);
     /// The key to access the ConductorState database
     pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
     /// The key to access the Wasm database
     pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
     /// The key to access the DnaDef database
     pub static ref DNA_DEF: DbKey<SingleStore> = DbKey::new(DbName::DnaDef);
+    /// The key to access the ValidationReceipts database
+    pub static ref VALIDATION_RECEIPTS: DbKey<MultiStore> = DbKey::new(DbName::ValidationReceipts);
 }
 
 lazy_static! {
@@ -182,6 +196,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*CACHE_CHAIN_HEADERS)?;
             register_db(env, um, &*CACHE_SYSTEM_META)?;
             register_db(env, um, &*CACHE_LINKS_META)?;
+            register_db(env, um, &*VALIDATION_RECEIPTS)?;
         }
         EnvironmentKind::Conductor => {
             register_db(env, um, &*CONDUCTOR_STATE)?;
@@ -210,10 +225,27 @@ fn register_db<V: 'static + Send + Sync>(
             key.with_value_type(),
             env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
         ),
-        DbKind::Multi => um.insert(
-            key.with_value_type(),
-            env.open_multi(db_str.as_str(), StoreOptions::create())?,
-        ),
+        DbKind::Multi => {
+            let mut opts = StoreOptions::create();
+
+            // This is needed for the optional put flag NO_DUP_DATA on KvvBuf.
+            // As far as I can tell, if we are not using NO_DUP_DATA, it will
+            // only affect the sorting of the values in case there are dups,
+            // which should be ok for our usage.
+            //
+            // NOTE - see:
+            // https://github.com/mozilla/rkv/blob/0.10.4/src/env.rs#L122-L131
+            //
+            // Aparently RKV already sets this flag, but it's not mentioned
+            // in the docs anywhere. We're going to set it too, just in case
+            // it is removed out from under us at some point in the future.
+            opts.flags.set(rkv::DatabaseFlags::DUP_SORT, true);
+
+            um.insert(
+                key.with_value_type(),
+                env.open_multi(db_str.as_str(), opts)?,
+            )
+        }
     };
     Ok(())
 }

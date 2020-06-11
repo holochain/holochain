@@ -8,8 +8,8 @@ use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::{
     state::{
-        cascade::Cascade, chain_cas::ChainCasBuf, chain_meta::ChainMetaBuf,
-        source_chain::SourceChain, workspace::WorkspaceResult,
+        cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBuf, source_chain::SourceChain,
+        workspace::WorkspaceResult,
     },
     sys_validate_element,
 };
@@ -120,9 +120,9 @@ where
 
 pub struct InvokeZomeWorkspace<'env> {
     pub source_chain: SourceChain<'env>,
-    pub meta: ChainMetaBuf<'env>,
+    pub meta: MetadataBuf<'env>,
     pub cache_cas: ChainCasBuf<'env>,
-    pub cache_meta: ChainMetaBuf<'env>,
+    pub cache_meta: MetadataBuf<'env>,
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
@@ -130,8 +130,8 @@ impl<'env> InvokeZomeWorkspace<'env> {
         let source_chain = SourceChain::new(reader, dbs)?;
 
         let cache_cas = ChainCasBuf::cache(reader, dbs)?;
-        let meta = ChainMetaBuf::primary(reader, dbs)?;
-        let cache_meta = ChainMetaBuf::cache(reader, dbs)?;
+        let meta = MetadataBuf::primary(reader, dbs)?;
+        let cache_meta = MetadataBuf::cache(reader, dbs)?;
 
         Ok(InvokeZomeWorkspace {
             source_chain,

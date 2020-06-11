@@ -12,11 +12,3 @@ pub enum ValidationResult {
     Invalid,
     Pending,
 }
-
-/// The value type of the sys-meta database
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum SysMetaVal {}
-
-/// The value type of the link-meta database
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum LinkMetaVal {}

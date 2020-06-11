@@ -40,19 +40,18 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    chain_meta::{ChainMetaBuf, ChainMetaBufT, EntryDhtStatus},
+    metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{composite_hash::EntryHash, EntryHashed};
-use std::collections::HashSet;
 use tracing::*;
 
 #[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, C = ChainMetaBuf<'env>>
+pub struct Cascade<'env, C = MetadataBuf<'env>>
 where
-    C: ChainMetaBufT<'env>,
+    C: MetadataBufT,
 {
     primary: &'env ChainCasBuf<'env>,
     primary_meta: &'env C,
@@ -79,7 +78,7 @@ enum Search {
 /// Depends on how much computation, and if writes are involved
 impl<'env, C> Cascade<'env, C>
 where
-    C: ChainMetaBufT<'env>,
+    C: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
@@ -109,7 +108,7 @@ where
             .await?
             .and_then(|entry| {
                 self.primary_meta
-                    .get_crud(entry_hash.clone())
+                    .get_dht_status(entry_hash)
                     .ok()
                     .map(|crud| {
                         if let EntryDhtStatus::Live = crud {
@@ -125,7 +124,7 @@ where
         match search {
             Search::Continue => Ok(self.cache.get_entry(entry_hash).await?.and_then(|entry| {
                 self.cache_meta
-                    .get_crud(entry_hash.clone())
+                    .get_dht_status(entry_hash)
                     .ok()
                     .and_then(|crud| match crud {
                         EntryDhtStatus::Live => Some(entry),
@@ -141,27 +140,25 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get_links<S: Into<String>>(
+    pub async fn dht_get_links<'a>(
         &self,
-        base: EntryHash,
-        tag: S,
-    ) -> DatabaseResult<HashSet<EntryHash>> {
+        key: &'a LinkMetaKey<'a>,
+    ) -> DatabaseResult<Vec<LinkMetaVal>> {
         // Am I an authority?
-        let authority = self.primary.contains(&base).await?;
-        let tag = tag.into();
+        let authority = self.primary.contains(&key.base()).await?;
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(base.clone(), tag.clone())?;
+            let links = self.primary_meta.get_links(key)?;
 
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(base, tag)
+                self.cache_meta.get_links(key)
             } else {
                 Ok(links)
             }
         } else {
             // Cache
-            self.cache_meta.get_links(base, tag)
+            self.cache_meta.get_links(key)
         }
     }
 }
