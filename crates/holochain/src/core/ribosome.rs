@@ -13,6 +13,8 @@ pub mod host_fn;
 pub mod wasm_ribosome;
 
 use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -306,6 +308,12 @@ pub trait RibosomeT: Sized {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
+
+    fn run_entry_defs(
+        &self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        invocation: EntryDefsInvocation,
+    ) -> RibosomeResult<EntryDefsResult>;
 
     fn run_validation_package(
         &self,
