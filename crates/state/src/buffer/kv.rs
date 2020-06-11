@@ -59,10 +59,7 @@ where
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
-        // Empty keys break lmdb
-        if k.as_ref().is_empty() {
-            return Err(DatabaseError::EmptyKey);
-        }
+        Self::empty_key(&k)?;
         use Op::*;
         let val = match self.scratch.get(k.as_ref()) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
@@ -74,32 +71,23 @@ where
 
     /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) -> DatabaseResult<()> {
+        Self::empty_key(&k)?;
         let k = k.as_ref().to_vec();
-        // Empty keys break lmdb
-        if k.is_empty() {
-            return Err(DatabaseError::EmptyKey);
-        }
         self.scratch.insert(k, Op::Put(Box::new(v)));
         Ok(())
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) -> DatabaseResult<()> {
+        Self::empty_key(&k)?;
         let k = k.as_ref().to_vec();
-        // Empty keys break lmdb
-        if k.is_empty() {
-            return Err(DatabaseError::EmptyKey);
-        }
         self.scratch.insert(k, Op::Delete);
         Ok(())
     }
 
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
-        // Empty keys break lmdb
-        if k.as_ref().is_empty() {
-            return Err(DatabaseError::EmptyKey);
-        }
+        Self::empty_key(&k)?;
         match self.db.get(self.reader, k)? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
             None => Ok(None),
@@ -118,10 +106,7 @@ where
 
     /// Iterator that returns all partial matches to this key
     pub fn iter_all_key_matches(&self, k: K) -> DatabaseResult<SingleKeyIter<V>> {
-        // Empty keys break lmdb
-        if k.as_ref().is_empty() {
-            return Err(DatabaseError::EmptyKey);
-        }
+        Self::empty_key(&k)?;
 
         let key = k.as_ref().to_vec();
         Ok(SingleKeyIter::new(
@@ -132,10 +117,7 @@ where
 
     /// Iterate from a key onwards
     pub fn iter_from(&self, k: K) -> DatabaseResult<SingleFromIter<V>> {
-        // Empty keys break lmdb
-        if k.as_ref().is_empty() {
-            return Err(DatabaseError::EmptyKey);
-        }
+        Self::empty_key(&k)?;
 
         let key = k.as_ref().to_vec();
         Ok(SingleFromIter::new(
@@ -173,6 +155,15 @@ where
             self.db.iter_end(self.reader)?,
         )
         .rev())
+    }
+
+    // Empty keys break lmdb
+    fn empty_key(k: &K) -> DatabaseResult<()> {
+        if k.as_ref().is_empty() {
+            Err(DatabaseError::EmptyKey)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -325,6 +316,8 @@ where
                 let _g = span.enter();
                 trace!(k = %String::from_utf8_lossy(k), ?v)
             });
+
+        // Raw iter
         let iter = iter
             .inspect(|(k, v)| {
                 let span = trace_span!("db < filter", key = %String::from_utf8_lossy(k));
@@ -362,15 +355,18 @@ where
         compare: fn(scratch: &[u8], db: &[u8]) -> bool,
     ) -> Option<IterItem<'env, V>> {
         match scratch_current {
+            // Return scratch value and keep db value
             Some(scratch) if compare(scratch.0, db.0) => {
                 trace!(msg = "r scratch key first", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
                 self.current = Some(db);
                 Some(scratch)
             }
+            // Return scratch value (or db value) and throw the other away
             Some(scratch) if scratch.0 == db.0 => {
                 trace!(msg = "r scratch key ==", k = %String::from_utf8_lossy(&scratch.0[..]), v = ?scratch.1);
                 Some(scratch)
             }
+            // Return db value and keep the scratch
             _ => {
                 trace!(msg = "r db _", k = %String::from_utf8_lossy(&db.0[..]), v = ?db.1);
                 self.scratch_current = scratch_current;

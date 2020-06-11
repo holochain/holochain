@@ -244,7 +244,6 @@ impl<'env> MetadataBuf<'env> {
     }
 }
 
-#[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait]
 impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
@@ -254,6 +253,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             .collect()
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         let (_, link_add_hash): (Header, HeaderHash) =
             HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
@@ -288,16 +288,19 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.links_meta.delete(key.to_key())
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn add_create(&mut self, create: header::EntryCreate) -> DatabaseResult<()> {
         let entry_hash = create.entry_hash.to_owned();
         self.add_entry_header(create, entry_hash).await
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn add_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
         let replace = update.replaces_address.to_owned();
         self.add_entry_header(update, replace).await
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
         self.add_entry_header(delete, remove).await
