@@ -12,6 +12,7 @@ mod kvv;
 
 use crate::prelude::Writer;
 pub use cas::CasBuf;
+pub use kv::partial_key_match;
 pub use kv::KvBuf;
 pub use kv_int::IntKvBuf;
 pub use kvv::KvvBuf;
@@ -40,8 +41,8 @@ pub trait BufIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 impl<T> BufIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
 
 /// Trait alias for the combination of constraints needed for values in [KvBuf](kv::KvBuf) and [IntKvBuf](kv_int::IntKvBuf)
-pub trait BufVal: Clone + Serialize + DeserializeOwned {}
-impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned {}
+pub trait BufVal: Clone + Serialize + DeserializeOwned + std::fmt::Debug {}
+impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::Debug {}
 
 /// Trait alias for the combination of constraints needed for values in [KvvBuf]
 pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned {}
