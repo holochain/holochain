@@ -1253,6 +1253,7 @@ dependencies = [
  "rust-base58",
  "serde",
  "serde_bytes",
+ "serde_derive",
  "serde_json",
  "shrinkwraprs",
  "snowflake",

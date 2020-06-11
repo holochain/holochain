@@ -1,24 +1,27 @@
-//! Dhtops
-//! Holochain's DHT operations.
+//! Data structures representing the operations that can be performed within a Holochain DHT.
 //!
-//! See the [item-level documentation for `DhtOp`][dhtop] for more details.
+//! See the [item-level documentation for `DhtOp`][DhtOp] for more details.
 //!
-//! [dhtop]: enum.DhtOp.html
+//! [DhtOp]: enum.DhtOp.html
 
 use crate::element::ChainElement;
-use crate::{composite_hash::AnyDhtHash, header, prelude::*, Header};
+use crate::{
+    composite_hash::{AnyDhtHash, EntryHash},
+    header,
+    prelude::*,
+    Header,
+};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
 use holochain_zome_types::Entry;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[allow(missing_docs)]
 pub mod error;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
-//#[derive(Clone, Deserialize, Serialize)]
-//#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum DhtOp {
     /// Used to notify the authority for a header that it has been created.
     ///
@@ -72,8 +75,22 @@ pub enum DhtOp {
     RegisterRemoveLink(Signature, header::LinkRemove),
 }
 
+/// A type for storing in databases that don't need the actual
+/// data. Everything is a hash of the type.
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DhtOpLight {
+    StoreElement(Signature, HeaderHash, Option<EntryHash>),
+    StoreEntry(Signature, HeaderHash, EntryHash),
+    RegisterAgentActivity(Signature, HeaderHash),
+    RegisterReplacedBy(Signature, HeaderHash, Option<EntryHash>),
+    RegisterDeletedBy(Signature, HeaderHash),
+    RegisterAddLink(Signature, HeaderHash),
+    RegisterRemoveLink(Signature, HeaderHash),
+}
+
 impl DhtOp {
-    /// Find the place to send this op
+    /// Returns the basis hash which determines which agents will receive this DhtOp 
     pub async fn dht_basis(&self) -> DhtOpResult<AnyDhtHash> {
         Ok(match self {
             Self::StoreElement(_, header, _) => {
@@ -119,6 +136,7 @@ enum UniqueForm<'a> {
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
+
 
 /// Turn a chain element into a DhtOp
 pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {

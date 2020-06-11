@@ -48,6 +48,8 @@ pub enum DbName {
     AuthoredDhtOps,
     /// Integrated [DhtOp]s KV store
     IntegratedDhtOps,
+    /// Integration Queue of [DhtOp]s KV store where key is [Timestamp] + [DhtOpHash]
+    IntegrationQueue,
 }
 
 impl std::fmt::Display for DbName {
@@ -69,6 +71,7 @@ impl std::fmt::Display for DbName {
             DnaDef => write!(f, "DnaDef"),
             AuthoredDhtOps => write!(f, "AuthoredDhtOps"),
             IntegratedDhtOps => write!(f, "IntegratedDhtOps"),
+            IntegrationQueue=> write!(f, "IntegrationQueue"),
         }
     }
 }
@@ -94,6 +97,7 @@ impl DbName {
             DnaDef => Single,
             AuthoredDhtOps => Single,
             IntegratedDhtOps => Single,
+            IntegrationQueue => Single,
         }
     }
 }
@@ -151,6 +155,8 @@ lazy_static! {
     pub static ref AUTHORED_DHT_OPS: DbKey<SingleStore> = DbKey::new(DbName::AuthoredDhtOps);
     /// The key to access the IntegratedDhtOps database
     pub static ref INTEGRATED_DHT_OPS: DbKey<SingleStore> = DbKey::new(DbName::IntegratedDhtOps);
+    /// The key to access the IntegrationQueue database
+    pub static ref INTEGRATION_QUEUE: DbKey<SingleStore> = DbKey::new(DbName::IntegrationQueue);
 }
 
 lazy_static! {
@@ -204,6 +210,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*CACHE_LINKS_META)?;
             register_db(env, um, &*AUTHORED_DHT_OPS)?;
             register_db(env, um, &*INTEGRATED_DHT_OPS)?;
+            register_db(env, um, &*INTEGRATION_QUEUE)?;
         }
         EnvironmentKind::Conductor => {
             register_db(env, um, &*CONDUCTOR_STATE)?;
