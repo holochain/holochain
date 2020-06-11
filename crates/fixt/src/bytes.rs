@@ -4,7 +4,7 @@ use rand::Rng;
 const UNPREDICTABLE_MIN_LEN: usize = 0;
 const UNPREDICTABLE_MAX_LEN: usize = 32;
 
-type Bytes = Vec<u8>;
+pub type Bytes = Vec<u8>;
 
 // Simply generate "bytes" which is a Vec<u8>
 // likely the most interesting is the Unpredictable curve that throws out random bytes in a vec

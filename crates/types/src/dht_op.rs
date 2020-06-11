@@ -85,8 +85,8 @@ impl DhtOp {
             Self::StoreEntry(_, header, _) => header.entry().clone().into(),
             Self::RegisterAgentActivity(_, header) => header.author().clone().into(),
             Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone(),
-            Self::RegisterDeletedBy(_, header) => header.removes_address.clone(),
-            Self::RegisterAddLink(_, header) => header.base_address.clone(),
+            Self::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
+            Self::RegisterAddLink(_, header) => header.base_address.clone().into(),
             Self::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
         })
     }
