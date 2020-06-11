@@ -13,6 +13,7 @@ repository = "https://github.com/holochain/holochain-serialization"
 
 [lib]
 proc-macro = true
+path = "src/lib.rs"
 
 [dependencies]
 quote = "=0.6.11"

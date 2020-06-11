@@ -1,3 +1,17 @@
+//! ## Overview
+//!
+//! Derive macros for serialized bytes.
+//!
+//! ## Example
+//!
+//! ```rust
+//! use holochain_serialized_bytes::prelude::*;
+//!
+//! #[derive(Serialize, Deserialize, PartialEq, Debug, SerializedBytes)]
+//! pub struct SomeData(String);
+//!
+//! ```
+
 #![recursion_limit = "128"]
 #![cfg_attr(tarpaulin, skip)]
 
