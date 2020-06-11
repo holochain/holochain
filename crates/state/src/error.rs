@@ -68,6 +68,9 @@ pub enum DatabaseError {
     #[error("Failue to remove directory")]
     DirectoryError(#[from] std::io::Error),
 
+    #[error(transparent)]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
+
     #[error("Empty keys cannot be used with lmdb")]
     EmptyKey,
 
