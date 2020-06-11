@@ -300,24 +300,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    curve Empty EntryDef {
-        id: EntryDefIdFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-        visibility: EntryVisibilityFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-        crdt_type: CrdtTypeFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-        required_validations: RequiredValidationsFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-    };
-    curve Unpredictable EntryDef {
-        id: EntryDefIdFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-        visibility: EntryVisibilityFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-        crdt_type: CrdtTypeFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-        required_validations: RequiredValidationsFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-    };
-    curve Predictable EntryDef {
-        id: EntryDefIdFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        visibility: EntryVisibilityFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        crdt_type: CrdtTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        required_validations: RequiredValidationsFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-    };
+    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations);
 );
 
 fixturator!(

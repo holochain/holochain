@@ -53,6 +53,22 @@ pub struct EntryDef {
     pub required_validations: RequiredValidations,
 }
 
+impl EntryDef {
+    pub fn new(
+        id: EntryDefId,
+        visibility: EntryVisibility,
+        crdt_type: CrdtType,
+        required_validations: RequiredValidations,
+    ) -> Self {
+        Self {
+            id,
+            visibility,
+            crdt_type,
+            required_validations,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EntryDefs(Vec<EntryDef>);
 
