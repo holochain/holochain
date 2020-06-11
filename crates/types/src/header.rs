@@ -7,6 +7,7 @@
 #![allow(missing_docs)]
 
 use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
+use holochain_zome_types::entry_def::EntryVisibility;
 
 pub mod builder;
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
@@ -317,18 +318,5 @@ impl AppEntryType {
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub enum EntryVisibility {
-    Public,
-    Private,
-}
-
-impl EntryVisibility {
-    /// converts entry visibility enum into boolean value on public
-    pub fn is_public(&self) -> bool {
-        *self == EntryVisibility::Public
     }
 }
