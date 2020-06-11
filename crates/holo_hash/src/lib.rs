@@ -295,6 +295,7 @@ macro_rules! new_holo_hash {
                         }).await.expect("spawn_blocking thread panic")
                     }.boxed().into()
                 }
+
             }
 
             impl HoloHashCoreHash for $name {

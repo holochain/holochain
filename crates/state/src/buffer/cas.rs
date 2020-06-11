@@ -4,6 +4,7 @@ use crate::{
     fatal_db_hash_construction_check, fatal_db_hash_integrity_check,
     prelude::{Reader, Writer},
 };
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holo_hash::Hashable;
 use holo_hash_core::HoloHashCoreHash;
@@ -47,24 +48,42 @@ where
     /// Put a value into the underlying [KvBuf]
     pub fn put(&mut self, h: H) {
         let (content, hash) = h.into_inner();
-        self.0.put(hash, content)
+        // These expects seem valid as it means the hashing is broken
+        self.0.put(hash, content).expect("Hash should not be empty");
     }
 
     /// Delete a value from the underlying [KvBuf]
     pub fn delete(&mut self, k: H::HashType) {
-        self.0.delete(k)
+        // These expects seem valid as it means the hashing is broken
+        self.0.delete(k).expect("Hash key is empty");
     }
 
-    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    pub fn iter_raw(&'env self) -> DatabaseResult<Box<dyn Iterator<Item = H> + 'env>> {
-        Ok(Box::new(self.0.iter_raw()?.map(|(hash, content)| {
-            // FIXME: make this a stream
-            tokio_safe_block_on::tokio_safe_block_on(
-                Self::deserialize_and_hash(hash, content),
-                std::time::Duration::from_millis(500),
-            )
-            .expect("TODO: make into stream")
+    /// Iterate over the underlying persisted data taking the scratch space into consideration
+    pub fn iter_fail(
+        &'env self,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
+        Ok(Box::new(self.0.iter()?.map(|(h, c)| {
+            Ok(Self::deserialize_and_hash_blocking(&h[..], c))
         })))
+    }
+
+    #[cfg(test)]
+    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
+    pub fn iter_fail_raw(
+        &'env self,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
+        Ok(Box::new(self.0.iter_raw()?.map(|(h, c)| {
+            Ok(Self::deserialize_and_hash_blocking(h, c))
+        })))
+    }
+
+    fn deserialize_and_hash_blocking(hash: &[u8], content: H::Content) -> H {
+        tokio_safe_block_on::tokio_safe_block_on(
+            Self::deserialize_and_hash(hash, content),
+            std::time::Duration::from_millis(500),
+        )
+        .expect("TODO: make into stream")
+        // TODO: make this a stream?
     }
 
     async fn deserialize_and_hash(hash_bytes: &[u8], content: H::Content) -> H {
@@ -75,19 +94,6 @@ where
         );
         fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
         data
-    }
-
-    /// Iterate over items which are staged for PUTs in the scratch space
-    // HACK: unfortunate leaky abstraction here, but needed to allow comprehensive
-    // iteration, by chaining this with an iter_raw
-    pub fn iter_scratch_puts(&'env self) -> impl Iterator<Item = H> + 'env {
-        self.0.iter_scratch_puts().map(|(hash, content)| {
-            tokio_safe_block_on::tokio_safe_block_on(
-                Self::deserialize_and_hash(hash.clone().get_bytes(), (**content).clone()),
-                std::time::Duration::from_millis(500),
-            )
-            .expect("TODO: make into stream")
-        })
     }
 }
 

@@ -521,7 +521,8 @@ where
         let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .iter()?
+            .get_all()?
+            .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
                 let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| async {
@@ -908,7 +909,7 @@ async fn p2p_event_task(
 ) {
     use tokio::stream::StreamExt;
     while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.agent_pub_key().clone());
+        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
         if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
             tracing::error!(
                 message = "error dispatching network event",
