@@ -140,7 +140,8 @@ enum UniqueForm<'a> {
 impl DhtOpLight {
     // TODO: Remove when used
     #[allow(dead_code)]
-    async fn from_op(op: DhtOp) -> Result<Self, SerializedBytesError> {
+    /// Convert a [DhtOp] to a [DhtOpLight]
+    pub async fn from_op(op: DhtOp) -> Result<Self, SerializedBytesError> {
         match op {
             DhtOp::StoreElement(s, h, _) => {
                 let e = h.entry_data().map(|(e, _)| e.clone());
