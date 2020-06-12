@@ -53,12 +53,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 
 [[package]]
-name = "cfg-if"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
-
-[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -115,13 +109,13 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.39"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01d69e13b9478fc7d89eb4168e2747be1345706b61a03f4eaf3ebbd42540f7e0"
+source = "git+https://github.com/holochain/holochain-serialization?branch=2020-06-06-serde-bytes#fc2111e04647c13731c263b4610ad35e6a0b92b2"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
  "serde-transcode",
+ "serde_bytes",
  "serde_json",
  "thiserror",
 ]
@@ -129,8 +123,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.39"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a176ead4e41cf09a7e47516ad585de6e7cf71185fd1576c2129655d6bb22ae67"
+source = "git+https://github.com/holochain/holochain-serialization?branch=2020-06-06-serde-bytes#fc2111e04647c13731c263b4610ad35e6a0b92b2"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -138,21 +131,8 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5945fe2aa2abe2b5b05953ec613ed2256cf6bd1567a2426bd79814c4b9e6d61"
-dependencies = [
- "byte-slice-cast",
- "holochain_serialized_bytes",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "holochain_wasmer_common"
 version = "0.0.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b27e28189282db511fe8f214b7e311b6e9325682bcd15841958777447d9ad5d2"
+source = "git+https://github.com/holochain/holochain-wasmer?branch=2020-06-05-criterion#2888317818bf44527a971e388ade15493ecb95bb"
 dependencies = [
  "byte-slice-cast",
  "holochain_serialized_bytes",
@@ -163,11 +143,10 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42cc8db5f88cc1f91c92bacf22a037474a1b54da20ab3a77c334ef7580776a8a"
+source = "git+https://github.com/holochain/holochain-wasmer?branch=2020-06-05-criterion#2888317818bf44527a971e388ade15493ecb95bb"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common 0.0.31",
+ "holochain_wasmer_common",
  "serde",
 ]
 
@@ -203,12 +182,6 @@ name = "libc"
 version = "0.2.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99e85c08494b21a9054e7fe1374a732aeadaff3980b6990b94bfd3a70f690005"
-
-[[package]]
-name = "memory_units"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
 name = "multihash"
@@ -589,8 +562,9 @@ name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common 0.0.30",
+ "holochain_wasmer_common",
  "serde",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -602,7 +576,6 @@ dependencies = [
  "holochain_zome_types",
  "serde",
  "test_wasm_common",
- "wee_alloc",
 ]
 
 [[package]]
@@ -651,18 +624,6 @@ name = "unicode-xid"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
-
-[[package]]
-name = "wee_alloc"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbb3b5a6b2bb17cb6ad44a2e68a43e8d2722c997da10e928665c72ec6c0a0b8e"
-dependencies = [
- "cfg-if",
- "libc",
- "memory_units",
- "winapi",
-]
 
 [[package]]
 name = "winapi"

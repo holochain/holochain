@@ -1,14 +1,9 @@
-extern crate wee_alloc;
 #[macro_use]
 extern crate lazy_static;
 
 use holochain_wasmer_guest::*;
 use holochain_zome_types::globals::ZomeGlobals;
 use holochain_zome_types::*;
-
-// Use `wee_alloc` as the global allocator.
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 // only the host functions we require in order to pull/push data across the host/guest boundary
 memory_externs!();

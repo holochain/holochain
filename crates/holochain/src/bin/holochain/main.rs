@@ -50,20 +50,7 @@ struct Opt {
 }
 
 fn main() {
-    tokio::runtime::Builder::new()
-        // we use both IO and Time tokio utilities
-        .enable_all()
-        // we want to use multiple threads
-        .threaded_scheduler()
-        // we want to use thread count matching cpu count
-        // (sometimes tokio by default only uses half cpu core threads)
-        .core_threads(num_cpus::get())
-        // give our threads a descriptive name (they'll be numbered too)
-        .thread_name("holochain-tokio-thread")
-        // build the runtime
-        .build()
-        // panic if we cannot (we cannot run without it)
-        .expect("can build tokio runtime")
+    holochain_2020::conductor::tokio_runtime()
         // the async_main function should only end if our program is done
         .block_on(async_main())
 }

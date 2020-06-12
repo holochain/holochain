@@ -11,7 +11,7 @@ categories = [ "fixtures" ]
 edition = "2018"
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.39"
+holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization", branch = "2020-06-06-serde-bytes" }
 paste = "=0.1.12"
 rand = "0.7"
 serde = { version = "1.0.104", features = [ "derive" ] }

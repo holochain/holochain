@@ -25,10 +25,10 @@ exclude = [
 ]
 
 [patch.crates-io]
-# holochain_serialized_bytes = { version = "=0.0.39", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
-# holochain_wasmer_common = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
-# holochain_wasmer_guest = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
-# holochain_wasmer_host = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
+# holochain_serialized_bytes = { version = "=0.0.39", git = "https://github.com/holochain/holochain-serialization.git", branch = "2020-06-06-serde-bytes" }
+# holochain_wasmer_common = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "2020-06-05-criterion" }
+# holochain_wasmer_guest = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "2020-06-05-criterion" }
+# holochain_wasmer_host = { version = "=0.0.30", git = "https://github.com/holochain/holochain-wasmer.git", branch = "2020-06-05-criterion" }
 
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 #rkv = { path = "../../rust/rkv" }

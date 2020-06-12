@@ -23,3 +23,20 @@ pub mod state;
 pub use cell::{error::CellError, Cell};
 pub use conductor::{Conductor, ConductorBuilder};
 pub use handle::ConductorHandle;
+
+pub fn tokio_runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new()
+        // we use both IO and Time tokio utilities
+        .enable_all()
+        // we want to use multiple threads
+        .threaded_scheduler()
+        // we want to use thread count matching cpu count
+        // (sometimes tokio by default only uses half cpu core threads)
+        .core_threads(num_cpus::get())
+        // give our threads a descriptive name (they'll be numbered too)
+        .thread_name("holochain-tokio-thread")
+        // build the runtime
+        .build()
+        // panic if we cannot (we cannot run without it)
+        .expect("can build tokio runtime")
+}

@@ -37,7 +37,6 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
     type Item = GuestOutput;
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let timeout = crate::start_hard_timeout!();
         let next = Ok(match self.remaining_zomes.first() {
             // there are no zomes left, we are finished
             None => None,
@@ -64,8 +63,6 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                 }
             }
         });
-        // the total should add trivial overhead vs the inner calls
-        crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
         next
     }
 }

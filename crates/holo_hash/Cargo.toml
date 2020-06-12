@@ -16,7 +16,7 @@ blake2b_simd = "0.5.10"
 fixt = { path = "../fixt" }
 futures = "0.3.5"
 holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
-holochain_serialized_bytes = "=0.0.39"
+holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization", branch = "2020-06-06-serde-bytes" }
 must_future = "0.1.1"
 rand = "0.7"
 serde = { version = "1.0.104", features = [ "derive" ] }

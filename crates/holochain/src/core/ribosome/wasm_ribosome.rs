@@ -263,15 +263,12 @@ impl RibosomeT for WasmRibosome {
             allow_side_effects: invocation.allow_side_effects(),
             workspace: workspace,
         };
-        let module_timeout = crate::start_hard_timeout!();
         let module = self.module(host_context.clone())?;
-        crate::end_hard_timeout!(module_timeout, crate::perf::WASM_MODULE_CACHE_HIT);
 
         if module.info().exports.contains_key(&to_call) {
             // there is a callback to_call and it is implemented in the wasm
             let mut instance = self.instance(host_context)?;
 
-            let call_timeout = crate::start_hard_timeout!();
             let result: GuestOutput = holochain_wasmer_host::guest::call(
                 &mut instance,
                 &to_call,
@@ -280,7 +277,6 @@ impl RibosomeT for WasmRibosome {
                 // @todo - is this a problem for large payloads like entries?
                 invocation.to_owned().host_input()?,
             )?;
-            crate::end_hard_timeout!(call_timeout, crate::perf::MULTI_WASM_CALL);
 
             Ok(Some(result))
         } else {
@@ -301,14 +297,13 @@ impl RibosomeT for WasmRibosome {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ZomeCallInvocation,
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
-        let timeout = crate::start_hard_timeout!();
 
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
@@ -321,11 +316,6 @@ impl RibosomeT for WasmRibosome {
             Some(result) => result,
             None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
         };
-
-        // instance building is slow 1s+ on a cold cache but should be ~0.8-1 millis on a cache hit
-        // tests should be warming the instance cache before calling zome functions
-        // there could be nested callbacks in this call so we give it 5ms
-        crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
 
         Ok(ZomeCallInvocationResponse::ZomeApiFn(guest_output))
     }

@@ -1,5 +1,5 @@
 [package]
-name = "test_wasm_init_fail"
+name = "test_wasm_bench"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
@@ -10,14 +10,14 @@ edition = "2018"
 [workspace]
 
 [lib]
-name = "test_wasm_init_fail"
+name = "test_wasm_bench"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
 holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization", branch = "2020-06-06-serde-bytes" }
 holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer", branch = "2020-06-05-criterion" }
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
-lazy_static = "1.4.0"
+
 serde = "=1.0.104"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 

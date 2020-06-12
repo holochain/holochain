@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 holo_hash_core = { path = "../holo_hash_core" }
-holochain_serialized_bytes = "=0.0.39"
+holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization", branch = "2020-06-06-serde-bytes" }
 # TODO: remove and replace with HoloHash
 multihash = "0.8.0"
 # TODO: remove this once there is some less obtrusive source of randomness

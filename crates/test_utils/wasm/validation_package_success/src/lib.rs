@@ -1,13 +1,7 @@
-extern crate wee_alloc;
-
 use holochain_wasmer_guest::*;
 use holochain_zome_types::*;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::validate::ValidationPackage;
-
-// Use `wee_alloc` as the global allocator.
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 holochain_wasmer_guest::holochain_externs!();
 
