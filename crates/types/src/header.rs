@@ -176,6 +176,15 @@ impl NewEntryHeader {
     }
 }
 
+impl From<NewEntryHeader> for Header {
+    fn from(h: NewEntryHeader) -> Self {
+        match h {
+            NewEntryHeader::Create(h) => Header::EntryCreate(h),
+            NewEntryHeader::Update(h) => Header::EntryUpdate(h),
+        }
+    }
+}
+
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 // TODO: Check this can never be written to > 255
