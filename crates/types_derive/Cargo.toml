@@ -8,8 +8,8 @@ keywords = [ "holochain", "holo", "bytes", "serde", "derive" ]
 categories = [ "parsing" ]
 license = "Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/holochain_json_derive"
-repository = "https://github.com/holochain/holochain-serialization"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
 
 [lib]
 proc-macro = true

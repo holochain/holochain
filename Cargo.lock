@@ -1106,9 +1106,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_common"
-version = "0.0.43-alpha3"
+version = "0.0.49-alpha1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1ea372338cb6550b0fa7f62b35c6d986e541181d9167083965adf6e15940b2d"
+checksum = "ea1848fd6b8c5386eb048cfff0c49b7b1063752271015994bac645775b1f29b5"
 dependencies = [
  "directories 1.0.2",
  "lazy_static",

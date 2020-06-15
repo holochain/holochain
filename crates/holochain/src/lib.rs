@@ -1,3 +1,5 @@
+//! all the components you need to build a holochain conductor
+
 // FIXME: uncomment this deny [TK-01128]
 // #![deny(missing_docs)]
 
