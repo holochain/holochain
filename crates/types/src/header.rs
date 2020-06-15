@@ -7,6 +7,7 @@
 #![allow(missing_docs)]
 
 use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
+use crate::{link::Tag, prelude::*};
 use holochain_zome_types::entry_def::EntryVisibility;
 
 pub mod builder;
@@ -158,12 +159,36 @@ impl HeaderHashed {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+/// A header of one of the two types that create a new entry.
+pub enum NewEntryHeader {
+    Create(EntryCreate),
+    Update(EntryUpdate),
+}
+
+impl NewEntryHeader {
+    /// Get the entry on this header
+    pub fn entry(&self) -> &EntryHash {
+        match self {
+            NewEntryHeader::Create(EntryCreate { entry_hash, .. })
+            | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
+        }
+    }
+}
+
+impl From<NewEntryHeader> for Header {
+    fn from(h: NewEntryHeader) -> Self {
+        match h {
+            NewEntryHeader::Create(h) => Header::EntryCreate(h),
+            NewEntryHeader::Update(h) => Header::EntryUpdate(h),
+        }
+    }
+}
+
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 // TODO: Check this can never be written to > 255
 pub type ZomeId = u8;
-
-use crate::{link::Tag, prelude::*};
 
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -214,6 +239,7 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
+    pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderAddress,
 }
