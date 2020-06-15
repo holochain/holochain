@@ -535,7 +535,7 @@ fixturator!(
 
 fixturator!(
     LinkRemoveBuilder;
-    constructor fn new(HeaderHash);
+    constructor fn new(HeaderHash, EntryHash);
 );
 
 fixturator!(
