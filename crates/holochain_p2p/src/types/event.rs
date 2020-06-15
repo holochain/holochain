@@ -2,6 +2,13 @@
 
 use crate::*;
 
+/// Get options help control how the get is processed at various levels.
+pub struct GetOptions {
+    /// Whether the remote-end should follow redirects or just return the
+    /// requested entry.
+    pub follow_redirects: bool,
+}
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
@@ -34,12 +41,11 @@ ghost_actor::ghost_chan! {
 
         /// A remote node is requesting entry data from us.
         fn get(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            entry_hash: holochain_types::composite_hash::AnyDhtHash,
+            options: GetOptions,
+        ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// A remote node is requesting link data from us.
         fn get_links(

@@ -324,8 +324,14 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_get(&mut self, _input: actor::Get) -> HolochainP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+    fn handle_get(
+        &mut self,
+        _dna_hash: DnaHash,
+        _entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        _options: actor::GetOptions,
+    ) -> HolochainP2pHandlerResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>>
+    {
+        Ok(async move { Ok(vec![]) }.boxed().into())
     }
 
     fn handle_get_links(&mut self, _input: actor::GetLinks) -> HolochainP2pHandlerResult<()> {

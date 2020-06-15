@@ -11,13 +11,51 @@ pub struct GetValidationPackage {
     // TODO - parameters
 }
 
-/// Get an entry from the DHT.
-pub struct Get {
-    /// The dna_hash / space_hash context.
-    pub dna_hash: DnaHash,
-    /// The agent_id / agent_pub_key context.
-    pub agent_pub_key: AgentPubKey,
-    // TODO - parameters
+/// Get options help control how the get is processed at various levels.
+/// Fields tagged with `[Network]` are network-level controls.
+/// Fields tagged with `[Remote]` are controls that will be forwarded to the
+/// remote agent processing this `Get` request.
+pub struct GetOptions {
+    /// [Network]
+    /// How many remote nodes should we make requests of / aggregate.
+    /// Set to `None` for a default "best-effort".
+    pub remote_agent_count: Option<u8>,
+
+    /// [Network]
+    /// Timeout to await responses for aggregation.
+    /// Set to `None` for a default "best-effort".
+    /// Note - if all requests time-out you will receive an empty resut,
+    /// not a timeout error.
+    pub timeout_ms: Option<u64>,
+
+    /// [Network]
+    /// We are interested in speed. If `true` and we have any results
+    /// when `race_timeout_ms` is expired, those results will be returned.
+    /// After `race_timeout_ms` and before `timeout_ms` the first result
+    /// received will be returned.
+    pub as_race: bool,
+
+    /// [Network]
+    /// See `as_race` for details.
+    /// Set to `None` for a default "best-effort" race.
+    pub race_timeout_ms: Option<u64>,
+
+    /// [Remote]
+    /// Whether the remote-end should follow redirects or just return the
+    /// requested entry.
+    pub follow_redirects: bool,
+}
+
+impl Default for GetOptions {
+    fn default() -> Self {
+        Self {
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: true,
+            race_timeout_ms: None,
+            follow_redirects: true,
+        }
+    }
 }
 
 /// Get links from the DHT.
@@ -56,7 +94,11 @@ ghost_actor::ghost_actor! {
         fn get_validation_package(input: GetValidationPackage) -> (); // TODO - proper return type
 
         /// Get an entry from the DHT.
-        fn get(input: Get) -> (); // TODO - proper return type
+        fn get(
+            dna_hash: DnaHash,
+            entry_hash: holochain_types::composite_hash::AnyDhtHash,
+            options: GetOptions,
+        ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// Get links from the DHT.
         fn get_links(input: GetLinks) -> (); // TODO - proper return type
