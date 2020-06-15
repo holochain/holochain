@@ -160,7 +160,7 @@ impl HeaderHashed {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-/// Set of headers that can add a new entry
+/// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     Create(EntryCreate),
     Update(EntryUpdate),

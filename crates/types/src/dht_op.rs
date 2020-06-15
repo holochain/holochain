@@ -21,7 +21,7 @@ pub mod error;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub enum DhtOp {
     /// Used to notify the authority for a header that it has been created.
     ///
@@ -128,11 +128,8 @@ enum UniqueForm<'a> {
     StoreElement(&'a Header),
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
-    // note: changed from entry to header since last discussion
     RegisterReplacedBy(&'a header::EntryUpdate),
     RegisterDeletedBy(&'a header::EntryDelete),
-
-    // future work: encode idempotency in LinkAdd entries themselves
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
@@ -252,20 +249,6 @@ impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
     }
 }
 
-impl TryFrom<DhtOp> for SerializedBytes {
-    type Error = SerializedBytesError;
-    fn try_from(op: DhtOp) -> Result<Self, Self::Error> {
-        Self::try_from(&op.as_unique_form())
-    }
-}
-
-impl TryFrom<&DhtOp> for SerializedBytes {
-    type Error = SerializedBytesError;
-    fn try_from(op: &DhtOp) -> Result<Self, Self::Error> {
-        Self::try_from(&op.as_unique_form())
-    }
-}
-
 make_hashed_base! {
     Visibility(pub),
     HashedName(DhtOpHashed),
@@ -275,11 +258,9 @@ make_hashed_base! {
 
 impl DhtOpHashed {
     /// Create a hashed [DhtOp]
-    pub async fn with_data(op: DhtOp) -> Result<Self, SerializedBytesError> {
-        let sb = SerializedBytes::try_from(&op)?;
-        Ok(DhtOpHashed::with_pre_hashed(
-            op,
-            DhtOpHash::with_data(UnsafeBytes::from(sb).into()).await,
-        ))
+    pub async fn with_data(op: DhtOp) -> Self {
+        let sb = SerializedBytes::try_from(&op.as_unique_form())
+            .expect("`UniqueForm` must be serializable into MessagePack");
+        DhtOpHashed::with_pre_hashed(op, DhtOpHash::with_data(UnsafeBytes::from(sb).into()).await)
     }
 }
