@@ -8,11 +8,20 @@ use std::{
 mod space;
 use space::*;
 
-/// if the user specifies zero (0) for remote_agent_count
+/// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_BROADCAST_REMOTE_AGENT_COUNT: u8 = 5;
 
-/// if the user specifies zero (0) for timeout_ms
+/// if the user specifies None or zero (0) for timeout_ms
 const DEFAULT_BROADCAST_TIMEOUT_MS: u64 = 1000;
+
+/// if the user specifies None or zero (0) for remote_agent_count
+const DEFAULT_MULTI_REQUEST_REMOTE_AGENT_COUNT: u8 = 2;
+
+/// if the user specifies None or zero (0) for timeout_ms
+const DEFAULT_MULTI_REQUEST_TIMEOUT_MS: u64 = 1000;
+
+/// if the user specifies None or zero (0) for race_timeout_ms
+const DEFAULT_MULTI_REQUEST_RACE_TIMEOUT_MS: u64 = 200;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
@@ -171,6 +180,95 @@ impl KitsuneP2pActor {
         .boxed()
         .into())
     }
+
+    /// actual logic for handle_multi_request ...
+    /// the top-level handler may or may not spawn a task for this
+    #[allow(unused_variables, unused_assignments, unused_mut)]
+    fn handle_multi_request_inner(
+        &mut self,
+        input: actor::MultiRequest,
+    ) -> KitsuneP2pHandlerResult<Vec<actor::MultiRequestResponse>> {
+        let actor::MultiRequest {
+            space,
+            from_agent,
+            basis,
+            remote_agent_count,
+            timeout_ms,
+            as_race,
+            race_timeout_ms,
+            request,
+        } = input;
+
+        let remote_agent_count = remote_agent_count.expect("set by handle_multi_request");
+        let timeout_ms = timeout_ms.expect("set by handle_multi_request");
+        let mut race_timeout_ms = race_timeout_ms.expect("set by handle_multi_request");
+        if !as_race {
+            // if these are the same, the effect is that we are not racing
+            race_timeout_ms = timeout_ms;
+        }
+
+        if !self.spaces.contains_key(&space) {
+            return Err(KitsuneP2pError::RoutingSpaceError(space));
+        }
+
+        // encode the data to send
+        let request = Arc::new(wire::Wire::request(request).encode());
+
+        let mut internal_sender = self.internal_sender.clone();
+
+        Ok(async move {
+            let start = std::time::Instant::now();
+            let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
+            let mut out = Vec::new();
+
+            // TODO - note this logic isn't quite right
+            //        but we don't want to spend too much time on it
+            //        when we don't have a real peer-discovery pathway
+            //      - right now we're checking for enough agents up to
+            //        the race_timeout - then stopping that and
+            //        checking for responses.
+
+            let mut req_futs = Vec::new();
+
+            loop {
+                let mut i_s = internal_sender.clone();
+                if let Ok(agent_list) = i_s
+                    .ghost_actor_internal()
+                    .list_online_agents_for_basis_hash(space.clone(), basis.clone())
+                    .await
+                {
+                    for agent in agent_list {
+                        if agent != from_agent && !sent_to.contains(&agent) {
+                            sent_to.insert(agent.clone());
+                            let mut i_s = internal_sender.clone();
+                            let space = space.clone();
+                            let request = request.clone();
+                            req_futs.push(Box::pin(async move {
+                                i_s.ghost_actor_internal()
+                                    .immediate_request(space, agent, request)
+                                    .await
+                            }));
+                        }
+                        if sent_to.len() >= remote_agent_count as usize {
+                            break;
+                        }
+                    }
+
+                    if sent_to.len() >= remote_agent_count as usize
+                        || start.elapsed().as_millis() as u64 > race_timeout_ms
+                    {
+                        break;
+                    }
+
+                    tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+                }
+            }
+
+            Ok(out)
+        }
+        .boxed()
+        .into())
+    }
 }
 
 impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
@@ -272,9 +370,39 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
 
     fn handle_multi_request(
         &mut self,
-        _input: actor::MultiRequest,
+        mut input: actor::MultiRequest,
     ) -> KitsuneP2pHandlerResult<Vec<actor::MultiRequestResponse>> {
-        Ok(async move { Ok(vec![]) }.boxed().into())
+        // if the user doesn't care about remote_agent_count, apply default
+        match input.remote_agent_count {
+            None | Some(0) => {
+                input.remote_agent_count = Some(DEFAULT_MULTI_REQUEST_REMOTE_AGENT_COUNT);
+            }
+            _ => (),
+        }
+
+        // if the user doesn't care about timeout_ms, apply default
+        match input.timeout_ms {
+            None | Some(0) => {
+                input.timeout_ms = Some(DEFAULT_MULTI_REQUEST_TIMEOUT_MS);
+            }
+            _ => (),
+        }
+
+        if input.as_race {
+            // if the user doesn't care about race_timeout_ms, apply default
+            match input.race_timeout_ms {
+                None | Some(0) => {
+                    input.race_timeout_ms = Some(DEFAULT_MULTI_REQUEST_RACE_TIMEOUT_MS);
+                }
+                _ => (),
+            }
+
+            if input.race_timeout_ms.unwrap() > input.timeout_ms.unwrap() {
+                input.race_timeout_ms = Some(input.timeout_ms.unwrap());
+            }
+        }
+
+        self.handle_multi_request_inner(input)
     }
 
     fn handle_ghost_actor_internal(&mut self, input: Internal) -> KitsuneP2pResult<()> {

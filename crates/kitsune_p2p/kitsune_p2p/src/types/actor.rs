@@ -31,25 +31,33 @@ pub struct Broadcast {
 pub struct MultiRequest {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
+    /// The agent making the request.
+    pub from_agent: Arc<super::KitsuneAgent>,
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
     /// See docs on Broadcast
     pub remote_agent_count: Option<u8>,
     /// See docs on Broadcast
     pub timeout_ms: Option<u64>,
+    /// We are interested in speed. If `true` and we have any results
+    /// when `race_timeout_ms` is expired, those results will be returned.
+    /// After `race_timeout_ms` and before `timeout_ms` the first result
+    /// received will be returned.
+    pub as_race: bool,
+    /// See `as_race` for details.
+    /// Set to `None` for a default "best-effort" race.
+    pub race_timeout_ms: Option<u64>,
     /// Request data.
-    pub request: Arc<Vec<u8>>,
+    pub request: Vec<u8>,
 }
 
 /// A response type helps indicate what agent gave what response.
 #[derive(Clone)]
 pub struct MultiRequestResponse {
-    /// The "agent" context.
+    /// The agent that gave this response.
     pub agent: Arc<super::KitsuneAgent>,
     /// Response data.
-    pub response: Arc<Vec<u8>>,
+    pub response: Vec<u8>,
 }
 
 ghost_actor::ghost_actor! {
