@@ -488,7 +488,7 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
             ribosome.module(host_context).unwrap();
         }
 
-        self.0.index = self.0.index + 1;
+        self.0.index += 1;
 
         Some(ribosome)
     }

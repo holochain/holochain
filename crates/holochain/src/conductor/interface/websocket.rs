@@ -158,7 +158,7 @@ async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>)
         // Show if these are actually finishing
         match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
             Ok(Ok(Ok(_))) => (),
-            r @ _ => warn!(message = "Websocket listener failed to join child tasks", result = ?r),
+            r => warn!(message = "Websocket listener failed to join child tasks", result = ?r),
         }
     }
 }

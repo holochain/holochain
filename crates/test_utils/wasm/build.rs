@@ -1,5 +1,4 @@
 use std::path::Path;
-use toml;
 
 fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
