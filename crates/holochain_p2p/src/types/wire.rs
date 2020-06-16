@@ -17,6 +17,11 @@ pub(crate) enum WireMessage {
         #[serde(with = "serde_bytes")]
         receipt: Vec<u8>,
     },
+    Get {
+        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        options: event::GetOptions,
+    },
+    GetResponse(Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>),
 }
 
 impl WireMessage {
@@ -53,5 +58,21 @@ impl WireMessage {
         Self::ValidationReceipt {
             receipt: UnsafeBytes::from(receipt).into(),
         }
+    }
+
+    pub fn get(
+        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        options: event::GetOptions,
+    ) -> WireMessage {
+        Self::Get {
+            entry_hash,
+            options,
+        }
+    }
+
+    pub fn get_response(
+        res: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    ) -> WireMessage {
+        Self::GetResponse(res)
     }
 }

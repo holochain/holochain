@@ -88,7 +88,12 @@ impl HolochainP2pCell {
     ) -> actor::HolochainP2pResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>>
     {
         self.sender
-            .get((*self.dna_hash).clone(), entry_hash, options)
+            .get(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                entry_hash,
+                options,
+            )
             .await
     }
 

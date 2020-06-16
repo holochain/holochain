@@ -3,10 +3,19 @@
 use crate::*;
 
 /// Get options help control how the get is processed at various levels.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetOptions {
     /// Whether the remote-end should follow redirects or just return the
     /// requested entry.
     pub follow_redirects: bool,
+}
+
+impl From<&actor::GetOptions> for GetOptions {
+    fn from(a: &actor::GetOptions) -> Self {
+        Self {
+            follow_redirects: a.follow_redirects,
+        }
+    }
 }
 
 ghost_actor::ghost_chan! {

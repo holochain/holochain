@@ -96,6 +96,7 @@ ghost_actor::ghost_actor! {
         /// Get an entry from the DHT.
         fn get(
             dna_hash: DnaHash,
+            from_agent: AgentPubKey,
             entry_hash: holochain_types::composite_hash::AnyDhtHash,
             options: GetOptions,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
