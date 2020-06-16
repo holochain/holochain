@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
+use crate::composite_hash::{EntryHash, HeaderAddress};
 use crate::{link::Tag, prelude::*};
 use holochain_zome_types::entry_def::EntryVisibility;
 
@@ -190,6 +190,13 @@ impl From<NewEntryHeader> for Header {
 // TODO: Check this can never be written to > 255
 pub type ZomeId = u8;
 
+/// Specifies whether an [EntryUpdate] referes to an [Entry] or a [Header]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum UpdatesTo {
+    Header,
+    Entry,
+}
+
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
@@ -227,6 +234,7 @@ pub struct LinkAdd {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
+    // TODO: change to header hash
     pub base_address: EntryHash,
     pub target_address: EntryHash,
     pub zome_id: ZomeId,
@@ -282,7 +290,8 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub replaces_address: AnyDhtHash,
+    pub updates_to: UpdatesTo,
+    pub replaces_address: HeaderHash,
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,

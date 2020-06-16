@@ -113,7 +113,12 @@ pub trait MetadataBufT {
 
     async fn add_create(&mut self, create: header::EntryCreate) -> DatabaseResult<()>;
 
-    async fn add_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+    async fn add_update(
+        &mut self,
+        update: header::EntryUpdate,
+        entry: Option<EntryHash>,
+    ) -> DatabaseResult<()>;
+
     async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
 
     fn get_creates(
@@ -295,8 +300,20 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn add_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
-        let replace = update.replaces_address.to_owned();
+    async fn add_update(
+        &mut self,
+        update: header::EntryUpdate,
+        entry: Option<EntryHash>,
+    ) -> DatabaseResult<()> {
+        let replace: AnyDhtHash = match (&update.updates_to, entry) {
+            (header::UpdatesTo::Header, None) => update.replaces_address.clone().into(),
+            (header::UpdatesTo::Header, Some(_)) => {
+                panic!("Can't update to entry when EntryUpdate points to header")
+            }
+            (header::UpdatesTo::Entry, None) => panic!("Can't update to entry with no entry hash"),
+            (header::UpdatesTo::Entry, Some(entry_hash)) => entry_hash.into(),
+        };
+        // let replace = update.replaces_address.to_owned();
         self.add_entry_header(update, replace).await
     }
 
@@ -372,7 +389,7 @@ mock! {
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
-        fn sync_add_update(&self, update: header::EntryUpdate) -> DatabaseResult<()>;
+        fn sync_add_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
         fn sync_add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
@@ -452,8 +469,12 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_add_create(create)
     }
 
-    async fn add_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
-        self.sync_add_update(update)
+    async fn add_update(
+        &mut self,
+        update: header::EntryUpdate,
+        entry: Option<EntryHash>,
+    ) -> DatabaseResult<()> {
+        self.sync_add_update(update, entry)
     }
     async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
         self.sync_add_delete(delete)

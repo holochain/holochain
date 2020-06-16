@@ -66,7 +66,7 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterReplacedBy(Signature, header::EntryUpdate, Box<Entry>),
+    RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
     /// Op for deleting an entry
     RegisterDeletedBy(Signature, header::EntryDelete),
     /// Op for adding a link  
@@ -101,7 +101,7 @@ impl DhtOp {
             }
             Self::StoreEntry(_, header, _) => header.entry().clone().into(),
             Self::RegisterAgentActivity(_, header) => header.author().clone().into(),
-            Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone(),
+            Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone().into(),
             Self::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
             Self::RegisterAddLink(_, header) => header.base_address.clone().into(),
             Self::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
@@ -233,7 +233,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 ops.push(DhtOp::RegisterReplacedBy(
                     sig,
                     entry_update.clone(),
-                    Box::new(entry),
+                    Some(Box::new(entry)),
                 ));
             }
             EntryVisibility::Private => {
@@ -242,6 +242,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 } else {
                     panic!("First op should always be store element");
                 }
+                ops.push(DhtOp::RegisterReplacedBy(sig, entry_update.clone(), None));
             }
         },
         Header::EntryDelete(entry_delete) => {

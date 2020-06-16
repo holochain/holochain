@@ -9,31 +9,22 @@ mod tests {
     use crate::core::state::metadata::{MetadataBuf, MetadataBufT, SysMetaVal};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use header::HeaderBuilderCommon;
+    use header::{HeaderBuilderCommon, UpdatesTo};
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
-        composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
+        composite_hash::{EntryHash, HeaderAddress},
         fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},
         header::{self, builder, EntryType, HeaderBuilder},
         Header, HeaderHashed,
     };
     use unwrap_to::unwrap_to;
 
-    fixturator!(
-        AnyDhtHash;
-        variants [
-            EntryContent(EntryContentHash)
-            Agent(AgentPubKey)
-            Header(HeaderHash)
-        ];
-    );
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
         entry_hashes: Box<dyn Iterator<Item = EntryHash>>,
         entry_types: Box<dyn Iterator<Item = EntryType>>,
         commons: Box<dyn Iterator<Item = HeaderBuilderCommon>>,
-        any_dht_hashes: Box<dyn Iterator<Item = AnyDhtHash>>,
     }
 
     impl TestFixtures {
@@ -49,7 +40,6 @@ mod tests {
                     AppEntryTypeFixturator::new(Unpredictable).map(EntryType::App),
                 ),
                 commons: Box::new(HeaderBuilderCommonFixturator::new(Unpredictable)),
-                any_dht_hashes: Box::new(AnyDhtHashFixturator::new(Unpredictable)),
             }
         }
 
@@ -68,18 +58,16 @@ mod tests {
         pub fn common(&mut self) -> HeaderBuilderCommon {
             self.commons.next().unwrap()
         }
-
-        pub fn any_dht_hash(&mut self) -> AnyDhtHash {
-            self.any_dht_hashes.next().unwrap()
-        }
     }
 
     async fn test_update(
-        replaces_address: AnyDhtHash,
+        replaces_address: HeaderHash,
         entry_hash: EntryHash,
+        updates_to: UpdatesTo,
         fx: &mut TestFixtures,
     ) -> (header::EntryUpdate, HeaderHashed) {
         let builder = builder::EntryUpdate {
+            updates_to,
             replaces_address,
             entry_hash,
             entry_type: fx.entry_type(),
@@ -128,10 +116,15 @@ mod tests {
         {
             let reader = env.reader()?;
             let mut buf = MetadataBuf::primary(&reader, &env)?;
-            let (update, expected) =
-                test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
-            buf.add_update(update.clone()).await?;
-            let original = unwrap_to!(update.replaces_address => AnyDhtHash::Header);
+            let (update, expected) = test_update(
+                fx.header_hash().into(),
+                fx.entry_hash(),
+                UpdatesTo::Header,
+                &mut fx,
+            )
+            .await;
+            buf.add_update(update.clone(), None).await?;
+            let original = update.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
             assert_eq!(&canonical, expected.as_ref());
@@ -149,17 +142,32 @@ mod tests {
         {
             let reader = env.reader()?;
             let mut buf = MetadataBuf::primary(&reader, &env)?;
-            let (update1, header1) =
-                test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
-            let (update2, header2) =
-                test_update(header1.into_hash().into(), fx.entry_hash(), &mut fx).await;
-            let (update3, expected) =
-                test_update(header2.into_hash().into(), fx.entry_hash(), &mut fx).await;
-            let _ = buf.add_update(update1.clone()).await?;
-            let _ = buf.add_update(update2).await?;
-            buf.add_update(update3.clone()).await?;
+            let (update1, header1) = test_update(
+                fx.header_hash().into(),
+                fx.entry_hash(),
+                UpdatesTo::Header,
+                &mut fx,
+            )
+            .await;
+            let (update2, header2) = test_update(
+                header1.into_hash().into(),
+                fx.entry_hash(),
+                UpdatesTo::Header,
+                &mut fx,
+            )
+            .await;
+            let (update3, expected) = test_update(
+                header2.into_hash().into(),
+                fx.entry_hash(),
+                UpdatesTo::Header,
+                &mut fx,
+            )
+            .await;
+            let _ = buf.add_update(update1.clone(), None).await?;
+            let _ = buf.add_update(update2, None).await?;
+            buf.add_update(update3.clone(), None).await?;
 
-            let original = unwrap_to!(update1.replaces_address => AnyDhtHash::Header);
+            let original = update1.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
             assert_eq!(&canonical, expected.as_ref());
@@ -177,14 +185,20 @@ mod tests {
         {
             let reader = env.reader()?;
             let mut buf = MetadataBuf::primary(&reader, &env)?;
-            let (update, _) = test_update(fx.entry_hash().into(), fx.entry_hash(), &mut fx).await;
-            let _ = buf.add_update(update.clone()).await?;
+            let original_entry = fx.entry_hash();
+            let header_hash = test_create(original_entry.clone(), &mut fx)
+                .await
+                .1
+                .into_inner()
+                .1;
 
-            let original: EntryHash =
-                unwrap_to!(update.replaces_address => AnyDhtHash::EntryContent)
-                    .clone()
-                    .into();
-            let canonical = buf.get_canonical_entry_hash(original)?;
+            let (update, _) =
+                test_update(header_hash, fx.entry_hash(), UpdatesTo::Entry, &mut fx).await;
+            let _ = buf
+                .add_update(update.clone(), Some(original_entry.clone()))
+                .await?;
+
+            let canonical = buf.get_canonical_entry_hash(original_entry)?;
 
             let expected = update.entry_hash;
             assert_eq!(canonical, expected);
@@ -202,20 +216,39 @@ mod tests {
         {
             let reader = env.reader()?;
             let mut buf = MetadataBuf::primary(&reader, &env)?;
-            let (update1, _) = test_update(fx.entry_hash().into(), fx.entry_hash(), &mut fx).await;
-            let (update2, _) =
-                test_update(update1.replaces_address.clone(), fx.entry_hash(), &mut fx).await;
-            let (update3, _) =
-                test_update(update2.replaces_address.clone(), fx.entry_hash(), &mut fx).await;
-            let _ = buf.add_update(update1.clone()).await?;
-            let _ = buf.add_update(update2.clone()).await?;
-            let _ = buf.add_update(update3.clone()).await?;
+            let original_entry = fx.entry_hash();
+            let header_hash = test_create(original_entry.clone(), &mut fx)
+                .await
+                .1
+                .into_inner()
+                .1;
+            let (update1, _) =
+                test_update(header_hash, fx.entry_hash(), UpdatesTo::Entry, &mut fx).await;
+            let (update2, _) = test_update(
+                update1.replaces_address.clone(),
+                fx.entry_hash(),
+                UpdatesTo::Entry,
+                &mut fx,
+            )
+            .await;
+            let (update3, _) = test_update(
+                update2.replaces_address.clone(),
+                fx.entry_hash(),
+                UpdatesTo::Entry,
+                &mut fx,
+            )
+            .await;
+            let _ = buf
+                .add_update(update1.clone(), Some(original_entry.clone()))
+                .await?;
+            let _ = buf
+                .add_update(update2.clone(), Some(original_entry.clone()))
+                .await?;
+            let _ = buf
+                .add_update(update3.clone(), Some(original_entry.clone()))
+                .await?;
 
-            let original: EntryHash =
-                unwrap_to!(update1.replaces_address => AnyDhtHash::EntryContent)
-                    .clone()
-                    .into();
-            let canonical = buf.get_canonical_entry_hash(original)?;
+            let canonical = buf.get_canonical_entry_hash(original_entry)?;
 
             let expected = update3.entry_hash;
             assert_eq!(canonical, expected);
@@ -233,24 +266,34 @@ mod tests {
         {
             let reader = env.reader()?;
             let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let original_entry = fx.entry_hash();
+            let header_hash = test_create(original_entry.clone(), &mut fx)
+                .await
+                .1
+                .into_inner()
+                .1;
             let (update_header, expected_header_hash) =
-                test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
-            let (update_entry, _) =
-                test_update(fx.entry_hash().into(), fx.entry_hash(), &mut fx).await;
+                test_update(header_hash, fx.entry_hash(), UpdatesTo::Header, &mut fx).await;
 
-            let _ = buf.add_update(update_header.clone()).await?;
-            let _ = buf.add_update(update_entry.clone()).await?;
+            let original_entry_1 = fx.entry_hash();
+            let header_hash = test_create(original_entry_1.clone(), &mut fx)
+                .await
+                .1
+                .into_inner()
+                .1;
+            let (update_entry, _) =
+                test_update(header_hash, fx.entry_hash(), UpdatesTo::Entry, &mut fx).await;
+
+            let _ = buf.add_update(update_header.clone(), None).await?;
+            let _ = buf
+                .add_update(update_entry.clone(), Some(original_entry.clone()))
+                .await?;
             let expected_entry_hash = update_entry.entry_hash;
 
-            let original_header_hash =
-                unwrap_to!(update_header.replaces_address => AnyDhtHash::Header);
-            let original_entry_hash =
-                unwrap_to!(update_entry.replaces_address => AnyDhtHash::EntryContent)
-                    .clone()
-                    .into();
+            let original_header_hash = update_header.replaces_address;
             let canonical_header_hash =
                 buf.get_canonical_header_hash(original_header_hash.clone())?;
-            let canonical_entry_hash = buf.get_canonical_entry_hash(original_entry_hash)?;
+            let canonical_entry_hash = buf.get_canonical_entry_hash(original_entry_1)?;
 
             assert_eq!(&canonical_header_hash, expected_header_hash.as_ref());
             assert_eq!(canonical_entry_hash, expected_entry_hash);
@@ -308,11 +351,22 @@ mod tests {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
-        let any_hash = fx.any_dht_hash();
+        let original_entry_hash = fx.entry_hash();
+        let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
+            .await
+            .1
+            .into_inner()
+            .1;
         let mut expected = Vec::new();
         let mut entry_updates = Vec::new();
         for _ in 0..10 {
-            let (e, hash) = test_update(any_hash.clone(), fx.entry_hash(), &mut fx).await;
+            let (e, hash) = test_update(
+                original_header_hash.clone(),
+                fx.entry_hash(),
+                UpdatesTo::Entry,
+                &mut fx,
+            )
+            .await;
             let (_, hash) = <(Header, HeaderHash)>::from(hash);
             expected.push(SysMetaVal::Update(hash.into()));
             entry_updates.push(e)
@@ -323,10 +377,13 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for update in entry_updates {
-                meta_buf.add_update(update).await.unwrap();
+                meta_buf
+                    .add_update(update, Some(original_entry_hash.clone()))
+                    .await
+                    .unwrap();
             }
             let mut headers = meta_buf
-                .get_updates(any_hash.clone())
+                .get_updates(original_entry_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -339,7 +396,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
-                .get_updates(any_hash.clone())
+                .get_updates(original_entry_hash.into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();

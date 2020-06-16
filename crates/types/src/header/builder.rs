@@ -1,14 +1,15 @@
 use super::EntryType;
 use crate::header;
 use crate::{
-    composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
+    composite_hash::{EntryHash, HeaderAddress},
     link::Tag,
     Timestamp,
 };
 use derive_more::Constructor;
 use header::HeaderInner;
-use header::ZomeId;
+use header::{UpdatesTo, ZomeId};
 use holo_hash::*;
+use holochain_serialized_bytes::SerializedBytes;
 
 #[derive(Constructor)]
 pub struct HeaderBuilderCommon {
@@ -104,7 +105,8 @@ builder_variant!(EntryCreate {
 });
 
 builder_variant!(EntryUpdate {
-    replaces_address: AnyDhtHash,
+    updates_to: UpdatesTo,
+    replaces_address: HeaderHash,
 
     entry_type: EntryType,
     entry_hash: EntryHash,
@@ -112,4 +114,8 @@ builder_variant!(EntryUpdate {
 
 builder_variant!(EntryDelete {
     removes_address: HeaderAddress,
+});
+
+builder_variant!(AgentValidationPkg {
+    membrane_proof: Option<SerializedBytes>,
 });

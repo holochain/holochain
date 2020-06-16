@@ -10,8 +10,10 @@ use holo_hash::DnaHashFixturator;
 use holo_hash::EntryContentHashFixturator;
 use holo_hash::HeaderHashFixturator;
 use holo_hash::HoloHashExt;
-use holo_hash::WasmHash;
+use holo_hash::{DnaHash, WasmHash};
 use holo_hash_core::HeaderHash;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_types::composite_hash::AnyDhtHash;
 use holochain_types::composite_hash::EntryHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
@@ -19,13 +21,30 @@ use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
+use holochain_types::fixt::AppEntryTypeFixturator;
 use holochain_types::fixt::HeaderBuilderCommonFixturator;
 use holochain_types::fixt::TimestampFixturator;
+use holochain_types::fixt::UpdatesToFixturator;
+use holochain_types::header::builder::AgentValidationPkg as AgentValidationPkgBuilder;
+use holochain_types::header::builder::ChainClose as ChainCloseBuilder;
+use holochain_types::header::builder::ChainOpen as ChainOpenBuilder;
+use holochain_types::header::builder::EntryCreate as EntryCreateBuilder;
+use holochain_types::header::builder::EntryDelete as EntryDeleteBuilder;
+use holochain_types::header::builder::EntryUpdate as EntryUpdateBuilder;
 use holochain_types::header::builder::HeaderBuilder;
+use holochain_types::header::builder::InitZomesComplete as InitZomesCompleteBuilder;
 use holochain_types::header::builder::LinkAdd as LinkAddBuilder;
 use holochain_types::header::builder::LinkRemove as LinkRemoveBuilder;
+use holochain_types::header::AgentValidationPkg;
+use holochain_types::header::ChainClose;
+use holochain_types::header::ChainOpen;
+use holochain_types::header::EntryCreate;
+use holochain_types::header::EntryDelete;
+use holochain_types::header::EntryType;
+use holochain_types::header::EntryUpdate;
+use holochain_types::header::InitZomesComplete;
 use holochain_types::header::LinkAdd;
-use holochain_types::header::{HeaderBuilderCommon, LinkRemove, ZomeId};
+use holochain_types::header::{Dna, HeaderBuilderCommon, LinkRemove, ZomeId};
 use holochain_types::link::Tag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
@@ -506,59 +525,32 @@ fixturator!(
     Tag; from Bytes;
 );
 
-fixturator!(
-    LinkAddBuilder;
-    constructor fn new(EntryHash, EntryHash, u8, Tag);
-);
+// fixturator!(
+//     LinkAddBuilder;
+//     constructor fn new(EntryHash, EntryHash, u8, Tag);
+// );
 
-fixturator!(
-    LinkAddBuilderCombo;
-    constructor fn new(LinkAddBuilder, HeaderBuilderCommon);
-);
-pub struct LinkAddBuilderCombo(LinkAddBuilder, HeaderBuilderCommon);
+// fixturator!(
+//     LinkAddBuilderCombo;
+//     constructor fn new(LinkAddBuilder, HeaderBuilderCommon);
+// );
+// pub struct LinkAddBuilderCombo(LinkAddBuilder, HeaderBuilderCommon);
 
-impl LinkAddBuilderCombo {
-    fn new(l: LinkAddBuilder, h: HeaderBuilderCommon) -> Self {
-        Self(l, h)
-    }
-}
+// impl LinkAddBuilderCombo {
+//     fn new(l: LinkAddBuilder, h: HeaderBuilderCommon) -> Self {
+//         Self(l, h)
+//     }
+// }
 
-impl From<LinkAddBuilderCombo> for LinkAdd {
-    fn from(l: LinkAddBuilderCombo) -> Self {
-        l.0.build(l.1)
-    }
-}
+// impl From<LinkAddBuilderCombo> for LinkAdd {
+//     fn from(l: LinkAddBuilderCombo) -> Self {
+//         l.0.build(l.1)
+//     }
+// }
 
-fixturator!(
-    LinkAdd; from LinkAddBuilderCombo;
-);
-
-fixturator!(
-    LinkRemoveBuilder;
-    constructor fn new(HeaderHash, EntryHash);
-);
-
-fixturator!(
-    LinkRemoveBuilderCombo;
-    constructor fn new(LinkRemoveBuilder, HeaderBuilderCommon);
-);
-pub struct LinkRemoveBuilderCombo(LinkRemoveBuilder, HeaderBuilderCommon);
-
-impl LinkRemoveBuilderCombo {
-    fn new(l: LinkRemoveBuilder, h: HeaderBuilderCommon) -> Self {
-        Self(l, h)
-    }
-}
-
-impl From<LinkRemoveBuilderCombo> for LinkRemove {
-    fn from(l: LinkRemoveBuilderCombo) -> Self {
-        l.0.build(l.1)
-    }
-}
-
-fixturator!(
-    LinkRemove; from LinkRemoveBuilderCombo;
-);
+// fixturator!(
+//     LinkAdd; from LinkAddBuilderCombo;
+// );
 
 fixturator!(
     LinkMetaVal;
@@ -606,3 +598,152 @@ impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
         Some(f)
     }
 }
+
+fixturator!(
+    DnaBuilderCombo;
+    constructor fn new(DnaHash, HeaderBuilderCommon);
+);
+pub struct DnaBuilderCombo(DnaHash, HeaderBuilderCommon);
+
+impl DnaBuilderCombo {
+    fn new(hash: DnaHash, h: HeaderBuilderCommon) -> Self {
+        Self(hash, h)
+    }
+}
+
+impl From<DnaBuilderCombo> for Dna {
+    fn from(d: DnaBuilderCombo) -> Self {
+        Self {
+            author: d.1.author,
+            timestamp: d.1.timestamp,
+            header_seq: d.1.header_seq,
+            hash: d.0,
+        }
+    }
+}
+
+fixturator!(
+    Dna; from DnaBuilderCombo;
+);
+
+macro_rules! header_fixturator {
+    (
+        $type:ident;
+        constructor fn $fn:tt( $( $newtype:ty ),* );
+    ) => {
+        item!{
+            fixturator!{
+                [<$type:camel Builder>];
+                constructor fn $fn($($newtype),*);
+            }
+            fixturator!(
+                [<$type:camel BuilderCombo>];
+                constructor fn new([<$type:camel Builder>], HeaderBuilderCommon);
+            );
+            pub struct [<$type:camel BuilderCombo>]([<$type:camel Builder>], HeaderBuilderCommon);
+            impl [<$type:camel BuilderCombo>] {
+                fn new(l: [<$type:camel Builder>], h: HeaderBuilderCommon) -> Self {
+                    Self(l, h)
+                }
+            }
+
+            impl From<[<$type:camel BuilderCombo>]> for $type {
+                fn from(l: [<$type:camel BuilderCombo>]) -> Self {
+                    l.0.build(l.1)
+                }
+            }
+
+            fixturator!(
+                $type; from [<$type:camel BuilderCombo>];
+            );
+        }
+    };
+}
+
+header_fixturator!(
+    LinkRemove;
+    constructor fn new(HeaderHash, EntryHash);
+);
+
+header_fixturator!(
+    LinkAdd;
+    constructor fn new(EntryHash, EntryHash, u8, Tag);
+);
+
+type MaybeSerializedBytes = Option<SerializedBytes>;
+
+fixturator! {
+    MaybeSerializedBytes;
+    enum [ Some None ];
+    curve Empty MaybeSerializedBytes::None;
+    curve Unpredictable match MaybeSerializedBytesVariant::random() {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
+    };
+    curve Predictable match MaybeSerializedBytesVariant::nth(self.0.index) {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+    };
+}
+
+fixturator! {
+    EntryType;
+    enum [ AgentPubKey App CapClaim CapGrant ];
+    curve Empty EntryType::AgentPubKey;
+    curve Unpredictable match EntryTypeVariant::random() {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryType)),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+    curve Predictable match EntryTypeVariant::nth(self.0.index) {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+}
+
+header_fixturator!(
+    AgentValidationPkg;
+    constructor fn new(MaybeSerializedBytes);
+);
+
+header_fixturator!(
+    InitZomesComplete;
+    constructor fn new();
+);
+
+header_fixturator!(
+    ChainOpen;
+    constructor fn new(DnaHash);
+);
+
+header_fixturator!(
+    ChainClose;
+    constructor fn new(DnaHash);
+);
+
+header_fixturator!(
+    EntryCreate;
+    constructor fn new(EntryType, EntryHash);
+);
+
+fixturator!(
+    AnyDhtHash;
+    variants [
+        EntryContent(EntryContentHash)
+        Agent(AgentPubKey)
+        Header(HeaderHash)
+    ];
+);
+
+header_fixturator!(
+    EntryUpdate;
+    constructor fn new(UpdatesTo, HeaderHash, EntryType, EntryHash);
+);
+
+header_fixturator!(
+    EntryDelete;
+    constructor fn new(HeaderHash);
+);

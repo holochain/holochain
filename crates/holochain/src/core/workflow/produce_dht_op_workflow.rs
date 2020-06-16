@@ -22,6 +22,9 @@ use std::convert::TryFrom;
 use tracing::*;
 use tracing_futures::Instrument;
 
+#[cfg(test)]
+mod dht_op_tests;
+
 pub(crate) struct ProduceDhtOpWorkflow {}
 
 impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {
@@ -129,31 +132,24 @@ mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
     use crate::core::state::chain_cas::ChainCasBuf;
-    use crate::fixt::{EntryFixturator, EntryHashFixturator};
+
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use holo_hash::{Hashable, Hashed, HeaderHash, HeaderHashFixturator, HoloHashBaseExt};
-    use holochain_keystore::Signature;
+    use holo_hash::{Hashable, Hashed, HoloHashBaseExt};
+
     use holochain_state::{
         env::{ReadManager, WriteManager},
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        composite_hash::EntryHash,
         dht_op::{ops_from_element, DhtOp, DhtOpHashed},
-        element::{ChainElement, SignedHeaderHashed},
-        fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator, SignatureFixturator},
-        header::{
-            builder::{self, HeaderBuilder},
-            EntryCreate, EntryType, EntryUpdate, HeaderBuilderCommon, NewEntryHeader,
-        },
+        header::{builder, EntryType, NewEntryHeader},
         observability,
         test_utils::fake_app_entry_type,
-        Entry, EntryHashed, Header, HeaderHashed,
+        Entry, EntryHashed, Header,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use matches::assert_matches;
-    use pretty_assertions::assert_eq;
     use std::collections::HashSet;
     use unwrap_to::unwrap_to;
 
@@ -223,7 +219,7 @@ mod tests {
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::EntryUpdate).clone();
                 let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
-                DhtOp::RegisterReplacedBy(s, h, e)
+                DhtOp::RegisterReplacedBy(s, h, Some(e))
             }
             DhtOpLight::RegisterDeletedBy(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
@@ -379,141 +375,5 @@ mod tests {
 
         assert_eq!(last_count, count);
         assert_eq!(last_count, authored_count);
-    }
-
-    // struct ChainElementTest {
-    //     pub_entry_type: Box<dyn Iterator<Item = EntryType>>,
-    //     priv_entry_type: Box<dyn Iterator<Item = EntryType>>,
-    //     entry_hash: Box<dyn Iterator<Item = EntryHash>>,
-    //     commons: Box<dyn Iterator<Item = HeaderBuilderCommon>>,
-    //     header_hash: Box<dyn Iterator<Item = HeaderHash>>,
-    //     sig: Box<dyn Iterator<Item = Signature>>,
-    //     entry: Box<dyn Iterator<Item = Entry>>,
-    // }
-
-    struct ChainElementTest {
-        pub_entry_type: EntryType,
-        priv_entry_type: EntryType,
-        entry_hash: EntryHash,
-        commons: Box<dyn Iterator<Item = HeaderBuilderCommon>>,
-        header_hash: HeaderHash,
-        sig: Signature,
-        entry: Entry,
-    }
-
-    impl ChainElementTest {
-        fn new() -> Option<Self> {
-            let pub_entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
-                .map(|a| EntryType::App(a))
-                .next()?;
-            let priv_entry_type = AppEntryTypeFixturator::new(EntryVisibility::Private)
-                .map(|a| EntryType::App(a))
-                .next()?;
-            let entry_hash = EntryHashFixturator::new(Unpredictable).next()?;
-            let commons = HeaderBuilderCommonFixturator::new(Unpredictable);
-            let header_hash = HeaderHashFixturator::new(Unpredictable).next()?;
-            let sig = SignatureFixturator::new(Unpredictable).next()?;
-            let entry = EntryFixturator::new(Unpredictable).next()?;
-            Some(Self {
-                pub_entry_type,
-                priv_entry_type,
-                entry_hash,
-                commons: Box::new(commons),
-                header_hash,
-                sig,
-                entry,
-            })
-        }
-
-        fn entry_create(&mut self, entry_type: EntryType) -> (EntryCreate, ChainElement) {
-            let entry_create = builder::EntryCreate {
-                entry_type,
-                entry_hash: self.entry_hash.clone(),
-            }
-            .build(self.commons.next().unwrap());
-            let element = self.to_element(entry_create.clone().into(), Some(self.entry.clone()));
-            (entry_create, element)
-        }
-
-        fn entry_update(&mut self, entry_type: EntryType) -> (EntryUpdate, ChainElement) {
-            let entry_update = builder::EntryUpdate {
-                entry_type,
-                entry_hash: self.entry_hash.clone(),
-                replaces_address: self.header_hash.clone().into(),
-            }
-            .build(self.commons.next().unwrap());
-            let element = self.to_element(entry_update.clone().into(), Some(self.entry.clone()));
-            (entry_update, element)
-        }
-
-        fn pub_entry_create(mut self) -> (ChainElement, Vec<DhtOp>) {
-            let (entry_create, element) = self.entry_create(self.pub_entry_type.clone());
-            let header: Header = entry_create.clone().into();
-
-            let ops = vec![
-                DhtOp::StoreElement(
-                    self.sig.clone(),
-                    header.clone(),
-                    Some(self.entry.clone().into()),
-                ),
-                DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-                DhtOp::StoreEntry(
-                    self.sig.clone(),
-                    NewEntryHeader::Create(entry_create),
-                    self.entry.clone().into(),
-                ),
-            ];
-            (element, ops)
-        }
-
-        fn priv_entry_create(mut self) -> (ChainElement, Vec<DhtOp>) {
-            let (entry_create, element) = self.entry_create(self.priv_entry_type.clone());
-            let header: Header = entry_create.clone().into();
-
-            let ops = vec![
-                DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
-                DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-            ];
-            (element, ops)
-        }
-
-        fn priv_entry_update(mut self) -> (ChainElement, Vec<DhtOp>) {
-            let (entry_update, element) = self.entry_update(self.priv_entry_type.clone());
-            let header: Header = entry_update.clone().into();
-
-            let ops = vec![
-                DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
-                DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-            ];
-            (element, ops)
-        }
-
-        fn to_element(&mut self, header: Header, entry: Option<Entry>) -> ChainElement {
-            let h = HeaderHashed::with_pre_hashed(header.clone(), self.header_hash.clone());
-            let h = SignedHeaderHashed::with_presigned(h, self.sig.clone());
-            ChainElement::new(h, entry.clone())
-        }
-    }
-
-    // TODO: This should be unit test on [DhtOp] but can't be due to
-    // the dependencies
-    #[tokio::test(threaded_scheduler)]
-    async fn private_entries() {
-        let builder = ChainElementTest::new().unwrap();
-        let (private_element, expected) = builder.priv_entry_create();
-        let result = ops_from_element(&private_element).unwrap();
-        assert_eq!(result, expected);
-        let builder = ChainElementTest::new().unwrap();
-        let (private_element, expected) = builder.priv_entry_update();
-        let result = ops_from_element(&private_element).unwrap();
-        assert_eq!(result, expected);
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn public_entries() {
-        let builder = ChainElementTest::new().unwrap();
-        let (public_element, expected) = builder.pub_entry_create();
-        let result = ops_from_element(&public_element).unwrap();
-        assert_eq!(result, expected);
     }
 }
