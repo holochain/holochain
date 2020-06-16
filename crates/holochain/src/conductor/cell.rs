@@ -364,7 +364,7 @@ impl Cell {
         let reader = env_ref.reader()?;
         // Create the workspace
         let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)
-            .map_err(|e| WorkflowRunError::from(e))
+            .map_err(WorkflowRunError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);
 
@@ -391,7 +391,7 @@ impl Cell {
         trace!(?init_result);
         match init_result {
             InitResult::Pass => (),
-            r @ _ => return Err(CellError::InitFailed(r)),
+            r => return Err(CellError::InitFailed(r)),
         }
         Ok(())
     }

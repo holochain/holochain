@@ -39,7 +39,7 @@ holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
 legacy = { path = "../legacy", package = "holochain_2020_legacy" }
-mockall = "0.6.0"
+mockall = "0.7.0"
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
