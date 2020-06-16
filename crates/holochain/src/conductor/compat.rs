@@ -241,10 +241,10 @@ pub mod tests {
         let persistence_dir = PathBuf::from("persistence_dir");
 
         let legacy_config = legacy::Config {
-            dnas: dnas.clone(),
-            instances: instances.clone(),
-            interfaces: interfaces.clone(),
-            dpki: Some(dpki.clone()),
+            dnas,
+            instances,
+            interfaces,
+            dpki: Some(dpki),
             persistence_dir: persistence_dir.clone(),
             ..Default::default()
         };
