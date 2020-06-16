@@ -5,7 +5,7 @@
 //! ## Example
 //!
 //! ```rust
-//! guse holochain_serialized_bytes::prelude::*;
+//! use holochain_serialized_bytes::prelude::*;
 //!
 //! #[derive(Serialize, Deserialize, PartialEq, Debug, SerializedBytes)]
 //! pub struct SomeData(String);
