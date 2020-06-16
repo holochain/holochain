@@ -234,7 +234,6 @@ pub struct LinkAdd {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    // TODO: change to header hash
     pub base_address: EntryHash,
     pub target_address: EntryHash,
     pub zome_id: ZomeId,

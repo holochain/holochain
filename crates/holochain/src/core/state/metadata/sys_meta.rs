@@ -406,6 +406,62 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn add_entry_get_updates_header() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let mut fx = TestFixtures::new();
+        let original_entry_hash = fx.entry_hash();
+        let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
+            .await
+            .1
+            .into_inner()
+            .1;
+        let mut expected = Vec::new();
+        let mut entry_updates = Vec::new();
+        for _ in 0..10 {
+            let (e, hash) = test_update(
+                original_header_hash.clone(),
+                fx.entry_hash(),
+                UpdatesTo::Header,
+                &mut fx,
+            )
+            .await;
+            let (_, hash) = <(Header, HeaderHash)>::from(hash);
+            expected.push(SysMetaVal::Update(hash.into()));
+            entry_updates.push(e)
+        }
+
+        expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            for update in entry_updates {
+                meta_buf.add_update(update, None).await.unwrap();
+            }
+            let mut headers = meta_buf
+                .get_updates(original_header_hash.clone().into())
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+            assert_eq!(headers, expected);
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+        {
+            let reader = env.reader().unwrap();
+            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let mut headers = meta_buf
+                .get_updates(original_header_hash.into())
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+            assert_eq!(headers, expected);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_deletes() {
         let arc = test_cell_env();
         let env = arc.guard().await;

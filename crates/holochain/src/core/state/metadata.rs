@@ -313,7 +313,6 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             (header::UpdatesTo::Entry, None) => panic!("Can't update to entry with no entry hash"),
             (header::UpdatesTo::Entry, Some(entry_hash)) => entry_hash.into(),
         };
-        // let replace = update.replaces_address.to_owned();
         self.add_entry_header(update, replace).await
     }
 

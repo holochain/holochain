@@ -214,6 +214,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 ),
             )),
             EntryVisibility::Private => {
+                // This entry is private so remove it from StoreElement
                 if let Some(DhtOp::StoreElement(_, _, e)) = ops.get_mut(0) {
                     *e = None;
                 } else {
@@ -237,6 +238,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 ));
             }
             EntryVisibility::Private => {
+                // This entry is private so remove it from StoreElement
                 if let Some(DhtOp::StoreElement(_, _, e)) = ops.get_mut(0) {
                     *e = None;
                 } else {

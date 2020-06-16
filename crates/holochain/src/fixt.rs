@@ -525,33 +525,6 @@ fixturator!(
     Tag; from Bytes;
 );
 
-// fixturator!(
-//     LinkAddBuilder;
-//     constructor fn new(EntryHash, EntryHash, u8, Tag);
-// );
-
-// fixturator!(
-//     LinkAddBuilderCombo;
-//     constructor fn new(LinkAddBuilder, HeaderBuilderCommon);
-// );
-// pub struct LinkAddBuilderCombo(LinkAddBuilder, HeaderBuilderCommon);
-
-// impl LinkAddBuilderCombo {
-//     fn new(l: LinkAddBuilder, h: HeaderBuilderCommon) -> Self {
-//         Self(l, h)
-//     }
-// }
-
-// impl From<LinkAddBuilderCombo> for LinkAdd {
-//     fn from(l: LinkAddBuilderCombo) -> Self {
-//         l.0.build(l.1)
-//     }
-// }
-
-// fixturator!(
-//     LinkAdd; from LinkAddBuilderCombo;
-// );
-
 fixturator!(
     LinkMetaVal;
     constructor fn new(HeaderHash, EntryHash, Timestamp, u8, Tag);

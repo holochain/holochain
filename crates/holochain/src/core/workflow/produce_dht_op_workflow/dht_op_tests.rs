@@ -44,27 +44,29 @@ struct ChainElementTest {
 }
 
 impl ChainElementTest {
-    fn new() -> Option<Self> {
+    fn new() -> Self {
         let pub_entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
             .map(|a| EntryType::App(a))
-            .next()?;
+            .next()
+            .unwrap();
         let priv_entry_type = AppEntryTypeFixturator::new(EntryVisibility::Private)
             .map(|a| EntryType::App(a))
-            .next()?;
-        let entry_hash = EntryHashFixturator::new(Unpredictable).next()?;
+            .next()
+            .unwrap();
+        let entry_hash = fixt!(EntryHash);
         let commons = HeaderBuilderCommonFixturator::new(Unpredictable);
-        let header_hash = HeaderHashFixturator::new(Unpredictable).next()?;
-        let sig = SignatureFixturator::new(Unpredictable).next()?;
-        let entry = EntryFixturator::new(Unpredictable).next()?;
-        let updates_to = UpdatesToFixturator::new(Unpredictable).next()?;
-        let link_add = LinkAddFixturator::new(Unpredictable).next()?;
-        let link_remove = LinkRemoveFixturator::new(Unpredictable).next()?;
+        let header_hash = fixt!(HeaderHash);
+        let sig = fixt!(Signature);
+        let entry = fixt!(Entry);
+        let updates_to = fixt!(UpdatesTo);
+        let link_add = fixt!(LinkAdd);
+        let link_remove = fixt!(LinkRemove);
         let dna = fixt!(Dna);
         let chain_open = fixt!(ChainOpen);
         let chain_close = fixt!(ChainClose);
         let agent_validation_pkg = fixt!(AgentValidationPkg);
         let init_zomes_complete = fixt!(InitZomesComplete);
-        Some(Self {
+        Self {
             pub_entry_type,
             priv_entry_type,
             entry_hash,
@@ -80,7 +82,7 @@ impl ChainElementTest {
             chain_open,
             agent_validation_pkg,
             init_zomes_complete,
-        })
+        }
     }
 
     fn entry_create(&mut self, entry_type: EntryType) -> (EntryCreate, ChainElement) {
@@ -244,11 +246,11 @@ impl ChainElementTest {
 // the dependencies
 #[tokio::test(threaded_scheduler)]
 async fn private_entries() {
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let (private_element, expected) = builder.priv_entry_create();
     let result = ops_from_element(&private_element).unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let (private_element, expected) = builder.priv_entry_update();
     let result = ops_from_element(&private_element).unwrap();
     assert_eq!(result, expected);
@@ -257,27 +259,27 @@ async fn private_entries() {
 #[tokio::test(threaded_scheduler)]
 async fn public_entries() {
     observability::test_run().ok();
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let (public_element, expected) = builder.pub_entry_create();
     let result = ops_from_element(&public_element).unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let (public_element, expected) = builder.pub_entry_update();
     let result = ops_from_element(&public_element).unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let (public_element, expected) = builder.entry_delete();
     let result = ops_from_element(&public_element).unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let (public_element, expected) = builder.link_add();
     let result = ops_from_element(&public_element).unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let (public_element, expected) = builder.link_remove();
     let result = ops_from_element(&public_element).unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new().unwrap();
+    let builder = ChainElementTest::new();
     let public_elements = builder.others();
     for (public_element, expected) in public_elements {
         debug!(?public_element);
