@@ -410,10 +410,10 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
                     space,
                     from_agent,
                     basis,
-                    remote_agent_count: None, // default best-effort
-                    timeout_ms: None,         // default best-effort
-                    as_race: true,
-                    race_timeout_ms: None, // default best-effort
+                    remote_agent_count: options.remote_agent_count,
+                    timeout_ms: options.timeout_ms,
+                    as_race: options.as_race,
+                    race_timeout_ms: options.race_timeout_ms,
                     request,
                 })
                 .await?;
