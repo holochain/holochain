@@ -1239,7 +1239,6 @@ dependencies = [
  "holochain_crypto",
  "holochain_keystore",
  "holochain_serialized_bytes",
- "holochain_types_derive",
  "holochain_wasmer_common",
  "holochain_zome_types",
  "lazy_static",
@@ -1266,14 +1265,6 @@ dependencies = [
  "tracing-core",
  "tracing-serde",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "holochain_types_derive"
-version = "0.0.1"
-dependencies = [
- "quote 0.6.11",
- "syn 0.15.31",
 ]
 
 [[package]]
