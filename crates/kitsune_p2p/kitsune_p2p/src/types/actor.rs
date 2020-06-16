@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 /// Publish data to a "neighborhood" of remote nodes surrounding the "basis" hash.
 /// Returns an approximate number of nodes reached.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Broadcast {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
@@ -27,7 +27,7 @@ pub struct Broadcast {
 
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
 /// The remote sides will see these messages as "RequestEvt" events.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MultiRequest {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
@@ -52,7 +52,7 @@ pub struct MultiRequest {
 }
 
 /// A response type helps indicate what agent gave what response.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MultiRequestResponse {
     /// The agent that gave this response.
     pub agent: Arc<super::KitsuneAgent>,

@@ -218,18 +218,17 @@ impl KitsuneP2pActor {
 
         Ok(async move {
             let start = std::time::Instant::now();
-            let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
-            let mut out = Vec::new();
 
-            // TODO - note this logic isn't quite right
+            // TODO - this logic isn't quite right
             //        but we don't want to spend too much time on it
             //        when we don't have a real peer-discovery pathway
             //      - right now we're checking for enough agents up to
             //        the race_timeout - then stopping that and
             //        checking for responses.
 
-            let mut req_futs = Vec::new();
-
+            // send requests to agents
+            let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
+            let (res_send, mut res_recv) = tokio::sync::mpsc::channel(10);
             loop {
                 let mut i_s = internal_sender.clone();
                 if let Ok(agent_list) = i_s
@@ -238,29 +237,101 @@ impl KitsuneP2pActor {
                     .await
                 {
                     for agent in agent_list {
+                        // for each agent returned
+                        // if we haven't sent them a request
+                        // and they aren't the requestor - send a request
+                        // if we meet our request quota break out.
                         if agent != from_agent && !sent_to.contains(&agent) {
                             sent_to.insert(agent.clone());
                             let mut i_s = internal_sender.clone();
                             let space = space.clone();
                             let request = request.clone();
-                            req_futs.push(Box::pin(async move {
-                                i_s.ghost_actor_internal()
-                                    .immediate_request(space, agent, request)
+                            let mut res_send = res_send.clone();
+                            // make the request - the responses will be
+                            // sent back to our channel
+                            tokio::task::spawn(async move {
+                                if let Ok(response) = i_s
+                                    .ghost_actor_internal()
+                                    .immediate_request(space, agent.clone(), request)
                                     .await
-                            }));
+                                {
+                                    let _ = res_send
+                                        .send(actor::MultiRequestResponse { agent, response })
+                                        .await;
+                                }
+                            });
                         }
                         if sent_to.len() >= remote_agent_count as usize {
                             break;
                         }
                     }
 
+                    // keep checking until we meet our request quota
+                    // or we get to our race timeout
                     if sent_to.len() >= remote_agent_count as usize
                         || start.elapsed().as_millis() as u64 > race_timeout_ms
                     {
                         break;
                     }
 
+                    // we haven't broken, but there are no new peers to send to
+                    // wait for a bit, maybe more will come online
                     tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+                }
+            }
+
+            // await responses
+            let mut out = Vec::new();
+            let mut result_fut = None;
+            loop {
+                // set up our future for waiting on results
+                if result_fut.is_none() {
+                    // if there are results already pending, pull them out
+                    while let Ok(result) = res_recv.try_recv() {
+                        out.push(result);
+                    }
+
+                    use tokio::stream::StreamExt;
+                    result_fut = Some(res_recv.next());
+                }
+
+                // calculate the time to wait based on our barriers
+                let elapsed = start.elapsed().as_millis() as u64;
+                let mut time_remaining = if elapsed > race_timeout_ms {
+                    timeout_ms - elapsed
+                } else {
+                    race_timeout_ms - elapsed
+                };
+                if time_remaining < 1 {
+                    time_remaining = 1;
+                }
+
+                // await either
+                //  -  (LEFT) - we need to check one of our timeouts
+                //  - (RIGHT) - we have received a response
+                match futures::future::select(
+                    tokio::time::delay_for(std::time::Duration::from_millis(time_remaining)),
+                    result_fut.take().unwrap(),
+                )
+                .await
+                {
+                    futures::future::Either::Left((_, r_fut)) => {
+                        result_fut = Some(r_fut);
+                    }
+                    futures::future::Either::Right((result, _)) => {
+                        if result.is_none() {
+                            break;
+                        }
+                        out.push(result.unwrap());
+                    }
+                }
+
+                // break out if we are beyond time
+                let elapsed = start.elapsed().as_millis() as u64;
+                if elapsed > timeout_ms
+                    || (elapsed > race_timeout_ms && out.len() >= remote_agent_count as usize)
+                {
+                    break;
                 }
             }
 
