@@ -152,12 +152,11 @@ impl<'env> InvokeZomeWorkspace<'env> {
 }
 
 impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
-    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-        self.source_chain.into_inner().flush_to_txn(&mut writer)?;
-        self.meta.flush_to_txn(&mut writer)?;
-        self.cache_cas.flush_to_txn(&mut writer)?;
-        self.cache_meta.flush_to_txn(&mut writer)?;
-        writer.commit()?;
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.into_inner().flush_to_txn(writer)?;
+        self.meta.flush_to_txn(writer)?;
+        self.cache_cas.flush_to_txn(writer)?;
+        self.cache_meta.flush_to_txn(writer)?;
         Ok(())
     }
 }

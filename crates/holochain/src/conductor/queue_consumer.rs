@@ -21,7 +21,15 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
+use derive_more::Constructor;
+use holochain_state::{
+    env::{EnvironmentRefRw, EnvironmentWrite, WriteManager},
+    error::DatabaseError,
+    prelude::Writer,
+};
 use tokio::sync::mpsc;
+
+mod dht_op_integration_consumer;
 
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
@@ -52,11 +60,25 @@ impl Waker {
     }
 }
 
+#[derive(Constructor)]
+struct OneshotWriter(EnvironmentWrite);
+
+impl OneshotWriter {
+    pub async fn with_writer<F>(self, f: F) -> Result<(), DatabaseError>
+    where
+        F: FnOnce(&mut Writer) -> () + Send,
+    {
+        let env_ref = self.0.guard().await;
+        env_ref.with_commit::<DatabaseError, (), _>(|w| Ok(f(w)))?;
+        Ok(())
+    }
+}
+
+/// The only error possible when attempting to wake: the channel is closed
 pub struct QueueWakerClosedError;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
 pub async fn spawn_queue_consumer_tasks() {
     let (tx_integration, rx_integration) = Waker::new();
-
 }

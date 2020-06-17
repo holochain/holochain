@@ -30,6 +30,7 @@ mod initialize_zomes_workflow;
 pub(crate) use call_zome_workflow::unsafe_invoke_zome_workspace;
 pub(crate) use call_zome_workflow::*;
 pub(crate) use genesis_workflow::*;
+use holochain_state::env::WriteManager;
 pub(crate) use initialize_zomes_workflow::*;
 
 pub use effects::*;
@@ -80,7 +81,7 @@ pub async fn run_workflow<'env, O: Send, Wf: Workflow<'env, Output = O> + 'env>(
 }
 
 /// Apply the WorkflowEffects to finalize the Workflow.
-/// 1. Persist DB changes via `Workspace::commit_txn`
+/// 1. Persist DB changes via `Workspace::flush_to_txn`
 /// 2. Call any Wasm callbacks
 /// 3. Emit any Signals
 /// 4. Trigger any subsequent Workflows
@@ -99,8 +100,7 @@ async fn finish<'env, Wf: Workflow<'env>>(
     // finish workspace
     {
         let env = arc.guard().await;
-        let writer = env.writer_unmanaged()?;
-        workspace.commit_txn(writer)?;
+        let writer = env.with_commit(|mut writer| workspace.flush_to_txn(&mut writer))?;
     }
 
     // finish callbacks

@@ -108,9 +108,8 @@ impl<'env> GenesisWorkspace<'env> {
 }
 
 impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
-    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn(&mut writer)?;
-        writer.commit()?;
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn(writer)?;
         Ok(())
     }
 }

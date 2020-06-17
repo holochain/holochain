@@ -27,8 +27,13 @@ pub trait Workspace<'env>: Send + Sized {
     // function -- this is also the case for the WorkflowTriggers
     // fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self>;
 
-    /// Flush accumulated changes to the database. This consumes a Writer.
-    fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
+    /// Flush accumulated changes to the writer without committing.
+    /// This consumes the Workspace.
+    ///
+    /// No method is provided to commit the writer as well, because Writers
+    /// should be managed such that write failures are properly handled, which
+    /// is outside the scope of the workspace.
+    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), WorkspaceError>;
 }
 
 #[cfg(test)]
@@ -59,10 +64,9 @@ pub mod tests {
     }
 
     impl<'env> Workspace<'env> for TestWorkspace<'env> {
-        fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-            self.one.flush_to_txn(&mut writer)?;
-            self.two.flush_to_txn(&mut writer)?;
-            writer.commit()?;
+        fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+            self.one.flush_to_txn(writer)?;
+            self.two.flush_to_txn(writer)?;
             Ok(())
         }
     }
@@ -84,7 +88,7 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true).unwrap();
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
             assert_eq!(workspace.two.get(&addr2)?, Some(true));
-            workspace.commit_txn(writer)?;
+            env.with_commit(|mut writer| workspace.flush_to_txn(&mut writer))?;
         }
 
         // Ensure that the data was persisted

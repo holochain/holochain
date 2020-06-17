@@ -67,12 +67,12 @@ where
 pub(crate) struct InitializeZomesWorkspace<'env>(pub(crate) InvokeZomeWorkspace<'env>);
 
 impl<'env> Workspace<'env> for InitializeZomesWorkspace<'env> {
-    fn commit_txn(self, mut writer: Writer) -> Result<(), WorkspaceError> {
-        self.0.source_chain.into_inner().flush_to_txn(&mut writer)?;
-        self.0.meta.flush_to_txn(&mut writer)?;
-        self.0.cache_cas.flush_to_txn(&mut writer)?;
-        self.0.cache_meta.flush_to_txn(&mut writer)?;
-        Ok(writer.commit()?)
+    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), WorkspaceError> {
+        self.0.source_chain.into_inner().flush_to_txn(writer)?;
+        self.0.meta.flush_to_txn(writer)?;
+        self.0.cache_cas.flush_to_txn(writer)?;
+        self.0.cache_meta.flush_to_txn(writer)?;
+        Ok(())
     }
 }
 
