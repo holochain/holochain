@@ -37,7 +37,6 @@ use tracing::*;
 
 #[allow(missing_docs)]
 pub mod error;
-pub mod queue_consumer;
 
 impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)

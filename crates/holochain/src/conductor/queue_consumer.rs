@@ -25,9 +25,12 @@ use tokio::sync::mpsc;
 
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
-struct QueueConsumerWaker(mpsc::Sender<()>);
+struct Waker(mpsc::Sender<()>);
 
-impl QueueConsumerWaker {
+/// The receiving side of a Waker channel
+type Listener = mpsc::Receiver<()>;
+
+impl Waker {
     /// Create a new channel for waking a consumer
     ///
     /// The channel buffer is set to 1 to ensure that the consumer does not
@@ -53,4 +56,7 @@ pub struct QueueWakerClosedError;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
-pub async fn spawn_queue_consumer_tasks() {}
+pub async fn spawn_queue_consumer_tasks() {
+    let (tx_integration, rx_integration) = Waker::new();
+
+}
