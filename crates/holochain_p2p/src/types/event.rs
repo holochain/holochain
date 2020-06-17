@@ -52,9 +52,9 @@ ghost_actor::ghost_chan! {
         fn get(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            entry_hash: holochain_types::composite_hash::AnyDhtHash,
+            request_hash: holochain_types::composite_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
+        ) -> SerializedBytes;
 
         /// A remote node is requesting link data from us.
         fn get_links(

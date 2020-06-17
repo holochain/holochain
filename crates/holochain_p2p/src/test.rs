@@ -2,26 +2,6 @@
 mod tests {
     use crate::*;
 
-    fn fake_dht_op() -> holochain_types::dht_op::DhtOp {
-        let a1: holo_hash::AgentPubKey = crate::holo_hash_core::AgentPubKey::new(
-            b"111111111111111111111111111111111111".to_vec(),
-        )
-        .into();
-        let d1: holo_hash::DnaHash =
-            crate::holo_hash_core::DnaHash::new(b"ssssssssssssssssssssssssssssssssssss".to_vec())
-                .into();
-        holochain_types::dht_op::DhtOp::StoreElement(
-            holochain_keystore::Signature(vec![0; 32]),
-            holochain_types::header::Header::Dna(holochain_types::header::Dna {
-                author: a1,
-                timestamp: holochain_types::Timestamp::now(),
-                header_seq: 0,
-                hash: d1,
-            }),
-            None,
-        )
-    }
-
     #[tokio::test(threaded_scheduler)]
     async fn test_call_remote_workflow() {
         let dna: holo_hash::DnaHash =
@@ -185,19 +165,14 @@ mod tests {
         )
         .into();
 
-        let dht_op_hash_1: holo_hash::DhtOpHash =
-            crate::holo_hash_core::DhtOpHash::new(b"444444444444444444444444444444444444".to_vec())
-                .into();
-        let dht_op_hash_2: holo_hash::DhtOpHash =
-            crate::holo_hash_core::DhtOpHash::new(b"555555555555555555555555555555555555".to_vec())
-                .into();
-
         let (mut p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
+        let test_1 = SerializedBytes::from(UnsafeBytes::from(b"resp-1".to_vec()));
+        let test_2 = SerializedBytes::from(UnsafeBytes::from(b"resp-2".to_vec()));
+
         let mut respond_queue = vec![
-            dht_op_hash_1.clone(),
-            dht_op_hash_2.clone(),
-            dht_op_hash_1.clone(),
+            test_1.clone(),
+            test_2.clone(),
         ];
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
@@ -205,13 +180,12 @@ mod tests {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     Get { respond, .. } => {
-                        let mut out = Vec::new();
-                        for _ in 0..2 {
-                            if let Some(h) = respond_queue.pop() {
-                                out.push((h, fake_dht_op()));
-                            }
-                        }
-                        let _ = respond(Ok(out));
+                        let resp = if let Some(h) = respond_queue.pop() {
+                            h
+                        } else {
+                            panic!("too many requests!")
+                        };
+                        let _ = respond(Ok(resp));
                     }
                     _ => panic!("unexpected event"),
                 }
@@ -236,7 +210,7 @@ mod tests {
         assert_eq!(2, res.len());
 
         for r in res {
-            assert!(r.0 == dht_op_hash_1 || r.0 == dht_op_hash_2);
+            assert!(r == test_1 || r == test_2);
         }
 
         p2p.ghost_actor_shutdown().await.unwrap();

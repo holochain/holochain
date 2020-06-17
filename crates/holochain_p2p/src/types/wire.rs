@@ -21,7 +21,6 @@ pub(crate) enum WireMessage {
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
         options: event::GetOptions,
     },
-    GetResponse(Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>),
 }
 
 impl WireMessage {
@@ -68,11 +67,5 @@ impl WireMessage {
             entry_hash,
             options,
         }
-    }
-
-    pub fn get_response(
-        res: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-    ) -> WireMessage {
-        Self::GetResponse(res)
     }
 }

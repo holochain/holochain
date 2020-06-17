@@ -97,9 +97,9 @@ ghost_actor::ghost_actor! {
         fn get(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            entry_hash: holochain_types::composite_hash::AnyDhtHash,
+            request_hash: holochain_types::composite_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
+        ) -> Vec<SerializedBytes>;
 
         /// Get links from the DHT.
         fn get_links(input: GetLinks) -> (); // TODO - proper return type

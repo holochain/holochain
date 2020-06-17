@@ -83,15 +83,15 @@ impl HolochainP2pCell {
     /// Get an entry from the DHT.
     pub async fn get(
         &mut self,
-        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        request_hash: holochain_types::composite_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>>
+    ) -> actor::HolochainP2pResult<Vec<SerializedBytes>>
     {
         self.sender
             .get(
                 (*self.dna_hash).clone(),
                 (*self.from_agent).clone(),
-                entry_hash,
+                request_hash,
                 options,
             )
             .await
