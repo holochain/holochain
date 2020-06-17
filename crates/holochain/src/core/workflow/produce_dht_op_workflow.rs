@@ -22,9 +22,6 @@ use tracing_futures::Instrument;
 
 pub mod dht_op;
 
-#[cfg(test)]
-mod dht_op_tests;
-
 pub(crate) struct ProduceDhtOpWorkflow {}
 
 impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {

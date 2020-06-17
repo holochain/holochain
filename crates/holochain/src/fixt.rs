@@ -567,40 +567,6 @@ fixturator!(
     constructor fn from_builder(DnaHash, HeaderBuilderCommon);
 );
 
-// macro_rules! header_fixturator {
-//     (
-//         $type:ident;
-//         constructor fn $fn:tt( $( $newtype:ty ),* );
-//     ) => {
-//         item!{
-//             fixturator!{
-//                 [<$type:camel Builder>];
-//                 constructor fn $fn($($newtype),*);
-//             }
-//             fixturator!(
-//                 [<$type:camel BuilderCombo>];
-//                 constructor fn new([<$type:camel Builder>], HeaderBuilderCommon);
-//             );
-//             pub struct [<$type:camel BuilderCombo>]([<$type:camel Builder>], HeaderBuilderCommon);
-//             impl [<$type:camel BuilderCombo>] {
-//                 fn new(l: [<$type:camel Builder>], h: HeaderBuilderCommon) -> Self {
-//                     Self(l, h)
-//                 }
-//             }
-
-//             impl From<[<$type:camel BuilderCombo>]> for $type {
-//                 fn from(l: [<$type:camel BuilderCombo>]) -> Self {
-//                     l.0.build(l.1)
-//                 }
-//             }
-
-//             fixturator!(
-//                 $type; from [<$type:camel BuilderCombo>];
-//             );
-//         }
-//     };
-// }
-
 fixturator!(
     LinkRemove;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);

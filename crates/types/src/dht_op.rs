@@ -5,12 +5,7 @@
 //! [DhtOp]: enum.DhtOp.html
 
 use crate::element::ChainElement;
-use crate::{
-    composite_hash::{AnyDhtHash, EntryHash},
-    header,
-    prelude::*,
-    Header,
-};
+use crate::{composite_hash::EntryHash, header, prelude::*, Header};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
 use holochain_zome_types::Entry;
@@ -112,24 +107,6 @@ pub struct RegisterReplacedBy {
 }
 
 impl DhtOp {
-    /// Returns the basis hash which determines which agents will receive this DhtOp
-    pub async fn dht_basis(&self) -> DhtOpResult<AnyDhtHash> {
-        Ok(match self {
-            Self::StoreElement(_, header, _) => {
-                let (_, hash): (_, HeaderHash) = header::HeaderHashed::with_data(header.clone())
-                    .await?
-                    .into();
-                hash.into()
-            }
-            Self::StoreEntry(_, header, _) => header.entry().clone().into(),
-            Self::RegisterAgentActivity(_, header) => header.author().clone().into(),
-            Self::RegisterReplacedBy(_, header, _) => header.replaces_address.clone().into(),
-            Self::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
-            Self::RegisterAddLink(_, header) => header.base_address.clone().into(),
-            Self::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
-        })
-    }
-
     fn as_unique_form(&self) -> UniqueForm<'_> {
         match self {
             Self::StoreElement(_, header, _) => UniqueForm::StoreElement(header),

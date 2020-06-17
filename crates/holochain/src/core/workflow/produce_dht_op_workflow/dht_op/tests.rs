@@ -1,13 +1,19 @@
-use crate::fixt::{
-    AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
-    EntryFixturator, EntryHashFixturator, EntryTypeFixturator, InitZomesCompleteFixturator,
-    LinkAddFixturator, LinkRemoveFixturator,
+use super::dht_basis;
+use crate::{
+    core::state::{cascade::Cascade, chain_cas::ChainCasBuf, metadata::MockMetadataBuf},
+    fixt::{
+        AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
+        EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
+        EntryUpdateFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
+        LinkRemoveFixturator,
+    },
 };
 use fixt::prelude::*;
-use holo_hash::{HeaderHash, HeaderHashFixturator};
+use holo_hash::{Hashed, HeaderHash, HeaderHashFixturator};
 use holochain_keystore::Signature;
+use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    composite_hash::EntryHash,
+    composite_hash::{AnyDhtHash, EntryHash},
     dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     fixt::{HeaderBuilderCommonFixturator, SignatureFixturator, UpdateBasisFixturator},
@@ -16,7 +22,7 @@ use holochain_types::{
         AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate,
         HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove, NewEntryHeader, UpdateBasis,
     },
-    observability, Entry, Header, HeaderHashed,
+    observability, Entry, EntryHashed, Header, HeaderHashed,
 };
 use pretty_assertions::assert_eq;
 use tracing::*;
@@ -235,5 +241,53 @@ async fn test_all_ops() {
         debug!(?element);
         let result = ops_from_element(&element).unwrap();
         assert_eq!(result, expected);
+    }
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn test_dht_basis() {
+    let env = test_cell_env();
+    let dbs = env.dbs().await;
+    let env_ref = env.guard().await;
+
+    {
+        // Create a header that points to an entry
+        let new_entry = fixt!(Entry);
+        let original_header = fixt!(EntryCreate);
+        let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
+
+        let original_header_hash = HeaderHashed::with_data(Header::EntryCreate(original_header))
+            .await
+            .unwrap();
+        let signed_header =
+            SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
+        let original_header_hash = original_header_hash.into_inner().1;
+
+        let entry_hashed = EntryHashed::with_pre_hashed(new_entry.clone(), fixt!(EntryHash));
+
+        // Setup a cascade
+        let reader = env_ref.reader().unwrap();
+        let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
+
+        // Put the header into the db
+        cas.put(signed_header, Some(entry_hashed)).unwrap();
+        let cache = ChainCasBuf::cache(&reader, &dbs).unwrap();
+        let metadata = MockMetadataBuf::new();
+        let metadata_cache = MockMetadataBuf::new();
+        let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+
+        // Create the update header with the same hash
+        let mut entry_update = fixt!(EntryUpdate);
+        entry_update.update_basis = UpdateBasis::Entry;
+        entry_update.replaces_address = original_header_hash;
+
+        // Create the op
+        let op = DhtOp::RegisterReplacedBy(fixt!(Signature), entry_update, Some(new_entry.into()));
+
+        // Get the basis
+        let result = dht_basis(&op, &cascade).await.unwrap();
+
+        // Check the hash matches
+        assert_eq!(expected_entry_hash, result);
     }
 }
