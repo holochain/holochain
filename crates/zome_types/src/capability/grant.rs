@@ -30,6 +30,7 @@ pub struct ZomeCallCapGrant {
 }
 
 impl ZomeCallCapGrant {
+    /// Constructor
     pub fn new(tag: String, access: CapAccess, functions: GrantedFunctions) -> Self {
         Self {
             tag,
@@ -119,6 +120,7 @@ impl CapAccess {
         }
     }
 
+    /// If this CapAccess has a secret, get it
     pub fn secret(&self) -> Option<&CapSecret> {
         match self {
             CapAccess::Transferable { secret } | CapAccess::Assigned { secret, .. } => Some(secret),
