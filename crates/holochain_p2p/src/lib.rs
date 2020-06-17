@@ -85,8 +85,7 @@ impl HolochainP2pCell {
         &mut self,
         request_hash: holochain_types::composite_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<SerializedBytes>>
-    {
+    ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
         self.sender
             .get(
                 (*self.dna_hash).clone(),

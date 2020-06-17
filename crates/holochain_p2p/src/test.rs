@@ -170,10 +170,7 @@ mod tests {
         let test_1 = SerializedBytes::from(UnsafeBytes::from(b"resp-1".to_vec()));
         let test_2 = SerializedBytes::from(UnsafeBytes::from(b"resp-2".to_vec()));
 
-        let mut respond_queue = vec![
-            test_1.clone(),
-            test_2.clone(),
-        ];
+        let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
             while let Some(evt) = evt.next().await {

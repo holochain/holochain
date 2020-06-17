@@ -211,8 +211,7 @@ impl HolochainP2pActor {
         to_agent: AgentPubKey,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
         options: event::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<u8>>
-    {
+    ) -> HolochainP2pHandlerResult<Vec<u8>> {
         let mut evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender
@@ -371,8 +370,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         from_agent: AgentPubKey,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<SerializedBytes>>
-    {
+    ) -> HolochainP2pHandlerResult<Vec<SerializedBytes>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
         let basis = entry_hash.to_kitsune();

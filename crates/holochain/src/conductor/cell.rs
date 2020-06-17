@@ -214,13 +214,13 @@ impl Cell {
             Get {
                 span,
                 respond,
-                entry_hash,
+                request_hash,
                 options,
                 ..
             } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_get(entry_hash, options)
+                    self.handle_get(request_hash, options)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
@@ -301,9 +301,9 @@ impl Cell {
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
-        _entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        _request_hash: holochain_types::composite_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+    ) -> CellResult<SerializedBytes> {
         unimplemented!()
     }
 
