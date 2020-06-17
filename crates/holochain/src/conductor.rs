@@ -30,7 +30,6 @@ pub mod interactive;
 pub mod interface;
 pub mod manager;
 pub mod paths;
-#[allow(missing_docs)]
 pub mod state;
 
 pub use cell::{error::CellError, Cell};
