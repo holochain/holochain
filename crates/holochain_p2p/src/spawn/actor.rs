@@ -140,11 +140,11 @@ impl HolochainP2pActor {
                         });
                     }
                     crate::wire::WireMessage::Get {
-                        entry_hash,
+                        request_hash,
                         options,
                     } => {
                         let res_fut =
-                            match self.handle_incoming_get(space, agent, entry_hash, options) {
+                            match self.handle_incoming_get(space, agent, request_hash, options) {
                                 Err(e) => {
                                     let _ = respond(Err(e.into()));
                                     return Ok(async move { Ok(()) }.boxed().into());
@@ -209,13 +209,13 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        request_hash: holochain_types::composite_hash::AnyDhtHash,
         options: event::GetOptions,
     ) -> HolochainP2pHandlerResult<Vec<u8>> {
         let mut evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender
-                .get(dna_hash, to_agent, entry_hash, options)
+                .get(dna_hash, to_agent, request_hash, options)
                 .await;
             res.map(|res| UnsafeBytes::from(res).into())
         }

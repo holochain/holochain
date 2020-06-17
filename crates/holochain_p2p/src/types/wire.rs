@@ -18,7 +18,7 @@ pub(crate) enum WireMessage {
         receipt: Vec<u8>,
     },
     Get {
-        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        request_hash: holochain_types::composite_hash::AnyDhtHash,
         options: event::GetOptions,
     },
 }
@@ -60,11 +60,11 @@ impl WireMessage {
     }
 
     pub fn get(
-        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        request_hash: holochain_types::composite_hash::AnyDhtHash,
         options: event::GetOptions,
     ) -> WireMessage {
         Self::Get {
-            entry_hash,
+            request_hash,
             options,
         }
     }
