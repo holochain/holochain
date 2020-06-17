@@ -8,7 +8,6 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
-use header::EntryVisibility;
 use holo_hash::{Hashed, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
@@ -24,9 +23,10 @@ use holochain_types::{
     composite_hash::{EntryHash, HeaderAddress},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
-    header, Header,
+    Header,
 };
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::entry_def::EntryVisibility;
 use tracing::*;
 
 /// A CasBuf with Entries for values
@@ -240,7 +240,7 @@ mod tests {
     use holochain_keystore::test_keystore::spawn_test_keystore;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
-    use holochain_types::header::EntryVisibility;
+    use holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {

@@ -1,3 +1,4 @@
+//! All the components you need to build a Holochain Conductor
 // #![deny(missing_docs)]
 
 pub mod conductor;

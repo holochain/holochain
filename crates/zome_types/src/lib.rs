@@ -11,8 +11,12 @@
 
 pub mod capability;
 pub mod commit;
+#[allow(missing_docs)]
+pub mod crdt;
 pub mod debug;
 pub mod entry;
+#[allow(missing_docs)]
+pub mod entry_def;
 pub mod globals;
 pub mod hash;
 #[allow(missing_docs)]

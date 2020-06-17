@@ -2,7 +2,7 @@
 name = "holochain_2020"
 version = "0.0.1"
 description = "Holochain, a framework for distributed applications"
-license = "GPL-3.0-only"
+license = "CAL-1.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -25,7 +25,7 @@ futures = "0.3.1"
 hcid = "0.0.6"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
-holochain_common = "0.0.43-alpha3"
+holochain_common = "0.0.49-alpha1"
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
@@ -39,7 +39,7 @@ holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
 legacy = { path = "../legacy", package = "holochain_2020_legacy" }
-mockall = "0.6.0"
+mockall = "0.7.0"
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
@@ -72,6 +72,7 @@ maplit = "1.0.2"
 matches = "0.1.8"
 serial_test = "0.4.0"
 test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common" }
+unwrap_to = "0.1.0"
 
 [lib]
 name = "holochain_2020"

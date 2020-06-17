@@ -1,5 +1,7 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -48,6 +50,7 @@ use holo_hash_core::HoloHashCoreHash;
 use holochain_types::dna::DnaError;
 use holochain_types::dna::DnaFile;
 use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
@@ -258,7 +261,7 @@ impl RibosomeT for WasmRibosome {
         let host_context = HostContext {
             zome_name: zome_name.clone(),
             allow_side_effects: invocation.allow_side_effects(),
-            workspace: workspace,
+            workspace,
         };
         let module_timeout = crate::start_hard_timeout!();
         let module = self.module(host_context.clone())?;
@@ -341,6 +344,14 @@ impl RibosomeT for WasmRibosome {
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult> {
         do_callback!(self, workspace, invocation, InitCallbackResult)
+    }
+
+    fn run_entry_defs(
+        &self,
+        workspace: UnsafeInvokeZomeWorkspace,
+        invocation: EntryDefsInvocation,
+    ) -> RibosomeResult<EntryDefsResult> {
+        do_callback!(self, workspace, invocation, EntryDefsCallbackResult)
     }
 
     fn run_migrate_agent(
