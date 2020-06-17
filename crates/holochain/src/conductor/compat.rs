@@ -1,7 +1,7 @@
 use super::{
     config::{AdminInterfaceConfig, ConductorConfig, DpkiConfig, InterfaceDriver},
     error::ConductorError,
-    state::InterfaceConfig,
+    state::AppInterfaceConfig,
     ConductorBuilder, ConductorHandle,
 };
 use holo_hash::*;
@@ -105,7 +105,7 @@ pub async fn load_conductor_from_legacy_config(
     }
 
     for i in app_interfaces {
-        let InterfaceConfig {
+        let AppInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
             cells: _,
         } = i;
@@ -150,12 +150,14 @@ fn extract_admin_interfaces(
         .collect()
 }
 
-fn extract_app_interfaces(legacy_interfaces: Vec<legacy::InterfaceConfig>) -> Vec<InterfaceConfig> {
+fn extract_app_interfaces(
+    legacy_interfaces: Vec<legacy::InterfaceConfig>,
+) -> Vec<AppInterfaceConfig> {
     legacy_interfaces
         .into_iter()
         .filter(|c| !c.admin)
         .filter_map(|c: legacy::InterfaceConfig| {
-            convert_interface_driver(c.driver).map(|driver| InterfaceConfig {
+            convert_interface_driver(c.driver).map(|driver| AppInterfaceConfig {
                 driver,
                 // FIXME: cells not hooked up for now since we don't use signals yet
                 cells: Vec::new(),

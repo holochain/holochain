@@ -1,3 +1,6 @@
+//! Structs which allow the Conductor's state to be persisted across
+//! startups and shutdowns
+
 use crate::conductor::interface::InterfaceDriver;
 
 use holochain_types::{
@@ -23,18 +26,15 @@ pub struct ConductorState {
     pub active_apps: HashMap<AppId, Vec<InstalledCell>>,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
-    pub interfaces: HashMap<InterfaceId, InterfaceConfig>,
+    pub app_interfaces: HashMap<AppInterfaceNick, AppInterfaceConfig>,
 }
 
-pub type InterfaceId = String;
+/// A friendly name used to refer to an App Interface.
+// TODO: is this needed?
+pub type AppInterfaceNick = String;
 
 impl ConductorState {
-    pub fn check_consistency(&self) -> Result<(), DnaError> {
-        // FIXME: A huge amount of legacy code for checking the consistency of Dna was ripped out here
-        // let's make sure we get that back in once we land the Dna and Zome structure.
-        Ok(())
-    }
-
+    /// Retrieve info about an installed App by its AppId
     pub fn get_app_info(&self, app_id: &AppId) -> Option<InstalledApp> {
         self.active_apps
             .get(app_id)
@@ -46,8 +46,8 @@ impl ConductorState {
     }
 
     /// Returns the interface configuration with the given ID if present
-    pub fn interface_by_id(&self, id: &str) -> Option<InterfaceConfig> {
-        self.interfaces.get(id).cloned()
+    pub fn interface_by_id(&self, id: &str) -> Option<AppInterfaceConfig> {
+        self.app_interfaces.get(id).cloned()
     }
 }
 
@@ -62,8 +62,12 @@ impl ConductorState {
 ///
 /// The cells (referenced by ID) that are to be made available via that interface should be listed.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct InterfaceConfig {
+pub struct AppInterfaceConfig {
+    /// The list of CellIds which this app interface applies to
+    // FIXME: [ B-01607 ] currently not hooked up, doesn't make sense until
+    // Signals are implemented
     pub cells: Vec<CellId>,
+    /// The driver for the interface, e.g. Websocket
     pub driver: InterfaceDriver,
 }
 

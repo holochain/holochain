@@ -412,7 +412,7 @@ where
                         if !errors.is_empty() {
                             for cell in success {
                                 // Error needs to capture which app failed
-                                cell.cleanup().await.map_err(|e| CreateAppError::Failed {
+                                cell.destroy().await.map_err(|e| CreateAppError::Failed {
                                     app_id: app_id.clone(),
                                     errors: vec![e],
                                 })?;

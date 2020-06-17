@@ -1,3 +1,9 @@
+//! A Cell is an "instance" of Holochain DNA.
+//!
+//! It combines an AgentPubKey with a Dna to create a SourceChain, upon which
+//! ChainElements can be added. A constructed Cell is guaranteed to have a valid
+//! SourceChain which has already undergone Genesis.
+
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -29,6 +35,7 @@ use std::{
 };
 use tracing::*;
 
+#[allow(missing_docs)]
 pub mod error;
 
 impl Hash for Cell {
@@ -52,6 +59,9 @@ impl PartialEq for Cell {
 /// Any work it does is through running a workflow, passing references to
 /// the resources needed to complete that workflow.
 ///
+/// A Cell is guaranteed to contain a Source Chain which has undergone
+/// Genesis.
+///
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [CellConductorApi] or an [AppInterfaceApi])
@@ -66,6 +76,9 @@ where
 }
 
 impl Cell {
+    /// Constructor for a Cell. The SourceChain will be created, and genesis
+    /// will be run if necessary. A Cell will not be created if the SourceChain
+    /// is not ready to be used.
     pub async fn create<P: AsRef<Path>>(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -102,7 +115,9 @@ impl Cell {
         }
     }
 
-    /// Must be run before creating a cell
+    /// Performs the Genesis workflow the Cell, ensuring that its initial
+    /// elements are committed. This is a prerequisite for any other interaction
+    /// with the SourceChain
     pub async fn genesis<P: AsRef<Path>>(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -158,6 +173,7 @@ impl Cell {
         &self.id.agent_pubkey()
     }
 
+    /// Accessor
     pub fn id(&self) -> &CellId {
         &self.id
     }
@@ -337,7 +353,7 @@ impl Cell {
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult> {
         // Check if init has run if not run it
-        self.check_or_run_init().await?;
+        self.check_or_run_zome_init().await?;
 
         let arc = self.state_env();
         let env = arc.guard().await;
@@ -353,7 +369,8 @@ impl Cell {
             .map_err(Box::new)?)
     }
 
-    async fn check_or_run_init(&self) -> CellResult<()> {
+    /// Check if each Zome's init callback has been run, and if not, run it.
+    async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // If not run it
         let state_env = self.state_env.clone();
         let id = self.id.clone();
@@ -394,7 +411,9 @@ impl Cell {
         Ok(())
     }
 
-    pub async fn cleanup(self) -> CellResult<()> {
+    /// Delete all data associated with this Cell by deleting the associated
+    /// LMDB environment. Completely reverses Cell creation.
+    pub async fn destroy(self) -> CellResult<()> {
         let path = self.state_env.path().clone();
         // Remove db from global map
         // Delete directory
@@ -405,6 +424,7 @@ impl Cell {
         Ok(())
     }
 
+    /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()).await {
@@ -413,6 +433,7 @@ impl Cell {
         }
     }
 
+    /// Accessor for the LMDB environment backing this Cell
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn state_env(&self) -> &EnvironmentWrite {
         &self.state_env
