@@ -4,7 +4,7 @@ use header::UpdateBasis;
 use holo_hash::HeaderHash;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
-    dht_op::{DhtOp, DhtOpLight, RegisterReplacedByLight},
+    dht_op::{DhtOp, DhtOpHashes, DhtOpLight},
     header,
 };
 
@@ -13,49 +13,61 @@ pub mod error;
 #[cfg(test)]
 mod tests;
 
-/// Convert a [DhtOp] to a [DhtOpLight]
+/// Convert a [DhtOp] to a [DhtOpHashes]
 pub async fn dht_op_into_light(op: DhtOp, cascade: Cascade<'_>) -> DhtOpConvertResult<DhtOpLight> {
+    let basis = dht_basis(&op, &cascade).await?;
     match op {
         DhtOp::StoreElement(s, h, _) => {
             let e = h.entry_data().map(|(e, _)| e.clone());
             let (_, h) = header::HeaderHashed::with_data(h).await?.into();
-            Ok(DhtOpLight::StoreElement(s, h, e))
+            Ok(DhtOpLight {
+                basis,
+                op: DhtOpHashes::StoreElement(s, h, e),
+            })
         }
         DhtOp::StoreEntry(s, h, _) => {
             let e = h.entry().clone();
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight::StoreEntry(s, h, e))
+            Ok(DhtOpLight {
+                basis,
+                op: DhtOpHashes::StoreEntry(s, h, e),
+            })
         }
         DhtOp::RegisterAgentActivity(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h).await?.into();
-            Ok(DhtOpLight::RegisterAgentActivity(s, h))
+            Ok(DhtOpLight {
+                basis,
+                op: DhtOpHashes::RegisterAgentActivity(s, h),
+            })
         }
         DhtOp::RegisterReplacedBy(s, h, _) => {
             let e = h.entry_hash.clone();
-            let old_entry = match h.update_basis {
-                UpdateBasis::Entry => Some(get_header(&h.replaces_address, &cascade).await?),
-                _ => None,
-            };
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            let op = RegisterReplacedByLight {
-                signature: s,
-                entry_update: h,
-                new_entry: e,
-                old_entry,
-            };
-            Ok(DhtOpLight::RegisterReplacedBy(op))
+            Ok(DhtOpLight {
+                basis,
+                op: DhtOpHashes::RegisterReplacedBy(s, h, e),
+            })
         }
         DhtOp::RegisterDeletedBy(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight::RegisterAgentActivity(s, h))
+            Ok(DhtOpLight {
+                basis,
+                op: DhtOpHashes::RegisterAgentActivity(s, h),
+            })
         }
         DhtOp::RegisterAddLink(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight::RegisterAgentActivity(s, h))
+            Ok(DhtOpLight {
+                basis,
+                op: DhtOpHashes::RegisterAgentActivity(s, h),
+            })
         }
         DhtOp::RegisterRemoveLink(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight::RegisterAgentActivity(s, h))
+            Ok(DhtOpLight {
+                basis,
+                op: DhtOpHashes::RegisterAgentActivity(s, h),
+            })
         }
     }
 }

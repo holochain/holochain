@@ -153,7 +153,7 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{ops_from_element, DhtOp, DhtOpHashed, RegisterReplacedByLight},
+        dht_op::{ops_from_element, DhtOp, DhtOpHashed, DhtOpHashes},
         header::{builder, EntryType, NewEntryHeader},
         observability,
         test_utils::fake_app_entry_type,
@@ -204,14 +204,14 @@ mod tests {
     #[instrument(skip(light, cas))]
     async fn light_to_op<'env>(light: DhtOpLight, cas: &ChainCasBuf<'env>) -> DhtOp {
         trace!(?light);
-        match light {
-            DhtOpLight::StoreElement(s, h, _) => {
+        match light.op {
+            DhtOpHashes::StoreElement(s, h, _) => {
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = e.header().clone();
                 let e = e.entry().as_option().map(|e| Box::new(e.clone()));
                 DhtOp::StoreElement(s, h, e)
             }
-            DhtOpLight::StoreEntry(s, h, _) => {
+            DhtOpHashes::StoreEntry(s, h, _) => {
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = match e.header().clone() {
                     Header::EntryCreate(c) => NewEntryHeader::Create(c),
@@ -221,33 +221,28 @@ mod tests {
                 let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
                 DhtOp::StoreEntry(s, h, e)
             }
-            DhtOpLight::RegisterAgentActivity(s, h) => {
+            DhtOpHashes::RegisterAgentActivity(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = e.header().clone();
                 DhtOp::RegisterAgentActivity(s, h)
             }
-            DhtOpLight::RegisterReplacedBy(op) => {
-                let RegisterReplacedByLight {
-                    signature: s,
-                    entry_update: h,
-                    ..
-                } = op;
+            DhtOpHashes::RegisterReplacedBy(s, h, _) => {
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::EntryUpdate).clone();
                 let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
                 DhtOp::RegisterReplacedBy(s, h, Some(e))
             }
-            DhtOpLight::RegisterDeletedBy(s, h) => {
+            DhtOpHashes::RegisterDeletedBy(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::EntryDelete).clone();
                 DhtOp::RegisterDeletedBy(s, h)
             }
-            DhtOpLight::RegisterAddLink(s, h) => {
+            DhtOpHashes::RegisterAddLink(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::LinkAdd).clone();
                 DhtOp::RegisterAddLink(s, h)
             }
-            DhtOpLight::RegisterRemoveLink(s, h) => {
+            DhtOpHashes::RegisterRemoveLink(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::LinkRemove).clone();
                 DhtOp::RegisterRemoveLink(s, h)

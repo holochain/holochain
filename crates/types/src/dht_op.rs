@@ -5,7 +5,12 @@
 //! [DhtOp]: enum.DhtOp.html
 
 use crate::element::ChainElement;
-use crate::{composite_hash::EntryHash, header, prelude::*, Header};
+use crate::{
+    composite_hash::{AnyDhtHash, EntryHash},
+    header,
+    prelude::*,
+    Header,
+};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
 use holochain_zome_types::Entry;
@@ -71,39 +76,27 @@ pub enum DhtOp {
 }
 
 /// A type for storing in databases that don't need the actual
-/// data. Everything is a hash of the type.
+/// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DhtOpLight {
+pub enum DhtOpHashes {
     StoreElement(Signature, HeaderHash, Option<EntryHash>),
     StoreEntry(Signature, HeaderHash, EntryHash),
     RegisterAgentActivity(Signature, HeaderHash),
-    RegisterReplacedBy(RegisterReplacedByLight),
+    RegisterReplacedBy(Signature, HeaderHash, EntryHash),
     RegisterDeletedBy(Signature, HeaderHash),
     RegisterAddLink(Signature, HeaderHash),
     RegisterRemoveLink(Signature, HeaderHash),
 }
 
-#[allow(missing_docs)]
+/// A type for storing in databases that only need the hashes.
+/// Contains the basis
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RegisterReplacedByLight {
-    pub signature: Signature,
-    pub entry_update: HeaderHash,
-    /// The new entry being created
-    pub new_entry: EntryHash,
-    /// The entry being replaced if this update refers to the [Entry]
-    pub old_entry: Option<EntryHash>,
-}
-
-#[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq)]
-pub struct RegisterReplacedBy {
-    pub signature: Signature,
-    pub entry_update: header::EntryUpdate,
-    /// The new entry being created
-    pub new_entry: Option<Box<Entry>>,
-    /// The entry being replaced if this update refers to the [Entry]
-    pub old_entry: Option<Box<Entry>>,
+pub struct DhtOpLight {
+    /// Where to send this op
+    pub basis: AnyDhtHash,
+    /// Signatures and hashes of the op
+    pub op: DhtOpHashes,
 }
 
 impl DhtOp {
