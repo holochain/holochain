@@ -8,8 +8,11 @@ use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::{
     state::{
-        cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBuf, source_chain::SourceChain,
-        workspace::WorkspaceResult,
+        cascade::Cascade,
+        chain_cas::ChainCasBuf,
+        metadata::MetadataBuf,
+        source_chain::SourceChain,
+        workspace::{WorkspaceError, WorkspaceResult},
     },
     sys_validate_element,
 };
@@ -154,11 +157,20 @@ impl<'env> InvokeZomeWorkspace<'env> {
 
 impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
     fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-        self.source_chain.into_inner().flush_to_txn(&mut writer)?;
-        self.meta.flush_to_txn(&mut writer)?;
-        self.cache_cas.flush_to_txn(&mut writer)?;
-        self.cache_meta.flush_to_txn(&mut writer)?;
+        self.flush_to_txn(&mut writer)?;
         writer.commit()?;
+        Ok(())
+    }
+}
+
+impl<'env> BufferedStore<'env> for InvokeZomeWorkspace<'env> {
+    type Error = WorkspaceError;
+
+    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+        self.source_chain.flush_to_txn(writer)?;
+        self.meta.flush_to_txn(writer)?;
+        self.cache_cas.flush_to_txn(writer)?;
+        self.cache_meta.flush_to_txn(writer)?;
         Ok(())
     }
 }

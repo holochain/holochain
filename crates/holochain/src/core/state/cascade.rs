@@ -43,7 +43,11 @@ use super::{
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
 use holochain_state::error::DatabaseResult;
-use holochain_types::{composite_hash::EntryHash, EntryHashed};
+use holochain_types::{
+    composite_hash::{EntryHash, HeaderAddress},
+    element::SignedHeaderHashed,
+    EntryHashed,
+};
 use tracing::*;
 
 #[cfg(test)]
@@ -92,6 +96,28 @@ where
             primary_meta,
             cache,
             cache_meta,
+        }
+    }
+
+    /// Get a header without checking it's metadata
+    pub async fn dht_get_header_raw(
+        &self,
+        header_address: &HeaderAddress,
+    ) -> DatabaseResult<Option<SignedHeaderHashed>> {
+        match self.primary.get_header(header_address).await? {
+            None => self.cache.get_header(header_address).await,
+            r => Ok(r),
+        }
+    }
+
+    /// Get an entry without checking it's metadata
+    pub async fn dht_get_entry_raw(
+        &self,
+        entry_hash: &EntryHash,
+    ) -> DatabaseResult<Option<EntryHashed>> {
+        match self.primary.get_entry(entry_hash).await? {
+            None => self.cache.get_entry(entry_hash).await,
+            r => Ok(r),
         }
     }
 

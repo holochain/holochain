@@ -83,10 +83,32 @@ pub enum DhtOpLight {
     StoreElement(Signature, HeaderHash, Option<EntryHash>),
     StoreEntry(Signature, HeaderHash, EntryHash),
     RegisterAgentActivity(Signature, HeaderHash),
-    RegisterReplacedBy(Signature, HeaderHash, EntryHash),
+    RegisterReplacedBy(RegisterReplacedByLight),
     RegisterDeletedBy(Signature, HeaderHash),
     RegisterAddLink(Signature, HeaderHash),
     RegisterRemoveLink(Signature, HeaderHash),
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RegisterReplacedByLight {
+    pub signature: Signature,
+    pub entry_update: HeaderHash,
+    /// The new entry being created
+    pub new_entry: EntryHash,
+    /// The entry being replaced if this update refers to the [Entry]
+    pub old_entry: Option<EntryHash>,
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq)]
+pub struct RegisterReplacedBy {
+    pub signature: Signature,
+    pub entry_update: header::EntryUpdate,
+    /// The new entry being created
+    pub new_entry: Option<Box<Entry>>,
+    /// The entry being replaced if this update refers to the [Entry]
+    pub old_entry: Option<Box<Entry>>,
 }
 
 impl DhtOp {
@@ -132,45 +154,6 @@ enum UniqueForm<'a> {
     RegisterDeletedBy(&'a header::EntryDelete),
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
-}
-
-impl DhtOpLight {
-    /// Convert a [DhtOp] to a [DhtOpLight]
-    pub async fn from_op(op: DhtOp) -> Result<Self, SerializedBytesError> {
-        match op {
-            DhtOp::StoreElement(s, h, _) => {
-                let e = h.entry_data().map(|(e, _)| e.clone());
-                let (_, h) = header::HeaderHashed::with_data(h).await?.into();
-                Ok(DhtOpLight::StoreElement(s, h, e))
-            }
-            DhtOp::StoreEntry(s, h, _) => {
-                let e = h.entry().clone();
-                let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-                Ok(DhtOpLight::StoreEntry(s, h, e))
-            }
-            DhtOp::RegisterAgentActivity(s, h) => {
-                let (_, h) = header::HeaderHashed::with_data(h).await?.into();
-                Ok(DhtOpLight::RegisterAgentActivity(s, h))
-            }
-            DhtOp::RegisterReplacedBy(s, h, _) => {
-                let e = h.entry_hash.clone();
-                let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-                Ok(DhtOpLight::RegisterReplacedBy(s, h, e))
-            }
-            DhtOp::RegisterDeletedBy(s, h) => {
-                let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-                Ok(DhtOpLight::RegisterAgentActivity(s, h))
-            }
-            DhtOp::RegisterAddLink(s, h) => {
-                let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-                Ok(DhtOpLight::RegisterAgentActivity(s, h))
-            }
-            DhtOp::RegisterRemoveLink(s, h) => {
-                let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-                Ok(DhtOpLight::RegisterAgentActivity(s, h))
-            }
-        }
-    }
 }
 
 /// Turn a chain element into a DhtOp

@@ -1,8 +1,6 @@
-use super::{error::WorkflowResult, Workflow, WorkflowEffects};
-use crate::core::state::{
-    source_chain::SourceChain,
-    workspace::{Workspace, WorkspaceResult},
-};
+use super::{error::WorkflowResult, InvokeZomeWorkspace, Workflow, WorkflowEffects};
+use crate::core::state::workspace::{Workspace, WorkspaceError, WorkspaceResult};
+use dht_op::dht_op_into_light;
 use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
@@ -22,6 +20,8 @@ use std::convert::TryFrom;
 use tracing::*;
 use tracing_futures::Instrument;
 
+pub mod dht_op;
+
 #[cfg(test)]
 mod dht_op_tests;
 
@@ -38,13 +38,18 @@ impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
         async {
             debug!("Starting dht op workflow");
-            let all_ops = workspace.source_chain.get_incomplete_dht_ops().await?;
+            let invoke_zome_workspace = &mut workspace.invoke_zome_workspace;
+            let all_ops = invoke_zome_workspace
+                .source_chain
+                .get_incomplete_dht_ops()
+                .await?;
             for (index, ops) in all_ops {
                 for op in ops {
                     let (op, hash) = DhtOpHashed::with_data(op).await.into();
                     debug!(?hash);
+                    let cascade = invoke_zome_workspace.cascade();
                     // put the op in (using the "light hash form")
-                    let op = DhtOpLight::from_op(op).await?;
+                    let op = dht_op_into_light(op, cascade).await?;
                     workspace.integration_queue.put(
                         (Timestamp::now(), hash.clone()).try_into()?,
                         (ValidationStatus::Valid, op),
@@ -52,7 +57,7 @@ impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {
                     workspace.authored_dht_ops.put(hash, 0)?;
                 }
                 // Mark the dht op as complete
-                workspace.source_chain.complete_dht_op(index)?;
+                invoke_zome_workspace.source_chain.complete_dht_op(index)?;
             }
             // TODO: B-01567: Trigger IntegrateDhtOps workflow
             let fx = WorkflowEffects {
@@ -99,7 +104,7 @@ impl TryFrom<IntegrationQueueKey> for (Timestamp, DhtOpHash) {
 type IntegrationQueueValue = (ValidationStatus, DhtOpLight);
 
 pub(crate) struct ProduceDhtOpWorkspace<'env> {
-    pub source_chain: SourceChain<'env>,
+    pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
     pub authored_dht_ops: KvBuf<'env, DhtOpHash, u32, Reader<'env>>,
     pub integration_queue: KvBuf<'env, IntegrationQueueKey, IntegrationQueueValue, Reader<'env>>,
 }
@@ -111,7 +116,7 @@ impl<'env> ProduceDhtOpWorkspace<'env> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         let integration_queue = db.get_db(&*INTEGRATION_QUEUE)?;
         Ok(Self {
-            source_chain: SourceChain::new(reader, db)?,
+            invoke_zome_workspace: InvokeZomeWorkspace::new(reader, db)?,
             authored_dht_ops: KvBuf::new(reader, authored_dht_ops)?,
             integration_queue: KvBuf::new(reader, integration_queue)?,
         })
@@ -120,10 +125,19 @@ impl<'env> ProduceDhtOpWorkspace<'env> {
 
 impl<'env> Workspace<'env> for ProduceDhtOpWorkspace<'env> {
     fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-        self.source_chain.into_inner().flush_to_txn(&mut writer)?;
-        self.authored_dht_ops.flush_to_txn(&mut writer)?;
-        self.integration_queue.flush_to_txn(&mut writer)?;
+        self.flush_to_txn(&mut writer)?;
         Ok(writer.commit()?)
+    }
+}
+
+impl<'env> BufferedStore<'env> for ProduceDhtOpWorkspace<'env> {
+    type Error = WorkspaceError;
+
+    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+        self.invoke_zome_workspace.flush_to_txn(writer)?;
+        self.authored_dht_ops.flush_to_txn(writer)?;
+        self.integration_queue.flush_to_txn(writer)?;
+        Ok(())
     }
 }
 
@@ -131,7 +145,7 @@ impl<'env> Workspace<'env> for ProduceDhtOpWorkspace<'env> {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use crate::core::state::chain_cas::ChainCasBuf;
+    use crate::core::state::{chain_cas::ChainCasBuf, source_chain::SourceChain};
 
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
@@ -142,7 +156,7 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{ops_from_element, DhtOp, DhtOpHashed},
+        dht_op::{ops_from_element, DhtOp, DhtOpHashed, RegisterReplacedByLight},
         header::{builder, EntryType, NewEntryHeader},
         observability,
         test_utils::fake_app_entry_type,
@@ -215,7 +229,12 @@ mod tests {
                 let h = e.header().clone();
                 DhtOp::RegisterAgentActivity(s, h)
             }
-            DhtOpLight::RegisterReplacedBy(s, h, _) => {
+            DhtOpLight::RegisterReplacedBy(op) => {
+                let RegisterReplacedByLight {
+                    signature: s,
+                    entry_update: h,
+                    ..
+                } = op;
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::EntryUpdate).clone();
                 let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
@@ -250,19 +269,21 @@ mod tests {
         let expected = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
-            let mut workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let mut source_chain = ProduceDhtOpWorkspace::new(&reader, &dbs)
+                .unwrap()
+                .invoke_zome_workspace
+                .source_chain;
 
             // Add genesis so we can use the source chain
-            fake_genesis(&mut workspace.source_chain).await.unwrap();
-            let headers: Vec<_> = workspace.source_chain.iter_back().collect().unwrap();
+            fake_genesis(&mut source_chain).await.unwrap();
+            let headers: Vec<_> = source_chain.iter_back().collect().unwrap();
             // The ops will be created from start to end of the chain
             let headers: Vec<_> = headers.into_iter().rev().collect();
             let mut all_ops = Vec::new();
             // Collect the ops from genesis
             for h in headers {
                 let ops = ops_from_element(
-                    &workspace
-                        .source_chain
+                    &source_chain
                         .get_element(h.as_hash())
                         .await
                         .unwrap()
@@ -275,17 +296,17 @@ mod tests {
             // Add some entires and collect the expected ops
             for _ in 0..10 {
                 all_ops.push(
-                    td.put_fix_entry(&mut workspace.source_chain, EntryVisibility::Public)
+                    td.put_fix_entry(&mut source_chain, EntryVisibility::Public)
                         .await,
                 );
                 all_ops.push(
-                    td.put_fix_entry(&mut workspace.source_chain, EntryVisibility::Private)
+                    td.put_fix_entry(&mut source_chain, EntryVisibility::Private)
                         .await,
                 );
             }
 
             env_ref
-                .with_commit(|writer| workspace.source_chain.flush_to_txn(writer))
+                .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
             // Turn all the ops into hashes
@@ -357,7 +378,8 @@ mod tests {
             // Convert the results to light ops (hashes only)
             let mut r = Vec::with_capacity(results.len());
             for light_op in results {
-                let op = light_to_op(light_op, workspace.source_chain.cas()).await;
+                let op =
+                    light_to_op(light_op, workspace.invoke_zome_workspace.source_chain.cas()).await;
                 let (_, hash) = DhtOpHashed::with_data(op).await.into();
                 r.push(hash);
             }
