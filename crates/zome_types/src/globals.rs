@@ -22,7 +22,8 @@ pub struct ZomeGlobals {
 }
 
 /*
-// TODO: I think it should be more like this (@maackle)
+// FYI, after thinking about it, I think it should be more like this,
+// but feel free to delete this any time (@maackle)
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct ZomeGlobals {
     /// The name of this DNA
