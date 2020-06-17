@@ -1,7 +1,7 @@
 use crate::fixt::{
     AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
-    EntryFixturator, EntryHashFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
-    LinkRemoveFixturator,
+    EntryFixturator, EntryHashFixturator, EntryTypeFixturator, InitZomesCompleteFixturator,
+    LinkAddFixturator, LinkRemoveFixturator,
 };
 use fixt::prelude::*;
 use holo_hash::{HeaderHash, HeaderHashFixturator};
@@ -10,30 +10,25 @@ use holochain_types::{
     composite_hash::EntryHash,
     dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
-    fixt::{
-        AppEntryTypeFixturator, HeaderBuilderCommonFixturator, SignatureFixturator,
-        UpdatesToFixturator,
-    },
+    fixt::{HeaderBuilderCommonFixturator, SignatureFixturator, UpdateBasisFixturator},
     header::{
         builder::{self, HeaderBuilder},
         AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate,
-        HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove, NewEntryHeader, UpdatesTo,
+        HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove, NewEntryHeader, UpdateBasis,
     },
     observability, Entry, Header, HeaderHashed,
 };
-use holochain_zome_types::entry_def::EntryVisibility;
 use pretty_assertions::assert_eq;
 use tracing::*;
 
 struct ChainElementTest {
-    pub_entry_type: EntryType,
-    priv_entry_type: EntryType,
+    entry_type: EntryType,
     entry_hash: EntryHash,
     commons: Box<dyn Iterator<Item = HeaderBuilderCommon>>,
     header_hash: HeaderHash,
     sig: Signature,
     entry: Entry,
-    updates_to: UpdatesTo,
+    update_basis: UpdateBasis,
     link_add: LinkAdd,
     link_remove: LinkRemove,
     dna: Dna,
@@ -45,20 +40,13 @@ struct ChainElementTest {
 
 impl ChainElementTest {
     fn new() -> Self {
-        let pub_entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
-            .map(|a| EntryType::App(a))
-            .next()
-            .unwrap();
-        let priv_entry_type = AppEntryTypeFixturator::new(EntryVisibility::Private)
-            .map(|a| EntryType::App(a))
-            .next()
-            .unwrap();
+        let entry_type = fixt!(EntryType);
         let entry_hash = fixt!(EntryHash);
         let commons = HeaderBuilderCommonFixturator::new(Unpredictable);
         let header_hash = fixt!(HeaderHash);
         let sig = fixt!(Signature);
         let entry = fixt!(Entry);
-        let updates_to = fixt!(UpdatesTo);
+        let update_basis = fixt!(UpdateBasis);
         let link_add = fixt!(LinkAdd);
         let link_remove = fixt!(LinkRemove);
         let dna = fixt!(Dna);
@@ -67,14 +55,13 @@ impl ChainElementTest {
         let agent_validation_pkg = fixt!(AgentValidationPkg);
         let init_zomes_complete = fixt!(InitZomesComplete);
         Self {
-            pub_entry_type,
-            priv_entry_type,
+            entry_type,
             entry_hash,
             commons: Box::new(commons),
             header_hash,
             sig,
             entry,
-            updates_to,
+            update_basis,
             link_add,
             link_remove,
             dna,
@@ -85,9 +72,9 @@ impl ChainElementTest {
         }
     }
 
-    fn entry_create(&mut self, entry_type: EntryType) -> (EntryCreate, ChainElement) {
+    fn create_element(&mut self) -> (EntryCreate, ChainElement) {
         let entry_create = builder::EntryCreate {
-            entry_type,
+            entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
         }
         .build(self.commons.next().unwrap());
@@ -95,10 +82,10 @@ impl ChainElementTest {
         (entry_create, element)
     }
 
-    fn entry_update(&mut self, entry_type: EntryType) -> (EntryUpdate, ChainElement) {
+    fn update_element(&mut self) -> (EntryUpdate, ChainElement) {
         let entry_update = builder::EntryUpdate {
-            updates_to: self.updates_to.clone(),
-            entry_type,
+            update_basis: self.update_basis.clone(),
+            entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
             replaces_address: self.header_hash.clone().into(),
         }
@@ -107,8 +94,8 @@ impl ChainElementTest {
         (entry_update, element)
     }
 
-    fn pub_entry_create(mut self) -> (ChainElement, Vec<DhtOp>) {
-        let (entry_create, element) = self.entry_create(self.pub_entry_type.clone());
+    fn entry_create(mut self) -> (ChainElement, Vec<DhtOp>) {
+        let (entry_create, element) = self.create_element();
         let header: Header = entry_create.clone().into();
 
         let ops = vec![
@@ -127,31 +114,8 @@ impl ChainElementTest {
         (element, ops)
     }
 
-    fn priv_entry_create(mut self) -> (ChainElement, Vec<DhtOp>) {
-        let (entry_create, element) = self.entry_create(self.priv_entry_type.clone());
-        let header: Header = entry_create.clone().into();
-
-        let ops = vec![
-            DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
-            DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-        ];
-        (element, ops)
-    }
-
-    fn priv_entry_update(mut self) -> (ChainElement, Vec<DhtOp>) {
-        let (entry_update, element) = self.entry_update(self.priv_entry_type.clone());
-        let header: Header = entry_update.clone().into();
-
-        let ops = vec![
-            DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
-            DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-            DhtOp::RegisterReplacedBy(self.sig.clone(), entry_update, None),
-        ];
-        (element, ops)
-    }
-
-    fn pub_entry_update(mut self) -> (ChainElement, Vec<DhtOp>) {
-        let (entry_update, element) = self.entry_update(self.pub_entry_type.clone());
+    fn entry_update(mut self) -> (ChainElement, Vec<DhtOp>) {
+        let (entry_update, element) = self.update_element();
         let header: Header = entry_update.clone().into();
 
         let ops = vec![
@@ -242,48 +206,34 @@ impl ChainElementTest {
     }
 }
 
-// TODO: This should be unit test on [DhtOp] but can't be due to
-// the dependencies
 #[tokio::test(threaded_scheduler)]
-async fn private_entries() {
-    let builder = ChainElementTest::new();
-    let (private_element, expected) = builder.priv_entry_create();
-    let result = ops_from_element(&private_element).unwrap();
-    assert_eq!(result, expected);
-    let builder = ChainElementTest::new();
-    let (private_element, expected) = builder.priv_entry_update();
-    let result = ops_from_element(&private_element).unwrap();
-    assert_eq!(result, expected);
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn public_entries() {
+async fn test_all_ops() {
     observability::test_run().ok();
     let builder = ChainElementTest::new();
-    let (public_element, expected) = builder.pub_entry_create();
-    let result = ops_from_element(&public_element).unwrap();
+    let (element, expected) = builder.entry_create();
+    let result = ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
-    let (public_element, expected) = builder.pub_entry_update();
-    let result = ops_from_element(&public_element).unwrap();
+    let (element, expected) = builder.entry_update();
+    let result = ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
-    let (public_element, expected) = builder.entry_delete();
-    let result = ops_from_element(&public_element).unwrap();
+    let (element, expected) = builder.entry_delete();
+    let result = ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
-    let (public_element, expected) = builder.link_add();
-    let result = ops_from_element(&public_element).unwrap();
+    let (element, expected) = builder.link_add();
+    let result = ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
-    let (public_element, expected) = builder.link_remove();
-    let result = ops_from_element(&public_element).unwrap();
+    let (element, expected) = builder.link_remove();
+    let result = ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
-    let public_elements = builder.others();
-    for (public_element, expected) in public_elements {
-        debug!(?public_element);
-        let result = ops_from_element(&public_element).unwrap();
+    let elements = builder.others();
+    for (element, expected) in elements {
+        debug!(?element);
+        let result = ops_from_element(&element).unwrap();
         assert_eq!(result, expected);
     }
 }

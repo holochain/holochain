@@ -85,10 +85,13 @@ impl<'env> SourceChainBuf<'env> {
         self.cas.get_header(k).await
     }
 
-    pub async fn get_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
+    pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
         // FIXME: This collect shouldn't need to happen but the iterator to the db is not Send
-        let ops_headers = self.sequence.get_dht_ops()?.collect::<Vec<_>>();
+        let ops_headers = self
+            .sequence
+            .get_items_with_incomplete_dht_ops()?
+            .collect::<Vec<_>>();
         for (i, header) in ops_headers {
             let op = ops_from_element(
                 &self

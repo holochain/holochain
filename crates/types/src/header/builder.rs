@@ -7,7 +7,7 @@ use crate::{
 };
 use derive_more::Constructor;
 use header::HeaderInner;
-use header::{UpdatesTo, ZomeId};
+use header::{UpdateBasis, ZomeId};
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
 
@@ -74,6 +74,24 @@ macro_rules! builder_variant {
                 n.build(h)
             }
         }
+        impl header::$name {
+            pub fn from_builder(common: HeaderBuilderCommon, $($field : $t),*) -> Self {
+                let HeaderBuilderCommon {
+                    author,
+                    timestamp,
+                    header_seq,
+                    prev_header,
+                } = common;
+
+                header::$name {
+                    author,
+                    timestamp,
+                    header_seq,
+                    prev_header,
+                    $($field),*
+                }
+            }
+        }
     }
 }
 
@@ -105,7 +123,7 @@ builder_variant!(EntryCreate {
 });
 
 builder_variant!(EntryUpdate {
-    updates_to: UpdatesTo,
+    update_basis: UpdateBasis,
     replaces_address: HeaderHash,
 
     entry_type: EntryType,

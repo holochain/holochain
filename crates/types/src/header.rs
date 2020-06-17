@@ -190,9 +190,9 @@ impl From<NewEntryHeader> for Header {
 // TODO: Check this can never be written to > 255
 pub type ZomeId = u8;
 
-/// Specifies whether an [EntryUpdate] referes to an [Entry] or a [Header]
+/// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub enum UpdatesTo {
+pub enum UpdateBasis {
     Header,
     Entry,
 }
@@ -289,7 +289,7 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub updates_to: UpdatesTo,
+    pub update_basis: UpdateBasis,
     pub replaces_address: HeaderHash,
 
     pub entry_type: EntryType,
@@ -352,5 +352,17 @@ impl AppEntryType {
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
+    }
+}
+
+impl Dna {
+    /// Dna cannot implement the trait as it doesn't have a previous header
+    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
+        Self {
+            author: builder.author,
+            timestamp: builder.timestamp,
+            header_seq: builder.header_seq,
+            hash,
+        }
     }
 }

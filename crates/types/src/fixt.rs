@@ -3,7 +3,7 @@
 // FIXME (aka fixtme, haha, get it?) move other fixturators from this crate into this module
 
 use crate::dna::zome::Zome;
-use crate::header::{builder::HeaderBuilderCommon, AppEntryType, UpdatesTo};
+use crate::header::{builder::HeaderBuilderCommon, AppEntryType, UpdateBasis};
 use crate::Timestamp;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
@@ -64,6 +64,6 @@ fixturator!(
 newtype_fixturator!(Signature<Bytes>);
 
 fixturator!(
-    UpdatesTo;
+    UpdateBasis;
     unit variants [ Entry Header ] empty Entry;
 );

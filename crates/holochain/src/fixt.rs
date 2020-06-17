@@ -10,7 +10,7 @@ use holo_hash::DnaHashFixturator;
 use holo_hash::EntryContentHashFixturator;
 use holo_hash::HeaderHashFixturator;
 use holo_hash::HoloHashExt;
-use holo_hash::{DnaHash, WasmHash};
+use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::composite_hash::AnyDhtHash;
@@ -24,17 +24,7 @@ use holochain_types::dna::Zomes;
 use holochain_types::fixt::AppEntryTypeFixturator;
 use holochain_types::fixt::HeaderBuilderCommonFixturator;
 use holochain_types::fixt::TimestampFixturator;
-use holochain_types::fixt::UpdatesToFixturator;
-use holochain_types::header::builder::AgentValidationPkg as AgentValidationPkgBuilder;
-use holochain_types::header::builder::ChainClose as ChainCloseBuilder;
-use holochain_types::header::builder::ChainOpen as ChainOpenBuilder;
-use holochain_types::header::builder::EntryCreate as EntryCreateBuilder;
-use holochain_types::header::builder::EntryDelete as EntryDeleteBuilder;
-use holochain_types::header::builder::EntryUpdate as EntryUpdateBuilder;
-use holochain_types::header::builder::HeaderBuilder;
-use holochain_types::header::builder::InitZomesComplete as InitZomesCompleteBuilder;
-use holochain_types::header::builder::LinkAdd as LinkAddBuilder;
-use holochain_types::header::builder::LinkRemove as LinkRemoveBuilder;
+use holochain_types::fixt::UpdateBasisFixturator;
 use holochain_types::header::AgentValidationPkg;
 use holochain_types::header::ChainClose;
 use holochain_types::header::ChainOpen;
@@ -44,7 +34,7 @@ use holochain_types::header::EntryType;
 use holochain_types::header::EntryUpdate;
 use holochain_types::header::InitZomesComplete;
 use holochain_types::header::LinkAdd;
-use holochain_types::header::{Dna, HeaderBuilderCommon, LinkRemove, ZomeId};
+use holochain_types::header::{Dna, LinkRemove, ZomeId};
 use holochain_types::link::Tag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
@@ -544,7 +534,7 @@ pub struct KnownLinkRemove {
 impl Iterator for LinkAddFixturator<KnownLinkAdd> {
     type Item = LinkAdd;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkAddFixturator::new(Unpredictable).next().unwrap();
+        let mut f = fixt!(LinkAdd);
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
@@ -556,7 +546,7 @@ impl Iterator for LinkAddFixturator<KnownLinkAdd> {
 impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
     type Item = LinkRemove;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkRemoveFixturator::new(Unpredictable).next().unwrap();
+        let mut f = fixt!(LinkRemove);
         f.link_add_address = self.0.curve.link_add_address.clone();
         Some(f)
     }
@@ -565,7 +555,7 @@ impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
 impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
     type Item = LinkMetaVal;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkMetaValFixturator::new(Unpredictable).next().unwrap();
+        let mut f = fixt!(LinkMetaVal);
         f.target = self.0.curve.0.clone();
         f.tag = self.0.curve.1.clone();
         Some(f)
@@ -573,74 +563,52 @@ impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
 }
 
 fixturator!(
-    DnaBuilderCombo;
-    constructor fn new(DnaHash, HeaderBuilderCommon);
+    Dna;
+    constructor fn from_builder(DnaHash, HeaderBuilderCommon);
 );
-pub struct DnaBuilderCombo(DnaHash, HeaderBuilderCommon);
 
-impl DnaBuilderCombo {
-    fn new(hash: DnaHash, h: HeaderBuilderCommon) -> Self {
-        Self(hash, h)
-    }
-}
+// macro_rules! header_fixturator {
+//     (
+//         $type:ident;
+//         constructor fn $fn:tt( $( $newtype:ty ),* );
+//     ) => {
+//         item!{
+//             fixturator!{
+//                 [<$type:camel Builder>];
+//                 constructor fn $fn($($newtype),*);
+//             }
+//             fixturator!(
+//                 [<$type:camel BuilderCombo>];
+//                 constructor fn new([<$type:camel Builder>], HeaderBuilderCommon);
+//             );
+//             pub struct [<$type:camel BuilderCombo>]([<$type:camel Builder>], HeaderBuilderCommon);
+//             impl [<$type:camel BuilderCombo>] {
+//                 fn new(l: [<$type:camel Builder>], h: HeaderBuilderCommon) -> Self {
+//                     Self(l, h)
+//                 }
+//             }
 
-impl From<DnaBuilderCombo> for Dna {
-    fn from(d: DnaBuilderCombo) -> Self {
-        Self {
-            author: d.1.author,
-            timestamp: d.1.timestamp,
-            header_seq: d.1.header_seq,
-            hash: d.0,
-        }
-    }
-}
+//             impl From<[<$type:camel BuilderCombo>]> for $type {
+//                 fn from(l: [<$type:camel BuilderCombo>]) -> Self {
+//                     l.0.build(l.1)
+//                 }
+//             }
+
+//             fixturator!(
+//                 $type; from [<$type:camel BuilderCombo>];
+//             );
+//         }
+//     };
+// }
 
 fixturator!(
-    Dna; from DnaBuilderCombo;
-);
-
-macro_rules! header_fixturator {
-    (
-        $type:ident;
-        constructor fn $fn:tt( $( $newtype:ty ),* );
-    ) => {
-        item!{
-            fixturator!{
-                [<$type:camel Builder>];
-                constructor fn $fn($($newtype),*);
-            }
-            fixturator!(
-                [<$type:camel BuilderCombo>];
-                constructor fn new([<$type:camel Builder>], HeaderBuilderCommon);
-            );
-            pub struct [<$type:camel BuilderCombo>]([<$type:camel Builder>], HeaderBuilderCommon);
-            impl [<$type:camel BuilderCombo>] {
-                fn new(l: [<$type:camel Builder>], h: HeaderBuilderCommon) -> Self {
-                    Self(l, h)
-                }
-            }
-
-            impl From<[<$type:camel BuilderCombo>]> for $type {
-                fn from(l: [<$type:camel BuilderCombo>]) -> Self {
-                    l.0.build(l.1)
-                }
-            }
-
-            fixturator!(
-                $type; from [<$type:camel BuilderCombo>];
-            );
-        }
-    };
-}
-
-header_fixturator!(
     LinkRemove;
-    constructor fn new(HeaderHash, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
-header_fixturator!(
+fixturator!(
     LinkAdd;
-    constructor fn new(EntryHash, EntryHash, u8, Tag);
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, Tag);
 );
 
 type MaybeSerializedBytes = Option<SerializedBytes>;
@@ -677,29 +645,29 @@ fixturator! {
     };
 }
 
-header_fixturator!(
+fixturator!(
     AgentValidationPkg;
-    constructor fn new(MaybeSerializedBytes);
+    constructor fn from_builder(HeaderBuilderCommon, MaybeSerializedBytes);
 );
 
-header_fixturator!(
+fixturator!(
     InitZomesComplete;
-    constructor fn new();
+    constructor fn from_builder(HeaderBuilderCommon);
 );
 
-header_fixturator!(
+fixturator!(
     ChainOpen;
-    constructor fn new(DnaHash);
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
-header_fixturator!(
+fixturator!(
     ChainClose;
-    constructor fn new(DnaHash);
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
-header_fixturator!(
+fixturator!(
     EntryCreate;
-    constructor fn new(EntryType, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
 );
 
 fixturator!(
@@ -711,12 +679,12 @@ fixturator!(
     ];
 );
 
-header_fixturator!(
+fixturator!(
     EntryUpdate;
-    constructor fn new(UpdatesTo, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, UpdateBasis, HeaderHash, EntryType, EntryHash);
 );
 
-header_fixturator!(
+fixturator!(
     EntryDelete;
-    constructor fn new(HeaderHash);
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash);
 );

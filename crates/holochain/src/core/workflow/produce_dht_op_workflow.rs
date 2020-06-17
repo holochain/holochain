@@ -37,8 +37,8 @@ impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {
         mut workspace: Self::Workspace,
     ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
         async {
-            debug!("Starting dhtop workflow");
-            let all_ops = workspace.source_chain.get_dht_ops().await?;
+            debug!("Starting dht op workflow");
+            let all_ops = workspace.source_chain.get_incomplete_dht_ops().await?;
             for (index, ops) in all_ops {
                 for op in ops {
                     let (op, hash) = DhtOpHashed::with_data(op).await.into();
@@ -51,7 +51,7 @@ impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {
                     )?;
                     workspace.authored_dht_ops.put(hash, 0)?;
                 }
-                // Mark the dhtop as complete
+                // Mark the dht op as complete
                 workspace.source_chain.complete_dht_op(index)?;
             }
             // TODO: B-01567: Trigger IntegrateDhtOps workflow
@@ -245,15 +245,20 @@ mod tests {
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
+
+        // Setup the database and expected data
         let expected = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
             let mut workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
 
+            // Add genesis so we can use the source chain
             fake_genesis(&mut workspace.source_chain).await.unwrap();
             let headers: Vec<_> = workspace.source_chain.iter_back().collect().unwrap();
+            // The ops will be created from start to end of the chain
             let headers: Vec<_> = headers.into_iter().rev().collect();
             let mut all_ops = Vec::new();
+            // Collect the ops from genesis
             for h in headers {
                 let ops = ops_from_element(
                     &workspace
@@ -267,6 +272,7 @@ mod tests {
                 all_ops.push(ops);
             }
 
+            // Add some entires and collect the expected ops
             for _ in 0..10 {
                 all_ops.push(
                     td.put_fix_entry(&mut workspace.source_chain, EntryVisibility::Public)
@@ -282,6 +288,7 @@ mod tests {
                 .with_commit(|writer| workspace.source_chain.flush_to_txn(writer))
                 .unwrap();
 
+            // Turn all the ops into hashes
             let mut expected = Vec::new();
             for ops in all_ops {
                 for op in ops {
@@ -292,88 +299,106 @@ mod tests {
             expected
         };
 
-        let reader = env_ref.reader().unwrap();
-        let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-        let workflow = ProduceDhtOpWorkflow {};
-        let (_, effects) = workflow.workflow(workspace).await.unwrap();
-        let writer = env_ref.writer_unmanaged().unwrap();
-        effects.workspace.commit_txn(writer).unwrap();
-
-        let reader = env_ref.reader().unwrap();
-        let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-        let mut times = Vec::new();
-        let results = workspace
-            .integration_queue
-            .iter()
-            .unwrap()
-            .map(|(k, v)| {
-                let s = debug_span!("times");
-                let _g = s.enter();
-                let s = SerializedBytes::from(UnsafeBytes::from(k.to_vec()));
-                let t = T::try_from(s).unwrap();
-                debug!(time = ?t.0);
-                debug!(hash = ?t.1);
-                times.push(t.0);
-                assert_matches!(v.0, ValidationStatus::Valid);
-                Ok(v.1)
-            })
-            .collect::<Vec<_>>()
-            .unwrap();
-
-        times.into_iter().fold(None, |last, time| {
-            if let Some(lt) = last {
-                // Check they are ordered by time
-                assert!(lt <= time);
-            }
-            Some(time)
-        });
-
-        let mut authored_results = workspace
-            .authored_dht_ops
-            .iter()
-            .unwrap()
-            .map(|(k, v)| {
-                assert_eq!(v, 0);
-                Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
-            })
-            .collect::<Vec<_>>()
-            .unwrap();
-
-        let mut r = Vec::with_capacity(results.len());
-        for light_op in results {
-            let op = light_to_op(light_op, workspace.source_chain.cas()).await;
-            let (_, hash) = DhtOpHashed::with_data(op).await.into();
-            r.push(hash);
+        // Run the workflow and commit it
+        {
+            let reader = env_ref.reader().unwrap();
+            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let workflow = ProduceDhtOpWorkflow {};
+            let (_, effects) = workflow.workflow(workspace).await.unwrap();
+            let writer = env_ref.writer_unmanaged().unwrap();
+            effects.workspace.commit_txn(writer).unwrap();
         }
-        let r_h: HashSet<_> = r.iter().cloned().collect();
-        let e_h: HashSet<_> = expected.iter().cloned().collect();
-        let diff: HashSet<_> = r_h.difference(&e_h).collect();
-        assert_eq!(diff, HashSet::new());
 
-        // Check we got all the hashes
-        assert_eq!(r, expected);
+        // Pull out the results and check them
+        let last_count = {
+            let reader = env_ref.reader().unwrap();
+            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let mut times = Vec::new();
+            let results = workspace
+                .integration_queue
+                .iter()
+                .unwrap()
+                .map(|(k, v)| {
+                    let s = debug_span!("times");
+                    let _g = s.enter();
+                    let s = SerializedBytes::from(UnsafeBytes::from(k.to_vec()));
+                    let t = T::try_from(s).unwrap();
+                    debug!(time = ?t.0);
+                    debug!(hash = ?t.1);
+                    times.push(t.0);
+                    // Check the status is Valid
+                    assert_matches!(v.0, ValidationStatus::Valid);
+                    Ok(v.1)
+                })
+                .collect::<Vec<_>>()
+                .unwrap();
 
-        // authored are in a different order so need to sort
-        r.sort();
-        authored_results.sort();
-        assert_eq!(r, authored_results);
+            // Check that the integration queue is ordered by time
+            times.into_iter().fold(None, |last, time| {
+                if let Some(lt) = last {
+                    // Check they are ordered by time
+                    assert!(lt <= time);
+                }
+                Some(time)
+            });
+
+            // Get the authored ops
+            let mut authored_results = workspace
+                .authored_dht_ops
+                .iter()
+                .unwrap()
+                .map(|(k, v)| {
+                    assert_eq!(v, 0);
+                    Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
+                })
+                .collect::<Vec<_>>()
+                .unwrap();
+
+            // Convert the results to light ops (hashes only)
+            let mut r = Vec::with_capacity(results.len());
+            for light_op in results {
+                let op = light_to_op(light_op, workspace.source_chain.cas()).await;
+                let (_, hash) = DhtOpHashed::with_data(op).await.into();
+                r.push(hash);
+            }
+            let r_h: HashSet<_> = r.iter().cloned().collect();
+            let e_h: HashSet<_> = expected.iter().cloned().collect();
+            let diff: HashSet<_> = r_h.difference(&e_h).collect();
+
+            // Check for differences (redundant but useful for debugging)
+            assert_eq!(diff, HashSet::new());
+
+            // Check we got all the hashes
+            assert_eq!(r, expected);
+
+            // authored are in a different order so need to sort
+            r.sort();
+            authored_results.sort();
+            // Check authored are all there
+            assert_eq!(r, authored_results);
+            r.len()
+        };
 
         // Call the workflow again now the queue should be the same length as last time
         // because no new ops should hav been added
-        let last_count = r.len();
-        let reader = env_ref.reader().unwrap();
-        let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-        let workflow = ProduceDhtOpWorkflow {};
-        let (_, effects) = workflow.workflow(workspace).await.unwrap();
-        let writer = env_ref.writer_unmanaged().unwrap();
-        effects.workspace.commit_txn(writer).unwrap();
+        {
+            let reader = env_ref.reader().unwrap();
+            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let workflow = ProduceDhtOpWorkflow {};
+            let (_, effects) = workflow.workflow(workspace).await.unwrap();
+            let writer = env_ref.writer_unmanaged().unwrap();
+            effects.workspace.commit_txn(writer).unwrap();
+        }
 
-        let reader = env_ref.reader().unwrap();
-        let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-        let count = workspace.integration_queue.iter().unwrap().count().unwrap();
-        let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
+        // Check the lengths are unchanged
+        {
+            let reader = env_ref.reader().unwrap();
+            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let count = workspace.integration_queue.iter().unwrap().count().unwrap();
+            let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
 
-        assert_eq!(last_count, count);
-        assert_eq!(last_count, authored_count);
+            assert_eq!(last_count, count);
+            assert_eq!(last_count, authored_count);
+        }
     }
 }

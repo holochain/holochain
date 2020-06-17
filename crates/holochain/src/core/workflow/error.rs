@@ -36,7 +36,7 @@ pub enum WorkflowError {
     #[error("Capability token missing")]
     CapabilityMissing,
 
-    #[error("A hash failed: {0}")]
+    #[error(transparent)]
     FailedToHash(#[from] SerializedBytesError),
 }
 

@@ -2,7 +2,7 @@
 
 // FIXME: remove this when entire lib is documented
 // (in which case the deny will go at the lib level)
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 // pub mod dht;
 pub mod net;
