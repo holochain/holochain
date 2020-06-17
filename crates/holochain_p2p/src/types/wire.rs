@@ -10,7 +10,7 @@ pub(crate) enum WireMessage {
     Publish {
         from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
-        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     },
     ValidationReceipt {
@@ -18,7 +18,7 @@ pub(crate) enum WireMessage {
         receipt: Vec<u8>,
     },
     Get {
-        request_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
         options: event::GetOptions,
     },
 }
@@ -42,13 +42,13 @@ impl WireMessage {
     pub fn publish(
         from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
-        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> WireMessage {
         Self::Publish {
             from_agent,
             request_validation_receipt,
-            entry_hash,
+            dht_hash,
             ops,
         }
     }
@@ -60,12 +60,9 @@ impl WireMessage {
     }
 
     pub fn get(
-        request_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
         options: event::GetOptions,
     ) -> WireMessage {
-        Self::Get {
-            request_hash,
-            options,
-        }
+        Self::Get { dht_hash, options }
     }
 }
