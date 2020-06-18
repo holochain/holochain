@@ -174,6 +174,14 @@ impl NewEntryHeader {
             | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
         }
     }
+
+    /// Get the visibility of this header
+    pub fn visibility(&self) -> &EntryVisibility {
+        match self {
+            NewEntryHeader::Create(EntryCreate { entry_type, .. })
+            | NewEntryHeader::Update(EntryUpdate { entry_type, .. }) => entry_type.visibility(),
+        }
+    }
 }
 
 impl From<NewEntryHeader> for Header {

@@ -1,6 +1,6 @@
 use super::dht_basis;
 use crate::{
-    core::state::{cascade::Cascade, chain_cas::ChainCasBuf, metadata::MockMetadataBuf},
+    core::state::cascade::{test_dbs_and_mocks, Cascade},
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
         EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
@@ -267,13 +267,10 @@ async fn test_dht_basis() {
 
         // Setup a cascade
         let reader = env_ref.reader().unwrap();
-        let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
+        let (mut cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
 
         // Put the header into the db
         cas.put(signed_header, Some(entry_hashed)).unwrap();
-        let cache = ChainCasBuf::cache(&reader, &dbs).unwrap();
-        let metadata = MockMetadataBuf::new();
-        let metadata_cache = MockMetadataBuf::new();
         let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
 
         // Create the update header with the same hash

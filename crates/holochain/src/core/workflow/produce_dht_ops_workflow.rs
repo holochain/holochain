@@ -1,21 +1,17 @@
 use super::{error::WorkflowResult, InvokeZomeWorkspace};
-use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-    state::workspace::{Workspace, WorkspaceResult},
+use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
+use crate::core::state::{
+    dht_op_integration::{AuthoredDhtOps, IntegrationQueue, IntegrationValue},
+    workspace::{Workspace, WorkspaceResult},
 };
-use dht_op::{dht_op_to_light_basis, DhtOpLight};
-use holo_hash::DhtOpHash;
+use dht_op::dht_op_to_light_basis;
 use holochain_serialized_bytes::prelude::*;
-use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_state::{
     buffer::KvBuf,
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
-use holochain_types::{
-    composite_hash::AnyDhtHash, dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp,
-};
-use std::convert::TryFrom;
+use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp};
 use tracing::*;
 
 pub mod dht_op;
@@ -57,7 +53,7 @@ async fn produce_dht_ops_workflow_inner(
             debug!(?hash);
             let cascade = invoke_zome_workspace.cascade();
             // put the op in (using the "light hash form")
-            let (op, basis) = dht_op_to_light_basis(op, cascade).await?;
+            let (op, basis) = dht_op_to_light_basis(op, &cascade).await?;
             workspace.integration_queue.put(
                 (Timestamp::now(), hash.clone()).try_into()?,
                 IntegrationValue {
@@ -75,47 +71,10 @@ async fn produce_dht_ops_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-#[derive(Hash, Eq, PartialEq)]
-pub struct IntegrationQueueKey(SerializedBytes);
-#[derive(serde::Deserialize, serde::Serialize, SerializedBytes)]
-struct T(Timestamp, DhtOpHash);
-
-impl AsRef<[u8]> for IntegrationQueueKey {
-    fn as_ref(&self) -> &[u8] {
-        self.0.bytes().as_ref()
-    }
-}
-
-impl TryFrom<(Timestamp, DhtOpHash)> for IntegrationQueueKey {
-    type Error = SerializedBytesError;
-    fn try_from(t: (Timestamp, DhtOpHash)) -> Result<Self, Self::Error> {
-        Ok(Self(SerializedBytes::try_from(T(t.0, t.1))?))
-    }
-}
-
-impl TryFrom<IntegrationQueueKey> for (Timestamp, DhtOpHash) {
-    type Error = SerializedBytesError;
-    fn try_from(key: IntegrationQueueKey) -> Result<Self, Self::Error> {
-        let t = T::try_from(key.0)?;
-        Ok((t.0, t.1))
-    }
-}
-
-/// A type for storing in databases that only need the hashes.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct IntegrationValue {
-    /// Thi ops validation status
-    pub validation_status: ValidationStatus,
-    /// Where to send this op
-    pub basis: AnyDhtHash,
-    /// Signatures and hashes of the op
-    pub op: DhtOpLight,
-}
-
 pub struct ProduceDhtOpsWorkspace<'env> {
     pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
-    pub authored_dht_ops: KvBuf<'env, DhtOpHash, u32, Reader<'env>>,
-    pub integration_queue: KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>,
+    pub authored_dht_ops: AuthoredDhtOps<'env>,
+    pub integration_queue: IntegrationQueue<'env>,
 }
 
 impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
@@ -141,27 +100,27 @@ impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use crate::core::state::{chain_cas::ChainCasBuf, source_chain::SourceChain};
+    use crate::core::state::{dht_op_integration::IntegrationQueueKey, source_chain::SourceChain};
 
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use holo_hash::{Hashable, Hashed, HoloHashBaseExt};
+    use holo_hash::{DhtOpHash, Hashable, Hashed, HoloHashBaseExt};
 
+    use dht_op::light_to_op;
     use holochain_state::{
         env::{ReadManager, WriteManager},
         test_utils::test_cell_env,
     };
     use holochain_types::{
         dht_op::{ops_from_element, DhtOp, DhtOpHashed},
-        header::{builder, EntryType, NewEntryHeader},
+        header::{builder, EntryType},
         observability,
         test_utils::fake_app_entry_type,
-        Entry, EntryHashed, Header,
+        Entry, EntryHashed,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use matches::assert_matches;
     use std::collections::HashSet;
-    use unwrap_to::unwrap_to;
 
     struct TestData {
         app_entry: Box<dyn Iterator<Item = Entry>>,
@@ -197,55 +156,6 @@ mod tests {
                 .unwrap()
                 .unwrap();
             ops_from_element(&element).unwrap()
-        }
-    }
-
-    #[instrument(skip(light, cas))]
-    async fn light_to_op<'env>(light: DhtOpLight, cas: &ChainCasBuf<'env>) -> DhtOp {
-        trace!(?light);
-        match light {
-            DhtOpLight::StoreElement(s, h, _) => {
-                let e = cas.get_element(&h).await.unwrap().unwrap();
-                let h = e.header().clone();
-                let e = e.entry().as_option().map(|e| Box::new(e.clone()));
-                DhtOp::StoreElement(s, h, e)
-            }
-            DhtOpLight::StoreEntry(s, h, _) => {
-                let e = cas.get_element(&h).await.unwrap().unwrap();
-                let h = match e.header().clone() {
-                    Header::EntryCreate(c) => NewEntryHeader::Create(c),
-                    Header::EntryUpdate(c) => NewEntryHeader::Update(c),
-                    _ => panic!("Must be a header that creates an entry"),
-                };
-                let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
-                DhtOp::StoreEntry(s, h, e)
-            }
-            DhtOpLight::RegisterAgentActivity(s, h) => {
-                let e = cas.get_header(&h).await.unwrap().unwrap();
-                let h = e.header().clone();
-                DhtOp::RegisterAgentActivity(s, h)
-            }
-            DhtOpLight::RegisterReplacedBy(s, h, _) => {
-                let e = cas.get_element(&h).await.unwrap().unwrap();
-                let h = unwrap_to!(e.header() => Header::EntryUpdate).clone();
-                let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
-                DhtOp::RegisterReplacedBy(s, h, Some(e))
-            }
-            DhtOpLight::RegisterDeletedBy(s, h) => {
-                let e = cas.get_header(&h).await.unwrap().unwrap();
-                let h = unwrap_to!(e.header() => Header::EntryDelete).clone();
-                DhtOp::RegisterDeletedBy(s, h)
-            }
-            DhtOpLight::RegisterAddLink(s, h) => {
-                let e = cas.get_header(&h).await.unwrap().unwrap();
-                let h = unwrap_to!(e.header() => Header::LinkAdd).clone();
-                DhtOp::RegisterAddLink(s, h)
-            }
-            DhtOpLight::RegisterRemoveLink(s, h) => {
-                let e = cas.get_header(&h).await.unwrap().unwrap();
-                let h = unwrap_to!(e.header() => Header::LinkRemove).clone();
-                DhtOp::RegisterRemoveLink(s, h)
-            }
         }
     }
 
@@ -336,8 +246,10 @@ mod tests {
                 .map(|(k, v)| {
                     let s = debug_span!("times");
                     let _g = s.enter();
-                    let s = SerializedBytes::from(UnsafeBytes::from(k.to_vec()));
-                    let t = T::try_from(s).unwrap();
+                    let key = IntegrationQueueKey::from(SerializedBytes::from(UnsafeBytes::from(
+                        k.to_vec(),
+                    )));
+                    let t: (Timestamp, DhtOpHash) = key.try_into().unwrap();
                     debug!(time = ?t.0);
                     debug!(hash = ?t.1);
                     times.push(t.0);
@@ -372,8 +284,9 @@ mod tests {
             // Convert the results to light ops (hashes only)
             let mut r = Vec::with_capacity(results.len());
             for light_op in results {
-                let op =
-                    light_to_op(light_op, workspace.invoke_zome_workspace.source_chain.cas()).await;
+                let op = light_to_op(light_op, workspace.invoke_zome_workspace.source_chain.cas())
+                    .await
+                    .unwrap();
                 let (_, hash) = DhtOpHashed::with_data(op).await.into();
                 r.push(hash);
             }

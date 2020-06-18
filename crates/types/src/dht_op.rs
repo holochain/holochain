@@ -44,7 +44,7 @@ pub enum DhtOp {
     /// reality.
     StoreEntry(Signature, NewEntryHeader, Box<Entry>),
     /// Used to notify the authority for an agent's public key that that agent
-    /// has commited a new header.
+    /// has committed a new header.
     ///
     /// Conceptually, authorities receiving this `DhtOp` do three things:
     ///
