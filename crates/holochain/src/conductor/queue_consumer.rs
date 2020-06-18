@@ -7,33 +7,67 @@
 //! feeds data to the workflow, and a "destination" queue is a database which
 //! said workflow writes to as part of its processing of its source queue.
 //!
-//! When a consumer has exhausted its queue, it may notify another consumer
-//! that it now has work to do, because this consumer has placed work on
-//! another's queue.
+//! | workflow       | source queue     | dest. queue      | notifies       |
+//! |----------------|------------------|------------------|----------------|
+//! |                        **gossip path**                                |
+//! | HandleGossip   | *n/a*            | ValidationQueue  | SysValidation  |
+//! | SysValidation  | ValidationQueue  | ValidationQueue  | AppValidation  |
+//! | AppValidation  | ValidationQueue  | ValidationQueue  | DhtOpIntegr.   |
+//! |                       **authoring path**                              |
+//! | CallZome       | *n/a*            | ChainSequence    | ProduceDhtOps  |
+//! | ProduceDhtOps  | ChainSequence    | Auth'd + IntQ †  | DhtOpIntegr.   |
+//! |                 **integration, common to both paths**                 |
+//! | DhtOpIntegr.   | IntegrationQueue | IntegratedDhtOps | Publish        |
+//! | Publish        | AuthoredDhtOps   | *n/a*            | *n/a*          |
 //!
-//! | workflow        | source queue     | dest. queue      | notifies        |
-//! |-----------------|------------------|------------------|-----------------|
-//! | ProduceDhtOps   | ChainSequence    | IntegrationQueue | IntegrateDhtOps |
-//! | SysValidation   | ValidationQueue  | ValidationQueue  | AppValidation   |
-//! | AppValidation   | ValidationQueue  | ValidationQueue  | IntegrateDhtOps |
-//! | IntegrateDhtOps | IntegrationQueue | IntegratedDhtOps | Publish         |
+//! († Auth'd + IntQ is short for: AuthoredDhtOps + IntegrationQueue)
 //!
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
 use derive_more::{Constructor, From};
+use dht_op_integration_workflow::spawn_dht_op_integration_consumer;
 use holochain_state::{
     env::{EnvironmentRefRw, EnvironmentWrite, WriteManager},
     error::DatabaseError,
     prelude::Writer,
 };
+use publish_workflow::spawn_publish_consumer;
 use tokio::sync::mpsc;
 
-mod dht_op_integration_consumer;
+// TODO: move these to workflow mod
+mod dht_op_integration_workflow;
+use dht_op_integration_workflow::*;
+mod sys_validation_workflow;
+use sys_validation_workflow::*;
+mod app_validation_workflow;
+use app_validation_workflow::*;
+mod produce_workflow;
+use produce_workflow::*;
+mod publish_workflow;
+use publish_workflow::*;
+
+/// Spawns several long-running tasks which are responsible for processing work
+/// which shows up on various databases.
+pub async fn spawn_queue_consumer_tasks(env: EnvironmentWrite) {
+    // TODO: sys validation is not triggered until HandleGossip workflow
+    // is implemented
+    let (tx_sys_validation, rx_sys_validation) = QueueTrigger::new();
+    let (tx_app_validation, rx_app_validation) = QueueTrigger::new();
+    let (tx_produce, rx_produce) = QueueTrigger::new();
+    let (tx_integration, rx_integration) = QueueTrigger::new();
+    let (tx_publish, rx_publish) = QueueTrigger::new();
+
+    spawn_sys_validation_consumer(env.clone(), rx_sys_validation, tx_app_validation);
+    spawn_app_validation_consumer(env.clone(), rx_app_validation, tx_integration.clone());
+    spawn_produce_consumer(env.clone(), rx_produce, tx_integration);
+    spawn_dht_op_integration_consumer(env.clone(), rx_integration, tx_publish);
+    spawn_publish_consumer(env.clone(), rx_publish);
+}
 
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
-struct QueueTrigger(mpsc::Sender<()>);
+pub struct QueueTrigger(mpsc::Sender<()>);
 
 /// The receiving side of a QueueTrigger channel
 type QueueTriggerListener = mpsc::Receiver<()>;
@@ -76,9 +110,3 @@ impl OneshotWriter {
 
 /// The only error possible when attempting to trigger: the channel is closed
 pub struct QueueTriggerClosedError;
-
-/// Spawns several long-running tasks which are responsible for processing work
-/// which shows up on various databases.
-pub async fn spawn_queue_consumer_tasks() {
-    let (tx_integration, rx_integration) = QueueTrigger::new();
-}

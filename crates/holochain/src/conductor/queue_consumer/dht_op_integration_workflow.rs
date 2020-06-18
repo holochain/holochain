@@ -1,3 +1,5 @@
+//! The workflow and queue consumer for DhtOp integration
+
 use super::*;
 use crate::core::state::workspace::{Workspace, WorkspaceResult};
 use futures::StreamExt;
@@ -7,18 +9,24 @@ use holochain_state::{
     prelude::{GetDb, Reader},
 };
 
-async fn dht_op_integration_consumer(
+/// Spawn the QueueConsumer for DhtOpIntegration workflow
+pub fn spawn_dht_op_integration_consumer(
     env: EnvironmentWrite,
     mut rx: QueueTriggerListener,
     mut trigger_publish: QueueTrigger,
-) -> anyhow::Result<()> {
-    loop {
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader()?;
-        let workspace = DhtOpIntegrationWorkspace::new(&reader, &env_ref)?;
-        dht_op_integration_workflow(workspace, env.clone().into(), &mut trigger_publish).await?;
-        rx.next().await;
-    }
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            let env_ref = env.guard().await;
+            let reader = env_ref.reader().expect("Could not create LMDB reader");
+            let workspace = DhtOpIntegrationWorkspace::new(&reader, &env_ref)
+                .expect("Could not create Workspace");
+            dht_op_integration_workflow(workspace, env.clone().into(), &mut trigger_publish)
+                .await
+                .expect("Error running Workflow");
+            rx.next().await;
+        }
+    })
 }
 
 struct DhtOpIntegrationWorkspace<'env>(std::marker::PhantomData<&'env ()>);
