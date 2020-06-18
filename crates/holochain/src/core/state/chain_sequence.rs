@@ -109,10 +109,10 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
 
     pub fn get_items_with_incomplete_dht_ops(
         &self,
-    ) -> DatabaseResult<Box<dyn Iterator<Item = (u32, HeaderAddress)> + 'env>> {
-        // This only checks the db and not the scratch space.
-        // [DhtOp]s should only be created on elements actually
-        // written to the chain.
+    ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderAddress)> + 'env>> {
+        if !self.db.scratch_fresh() {
+            return Err(SourceChainError::ScratchNotFresh);
+        }
         // TODO: PERF: Currently this checks every header but we could keep
         // a list of indices for only the headers which have been transformed.
         Ok(Box::new(self.db.iter_raw()?.filter_map(|(i, c)| {

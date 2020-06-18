@@ -50,6 +50,9 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
+
+    #[error("Required the scratch space to be empty but contained values")]
+    ScratchNotFresh,
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

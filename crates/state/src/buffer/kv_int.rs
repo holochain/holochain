@@ -103,6 +103,11 @@ where
     pub fn iter_raw_reverse(&self) -> DatabaseResult<SingleIntIter<K, V>> {
         Ok(SingleIntIter::new(self.db.iter_end(self.reader)?))
     }
+
+    /// Confirm the scratch has not been written to yet
+    pub fn scratch_fresh(&self) -> bool {
+        self.scratch.is_empty()
+    }
 }
 
 impl<'env, K, V, R> BufferedStore<'env> for IntKvBuf<'env, K, V, R>
