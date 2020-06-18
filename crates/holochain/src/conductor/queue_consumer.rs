@@ -21,7 +21,7 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
-use derive_more::Constructor;
+use derive_more::{Constructor, From};
 use holochain_state::{
     env::{EnvironmentRefRw, EnvironmentWrite, WriteManager},
     error::DatabaseError,
@@ -33,34 +33,34 @@ mod dht_op_integration_consumer;
 
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
-struct Waker(mpsc::Sender<()>);
+struct QueueTrigger(mpsc::Sender<()>);
 
-/// The receiving side of a Waker channel
-type Listener = mpsc::Receiver<()>;
+/// The receiving side of a QueueTrigger channel
+type QueueTriggerListener = mpsc::Receiver<()>;
 
-impl Waker {
+impl QueueTrigger {
     /// Create a new channel for waking a consumer
     ///
     /// The channel buffer is set to 1 to ensure that the consumer does not
     /// have to be concerned with draining the channel in case it has received
-    /// multiple wake signals.
+    /// multiple trigger signals.
     pub fn new() -> (Self, mpsc::Receiver<()>) {
         let (tx, rx) = mpsc::channel(1);
         (Self(tx), rx)
     }
 
     /// Lazily nudge the consumer task, ignoring the case where the consumer
-    /// already has a pending wakeup signal
-    pub fn wake(&mut self) -> Result<(), QueueWakerClosedError> {
+    /// already has a pending trigger signal
+    pub fn trigger(&mut self) -> Result<(), QueueTriggerClosedError> {
         match self.0.try_send(()) {
-            Err(mpsc::error::TrySendError::Closed(_)) => Err(QueueWakerClosedError),
+            Err(mpsc::error::TrySendError::Closed(_)) => Err(QueueTriggerClosedError),
             Err(mpsc::error::TrySendError::Full(_)) => Ok(()),
             Ok(()) => Ok(()),
         }
     }
 }
 
-#[derive(Constructor)]
+#[derive(Constructor, From)]
 struct OneshotWriter(EnvironmentWrite);
 
 impl OneshotWriter {
@@ -74,11 +74,11 @@ impl OneshotWriter {
     }
 }
 
-/// The only error possible when attempting to wake: the channel is closed
-pub struct QueueWakerClosedError;
+/// The only error possible when attempting to trigger: the channel is closed
+pub struct QueueTriggerClosedError;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
 pub async fn spawn_queue_consumer_tasks() {
-    let (tx_integration, rx_integration) = Waker::new();
+    let (tx_integration, rx_integration) = QueueTrigger::new();
 }

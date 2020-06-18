@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::state::workspace::{Workspace, WorkspaceResult};
+use futures::StreamExt;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::{
     env::ReadManager,
@@ -8,15 +9,15 @@ use holochain_state::{
 
 async fn dht_op_integration_consumer(
     env: EnvironmentWrite,
-    rx: Listener,
-    mut wake_publish: Waker,
+    mut rx: QueueTriggerListener,
+    mut trigger_publish: QueueTrigger,
 ) -> anyhow::Result<()> {
     loop {
         let env_ref = env.guard().await;
         let reader = env_ref.reader()?;
-        let writer = OneshotWriter::new(env.clone());
         let workspace = DhtOpIntegrationWorkspace::new(&reader, &env_ref)?;
-        dht_op_integration_workflow(workspace, writer, &mut wake_publish).await?;
+        dht_op_integration_workflow(workspace, env.clone().into(), &mut trigger_publish).await?;
+        rx.next().await;
     }
 }
 
@@ -39,13 +40,19 @@ impl<'env> Workspace<'env> for DhtOpIntegrationWorkspace<'env> {
 async fn dht_op_integration_workflow<'env>(
     workspace: DhtOpIntegrationWorkspace<'env>,
     writer: OneshotWriter,
-    wake_publish: &mut Waker,
+    trigger_publish: &mut QueueTrigger,
 ) -> anyhow::Result<()> {
-    // do stuff
+    todo!("implement workflow");
 
+    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
+
+    // commit the workspace
     writer
         .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
         .await?;
-    let _ = wake_publish.wake();
+
+    // trigger other workflows
+    let _ = trigger_publish.trigger();
+
     Ok(())
 }
