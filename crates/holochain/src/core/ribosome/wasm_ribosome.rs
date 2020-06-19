@@ -263,6 +263,8 @@ impl RibosomeT for WasmRibosome {
 
         if module.info().exports.contains_key(&to_call) {
             // there is a callback to_call and it is implemented in the wasm
+            // it is important to fully instantiate this (e.g. don't try to use the module above)
+            // because it builds guards against memory leaks and handles imports correctly
             let mut instance = self.instance(host_context)?;
 
             let result: GuestOutput = holochain_wasmer_host::guest::call(
