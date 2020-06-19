@@ -5,12 +5,7 @@
 //! [DhtOp]: enum.DhtOp.html
 
 use crate::element::ChainElement;
-use crate::{
-    composite_hash::{AnyDhtHash, EntryHash},
-    header,
-    prelude::*,
-    Header,
-};
+use crate::{header, prelude::*, Header};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
 use holochain_zome_types::Entry;
@@ -73,30 +68,6 @@ pub enum DhtOp {
     RegisterAddLink(Signature, header::LinkAdd),
     /// Op for removing a link
     RegisterRemoveLink(Signature, header::LinkRemove),
-}
-
-/// A type for storing in databases that don't need the actual
-/// data. Everything is a hash of the type except the signatures.
-#[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DhtOpHashes {
-    StoreElement(Signature, HeaderHash, Option<EntryHash>),
-    StoreEntry(Signature, HeaderHash, EntryHash),
-    RegisterAgentActivity(Signature, HeaderHash),
-    RegisterReplacedBy(Signature, HeaderHash, EntryHash),
-    RegisterDeletedBy(Signature, HeaderHash),
-    RegisterAddLink(Signature, HeaderHash),
-    RegisterRemoveLink(Signature, HeaderHash),
-}
-
-/// A type for storing in databases that only need the hashes.
-/// Contains the basis
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DhtOpLight {
-    /// Where to send this op
-    pub basis: AnyDhtHash,
-    /// Signatures and hashes of the op
-    pub op: DhtOpHashes,
 }
 
 impl DhtOp {

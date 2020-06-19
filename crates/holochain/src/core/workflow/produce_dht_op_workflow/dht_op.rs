@@ -2,72 +2,70 @@ use crate::core::state::{cascade::Cascade, metadata::MetadataBufT};
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use header::UpdateBasis;
 use holo_hash::HeaderHash;
+use holochain_keystore::Signature;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
-    dht_op::{DhtOp, DhtOpHashes, DhtOpLight},
+    dht_op::DhtOp,
     header,
 };
+use serde::{Deserialize, Serialize};
 
 pub mod error;
 
 #[cfg(test)]
 mod tests;
 
-/// Convert a [DhtOp] to a [DhtOpHashes]
-pub async fn dht_op_into_light(op: DhtOp, cascade: Cascade<'_>) -> DhtOpConvertResult<DhtOpLight> {
+/// A type for storing in databases that don't need the actual
+/// data. Everything is a hash of the type except the signatures.
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DhtOpLight {
+    StoreElement(Signature, HeaderHash, Option<EntryHash>),
+    StoreEntry(Signature, HeaderHash, EntryHash),
+    RegisterAgentActivity(Signature, HeaderHash),
+    RegisterReplacedBy(Signature, HeaderHash, EntryHash),
+    RegisterDeletedBy(Signature, HeaderHash),
+    RegisterAddLink(Signature, HeaderHash),
+    RegisterRemoveLink(Signature, HeaderHash),
+}
+
+/// Convert a [DhtOp] to a [DhtOpLight]
+pub async fn dht_op_to_light_basis(
+    op: DhtOp,
+    cascade: Cascade<'_>,
+) -> DhtOpConvertResult<(DhtOpLight, AnyDhtHash)> {
     let basis = dht_basis(&op, &cascade).await?;
     match op {
         DhtOp::StoreElement(s, h, _) => {
             let e = h.entry_data().map(|(e, _)| e.clone());
             let (_, h) = header::HeaderHashed::with_data(h).await?.into();
-            Ok(DhtOpLight {
-                basis,
-                op: DhtOpHashes::StoreElement(s, h, e),
-            })
+            Ok((DhtOpLight::StoreElement(s, h, e), basis))
         }
         DhtOp::StoreEntry(s, h, _) => {
             let e = h.entry().clone();
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight {
-                basis,
-                op: DhtOpHashes::StoreEntry(s, h, e),
-            })
+            Ok((DhtOpLight::StoreEntry(s, h, e), basis))
         }
         DhtOp::RegisterAgentActivity(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h).await?.into();
-            Ok(DhtOpLight {
-                basis,
-                op: DhtOpHashes::RegisterAgentActivity(s, h),
-            })
+            Ok((DhtOpLight::RegisterAgentActivity(s, h), basis))
         }
         DhtOp::RegisterReplacedBy(s, h, _) => {
             let e = h.entry_hash.clone();
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight {
-                basis,
-                op: DhtOpHashes::RegisterReplacedBy(s, h, e),
-            })
+            Ok((DhtOpLight::RegisterReplacedBy(s, h, e), basis))
         }
         DhtOp::RegisterDeletedBy(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight {
-                basis,
-                op: DhtOpHashes::RegisterAgentActivity(s, h),
-            })
+            Ok((DhtOpLight::RegisterAgentActivity(s, h), basis))
         }
         DhtOp::RegisterAddLink(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight {
-                basis,
-                op: DhtOpHashes::RegisterAgentActivity(s, h),
-            })
+            Ok((DhtOpLight::RegisterAgentActivity(s, h), basis))
         }
         DhtOp::RegisterRemoveLink(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok(DhtOpLight {
-                basis,
-                op: DhtOpHashes::RegisterAgentActivity(s, h),
-            })
+            Ok((DhtOpLight::RegisterAgentActivity(s, h), basis))
         }
     }
 }

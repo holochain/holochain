@@ -1,6 +1,6 @@
 use super::{error::WorkflowResult, InvokeZomeWorkspace, Workflow, WorkflowEffects};
 use crate::core::state::workspace::{Workspace, WorkspaceError, WorkspaceResult};
-use dht_op::dht_op_into_light;
+use dht_op::{dht_op_to_light_basis, DhtOpLight};
 use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
@@ -11,9 +11,7 @@ use holochain_state::{
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
 use holochain_types::{
-    dht_op::{DhtOpHashed, DhtOpLight},
-    validate::ValidationStatus,
-    Timestamp,
+    composite_hash::AnyDhtHash, dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp,
 };
 use must_future::MustBoxFuture;
 use std::convert::TryFrom;
@@ -46,10 +44,14 @@ impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {
                     debug!(?hash);
                     let cascade = invoke_zome_workspace.cascade();
                     // put the op in (using the "light hash form")
-                    let op = dht_op_into_light(op, cascade).await?;
+                    let (op, basis) = dht_op_to_light_basis(op, cascade).await?;
                     workspace.integration_queue.put(
                         (Timestamp::now(), hash.clone()).try_into()?,
-                        (ValidationStatus::Valid, op),
+                        IntegrationValue {
+                            validation_status: ValidationStatus::Valid,
+                            op,
+                            basis,
+                        },
                     )?;
                     workspace.authored_dht_ops.put(hash, 0)?;
                 }
@@ -98,12 +100,21 @@ impl TryFrom<IntegrationQueueKey> for (Timestamp, DhtOpHash) {
     }
 }
 
-type IntegrationQueueValue = (ValidationStatus, DhtOpLight);
+/// A type for storing in databases that only need the hashes.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IntegrationValue {
+    /// Thi ops validation status
+    pub validation_status: ValidationStatus,
+    /// Where to send this op
+    pub basis: AnyDhtHash,
+    /// Signatures and hashes of the op
+    pub op: DhtOpLight,
+}
 
 pub(crate) struct ProduceDhtOpWorkspace<'env> {
     pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
     pub authored_dht_ops: KvBuf<'env, DhtOpHash, u32, Reader<'env>>,
-    pub integration_queue: KvBuf<'env, IntegrationQueueKey, IntegrationQueueValue, Reader<'env>>,
+    pub integration_queue: KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>,
 }
 
 impl<'env> ProduceDhtOpWorkspace<'env> {
@@ -153,7 +164,7 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{ops_from_element, DhtOp, DhtOpHashed, DhtOpHashes},
+        dht_op::{ops_from_element, DhtOp, DhtOpHashed},
         header::{builder, EntryType, NewEntryHeader},
         observability,
         test_utils::fake_app_entry_type,
@@ -204,14 +215,14 @@ mod tests {
     #[instrument(skip(light, cas))]
     async fn light_to_op<'env>(light: DhtOpLight, cas: &ChainCasBuf<'env>) -> DhtOp {
         trace!(?light);
-        match light.op {
-            DhtOpHashes::StoreElement(s, h, _) => {
+        match light {
+            DhtOpLight::StoreElement(s, h, _) => {
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = e.header().clone();
                 let e = e.entry().as_option().map(|e| Box::new(e.clone()));
                 DhtOp::StoreElement(s, h, e)
             }
-            DhtOpHashes::StoreEntry(s, h, _) => {
+            DhtOpLight::StoreEntry(s, h, _) => {
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = match e.header().clone() {
                     Header::EntryCreate(c) => NewEntryHeader::Create(c),
@@ -221,28 +232,28 @@ mod tests {
                 let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
                 DhtOp::StoreEntry(s, h, e)
             }
-            DhtOpHashes::RegisterAgentActivity(s, h) => {
+            DhtOpLight::RegisterAgentActivity(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = e.header().clone();
                 DhtOp::RegisterAgentActivity(s, h)
             }
-            DhtOpHashes::RegisterReplacedBy(s, h, _) => {
+            DhtOpLight::RegisterReplacedBy(s, h, _) => {
                 let e = cas.get_element(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::EntryUpdate).clone();
                 let e = e.entry().as_option().map(|e| Box::new(e.clone())).unwrap();
                 DhtOp::RegisterReplacedBy(s, h, Some(e))
             }
-            DhtOpHashes::RegisterDeletedBy(s, h) => {
+            DhtOpLight::RegisterDeletedBy(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::EntryDelete).clone();
                 DhtOp::RegisterDeletedBy(s, h)
             }
-            DhtOpHashes::RegisterAddLink(s, h) => {
+            DhtOpLight::RegisterAddLink(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::LinkAdd).clone();
                 DhtOp::RegisterAddLink(s, h)
             }
-            DhtOpHashes::RegisterRemoveLink(s, h) => {
+            DhtOpLight::RegisterRemoveLink(s, h) => {
                 let e = cas.get_header(&h).await.unwrap().unwrap();
                 let h = unwrap_to!(e.header() => Header::LinkRemove).clone();
                 DhtOp::RegisterRemoveLink(s, h)
@@ -340,8 +351,8 @@ mod tests {
                     debug!(hash = ?t.1);
                     times.push(t.0);
                     // Check the status is Valid
-                    assert_matches!(v.0, ValidationStatus::Valid);
-                    Ok(v.1)
+                    assert_matches!(v.validation_status, ValidationStatus::Valid);
+                    Ok(v.op)
                 })
                 .collect::<Vec<_>>()
                 .unwrap();
