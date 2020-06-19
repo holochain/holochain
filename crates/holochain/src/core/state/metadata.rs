@@ -49,7 +49,7 @@ pub enum EntryDhtStatus {
     Pending,
     /// This [Entry] has failed validation and will not be served by the DHT
     Rejected,
-    /// This [Entry] has taken too many resources
+    /// This [Entry] has taken too long / too many resources to validate, so we gave up
     Abandoned,
     /// There has been a conflict when validating this [Entry]
     Conflict,
