@@ -273,7 +273,7 @@ impl<'env> MetadataBuf<'env> {
             links_meta: KvBuf::new(reader, links_meta)?,
         })
     }
-    /// Create a [MetadataBuf] the primary databases
+    /// Create a [MetadataBuf] with the primary databases
     pub fn primary(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*PRIMARY_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*PRIMARY_LINKS_META)?;
