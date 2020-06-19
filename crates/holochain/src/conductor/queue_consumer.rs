@@ -49,28 +49,30 @@ use publish_workflow::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
-pub async fn spawn_queue_consumer_tasks(env: EnvironmentWrite) {
-    // TODO: sys validation is not triggered until HandleGossip workflow
-    // is implemented
-    let (tx_sys_validation, rx_sys_validation) = QueueTrigger::new();
-    let (tx_app_validation, rx_app_validation) = QueueTrigger::new();
-    let (tx_produce, rx_produce) = QueueTrigger::new();
-    let (tx_integration, rx_integration) = QueueTrigger::new();
-    let (tx_publish, rx_publish) = QueueTrigger::new();
+pub async fn spawn_queue_consumer_tasks(env: EnvironmentWrite) -> InitialQueueTriggers {
+    let (tx_publish, _) = spawn_publish_consumer(env.clone());
+    let (tx_integration, _) = spawn_dht_op_integration_consumer(env.clone(), tx_publish);
+    let (tx_app_validation, _) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
+    let (tx_sys_validation, _) = spawn_sys_validation_consumer(env.clone(), tx_app_validation);
+    let (tx_produce, _) = spawn_produce_consumer(env.clone(), tx_integration);
 
-    spawn_sys_validation_consumer(env.clone(), rx_sys_validation, tx_app_validation);
-    spawn_app_validation_consumer(env.clone(), rx_app_validation, tx_integration.clone());
-    spawn_produce_consumer(env.clone(), rx_produce, tx_integration);
-    spawn_dht_op_integration_consumer(env.clone(), rx_integration, tx_publish);
-    spawn_publish_consumer(env.clone(), rx_publish);
+    InitialQueueTriggers {
+        sys_validation: tx_sys_validation,
+        produce_dht_ops: tx_produce,
+    }
+}
+
+/// The entry points for kicking off a chain reaction of queue activity
+pub struct InitialQueueTriggers {
+    /// Notify the SysValidation workflow to run, i.e. after handling gossip
+    pub sys_validation: QueueTrigger,
+    /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
+    pub produce_dht_ops: QueueTrigger,
 }
 
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
 pub struct QueueTrigger(mpsc::Sender<()>);
-
-/// The receiving side of a QueueTrigger channel
-type QueueTriggerListener = mpsc::Receiver<()>;
 
 impl QueueTrigger {
     /// Create a new channel for waking a consumer
@@ -108,5 +110,51 @@ impl OneshotWriter {
     }
 }
 
+/// Declares whether a workflow has exhausted the queue or not
+enum WorkComplete {
+    Complete,
+    Incomplete,
+}
+
 /// The only error possible when attempting to trigger: the channel is closed
+#[derive(Debug)]
 pub struct QueueTriggerClosedError;
+
+/*
+/// experimental DRY struct that doesn't work very well, or at all
+
+pub struct QueueConsumer<Ws>
+where
+    Ws: for<'env> Workspace<'env>,
+{
+    env: EnvironmentWrite,
+    run_workflow:
+        Box<dyn Fn(Ws) -> MustBoxFuture<'static, WorkflowRunResult<WorkComplete>> + Send + Sync>,
+    channel: (QueueTrigger, QueueTriggerListener),
+    // triggers: Vec<QueueTrigger>,
+}
+
+impl<Ws> QueueConsumer<Ws>
+where
+    Ws: for<'env> Workspace<'env>,
+{
+    pub fn spawn(self) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            let (trigger_self, rx) = self.channel;
+            loop {
+                let env_ref = self.env.guard().await;
+                let reader = env_ref.reader().expect("Could not create LMDB reader");
+                let workspace =
+                    ProduceWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
+                if let WorkComplete::Incomplete = (*self.run_workflow)(workspace)
+                    .await
+                    .expect("Failed to run workflow")
+                {
+                    trigger_self.trigger().expect("Trigger channel closed")
+                };
+                rx.next().await;
+            }
+        })
+    }
+}
+*/

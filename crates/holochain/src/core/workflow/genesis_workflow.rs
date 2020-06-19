@@ -97,17 +97,14 @@ pub struct GenesisWorkspace<'env> {
     source_chain: SourceChainBuf<'env>,
 }
 
-impl<'env> GenesisWorkspace<'env> {
+impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
     /// Constructor
     #[allow(dead_code)]
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self {
             source_chain: SourceChainBuf::<'env>::new(reader, dbs)?,
         })
     }
-}
-
-impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.flush_to_txn(writer)?;
         Ok(())
@@ -118,6 +115,7 @@ impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
 pub mod tests {
 
     use super::{GenesisWorkflow, GenesisWorkspace};
+    use crate::core::state::workspace::Workspace;
     use crate::core::workflow::run_workflow;
     use crate::{
         conductor::api::MockCellConductorApi,

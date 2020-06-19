@@ -8,6 +8,7 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::state::workspace::Workspace;
 use crate::{
     conductor::{
         api::{error::ConductorApiResult, CellConductorApi},

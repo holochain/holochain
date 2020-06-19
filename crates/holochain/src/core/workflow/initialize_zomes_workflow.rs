@@ -8,11 +8,11 @@ use crate::core::{
         guest_callback::init::{InitInvocation, InitResult},
         RibosomeT,
     },
-    state::workspace::{Workspace, WorkspaceError},
+    state::workspace::{Workspace, WorkspaceError, WorkspaceResult},
 };
 use futures::FutureExt;
 use holochain_state::buffer::BufferedStore;
-use holochain_state::prelude::Writer;
+use holochain_state::prelude::{GetDb, Reader, Writer};
 use holochain_types::{dna::DnaDef, header::builder};
 use must_future::MustBoxFuture;
 
@@ -67,6 +67,12 @@ where
 pub(crate) struct InitializeZomesWorkspace<'env>(pub(crate) InvokeZomeWorkspace<'env>);
 
 impl<'env> Workspace<'env> for InitializeZomesWorkspace<'env> {
+    /// Constructor
+    #[allow(dead_code)]
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        Ok(Self(InvokeZomeWorkspace::new(reader, dbs)?))
+    }
+
     fn flush_to_txn(self, writer: &mut Writer) -> Result<(), WorkspaceError> {
         self.0.source_chain.into_inner().flush_to_txn(writer)?;
         self.0.meta.flush_to_txn(writer)?;

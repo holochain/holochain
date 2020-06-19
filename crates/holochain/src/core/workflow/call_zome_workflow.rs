@@ -126,7 +126,18 @@ pub struct InvokeZomeWorkspace<'env> {
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    pub fn cascade(&self) -> Cascade {
+        Cascade::new(
+            &self.source_chain.cas(),
+            &self.meta,
+            &self.cache_cas,
+            &self.cache_meta,
+        )
+    }
+}
+
+impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(reader, dbs)?;
 
         let cache_cas = ChainCasBuf::cache(reader, dbs)?;
@@ -141,17 +152,6 @@ impl<'env> InvokeZomeWorkspace<'env> {
         })
     }
 
-    pub fn cascade(&self) -> Cascade {
-        Cascade::new(
-            &self.source_chain.cas(),
-            &self.meta,
-            &self.cache_cas,
-            &self.cache_meta,
-        )
-    }
-}
-
-impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.into_inner().flush_to_txn(writer)?;
         self.meta.flush_to_txn(writer)?;
