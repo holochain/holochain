@@ -6,7 +6,6 @@ use crate::conductor::interface::InterfaceDriver;
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell},
     cell::CellId,
-    dna::error::DnaError,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

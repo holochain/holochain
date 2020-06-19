@@ -27,6 +27,7 @@ mod effects;
 pub mod error;
 mod genesis_workflow;
 mod initialize_zomes_workflow;
+mod produce_dht_op_workflow;
 pub(crate) use call_zome_workflow::unsafe_invoke_zome_workspace;
 pub(crate) use call_zome_workflow::*;
 pub(crate) use genesis_workflow::*;

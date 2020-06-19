@@ -8,8 +8,11 @@ use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::{
     state::{
-        cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBuf, source_chain::SourceChain,
-        workspace::WorkspaceResult,
+        cascade::Cascade,
+        chain_cas::ChainCasBuf,
+        metadata::MetadataBuf,
+        source_chain::SourceChain,
+        workspace::{WorkspaceError, WorkspaceResult},
     },
     sys_validate_element,
 };
@@ -104,6 +107,7 @@ where
                 }
             }
 
+            // TODO: B-01567: Trigger ProduceDhtOps workflow
             let fx = WorkflowEffects {
                 workspace,
                 callbacks: Default::default(),
