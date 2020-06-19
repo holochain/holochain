@@ -1,19 +1,20 @@
 //! Defines a ChainElement, the basic unit of Holochain data.
 
-use crate::{
-    composite_hash::HeaderAddress, header::EntryVisibility, prelude::*, Header, HeaderHashed,
-};
+use crate::{composite_hash::HeaderAddress, prelude::*, Header, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::entry_def::EntryVisibility;
 use must_future::MustBoxFuture;
 
 /// a chain element which is a triple containing the signature of the header along with the
 /// entry if the header type has one.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChainElement {
+    /// The signed header for this element
     signed_header: SignedHeaderHashed,
+    /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
 }
 

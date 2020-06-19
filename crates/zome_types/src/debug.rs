@@ -1,5 +1,8 @@
+//! Types related to the `debug` host function
+
 use holochain_serialized_bytes::prelude::*;
 
+/// Representation of message to be logged via the `debug` host function
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 pub struct DebugMsg {
     // TODO: Consider either replacing with `Cow<'static, str>` or with
@@ -13,6 +16,7 @@ pub struct DebugMsg {
 }
 
 impl DebugMsg {
+    /// Constructor
     pub fn new(module_path: String, file: String, line: u32, msg: String) -> Self {
         Self {
             module_path,
@@ -22,18 +26,22 @@ impl DebugMsg {
         }
     }
 
+    /// Access the msg part
     pub fn msg(&self) -> &str {
         &self.msg
     }
 
+    /// Access the module_path part
     pub fn module_path(&self) -> &str {
         &self.module_path
     }
 
+    /// Access the file part
     pub fn file(&self) -> &str {
         &self.file
     }
 
+    /// Access the line part
     pub fn line(&self) -> u32 {
         self.line
     }

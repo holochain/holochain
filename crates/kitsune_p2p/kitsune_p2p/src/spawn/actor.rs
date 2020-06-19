@@ -105,6 +105,8 @@ impl KitsuneP2pActor {
             broadcast,
         } = input;
 
+        let timeout_ms = timeout_ms.expect("set by handle_broadcast");
+
         if !self.spaces.contains_key(&space) {
             return Err(KitsuneP2pError::RoutingSpaceError(space));
         }
@@ -115,7 +117,10 @@ impl KitsuneP2pActor {
         let mut internal_sender = self.internal_sender.clone();
 
         // check 5(ish) times but with sane min/max
-        let mut check_interval = timeout_ms / 5;
+        // FYI - this strategy will likely change when we are no longer
+        //       purely short-circuit, and we are looping on peer discovery.
+        const CHECK_COUNT: u64 = 5;
+        let mut check_interval = timeout_ms / CHECK_COUNT;
         if check_interval < 10 {
             check_interval = 10;
         }
@@ -232,18 +237,22 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
 
     fn handle_broadcast(&mut self, mut input: actor::Broadcast) -> KitsuneP2pHandlerResult<u8> {
         // if the user doesn't care about remote_agent_count, apply default
-        if input.remote_agent_count == 0 {
-            input.remote_agent_count = DEFAULT_BROADCAST_REMOTE_AGENT_COUNT;
+        match input.remote_agent_count {
+            None | Some(0) => {
+                input.remote_agent_count = Some(DEFAULT_BROADCAST_REMOTE_AGENT_COUNT);
+            }
+            _ => (),
         }
 
         // if the user doesn't care about timeout_ms, apply default
         // also - if set to 0, we want to return immediately, but
         // spawn a task with that default timeout.
-        let do_spawn = if input.timeout_ms == 0 {
-            input.timeout_ms = DEFAULT_BROADCAST_TIMEOUT_MS;
-            true
-        } else {
-            false
+        let do_spawn = match input.timeout_ms {
+            None | Some(0) => {
+                input.timeout_ms = Some(DEFAULT_BROADCAST_TIMEOUT_MS);
+                true
+            }
+            _ => false,
         };
 
         // gather the inner future

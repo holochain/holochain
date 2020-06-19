@@ -80,8 +80,8 @@ pub mod tests {
             let mut workspace = TestWorkspace::new(&reader, &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, None);
 
-            workspace.one.put(addr1.clone(), 1);
-            workspace.two.put(addr2.clone(), true);
+            workspace.one.put(addr1.clone(), 1).unwrap();
+            workspace.two.put(addr2.clone(), true).unwrap();
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
             assert_eq!(workspace.two.get(&addr2)?, Some(true));
             workspace.commit_txn(writer)?;

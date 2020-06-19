@@ -70,7 +70,11 @@ impl HolochainP2pActor {
 
                 match request {
                     // this is a request type, not a broadcast
-                    crate::wire::WireMessage::CallRemote { .. } => unreachable!(),
+                    crate::wire::WireMessage::CallRemote { .. } => {
+                        return Err(HolochainP2pError::invalid_p2p_message(
+                            "invalid: call_remote is a request type, not a broadcast".to_string(),
+                        ))
+                    }
                     crate::wire::WireMessage::Publish {
                         from_agent,
                         request_validation_receipt,
@@ -96,7 +100,12 @@ impl HolochainP2pActor {
                         });
                     }
                     // this is a request type, not a broadcast
-                    crate::wire::WireMessage::ValidationReceipt { .. } => unreachable!(),
+                    crate::wire::WireMessage::ValidationReceipt { .. } => {
+                        return Err(HolochainP2pError::invalid_p2p_message(
+                            "invalid: validation_receipt is a request type, not a broadcast"
+                                .to_string(),
+                        ))
+                    }
                 }
             }
             Request {
@@ -134,7 +143,11 @@ impl HolochainP2pActor {
                     }
                     // holochain_p2p never publishes via request
                     // these only occur on broadcasts
-                    crate::wire::WireMessage::Publish { .. } => unreachable!(),
+                    crate::wire::WireMessage::Publish { .. } => {
+                        return Err(HolochainP2pError::invalid_p2p_message(
+                            "invalid: publish is a broadcast type, not a request".to_string(),
+                        ))
+                    }
                     crate::wire::WireMessage::ValidationReceipt { receipt } => {
                         let res_fut =
                             match self.handle_incoming_validation_receipt(space, agent, receipt) {
@@ -291,7 +304,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         request_validation_receipt: bool,
         entry_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-        timeout_ms: u64,
+        timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let basis = entry_hash.to_kitsune();
@@ -310,7 +323,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
                 .broadcast(kitsune_p2p::actor::Broadcast {
                     space,
                     basis,
-                    remote_agent_count: 0, // default best-effort
+                    remote_agent_count: None, // default best-effort
                     timeout_ms,
                     broadcast,
                 })
