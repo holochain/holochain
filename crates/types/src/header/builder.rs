@@ -2,12 +2,13 @@ use super::EntryType;
 use crate::header;
 use crate::{
     composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
-    Header, Timestamp,
+    link::Tag,
+    Timestamp,
 };
 use derive_more::Constructor;
 use header::HeaderInner;
+use header::ZomeId;
 use holo_hash::*;
-use holochain_serialized_bytes::SerializedBytes;
 
 #[derive(Constructor)]
 pub struct HeaderBuilderCommon {
@@ -29,13 +30,7 @@ pub struct HeaderBuilderCommon {
 /// the Dna header has no prev_entry causes a special case that need not be
 /// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
 pub trait HeaderBuilder<H: HeaderInner>: Sized {
-    fn build_inner(self, common: HeaderBuilderCommon) -> H;
-    fn build(self, common: HeaderBuilderCommon) -> H {
-        self.build_inner(common)
-    }
-    fn build_header(self, common: HeaderBuilderCommon) -> Header {
-        self.build_inner(common).into()
-    }
+    fn build(self, common: HeaderBuilderCommon) -> H;
 }
 
 macro_rules! builder_variant {
@@ -46,8 +41,16 @@ macro_rules! builder_variant {
             $(pub $field : $t),*
         }
 
+        impl $name {
+            pub fn new($($field : $t),* ) -> Self {
+                Self {
+                    $($field),*
+                }
+            }
+        }
+
         impl HeaderBuilder<header::$name> for $name {
-            fn build_inner(self, common: HeaderBuilderCommon) -> header::$name {
+            fn build(self, common: HeaderBuilderCommon) -> header::$name {
                 let HeaderBuilderCommon {
                     author,
                     timestamp,
@@ -64,20 +67,27 @@ macro_rules! builder_variant {
                 }
             }
         }
+
+        impl From<($name, HeaderBuilderCommon)> for header::$name {
+            fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
+                n.build(h)
+            }
+        }
     }
 }
 
 builder_variant!(InitZomesComplete {});
 
 builder_variant!(LinkAdd {
-    base_address: AnyDhtHash,
-    target_address: AnyDhtHash,
-    tag: SerializedBytes,
-    link_type: SerializedBytes,
+    base_address: EntryHash,
+    target_address: EntryHash,
+    zome_id: ZomeId,
+    tag: Tag,
 });
 
 builder_variant!(LinkRemove {
     link_add_address: HeaderAddress,
+    base_address: EntryHash,
 });
 
 builder_variant!(ChainOpen {
@@ -101,5 +111,5 @@ builder_variant!(EntryUpdate {
 });
 
 builder_variant!(EntryDelete {
-    removes_address: AnyDhtHash,
+    removes_address: HeaderAddress,
 });

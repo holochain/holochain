@@ -100,7 +100,7 @@ fixturator!(
             .unwrap(),
         };
 
-        self.0.index = self.0.index + 1;
+        self.0.index += 1;
         ret
     }
 );

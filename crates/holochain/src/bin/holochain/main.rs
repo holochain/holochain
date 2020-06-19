@@ -10,7 +10,7 @@ use structopt::StructOpt;
 use tracing::*;
 
 const ERROR_CODE: i32 = 42;
-const MAGIC_CONDUCTOR_READY_STRING: &'static str = "Conductor ready.";
+const MAGIC_CONDUCTOR_READY_STRING: &str = "Conductor ready.";
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "holochain", about = "The Holochain Conductor.")]

@@ -24,6 +24,10 @@ pub enum HolochainP2pError {
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
+    /// Invalid P2p Message
+    #[error("InvalidP2pMessage: {0}")]
+    InvalidP2pMessage(String),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -33,6 +37,11 @@ impl HolochainP2pError {
     /// promote a custom error type to a TransportError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
+    }
+
+    /// construct an invalid p2p message error variant
+    pub fn invalid_p2p_message(s: String) -> Self {
+        Self::InvalidP2pMessage(s)
     }
 }
 

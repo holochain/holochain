@@ -158,7 +158,7 @@ async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>)
         // Show if these are actually finishing
         match tokio::time::timeout(std::time::Duration::from_secs(1), h).await {
             Ok(Ok(Ok(_))) => (),
-            r @ _ => warn!(message = "Websocket listener failed to join child tasks", result = ?r),
+            r => warn!(message = "Websocket listener failed to join child tasks", result = ?r),
         }
     }
 }
@@ -514,11 +514,11 @@ mod test {
             .unwrap(),
         );
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocationRequest(request);
+        let msg = AppRequest::ZomeCallInvocation(request);
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCallInvocationResponse{ .. });
+            assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);
