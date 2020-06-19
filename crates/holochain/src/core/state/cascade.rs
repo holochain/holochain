@@ -99,7 +99,7 @@ where
         }
     }
 
-    /// Get a header without checking it's metadata
+    /// Get a header without checking its metadata
     pub async fn dht_get_header_raw(
         &self,
         header_address: &HeaderAddress,
