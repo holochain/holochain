@@ -12,7 +12,7 @@ enum ThisWasmEntry {
 }
 
 #[no_mangle]
-pub extern "C" fn validate(host_allocation_ptr: RemotePtr) -> RemotePtr {
+pub extern "C" fn validate(host_allocation_ptr: GuestPtr) -> GuestPtr {
     // load host args
     let input: HostInput = host_args!(host_allocation_ptr);
 
@@ -41,10 +41,10 @@ fn _commit_validate(to_commit: ThisWasmEntry) -> Result<GuestOutput, String> {
 }
 
 #[no_mangle]
-pub extern "C" fn always_validates(_: RemotePtr) -> RemotePtr {
+pub extern "C" fn always_validates(_: GuestPtr) -> GuestPtr {
     ret!(try_result!(_commit_validate(ThisWasmEntry::AlwaysValidates), "error processing commit"))
 }
 #[no_mangle]
-pub extern "C" fn never_validates(_: RemotePtr) -> RemotePtr {
+pub extern "C" fn never_validates(_: GuestPtr) -> GuestPtr {
     ret!(try_result!(_commit_validate(ThisWasmEntry::NeverValidates), "error processing commit"))
 }

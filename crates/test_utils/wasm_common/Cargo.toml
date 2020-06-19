@@ -10,7 +10,7 @@ crate-type = [ "cdylib", "rlib" ]
 path = "src/common.rs"
 
 [dependencies]
-holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization", branch = "2020-06-06-serde-bytes" }
-holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer", branch = "2020-06-05-criterion" }
+holochain_serialized_bytes = "=0.0.40"
+holochain_wasmer_common = "=0.0.32"
 serde = "=1.0.104"
 serde_bytes = "0.11"

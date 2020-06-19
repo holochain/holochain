@@ -13,7 +13,7 @@ macro_rules! guest_functions {
         $(
             host_externs!($host_fn);
             #[no_mangle]
-            pub extern "C" fn $guest_fn(host_allocation_ptr: RemotePtr) -> RemotePtr {
+            pub extern "C" fn $guest_fn(host_allocation_ptr: GuestPtr) -> GuestPtr {
                 let input = {
                     let v: HostInput = host_args!(host_allocation_ptr);
                     let deserialized = <$input_type>::try_from(v.into_inner());

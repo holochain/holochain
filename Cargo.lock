@@ -242,12 +242,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e8c087f005730276d1096a652e92a8bacee2e2472bcc9715a74d2bec38b5820"
 
 [[package]]
-name = "byte-slice-cast"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0a5e3906bcbf133e33c1d4d95afc664ad37fbdb9f6568d8043e7ea8c27d93d3"
-
-[[package]]
 name = "byte-tools"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1241,8 +1235,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.39"
-source = "git+https://github.com/holochain/holochain-serialization?branch=2020-06-06-serde-bytes#fc2111e04647c13731c263b4610ad35e6a0b92b2"
+version = "0.0.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03c9314720fa798e94b99ac219fd232c719688971adcf8c368c4e1aa91229183"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -1255,8 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.39"
-source = "git+https://github.com/holochain/holochain-serialization?branch=2020-06-06-serde-bytes#fc2111e04647c13731c263b4610ad35e6a0b92b2"
+version = "0.0.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90321247a91d3d01cf658465b5933dc40196321017f3c1a278725e004fc879a1"
 dependencies = [
  "quote 0.6.11",
  "syn 0.15.31",
@@ -1370,10 +1366,10 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.31"
-source = "git+https://github.com/holochain/holochain-wasmer?branch=2020-06-05-criterion#2888317818bf44527a971e388ade15493ecb95bb"
+version = "0.0.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "845812cc235fb9b8ae66c043d5334f24acd7338740765cfc0144c1afb734f058"
 dependencies = [
- "byte-slice-cast",
  "holochain_serialized_bytes",
  "serde",
  "thiserror",
@@ -1381,10 +1377,10 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.31"
-source = "git+https://github.com/holochain/holochain-wasmer?branch=2020-06-05-criterion#2888317818bf44527a971e388ade15493ecb95bb"
+version = "0.0.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d14f579b6325cd692b0822d4c7bd9c103c7174f2dc6d8268c552a6d2536512f"
 dependencies = [
- "byte-slice-cast",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "lazy_static",

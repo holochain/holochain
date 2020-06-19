@@ -119,8 +119,8 @@ impl WasmRibosome {
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_host_context_arc = std::sync::Arc::clone(&host_context_arc);
                 move |ctx: &mut Ctx,
-                      guest_allocation_ptr: RemotePtr|
-                      -> Result<RemotePtr, WasmError> {
+                      guest_allocation_ptr: GuestPtr|
+                      -> Result<Len, WasmError> {
                     let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
@@ -143,8 +143,8 @@ impl WasmRibosome {
                         .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
-                    let output_allocation_ptr: AllocationPtr = output_sb.into();
-                    Ok(output_allocation_ptr.as_remote_ptr())
+
+                    Ok($crate::holochain_wasmer_host::import::set_context_data(ctx, output_sb))
                 }
             }};
         }
@@ -153,12 +153,8 @@ impl WasmRibosome {
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
-            "__import_allocation",
-            func!(holochain_wasmer_host::import::__import_allocation),
-        );
-        ns.insert(
-            "__import_bytes",
-            func!(holochain_wasmer_host::import::__import_bytes),
+            "__import_data",
+            func!(holochain_wasmer_host::import::__import_data),
         );
 
         // imported host functions for core
@@ -304,7 +300,6 @@ impl RibosomeT for WasmRibosome {
         // cell_conductor_api: CellConductorApi,
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
-
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
         let fn_name = invocation.fn_name.clone();

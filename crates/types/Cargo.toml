@@ -24,9 +24,9 @@ holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
-holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization", branch = "2020-06-06-serde-bytes" }
+holochain_serialized_bytes = "=0.0.40"
 holochain_types_derive = { version = "=0.0.1", path = "../types_derive" }
-holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer", branch = "2020-06-05-criterion" }
+holochain_wasmer_common = "=0.0.32"
 holochain_zome_types = { path = "../zome_types" }
 lazy_static = "1.4.0"
 maplit = "1.0.2"

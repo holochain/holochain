@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3"
-holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization", branch = "2020-06-06-serde-bytes" }
+holochain_serialized_bytes = "=0.0.40"
 nanoid = "0.3"
 net2 = "0.2"
 serde = { version = "1", features = [ "derive" ] }

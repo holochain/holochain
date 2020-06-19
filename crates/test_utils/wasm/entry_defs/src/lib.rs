@@ -90,7 +90,7 @@ impl From<&Comment> for EntryDef {
 }
 
 #[no_mangle]
-pub extern "C" fn entry_defs(_: RemotePtr) -> RemotePtr {
+pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
     let globals: ZomeGlobals = try_result!(host_call!(__globals, ()), "failed to get globals");
 
     let defs: EntryDefs = vec![

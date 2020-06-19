@@ -11,7 +11,7 @@ holochain_wasmer_guest::holochain_externs!();
 #[no_mangle]
 /// round trip bytes back to the host
 /// useful to see what the basic throughput of our wasm implementation is
-pub extern "C" fn echo_bytes(ptr: RemotePtr) -> RemotePtr {
+pub extern "C" fn echo_bytes(ptr: GuestPtr) -> GuestPtr {
     let input: HostInput = host_args!(ptr);
     let sb: SerializedBytes = input.into_inner();
     ret!(GuestOutput::new(sb));

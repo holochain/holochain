@@ -4,7 +4,7 @@ use holochain_zome_types::*;
 holochain_wasmer_guest::holochain_externs!();
 
 #[no_mangle]
-pub extern "C" fn debug(_: RemotePtr) -> RemotePtr {
+pub extern "C" fn debug(_: GuestPtr) -> GuestPtr {
     let output: DebugOutput = try_result!(
         host_call!(
             __debug,

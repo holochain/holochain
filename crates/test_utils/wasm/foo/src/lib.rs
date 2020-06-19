@@ -6,7 +6,7 @@ holochain_wasmer_guest::holochain_externs!();
 
 #[no_mangle]
 /// always returns "foo" in a TestString
-pub extern "C" fn foo(_: RemotePtr) -> RemotePtr {
+pub extern "C" fn foo(_: GuestPtr) -> GuestPtr {
  // this is whatever the dev wants we don't know
  let response = TestString::from(String::from("foo"));
 
