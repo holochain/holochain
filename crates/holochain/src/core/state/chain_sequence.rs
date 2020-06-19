@@ -110,7 +110,7 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
     pub fn get_items_with_incomplete_dht_ops(
         &self,
     ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderAddress)> + 'env>> {
-        if !self.db.scratch_fresh() {
+        if !self.db.is_scratch_fresh() {
             return Err(SourceChainError::ScratchNotFresh);
         }
         // TODO: PERF: Currently this checks every header but we could keep

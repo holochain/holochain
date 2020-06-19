@@ -105,7 +105,7 @@ where
     }
 
     /// Confirm the scratch has not been written to yet
-    pub fn scratch_fresh(&self) -> bool {
+    pub fn is_scratch_fresh(&self) -> bool {
         self.scratch.is_empty()
     }
 }
