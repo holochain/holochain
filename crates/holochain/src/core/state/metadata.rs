@@ -51,7 +51,7 @@ pub enum EntryDhtStatus {
     Rejected,
     /// This [Entry] has taken too long / too many resources to validate, so we gave up
     Abandoned,
-    /// There has been a conflict when validating this [Entry]
+    /// **not implemented** There has been a conflict when validating this [Entry]
     Conflict,
     /// **not implemented** The author has withdrawn their publication of this element.
     Withdrawn,
