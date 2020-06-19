@@ -15,15 +15,15 @@ mock! {
         fn get_creates(
             &self,
             entry_hash: EntryHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
         fn get_updates(
             &self,
             hash: AnyDhtHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
         fn get_deletes(
             &self,
             header_hash: HeaderHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
         }
 }
 
@@ -48,7 +48,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_creates(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_creates(entry_hash)
     }
@@ -56,7 +56,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_updates(hash)
     }
@@ -64,7 +64,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_deletes(
         &self,
         header_hash: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_deletes(header_hash)
     }

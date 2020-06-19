@@ -7,7 +7,7 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::metadata::{MetadataBuf, MetadataBufT, SysMetaVal};
+    use crate::core::state::metadata::{MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use header::{HeaderBuilderCommon, UpdateBasis};
@@ -19,7 +19,6 @@ mod tests {
         header::{self, builder, EntryType, HeaderBuilder},
         Header, HeaderHashed,
     };
-    use unwrap_to::unwrap_to;
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
@@ -313,11 +312,11 @@ mod tests {
         for _ in 0..10 {
             let (e, hash) = test_create(entry_hash.clone(), &mut fx).await;
             let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(SysMetaVal::Create(hash.into()));
+            expected.push(hash);
             entry_creates.push(e)
         }
 
-        expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Create).clone());
+        expected.sort_by_key(|h| h.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -329,7 +328,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Create).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -342,7 +341,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Create).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
         }
     }
@@ -369,11 +368,11 @@ mod tests {
             )
             .await;
             let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(SysMetaVal::Update(hash.into()));
+            expected.push(hash);
             entry_updates.push(e)
         }
 
-        expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+        expected.sort_by_key(|h| h.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -388,7 +387,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -401,7 +400,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
         }
     }
@@ -428,11 +427,11 @@ mod tests {
             )
             .await;
             let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(SysMetaVal::Update(hash.into()));
+            expected.push(hash);
             entry_updates.push(e)
         }
 
-        expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+        expected.sort_by_key(|h| h.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -444,7 +443,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -457,7 +456,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Update).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
         }
     }
@@ -473,11 +472,11 @@ mod tests {
         for _ in 0..10 {
             let (e, hash) = test_delete(header_hash.clone(), &mut fx).await;
             let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(SysMetaVal::Delete(hash.into()));
+            expected.push(hash);
             entry_deletes.push(e)
         }
 
-        expected.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Delete).clone());
+        expected.sort_by_key(|h| h.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -489,7 +488,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Delete).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -502,7 +501,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| unwrap_to!(h => SysMetaVal::Delete).clone());
+            headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
         }
     }

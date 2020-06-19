@@ -90,7 +90,9 @@ pub async fn dht_basis<M: MetadataBufT>(
         DhtOp::RegisterAgentActivity(_, header) => header.author().clone().into(),
         DhtOp::RegisterReplacedBy(_, header, _) => match &header.update_basis {
             UpdateBasis::Header => header.replaces_address.clone().into(),
-            UpdateBasis::Entry => get_header(&header.replaces_address, &cascade).await?.into(),
+            UpdateBasis::Entry => get_entry_hash_for_header(&header.replaces_address, &cascade)
+                .await?
+                .into(),
         },
         DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
         DhtOp::RegisterAddLink(_, header) => header.base_address.clone().into(),
@@ -98,7 +100,7 @@ pub async fn dht_basis<M: MetadataBufT>(
     })
 }
 
-async fn get_header<M: MetadataBufT>(
+async fn get_entry_hash_for_header<M: MetadataBufT>(
     header_hash: &HeaderHash,
     cascade: &Cascade<'_, M>,
 ) -> DhtOpConvertResult<EntryHash> {

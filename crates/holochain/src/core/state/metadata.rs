@@ -159,23 +159,23 @@ pub trait MetadataBufT {
     /// Adds a new [EntryDelete] [Header] to an [Entry] in the sys metadata
     async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
 
-    /// Returns all the [EntryCreate] [Header]s on an [Entry]
+    /// Returns all the [HeaderHash]s of [EntryCreate] headers on an [Entry]
     fn get_creates(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the [EntryUpdates] [Header]s on an [Entry]
+    /// Returns all the [HeaderHash]s of [EntryUpdates] headers on an [Entry]
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the [EntryDeletes] [Header]s on an [Entry]
+    /// Returns all the [HeaderHash]s of [EntryDeletes] headers on an [Entry]
     fn get_deletes(
         &self,
         header_hash: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns the current status of a [Entry]
     fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -222,6 +222,14 @@ impl LinkMetaVal {
             timestamp,
             zome_id,
             tag,
+        }
+    }
+}
+
+impl From<SysMetaVal> for HeaderHash {
+    fn from(v: SysMetaVal) -> Self {
+        match v {
+            SysMetaVal::Create(h) | SysMetaVal::Update(h) | SysMetaVal::Delete(h) => h,
         }
     }
 }
@@ -380,31 +388,33 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_creates(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
-        Ok(Box::new(fallible_iterator::convert(
-            self.system_meta.get(&entry_hash.into())?,
-        )))
+        Ok(Box::new(
+            fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?)
+                .map(|h| Ok(h.into())),
+        ))
     }
 
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
-        Ok(Box::new(fallible_iterator::convert(
-            self.system_meta.get(&hash)?,
-        )))
+        Ok(Box::new(
+            fallible_iterator::convert(self.system_meta.get(&hash)?).map(|h| Ok(h.into())),
+        ))
     }
 
     fn get_deletes(
         &self,
         header_hash: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = SysMetaVal, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
-        Ok(Box::new(fallible_iterator::convert(
-            self.system_meta.get(&header_hash.into())?,
-        )))
+        Ok(Box::new(
+            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?)
+                .map(|h| Ok(h.into())),
+        ))
     }
 
     // TODO: For now this isn't actually checking the meta data.
