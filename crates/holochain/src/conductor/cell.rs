@@ -4,6 +4,7 @@
 //! ChainElements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::queue_consumer::spawn_queue_consumer_tasks;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -105,6 +106,10 @@ impl Cell {
         };
 
         if has_genesis {
+            // TODO: store these triggers somewhere so they can be hooked up
+            // to InvokeCallZome and HandleGossip workflows
+            let triggers = spawn_queue_consumer_tasks(state_env.clone());
+
             Ok(Self {
                 id,
                 conductor_api,

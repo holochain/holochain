@@ -49,7 +49,7 @@ use publish_workflow::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
-pub async fn spawn_queue_consumer_tasks(env: EnvironmentWrite) -> InitialQueueTriggers {
+pub fn spawn_queue_consumer_tasks(env: EnvironmentWrite) -> InitialQueueTriggers {
     let (tx_publish, _) = spawn_publish_consumer(env.clone());
     let (tx_integration, _) = spawn_dht_op_integration_consumer(env.clone(), tx_publish);
     let (tx_app_validation, _) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
