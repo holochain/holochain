@@ -36,6 +36,7 @@ pub use cell::{error::CellError, Cell};
 pub use conductor::{Conductor, ConductorBuilder};
 pub use handle::ConductorHandle;
 
+/// setup a tokio runtime that meets the conductor's needs
 pub fn tokio_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new()
         // we use both IO and Time tokio utilities
