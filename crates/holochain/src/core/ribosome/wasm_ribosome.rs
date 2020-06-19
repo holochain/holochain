@@ -257,7 +257,7 @@ impl RibosomeT for WasmRibosome {
         let host_context = HostContext {
             zome_name: zome_name.clone(),
             allow_side_effects: invocation.allow_side_effects(),
-            workspace: workspace,
+            workspace,
         };
         let module = self.module(host_context.clone())?;
 

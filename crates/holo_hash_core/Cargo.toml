@@ -2,7 +2,7 @@
 name = "holo_hash_core"
 version = "0.0.1"
 description = "hashing helpers supporting dht sharding"
-license = "Apache-2.0"
+license = "CAL-1.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]

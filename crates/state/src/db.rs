@@ -44,6 +44,12 @@ pub enum DbName {
     Wasm,
     /// database to store the [DnaDef]
     DnaDef,
+    /// Authored [DhtOp]s KV store
+    AuthoredDhtOps,
+    /// Integrated [DhtOp]s KV store
+    IntegratedDhtOps,
+    /// Integration Queue of [DhtOp]s KV store where key is [Timestamp] + [DhtOpHash]
+    IntegrationQueue,
     /// KVV store to accumulate validation receipts for a published EntryHash
     ValidationReceipts,
 }
@@ -65,6 +71,9 @@ impl std::fmt::Display for DbName {
             ConductorState => write!(f, "ConductorState"),
             Wasm => write!(f, "Wasm"),
             DnaDef => write!(f, "DnaDef"),
+            AuthoredDhtOps => write!(f, "AuthoredDhtOps"),
+            IntegratedDhtOps => write!(f, "IntegratedDhtOps"),
+            IntegrationQueue => write!(f, "IntegrationQueue"),
             ValidationReceipts => write!(f, "ValidationReceipts"),
         }
     }
@@ -89,6 +98,9 @@ impl DbName {
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
+            AuthoredDhtOps => Single,
+            IntegratedDhtOps => Single,
+            IntegrationQueue => Single,
             ValidationReceipts => Multi,
         }
     }
@@ -143,6 +155,12 @@ lazy_static! {
     pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
     /// The key to access the DnaDef database
     pub static ref DNA_DEF: DbKey<SingleStore> = DbKey::new(DbName::DnaDef);
+    /// The key to access the AuthoredDhtOps database
+    pub static ref AUTHORED_DHT_OPS: DbKey<SingleStore> = DbKey::new(DbName::AuthoredDhtOps);
+    /// The key to access the IntegratedDhtOps database
+    pub static ref INTEGRATED_DHT_OPS: DbKey<SingleStore> = DbKey::new(DbName::IntegratedDhtOps);
+    /// The key to access the IntegrationQueue database
+    pub static ref INTEGRATION_QUEUE: DbKey<SingleStore> = DbKey::new(DbName::IntegrationQueue);
     /// The key to access the ValidationReceipts database
     pub static ref VALIDATION_RECEIPTS: DbKey<MultiStore> = DbKey::new(DbName::ValidationReceipts);
 }
@@ -196,6 +214,9 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*CACHE_CHAIN_HEADERS)?;
             register_db(env, um, &*CACHE_SYSTEM_META)?;
             register_db(env, um, &*CACHE_LINKS_META)?;
+            register_db(env, um, &*AUTHORED_DHT_OPS)?;
+            register_db(env, um, &*INTEGRATED_DHT_OPS)?;
+            register_db(env, um, &*INTEGRATION_QUEUE)?;
             register_db(env, um, &*VALIDATION_RECEIPTS)?;
         }
         EnvironmentKind::Conductor => {

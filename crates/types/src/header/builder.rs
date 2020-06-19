@@ -87,6 +87,7 @@ builder_variant!(LinkAdd {
 
 builder_variant!(LinkRemove {
     link_add_address: HeaderAddress,
+    base_address: EntryHash,
 });
 
 builder_variant!(ChainOpen {

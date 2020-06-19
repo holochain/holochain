@@ -145,22 +145,21 @@ impl UnsafeInvokeZomeWorkspace {
 
 impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
     fn drop(&mut self) {
-        let arc = Arc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"));
-        match arc {
-            Err(arc) => {
-                warn!("Trying to drop UnsafeInvokeZomeWorkspace but there must be outstanding references");
-                // Wait on the lock to check if others have it
-                tokio_safe_block_on::tokio_safe_block_on(
-                    arc.write(),
-                    std::time::Duration::from_secs(10),
-                )
-                .ok();
-                // TODO: B-01648: Try to consume now hoping noone has taken a lock in the meantime
-                Arc::try_unwrap(arc).expect(
-                    "UnsafeInvokeZomeWorkspace still has live references when workflow is finished",
-                );
-            }
-            Ok(_) => (),
+        if let Err(arc) = Arc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"))
+        {
+            warn!(
+                "Trying to drop UnsafeInvokeZomeWorkspace but there must be outstanding references"
+            );
+            // Wait on the lock to check if others have it
+            tokio_safe_block_on::tokio_safe_block_on(
+                arc.write(),
+                std::time::Duration::from_secs(10),
+            )
+            .ok();
+            // TODO: B-01648: Try to consume now hoping noone has taken a lock in the meantime
+            Arc::try_unwrap(arc).expect(
+                "UnsafeInvokeZomeWorkspace still has live references when workflow is finished",
+            );
         }
     }
 }
