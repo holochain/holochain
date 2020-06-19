@@ -110,7 +110,7 @@ where
         }
     }
 
-    /// Get an entry without checking it's metadata
+    /// Get an entry without checking its metadata
     pub async fn dht_get_entry_raw(
         &self,
         entry_hash: &EntryHash,
