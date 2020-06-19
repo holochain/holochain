@@ -1,7 +1,7 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
-use super::{Workflow, WorkflowEffects};
+use super::{produce_dht_op_workflow::dht_op::error::DhtOpConvertError, Workflow, WorkflowEffects};
 use crate::{
     conductor::{api::error::ConductorApiError, CellError},
     core::{
@@ -35,6 +35,12 @@ pub enum WorkflowError {
 
     #[error("Capability token missing")]
     CapabilityMissing,
+
+    #[error(transparent)]
+    FailedToHash(#[from] SerializedBytesError),
+
+    #[error(transparent)]
+    DhtOpConvertError(#[from] DhtOpConvertError),
 }
 
 /// The `Result::Ok` of any workflow function is
