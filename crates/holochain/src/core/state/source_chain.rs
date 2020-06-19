@@ -3,6 +3,7 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
+use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{
     buffer::BufferedStore,
@@ -12,7 +13,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
-    header::{builder, EntryType, HeaderBuilderCommon, HeaderInner},
+    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
     prelude::*,
     EntryHashed,
 };
@@ -22,7 +23,6 @@ use holochain_zome_types::{
 };
 use shrinkwraprs::Shrinkwrap;
 
-use builder::HeaderBuilder;
 pub use error::*;
 pub use source_chain_buffer::*;
 
@@ -68,7 +68,7 @@ impl<'env> SourceChain<'env> {
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
         };
-        let header = header_builder.build_header(common);
+        let header = header_builder.build(common).into();
         self.put_raw(header, maybe_entry).await
     }
 
@@ -118,9 +118,9 @@ impl<'env> SourceChain<'env> {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
-            .iter_raw()?
+            .iter_fail()?
             .filter_map(|entry| {
-                entry.as_cap_grant().and_then(|grant| {
+                Ok(entry.as_cap_grant().and_then(|grant| {
                     grant.access().secret().and_then(|secret| {
                         if secret == query {
                             Some((entry.into_hash(), grant.clone()))
@@ -128,9 +128,9 @@ impl<'env> SourceChain<'env> {
                             None
                         }
                     })
-                })
+                }))
             })
-            .collect();
+            .collect()?;
 
         let answer = if hashes_n_grants.len() == 0 {
             None
@@ -162,16 +162,16 @@ impl<'env> SourceChain<'env> {
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapClaims",
             )
-            .iter_raw()?
+            .iter_fail()?
             .filter_map(|entry| {
                 if let (Entry::CapClaim(claim), entry_hash) = entry.into_inner() {
-                    Some((entry_hash, claim))
+                    Ok(Some((entry_hash, claim)))
                 } else {
-                    None
+                    Ok(None)
                 }
             })
-            .filter(|(_entry_hash, claim)| claim.secret() == query)
-            .collect();
+            .filter(|(_entry_hash, claim)| Ok(claim.secret() == query))
+            .collect()?;
 
         let answer = if hashes_n_claims.len() == 0 {
             None

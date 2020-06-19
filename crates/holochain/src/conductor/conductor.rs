@@ -412,7 +412,7 @@ where
                         if !errors.is_empty() {
                             for cell in success {
                                 // Error needs to capture which app failed
-                                cell.cleanup().await.map_err(|e| CreateAppError::Failed {
+                                cell.destroy().await.map_err(|e| CreateAppError::Failed {
                                     app_id: app_id.clone(),
                                     errors: vec![e],
                                 })?;
@@ -521,7 +521,8 @@ where
         let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .iter()?
+            .get_all()?
+            .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
                 let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| async {

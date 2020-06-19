@@ -67,6 +67,15 @@ pub enum DatabaseError {
 
     #[error("Failue to remove directory")]
     DirectoryError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    #[error("Empty keys cannot be used with lmdb")]
+    EmptyKey,
+
+    #[error("Key range must be not empty and start < end")]
+    InvalidKeyRange,
 }
 
 impl PartialEq for DatabaseError {
