@@ -35,7 +35,6 @@ use std::{
     path::Path,
 };
 use tracing::*;
-//use crate::core::ribosome::error::RibosomeError;
 
 #[allow(missing_docs)]
 pub mod error;
