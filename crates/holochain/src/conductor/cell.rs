@@ -19,8 +19,8 @@ use crate::{
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
-            error::WorkflowRunError, genesis_workflow::genesis_workflow, run_workflow,
-            GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflow,
+            error::WorkflowRunError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
+            run_workflow, GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
             InitializeZomesWorkspace, InvokeZomeWorkflow, InvokeZomeWorkspace,
             ZomeCallInvocationResult,
         },
@@ -406,10 +406,11 @@ impl Cell {
         // Get the ribosome
         let ribosome = WasmRibosome::new(dna_file);
 
-        // Create the workflow and run it
-        let workflow = InitializeZomesWorkflow { dna_def, ribosome };
-        let run_init = run_workflow(state_env.clone(), workflow, workspace).await;
-        let init_result = run_init.map_err(Box::new)??;
+        // Run the workflow
+        let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
+        let init_result = initialize_zomes_workflow(workspace, state_env.clone().into(), args)
+            .await
+            .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
             InitResult::Pass => (),

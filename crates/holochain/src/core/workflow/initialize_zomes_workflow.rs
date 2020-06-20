@@ -1,70 +1,68 @@
 use super::{
-    error::WorkflowResult, unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
-    InvokeZomeWorkspace, Workflow, WorkflowEffects,
+    error::WorkflowRunResult, unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
+    InvokeZomeWorkspace,
 };
 use crate::core::{
+    queue_consumer::OneshotWriter,
     ribosome::{
-        error::RibosomeResult,
         guest_callback::init::{InitInvocation, InitResult},
         RibosomeT,
     },
     state::workspace::{Workspace, WorkspaceError, WorkspaceResult},
 };
-use futures::FutureExt;
+use derive_more::Constructor;
 use holochain_state::buffer::BufferedStore;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use holochain_types::{dna::DnaDef, header::builder};
-use must_future::MustBoxFuture;
 
-pub(crate) struct InitializeZomesWorkflow<Ribosome: RibosomeT> {
+#[derive(Constructor)]
+pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
     pub dna_def: DnaDef,
     pub ribosome: Ribosome,
 }
 
-impl<'env, Ribosome> Workflow<'env> for InitializeZomesWorkflow<Ribosome>
-where
-    Ribosome: RibosomeT + Send + Sync + 'env,
-{
-    type Output = RibosomeResult<InitResult>;
-    type Workspace = InitializeZomesWorkspace<'env>;
-    type Triggers = ();
+// TODO: #[instrument]
+pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
+    mut workspace: InitializeZomesWorkspace<'env>,
+    writer: OneshotWriter,
+    args: InitializeZomesWorkflowArgs<Ribosome>,
+) -> WorkflowRunResult<InitResult> {
+    let result = initialize_zomes_workflow_inner(&mut workspace, args).await?;
 
-    fn workflow(
-        self,
-        mut workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
-        async {
-            let Self { dna_def, ribosome } = self;
-            // Call the init callback
-            let result = {
-                // TODO: We need a better solution then reusung the InvokeZomeWorkspace (i.e. ghost actor)
-                let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace.0);
-                let invocation = InitInvocation { dna_def };
-                ribosome.run_init(raw_workspace, invocation)
-            };
+    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-            // Insert the init marker
-            workspace
-                .0
-                .source_chain
-                .put(builder::InitZomesComplete {}, None)
-                .await?;
+    // commit the workspace
+    writer
+        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .await?;
 
-            let fx = WorkflowEffects {
-                workspace,
-                callbacks: Default::default(),
-                signals: Default::default(),
-                triggers: Default::default(),
-            };
-
-            Ok((result, fx))
-        }
-        .boxed()
-        .into()
-    }
+    Ok(result)
 }
 
-pub(crate) struct InitializeZomesWorkspace<'env>(pub(crate) InvokeZomeWorkspace<'env>);
+async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
+    workspace: &mut InitializeZomesWorkspace<'env>,
+    args: InitializeZomesWorkflowArgs<Ribosome>,
+) -> WorkflowRunResult<InitResult> {
+    let InitializeZomesWorkflowArgs { dna_def, ribosome } = args;
+    // Call the init callback
+    let result = {
+        // TODO: We need a better solution then reusung the InvokeZomeWorkspace (i.e. ghost actor)
+        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace.0);
+        let invocation = InitInvocation { dna_def };
+        ribosome.run_init(raw_workspace, invocation)?
+    };
+
+    // Insert the init marker
+    workspace
+        .0
+        .source_chain
+        .put(builder::InitZomesComplete {}, None)
+        .await?;
+
+    Ok(result)
+}
+
+pub struct InitializeZomesWorkspace<'env>(pub(crate) InvokeZomeWorkspace<'env>);
 
 impl<'env> Workspace<'env> for InitializeZomesWorkspace<'env> {
     /// Constructor
@@ -113,16 +111,14 @@ pub mod tests {
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
 
-        let workflow = InitializeZomesWorkflow { ribosome, dna_def };
-        let (_, effects) = workflow.workflow(workspace).await.unwrap();
-
-        // Check the initialize zome was added to a trigger
-        assert!(effects.signals.is_empty());
-        assert!(effects.callbacks.is_empty());
+        let args = InitializeZomesWorkflowArgs { ribosome, dna_def };
+        initialize_zomes_workflow_inner(&mut workspace, args)
+            .await
+            .unwrap();
 
         // Check init is added to the workspace
         assert_matches!(
-            effects.workspace.0.source_chain.get_index(3).await,
+            workspace.0.source_chain.get_index(3).await,
             Ok(Some(Header::InitZomesComplete(_)))
         );
     }
