@@ -129,7 +129,7 @@ where
 {
     env: EnvironmentWrite,
     run_workflow:
-        Box<dyn Fn(Ws) -> MustBoxFuture<'static, WorkflowRunResult<WorkComplete>> + Send + Sync>,
+        Box<dyn Fn(Ws) -> MustBoxFuture<'static, WorkflowResult<WorkComplete>> + Send + Sync>,
     channel: (QueueTrigger, QueueTriggerListener),
     // triggers: Vec<QueueTrigger>,
 }

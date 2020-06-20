@@ -4,7 +4,7 @@ use super::*;
 use crate::core::{
     state::workspace::{Workspace, WorkspaceResult},
     workflow::{
-        error::WorkflowRunResult,
+        error::WorkflowResult,
         produce_dht_op_workflow::{produce_dht_op_workflow, ProduceDhtOpWorkspace},
     },
 };

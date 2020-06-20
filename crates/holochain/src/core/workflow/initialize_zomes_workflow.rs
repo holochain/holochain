@@ -1,5 +1,5 @@
 use super::{
-    error::WorkflowRunResult, unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
+    error::WorkflowResult, unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
     InvokeZomeWorkspace,
 };
 use crate::core::{
@@ -26,7 +26,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
     mut workspace: InitializeZomesWorkspace<'env>,
     writer: OneshotWriter,
     args: InitializeZomesWorkflowArgs<Ribosome>,
-) -> WorkflowRunResult<InitResult> {
+) -> WorkflowResult<InitResult> {
     let result = initialize_zomes_workflow_inner(&mut workspace, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -42,7 +42,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
 async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     workspace: &mut InitializeZomesWorkspace<'env>,
     args: InitializeZomesWorkflowArgs<Ribosome>,
-) -> WorkflowRunResult<InitResult> {
+) -> WorkflowResult<InitResult> {
     let InitializeZomesWorkflowArgs { dna_def, ribosome } = args;
     // Call the init callback
     let result = {

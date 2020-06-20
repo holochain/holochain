@@ -7,7 +7,7 @@
 // FIXME: understand the details of actually getting the DNA
 // FIXME: creating entries in the config db
 
-use super::error::{WorkflowError, WorkflowRunError, WorkflowRunResult};
+use super::error::{WorkflowError, WorkflowResult};
 use crate::conductor::api::CellConductorApiT;
 use crate::core::{
     queue_consumer::OneshotWriter,
@@ -36,7 +36,7 @@ pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
     mut workspace: GenesisWorkspace<'env>,
     writer: OneshotWriter,
     args: GenesisWorkflowArgs<Api>,
-) -> WorkflowRunResult<()> {
+) -> WorkflowResult<()> {
     genesis_workflow_inner(&mut workspace, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -52,7 +52,7 @@ pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
 async fn genesis_workflow_inner<'env, Api: CellConductorApiT>(
     workspace: &mut GenesisWorkspace<'env>,
     args: GenesisWorkflowArgs<Api>,
-) -> WorkflowRunResult<()> {
+) -> WorkflowResult<()> {
     let GenesisWorkflowArgs {
         api,
         dna_file,

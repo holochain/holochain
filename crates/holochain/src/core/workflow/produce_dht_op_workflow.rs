@@ -1,4 +1,4 @@
-use super::{error::WorkflowRunResult, InvokeZomeWorkspace};
+use super::{error::WorkflowResult, InvokeZomeWorkspace};
 use crate::core::{
     queue_consumer::{OneshotWriter, QueueTrigger, WorkComplete},
     state::workspace::{Workspace, WorkspaceResult},
@@ -25,7 +25,7 @@ pub async fn produce_dht_op_workflow<'env>(
     mut workspace: ProduceDhtOpWorkspace<'env>,
     writer: OneshotWriter,
     trigger_integration: &mut QueueTrigger,
-) -> WorkflowRunResult<WorkComplete> {
+) -> WorkflowResult<WorkComplete> {
     let complete = produce_dht_op_workflow_inner(&mut workspace).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -43,7 +43,7 @@ pub async fn produce_dht_op_workflow<'env>(
 
 async fn produce_dht_op_workflow_inner<'env>(
     workspace: &mut ProduceDhtOpWorkspace<'env>,
-) -> WorkflowRunResult<WorkComplete> {
+) -> WorkflowResult<WorkComplete> {
     debug!("Starting dht op workflow");
     let invoke_zome_workspace = &mut workspace.invoke_zome_workspace;
     let all_ops = invoke_zome_workspace

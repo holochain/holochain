@@ -19,8 +19,8 @@ use crate::{
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
-            error::WorkflowRunError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
-            invoke_zome_workflow, run_workflow, GenesisWorkflowArgs, GenesisWorkspace,
+            error::WorkflowError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
+            invoke_zome_workflow, GenesisWorkflowArgs, GenesisWorkspace,
             InitializeZomesWorkflowArgs, InitializeZomesWorkspace, InvokeZomeWorkflowArgs,
             InvokeZomeWorkspace, ZomeCallInvocationResult,
         },
@@ -393,7 +393,7 @@ impl Cell {
         let reader = env_ref.reader()?;
         // Create the workspace
         let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)
-            .map_err(WorkflowRunError::from)
+            .map_err(WorkflowError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);
 

@@ -2,7 +2,7 @@ use crate::{
     conductor::api::error::ConductorApiError,
     core::{
         ribosome::{error::RibosomeError, guest_callback::init::InitResult},
-        workflow::error::{WorkflowError, WorkflowRunError},
+        workflow::error::WorkflowError,
     },
 };
 use holochain_state::error::DatabaseError;
@@ -24,11 +24,8 @@ pub enum CellError {
     CellWithoutGenesis(CellId),
     #[error("The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}")]
     Cleanup(String, PathBuf),
-    // FIXME: remove
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
-    #[error(transparent)]
-    WorkflowRunError(#[from] Box<WorkflowRunError>),
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]

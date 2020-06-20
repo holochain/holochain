@@ -1,8 +1,5 @@
+use super::error::{WorkflowError, WorkflowResult};
 use super::Workspace;
-use super::{
-    error::{WorkflowError, WorkflowResult, WorkflowRunResult},
-    Workflow, WorkflowEffects,
-};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
@@ -36,7 +33,7 @@ pub async fn invoke_zome_workflow<'env, Ribosome: RibosomeT>(
     writer: OneshotWriter,
     args: InvokeZomeWorkflowArgs<Ribosome>,
     mut trigger_produce_dht_ops: QueueTrigger,
-) -> WorkflowRunResult<ZomeCallInvocationResult> {
+) -> WorkflowResult<ZomeCallInvocationResult> {
     let result = invoke_zome_workflow_inner(&mut workspace, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -54,7 +51,7 @@ pub async fn invoke_zome_workflow<'env, Ribosome: RibosomeT>(
 async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     workspace: &mut InvokeZomeWorkspace<'env>,
     args: InvokeZomeWorkflowArgs<Ribosome>,
-) -> WorkflowRunResult<ZomeCallInvocationResult> {
+) -> WorkflowResult<ZomeCallInvocationResult> {
     let InvokeZomeWorkflowArgs {
         ribosome,
         invocation,
@@ -163,7 +160,7 @@ pub mod tests {
     use super::*;
     use crate::core::{
         ribosome::MockRibosomeT,
-        workflow::{error::WorkflowRunError, genesis_workflow::tests::fake_genesis},
+        workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
@@ -183,7 +180,7 @@ pub mod tests {
         workspace: &mut InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
-    ) -> WorkflowRunResult<ZomeCallInvocationResult> {
+    ) -> WorkflowResult<ZomeCallInvocationResult> {
         let args = InvokeZomeWorkflowArgs {
             invocation,
             ribosome,
@@ -222,7 +219,7 @@ pub mod tests {
         let error = run_call_zome(&mut workspace, ribosome, invocation)
             .await
             .unwrap_err();
-        assert_matches!(error, WorkflowRunError::CapabilityMissing);
+        assert_matches!(error, WorkflowError::CapabilityMissing);
     }
 
     // TODO: B-01553: Finish these tests when capabilities land
