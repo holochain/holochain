@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use std::sync::Arc;
 
 mod types;
@@ -39,12 +40,20 @@ impl HolochainP2pCell {
     /// Invoke a zome function on a remote node (if you have been granted the capability).
     pub async fn call_remote(
         &mut self,
+        to_agent: AgentPubKey,
+        zome_name: ZomeName,
+        fn_name: String,
+        cap: CapSecret,
         request: SerializedBytes,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
                 (*self.dna_hash).clone(),
                 (*self.from_agent).clone(),
+                to_agent,
+                zome_name,
+                fn_name,
+                cap,
                 request,
             )
             .await
