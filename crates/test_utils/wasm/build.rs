@@ -20,6 +20,7 @@ fn main() {
     }
 
     for &m in [
+        "bench",
         "debug",
         "entry_defs",
         "foo",
