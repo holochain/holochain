@@ -106,6 +106,31 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
         self.next_index += 1;
         self.current_head = Some(header_address);
     }
+
+    pub fn get_items_with_incomplete_dht_ops(
+        &self,
+    ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderAddress)> + 'env>> {
+        if !self.db.is_scratch_fresh() {
+            return Err(SourceChainError::ScratchNotFresh);
+        }
+        // TODO: PERF: Currently this checks every header but we could keep
+        // a list of indices for only the headers which have been transformed.
+        Ok(Box::new(self.db.iter_raw()?.filter_map(|(i, c)| {
+            if !c.dht_transforms_complete {
+                Some((i, c.header_address))
+            } else {
+                None
+            }
+        })))
+    }
+
+    pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
+        if let Some(mut c) = self.db.get(i)? {
+            c.dht_transforms_complete = true;
+            self.db.put(i, c);
+        }
+        Ok(())
+    }
 }
 
 impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
@@ -136,6 +161,7 @@ pub mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::observability;
+    use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
@@ -385,18 +411,20 @@ pub mod tests {
 
         let (result1, result2) = tokio::join!(task1, task2);
 
-        assert_eq!(
+        let expected_hash = HeaderHash::new(vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 5,
+        ])
+        .into();
+        assert_matches!(
             result1.unwrap(),
             Err(SourceChainError::HeadMoved(
                 None,
                 Some(
-                    HeaderHash::new(vec![
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5
-                    ])
-                    .into()
+                    hash
                 )
             ))
+            if hash == expected_hash
         );
         assert!(result2.unwrap().is_ok());
 
