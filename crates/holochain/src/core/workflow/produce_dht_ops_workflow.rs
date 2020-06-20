@@ -21,12 +21,12 @@ use tracing::*;
 pub mod dht_op;
 
 // TODO: #[instrument]
-pub async fn produce_dht_op_workflow<'env>(
-    mut workspace: ProduceDhtOpWorkspace<'env>,
+pub async fn produce_dht_ops_workflow<'env>(
+    mut workspace: ProduceDhtOpsWorkspace<'env>,
     writer: OneshotWriter,
     trigger_integration: &mut QueueTrigger,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = produce_dht_op_workflow_inner(&mut workspace).await?;
+    let complete = produce_dht_ops_workflow_inner(&mut workspace).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -41,8 +41,8 @@ pub async fn produce_dht_op_workflow<'env>(
     Ok(complete)
 }
 
-async fn produce_dht_op_workflow_inner<'env>(
-    workspace: &mut ProduceDhtOpWorkspace<'env>,
+async fn produce_dht_ops_workflow_inner<'env>(
+    workspace: &mut ProduceDhtOpsWorkspace<'env>,
 ) -> WorkflowResult<WorkComplete> {
     debug!("Starting dht op workflow");
     let invoke_zome_workspace = &mut workspace.invoke_zome_workspace;
@@ -111,13 +111,13 @@ pub struct IntegrationValue {
     pub op: DhtOpLight,
 }
 
-pub struct ProduceDhtOpWorkspace<'env> {
+pub struct ProduceDhtOpsWorkspace<'env> {
     pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
     pub authored_dht_ops: KvBuf<'env, DhtOpHash, u32, Reader<'env>>,
     pub integration_queue: KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>,
 }
 
-impl<'env> Workspace<'env> for ProduceDhtOpWorkspace<'env> {
+impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
     fn new(reader: &'env Reader<'env>, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         let integration_queue = db.get_db(&*INTEGRATION_QUEUE)?;
@@ -259,7 +259,7 @@ mod tests {
         let expected = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
-            let mut source_chain = ProduceDhtOpWorkspace::new(&reader, &dbs)
+            let mut source_chain = ProduceDhtOpsWorkspace::new(&reader, &dbs)
                 .unwrap()
                 .invoke_zome_workspace
                 .source_chain;
@@ -313,8 +313,10 @@ mod tests {
         // Run the workflow and commit it
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-            let complete = produce_dht_op_workflow_inner(&mut workspace).await.unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let complete = produce_dht_ops_workflow_inner(&mut workspace)
+                .await
+                .unwrap();
             env_ref
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
@@ -323,7 +325,7 @@ mod tests {
         // Pull out the results and check them
         let last_count = {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let mut times = Vec::new();
             let results = workspace
                 .integration_queue
@@ -395,8 +397,10 @@ mod tests {
         // because no new ops should hav been added
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-            let complete = produce_dht_op_workflow_inner(&mut workspace).await.unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let complete = produce_dht_ops_workflow_inner(&mut workspace)
+                .await
+                .unwrap();
             let writer = env_ref
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
@@ -405,7 +409,7 @@ mod tests {
         // Check the lengths are unchanged
         {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let count = workspace.integration_queue.iter().unwrap().count().unwrap();
             let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
 

@@ -1,13 +1,13 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::core::state::workspace::{Workspace, WorkspaceResult};
+use crate::core::{
+    state::workspace::Workspace,
+    workflow::app_validation_workflow::{app_validation_workflow, AppValidationWorkspace},
+};
 use futures::StreamExt;
 use holochain_state::env::EnvironmentWrite;
-use holochain_state::{
-    env::ReadManager,
-    prelude::{GetDb, Reader},
-};
+use holochain_state::env::ReadManager;
 
 /// Spawn the QueueConsumer for AppValidation workflow
 pub fn spawn_app_validation_consumer(
@@ -33,39 +33,4 @@ pub fn spawn_app_validation_consumer(
         }
     });
     (tx, handle)
-}
-
-struct AppValidationWorkspace<'env>(std::marker::PhantomData<&'env ()>);
-
-impl<'env> AppValidationWorkspace<'env> {}
-
-impl<'env> Workspace<'env> for AppValidationWorkspace<'env> {
-    /// Constructor
-    #[allow(dead_code)]
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        Ok(Self(std::marker::PhantomData))
-    }
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        todo!()
-    }
-}
-
-async fn app_validation_workflow<'env>(
-    workspace: AppValidationWorkspace<'env>,
-    writer: OneshotWriter,
-    trigger_integration: &mut QueueTrigger,
-) -> anyhow::Result<WorkComplete> {
-    todo!("implement workflow");
-
-    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
-
-    // commit the workspace
-    writer
-        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
-        .await?;
-
-    // trigger other workflows
-    trigger_integration.trigger();
-
-    Ok(WorkComplete::Complete)
 }

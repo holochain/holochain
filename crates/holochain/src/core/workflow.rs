@@ -24,10 +24,14 @@
 use crate::core::state::workspace::Workspace;
 pub mod error;
 
+pub mod app_validation_workflow;
 pub mod call_zome_workflow;
 pub mod genesis_workflow;
 pub mod initialize_zomes_workflow;
-pub mod produce_dht_op_workflow;
+pub mod integrate_dht_ops_workflow;
+pub mod produce_dht_ops_workflow;
+pub mod publish_dht_ops_workflow;
+pub mod sys_validation_workflow;
 pub(crate) use call_zome_workflow::unsafe_invoke_zome_workspace;
 pub(crate) use call_zome_workflow::*;
 pub(crate) use genesis_workflow::*;

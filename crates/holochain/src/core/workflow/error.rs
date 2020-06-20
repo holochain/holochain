@@ -1,7 +1,7 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
-use super::produce_dht_op_workflow::dht_op::error::DhtOpConvertError;
+use super::produce_dht_ops_workflow::dht_op::error::DhtOpConvertError;
 use crate::{
     conductor::{api::error::ConductorApiError, CellError},
     core::{

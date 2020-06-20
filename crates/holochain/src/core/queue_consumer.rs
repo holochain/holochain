@@ -26,39 +26,37 @@
 //! remove the item it has just processed.
 
 use derive_more::{Constructor, Display, From};
-use dht_op_integration_workflow::spawn_dht_op_integration_consumer;
 use holochain_state::{
-    env::{EnvironmentRefRw, EnvironmentWrite, WriteManager},
+    env::{EnvironmentWrite, WriteManager},
     error::DatabaseError,
     prelude::Writer,
 };
-use publish_workflow::spawn_publish_consumer;
 use tokio::sync::mpsc;
 
 // TODO: move these to workflow mod
-mod dht_op_integration_workflow;
-use dht_op_integration_workflow::*;
-mod sys_validation_workflow;
-use sys_validation_workflow::*;
-mod app_validation_workflow;
-use app_validation_workflow::*;
-mod produce_workflow;
-use produce_workflow::*;
-mod publish_workflow;
-use publish_workflow::*;
+mod integrate_dht_ops_consumer;
+use integrate_dht_ops_consumer::*;
+mod sys_validation_consumer;
+use sys_validation_consumer::*;
+mod app_validation_consumer;
+use app_validation_consumer::*;
+mod produce_dht_ops_consumer;
+use produce_dht_ops_consumer::*;
+mod publish_dht_ops_consumer;
+use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
 pub fn spawn_queue_consumer_tasks(env: EnvironmentWrite) -> InitialQueueTriggers {
-    let (tx_publish, _) = spawn_publish_consumer(env.clone());
-    let (tx_integration, _) = spawn_dht_op_integration_consumer(env.clone(), tx_publish);
+    let (tx_publish_dht_ops, _) = spawn_publish_dht_ops_consumer(env.clone());
+    let (tx_integration, _) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish_dht_ops);
     let (tx_app_validation, _) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
     let (tx_sys_validation, _) = spawn_sys_validation_consumer(env.clone(), tx_app_validation);
-    let (tx_produce, _) = spawn_produce_consumer(env.clone(), tx_integration);
+    let (tx_produce_dht_ops, _) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
 
     InitialQueueTriggers {
         sys_validation: tx_sys_validation,
-        produce_dht_ops: tx_produce,
+        produce_dht_ops: tx_produce_dht_ops,
     }
 }
 
@@ -128,7 +126,7 @@ where
     Ws: for<'env> Workspace<'env>,
 {
     env: EnvironmentWrite,
-    run_workflow:
+    run_consumer:
         Box<dyn Fn(Ws) -> MustBoxFuture<'static, WorkflowResult<WorkComplete>> + Send + Sync>,
     channel: (QueueTrigger, QueueTriggerListener),
     // triggers: Vec<QueueTrigger>,
@@ -145,8 +143,8 @@ where
                 let env_ref = self.env.guard().await;
                 let reader = env_ref.reader().expect("Could not create LMDB reader");
                 let workspace =
-                    ProduceWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
-                if let WorkComplete::Incomplete = (*self.run_workflow)(workspace)
+                    produce_dht_opsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
+                if let WorkComplete::Incomplete = (*self.run_consumer)(workspace)
                     .await
                     .expect("Failed to run workflow")
                 {

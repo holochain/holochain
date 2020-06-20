@@ -2,21 +2,15 @@
 
 use super::*;
 use crate::core::{
-    state::workspace::{Workspace, WorkspaceResult},
-    workflow::{
-        error::WorkflowResult,
-        produce_dht_op_workflow::{produce_dht_op_workflow, ProduceDhtOpWorkspace},
-    },
+    state::workspace::Workspace,
+    workflow::produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
 };
 use futures::StreamExt;
 use holochain_state::env::EnvironmentWrite;
-use holochain_state::{
-    env::ReadManager,
-    prelude::{GetDb, Reader},
-};
+use holochain_state::env::ReadManager;
 
-/// Spawn the QueueConsumer for Produce workflow
-pub fn spawn_produce_consumer(
+/// Spawn the QueueConsumer for Produce_dht_ops workflow
+pub fn spawn_produce_dht_ops_consumer(
     env: EnvironmentWrite,
     mut trigger_integration: QueueTrigger,
 ) -> (QueueTrigger, tokio::task::JoinHandle<()>) {
@@ -27,9 +21,9 @@ pub fn spawn_produce_consumer(
             let env_ref = env.guard().await;
             let reader = env_ref.reader().expect("Could not create LMDB reader");
             let workspace =
-                ProduceDhtOpWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
+                ProduceDhtOpsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
-                produce_dht_op_workflow(workspace, env.clone().into(), &mut trigger_integration)
+                produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_integration)
                     .await
                     .expect("Error running Workflow")
             {
