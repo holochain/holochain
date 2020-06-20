@@ -25,7 +25,7 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
-use derive_more::{Constructor, From};
+use derive_more::{Constructor, Display, From};
 use dht_op_integration_workflow::spawn_dht_op_integration_consumer;
 use holochain_state::{
     env::{EnvironmentRefRw, EnvironmentWrite, WriteManager},
@@ -117,7 +117,7 @@ pub enum WorkComplete {
 }
 
 /// The only error possible when attempting to trigger: the channel is closed
-#[derive(Debug)]
+#[derive(Debug, Display, thiserror::Error)]
 pub struct QueueTriggerClosedError;
 
 /*

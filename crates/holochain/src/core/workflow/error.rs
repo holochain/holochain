@@ -5,6 +5,7 @@ use super::{produce_dht_op_workflow::dht_op::error::DhtOpConvertError, Workflow,
 use crate::{
     conductor::{api::error::ConductorApiError, CellError},
     core::{
+        queue_consumer::QueueTriggerClosedError,
         ribosome::error::RibosomeError,
         state::{source_chain::SourceChainError, workspace::WorkspaceError},
     },
@@ -91,6 +92,9 @@ pub enum WorkflowRunError {
 
     #[error(transparent)]
     CellError(#[from] CellError),
+
+    #[error(transparent)]
+    QueueTriggerClosedError(#[from] QueueTriggerClosedError),
 }
 
 /// Internal type to handle running workflows

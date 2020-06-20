@@ -7,7 +7,7 @@
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
-use crate::core::queue_consumer::spawn_queue_consumer_tasks;
+use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::state::workspace::Workspace;
 use crate::{
@@ -20,9 +20,9 @@ use crate::{
         state::source_chain::SourceChainBuf,
         workflow::{
             error::WorkflowRunError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
-            run_workflow, GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
-            InitializeZomesWorkspace, InvokeZomeWorkflow, InvokeZomeWorkspace,
-            ZomeCallInvocationResult,
+            invoke_zome_workflow, run_workflow, GenesisWorkflowArgs, GenesisWorkspace,
+            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, InvokeZomeWorkflowArgs,
+            InvokeZomeWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -76,6 +76,7 @@ where
     conductor_api: CA,
     state_env: EnvironmentWrite,
     holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+    queue_triggers: InitialQueueTriggers,
 }
 
 impl Cell {
@@ -109,13 +110,14 @@ impl Cell {
         if has_genesis {
             // TODO: store these triggers somewhere so they can be hooked up
             // to InvokeCallZome and HandleGossip workflows
-            let triggers = spawn_queue_consumer_tasks(state_env.clone());
+            let queue_triggers = spawn_queue_consumer_tasks(state_env.clone());
 
             Ok(Self {
                 id,
                 conductor_api,
                 state_env,
                 holochain_p2p_cell,
+                queue_triggers,
             })
         } else {
             Err(CellError::CellWithoutGenesis(id))
@@ -367,13 +369,18 @@ impl Cell {
         let reader = env.reader()?;
         let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
 
-        let workflow = InvokeZomeWorkflow {
+        let args = InvokeZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
             invocation,
         };
-        Ok(run_workflow(self.state_env().clone(), workflow, workspace)
-            .await
-            .map_err(Box::new)?)
+        Ok(invoke_zome_workflow(
+            workspace,
+            self.state_env().clone().into(),
+            args,
+            self.queue_triggers.produce_dht_ops.clone(),
+        )
+        .await
+        .map_err(Box::new)?)
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
