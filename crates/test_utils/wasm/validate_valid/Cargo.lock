@@ -181,6 +181,7 @@ dependencies = [
  "nanoid",
  "rust-base58",
  "serde",
+ "serde_bytes",
 ]
 
 [[package]]

@@ -21,3 +21,4 @@ nanoid = "0.3"
 # TODO: remove and replace with HoloHash
 rust-base58 = "0.0.4"
 serde = { version = "1.0.104", features = [ "derive" ] }
+serde_bytes = "0.11"

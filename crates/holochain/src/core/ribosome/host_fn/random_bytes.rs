@@ -1,65 +1,61 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
-use holochain_zome_types::debug::DebugMsg;
-use holochain_zome_types::DebugInput;
-use holochain_zome_types::DebugOutput;
-use std::sync::Arc;
-use tracing::*;
+use holochain_crypto::crypto_init_sodium;
 use holochain_crypto::crypto_randombytes_buf;
+use holochain_crypto::crypto_secure_buffer;
+use holochain_crypto::DynCryptoBytes;
+use holochain_zome_types::bytes::Bytes;
+use holochain_zome_types::RandomBytesInput;
+use holochain_zome_types::RandomBytesOutput;
+use std::sync::Arc;
 
 pub async fn random_bytes(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     input: RandomBytesInput,
 ) -> RibosomeResult<RandomBytesOutput> {
-    let len: u32 = input.into_inner();
+    let _ = crypto_init_sodium();
+    let mut buf: DynCryptoBytes = crypto_secure_buffer(input.into_inner() as _)?;
 
-    let mut buf: Vec<u8> = vec![0; len];
+    crypto_randombytes_buf(&mut buf).await?;
 
-    crypto_randombytes_buf(&mut buf).await;
+    let random_bytes = buf.read();
 
-    Ok(
-        RandomBytesOutput::new(buf)
-    )
+    Ok(RandomBytesOutput::new(Bytes::from(random_bytes.to_vec())))
 }
 
 #[cfg(test)]
 pub mod wasm_test {
+    use crate::core::ribosome::host_fn::random_bytes::random_bytes;
+    use crate::core::ribosome::HostContextFixturator;
+    use crate::fixt::WasmRibosomeFixturator;
     use holochain_zome_types::RandomBytesInput;
     use holochain_zome_types::RandomBytesOutput;
+    use std::convert::TryInto;
+    use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
     async fn random_bytes_test() {
-        let ribosome = WasmRibosomeFixturator::new(Unpredictable).next().unwrap();
-        let host_context = HostContextFixturator::new(Unpredictable).next().unwrap();
-        // cast a u8 here so we can keep the length manageable
-        let len = U8Fixturator::new(Unpredictable).next().unwrap() as u32;
-        let input = RandomBytesInput::new(len);
+        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+            .next()
+            .unwrap();
+        let host_context = HostContextFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        const LEN: usize = 10;
+        let input = RandomBytesInput::new(LEN.try_into().unwrap());
 
-        let output: RandomBytesOutput = random_bytes(input).await;
+        let output: RandomBytesOutput = tokio::task::spawn(async move {
+            random_bytes(Arc::new(ribosome), Arc::new(host_context), input)
+                .await
+                .unwrap()
+        })
+        .await
+        .unwrap();
 
-        println!("{}", output);
+        println!("{:?}", output);
+
+        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
-
-    // #[tokio::test(threaded_scheduler)]
-    // #[serial_test::serial]
-    // async fn ribosome_random_bytes_test() {
-    //     // this shows that debug is called but our line numbers will be messed up
-    //     // the line numbers will show as coming from this test because we made the input here
-    //     let output: RandomBytesOutput = crate::call_test_ribosome!(
-    //         TestWasm::Imports,
-    //         "random_bytes",
-    //         DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
-    //     );
-    //     assert_eq!(output, DebugOutput::new(()));
-    // }
-    //
-    // #[tokio::test(threaded_scheduler)]
-    // #[serial_test::serial]
-    // async fn wasm_line_numbers_test() {
-    //     // this shows that we can get line numbers out of wasm
-    //     let output: DebugOutput = crate::call_test_ribosome!(TestWasm::Debug, "debug", ());
-    //     assert_eq!(output, DebugOutput::new(()));
-    // }
 }

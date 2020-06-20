@@ -90,7 +90,7 @@ mod tests {
     use std::convert::TryInto;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
+    // #[serial_test::serial]
     async fn call_iterator_iterates() {
         // stuff we need to test with
         let mut sequence = Sequence::new();
@@ -137,9 +137,11 @@ mod tests {
                     .with(always(), always(), eq(zome_name.clone()), eq(fn_component))
                     .times(1)
                     .in_sequence(&mut sequence)
-                    .return_const(Ok(Some(GuestOutput::new(
-                        InitCallbackResult::Pass.try_into().unwrap(),
-                    ))));
+                    .returning(|_, _, _, _| {
+                        Ok(Some(GuestOutput::new(
+                            InitCallbackResult::Pass.try_into().unwrap(),
+                        )))
+                    });
             }
 
             // the fn components are reset from the invocation every zome
