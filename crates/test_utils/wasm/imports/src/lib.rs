@@ -57,7 +57,6 @@ guest_functions!(
         RemoveLinkInput,
         RemoveLinkOutput
     ],
-    [__send, send, SendInput, SendOutput],
     [__sign, sign, SignInput, SignOutput],
     [__schedule, schedule, ScheduleInput, ScheduleOutput],
     [

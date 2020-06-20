@@ -27,6 +27,8 @@ pub enum CellError {
     #[error(transparent)]
     WorkflowRunError(#[from] Box<WorkflowRunError>),
     #[error(transparent)]
+    WorkspaceError(#[from] crate::core::state::workspace::WorkspaceError),
+    #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
     InitFailed(InitResult),
