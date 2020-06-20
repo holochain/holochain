@@ -12,6 +12,8 @@ use holo_hash::HeaderHashFixturator;
 use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_types::composite_hash::AnyDhtHash;
 use holochain_types::composite_hash::EntryHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
@@ -19,13 +21,20 @@ use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
+use holochain_types::fixt::AppEntryTypeFixturator;
 use holochain_types::fixt::HeaderBuilderCommonFixturator;
 use holochain_types::fixt::TimestampFixturator;
-use holochain_types::header::builder::HeaderBuilder;
-use holochain_types::header::builder::LinkAdd as LinkAddBuilder;
-use holochain_types::header::builder::LinkRemove as LinkRemoveBuilder;
+use holochain_types::fixt::UpdateBasisFixturator;
+use holochain_types::header::AgentValidationPkg;
+use holochain_types::header::ChainClose;
+use holochain_types::header::ChainOpen;
+use holochain_types::header::EntryCreate;
+use holochain_types::header::EntryDelete;
+use holochain_types::header::EntryType;
+use holochain_types::header::EntryUpdate;
+use holochain_types::header::InitZomesComplete;
 use holochain_types::header::LinkAdd;
-use holochain_types::header::{HeaderBuilderCommon, LinkRemove, ZomeId};
+use holochain_types::header::{Dna, LinkRemove, ZomeId};
 use holochain_types::link::Tag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
@@ -507,60 +516,6 @@ fixturator!(
 );
 
 fixturator!(
-    LinkAddBuilder;
-    constructor fn new(EntryHash, EntryHash, u8, Tag);
-);
-
-fixturator!(
-    LinkAddBuilderCombo;
-    constructor fn new(LinkAddBuilder, HeaderBuilderCommon);
-);
-pub struct LinkAddBuilderCombo(LinkAddBuilder, HeaderBuilderCommon);
-
-impl LinkAddBuilderCombo {
-    fn new(l: LinkAddBuilder, h: HeaderBuilderCommon) -> Self {
-        Self(l, h)
-    }
-}
-
-impl From<LinkAddBuilderCombo> for LinkAdd {
-    fn from(l: LinkAddBuilderCombo) -> Self {
-        l.0.build(l.1)
-    }
-}
-
-fixturator!(
-    LinkAdd; from LinkAddBuilderCombo;
-);
-
-fixturator!(
-    LinkRemoveBuilder;
-    constructor fn new(HeaderHash, EntryHash);
-);
-
-fixturator!(
-    LinkRemoveBuilderCombo;
-    constructor fn new(LinkRemoveBuilder, HeaderBuilderCommon);
-);
-pub struct LinkRemoveBuilderCombo(LinkRemoveBuilder, HeaderBuilderCommon);
-
-impl LinkRemoveBuilderCombo {
-    fn new(l: LinkRemoveBuilder, h: HeaderBuilderCommon) -> Self {
-        Self(l, h)
-    }
-}
-
-impl From<LinkRemoveBuilderCombo> for LinkRemove {
-    fn from(l: LinkRemoveBuilderCombo) -> Self {
-        l.0.build(l.1)
-    }
-}
-
-fixturator!(
-    LinkRemove; from LinkRemoveBuilderCombo;
-);
-
-fixturator!(
     LinkMetaVal;
     constructor fn new(HeaderHash, EntryHash, Timestamp, u8, Tag);
 );
@@ -579,7 +534,7 @@ pub struct KnownLinkRemove {
 impl Iterator for LinkAddFixturator<KnownLinkAdd> {
     type Item = LinkAdd;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkAddFixturator::new(Unpredictable).next().unwrap();
+        let mut f = fixt!(LinkAdd);
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
@@ -591,7 +546,7 @@ impl Iterator for LinkAddFixturator<KnownLinkAdd> {
 impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
     type Item = LinkRemove;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkRemoveFixturator::new(Unpredictable).next().unwrap();
+        let mut f = fixt!(LinkRemove);
         f.link_add_address = self.0.curve.link_add_address.clone();
         Some(f)
     }
@@ -600,9 +555,102 @@ impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
 impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
     type Item = LinkMetaVal;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = LinkMetaValFixturator::new(Unpredictable).next().unwrap();
+        let mut f = fixt!(LinkMetaVal);
         f.target = self.0.curve.0.clone();
         f.tag = self.0.curve.1.clone();
         Some(f)
     }
 }
+
+fixturator!(
+    Dna;
+    constructor fn from_builder(DnaHash, HeaderBuilderCommon);
+);
+
+fixturator!(
+    LinkRemove;
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+);
+
+fixturator!(
+    LinkAdd;
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, Tag);
+);
+
+type MaybeSerializedBytes = Option<SerializedBytes>;
+
+fixturator! {
+    MaybeSerializedBytes;
+    enum [ Some None ];
+    curve Empty MaybeSerializedBytes::None;
+    curve Unpredictable match MaybeSerializedBytesVariant::random() {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
+    };
+    curve Predictable match MaybeSerializedBytesVariant::nth(self.0.index) {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+    };
+}
+
+fixturator! {
+    EntryType;
+    enum [ AgentPubKey App CapClaim CapGrant ];
+    curve Empty EntryType::AgentPubKey;
+    curve Unpredictable match EntryTypeVariant::random() {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryType)),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+    curve Predictable match EntryTypeVariant::nth(self.0.index) {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+}
+
+fixturator!(
+    AgentValidationPkg;
+    constructor fn from_builder(HeaderBuilderCommon, MaybeSerializedBytes);
+);
+
+fixturator!(
+    InitZomesComplete;
+    constructor fn from_builder(HeaderBuilderCommon);
+);
+
+fixturator!(
+    ChainOpen;
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+);
+
+fixturator!(
+    ChainClose;
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+);
+
+fixturator!(
+    EntryCreate;
+    constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
+);
+
+fixturator!(
+    AnyDhtHash;
+    variants [
+        EntryContent(EntryContentHash)
+        Agent(AgentPubKey)
+        Header(HeaderHash)
+    ];
+);
+
+fixturator!(
+    EntryUpdate;
+    constructor fn from_builder(HeaderBuilderCommon, UpdateBasis, HeaderHash, EntryType, EntryHash);
+);
+
+fixturator!(
+    EntryDelete;
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash);
+);
