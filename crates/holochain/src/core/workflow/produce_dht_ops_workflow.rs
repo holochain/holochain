@@ -21,8 +21,8 @@ use tracing::*;
 pub mod dht_op;
 
 // TODO: #[instrument]
-pub async fn produce_dht_ops_workflow<'env>(
-    mut workspace: ProduceDhtOpsWorkspace<'env>,
+pub async fn produce_dht_ops_workflow(
+    mut workspace: ProduceDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
     trigger_integration: &mut QueueTrigger,
 ) -> WorkflowResult<WorkComplete> {
@@ -41,8 +41,8 @@ pub async fn produce_dht_ops_workflow<'env>(
     Ok(complete)
 }
 
-async fn produce_dht_ops_workflow_inner<'env>(
-    workspace: &mut ProduceDhtOpsWorkspace<'env>,
+async fn produce_dht_ops_workflow_inner(
+    workspace: &mut ProduceDhtOpsWorkspace<'_>,
 ) -> WorkflowResult<WorkComplete> {
     debug!("Starting dht op workflow");
     let invoke_zome_workspace = &mut workspace.invoke_zome_workspace;

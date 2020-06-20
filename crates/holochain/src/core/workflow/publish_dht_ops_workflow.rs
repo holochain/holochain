@@ -9,8 +9,8 @@ use error::WorkflowResult;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use tracing::*;
 
-pub async fn publish_dht_ops_workflow<'env>(
-    workspace: PublishDhtOpsWorkspace<'env>,
+pub async fn publish_dht_ops_workflow(
+    workspace: PublishDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
 ) -> WorkflowResult<WorkComplete> {
     warn!("unimplemented");

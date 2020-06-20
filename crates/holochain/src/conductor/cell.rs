@@ -110,7 +110,7 @@ impl Cell {
         if has_genesis {
             // TODO: store these triggers somewhere so they can be hooked up
             // to InvokeCallZome and HandleGossip workflows
-            let queue_triggers = spawn_queue_consumer_tasks(state_env.clone());
+            let queue_triggers = spawn_queue_consumer_tasks(&state_env);
 
             Ok(Self {
                 id,

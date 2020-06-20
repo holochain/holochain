@@ -47,7 +47,7 @@ use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
-pub fn spawn_queue_consumer_tasks(env: EnvironmentWrite) -> InitialQueueTriggers {
+pub fn spawn_queue_consumer_tasks(env: &EnvironmentWrite) -> InitialQueueTriggers {
     let (tx_publish_dht_ops, _) = spawn_publish_dht_ops_consumer(env.clone());
     let (tx_integration, _) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish_dht_ops);
     let (tx_app_validation, _) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
@@ -103,7 +103,10 @@ impl OneshotWriter {
         F: FnOnce(&mut Writer) -> () + Send,
     {
         let env_ref = self.0.guard().await;
-        env_ref.with_commit::<DatabaseError, (), _>(|w| Ok(f(w)))?;
+        env_ref.with_commit::<DatabaseError, (), _>(|w| {
+            f(w);
+            Ok(())
+        })?;
         Ok(())
     }
 }

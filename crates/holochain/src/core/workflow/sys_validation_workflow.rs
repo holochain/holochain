@@ -8,8 +8,8 @@ use crate::core::{
 use error::WorkflowResult;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 
-pub async fn sys_validation_workflow<'env>(
-    workspace: SysValidationWorkspace<'env>,
+pub async fn sys_validation_workflow(
+    workspace: SysValidationWorkspace<'_>,
     writer: OneshotWriter,
     trigger_app_validation: &mut QueueTrigger,
 ) -> WorkflowResult<WorkComplete> {

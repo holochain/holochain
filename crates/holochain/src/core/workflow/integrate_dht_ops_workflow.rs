@@ -9,8 +9,8 @@ use error::WorkflowResult;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use tracing::*;
 
-pub async fn integrate_dht_ops_workflow<'env>(
-    workspace: IntegrateDhtOpsWorkspace<'env>,
+pub async fn integrate_dht_ops_workflow(
+    workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
     trigger_publish: &mut QueueTrigger,
 ) -> WorkflowResult<WorkComplete> {

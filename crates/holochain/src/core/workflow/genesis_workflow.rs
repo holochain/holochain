@@ -66,7 +66,7 @@ async fn genesis_workflow_inner<'env, Api: CellConductorApiT>(
         .expect("TODO: actually implement this")
         == "INVALID"
     {
-        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()).into());
+        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
 
     workspace
