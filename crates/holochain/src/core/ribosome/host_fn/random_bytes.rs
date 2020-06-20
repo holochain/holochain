@@ -30,12 +30,14 @@ pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
     use crate::core::ribosome::HostContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::RandomBytesInput;
     use holochain_zome_types::RandomBytesOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
+    /// we can get some random data out of the fn directly
     async fn random_bytes_test() {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
@@ -56,6 +58,19 @@ pub mod wasm_test {
 
         println!("{:?}", output);
 
+        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    #[serial_test::serial]
+    /// we can get some random data out of the fn via. a wasm call
+    async fn ribosome_random_bytes_test() {
+        const LEN: usize = 5;
+        let output: RandomBytesOutput = crate::call_test_ribosome!(
+            TestWasm::Imports,
+            "random_bytes",
+            RandomBytesInput::new(5 as _)
+        );
         assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
 }
