@@ -6,6 +6,7 @@ use holochain_zome_types::zome::ZomeName;
 
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestWasm {
+    Bench,
     Debug,
     EntryDefs,
     Foo,
@@ -26,6 +27,7 @@ pub enum TestWasm {
 impl From<TestWasm> for ZomeName {
     fn from(test_wasm: TestWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
+            TestWasm::Bench => "bench",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::Foo => "foo",
@@ -48,6 +50,11 @@ impl From<TestWasm> for ZomeName {
 impl From<TestWasm> for DnaWasm {
     fn from(test_wasm: TestWasm) -> DnaWasm {
         DnaWasm::from(match test_wasm {
+            TestWasm::Bench => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_bench.wasm"
+            ))
+            .to_vec(),
             TestWasm::Debug => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_debug.wasm"

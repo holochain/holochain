@@ -1,4 +1,5 @@
 //! Module containing the HolochainP2p actor definition.
+#![allow(clippy::too_many_arguments)]
 
 use crate::*;
 
@@ -40,7 +41,15 @@ ghost_actor::ghost_actor! {
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).
-        fn call_remote(dna_hash: DnaHash, agent_pub_key: AgentPubKey, request: SerializedBytes) -> SerializedBytes;
+        fn call_remote(
+            dna_hash: DnaHash,
+            from_agent: AgentPubKey,
+            to_agent: AgentPubKey,
+            zome_name: ZomeName,
+            fn_name: String,
+            cap: CapSecret,
+            request: SerializedBytes,
+        ) -> SerializedBytes;
 
         /// Publish data to the correct neigborhood.
         fn publish(
