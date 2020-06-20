@@ -1,9 +1,12 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
-use holochain_types::composite_hash::{EntryHash, HeaderAddress};
+use holochain_types::{
+    composite_hash::{EntryHash, HeaderAddress},
+    dht_op::error::DhtOpError,
+};
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
@@ -44,6 +47,12 @@ pub enum SourceChainError {
 
     #[error(transparent)]
     BlockOnError(#[from] tokio_safe_block_on::BlockOnError),
+
+    #[error(transparent)]
+    DhtOpError(#[from] DhtOpError),
+
+    #[error("Required the scratch space to be empty but contained values")]
+    ScratchNotFresh,
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??

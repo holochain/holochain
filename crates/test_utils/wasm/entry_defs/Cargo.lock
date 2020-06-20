@@ -35,12 +35,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "byte-slice-cast"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0a5e3906bcbf133e33c1d4d95afc664ad37fbdb9f6568d8043e7ea8c27d93d3"
-
-[[package]]
 name = "byte-tools"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -51,12 +45,6 @@ name = "byteorder"
 version = "1.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
-
-[[package]]
-name = "cfg-if"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "cloudabi"
@@ -114,23 +102,24 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.39"
+version = "0.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01d69e13b9478fc7d89eb4168e2747be1345706b61a03f4eaf3ebbd42540f7e0"
+checksum = "03c9314720fa798e94b99ac219fd232c719688971adcf8c368c4e1aa91229183"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
  "serde-transcode",
+ "serde_bytes",
  "serde_json",
  "thiserror",
 ]
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.39"
+version = "0.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a176ead4e41cf09a7e47516ad585de6e7cf71185fd1576c2129655d6bb22ae67"
+checksum = "90321247a91d3d01cf658465b5933dc40196321017f3c1a278725e004fc879a1"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -138,11 +127,10 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.30"
+version = "0.0.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5945fe2aa2abe2b5b05953ec613ed2256cf6bd1567a2426bd79814c4b9e6d61"
+checksum = "b4c9c9ec24070197551422eac1f235cd33589683fecb7a4b96ccfd67e428dd09"
 dependencies = [
- "byte-slice-cast",
  "holochain_serialized_bytes",
  "serde",
  "thiserror",
@@ -150,9 +138,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.30"
+version = "0.0.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a5664085dfab8e9bb0e93875fc97f46fad91d51b2af887277d9aeed987288ef"
+checksum = "d347086ed1c1ecbb591bd4efbbb1f955523f47a4789f318a3694a7c99d3a2023"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -187,22 +175,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8b7a7c0c47db5545ed3fef7468ee7bb5b74691498139e4b3f6a20685dc6dd8e"
 
 [[package]]
-name = "lazy_static"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
 name = "libc"
 version = "0.2.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9457b06509d27052635f90d6466700c65095fdf75409b3fbdd903e988b886f49"
-
-[[package]]
-name = "memory_units"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
 name = "multihash"
@@ -585,6 +561,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "serde",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -594,10 +571,8 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "lazy_static",
  "serde",
  "test_wasm_common",
- "wee_alloc",
 ]
 
 [[package]]
@@ -646,18 +621,6 @@ name = "unicode-xid"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
-
-[[package]]
-name = "wee_alloc"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbb3b5a6b2bb17cb6ad44a2e68a43e8d2722c997da10e928665c72ec6c0a0b8e"
-dependencies = [
- "cfg-if",
- "libc",
- "memory_units",
- "winapi",
-]
 
 [[package]]
 name = "winapi"

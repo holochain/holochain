@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
+use crate::composite_hash::{EntryHash, HeaderAddress};
 use crate::{link::Tag, prelude::*};
 use holochain_zome_types::entry_def::EntryVisibility;
 
@@ -190,6 +190,13 @@ impl From<NewEntryHeader> for Header {
 // TODO: Check this can never be written to > 255
 pub type ZomeId = u8;
 
+/// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum UpdateBasis {
+    Header,
+    Entry,
+}
+
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
@@ -282,7 +289,8 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub replaces_address: AnyDhtHash,
+    pub update_basis: UpdateBasis,
+    pub replaces_address: HeaderHash,
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
@@ -344,5 +352,17 @@ impl AppEntryType {
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
+    }
+}
+
+impl Dna {
+    /// Dna cannot implement the trait as it doesn't have a previous header
+    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
+        Self {
+            author: builder.author,
+            timestamp: builder.timestamp,
+            header_seq: builder.header_seq,
+            hash,
+        }
     }
 }

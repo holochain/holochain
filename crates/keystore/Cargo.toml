@@ -14,7 +14,7 @@ edition = "2018"
 ghost_actor = "0.1.0"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
-holochain_serialized_bytes = "0.0.39"
+holochain_serialized_bytes = "=0.0.40"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 thiserror = "1"

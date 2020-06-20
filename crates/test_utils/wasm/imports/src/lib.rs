@@ -1,14 +1,9 @@
-extern crate wee_alloc;
 #[macro_use]
 extern crate lazy_static;
 
 use holochain_wasmer_guest::*;
 use holochain_zome_types::globals::ZomeGlobals;
 use holochain_zome_types::*;
-
-// Use `wee_alloc` as the global allocator.
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 // only the host functions we require in order to pull/push data across the host/guest boundary
 memory_externs!();
@@ -18,7 +13,7 @@ macro_rules! guest_functions {
         $(
             host_externs!($host_fn);
             #[no_mangle]
-            pub extern "C" fn $guest_fn(host_allocation_ptr: RemotePtr) -> RemotePtr {
+            pub extern "C" fn $guest_fn(host_allocation_ptr: GuestPtr) -> GuestPtr {
                 let input = {
                     let v: HostInput = host_args!(host_allocation_ptr);
                     let deserialized = <$input_type>::try_from(v.into_inner());
@@ -62,7 +57,6 @@ guest_functions!(
         RemoveLinkInput,
         RemoveLinkOutput
     ],
-    [__send, send, SendInput, SendOutput],
     [__sign, sign, SignInput, SignOutput],
     [__schedule, schedule, ScheduleInput, ScheduleOutput],
     [
