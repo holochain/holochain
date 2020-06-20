@@ -11,5 +11,10 @@ path = "src/common.rs"
 
 [dependencies]
 holochain_serialized_bytes = "=0.0.40"
+<<<<<<< HEAD
 holochain_wasmer_common = "=0.0.33"
+=======
+holochain_wasmer_common = "=0.0.32"
+>>>>>>> 25d6fed0977ac7dffada25d530b0afd952441ba5
 serde = "=1.0.104"
+serde_bytes = "0.11"

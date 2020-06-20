@@ -105,7 +105,7 @@ impl WasmRibosome {
     }
 
     fn imports(&self, host_context: HostContext) -> ImportObject {
-        let timeout = crate::start_hard_timeout!();
+        let instance_timeout = crate::start_hard_timeout!();
 
         let allow_side_effects = host_context.allow_side_effects();
 
@@ -118,8 +118,8 @@ impl WasmRibosome {
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_host_context_arc = std::sync::Arc::clone(&host_context_arc);
                 move |ctx: &mut Ctx,
-                      guest_allocation_ptr: RemotePtr|
-                      -> Result<RemotePtr, WasmError> {
+                      guest_allocation_ptr: GuestPtr|
+                      -> Result<Len, WasmError> {
                     let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
@@ -142,8 +142,8 @@ impl WasmRibosome {
                         .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
-                    let output_allocation_ptr: AllocationPtr = output_sb.into();
-                    Ok(output_allocation_ptr.as_remote_ptr())
+
+                    Ok($crate::holochain_wasmer_host::import::set_context_data(ctx, output_sb))
                 }
             }};
         }
@@ -152,12 +152,8 @@ impl WasmRibosome {
 
         // standard memory handling used by the holochain_wasmer guest and host macros
         ns.insert(
-            "__import_allocation",
-            func!(holochain_wasmer_host::import::__import_allocation),
-        );
-        ns.insert(
-            "__import_bytes",
-            func!(holochain_wasmer_host::import::__import_bytes),
+            "__import_data",
+            func!(holochain_wasmer_host::import::__import_data),
         );
 
         // imported host functions for core
@@ -204,7 +200,7 @@ impl WasmRibosome {
         }
         imports.register("env", ns);
 
-        crate::end_hard_timeout!(timeout, crate::perf::WASM_INSTANCE);
+        crate::end_hard_timeout!(instance_timeout, crate::perf::WASM_INSTANCE);
         imports
     }
 }
@@ -266,6 +262,8 @@ impl RibosomeT for WasmRibosome {
 
         if module.info().exports.contains_key(&to_call) {
             // there is a callback to_call and it is implemented in the wasm
+            // it is important to fully instantiate this (e.g. don't try to use the module above)
+            // because it builds guards against memory leaks and handles imports correctly
             let mut instance = self.instance(host_context)?;
 
             let call_timeout = crate::start_hard_timeout!();
@@ -298,7 +296,7 @@ impl RibosomeT for WasmRibosome {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function<'env>(
+    fn call_zome_function(
         self,
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ZomeCallInvocation,
@@ -306,7 +304,6 @@ impl RibosomeT for WasmRibosome {
         // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
         let timeout = crate::start_hard_timeout!();
-
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
         let fn_name = invocation.fn_name.clone();
