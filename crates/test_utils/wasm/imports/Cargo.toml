@@ -15,11 +15,7 @@ crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
 holochain_serialized_bytes = "=0.0.40"
-<<<<<<< HEAD
 holochain_wasmer_guest = "=0.0.33"
-=======
-holochain_wasmer_guest = "=0.0.32"
->>>>>>> 25d6fed0977ac7dffada25d530b0afd952441ba5
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 lazy_static = "1.4.0"
 
