@@ -97,7 +97,7 @@ impl QueueTrigger {
 }
 
 #[derive(Constructor, From)]
-struct OneshotWriter(EnvironmentWrite);
+pub struct OneshotWriter(EnvironmentWrite);
 
 impl OneshotWriter {
     pub async fn with_writer<F>(self, f: F) -> Result<(), DatabaseError>
@@ -111,7 +111,7 @@ impl OneshotWriter {
 }
 
 /// Declares whether a workflow has exhausted the queue or not
-enum WorkComplete {
+pub enum WorkComplete {
     Complete,
     Incomplete,
 }

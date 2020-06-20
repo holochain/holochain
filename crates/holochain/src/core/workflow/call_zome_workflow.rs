@@ -168,8 +168,7 @@ impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::core::ribosome::MockRibosomeT;
-    use crate::core::workflow::{effects::WorkflowTriggers, fake_genesis, WorkflowError};
+    use crate::core::{ribosome::MockRibosomeT, workflow::genesis_workflow::tests::fake_genesis};
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
@@ -311,7 +310,6 @@ pub mod tests {
         let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();
-        assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());
     }
@@ -347,7 +345,6 @@ pub mod tests {
         let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();
-        assert!(effects.triggers.is_empty());
         assert!(effects.callbacks.is_empty());
         assert!(effects.signals.is_empty());
     }
@@ -380,9 +377,6 @@ pub mod tests {
         let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();
-        assert!(effects.triggers.is_empty());
-        assert!(effects.callbacks.is_empty());
-        assert!(effects.signals.is_empty());
         // TODO: Check the workspace has changes
     }
 }

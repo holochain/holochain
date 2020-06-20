@@ -13,6 +13,7 @@ use holochain_state::error::DatabaseError;
 use holochain_types::prelude::*;
 use thiserror::Error;
 
+/// FIXME: remove completely, rename WorkflowRunError to WorkflowError
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("Agent is invalid: {0:?}")]
@@ -41,6 +42,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     DhtOpConvertError(#[from] DhtOpConvertError),
+
+    #[error(transparent)]
+    CellError(#[from] CellError),
 }
 
 /// The `Result::Ok` of any workflow function is
@@ -56,13 +60,34 @@ pub type WorkflowResult<'env, Wf> = Result<
 #[derive(Error, Debug)]
 pub enum WorkflowRunError {
     #[error(transparent)]
+    WorkflowError(#[from] WorkflowError),
+
+    #[error("Agent is invalid: {0:?}")]
+    AgentInvalid(AgentPubKey),
+
+    #[error("Conductor API error: {0}")]
+    ConductorApi(#[from] Box<ConductorApiError>),
+
+    #[error("Workspace error: {0}")]
+    WorkspaceError(#[from] WorkspaceError),
+
+    #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),
 
     #[error(transparent)]
-    WorkflowError(#[from] WorkflowError),
+    RibosomeError(#[from] RibosomeError),
+
+    #[error("Source chain error: {0}")]
+    SourceChainError(#[from] SourceChainError),
+
+    #[error("Capability token missing")]
+    CapabilityMissing,
 
     #[error(transparent)]
-    WorkspaceError(#[from] WorkspaceError),
+    FailedToHash(#[from] SerializedBytesError),
+
+    #[error(transparent)]
+    DhtOpConvertError(#[from] DhtOpConvertError),
 
     #[error(transparent)]
     CellError(#[from] CellError),

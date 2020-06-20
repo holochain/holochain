@@ -4,10 +4,10 @@
 //! ChainElements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::queue_consumer::spawn_queue_consumer_tasks;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::state::workspace::Workspace;
 use crate::{
@@ -19,9 +19,10 @@ use crate::{
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
-            error::WorkflowRunError, run_workflow, GenesisWorkflow, GenesisWorkspace,
-            InitializeZomesWorkflow, InitializeZomesWorkspace, InvokeZomeWorkflow,
-            InvokeZomeWorkspace, ZomeCallInvocationResult,
+            error::WorkflowRunError, genesis_workflow::genesis_workflow, run_workflow,
+            GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflow,
+            InitializeZomesWorkspace, InvokeZomeWorkflow, InvokeZomeWorkspace,
+            ZomeCallInvocationResult,
         },
     },
 };
@@ -155,14 +156,14 @@ impl Cell {
         let workspace = GenesisWorkspace::new(&reader, &env)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        let workflow = GenesisWorkflow::new(
+        let args = GenesisWorkflowArgs::new(
             conductor_api,
             dna_file,
             id.agent_pubkey().clone(),
             membrane_proof,
         );
 
-        run_workflow(state_env.clone(), workflow, workspace)
+        genesis_workflow(workspace, state_env.clone().into(), args)
             .await
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
