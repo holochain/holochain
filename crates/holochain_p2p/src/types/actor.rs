@@ -25,7 +25,7 @@ pub struct GetOptions {
     /// [Network]
     /// Timeout to await responses for aggregation.
     /// Set to `None` for a default "best-effort".
-    /// Note - if all requests time-out you will receive an empty resut,
+    /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
 
