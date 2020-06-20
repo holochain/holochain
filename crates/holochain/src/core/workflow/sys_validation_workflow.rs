@@ -13,7 +13,7 @@ pub async fn sys_validation_workflow<'env>(
     writer: OneshotWriter,
     trigger_app_validation: &mut QueueTrigger,
 ) -> WorkflowResult<WorkComplete> {
-    todo!("implement workflow");
+    tracing::warn!("unimplemented");
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -23,7 +23,7 @@ pub async fn sys_validation_workflow<'env>(
         .await?;
 
     // trigger other workflows
-    trigger_app_validation.trigger();
+    trigger_app_validation.trigger()?;
 
     Ok(WorkComplete::Complete)
 }
@@ -34,11 +34,10 @@ impl<'env> SysValidationWorkspace<'env> {}
 
 impl<'env> Workspace<'env> for SysValidationWorkspace<'env> {
     /// Constructor
-    #[allow(dead_code)]
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    fn new(_reader: &'env Reader<'env>, _dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self(std::marker::PhantomData))
     }
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, _writer: &mut Writer) -> WorkspaceResult<()> {
         todo!()
     }
 }

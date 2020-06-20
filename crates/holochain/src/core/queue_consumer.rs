@@ -109,6 +109,7 @@ impl OneshotWriter {
 }
 
 /// Declares whether a workflow has exhausted the queue or not
+#[derive(Clone, Debug, PartialEq)]
 pub enum WorkComplete {
     Complete,
     Incomplete,

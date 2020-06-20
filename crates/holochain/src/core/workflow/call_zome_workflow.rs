@@ -13,7 +13,6 @@ use crate::core::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_state::prelude::*;
-use must_future::MustBoxFuture;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 pub mod unsafe_invoke_zome_workspace;
@@ -200,7 +199,7 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(

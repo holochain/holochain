@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::core::{
-    state::workspace::{Workspace, WorkspaceResult},
+    state::workspace::Workspace,
     workflow::sys_validation_workflow::{sys_validation_workflow, SysValidationWorkspace},
 };
 use futures::StreamExt;

@@ -78,7 +78,6 @@ pub mod tests {
         let addr2 = "hi".to_string();
         {
             let reader = env.reader()?;
-            let writer = env.writer_unmanaged()?;
             let mut workspace = TestWorkspace::new(&reader, &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, None);
 

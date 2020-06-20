@@ -24,7 +24,7 @@ pub async fn integrate_dht_ops_workflow<'env>(
         .await?;
 
     // trigger other workflows
-    trigger_publish.trigger();
+    trigger_publish.trigger()?;
 
     Ok(WorkComplete::Complete)
 }
@@ -34,10 +34,10 @@ pub struct IntegrateDhtOpsWorkspace<'env>(std::marker::PhantomData<&'env ()>);
 impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
     /// Constructor
     #[allow(dead_code)]
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    fn new(_reader: &'env Reader<'env>, _dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self(std::marker::PhantomData))
     }
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn(self, _writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented");
         Ok(())
     }

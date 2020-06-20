@@ -36,7 +36,7 @@ pub async fn produce_dht_ops_workflow<'env>(
         .await?;
 
     // trigger other workflows
-    trigger_integration.trigger();
+    trigger_integration.trigger()?;
 
     Ok(complete)
 }
@@ -317,6 +317,7 @@ mod tests {
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
+            assert_matches!(complete, WorkComplete::Complete);
             env_ref
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
@@ -401,7 +402,8 @@ mod tests {
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
-            let writer = env_ref
+            assert_matches!(complete, WorkComplete::Complete);
+            env_ref
                 .with_commit(|writer| workspace.flush_to_txn(writer))
                 .unwrap();
         }

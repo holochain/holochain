@@ -5,7 +5,6 @@ use crate::core::{
     queue_consumer::{OneshotWriter, QueueTrigger, WorkComplete},
     state::workspace::{Workspace, WorkspaceResult},
 };
-use futures::StreamExt;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use tracing::*;
 
@@ -24,7 +23,7 @@ pub async fn app_validation_workflow<'env>(
         .await?;
 
     // trigger other workflows
-    trigger_integration.trigger();
+    trigger_integration.trigger()?;
 
     Ok(WorkComplete::Complete)
 }
