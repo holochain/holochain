@@ -10,6 +10,7 @@ use holochain_zome_types::RandomBytesInput;
 use holochain_zome_types::RandomBytesOutput;
 use std::sync::Arc;
 
+/// return n crypto secure random bytes from the standard holochain crypto lib
 pub async fn random_bytes(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
