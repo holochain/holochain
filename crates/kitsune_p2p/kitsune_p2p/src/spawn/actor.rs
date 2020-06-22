@@ -276,6 +276,8 @@ impl KitsuneP2pActor {
 
                     // we haven't broken, but there are no new peers to send to
                     // wait for a bit, maybe more will come online
+                    // NOTE - this logic is naive - fix once we have
+                    //        a unified loop with the peer-discovery
                     tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
                 }
             }
@@ -320,6 +322,7 @@ impl KitsuneP2pActor {
                     }
                     futures::future::Either::Right((result, _)) => {
                         if result.is_none() {
+                            ghost_actor::dependencies::tracing::error!("this should not happen");
                             break;
                         }
                         out.push(result.unwrap());
