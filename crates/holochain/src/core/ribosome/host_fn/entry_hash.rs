@@ -21,7 +21,7 @@ pub async fn entry_hash(
 
     let core_hash: holo_hash_core::HoloHashCore = entry_hash.into();
 
-    Ok(EntryHashOutput::new(core_hash.into()))
+    Ok(EntryHashOutput::new(core_hash))
 }
 
 #[cfg(test)]
