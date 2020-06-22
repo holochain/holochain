@@ -2,7 +2,7 @@ use crate::{
     conductor::api::error::ConductorApiError,
     core::{
         ribosome::{error::RibosomeError, guest_callback::init::InitResult},
-        workflow::error::WorkflowRunError,
+        workflow::error::WorkflowError,
     },
 };
 use holochain_state::error::DatabaseError;
@@ -25,7 +25,7 @@ pub enum CellError {
     #[error("The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}")]
     Cleanup(String, PathBuf),
     #[error(transparent)]
-    WorkflowRunError(#[from] Box<WorkflowRunError>),
+    WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] crate::core::state::workspace::WorkspaceError),
     #[error(transparent)]

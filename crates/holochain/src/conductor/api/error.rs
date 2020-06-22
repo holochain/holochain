@@ -9,7 +9,7 @@ use crate::{
     core::{
         ribosome::error::RibosomeError,
         state::{source_chain::SourceChainError, workspace::WorkspaceError},
-        workflow::error::WorkflowRunError,
+        workflow::error::WorkflowError,
     },
 };
 use holochain_serialized_bytes::prelude::*;
@@ -57,7 +57,7 @@ pub enum ConductorApiError {
     /// Workflow error.
     // TODO: perhaps this Box can be avoided with further reorganization
     #[error(transparent)]
-    WorkflowRunError(#[from] Box<WorkflowRunError>),
+    WorkflowError(#[from] Box<WorkflowError>),
 
     /// DnaError
     #[error("DnaError: {0}")]
