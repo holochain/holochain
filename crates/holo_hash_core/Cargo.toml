@@ -11,6 +11,6 @@ categories = [ "cryptography" ]
 edition = "2018"
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.39"
+holochain_serialized_bytes = "=0.0.40"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"

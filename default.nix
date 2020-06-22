@@ -33,7 +33,10 @@ with holonix.pkgs;
    ''
   ];
 
-  buildInputs = [ ]
+  buildInputs = [
+   holonix.pkgs.gnuplot
+   holonix.pkgs.flamegraph
+  ]
    ++ holonix.shell.buildInputs
 
    # release hooks
