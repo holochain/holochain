@@ -29,10 +29,14 @@ pub fn spawn_publish_dht_ops_consumer(
             {
                 trigger_self.trigger()
             };
+            // notify the Cell that the first loop has completed
             if let Some(tx_first) = tx_first.take() {
                 let _ = tx_first.send(());
             }
-            rx.listen().await;
+            if let Err(_) = rx.listen().await {
+                tracing::warn!("Cell is shutting down: stopping queue consumer.");
+                break;
+            };
         }
     });
     (tx, rx_first)

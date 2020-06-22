@@ -26,7 +26,6 @@
 //! remove the item it has just processed.
 
 use derive_more::{Constructor, Display, From};
-use futures::StreamExt;
 use holochain_state::{
     env::{EnvironmentWrite, WriteManager},
     error::DatabaseError,
