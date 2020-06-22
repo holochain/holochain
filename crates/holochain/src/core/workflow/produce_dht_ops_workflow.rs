@@ -4,7 +4,8 @@ use crate::core::{
     state::workspace::{Workspace, WorkspaceResult},
 };
 use dht_op::{dht_op_to_light_basis, DhtOpLight};
-use holo_hash::DhtOpHash;
+use fallible_iterator::FallibleIterator;
+use holo_hash::{DhtOpHash, Hashed};
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_state::{
@@ -50,6 +51,7 @@ async fn produce_dht_ops_workflow_inner(
         .source_chain
         .get_incomplete_dht_ops()
         .await?;
+
     for (index, ops) in all_ops {
         for op in ops {
             let (op, hash) = DhtOpHashed::with_data(op).await.into();

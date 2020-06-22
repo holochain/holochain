@@ -112,6 +112,10 @@ impl<'env> SourceChainBuf<'env> {
         &self.cas
     }
 
+    pub fn sequence(&self) -> &ChainSequenceBuf {
+        &self.sequence
+    }
+
     /// Add a ChainElement to the source chain, using a fully-formed Header
     pub async fn put_raw(
         &mut self,

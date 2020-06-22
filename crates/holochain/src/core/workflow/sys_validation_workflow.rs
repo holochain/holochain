@@ -7,6 +7,7 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use holochain_state::prelude::{GetDb, Reader, Writer};
+use tracing::*;
 
 pub async fn sys_validation_workflow(
     workspace: SysValidationWorkspace<'_>,
@@ -38,6 +39,7 @@ impl<'env> Workspace<'env> for SysValidationWorkspace<'env> {
         Ok(Self(std::marker::PhantomData))
     }
     fn flush_to_txn(self, _writer: &mut Writer) -> WorkspaceResult<()> {
-        todo!()
+        warn!("unimplemented");
+        Ok(())
     }
 }

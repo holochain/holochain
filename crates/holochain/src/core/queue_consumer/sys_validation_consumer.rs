@@ -13,10 +13,12 @@ use holochain_state::env::ReadManager;
 pub fn spawn_sys_validation_consumer(
     env: EnvironmentWrite,
     mut trigger_app_validation: QueueTrigger,
-) -> (QueueTrigger, tokio::task::JoinHandle<()>) {
+) -> (QueueTrigger, tokio::sync::mpsc::Receiver<()>) {
     let (tx, mut rx) = QueueTrigger::new();
+    let (tx_first, rx_first) = tokio::sync::mpsc::channel(1);
+    let mut tx_first = Some(tx_first);
     let mut trigger_self = tx.clone();
-    let handle = tokio::spawn(async move {
+    let _handle = tokio::spawn(async move {
         loop {
             let env_ref = env.guard().await;
             let reader = env_ref.reader().expect("Could not create LMDB reader");
@@ -29,8 +31,11 @@ pub fn spawn_sys_validation_consumer(
             {
                 trigger_self.trigger().expect("Trigger channel closed")
             };
+            if let Some(mut tx_first) = tx_first.take() {
+                let _ = tx_first.send(());
+            }
             rx.next().await;
         }
     });
-    (tx, handle)
+    (tx, rx_first)
 }

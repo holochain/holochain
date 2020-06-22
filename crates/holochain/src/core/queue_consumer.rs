@@ -26,6 +26,7 @@
 //! remove the item it has just processed.
 
 use derive_more::{Constructor, Display, From};
+use futures::StreamExt;
 use holochain_state::{
     env::{EnvironmentWrite, WriteManager},
     error::DatabaseError,
@@ -47,16 +48,22 @@ use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
-pub fn spawn_queue_consumer_tasks(env: &EnvironmentWrite) -> InitialQueueTriggers {
-    let (tx_publish_dht_ops, _) = spawn_publish_dht_ops_consumer(env.clone());
-    let (tx_integration, _) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish_dht_ops);
-    let (tx_app_validation, _) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
-    let (tx_sys_validation, _) = spawn_sys_validation_consumer(env.clone(), tx_app_validation);
-    let (tx_produce_dht_ops, _) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
+///
+/// Waits for the initial loop to complete before returning, to prevent causing
+/// a race condition by trying to run a workflow too soon after cell creation.
+pub async fn spawn_queue_consumer_tasks(env: &EnvironmentWrite) -> InitialQueueTriggers {
+    let (tx_publish, mut rx1) = spawn_publish_dht_ops_consumer(env.clone());
+    let (tx_integration, mut rx2) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish);
+    let (tx_app, mut rx3) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
+    let (tx_sys, mut rx4) = spawn_sys_validation_consumer(env.clone(), tx_app);
+    let (tx_produce, mut rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
+
+    // Wait for initial loop to complete for each consumer
+    tokio::join!(rx1.next(), rx2.next(), rx3.next(), rx4.next(), rx5.next());
 
     InitialQueueTriggers {
-        sys_validation: tx_sys_validation,
-        produce_dht_ops: tx_produce_dht_ops,
+        sys_validation: tx_sys,
+        produce_dht_ops: tx_produce,
     }
 }
 
