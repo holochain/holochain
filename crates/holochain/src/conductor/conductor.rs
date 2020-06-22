@@ -40,7 +40,7 @@ use crate::{
 use holo_hash::Hashable;
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
-    KeystoreSender,
+    KeystoreApiSender, KeystoreSender,
 };
 use holochain_state::{
     buffer::BufferedStore,
@@ -599,7 +599,7 @@ where
 async fn delete_me_create_test_keystore() -> KeystoreSender {
     use std::convert::TryFrom;
     let _ = holochain_crypto::crypto_init_sodium();
-    let mut keystore = spawn_test_keystore(vec![
+    let keystore = spawn_test_keystore(vec![
         MockKeypair {
             pub_key: holo_hash::AgentPubKey::try_from(
                 "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
