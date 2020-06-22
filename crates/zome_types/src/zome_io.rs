@@ -88,7 +88,7 @@ wasm_io_types!(
     pub struct GetLinksOutput(());
     // @TODO
     pub struct GetEntryInput(());
-    pub struct GetEntryOutput(());
+    pub struct GetEntryOutput(Option<crate::Entry>);
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
