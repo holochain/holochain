@@ -4,7 +4,7 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::{
-    queue_consumer::{OneshotWriter, QueueTrigger},
+    queue_consumer::{OneshotWriter, TriggerSender},
     state::{
         cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBuf, source_chain::SourceChain,
         workspace::WorkspaceResult,
@@ -31,7 +31,7 @@ pub async fn invoke_zome_workflow<'env, Ribosome: RibosomeT>(
     mut workspace: InvokeZomeWorkspace<'env>,
     writer: OneshotWriter,
     args: InvokeZomeWorkflowArgs<Ribosome>,
-    mut trigger_produce_dht_ops: QueueTrigger,
+    mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let result = invoke_zome_workflow_inner(&mut workspace, args).await?;
 
@@ -42,7 +42,7 @@ pub async fn invoke_zome_workflow<'env, Ribosome: RibosomeT>(
         .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
         .await?;
 
-    trigger_produce_dht_ops.trigger()?;
+    trigger_produce_dht_ops.trigger();
 
     Ok(result)
 }

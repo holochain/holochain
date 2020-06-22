@@ -59,7 +59,7 @@ pub async fn spawn_queue_consumer_tasks(env: &EnvironmentWrite) -> InitialQueueT
     let (tx_produce, mut rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
 
     // Wait for initial loop to complete for each consumer
-    tokio::join!(rx1.next(), rx2.next(), rx3.next(), rx4.next(), rx5.next());
+    tokio::join!(rx1, rx2, rx3, rx4, rx5);
 
     InitialQueueTriggers {
         sys_validation: tx_sys,
@@ -70,34 +70,46 @@ pub async fn spawn_queue_consumer_tasks(env: &EnvironmentWrite) -> InitialQueueT
 /// The entry points for kicking off a chain reaction of queue activity
 pub struct InitialQueueTriggers {
     /// Notify the SysValidation workflow to run, i.e. after handling gossip
-    pub sys_validation: QueueTrigger,
+    pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
-    pub produce_dht_ops: QueueTrigger,
+    pub produce_dht_ops: TriggerSender,
 }
 
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
-pub struct QueueTrigger(mpsc::Sender<()>);
+pub struct TriggerSender(mpsc::Sender<()>);
+pub struct TriggerReceiver(mpsc::Receiver<()>);
 
-impl QueueTrigger {
+impl TriggerSender {
     /// Create a new channel for waking a consumer
     ///
-    /// The channel buffer is set to 1 to ensure that the consumer does not
-    /// have to be concerned with draining the channel in case it has received
-    /// multiple trigger signals.
-    pub fn new() -> (Self, mpsc::Receiver<()>) {
-        let (tx, rx) = mpsc::channel(1);
-        (Self(tx), rx)
+    /// The channel buffer is set to num_cpus to deal with the potential
+    /// inconsistency from the perspective of any particular CPU thread
+    pub fn new() -> (TriggerSender, TriggerReceiver) {
+        let (tx, rx) = mpsc::channel(num_cpus::get());
+        (TriggerSender(tx), TriggerReceiver(rx))
     }
 
     /// Lazily nudge the consumer task, ignoring the case where the consumer
     /// already has a pending trigger signal
-    pub fn trigger(&mut self) -> Result<(), QueueTriggerClosedError> {
+    pub fn trigger(&mut self) {
         match self.0.try_send(()) {
-            Err(mpsc::error::TrySendError::Closed(_)) => Err(QueueTriggerClosedError),
-            Err(mpsc::error::TrySendError::Full(_)) => Ok(()),
-            Ok(()) => Ok(()),
-        }
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                tracing::warn!(
+                    "Queue consumer trigger was sent while Cell is shutting down: ignoring."
+                );
+            }
+            Err(mpsc::error::TrySendError::Full(_)) => (),
+            Ok(()) => (),
+        };
+    }
+}
+
+impl TriggerReceiver {
+    /// Listen for one or more items to come through, draining the channel
+    /// each time
+    pub async fn listen(&mut self) {
+        while let Some(_) = self.0.next().await {}
     }
 }
 
@@ -139,8 +151,8 @@ where
     env: EnvironmentWrite,
     run_consumer:
         Box<dyn Fn(Ws) -> MustBoxFuture<'static, WorkflowResult<WorkComplete>> + Send + Sync>,
-    channel: (QueueTrigger, QueueTriggerListener),
-    // triggers: Vec<QueueTrigger>,
+    channel: (TriggerSender, QueueTriggerListener),
+    // triggers: Vec<TriggerSender>,
 }
 
 impl<Ws> QueueConsumer<Ws>
@@ -159,9 +171,9 @@ where
                     .await
                     .expect("Failed to run workflow")
                 {
-                    trigger_self.trigger().expect("Trigger channel closed")
+                    trigger_self.trigger()
                 };
-                rx.next().await;
+                rx.listen().await;
             }
         })
     }

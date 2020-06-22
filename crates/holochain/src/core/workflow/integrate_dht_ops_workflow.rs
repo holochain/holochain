@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::core::{
-    queue_consumer::{OneshotWriter, QueueTrigger, WorkComplete},
+    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::workspace::{Workspace, WorkspaceResult},
 };
 use error::WorkflowResult;
@@ -12,7 +12,7 @@ use tracing::*;
 pub async fn integrate_dht_ops_workflow(
     workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
-    trigger_publish: &mut QueueTrigger,
+    trigger_publish: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     warn!("unimplemented");
 
@@ -24,7 +24,7 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
 
     // trigger other workflows
-    trigger_publish.trigger()?;
+    trigger_publish.trigger();
 
     Ok(WorkComplete::Complete)
 }

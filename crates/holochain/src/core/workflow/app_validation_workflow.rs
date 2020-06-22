@@ -2,7 +2,7 @@
 
 use super::error::WorkflowResult;
 use crate::core::{
-    queue_consumer::{OneshotWriter, QueueTrigger, WorkComplete},
+    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::workspace::{Workspace, WorkspaceResult},
 };
 use holochain_state::prelude::{GetDb, Reader, Writer};
@@ -11,7 +11,7 @@ use tracing::*;
 pub async fn app_validation_workflow(
     workspace: AppValidationWorkspace<'_>,
     writer: OneshotWriter,
-    trigger_integration: &mut QueueTrigger,
+    trigger_integration: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     warn!("unimplemented");
 
@@ -23,7 +23,7 @@ pub async fn app_validation_workflow(
         .await?;
 
     // trigger other workflows
-    trigger_integration.trigger()?;
+    trigger_integration.trigger();
 
     Ok(WorkComplete::Complete)
 }

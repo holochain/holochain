@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::core::{
-    queue_consumer::{OneshotWriter, QueueTrigger, WorkComplete},
+    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::workspace::{Workspace, WorkspaceResult},
 };
 use error::WorkflowResult;
@@ -12,7 +12,7 @@ use tracing::*;
 pub async fn sys_validation_workflow(
     workspace: SysValidationWorkspace<'_>,
     writer: OneshotWriter,
-    trigger_app_validation: &mut QueueTrigger,
+    trigger_app_validation: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     tracing::warn!("unimplemented");
 
@@ -24,7 +24,7 @@ pub async fn sys_validation_workflow(
         .await?;
 
     // trigger other workflows
-    trigger_app_validation.trigger()?;
+    trigger_app_validation.trigger();
 
     Ok(WorkComplete::Complete)
 }

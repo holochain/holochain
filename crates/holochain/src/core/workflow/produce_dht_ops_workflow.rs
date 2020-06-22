@@ -1,6 +1,6 @@
 use super::{error::WorkflowResult, InvokeZomeWorkspace};
 use crate::core::{
-    queue_consumer::{OneshotWriter, QueueTrigger, WorkComplete},
+    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::workspace::{Workspace, WorkspaceResult},
 };
 use dht_op::{dht_op_to_light_basis, DhtOpLight};
@@ -24,7 +24,7 @@ pub mod dht_op;
 pub async fn produce_dht_ops_workflow(
     mut workspace: ProduceDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
-    trigger_integration: &mut QueueTrigger,
+    trigger_integration: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let complete = produce_dht_ops_workflow_inner(&mut workspace).await?;
 
@@ -36,7 +36,7 @@ pub async fn produce_dht_ops_workflow(
         .await?;
 
     // trigger other workflows
-    trigger_integration.trigger()?;
+    trigger_integration.trigger();
 
     Ok(complete)
 }

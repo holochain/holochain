@@ -12,9 +12,9 @@ use holochain_state::env::ReadManager;
 /// Spawn the QueueConsumer for AppValidation workflow
 pub fn spawn_app_validation_consumer(
     env: EnvironmentWrite,
-    mut trigger_integration: QueueTrigger,
-) -> (QueueTrigger, tokio::sync::oneshot::Receiver<()>) {
-    let (tx, mut rx) = QueueTrigger::new();
+    mut trigger_integration: TriggerSender,
+) -> (TriggerSender, tokio::sync::oneshot::Receiver<()>) {
+    let (tx, mut rx) = TriggerSender::new();
     let (tx_first, rx_first) = tokio::sync::oneshot::channel();
     let mut tx_first = Some(tx_first);
     let mut trigger_self = tx.clone();
@@ -29,12 +29,12 @@ pub fn spawn_app_validation_consumer(
                     .await
                     .expect("Error running Workflow")
             {
-                trigger_self.trigger().expect("Trigger channel closed")
+                trigger_self.trigger()
             };
             if let Some(mut tx_first) = tx_first.take() {
                 let _ = tx_first.send(());
             }
-            rx.next().await;
+            rx.listen().await;
         }
     });
     (tx, rx_first)
