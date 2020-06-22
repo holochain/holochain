@@ -92,7 +92,7 @@ wasm_io_types!(
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
-    // @TODO
+    // hash an entry on the host and get a core hash back
     pub struct EntryHashInput(crate::entry::Entry);
     pub struct EntryHashOutput(holo_hash_core::HoloHashCore);
     // the current system time, in the opinion of the host, as a Duration
