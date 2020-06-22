@@ -5,7 +5,6 @@ use crate::core::{
     state::workspace::Workspace,
     workflow::app_validation_workflow::{app_validation_workflow, AppValidationWorkspace},
 };
-use futures::StreamExt;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::env::ReadManager;
 
@@ -31,7 +30,7 @@ pub fn spawn_app_validation_consumer(
             {
                 trigger_self.trigger()
             };
-            if let Some(mut tx_first) = tx_first.take() {
+            if let Some(tx_first) = tx_first.take() {
                 let _ = tx_first.send(());
             }
             rx.listen().await;

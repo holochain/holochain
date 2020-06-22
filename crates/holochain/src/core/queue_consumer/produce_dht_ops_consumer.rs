@@ -30,7 +30,7 @@ pub fn spawn_produce_dht_ops_consumer(
             {
                 trigger_self.trigger()
             };
-            if let Some(mut tx_first) = tx_first.take() {
+            if let Some(tx_first) = tx_first.take() {
                 let _ = tx_first.send(());
             }
             rx.listen().await;

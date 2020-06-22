@@ -52,14 +52,18 @@ use publish_dht_ops_consumer::*;
 /// Waits for the initial loop to complete before returning, to prevent causing
 /// a race condition by trying to run a workflow too soon after cell creation.
 pub async fn spawn_queue_consumer_tasks(env: &EnvironmentWrite) -> InitialQueueTriggers {
-    let (tx_publish, mut rx1) = spawn_publish_dht_ops_consumer(env.clone());
-    let (tx_integration, mut rx2) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish);
-    let (tx_app, mut rx3) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
-    let (tx_sys, mut rx4) = spawn_sys_validation_consumer(env.clone(), tx_app);
-    let (tx_produce, mut rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
+    let (tx_publish, rx1) = spawn_publish_dht_ops_consumer(env.clone());
+    let (tx_integration, rx2) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish);
+    let (tx_app, rx3) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
+    let (tx_sys, rx4) = spawn_sys_validation_consumer(env.clone(), tx_app);
+    let (tx_produce, rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
 
     // Wait for initial loop to complete for each consumer
-    tokio::join!(rx1, rx2, rx3, rx4, rx5);
+    futures::future::join_all(vec![rx1, rx2, rx3, rx4, rx5].into_iter())
+        .await
+        .into_iter()
+        .collect::<Result<Vec<()>, _>>()
+        .expect("A queue consumer's oneshot channel was closed before initializing.");
 
     InitialQueueTriggers {
         sys_validation: tx_sys,

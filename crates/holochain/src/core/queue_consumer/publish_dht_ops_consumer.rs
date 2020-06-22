@@ -5,7 +5,6 @@ use crate::core::{
     state::workspace::Workspace,
     workflow::publish_dht_ops_workflow::{publish_dht_ops_workflow, PublishDhtOpsWorkspace},
 };
-use futures::StreamExt;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::env::ReadManager;
 
@@ -30,7 +29,7 @@ pub fn spawn_publish_dht_ops_consumer(
             {
                 trigger_self.trigger()
             };
-            if let Some(mut tx_first) = tx_first.take() {
+            if let Some(tx_first) = tx_first.take() {
                 let _ = tx_first.send(());
             }
             rx.listen().await;
