@@ -256,7 +256,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.conductor.read().await;
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        cell.call_zome(invocation).await
+        Ok(cell.call_zome(invocation).await?)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {

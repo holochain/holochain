@@ -32,10 +32,12 @@ pub mod integrate_dht_ops_workflow;
 pub mod produce_dht_ops_workflow;
 pub mod publish_dht_ops_workflow;
 pub mod sys_validation_workflow;
-pub(crate) use call_zome_workflow::unsafe_invoke_zome_workspace;
-pub(crate) use call_zome_workflow::*;
-pub(crate) use genesis_workflow::*;
-pub(crate) use initialize_zomes_workflow::*;
+
+// TODO: either remove wildcards or add wildcards for all above child modules
+pub use call_zome_workflow::unsafe_invoke_zome_workspace;
+pub use call_zome_workflow::*;
+pub use genesis_workflow::*;
+pub use initialize_zomes_workflow::*;
 
 #[cfg(test)]
 pub use genesis_workflow::tests::fake_genesis;
