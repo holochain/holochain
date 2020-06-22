@@ -6,11 +6,11 @@ use kitsune_p2p_types::{
     transport::*,
 };
 
-ghost_actor::ghost_chan! {
-    chan ListenerInner<TransportError> {
+ghost_actor::ghost_actor! {
+    actor ListenerInner<TransportError> {
         /// our incoming task has produced a connection instance
         fn register_incoming(
-            sender: TransportConnectionSender,
+            sender: ghost_actor::GhostSender<TransportConnection>,
             receiver: TransportConnectionEventReceiver,
         ) -> ();
     }
@@ -19,12 +19,33 @@ ghost_actor::ghost_chan! {
 /// QUIC implementation of kitsune TransportListener actor.
 struct TransportListenerQuic {
     #[allow(dead_code)]
-    internal_sender: TransportListenerInternalSender<ListenerInner>,
+    internal_sender: ghost_actor::GhostSender<ListenerInner>,
     quinn_endpoint: quinn::Endpoint,
     incoming_sender: futures::channel::mpsc::Sender<TransportListenerEvent>,
 }
 
-impl TransportListenerHandler<(), ListenerInner> for TransportListenerQuic {
+impl ghost_actor::GhostControlHandler for TransportListenerQuic {}
+
+impl ghost_actor::GhostHandler<ListenerInner> for TransportListenerQuic {}
+
+impl ListenerInnerHandler for TransportListenerQuic {
+    fn handle_register_incoming(
+        &mut self,
+        sender: ghost_actor::GhostSender<TransportConnection>,
+        receiver: TransportConnectionEventReceiver,
+    ) -> ListenerInnerHandlerResult<()> {
+        let send_clone = self.incoming_sender.clone();
+        Ok(
+            async move { send_clone.incoming_connection(sender, receiver).await }
+                .boxed()
+                .into(),
+        )
+    }
+}
+
+impl ghost_actor::GhostHandler<TransportListener> for TransportListenerQuic {}
+
+impl TransportListenerHandler for TransportListenerQuic {
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<Url2> {
         let out = url2!(
             "{}://{}",
@@ -39,8 +60,10 @@ impl TransportListenerHandler<(), ListenerInner> for TransportListenerQuic {
     fn handle_connect(
         &mut self,
         input: Url2,
-    ) -> TransportListenerHandlerResult<(TransportConnectionSender, TransportConnectionEventReceiver)>
-    {
+    ) -> TransportListenerHandlerResult<(
+        ghost_actor::GhostSender<TransportConnection>,
+        TransportConnectionEventReceiver,
+    )> {
         // TODO fix this block_on
         let addr = tokio_safe_block_on::tokio_safe_block_on(
             crate::url_to_addr(&input, crate::SCHEME),
@@ -57,29 +80,15 @@ impl TransportListenerHandler<(), ListenerInner> for TransportListenerQuic {
                 .into(),
         )
     }
-
-    fn handle_ghost_actor_internal(&mut self, input: ListenerInner) -> TransportListenerResult<()> {
-        match input {
-            ListenerInner::RegisterIncoming {
-                respond,
-                sender,
-                receiver,
-                ..
-            } => {
-                let mut send_clone = self.incoming_sender.clone();
-                tokio::task::spawn(async move {
-                    let _ = respond(send_clone.incoming_connection(sender, receiver).await);
-                });
-            }
-        }
-        Ok(())
-    }
 }
 
 /// Spawn a new QUIC TransportListenerSender.
 pub async fn spawn_transport_listener_quic(
     bind_to: Url2,
-) -> TransportListenerResult<(TransportListenerSender, TransportListenerEventReceiver)> {
+) -> TransportListenerResult<(
+    ghost_actor::GhostSender<TransportListener>,
+    TransportListenerEventReceiver,
+)> {
     let (server_config, _server_cert) = danger::configure_server()
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
     let mut builder = quinn::Endpoint::builder();
@@ -90,51 +99,45 @@ pub async fn spawn_transport_listener_quic(
         .map_err(TransportError::custom)?;
 
     let (incoming_sender, receiver) = futures::channel::mpsc::channel(10);
-    let (sender, driver) =
-        TransportListenerSender::ghost_actor_spawn(Box::new(|internal_sender| {
-            async move {
-                let internal_sender_clone = internal_sender.clone();
-                tokio::task::spawn(async move {
-                    while let Some(maybe_con) = incoming.next().await {
-                        let mut internal_sender_clone = internal_sender_clone.clone();
 
-                        // TODO - some buffer_unordered(10) magic
-                        //        so we don't process infinite incoming connections
-                        tokio::task::spawn(async move {
-                            let r =
-                                match crate::connection::spawn_transport_connection_quic(maybe_con)
-                                    .await
-                                {
-                                    Err(_) => {
-                                        // TODO - log this?
-                                        return;
-                                    }
-                                    Ok(r) => r,
-                                };
+    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
-                            if let Err(_) = internal_sender_clone
-                                .ghost_actor_internal()
-                                .register_incoming(r.0, r.1)
-                                .await
-                            {
-                                // TODO - log this?
-                                return;
-                            }
-                        });
+    let internal_sender = builder.channel_factory().create_channel().await?;
+
+    let sender = builder.channel_factory().create_channel().await?;
+
+    let internal_sender_clone = internal_sender.clone();
+    tokio::task::spawn(async move {
+        while let Some(maybe_con) = incoming.next().await {
+            let internal_sender_clone = internal_sender_clone.clone();
+
+            // TODO - some buffer_unordered(10) magic
+            //        so we don't process infinite incoming connections
+            tokio::task::spawn(async move {
+                let r = match crate::connection::spawn_transport_connection_quic(maybe_con).await {
+                    Err(_) => {
+                        // TODO - log this?
+                        return;
                     }
-                });
+                    Ok(r) => r,
+                };
 
-                Ok(TransportListenerQuic {
-                    internal_sender,
-                    quinn_endpoint,
-                    incoming_sender,
-                })
-            }
-            .boxed()
-            .into()
-        }))
-        .await?;
-    tokio::task::spawn(driver);
+                if let Err(_) = internal_sender_clone.register_incoming(r.0, r.1).await {
+                    // TODO - log this?
+                    return;
+                }
+            });
+        }
+    });
+
+    let actor = TransportListenerQuic {
+        internal_sender,
+        quinn_endpoint,
+        incoming_sender,
+    };
+
+    tokio::task::spawn(builder.spawn(actor));
+
     Ok((sender, receiver))
 }
 

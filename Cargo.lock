@@ -1604,7 +1604,7 @@ name = "kitsune_p2p_types"
 version = "0.0.1"
 dependencies = [
  "futures",
- "ghost_actor 0.1.0",
+ "ghost_actor 0.2.0-alpha.6",
  "thiserror",
  "tokio",
  "url2",

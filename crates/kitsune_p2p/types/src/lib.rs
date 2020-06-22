@@ -52,9 +52,9 @@ pub mod transport {
 
     /// Defines an established connection to a remote peer.
     pub mod transport_connection {
-        ghost_actor::ghost_chan! {
+        ghost_actor::ghost_actor! {
             /// Event stream for handling incoming requests from a remote.
-            pub chan TransportConnectionEvent<super::TransportError> {
+            pub actor TransportConnectionEvent<super::TransportError> {
                 /// Event for handling incoming requests from a remote.
                 fn incoming_request(url: url2::Url2, data: Vec<u8>) -> Vec<u8>;
             }
@@ -80,12 +80,12 @@ pub mod transport {
     /// (1) for accepting incoming connections and
     /// (2) for making outgoing connections.
     pub mod transport_listener {
-        ghost_actor::ghost_chan! {
+        ghost_actor::ghost_actor! {
             /// Event stream for handling incoming connections.
-            pub chan TransportListenerEvent<super::TransportError> {
+            pub actor TransportListenerEvent<super::TransportError> {
                 /// Event for handling incoming connections from a remote.
                 fn incoming_connection(
-                    sender: super::transport_connection::TransportConnectionSender,
+                    sender: ghost_actor::GhostSender<super::transport_connection::TransportConnection>,
                     receiver: super::transport_connection::TransportConnectionEventReceiver,
                 ) -> ();
             }
@@ -103,7 +103,7 @@ pub mod transport {
 
                 /// Attempt to establish an outgoing connection to a remote.
                 fn connect(url: url2::Url2) -> (
-                    super::transport_connection::TransportConnectionSender,
+                    ghost_actor::GhostSender<super::transport_connection::TransportConnection>,
                     super::transport_connection::TransportConnectionEventReceiver,
                 );
             }
