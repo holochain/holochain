@@ -7,16 +7,19 @@
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
+use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
+use crate::core::state::workspace::Workspace;
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
-            error::WorkflowRunError, run_workflow, GenesisWorkflow, GenesisWorkspace,
-            InitializeZomesWorkflow, InitializeZomesWorkspace, InvokeZomeWorkflow,
+            error::WorkflowError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
+            invoke_zome_workflow, GenesisWorkflowArgs, GenesisWorkspace,
+            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, InvokeZomeWorkflowArgs,
             InvokeZomeWorkspace, ZomeCallInvocationResult,
         },
     },
@@ -74,6 +77,7 @@ where
     conductor_api: CA,
     state_env: EnvironmentWrite,
     holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+    queue_triggers: InitialQueueTriggers,
 }
 
 impl Cell {
@@ -105,12 +109,14 @@ impl Cell {
         };
 
         if has_genesis {
-            // TODO: Trigger produce_dht_ops_workflow here
+            let queue_triggers = spawn_queue_consumer_tasks(&state_env).await;
+
             Ok(Self {
                 id,
                 conductor_api,
                 state_env,
                 holochain_p2p_cell,
+                queue_triggers,
             })
         } else {
             Err(CellError::CellWithoutGenesis(id))
@@ -151,14 +157,14 @@ impl Cell {
         let workspace = GenesisWorkspace::new(&reader, &env)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        let workflow = GenesisWorkflow::new(
+        let args = GenesisWorkflowArgs::new(
             conductor_api,
             dna_file,
             id.agent_pubkey().clone(),
             membrane_proof,
         );
 
-        run_workflow(state_env.clone(), workflow, workspace)
+        genesis_workflow(workspace, state_env.clone().into(), args)
             .await
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
@@ -385,13 +391,18 @@ impl Cell {
         let reader = env.reader()?;
         let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
 
-        let workflow = InvokeZomeWorkflow {
+        let args = InvokeZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
             invocation,
         };
-        Ok(run_workflow(self.state_env().clone(), workflow, workspace)
-            .await
-            .map_err(Box::new)?)
+        Ok(invoke_zome_workflow(
+            workspace,
+            self.state_env().clone().into(),
+            args,
+            self.queue_triggers.produce_dht_ops.clone(),
+        )
+        .await
+        .map_err(Box::new)?)
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
@@ -404,7 +415,7 @@ impl Cell {
         let reader = env_ref.reader()?;
         // Create the workspace
         let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)
-            .map_err(WorkflowRunError::from)
+            .map_err(WorkflowError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);
 
@@ -424,10 +435,11 @@ impl Cell {
         // Get the ribosome
         let ribosome = WasmRibosome::new(dna_file);
 
-        // Create the workflow and run it
-        let workflow = InitializeZomesWorkflow { dna_def, ribosome };
-        let run_init = run_workflow(state_env.clone(), workflow, workspace).await;
-        let init_result = run_init.map_err(Box::new)??;
+        // Run the workflow
+        let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
+        let init_result = initialize_zomes_workflow(workspace, state_env.clone().into(), args)
+            .await
+            .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
             InitResult::Pass => (),
