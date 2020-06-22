@@ -14,6 +14,7 @@ pub const REQUIRED_VALIDATIONS: u8 = 13;
 pub type AnchorId = String;
 
 #[derive(Default)]
+#[repr(transparent)]
 pub struct Anchor(AnchorId);
 
 impl From<&Anchor> for EntryDefId {
@@ -56,8 +57,23 @@ impl Anchor {
         (&Anchor::default()).into()
     }
 
-    pub fn get(id: &AnchorId) -> Option<Self> {
+    pub fn get(id: &AnchorId) -> Result<Option<Self>, WasmError> {
+        let anchor = Self::from(id);
 
+        let entry_address_output: EntryAddressOutput =
+            host_call!(
+                __entry_address,
+                EntryAddressInput::from(anchor),
+            )?;
+        let entry_address
+
+        let output: GetEntryOutput = try_result!(
+            host_call!(
+                __get_entry,
+                GetEntryInput::new(debug_msg!("debug line numbers {}", "work"))
+            ),
+            format!("failed to call get for anchor id: {}", id)
+        );
     }
 
     /// local agent ensures the anchor exists in the DHT
