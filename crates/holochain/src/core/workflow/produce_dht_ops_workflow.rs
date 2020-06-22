@@ -4,8 +4,7 @@ use crate::core::{
     state::workspace::{Workspace, WorkspaceResult},
 };
 use dht_op::{dht_op_to_light_basis, DhtOpLight};
-use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, Hashed};
+use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_state::{

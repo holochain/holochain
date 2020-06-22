@@ -12,7 +12,6 @@ use crate::core::{
     sys_validate_element,
 };
 use fallible_iterator::FallibleIterator;
-use holo_hash::Hashed;
 use holochain_state::prelude::*;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
