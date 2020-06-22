@@ -6,7 +6,7 @@ use crate::core::{
     state::{
         cascade::Cascade,
         chain_cas::ChainCasBuf,
-        dht_op_integration::{IntegratedDhtOps, IntegrationQueue},
+        dht_op_integration::{IntegratedDhtOpsStore, IntegrationQueueStore},
         metadata::MetadataBuf,
         workspace::{Workspace, WorkspaceResult},
     },
@@ -58,9 +58,9 @@ async fn integrate_dht_ops_workflow_inner(
 
 pub struct IntegrateDhtOpsWorkspace<'env> {
     // integration queue
-    integration_queue: IntegrationQueue<'env>,
+    integration_queue: IntegrationQueueStore<'env>,
     // integrated ops
-    integrated_dht_ops: IntegratedDhtOps<'env>,
+    integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing
     cas: ChainCasBuf<'env>,
     // metadata store

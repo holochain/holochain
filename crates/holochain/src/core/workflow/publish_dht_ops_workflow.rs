@@ -23,7 +23,7 @@ use crate::core::{
     queue_consumer::WorkComplete,
     state::{
         chain_cas::ChainCasBuf,
-        dht_op_integration::{AuthoredDhtOps, IntegratedDhtOps, IntegrationValue},
+        dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegrationValue},
     },
 };
 use fallible_iterator::FallibleIterator;
@@ -47,11 +47,11 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 /// Database buffers required for publishing [DhtOp]s
 pub struct PublishDhtOpsWorkspace<'env> {
     /// Database of authored [DhtOpHash]
-    authored_dht_ops: AuthoredDhtOps<'env>,
+    authored_dht_ops: AuthoredDhtOpsStore<'env>,
     /// Cas for looking up data to construct ops
     cas: ChainCasBuf<'env>,
     // Integrated Ops database for looking up [DhtOp]s
-    integrated_dht_ops: IntegratedDhtOps<'env>,
+    integrated_dht_ops: IntegratedDhtOpsStore<'env>,
 }
 
 pub async fn publish_dht_ops_workflow(
@@ -146,11 +146,11 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         })
     }
 
-    fn authored(&self) -> &AuthoredDhtOps<'env> {
+    fn authored(&self) -> &AuthoredDhtOpsStore<'env> {
         &self.authored_dht_ops
     }
 
-    fn integrated(&self) -> &IntegratedDhtOps<'env> {
+    fn integrated(&self) -> &IntegratedDhtOpsStore<'env> {
         &self.integrated_dht_ops
     }
 

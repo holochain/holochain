@@ -1,7 +1,7 @@
 use super::{error::WorkflowResult, InvokeZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOps, IntegrationQueue, IntegrationValue},
+    dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationValue},
     workspace::{Workspace, WorkspaceResult},
 };
 use dht_op::dht_op_to_light_basis;
@@ -73,8 +73,8 @@ async fn produce_dht_ops_workflow_inner(
 
 pub struct ProduceDhtOpsWorkspace<'env> {
     pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
-    pub authored_dht_ops: AuthoredDhtOps<'env>,
-    pub integration_queue: IntegrationQueue<'env>,
+    pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
+    pub integration_queue: IntegrationQueueStore<'env>,
 }
 
 impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {

@@ -1,15 +1,22 @@
+//! Various types for the databases involved in the DhtOp integration workflow
+
 use crate::core::workflow::produce_dht_ops_workflow::dht_op::DhtOpLight;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{buffer::KvBuf, prelude::Reader};
 use holochain_types::{composite_hash::AnyDhtHash, validate::ValidationStatus, Timestamp};
 
-pub type AuthoredDhtOps<'env> = KvBuf<'env, DhtOpHash, u32, Reader<'env>>;
+/// Database type for AuthoredDhtOps
+pub type AuthoredDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, u32, Reader<'env>>;
 
-pub type IntegrationQueue<'env> = KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>;
+/// Database type for IntegrationQueue
+pub type IntegrationQueueStore<'env> =
+    KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>;
 
-pub type IntegratedDhtOps<'env> = KvBuf<'env, DhtOpHash, IntegrationValue, Reader<'env>>;
+/// Database type for IntegratedDhtOps
+pub type IntegratedDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, IntegrationValue, Reader<'env>>;
 
+/// The key type for the IntegrationQueue db
 #[derive(Hash, Eq, PartialEq)]
 pub struct IntegrationQueueKey(SerializedBytes);
 #[derive(serde::Deserialize, serde::Serialize, SerializedBytes)]
