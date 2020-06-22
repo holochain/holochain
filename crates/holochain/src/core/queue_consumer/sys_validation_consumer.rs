@@ -13,9 +13,9 @@ use holochain_state::env::ReadManager;
 pub fn spawn_sys_validation_consumer(
     env: EnvironmentWrite,
     mut trigger_app_validation: QueueTrigger,
-) -> (QueueTrigger, tokio::sync::mpsc::Receiver<()>) {
+) -> (QueueTrigger, tokio::sync::oneshot::Receiver<()>) {
     let (tx, mut rx) = QueueTrigger::new();
-    let (tx_first, rx_first) = tokio::sync::mpsc::channel(1);
+    let (tx_first, rx_first) = tokio::sync::oneshot::channel();
     let mut tx_first = Some(tx_first);
     let mut trigger_self = tx.clone();
     let _handle = tokio::spawn(async move {
