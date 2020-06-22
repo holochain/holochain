@@ -82,6 +82,8 @@ pub struct InitialQueueTriggers {
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
 pub struct TriggerSender(mpsc::Sender<()>);
+
+/// The receiving end of a queue trigger channel
 pub struct TriggerReceiver(mpsc::Receiver<()>);
 
 impl TriggerSender {
@@ -111,16 +113,35 @@ impl TriggerSender {
 
 impl TriggerReceiver {
     /// Listen for one or more items to come through, draining the channel
-    /// each time
-    pub async fn listen(&mut self) {
-        while let Some(_) = self.0.next().await {}
+    /// each time. Bubble up errors on empty channel.
+    pub async fn listen(&mut self) -> Result<(), QueueTriggerClosedError> {
+        use tokio::sync::mpsc::error::TryRecvError;
+
+        // wait for next item
+        if let Some(_) = self.0.recv().await {
+            // drain the channel
+            loop {
+                match self.0.try_recv() {
+                    Err(TryRecvError::Closed) => return Err(QueueTriggerClosedError),
+                    Err(TryRecvError::Empty) => return Ok(()),
+                    Ok(()) => (),
+                }
+            }
+        } else {
+            return Err(QueueTriggerClosedError);
+        }
     }
 }
 
+/// A lazy Writer factory which can only be used once.
+///
+/// This is a way of encapsulating an EnvironmentWrite so that it can only be
+/// used to create a single Writer before being consumed.
 #[derive(Constructor, From)]
 pub struct OneshotWriter(EnvironmentWrite);
 
 impl OneshotWriter {
+    /// Create the writer and pass it into a closure.
     pub async fn with_writer<F>(self, f: F) -> Result<(), DatabaseError>
     where
         F: FnOnce(&mut Writer) -> () + Send,
@@ -137,49 +158,12 @@ impl OneshotWriter {
 /// Declares whether a workflow has exhausted the queue or not
 #[derive(Clone, Debug, PartialEq)]
 pub enum WorkComplete {
+    /// The queue has been exhausted
     Complete,
+    /// Items still remain on the queue
     Incomplete,
 }
 
 /// The only error possible when attempting to trigger: the channel is closed
 #[derive(Debug, Display, thiserror::Error)]
 pub struct QueueTriggerClosedError;
-
-/*
-/// experimental DRY struct that doesn't work very well, or at all
-
-pub struct QueueConsumer<Ws>
-where
-    Ws: for<'env> Workspace<'env>,
-{
-    env: EnvironmentWrite,
-    run_consumer:
-        Box<dyn Fn(Ws) -> MustBoxFuture<'static, WorkflowResult<WorkComplete>> + Send + Sync>,
-    channel: (TriggerSender, QueueTriggerListener),
-    // triggers: Vec<TriggerSender>,
-}
-
-impl<Ws> QueueConsumer<Ws>
-where
-    Ws: for<'env> Workspace<'env>,
-{
-    pub fn spawn(self) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let (trigger_self, rx) = self.channel;
-            loop {
-                let env_ref = self.env.guard().await;
-                let reader = env_ref.reader().expect("Could not create LMDB reader");
-                let workspace =
-                    produce_dht_opsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
-                if let WorkComplete::Incomplete = (*self.run_consumer)(workspace)
-                    .await
-                    .expect("Failed to run workflow")
-                {
-                    trigger_self.trigger()
-                };
-                rx.listen().await;
-            }
-        })
-    }
-}
-*/
