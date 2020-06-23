@@ -617,13 +617,12 @@ mod tests {
                         Publish {
                             respond,
                             span,
-                            entry_hash,
+                            dht_hash,
                             ops,
                             ..
                         } => {
                             let _g = span.enter();
-                            let basis = entry_hash;
-                            debug!(?basis);
+                            debug!(?dht_hash);
                             debug!(?ops);
 
                             // Check the ops are correct
@@ -631,7 +630,7 @@ mod tests {
                                 match expected.get(&op_hash) {
                                     Some((expected_op, expected_basis, count)) => {
                                         assert_eq!(&op, expected_op);
-                                        assert_eq!(&basis, expected_basis);
+                                        assert_eq!(&dht_hash, expected_basis);
                                         count.fetch_add(1, Ordering::SeqCst);
                                     }
                                     None => {
