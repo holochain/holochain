@@ -4,7 +4,10 @@
 //! Every Workflow has an associated Workspace type.
 
 use super::source_chain::SourceChainError;
-use holochain_state::{error::DatabaseError, prelude::Writer};
+use holochain_state::{
+    error::DatabaseError,
+    prelude::{GetDb, Reader, Writer},
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -22,13 +25,16 @@ pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
 /// Defines a Workspace
 pub trait Workspace<'env>: Send + Sized {
-    // TODO: if we can have a generic way to create a Workspace, we can have
-    // `run_workflow` automatically create one and pass it into the workflow
-    // function -- this is also the case for the WorkflowTriggers
-    // fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self>;
+    /// Generic constructor
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self>;
 
-    /// Flush accumulated changes to the database. This consumes a Writer.
-    fn commit_txn(self, writer: Writer) -> Result<(), WorkspaceError>;
+    /// Flush accumulated changes to the writer without committing.
+    /// This consumes the Workspace.
+    ///
+    /// No method is provided to commit the writer as well, because Writers
+    /// should be managed such that write failures are properly handled, which
+    /// is outside the scope of the workspace.
+    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), WorkspaceError>;
 }
 
 #[cfg(test)]
@@ -49,20 +55,16 @@ pub mod tests {
         two: KvBuf<'env, String, bool, Reader<'env>>,
     }
 
-    impl<'env> TestWorkspace<'env> {
-        pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    impl<'env> Workspace<'env> for TestWorkspace<'env> {
+        fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_PUBLIC_ENTRIES)?)?,
                 two: KvBuf::new(reader, dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?)?,
             })
         }
-    }
-
-    impl<'env> Workspace<'env> for TestWorkspace<'env> {
-        fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-            self.one.flush_to_txn(&mut writer)?;
-            self.two.flush_to_txn(&mut writer)?;
-            writer.commit()?;
+        fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+            self.one.flush_to_txn(writer)?;
+            self.two.flush_to_txn(writer)?;
             Ok(())
         }
     }
@@ -76,7 +78,6 @@ pub mod tests {
         let addr2 = "hi".to_string();
         {
             let reader = env.reader()?;
-            let writer = env.writer_unmanaged()?;
             let mut workspace = TestWorkspace::new(&reader, &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, None);
 
@@ -84,7 +85,7 @@ pub mod tests {
             workspace.two.put(addr2.clone(), true).unwrap();
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
             assert_eq!(workspace.two.get(&addr2)?, Some(true));
-            workspace.commit_txn(writer)?;
+            env.with_commit(|mut writer| workspace.flush_to_txn(&mut writer))?;
         }
 
         // Ensure that the data was persisted
