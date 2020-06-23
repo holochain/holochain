@@ -1,17 +1,12 @@
 //! # Publish Dht Op Workflow
 //!
 //! ## Open questions
-//! - [x] Do we go to the network to get something missing from a DhtOp before sending it: __Assuming yes__.
 //! - [x] Publish add and remove links on private entries, what are the constraints on when to publish
 //! For now, Publish links on private entries
-// TODO: Make story about: later consider adding a flag to make a link private and not publish it.
+// TODO: B-01827 Make story about: later consider adding a flag to make a link private and not publish it.
 //       Even for those private links, we may need to publish them to the author of the private entry
 //       (and we'd have to reference its header  which actually exists on the DHT to make that work,
 //       rather than the entry which does not exist on the DHT).
-//! - [ ] How to get the keys out of the Authored db in an iterator?
-//! The deserialization fails. We could go with the queue idea and then we wouldn't need to
-//! deserialize keys
-//! We could also put the op_hash in the db value
 //!
 //!
 
@@ -74,7 +69,6 @@ pub async fn publish_dht_ops_workflow(
     Ok(WorkComplete::Complete)
 }
 
-// TODO: Turn this into an unmanaged inner function
 pub async fn publish_dht_ops_workflow_inner(
     workspace: &PublishDhtOpsWorkspace<'_>,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
@@ -623,13 +617,12 @@ mod tests {
                         Publish {
                             respond,
                             span,
-                            entry_hash,
+                            dht_hash,
                             ops,
                             ..
                         } => {
                             let _g = span.enter();
-                            let basis = entry_hash;
-                            debug!(?basis);
+                            debug!(?dht_hash);
                             debug!(?ops);
 
                             // Check the ops are correct
@@ -637,7 +630,7 @@ mod tests {
                                 match expected.get(&op_hash) {
                                     Some((expected_op, expected_basis, count)) => {
                                         assert_eq!(&op, expected_op);
-                                        assert_eq!(&basis, expected_basis);
+                                        assert_eq!(&dht_hash, expected_basis);
                                         count.fetch_add(1, Ordering::SeqCst);
                                     }
                                     None => {
@@ -676,5 +669,5 @@ mod tests {
         recv_task.await.unwrap();
     }
 
-    // TODO: Test public ops do publish
+    // TODO: COVERAGE: Test public ops do publish
 }

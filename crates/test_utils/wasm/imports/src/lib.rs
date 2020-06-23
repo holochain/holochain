@@ -57,6 +57,7 @@ guest_functions!(
         RemoveLinkInput,
         RemoveLinkOutput
     ],
+    [__random_bytes, random_bytes, RandomBytesInput, RandomBytesOutput],
     [__sign, sign, SignInput, SignOutput],
     [__schedule, schedule, ScheduleInput, ScheduleOutput],
     [
@@ -93,8 +94,8 @@ guest_functions!(
         EntryTypePropertiesOutput
     ],
     [
-        __entry_address,
-        entry_address,
+        __entry_hash,
+        entry_hash,
         EntryHashInput,
         EntryHashOutput
     ],

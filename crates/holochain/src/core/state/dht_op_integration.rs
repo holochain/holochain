@@ -7,18 +7,23 @@ use holochain_state::{buffer::KvBuf, prelude::Reader};
 use holochain_types::{composite_hash::AnyDhtHash, validate::ValidationStatus, Timestamp};
 
 /// Database type for AuthoredDhtOps
+/// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
 pub type AuthoredDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, u32, Reader<'env>>;
 
 /// Database type for IntegrationQueue
+/// Queue of ops ready to be integrated
 pub type IntegrationQueueStore<'env> =
     KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>;
 
 /// Database type for IntegratedDhtOps
+/// [DhtOp]s that have already been integrated
 pub type IntegratedDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, IntegrationValue, Reader<'env>>;
 
 /// The key type for the IntegrationQueue db
+/// Key for the Integration Queue that ensures they are ordered by time
 #[derive(Hash, Eq, PartialEq)]
 pub struct IntegrationQueueKey(SerializedBytes);
+
 #[derive(serde::Deserialize, serde::Serialize, SerializedBytes)]
 struct T(Timestamp, DhtOpHash);
 
