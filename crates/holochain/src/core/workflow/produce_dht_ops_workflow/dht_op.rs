@@ -72,7 +72,7 @@ pub async fn dht_op_to_light_basis<C: MetadataBufT>(
 }
 
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
-/// This only checks the cas so can only be used with ops that you are an authority 
+/// This only checks the cas so can only be used with ops that you are an authority
 // or author of.
 pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<DhtOp> {
     let op_name = format!("{:?}", op);

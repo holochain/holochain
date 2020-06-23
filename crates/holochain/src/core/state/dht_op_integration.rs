@@ -15,7 +15,6 @@ pub type IntegrationQueue<'env> = KvBuf<'env, IntegrationQueueKey, IntegrationVa
 /// [DhtOp]s that have already been integrated
 pub type IntegratedDhtOps<'env> = KvBuf<'env, DhtOpHash, IntegrationValue, Reader<'env>>;
 
-
 /// Key for the Integration Queue that ensures they are ordered by time
 #[derive(Hash, Eq, PartialEq)]
 pub struct IntegrationQueueKey(SerializedBytes);
