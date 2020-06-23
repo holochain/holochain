@@ -56,6 +56,9 @@ wasm_io_types!(
     // @TODO
     pub struct QueryInput(());
     pub struct QueryOutput(());
+    // the length of random bytes to create
+    pub struct RandomBytesInput(u32);
+    pub struct RandomBytesOutput(crate::bytes::Bytes);
     // @TODO
     pub struct RemoveLinkInput(());
     pub struct RemoveLinkOutput(());

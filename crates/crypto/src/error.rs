@@ -35,6 +35,7 @@ pub enum CryptoError {
     InternalSodium,
 
     /// error in tokio task
+    #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
 
     /// generic internal error
