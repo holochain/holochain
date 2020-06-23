@@ -4,13 +4,16 @@ use crate::core::workflow::produce_dht_ops_workflow::dht_op::DhtOpLight;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{buffer::KvBuf, prelude::Reader};
-use holochain_types::{composite_hash::AnyDhtHash, validate::ValidationStatus, Timestamp};
+use holochain_types::{
+    composite_hash::AnyDhtHash, dht_op::DhtOp, validate::ValidationStatus, Timestamp,
+};
 
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
 pub type AuthoredDhtOps<'env> = KvBuf<'env, DhtOpHash, u32, Reader<'env>>;
 
 /// Queue of ops ready to be integrated
-pub type IntegrationQueue<'env> = KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>;
+pub type IntegrationQueue<'env> =
+    KvBuf<'env, IntegrationQueueKey, IntegrationQueueValue, Reader<'env>>;
 
 /// [DhtOp]s that have already been integrated
 pub type IntegratedDhtOps<'env> = KvBuf<'env, DhtOpHash, IntegrationValue, Reader<'env>>;
@@ -52,6 +55,15 @@ pub struct IntegrationValue {
     pub basis: AnyDhtHash,
     /// Signatures and hashes of the op
     pub op: DhtOpLight,
+}
+
+/// A type for storing in databases that only need the hashes.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IntegrationQueueValue {
+    /// Thi ops validation status
+    pub validation_status: ValidationStatus,
+    /// Signatures and hashes of the op
+    pub op: DhtOp,
 }
 
 #[cfg(test)]
