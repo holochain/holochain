@@ -164,7 +164,7 @@ impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
     }
 }
 
-mod error {
+pub mod error {
     use thiserror::Error;
     #[derive(Error, Debug)]
     pub enum UnsafeInvokeZomeWorkspaceError {

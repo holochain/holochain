@@ -21,6 +21,10 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
 
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+/// @todo make some options for get
+pub struct GetOptions;
+
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 #[allow(clippy::large_enum_variant)]
