@@ -1,12 +1,14 @@
+use fixt::prelude::*;
 use holochain_2020::core::state::{
     cascade::Cascade,
-    chain_meta::ChainMetaBuf,
+    metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
     header,
+    link::Tag,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
@@ -79,8 +81,8 @@ async fn get_links() -> SourceChainResult<()> {
     let cache = SourceChainBuf::cache(&reader, &dbs)?;
 
     // create a cache and a cas for store and meta
-    let primary_meta = ChainMetaBuf::primary(&reader, &dbs)?;
-    let cache_meta = ChainMetaBuf::cache(&reader, &dbs)?;
+    let primary_meta = MetadataBuf::primary(&reader, &dbs)?;
+    let cache_meta = MetadataBuf::cache(&reader, &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
@@ -99,7 +101,11 @@ async fn get_links() -> SourceChainResult<()> {
         &cache.cas(),
         &cache_meta,
     );
-    let links = cascade.dht_get_links(base.into(), "").await?;
+    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+    let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
+
+    let links = cascade.dht_get_links(&key).await?;
     let link = links.into_iter().next();
     assert_eq!(link, None);
     Ok(())

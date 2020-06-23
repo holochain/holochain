@@ -3,19 +3,39 @@ pub mod curve;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
+use crate::core::state::metadata::LinkMetaVal;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
+use holo_hash::EntryContentHashFixturator;
 use holo_hash::HeaderHashFixturator;
 use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_types::composite_hash::AnyDhtHash;
+use holochain_types::composite_hash::EntryHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaDef;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
+use holochain_types::fixt::AppEntryTypeFixturator;
+use holochain_types::fixt::HeaderBuilderCommonFixturator;
+use holochain_types::fixt::TimestampFixturator;
+use holochain_types::fixt::UpdateBasisFixturator;
+use holochain_types::header::AgentValidationPkg;
+use holochain_types::header::ChainClose;
+use holochain_types::header::ChainOpen;
+use holochain_types::header::EntryCreate;
+use holochain_types::header::EntryDelete;
+use holochain_types::header::EntryType;
+use holochain_types::header::EntryUpdate;
+use holochain_types::header::InitZomesComplete;
+use holochain_types::header::LinkAdd;
+use holochain_types::header::{Dna, LinkRemove, ZomeId};
+use holochain_types::link::Tag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
@@ -25,6 +45,12 @@ use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::GrantedFunctions;
 use holochain_zome_types::capability::ZomeCallCapGrant;
+use holochain_zome_types::crdt::CrdtType;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
@@ -218,9 +244,9 @@ fixturator!(
 );
 
 fixturator!(
-    Wasms,
-    { BTreeMap::new() },
-    {
+    Wasms;
+    curve Empty BTreeMap::new();
+    curve Unpredictable {
         let mut rng = rand::thread_rng();
         let number_of_wasms = rng.gen_range(0, 5);
 
@@ -239,8 +265,8 @@ fixturator!(
             );
         }
         wasms
-    },
-    {
+    };
+    curve Predictable {
         let mut wasms: Wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new_indexed(Predictable, self.0.index);
         for _ in (0..3) {
@@ -256,20 +282,71 @@ fixturator!(
             );
         }
         wasms
-    }
+    };
 );
 
 fixturator!(
-    Zomes,
-    Vec::new(),
-    {
+    EntryVisibility;
+    unit variants [ Public Private ] empty Private;
+);
+
+fixturator!(
+    CrdtType;
+    curve Empty CrdtType;
+    curve Unpredictable CrdtType;
+    curve Predictable CrdtType;
+);
+
+fixturator!(
+    EntryDefId;
+    from String;
+);
+
+fixturator!(
+    RequiredValidations;
+    from u8;
+);
+
+fixturator!(
+    EntryDef;
+    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations);
+);
+
+fixturator!(
+    EntryDefs;
+    curve Empty Vec::new().into();
+    curve Unpredictable {
+        let mut rng = rand::thread_rng();
+        let number_of_defs = rng.gen_range(0, 5);
+
+        let mut defs = vec![];
+        let mut entry_def_fixturator = EntryDefFixturator::new(Unpredictable);
+        for _ in 0..number_of_defs {
+            defs.push(entry_def_fixturator.next().unwrap());
+        }
+        defs.into()
+    };
+    curve Predictable {
+        let mut defs = vec![];
+        let mut entry_def_fixturator = EntryDefFixturator::new(Predictable);
+        for _ in 0..3 {
+            defs.push(entry_def_fixturator.next().unwrap());
+        }
+        defs.into()
+    };
+);
+
+fixturator!(
+    Zomes;
+    curve Empty Vec::new();
+    curve Unpredictable {
         // @todo implement unpredictable zomes
         ZomesFixturator::new(Empty).next().unwrap()
-    },
-    {
+    };
+    curve Predictable {
         // @todo implement predictable zomes
         ZomesFixturator::new(Empty).next().unwrap()
-    }
+    };
 );
 
 fixturator!(
@@ -420,8 +497,160 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
             ribosome.module(host_context).unwrap();
         }
 
-        self.0.index = self.0.index + 1;
+        self.0.index += 1;
 
         Some(ribosome)
     }
 }
+
+fixturator!(
+    EntryHash;
+    variants [
+        Entry(EntryContentHash)
+        Agent(AgentPubKey)
+    ];
+);
+
+fixturator!(
+    Tag; from Bytes;
+);
+
+fixturator!(
+    LinkMetaVal;
+    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, Tag);
+);
+
+pub struct KnownLinkAdd {
+    pub base_address: EntryHash,
+    pub target_address: EntryHash,
+    pub tag: Tag,
+    pub zome_id: ZomeId,
+}
+
+pub struct KnownLinkRemove {
+    pub link_add_address: holo_hash::HeaderHash,
+}
+
+impl Iterator for LinkAddFixturator<KnownLinkAdd> {
+    type Item = LinkAdd;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut f = fixt!(LinkAdd);
+        f.base_address = self.0.curve.base_address.clone();
+        f.target_address = self.0.curve.target_address.clone();
+        f.tag = self.0.curve.tag.clone();
+        f.zome_id = self.0.curve.zome_id;
+        Some(f)
+    }
+}
+
+impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
+    type Item = LinkRemove;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut f = fixt!(LinkRemove);
+        f.link_add_address = self.0.curve.link_add_address.clone();
+        Some(f)
+    }
+}
+
+impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
+    type Item = LinkMetaVal;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut f = fixt!(LinkMetaVal);
+        f.target = self.0.curve.0.clone();
+        f.tag = self.0.curve.1.clone();
+        Some(f)
+    }
+}
+
+fixturator!(
+    Dna;
+    constructor fn from_builder(DnaHash, HeaderBuilderCommon);
+);
+
+fixturator!(
+    LinkRemove;
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+);
+
+fixturator!(
+    LinkAdd;
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, Tag);
+);
+
+type MaybeSerializedBytes = Option<SerializedBytes>;
+
+fixturator! {
+    MaybeSerializedBytes;
+    enum [ Some None ];
+    curve Empty MaybeSerializedBytes::None;
+    curve Unpredictable match MaybeSerializedBytesVariant::random() {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
+    };
+    curve Predictable match MaybeSerializedBytesVariant::nth(self.0.index) {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+    };
+}
+
+fixturator! {
+    EntryType;
+    enum [ AgentPubKey App CapClaim CapGrant ];
+    curve Empty EntryType::AgentPubKey;
+    curve Unpredictable match EntryTypeVariant::random() {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryType)),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+    curve Predictable match EntryTypeVariant::nth(self.0.index) {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+}
+
+fixturator!(
+    AgentValidationPkg;
+    constructor fn from_builder(HeaderBuilderCommon, MaybeSerializedBytes);
+);
+
+fixturator!(
+    InitZomesComplete;
+    constructor fn from_builder(HeaderBuilderCommon);
+);
+
+fixturator!(
+    ChainOpen;
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+);
+
+fixturator!(
+    ChainClose;
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+);
+
+fixturator!(
+    EntryCreate;
+    constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
+);
+
+fixturator!(
+    AnyDhtHash;
+    variants [
+        EntryContent(EntryContentHash)
+        Agent(AgentPubKey)
+        Header(HeaderHash)
+    ];
+);
+
+fixturator!(
+    EntryUpdate;
+    constructor fn from_builder(HeaderBuilderCommon, UpdateBasis, HeaderHash, EntryType, EntryHash);
+);
+
+fixturator!(
+    EntryDelete;
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash);
+);

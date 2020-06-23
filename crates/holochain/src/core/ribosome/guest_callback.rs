@@ -1,3 +1,4 @@
+pub mod entry_defs;
 pub mod init;
 pub mod migrate_agent;
 pub mod post_commit;
@@ -36,7 +37,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
     type Item = GuestOutput;
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let timeout = crate::start_hard_timeout!();
+        let call_iterator_timeout = crate::start_hard_timeout!();
         let next = Ok(match self.remaining_zomes.first() {
             // there are no zomes left, we are finished
             None => None,
@@ -64,7 +65,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
             }
         });
         // the total should add trivial overhead vs the inner calls
-        crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
+        crate::end_hard_timeout!(call_iterator_timeout, crate::perf::MULTI_WASM_CALL);
         next
     }
 }
@@ -136,9 +137,11 @@ mod tests {
                     .with(always(), always(), eq(zome_name.clone()), eq(fn_component))
                     .times(1)
                     .in_sequence(&mut sequence)
-                    .return_const(Ok(Some(GuestOutput::new(
-                        InitCallbackResult::Pass.try_into().unwrap(),
-                    ))));
+                    .returning(|_, _, _, _| {
+                        Ok(Some(GuestOutput::new(
+                            InitCallbackResult::Pass.try_into().unwrap(),
+                        )))
+                    });
             }
 
             // the fn components are reset from the invocation every zome

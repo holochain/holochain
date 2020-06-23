@@ -2,26 +2,6 @@
 
 use std::sync::Arc;
 
-/// We are receiving a request from a remote node.
-pub struct RequestEvt {
-    /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
-    /// Request data.
-    pub request: Arc<Vec<u8>>,
-}
-
-/// We are receiving a broadcast from a remote node.
-pub struct BroadcastEvt {
-    /// The "space" context.
-    pub space: Arc<super::KitsuneSpace>,
-    /// The "agent" context.
-    pub agent: Arc<super::KitsuneAgent>,
-    /// Broadcast data.
-    pub broadcast: Arc<Vec<u8>>,
-}
-
 /// Gather a list of op-hashes from our implementor that meet criteria.
 pub struct FetchOpHashesForConstraintsEvt {
     /// The "space" context.
@@ -63,10 +43,10 @@ ghost_actor::ghost_chan! {
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
         /// We are receiving a request from a remote node.
-        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
+        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Vec<u8>) -> Vec<u8>;
 
         /// We are receiving a broadcast from a remote node.
-        fn broadcast(input: BroadcastEvt) -> ();
+        fn broadcast(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Vec<u8>) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<(super::KitsuneDataHash, Vec<super::KitsuneOpHash>)>;

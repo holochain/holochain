@@ -12,6 +12,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::HeaderAddress,
+    dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
     header::{self},
@@ -84,8 +85,35 @@ impl<'env> SourceChainBuf<'env> {
         self.cas.get_header(k).await
     }
 
+    pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
+        let mut ops = Vec::new();
+        // FIXME: This collect shouldn't need to happen but the iterator to the db is not Send
+        let ops_headers = self
+            .sequence
+            .get_items_with_incomplete_dht_ops()?
+            .collect::<Vec<_>>();
+        for (i, header) in ops_headers {
+            let op = ops_from_element(
+                &self
+                    .get_element(&header)
+                    .await?
+                    .expect("BUG: element in sequence but not cas"),
+            )?;
+            ops.push((i, op));
+        }
+        Ok(ops)
+    }
+
+    pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
+        self.sequence.complete_dht_op(i)
+    }
+
     pub fn cas(&self) -> &ChainCasBuf {
         &self.cas
+    }
+
+    pub fn sequence(&self) -> &ChainSequenceBuf {
+        &self.sequence
     }
 
     /// Add a ChainElement to the source chain, using a fully-formed Header
@@ -131,16 +159,14 @@ impl<'env> SourceChainBuf<'env> {
         Ok(self
             .cas
             .public_entries()
-            .iter_raw()?
-            .chain(
-                // Add in values from the scratch space, to be comprehensive
-                self.cas.public_entries().iter_scratch_puts(),
-            )
-            .filter_map(|e| match e.into_content() {
-                Entry::Agent(agent_pubkey) => Some(agent_pubkey),
-                _ => None,
+            .iter_fail()?
+            .filter_map(|e| {
+                Ok(match e.into_content() {
+                    Entry::Agent(agent_pubkey) => Some(agent_pubkey),
+                    _ => None,
+                })
             })
-            .next()
+            .next()?
             .map(|h| h.into()))
     }
 

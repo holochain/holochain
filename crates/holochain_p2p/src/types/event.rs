@@ -2,6 +2,22 @@
 
 use crate::*;
 
+/// Get options help control how the get is processed at various levels.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetOptions {
+    /// Whether the remote-end should follow redirects or just return the
+    /// requested entry.
+    pub follow_redirects: bool,
+}
+
+impl From<&actor::GetOptions> for GetOptions {
+    fn from(a: &actor::GetOptions) -> Self {
+        Self {
+            follow_redirects: a.follow_redirects,
+        }
+    }
+}
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
@@ -9,50 +25,53 @@ ghost_actor::ghost_chan! {
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
             dna_hash: DnaHash,
-            agent_pub_key: AgentPubKey,
+            to_agent: AgentPubKey,
+            zome_name: ZomeName,
+            fn_name: String,
+            cap: CapSecret,
             request: SerializedBytes,
         ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.
         fn publish(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
-            agent_pub_key: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            to_agent: AgentPubKey,
+            from_agent: AgentPubKey,
+            request_validation_receipt: bool,
+            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ) -> ();
 
         /// A remote node is requesting a validation package.
         fn get_validation_package(
             // The dna_hash / space_hash context.
             dna_hash: DnaHash,
             // The agent_id / agent_pub_key context.
-            agent_pub_key: AgentPubKey,
+            to_agent: AgentPubKey,
             // TODO - parameters
         ) -> (); // TODO - proper return type
 
         /// A remote node is requesting entry data from us.
         fn get(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
-            agent_pub_key: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            to_agent: AgentPubKey,
+            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            options: GetOptions,
+        ) -> SerializedBytes;
 
         /// A remote node is requesting link data from us.
         fn get_links(
             // The dna_hash / space_hash context.
             dna_hash: DnaHash,
             // The agent_id / agent_pub_key context.
-            agent_pub_key: AgentPubKey,
+            to_agent: AgentPubKey,
             // TODO - parameters
         ) -> (); // TODO - proper return type
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
             dna_hash: DnaHash,
-            agent_pub_key: AgentPubKey,
+            to_agent: AgentPubKey,
             receipt: SerializedBytes,
         ) -> ();
 
@@ -61,7 +80,7 @@ ghost_actor::ghost_chan! {
             // The dna_hash / space_hash context.
             dna_hash: DnaHash,
             // The agent_id / agent_pub_key context.
-            agent_pub_key: AgentPubKey,
+            to_agent: AgentPubKey,
             // TODO - parameters
         ) -> (); // TODO - proper return type
 
@@ -70,7 +89,7 @@ ghost_actor::ghost_chan! {
             // The dna_hash / space_hash context.
             dna_hash: DnaHash,
             // The agent_id / agent_pub_key context.
-            agent_pub_key: AgentPubKey,
+            to_agent: AgentPubKey,
             // TODO - parameters
         ) -> (); // TODO - proper return type
 
@@ -79,7 +98,7 @@ ghost_actor::ghost_chan! {
             // The dna_hash / space_hash context.
             dna_hash: DnaHash,
             // The agent_id / agent_pub_key context.
-            agent_pub_key: AgentPubKey,
+            to_agent: AgentPubKey,
             // The data to sign.
             data: Vec<u8>,
         ) -> Signature;
@@ -110,8 +129,8 @@ impl HolochainP2pEvent {
     }
 
     /// The agent_pub_key associated with this network p2p event.
-    pub fn agent_pub_key(&self) -> &AgentPubKey {
-        match_p2p_evt!(self => |agent_pub_key| { agent_pub_key })
+    pub fn as_to_agent(&self) -> &AgentPubKey {
+        match_p2p_evt!(self => |to_agent| { to_agent })
     }
 }
 

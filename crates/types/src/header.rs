@@ -6,7 +6,9 @@
 
 #![allow(missing_docs)]
 
-use crate::composite_hash::{AnyDhtHash, EntryHash, HeaderAddress};
+use crate::composite_hash::{EntryHash, HeaderAddress};
+use crate::{link::Tag, prelude::*};
+use holochain_zome_types::entry_def::EntryVisibility;
 
 pub mod builder;
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
@@ -157,11 +159,43 @@ impl HeaderHashed {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+/// A header of one of the two types that create a new entry.
+pub enum NewEntryHeader {
+    Create(EntryCreate),
+    Update(EntryUpdate),
+}
+
+impl NewEntryHeader {
+    /// Get the entry on this header
+    pub fn entry(&self) -> &EntryHash {
+        match self {
+            NewEntryHeader::Create(EntryCreate { entry_hash, .. })
+            | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
+        }
+    }
+}
+
+impl From<NewEntryHeader> for Header {
+    fn from(h: NewEntryHeader) -> Self {
+        match h {
+            NewEntryHeader::Create(h) => Header::EntryCreate(h),
+            NewEntryHeader::Update(h) => Header::EntryUpdate(h),
+        }
+    }
+}
+
 /// this id in an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
+// TODO: Check this can never be written to > 255
 pub type ZomeId = u8;
 
-use crate::prelude::*;
+/// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum UpdateBasis {
+    Header,
+    Entry,
+}
 
 /// header for a DNA entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -200,10 +234,10 @@ pub struct LinkAdd {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub base_address: AnyDhtHash,
-    pub target_address: AnyDhtHash,
-    pub tag: SerializedBytes,
-    pub link_type: SerializedBytes,
+    pub base_address: EntryHash,
+    pub target_address: EntryHash,
+    pub zome_id: ZomeId,
+    pub tag: Tag,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -212,6 +246,7 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
+    pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderAddress,
 }
@@ -254,7 +289,8 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub replaces_address: AnyDhtHash,
+    pub update_basis: UpdateBasis,
+    pub replaces_address: HeaderHash,
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
@@ -268,7 +304,7 @@ pub struct EntryDelete {
     pub prev_header: HeaderAddress,
 
     /// Address of the Element being deleted
-    pub removes_address: AnyDhtHash,
+    pub removes_address: HeaderAddress,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -319,15 +355,14 @@ impl AppEntryType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub enum EntryVisibility {
-    Public,
-    Private,
-}
-
-impl EntryVisibility {
-    /// converts entry visibility enum into boolean value on public
-    pub fn is_public(&self) -> bool {
-        *self == EntryVisibility::Public
+impl Dna {
+    /// Dna cannot implement the trait as it doesn't have a previous header
+    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
+        Self {
+            author: builder.author,
+            timestamp: builder.timestamp,
+            header_seq: builder.header_seq,
+            hash,
+        }
     }
 }

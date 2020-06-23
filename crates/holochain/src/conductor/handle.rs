@@ -164,6 +164,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Dump the cells state
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
+    /// Get info about an installed App, whether active or inactive
+    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
+
     // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -253,7 +256,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.conductor.read().await;
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        cell.call_zome(invocation).await.map_err(Into::into)
+        Ok(cell.call_zome(invocation).await?)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
@@ -364,6 +367,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.dump_cell_state(cell_id).await
     }
 
+    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+        Ok(self
+            .conductor
+            .read()
+            .await
+            .get_state()
+            .await?
+            .get_app_info(app_id))
+    }
+
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.conductor.read().await;
@@ -442,6 +455,8 @@ pub mod mock {
             fn sync_deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
             fn sync_dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+            fn sync_get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
             #[cfg(test)]
             fn sync_get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -556,6 +571,10 @@ pub mod mock {
         /// Dump the cells state
         async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             self.sync_dump_cell_state(cell_id)
+        }
+
+        async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+            self.sync_get_app_info(app_id)
         }
 
         // HACK: remove when B-01593 lands

@@ -2,9 +2,10 @@
 name = "holochain_zome_types"
 version = "0.0.1"
 description = "Holochain zome types"
-license = "GPL-3.0-only"
+license = "CAL-1.0"
 homepage = "https://github.com/Holo-host/holochain-2020"
 documentation = "https://github.com/Holo-host/holochain-2020"
+readme = "README.md"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
@@ -12,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 holo_hash_core = { path = "../holo_hash_core" }
-holochain_serialized_bytes = "=0.0.39"
+holochain_serialized_bytes = "=0.0.40"
 # TODO: remove and replace with HoloHash
 multihash = "0.8.0"
 # TODO: remove this once there is some less obtrusive source of randomness
@@ -20,3 +21,4 @@ nanoid = "0.3"
 # TODO: remove and replace with HoloHash
 rust-base58 = "0.0.4"
 serde = { version = "1.0.104", features = [ "derive" ] }
+serde_bytes = "0.11"

@@ -1,10 +1,10 @@
 use std::path::Path;
-use toml;
 
 fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
 
     println!("cargo:rerun-if-changed=Cargo.toml");
+    println!("cargo:rerun-if-changed=*");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
@@ -20,7 +20,9 @@ fn main() {
     }
 
     for &m in [
+        "bench",
         "debug",
+        "entry_defs",
         "foo",
         "imports",
         "init_pass",
@@ -40,10 +42,7 @@ fn main() {
         let cargo_toml = Path::new(m).join("Cargo.toml");
 
         let cargo_command = std::env::var_os("CARGO");
-        let cargo_command = cargo_command
-            .as_ref()
-            .map(|s| &**s)
-            .unwrap_or_else(|| "cargo".as_ref());
+        let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
 
         let status = std::process::Command::new(cargo_command)
             .arg("build")

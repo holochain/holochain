@@ -21,3 +21,9 @@ impl From<&str> for ZomeName {
         Self(s.to_string())
     }
 }
+
+impl From<String> for ZomeName {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}

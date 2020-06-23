@@ -24,6 +24,10 @@ pub enum HolochainP2pError {
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
+    /// Invalid P2p Message
+    #[error("InvalidP2pMessage: {0}")]
+    InvalidP2pMessage(String),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -33,6 +37,11 @@ impl HolochainP2pError {
     /// promote a custom error type to a TransportError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
+    }
+
+    /// construct an invalid p2p message error variant
+    pub fn invalid_p2p_message(s: String) -> Self {
+        Self::InvalidP2pMessage(s)
     }
 }
 
@@ -89,12 +98,12 @@ pub mod event;
 
 pub(crate) mod wire;
 
-macro_rules! to_kitsune {
-    ($($i:ident<$h:ty, $hc:ty> -> $k:ty,)*) => {
+macro_rules! to_and_from_kitsune {
+    ($($i:ident<$h:ty, $hc:ty,> -> $k:ty,)*) => {
         $(
             pub(crate) trait $i: ::std::clone::Clone + Sized {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
-                fn to_kitsune(self) -> ::std::sync::Arc<$k> {
+                fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self;
@@ -113,7 +122,39 @@ macro_rules! to_kitsune {
     };
 }
 
+to_and_from_kitsune! {
+    DnaHashExt<
+        holo_hash::DnaHash,
+        crate::holo_hash_core::DnaHash,
+    > -> kitsune_p2p::KitsuneSpace,
+    AgentPubKeyExt<
+        holo_hash::AgentPubKey,
+        crate::holo_hash_core::AgentPubKey,
+    > -> kitsune_p2p::KitsuneAgent,
+}
+
+macro_rules! to_kitsune {
+    ($($i:ident<$h:ty, $hc:ty,> -> $k:ty,)*) => {
+        $(
+            pub(crate) trait $i: ::std::clone::Clone + Sized {
+                fn into_kitsune(self) -> ::std::sync::Arc<$k>;
+                fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
+                    self.clone().into_kitsune()
+                }
+            }
+
+            impl $i for $h {
+                fn into_kitsune(self) -> ::std::sync::Arc<$k> {
+                    ::std::sync::Arc::new(self.into_inner().into())
+                }
+            }
+        )*
+    };
+}
+
 to_kitsune! {
-    DnaHashExt<holo_hash::DnaHash, crate::holo_hash_core::DnaHash> -> kitsune_p2p::KitsuneSpace,
-    AgentPubKeyExt<holo_hash::AgentPubKey, crate::holo_hash_core::AgentPubKey> -> kitsune_p2p::KitsuneAgent,
+    AnyDhtHashExt<
+        holochain_types::composite_hash::AnyDhtHash,
+        crate::holo_hash_core::EntryContentHash,
+    > -> kitsune_p2p::KitsuneBasis,
 }

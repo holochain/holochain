@@ -167,9 +167,7 @@ that the host will use to request safe memory allocations and deallocations from
 the guest.
 
 This allows the host to repect the guest's own memory allocation logic, and so
-provides support for alternative allocators such as the wasm-friendly wee alloc.
-
-https://github.com/rustwasm/wee_alloc
+provides support for alternative allocators.
 
 Exposing these functions is as simple as calling the `holochain_externs!` macro
 in the `holochain_wasmer_guest` crate.
@@ -293,7 +291,7 @@ Defining an extern function for holochain in Rust is straightforward:
 
 Since we will want to accept and return more complex data than small chunks of
 binary, there are a few macros such as `host_args!()` and `ret!()` that import
-and export anything that can be serialized with `serde` from and to `RemotePtr`
+and export anything that can be serialized with `serde` from and to `GuestPtr`
 values.
 
 It's probably not clear how it is possible to "serialize" arbitrary data into a
@@ -321,7 +319,7 @@ To implement an `init` callback we need a few things:
 - the `holochain_externs!()` macro as above
 - to define an `extern` called `init` as described above
 - to use the `ret!()` macro with the `GuestOutput` type to return an
-  `InitCallbackResult` enum, serialized into a `RemotePtr`
+  `InitCallbackResult` enum, serialized into a `GuestPtr`
 
 That last point is a little complex so I'll break it down.
 
@@ -355,9 +353,9 @@ holochain_externs!();
 // tell the compiler not to "mangle" (rename) the function
 #[no_mangle]
 // note the `extern "C"` keywords
-pub extern "C" fn init(_: RemotePtr) -> RemotePtr {
+pub extern "C" fn init(_: GuestPtr) -> GuestPtr {
 
- // `ret!` will `return` anything `TryInto<SerializedBytes>` as a `RemotePtr`
+ // `ret!` will `return` anything `TryInto<SerializedBytes>` as a `GuestPtr`
  ret!(
   GuestOutput::new(
    // the host will allow this wasm to be installed if it returns `Pass`
@@ -374,7 +372,7 @@ A minimal functional wasm that implements a `hello_world` function that can be
 called by the outside world, e.g. via. websockets RPC calls.
 
 Our function won't take any inputs or do any real work, it will simply return
-a `RemotePtr` to an empty placeholder `HelloWorld` struct.
+a `GuestPtr` to an empty placeholder `HelloWorld` struct.
 
 The holochain host would return a messagepack-serialized representation of this
 `HelloWorld` struct back to the guest via. websockets RPC.
@@ -413,7 +411,7 @@ struct HelloWorld;
 // the same #[no_mangle] attribute and `extern "C"` keywords are used to expose
 // functions to the external world as to implement callback functions
 #[no_mangle]
-pub extern "C" hello_world(_: RemotePtr) -> RemotePtr {
+pub extern "C" hello_world(_: GuestPtr) -> GuestPtr {
  ret!(
   GuestOutput(
    // the derived serialization traits make this work
@@ -438,14 +436,14 @@ In addition to the patterns we demonstrated above for externs and callbacks, we
 also need to introduce the `host_call()!` and `host_args!()` macros.
 
 The `host_call!()` macro works very similarly to the `ret!()` macro in that it
-takes serializable data on the guest and sends it to the host as a `RemotePtr`.
+takes serializable data on the guest and sends it to the host as a `GuestPtr`.
 The difference is that instead of causing the guest to `return`, this data is
 the argument to a function that _executes and blocks immediately on the host_
 and the result is deserialized back into the guest wasm automatically, inline
-from a returned `RemotePtr`.
+from a returned `GuestPtr`.
 
 The `host_args!()` macro can be used _immediately at the start of a guest
-function execution_ to attempt to deserialize the `RemotePtr` argument from the
+function execution_ to attempt to deserialize the `GuestPtr` argument from the
 host to a guest function. Internally the host is writing bytes directly to the
 guest wasm memory and telling the guest memory allocator to leak these bytes.
 The `host_args!()` macro relies on and cleans up this temporary memory leak so
@@ -496,7 +494,7 @@ struct Png([u8]);
 // the websockets client can send raw binary bytes as the payload to this
 // save_image function and the `remote_ptr` arg will point to the image data
 #[no_mangle]
-pub extern "C" fn save_image(remote_ptr: RemotePtr) -> RemotePtr {
+pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
 
  // the deserialization pattern mimics serde
  // we tell the compiler that we expect a `Png` type and `host_args!()` will
@@ -526,7 +524,7 @@ pub extern "C" fn save_image(remote_ptr: RemotePtr) -> RemotePtr {
 // all the input and output values and behaviour are the same as the base hook
 // but it will only be triggered for Entry::App variants rather than any Entry
 // this is optional, the same logic can be implemented with the base `validate`
-pub extern "C" fn validate_entry(remote_ptr: RemotePtr) -> RemotePtr {
+pub extern "C" fn validate_entry(remote_ptr: GuestPtr) -> GuestPtr {
 
  // HostInput is the mirror of GuestOutput
  let input: HostInput = host_args!(remote_ptr);
@@ -579,7 +577,7 @@ There are several reasons for this:
 
 But so far all the examples have been littered with `unwrap()` and similar.
 
-This is because all the extern functions can only accept and receive `RemotePtr`
+This is because all the extern functions can only accept and receive `GuestPtr`
 data and we had no tools to handle `Result` or `?` type logic that is idiomatic
 to Rust.
 
@@ -626,7 +624,7 @@ struct Message(String);
 
 #[no_mangle]
 // an extern that allows websockets to commit some utf-8 message string
-pub extern "C" fn commit_message(remote_ptr: RemotePtr) -> RemotePtr {
+pub extern "C" fn commit_message(remote_ptr: GuestPtr) -> GuestPtr {
  let message: Message = host_args!(remote_ptr);
  // try_result! works exactly like `?`
  // it evalutes to v from Ok(v) or short circuits with Err(e)
@@ -691,13 +689,13 @@ holochain_externs!();
 
 #[no_mangle]
 // note the generic structure of this extern...
-pub extern "C" fn save_image(remote_ptr: RemotePtr) -> RemotePtr {
+pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
  ret!(try_result!(_save_image(host_args!(remote_ptr)), "save_image error"));
 }
 
 #[no_mangle]
 // the generic structure of this extern matches save_image
-pub extern "C" fn validate_entry(remote_ptr: RemotePtr) -> RemotePtr {
+pub extern "C" fn validate_entry(remote_ptr: GuestPtr) -> GuestPtr {
  ret!(try_result!(_validate_entry(host_args!(remote_ptr)), "validate entry error"));
 }
 

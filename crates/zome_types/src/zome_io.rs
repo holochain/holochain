@@ -56,6 +56,9 @@ wasm_io_types!(
     // @TODO
     pub struct QueryInput(());
     pub struct QueryOutput(());
+    // the length of random bytes to create
+    pub struct RandomBytesInput(u32);
+    pub struct RandomBytesOutput(crate::bytes::Bytes);
     // @TODO
     pub struct RemoveLinkInput(());
     pub struct RemoveLinkOutput(());
@@ -92,9 +95,9 @@ wasm_io_types!(
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
-    // @TODO
-    pub struct EntryHashInput(());
-    pub struct EntryHashOutput(());
+    // hash an entry on the host and get a core hash back
+    pub struct EntryHashInput(crate::entry::Entry);
+    pub struct EntryHashOutput(holo_hash_core::HoloHashCore);
     // the current system time, in the opinion of the host, as a Duration
     pub struct SysTimeInput(());
     pub struct SysTimeOutput(core::time::Duration);

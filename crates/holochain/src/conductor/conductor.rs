@@ -52,7 +52,7 @@ use holochain_state::{
 };
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
-    cell::{CellHandle, CellId},
+    cell::CellId,
     dna::{wasm::DnaWasmHashed, DnaFile},
 };
 use std::collections::HashMap;
@@ -114,9 +114,6 @@ where
     /// This exists so that we can run tests and bind to port 0, and find out
     /// the dynamically allocated port later.
     admin_websocket_ports: Vec<u16>,
-
-    /// Placeholder. A way to look up a Cell from its app-specific handle.
-    _handle_map: HashMap<CellHandle, CellId>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
@@ -415,7 +412,7 @@ where
                         if !errors.is_empty() {
                             for cell in success {
                                 // Error needs to capture which app failed
-                                cell.cleanup().await.map_err(|e| CreateAppError::Failed {
+                                cell.destroy().await.map_err(|e| CreateAppError::Failed {
                                     app_id: app_id.clone(),
                                     errors: vec![e],
                                 })?;
@@ -524,7 +521,8 @@ where
         let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .iter()?
+            .get_all()?
+            .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
                 let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| async {
@@ -670,7 +668,6 @@ where
             wasm_env,
             state_db: Kv::new(db)?,
             cells: HashMap::new(),
-            _handle_map: HashMap::new(),
             shutting_down: false,
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
@@ -683,9 +680,7 @@ where
         })
     }
 
-    // FIXME: remove allow once we actually use this function
-    #[allow(dead_code)]
-    async fn get_state(&self) -> ConductorResult<ConductorState> {
+    pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
         let guard = self.env.guard().await;
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
@@ -914,7 +909,7 @@ async fn p2p_event_task(
 ) {
     use tokio::stream::StreamExt;
     while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.agent_pub_key().clone());
+        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
         if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
             tracing::error!(
                 message = "error dispatching network event",
