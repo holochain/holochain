@@ -9,6 +9,7 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::GetEntryInput;
 use holochain_zome_types::GetEntryOutput;
 use must_future::MustBoxFuture;
+use std::convert::TryInto;
 use std::sync::Arc;
 
 pub async fn get_entry<'a>(
@@ -17,12 +18,13 @@ pub async fn get_entry<'a>(
     input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
     let (hash, _options) = input.into_inner();
+    let cascade_hash = hash.try_into()?;
     let call =
         |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
                 let cascade = workspace.cascade();
                 let maybe_entry = cascade
-                    .dht_get(&hash.into())
+                    .dht_get(&cascade_hash)
                     .await?
                     .map(|e| e.into_content());
                 Ok(maybe_entry)

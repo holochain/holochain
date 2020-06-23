@@ -419,7 +419,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     // TODO: For now this isn't actually checking the meta data.
     // Once the meta data is finished this should be hooked up
-    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn get_dht_status(&self, _entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
         // if fallible_iterator::convert(self.system_meta.get(&entry_hash.clone().into())?)
         //     .filter(|sys_val| {
         //         if let SysMetaVal::Create(_) = sys_val {

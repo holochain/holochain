@@ -70,6 +70,17 @@ impl From<EntryHash> for holo_hash_core::HoloHashCore {
     }
 }
 
+impl TryFrom<holo_hash_core::HoloHashCore> for EntryHash {
+    type Error = HoloHashError;
+    fn try_from(holo_hash: holo_hash_core::HoloHashCore) -> Result<Self, Self::Error> {
+        Ok(match holo_hash {
+            holo_hash_core::HoloHashCore::AgentPubKey(v) => EntryHash::Agent(v.into()),
+            holo_hash_core::HoloHashCore::EntryContentHash(v) => EntryHash::Entry(v.into()),
+            _ => Err(HoloHashError::BadPrefix)?,
+        })
+    }
+}
+
 impl From<EntryHash> for HoloHash {
     fn from(entry_hash: EntryHash) -> HoloHash {
         match_entry_hash!(entry_hash => |i| { i.into() })
