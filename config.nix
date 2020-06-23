@@ -12,7 +12,7 @@
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "be5f9edb42f6e60db32e518ca10a7f62ae421526"
+   ref = "be5f9edb42f6e60db32e518ca10a7f62ae421526";
    # ^^ this is HEAD of 2020-02-27-rust-stable-2-flags as of 2020-06-23 (freesig)
 
    # the sha of what is downloaded from the above ref
@@ -20,7 +20,7 @@
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
-   sha256 = "18ihawd9gi1hr4md5jdz8gyycczznsd6hk5pbc4l2ms36p4axg9q";
+   sha256 = "1vjc0znz0sfp4xd42wnmxfanjsj9jdbhpyn4wk786b48xfffrnqm"; 
 
    # the github owner of the holonix repo
    owner = "holochain";

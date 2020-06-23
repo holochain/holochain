@@ -237,7 +237,7 @@ async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut 
     );
     let request = AppRequest::ZomeCallInvocation(request);
     let response = app_interface.request(request);
-    let call_response = check_timeout(holochain, response, 2000).await;
+    let call_response = check_timeout(holochain, response, 10000).await;
     let foo = TestString::from(String::from("foo"));
     let expected = Box::new(GuestOutput::new(foo.try_into().unwrap()));
     trace!(?call_response);
