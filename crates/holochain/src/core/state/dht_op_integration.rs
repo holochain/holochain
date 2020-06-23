@@ -1,17 +1,25 @@
+//! Database buffers and type related to [DhtOp]s
+
 use crate::core::workflow::produce_dht_ops_workflow::dht_op::DhtOpLight;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{buffer::KvBuf, prelude::Reader};
 use holochain_types::{composite_hash::AnyDhtHash, validate::ValidationStatus, Timestamp};
 
+/// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
 pub type AuthoredDhtOps<'env> = KvBuf<'env, DhtOpHash, u32, Reader<'env>>;
 
+/// Queue of ops ready to be integrated
 pub type IntegrationQueue<'env> = KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>;
 
+/// [DhtOp]s that have already been integrated
 pub type IntegratedDhtOps<'env> = KvBuf<'env, DhtOpHash, IntegrationValue, Reader<'env>>;
 
+
+/// Key for the Integration Queue that ensures they are ordered by time
 #[derive(Hash, Eq, PartialEq)]
 pub struct IntegrationQueueKey(SerializedBytes);
+
 #[derive(serde::Deserialize, serde::Serialize, SerializedBytes)]
 struct T(Timestamp, DhtOpHash);
 
