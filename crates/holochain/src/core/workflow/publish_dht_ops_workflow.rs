@@ -37,6 +37,7 @@ use tracing::*;
 /// Default redundancy factor for validation receipts
 // TODO: Pull this from the wasm entry def and only use this if it's missing
 // TODO: Put a default in the DnaBundle
+// TODO: build zome_types/entry_def map to get the (AppEntryType map to entry def)
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 
 /// Database buffers required for publishing [DhtOp]s
