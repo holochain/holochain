@@ -94,14 +94,14 @@ impl Space {
         let data = wire::Wire::decode((*data).clone())?;
 
         match data {
-            wire::Wire::Request(data) => {
-                Ok(async move { evt_sender.request(space, agent, data).await }
+            wire::Wire::Call(payload) => {
+                Ok(async move { evt_sender.call(space, agent, payload).await }
                     .boxed()
                     .into())
             }
-            wire::Wire::Broadcast(data) => {
+            wire::Wire::Notify(payload) => {
                 Ok(async move {
-                    evt_sender.broadcast(space, agent, data).await?;
+                    evt_sender.notify(space, agent, payload).await?;
                     // broadcast doesn't return anything...
                     Ok(vec![])
                 }
@@ -112,10 +112,10 @@ impl Space {
     }
 
     /// send / process a request - waiting / retrying as appropriate
-    pub fn handle_request(
+    pub fn handle_rpc_single(
         &mut self,
         agent: Arc<KitsuneAgent>,
-        data: Arc<Vec<u8>>,
+        payload: Arc<Vec<u8>>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let mut internal_sender = self.internal_sender.clone();
@@ -126,7 +126,7 @@ impl Space {
                 // attempt to send the request right now
                 let err = match internal_sender
                     .ghost_actor_internal()
-                    .immediate_request(space.clone(), agent.clone(), data.clone())
+                    .immediate_request(space.clone(), agent.clone(), payload.clone())
                     .await
                 {
                     Ok(res) => return Ok(res),

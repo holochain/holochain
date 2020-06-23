@@ -560,7 +560,6 @@ name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
  "serde",
  "serde_bytes",
 ]

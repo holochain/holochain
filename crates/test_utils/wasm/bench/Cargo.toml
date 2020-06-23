@@ -25,6 +25,5 @@ holochain_wasmer_guest = "=0.0.32"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 
 serde = "=1.0.104"
-test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 
 [patch.crates-io]
