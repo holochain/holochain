@@ -94,8 +94,8 @@ guest_functions!(
         EntryTypePropertiesOutput
     ],
     [
-        __entry_address,
-        entry_address,
+        __entry_hash,
+        entry_hash,
         EntryHashInput,
         EntryHashOutput
     ],

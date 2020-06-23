@@ -5,7 +5,7 @@ pub mod debug;
 pub mod decrypt;
 pub mod emit_signal;
 pub mod encrypt;
-pub mod entry_address;
+pub mod entry_hash;
 pub mod entry_type_properties;
 pub mod get_entry;
 pub mod get_links;
