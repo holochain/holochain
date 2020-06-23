@@ -55,18 +55,18 @@ impl HolochainP2pActor {
     ) -> HolochainP2pHandlerResult<()> {
         use kitsune_p2p::event::KitsuneP2pEvent::*;
         match event {
-            Broadcast {
+            Notify {
                 span,
                 respond,
                 space,
                 agent,
-                data,
+                payload,
             } => {
                 let _g = span.enter();
                 let space = DnaHash::from_kitsune(&space);
                 let agent = AgentPubKey::from_kitsune(&agent);
 
-                let request = crate::wire::WireMessage::decode(data)?;
+                let request = crate::wire::WireMessage::decode(payload)?;
 
                 match request {
                     // this is a request type, not a broadcast
@@ -113,18 +113,18 @@ impl HolochainP2pActor {
                     }
                 }
             }
-            Request {
+            Call {
                 span,
                 respond,
                 space,
                 agent,
-                data,
+                payload,
             } => {
                 let _g = span.enter();
                 let space = DnaHash::from_kitsune(&space);
                 let agent = AgentPubKey::from_kitsune(&agent);
 
-                let request = crate::wire::WireMessage::decode(data)?;
+                let request = crate::wire::WireMessage::decode(payload)?;
 
                 match request {
                     crate::wire::WireMessage::CallRemote {
@@ -324,7 +324,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            let result = kitsune_p2p.request(space, to_agent, req).await?;
+            let result = kitsune_p2p.rpc_single(space, to_agent, req).await?;
             let result = UnsafeBytes::from(result).into();
             Ok(result)
         }
@@ -344,7 +344,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         let space = dna_hash.into_kitsune();
         let basis = dht_hash.to_kitsune();
 
-        let broadcast = crate::wire::WireMessage::publish(
+        let payload = crate::wire::WireMessage::publish(
             from_agent,
             request_validation_receipt,
             dht_hash,
@@ -355,12 +355,12 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .broadcast(kitsune_p2p::actor::Broadcast {
+                .notify_multi(kitsune_p2p::actor::NotifyMulti {
                     space,
                     basis,
                     remote_agent_count: None, // default best-effort
                     timeout_ms,
-                    broadcast,
+                    payload,
                 })
                 .await?;
             Ok(())
@@ -388,12 +388,12 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
         let basis = dht_hash.to_kitsune();
         let r_options: event::GetOptions = (&options).into();
 
-        let request = crate::wire::WireMessage::get(dht_hash, r_options).encode()?;
+        let payload = crate::wire::WireMessage::get(dht_hash, r_options).encode()?;
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             let result = kitsune_p2p
-                .multi_request(kitsune_p2p::actor::MultiRequest {
+                .rpc_multi(kitsune_p2p::actor::RpcMulti {
                     space,
                     from_agent,
                     basis,
@@ -401,13 +401,13 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
                     timeout_ms: options.timeout_ms,
                     as_race: options.as_race,
                     race_timeout_ms: options.race_timeout_ms,
-                    request,
+                    payload,
                 })
                 .await?;
 
             let mut out = Vec::new();
             for item in result {
-                let kitsune_p2p::actor::MultiRequestResponse { response, .. } = item;
+                let kitsune_p2p::actor::RpcMultiResponse { response, .. } = item;
                 out.push(UnsafeBytes::from(response).into());
             }
 
@@ -434,7 +434,7 @@ impl HolochainP2pHandler<(), Internal> for HolochainP2pActor {
 
         let mut kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            kitsune_p2p.request(space, agent, req).await?;
+            kitsune_p2p.rpc_single(space, agent, req).await?;
             Ok(())
         }
         .boxed()
