@@ -321,7 +321,7 @@ impl EntryType {
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
             EntryType::AgentPubKey => &EntryVisibility::Public,
-            EntryType::App(t) => &t.visibility,
+            EntryType::App(t) => &t.visibility(),
             EntryType::CapClaim => &EntryVisibility::Private,
             EntryType::CapGrant => &EntryVisibility::Private,
         }
@@ -332,6 +332,7 @@ impl EntryType {
 pub struct AppEntryType {
     pub(crate) id: Vec<u8>,
     pub(crate) zome_id: ZomeId,
+    // @todo don't do this, use entry defs instead
     pub(crate) visibility: EntryVisibility,
 }
 

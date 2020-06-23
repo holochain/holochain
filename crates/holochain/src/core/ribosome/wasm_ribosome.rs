@@ -296,7 +296,7 @@ impl RibosomeT for WasmRibosome {
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
-        self,
+        &self,
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ZomeCallInvocation,
         // cell_conductor_api: CellConductorApi,

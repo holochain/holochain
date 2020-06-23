@@ -1,6 +1,7 @@
 use holochain_wasmer_guest::*;
 use holochain_zome_types::*;
 use holochain_zome_types::validate::ValidateCallbackResult;
+use holochain_zome_types::entry_def::EntryDefId;
 
 holochain_wasmer_guest::holochain_externs!();
 
@@ -9,6 +10,15 @@ holochain_wasmer_guest::holochain_externs!();
 enum ThisWasmEntry {
     AlwaysValidates,
     NeverValidates,
+}
+
+impl From<&ThisWasmEntry> for EntryDefId {
+    fn from(entry: &ThisWasmEntry) -> Self {
+        match entry {
+            ThisWasmEntry::AlwaysValidates => "always_validates",
+            ThisWasmEntry::NeverValidates => "never_validates",
+        }.into()
+    }
 }
 
 #[no_mangle]
@@ -36,7 +46,7 @@ pub extern "C" fn validate(host_allocation_ptr: GuestPtr) -> GuestPtr {
 
 /// we can write normal rust code with Results outside our externs
 fn _commit_validate(to_commit: ThisWasmEntry) -> Result<GuestOutput, String> {
-    let commit_output: CommitEntryOutput = host_call!(__commit_entry, CommitEntryInput::new(Entry::App(to_commit.try_into()?)))?;
+    let commit_output: CommitEntryOutput = host_call!(__commit_entry, CommitEntryInput::new(((&to_commit).into(), Entry::App(to_commit.try_into()?))))?;
     Ok(GuestOutput::new(commit_output.try_into()?))
 }
 

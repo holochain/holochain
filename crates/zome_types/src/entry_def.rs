@@ -5,6 +5,7 @@ use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[repr(transparent)]
 pub struct EntryDefId(String);
 
 impl From<String> for EntryDefId {
@@ -19,7 +20,7 @@ impl From<&str> for EntryDefId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Copy)]
 pub enum EntryVisibility {
     Public,
     Private,
@@ -71,6 +72,21 @@ impl EntryDef {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EntryDefs(Vec<EntryDef>);
+
+impl EntryDefs {
+    pub fn entry_def_id_position(&self, entry_def_id: EntryDefId) -> Option<usize> {
+        self.0
+            .iter()
+            .position(|entry_def| entry_def.id == entry_def_id)
+    }
+}
+
+impl std::ops::Index<usize> for EntryDefs {
+    type Output = EntryDef;
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.0[i]
+    }
+}
 
 impl From<Vec<EntryDef>> for EntryDefs {
     fn from(v: Vec<EntryDef>) -> Self {

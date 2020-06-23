@@ -28,6 +28,10 @@ pub enum RibosomeError {
     #[error("Attempted to call a zome function that doesn't exist: Zome: {0} Fn {1}")]
     ZomeFnNotExists(ZomeName, String),
 
+    /// a problem with entry defs
+    #[error("An error with entry defs: {0}")]
+    EntryDefs(ZomeName, String),
+
     /// ident
     #[error(transparent)]
     CryptoError(#[from] CryptoError),
