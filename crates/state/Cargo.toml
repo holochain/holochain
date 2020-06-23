@@ -10,7 +10,6 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.26"
-async-trait = "0.1.24"
 derive_more = "0.99.3"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
@@ -23,10 +22,8 @@ holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_types = { path = "../types" }
 lazy_static = "1.4.0"
-mockall = "0.7.0"
 must_future = "0.1.1"
 nanoid = "0.3.0"
-owning_ref = "0.4.1"
 parking_lot = "0.10.0"
 rand = "0.7"
 rkv = "=0.10.4"
@@ -39,7 +36,6 @@ thiserror = "1.0.10"
 tokio = { version = "0.2.11", features = [ "macros", "rt-threaded", "rt-util", "sync" ] }
 tokio_safe_block_on = "0.1.1"
 tracing = "0.1.13"
-tracing-futures = "0.2.3"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "0.0.46-alpha1" }

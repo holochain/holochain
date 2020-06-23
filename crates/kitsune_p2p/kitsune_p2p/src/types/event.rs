@@ -43,10 +43,10 @@ ghost_actor::ghost_chan! {
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
         /// We are receiving a request from a remote node.
-        fn request(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Vec<u8>) -> Vec<u8>;
+        fn call(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
 
-        /// We are receiving a broadcast from a remote node.
-        fn broadcast(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, data: Vec<u8>) -> ();
+        /// We are receiving a notification from a remote node.
+        fn notify(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<(super::KitsuneDataHash, Vec<super::KitsuneOpHash>)>;

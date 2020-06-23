@@ -21,11 +21,11 @@ mod tests {
             while let Some(evt) = evt.next().await {
                 use KitsuneP2pEvent::*;
                 match evt {
-                    Request {
+                    Call {
                         respond,
                         space,
                         agent,
-                        data,
+                        payload,
                         ..
                     } => {
                         if space != space1_clone {
@@ -34,7 +34,7 @@ mod tests {
                         if agent != a2_clone {
                             panic!("unexpected agent");
                         }
-                        if &*data != b"hello" {
+                        if &*payload != b"hello" {
                             panic!("unexpected request");
                         }
                         let _ = respond(Ok(b"echo: hello".to_vec()));
@@ -47,7 +47,7 @@ mod tests {
         p2p.join(space1.clone(), a1.clone()).await.unwrap();
         p2p.join(space1.clone(), a2.clone()).await.unwrap();
 
-        let res = p2p.request(space1, a2, b"hello".to_vec()).await.unwrap();
+        let res = p2p.rpc_single(space1, a2, b"hello".to_vec()).await.unwrap();
         assert_eq!(b"echo: hello".to_vec(), res);
 
         p2p.ghost_actor_shutdown().await.unwrap();
@@ -76,16 +76,16 @@ mod tests {
             while let Some(evt) = evt.next().await {
                 use KitsuneP2pEvent::*;
                 match evt {
-                    Broadcast {
+                    Notify {
                         respond,
                         space,
-                        data,
+                        payload,
                         ..
                     } => {
                         if space != space1_clone {
                             panic!("unexpected space");
                         }
-                        if &*data != b"test-broadcast" {
+                        if &*payload != b"test-broadcast" {
                             panic!("unexpected request");
                         }
                         let _ = respond(Ok(()));
@@ -101,13 +101,13 @@ mod tests {
         p2p.join(space1.clone(), a3.clone()).await.unwrap();
 
         let res = p2p
-            .broadcast(actor::Broadcast {
+            .notify_multi(actor::NotifyMulti {
                 space: space1,
                 // this is just a dummy value right now
                 basis: Arc::new(b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_vec().into()),
                 remote_agent_count: Some(42),
                 timeout_ms: Some(20),
-                broadcast: b"test-broadcast".to_vec(),
+                payload: b"test-broadcast".to_vec(),
             })
             .await
             .unwrap();
@@ -138,17 +138,17 @@ mod tests {
             while let Some(evt) = evt.next().await {
                 use KitsuneP2pEvent::*;
                 match evt {
-                    Request {
+                    Call {
                         respond,
                         space,
-                        data,
+                        payload,
                         ..
                     } => {
                         if space != space1_clone {
                             panic!("unexpected space");
                         }
-                        let data = String::from_utf8_lossy(&data);
-                        assert_eq!(&data, "test-multi-request");
+                        let payload = String::from_utf8_lossy(&payload);
+                        assert_eq!(&payload, "test-multi-request");
                         let _ = respond(Ok(b"echo: test-multi-request".to_vec()));
                     }
                     _ => panic!("unexpected event"),
@@ -161,7 +161,7 @@ mod tests {
         p2p.join(space1.clone(), a3.clone()).await.unwrap();
 
         let res = p2p
-            .multi_request(actor::MultiRequest {
+            .rpc_multi(actor::RpcMulti {
                 space: space1,
                 from_agent: a1,
                 // this is just a dummy value right now
@@ -170,7 +170,7 @@ mod tests {
                 timeout_ms: Some(20),
                 as_race: true,
                 race_timeout_ms: Some(20),
-                request: b"test-multi-request".to_vec(),
+                payload: b"test-multi-request".to_vec(),
             })
             .await
             .unwrap();
