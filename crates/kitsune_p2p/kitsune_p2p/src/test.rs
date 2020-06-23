@@ -118,4 +118,71 @@ mod tests {
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
     }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_multi_request_workflow() {
+        let space1: Arc<KitsuneSpace> =
+            Arc::new(b"ssssssssssssssssssssssssssssssssssss".to_vec().into());
+        let a1: Arc<KitsuneAgent> =
+            Arc::new(b"111111111111111111111111111111111111".to_vec().into());
+        let a2: Arc<KitsuneAgent> =
+            Arc::new(b"222222222222222222222222222222222222".to_vec().into());
+        let a3: Arc<KitsuneAgent> =
+            Arc::new(b"333333333333333333333333333333333333".to_vec().into());
+
+        let (mut p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+
+        let space1_clone = space1.clone();
+        let r_task = tokio::task::spawn(async move {
+            use tokio::stream::StreamExt;
+            while let Some(evt) = evt.next().await {
+                use KitsuneP2pEvent::*;
+                match evt {
+                    Request {
+                        respond,
+                        space,
+                        data,
+                        ..
+                    } => {
+                        if space != space1_clone {
+                            panic!("unexpected space");
+                        }
+                        let data = String::from_utf8_lossy(&data);
+                        assert_eq!(&data, "test-multi-request");
+                        let _ = respond(Ok(b"echo: test-multi-request".to_vec()));
+                    }
+                    _ => panic!("unexpected event"),
+                }
+            }
+        });
+
+        p2p.join(space1.clone(), a1.clone()).await.unwrap();
+        p2p.join(space1.clone(), a2.clone()).await.unwrap();
+        p2p.join(space1.clone(), a3.clone()).await.unwrap();
+
+        let res = p2p
+            .multi_request(actor::MultiRequest {
+                space: space1,
+                from_agent: a1,
+                // this is just a dummy value right now
+                basis: Arc::new(b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_vec().into()),
+                remote_agent_count: Some(2),
+                timeout_ms: Some(20),
+                as_race: true,
+                race_timeout_ms: Some(20),
+                request: b"test-multi-request".to_vec(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(2, res.len());
+        for r in res {
+            let data = String::from_utf8_lossy(&r.response);
+            assert_eq!("echo: test-multi-request", &data);
+            assert!(r.agent == a2 || r.agent == a3);
+        }
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
+    }
 }
