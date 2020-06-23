@@ -1,7 +1,9 @@
-use super::{error::WorkflowResult, InvokeZomeWorkspace, Workflow, WorkflowEffects};
-use crate::core::state::workspace::{Workspace, WorkspaceError, WorkspaceResult};
+use super::{error::WorkflowResult, InvokeZomeWorkspace};
+use crate::core::{
+    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
+    state::workspace::{Workspace, WorkspaceResult},
+};
 use dht_op::{dht_op_to_light_basis, DhtOpLight};
-use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
@@ -13,65 +15,64 @@ use holochain_state::{
 use holochain_types::{
     composite_hash::AnyDhtHash, dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp,
 };
-use must_future::MustBoxFuture;
 use std::convert::TryFrom;
 use tracing::*;
-use tracing_futures::Instrument;
 
 pub mod dht_op;
 
-pub(crate) struct ProduceDhtOpWorkflow {}
+// TODO: #[instrument]
+pub async fn produce_dht_ops_workflow(
+    mut workspace: ProduceDhtOpsWorkspace<'_>,
+    writer: OneshotWriter,
+    trigger_integration: &mut TriggerSender,
+) -> WorkflowResult<WorkComplete> {
+    let complete = produce_dht_ops_workflow_inner(&mut workspace).await?;
 
-impl<'env> Workflow<'env> for ProduceDhtOpWorkflow {
-    type Output = ();
-    type Workspace = ProduceDhtOpWorkspace<'env>;
-    type Triggers = ();
+    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    fn workflow(
-        self,
-        mut workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
-        async {
-            debug!("Starting dht op workflow");
-            let invoke_zome_workspace = &mut workspace.invoke_zome_workspace;
-            let all_ops = invoke_zome_workspace
-                .source_chain
-                .get_incomplete_dht_ops()
-                .await?;
-            for (index, ops) in all_ops {
-                for op in ops {
-                    let (op, hash) = DhtOpHashed::with_data(op).await.into();
-                    debug!(?hash);
-                    let cascade = invoke_zome_workspace.cascade();
-                    // put the op in (using the "light hash form")
-                    let (op, basis) = dht_op_to_light_basis(op, cascade).await?;
-                    workspace.integration_queue.put(
-                        (Timestamp::now(), hash.clone()).try_into()?,
-                        IntegrationValue {
-                            validation_status: ValidationStatus::Valid,
-                            op,
-                            basis,
-                        },
-                    )?;
-                    workspace.authored_dht_ops.put(hash, 0)?;
-                }
-                // Mark the dht op as complete
-                invoke_zome_workspace.source_chain.complete_dht_op(index)?;
-            }
-            // TODO: B-01567: Trigger IntegrateDhtOps workflow
-            let fx = WorkflowEffects {
-                workspace,
-                callbacks: Default::default(),
-                signals: Default::default(),
-                triggers: Default::default(),
-            };
+    // commit the workspace
+    writer
+        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .await?;
 
-            Ok(((), fx))
+    // trigger other workflows
+    trigger_integration.trigger();
+
+    Ok(complete)
+}
+
+async fn produce_dht_ops_workflow_inner(
+    workspace: &mut ProduceDhtOpsWorkspace<'_>,
+) -> WorkflowResult<WorkComplete> {
+    debug!("Starting dht op workflow");
+    let invoke_zome_workspace = &mut workspace.invoke_zome_workspace;
+    let all_ops = invoke_zome_workspace
+        .source_chain
+        .get_incomplete_dht_ops()
+        .await?;
+
+    for (index, ops) in all_ops {
+        for op in ops {
+            let (op, hash) = DhtOpHashed::with_data(op).await.into();
+            debug!(?hash);
+            let cascade = invoke_zome_workspace.cascade();
+            // put the op in (using the "light hash form")
+            let (op, basis) = dht_op_to_light_basis(op, cascade).await?;
+            workspace.integration_queue.put(
+                (Timestamp::now(), hash.clone()).try_into()?,
+                IntegrationValue {
+                    validation_status: ValidationStatus::Valid,
+                    op,
+                    basis,
+                },
+            )?;
+            workspace.authored_dht_ops.put(hash, 0)?;
         }
-        .instrument(trace_span!("ProduceDhtOpWorkflow"))
-        .boxed()
-        .into()
+        // Mark the dht op as complete
+        invoke_zome_workspace.source_chain.complete_dht_op(index)?;
     }
+
+    Ok(WorkComplete::Complete)
 }
 
 #[derive(Hash, Eq, PartialEq)]
@@ -111,16 +112,14 @@ pub struct IntegrationValue {
     pub op: DhtOpLight,
 }
 
-pub(crate) struct ProduceDhtOpWorkspace<'env> {
+pub struct ProduceDhtOpsWorkspace<'env> {
     pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
     pub authored_dht_ops: KvBuf<'env, DhtOpHash, u32, Reader<'env>>,
     pub integration_queue: KvBuf<'env, IntegrationQueueKey, IntegrationValue, Reader<'env>>,
 }
 
-impl<'env> ProduceDhtOpWorkspace<'env> {
-    // FIXME: Remove when used
-    #[allow(dead_code)]
-    pub(crate) fn new(reader: &'env Reader<'env>, db: &impl GetDb) -> WorkspaceResult<Self> {
+impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
+    fn new(reader: &'env Reader<'env>, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         let integration_queue = db.get_db(&*INTEGRATION_QUEUE)?;
         Ok(Self {
@@ -129,19 +128,8 @@ impl<'env> ProduceDhtOpWorkspace<'env> {
             integration_queue: KvBuf::new(reader, integration_queue)?,
         })
     }
-}
 
-impl<'env> Workspace<'env> for ProduceDhtOpWorkspace<'env> {
-    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-        self.flush_to_txn(&mut writer)?;
-        Ok(writer.commit()?)
-    }
-}
-
-impl<'env> BufferedStore<'env> for ProduceDhtOpWorkspace<'env> {
-    type Error = WorkspaceError;
-
-    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.invoke_zome_workspace.flush_to_txn(writer)?;
         self.authored_dht_ops.flush_to_txn(writer)?;
         self.integration_queue.flush_to_txn(writer)?;
@@ -272,7 +260,7 @@ mod tests {
         let expected = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
-            let mut source_chain = ProduceDhtOpWorkspace::new(&reader, &dbs)
+            let mut source_chain = ProduceDhtOpsWorkspace::new(&reader, &dbs)
                 .unwrap()
                 .invoke_zome_workspace
                 .source_chain;
@@ -296,8 +284,8 @@ mod tests {
                 all_ops.push(ops);
             }
 
-            // Add some entires and collect the expected ops
-            for _ in 0..10 {
+            // Add some entries and collect the expected ops
+            for _ in 0..10 as u8 {
                 all_ops.push(
                     td.put_fix_entry(&mut source_chain, EntryVisibility::Public)
                         .await,
@@ -326,17 +314,20 @@ mod tests {
         // Run the workflow and commit it
         {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-            let workflow = ProduceDhtOpWorkflow {};
-            let (_, effects) = workflow.workflow(workspace).await.unwrap();
-            let writer = env_ref.writer_unmanaged().unwrap();
-            effects.workspace.commit_txn(writer).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let complete = produce_dht_ops_workflow_inner(&mut workspace)
+                .await
+                .unwrap();
+            assert_matches!(complete, WorkComplete::Complete);
+            env_ref
+                .with_commit(|writer| workspace.flush_to_txn(writer))
+                .unwrap();
         }
 
         // Pull out the results and check them
         let last_count = {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let mut times = Vec::new();
             let results = workspace
                 .integration_queue
@@ -408,17 +399,20 @@ mod tests {
         // because no new ops should hav been added
         {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
-            let workflow = ProduceDhtOpWorkflow {};
-            let (_, effects) = workflow.workflow(workspace).await.unwrap();
-            let writer = env_ref.writer_unmanaged().unwrap();
-            effects.workspace.commit_txn(writer).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let complete = produce_dht_ops_workflow_inner(&mut workspace)
+                .await
+                .unwrap();
+            assert_matches!(complete, WorkComplete::Complete);
+            env_ref
+                .with_commit(|writer| workspace.flush_to_txn(writer))
+                .unwrap();
         }
 
         // Check the lengths are unchanged
         {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpWorkspace::new(&reader, &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let count = workspace.integration_queue.iter().unwrap().count().unwrap();
             let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
 

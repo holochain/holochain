@@ -7,89 +7,79 @@
 // FIXME: understand the details of actually getting the DNA
 // FIXME: creating entries in the config db
 
-use super::Workspace;
-use super::{Workflow, WorkflowEffects, WorkflowError, WorkflowResult};
+use super::error::{WorkflowError, WorkflowResult};
 use crate::conductor::api::CellConductorApiT;
-use crate::core::state::{source_chain::SourceChainBuf, workspace::WorkspaceResult};
-use futures::future::FutureExt;
+use crate::core::{
+    queue_consumer::OneshotWriter,
+    state::{
+        source_chain::SourceChainBuf,
+        workspace::{Workspace, WorkspaceResult},
+    },
+};
+use derive_more::Constructor;
 use holochain_state::prelude::*;
 use holochain_types::dna::DnaFile;
 use holochain_types::prelude::*;
-use must_future::MustBoxFuture;
 
 /// The struct which implements the genesis Workflow
-pub struct GenesisWorkflow<Api: CellConductorApiT> {
+#[derive(Constructor, Debug)]
+pub struct GenesisWorkflowArgs<Api: CellConductorApiT> {
     api: Api,
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<SerializedBytes>,
 }
 
-impl<'env, Api: CellConductorApiT + Send + Sync + 'env> Workflow<'env> for GenesisWorkflow<Api> {
-    type Output = ();
-    type Workspace = GenesisWorkspace<'env>;
-    type Triggers = ();
+// TODO: #[instrument]
+pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
+    mut workspace: GenesisWorkspace<'env>,
+    writer: OneshotWriter,
+    args: GenesisWorkflowArgs<Api>,
+) -> WorkflowResult<()> {
+    genesis_workflow_inner(&mut workspace, args).await?;
 
-    fn workflow(
-        self,
-        mut workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
-        async {
-            let Self {
-                api,
-                dna_file,
-                agent_pubkey,
-                membrane_proof,
-            } = self;
+    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-            // TODO: this is a placeholder for a real DPKI request to show intent
-            if api
-                .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
-                .await
-                .map_err(Box::new)?
-                == "INVALID"
-            {
-                return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
-            }
+    // commit the workspace
+    writer
+        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .await?;
 
-            workspace
-                .source_chain
-                .genesis(
-                    dna_file.dna_hash().clone(),
-                    agent_pubkey.clone(),
-                    membrane_proof,
-                )
-                .await?;
-
-            let fx = WorkflowEffects {
-                workspace,
-                callbacks: Default::default(),
-                signals: Default::default(),
-                triggers: (),
-            };
-            let result = ();
-
-            Ok((result, fx))
-        }
-        .boxed()
-        .into()
-    }
+    Ok(())
 }
 
-impl<Api: CellConductorApiT> GenesisWorkflow<Api> {
-    pub fn new(
-        api: Api,
-        dna_file: DnaFile,
-        agent_pubkey: AgentPubKey,
-        membrane_proof: Option<SerializedBytes>,
-    ) -> Self {
-        Self {
-            api,
-            dna_file,
-            agent_pubkey,
-            membrane_proof,
-        }
+async fn genesis_workflow_inner<'env, Api: CellConductorApiT>(
+    workspace: &mut GenesisWorkspace<'env>,
+    args: GenesisWorkflowArgs<Api>,
+) -> WorkflowResult<()> {
+    let GenesisWorkflowArgs {
+        api,
+        dna_file,
+        agent_pubkey,
+        membrane_proof,
+    } = args;
+
+    // TODO: this is a placeholder for a real DPKI request to show intent
+    if api
+        .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
+        .await
+        .expect("TODO: actually implement this")
+        == "INVALID"
+    {
+        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
+
+    workspace
+        .source_chain
+        .genesis(
+            dna_file.dna_hash().clone(),
+            agent_pubkey.clone(),
+            membrane_proof,
+        )
+        .await
+        .map_err(WorkflowError::from)?;
+
+    Ok(())
 }
 
 /// The workspace for Genesis
@@ -97,20 +87,16 @@ pub struct GenesisWorkspace<'env> {
     source_chain: SourceChainBuf<'env>,
 }
 
-impl<'env> GenesisWorkspace<'env> {
+impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
     /// Constructor
     #[allow(dead_code)]
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self {
             source_chain: SourceChainBuf::<'env>::new(reader, dbs)?,
         })
     }
-}
-
-impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
-    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn(&mut writer)?;
-        writer.commit()?;
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn(writer)?;
         Ok(())
     }
 }
@@ -118,15 +104,15 @@ impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
 #[cfg(test)]
 pub mod tests {
 
-    use super::{GenesisWorkflow, GenesisWorkspace};
-    use crate::core::workflow::run_workflow;
+    use super::*;
+    use crate::core::state::workspace::Workspace;
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{state::source_chain::SourceChain, SourceChainResult},
     };
     use fallible_iterator::FallibleIterator;
     use holo_hash::Hashed;
-    use holochain_state::{env::*, test_utils::test_cell_env};
+    use holochain_state::test_utils::test_cell_env;
     use holochain_types::{
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
@@ -157,13 +143,13 @@ pub mod tests {
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
-            let workflow = GenesisWorkflow {
+            let args = GenesisWorkflowArgs {
                 api,
                 dna_file: dna.clone(),
                 agent_pubkey: agent_pubkey.clone(),
                 membrane_proof: None,
             };
-            let _: () = run_workflow(arc.clone(), workflow, workspace).await?;
+            let _: () = genesis_workflow(workspace, arc.clone().into(), args).await?;
         }
 
         {
