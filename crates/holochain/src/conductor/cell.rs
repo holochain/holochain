@@ -221,13 +221,13 @@ impl Cell {
                 respond,
                 from_agent,
                 request_validation_receipt,
-                entry_hash,
+                dht_hash,
                 ops,
                 ..
             } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_publish(from_agent, request_validation_receipt, entry_hash, ops)
+                    self.handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
@@ -240,10 +240,16 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
             }
-            Get { span, respond, .. } => {
+            Get {
+                span,
+                respond,
+                dht_hash,
+                options,
+                ..
+            } => {
                 let _g = span.enter();
                 let _ = respond(
-                    self.handle_get()
+                    self.handle_get(dht_hash, options)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other),
                 );
@@ -302,7 +308,7 @@ impl Cell {
         &self,
         _from_agent: AgentPubKey,
         _request_validation_receipt: bool,
-        _entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        _dht_hash: holochain_types::composite_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         unimplemented!()
@@ -314,7 +320,11 @@ impl Cell {
     }
 
     /// a remote node is asking us for entry data
-    async fn handle_get(&self) -> CellResult<()> {
+    async fn handle_get(
+        &self,
+        _dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        _options: holochain_p2p::event::GetOptions,
+    ) -> CellResult<SerializedBytes> {
         unimplemented!()
     }
 

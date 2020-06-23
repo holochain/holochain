@@ -9,6 +9,7 @@
 
 #![deny(missing_docs)]
 
+pub mod bytes;
 pub mod capability;
 pub mod commit;
 #[allow(missing_docs)]
