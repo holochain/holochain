@@ -89,7 +89,7 @@ wasm_io_types!(
     // @TODO
     pub struct GetLinksInput(());
     pub struct GetLinksOutput(());
-    // @TODO
+    // get an entry from the cascade
     pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
     pub struct GetEntryOutput(Option<crate::entry::Entry>);
     // @TODO
