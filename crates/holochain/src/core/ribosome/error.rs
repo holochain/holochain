@@ -25,6 +25,9 @@ pub enum RibosomeError {
     /// A ZomeFn was called by name that doesn't exist
     #[error("Attempted to call a zome function that doesn't exist: Zome: {0} Fn {1}")]
     ZomeFnNotExists(ZomeName, String),
+
+    #[error(transparent)]
+    DatabaseError(#[from] holochain_state::error::DatabaseError),
 }
 
 /// Type alias

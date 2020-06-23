@@ -87,8 +87,8 @@ wasm_io_types!(
     pub struct GetLinksInput(());
     pub struct GetLinksOutput(());
     // @TODO
-    pub struct GetEntryInput(());
-    pub struct GetEntryOutput(());
+    pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
+    pub struct GetEntryOutput(Option<crate::entry::Entry>);
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
