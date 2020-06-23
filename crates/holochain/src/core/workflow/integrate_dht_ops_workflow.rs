@@ -228,4 +228,29 @@ mod tests {
                 .expect("Entry is not in cas");
         }
     }
+    
+    // Entries, Private Entries & Headers are stored to CAS
+    #[tokio::test(threaded_scheduler)]
+    async fn test_cas_update () {
+        // Pre state
+        // TODO: Entry A
+        // TODO: Header A: EntryCreate creates Entry A
+        // TODO: DhtOp A: StoreElement with Header A and Entry A
+        // TODO: Integration Queue has Op A
+        // TODO: Cache has Entry A and Header A
+        // Test
+        // TODO: Run workflow
+        // Post state
+        // TODO: Check Cas has Entry A and Header A
+        // TODO: Check DhtOp A is in integrated ops db
+        
+        // More general
+        // For all DhtOp (private and public):
+        // Put associated data into cache
+        // Add DhtOps to integration queue
+        // Run workflow
+        // Check all headers from ops are in Cas
+        // If the Op has an entry check it's in the Cas
+        // Check all aops are in integrated ops db
+    }
 }
