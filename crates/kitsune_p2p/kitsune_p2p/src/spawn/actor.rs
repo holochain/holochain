@@ -9,19 +9,19 @@ mod space;
 use space::*;
 
 /// if the user specifies None or zero (0) for remote_agent_count
-const DEFAULT_BROADCAST_REMOTE_AGENT_COUNT: u8 = 5;
+const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
 
 /// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_BROADCAST_TIMEOUT_MS: u64 = 1000;
+const DEFAULT_NOTIFY_TIMEOUT_MS: u64 = 1000;
 
 /// if the user specifies None or zero (0) for remote_agent_count
-const DEFAULT_MULTI_REQUEST_REMOTE_AGENT_COUNT: u8 = 2;
+const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
 
 /// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_MULTI_REQUEST_TIMEOUT_MS: u64 = 1000;
+const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 1000;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
-const DEFAULT_MULTI_REQUEST_RACE_TIMEOUT_MS: u64 = 200;
+const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
@@ -102,7 +102,7 @@ impl KitsuneP2pActor {
         Ok(async move { Ok(res) }.boxed().into())
     }
 
-    /// actual logic for handle_multi_request ...
+    /// actual logic for handle_rpc_multi ...
     /// the top-level handler may or may not spawn a task for this
     #[allow(unused_variables, unused_assignments, unused_mut)]
     fn handle_rpc_multi_inner(
@@ -120,9 +120,9 @@ impl KitsuneP2pActor {
             payload,
         } = input;
 
-        let remote_agent_count = remote_agent_count.expect("set by handle_multi_request");
-        let timeout_ms = timeout_ms.expect("set by handle_multi_request");
-        let mut race_timeout_ms = race_timeout_ms.expect("set by handle_multi_request");
+        let remote_agent_count = remote_agent_count.expect("set by handle_rpc_multi");
+        let timeout_ms = timeout_ms.expect("set by handle_rpc_multi");
+        let mut race_timeout_ms = race_timeout_ms.expect("set by handle_rpc_multi");
         if !as_race {
             // if these are the same, the effect is that we are not racing
             race_timeout_ms = timeout_ms;
@@ -147,7 +147,7 @@ impl KitsuneP2pActor {
             //        the race_timeout - then stopping that and
             //        checking for responses.
 
-            // send requests to agents
+            // send calls to agents
             let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
             let (res_send, mut res_recv) = tokio::sync::mpsc::channel(10);
             loop {
@@ -159,8 +159,8 @@ impl KitsuneP2pActor {
                 {
                     for agent in agent_list {
                         // for each agent returned
-                        // if we haven't sent them a request
-                        // and they aren't the requestor - send a request
+                        // if we haven't sent them a call
+                        // and they aren't the requestor - send a call
                         // if we meet our request quota break out.
                         if agent != from_agent && !sent_to.contains(&agent) {
                             sent_to.insert(agent.clone());
@@ -168,7 +168,7 @@ impl KitsuneP2pActor {
                             let space = space.clone();
                             let payload = payload.clone();
                             let mut res_send = res_send.clone();
-                            // make the request - the responses will be
+                            // make the call - the responses will be
                             // sent back to our channel
                             tokio::task::spawn(async move {
                                 if let Ok(response) = i_s
@@ -187,7 +187,7 @@ impl KitsuneP2pActor {
                         }
                     }
 
-                    // keep checking until we meet our request quota
+                    // keep checking until we meet our call quota
                     // or we get to our race timeout
                     if sent_to.len() >= remote_agent_count as usize
                         || start.elapsed().as_millis() as u64 > race_timeout_ms
@@ -265,9 +265,12 @@ impl KitsuneP2pActor {
         .into())
     }
 
-    /// actual logic for handle_broadcast ...
+    /// actual logic for handle_notify_multi ...
     /// the top-level handler may or may not spawn a task for this
-    fn handle_notify_inner(&mut self, input: actor::NotifyMulti) -> KitsuneP2pHandlerResult<u8> {
+    fn handle_notify_multi_inner(
+        &mut self,
+        input: actor::NotifyMulti,
+    ) -> KitsuneP2pHandlerResult<u8> {
         let actor::NotifyMulti {
             space,
             basis,
@@ -277,7 +280,7 @@ impl KitsuneP2pActor {
             payload,
         } = input;
 
-        let timeout_ms = timeout_ms.expect("set by handle_broadcast");
+        let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
 
         if !self.spaces.contains_key(&space) {
             return Err(KitsuneP2pError::RoutingSpaceError(space));
@@ -314,7 +317,7 @@ impl KitsuneP2pActor {
                     for agent in agent_list {
                         if !sent_to.contains(&agent) {
                             sent_to.insert(agent.clone());
-                            // send the broadcast here - but spawn
+                            // send the notify here - but spawn
                             // so we're not holding up this loop
                             let mut internal_sender = internal_sender.clone();
                             let space = space.clone();
@@ -414,7 +417,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         // if the user doesn't care about remote_agent_count, apply default
         match input.remote_agent_count {
             None | Some(0) => {
-                input.remote_agent_count = Some(DEFAULT_MULTI_REQUEST_REMOTE_AGENT_COUNT);
+                input.remote_agent_count = Some(DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT);
             }
             _ => (),
         }
@@ -422,7 +425,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         // if the user doesn't care about timeout_ms, apply default
         match input.timeout_ms {
             None | Some(0) => {
-                input.timeout_ms = Some(DEFAULT_MULTI_REQUEST_TIMEOUT_MS);
+                input.timeout_ms = Some(DEFAULT_RPC_MULTI_TIMEOUT_MS);
             }
             _ => (),
         }
@@ -431,7 +434,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
             // if the user doesn't care about race_timeout_ms, apply default
             match input.race_timeout_ms {
                 None | Some(0) => {
-                    input.race_timeout_ms = Some(DEFAULT_MULTI_REQUEST_RACE_TIMEOUT_MS);
+                    input.race_timeout_ms = Some(DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS);
                 }
                 _ => (),
             }
@@ -451,7 +454,7 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         // if the user doesn't care about remote_agent_count, apply default
         match input.remote_agent_count {
             None | Some(0) => {
-                input.remote_agent_count = Some(DEFAULT_BROADCAST_REMOTE_AGENT_COUNT);
+                input.remote_agent_count = Some(DEFAULT_NOTIFY_REMOTE_AGENT_COUNT);
             }
             _ => (),
         }
@@ -461,14 +464,14 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         // spawn a task with that default timeout.
         let do_spawn = match input.timeout_ms {
             None | Some(0) => {
-                input.timeout_ms = Some(DEFAULT_BROADCAST_TIMEOUT_MS);
+                input.timeout_ms = Some(DEFAULT_NOTIFY_TIMEOUT_MS);
                 true
             }
             _ => false,
         };
 
         // gather the inner future
-        let inner_fut = match self.handle_notify_inner(input) {
+        let inner_fut = match self.handle_notify_multi_inner(input) {
             Err(e) => return Err(e),
             Ok(f) => f,
         };
