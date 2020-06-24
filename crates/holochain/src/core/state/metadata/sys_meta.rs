@@ -10,7 +10,7 @@ mod tests {
     use crate::core::state::metadata::{MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use header::{HeaderBuilderCommon, UpdateBasis, NewEntryHeader};
+    use header::{HeaderBuilderCommon, NewEntryHeader, UpdateBasis};
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
@@ -321,7 +321,10 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for create in entry_creates {
-                meta_buf.register_header(NewEntryHeader::Create(create)).await.unwrap();
+                meta_buf
+                    .register_header(NewEntryHeader::Create(create))
+                    .await
+                    .unwrap();
             }
             let mut headers = meta_buf
                 .get_headers(entry_hash.clone())

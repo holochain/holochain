@@ -15,7 +15,7 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{Hashable, Hashed};
+use holo_hash::{AgentPubKey, Hashable, Hashed};
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
@@ -36,8 +36,9 @@ pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
     trigger_publish: &mut TriggerSender,
+    agent_pub_key: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
-    let result = integrate_dht_ops_workflow_inner(&mut workspace).await?;
+    let result = integrate_dht_ops_workflow_inner(&mut workspace, agent_pub_key).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -55,6 +56,7 @@ pub async fn integrate_dht_ops_workflow(
 
 async fn integrate_dht_ops_workflow_inner(
     workspace: &mut IntegrateDhtOpsWorkspace<'_>,
+    agent_pub_key: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     // Pull ops out of queue
     // TODO: PERF: Not collect, iterator cannot cross awaits
@@ -65,7 +67,7 @@ async fn integrate_dht_ops_workflow_inner(
         .collect::<Vec<_>>()?;
 
     for value in ops {
-        // TODO: Process each op
+        // Process each op
         let IntegrationQueueValue {
             op,
             validation_status,
@@ -101,11 +103,17 @@ async fn integrate_dht_ops_workflow_inner(
                 workspace.cas.put(signed_header, Some(entry))?;
             }
             DhtOp::RegisterAgentActivity(signature, header) => {
-                // TODO: Store header
-                // TODO: meta.agent_activity(header)
-                // TODO: agent_activity is a header on this agents header
+                // Store header
+                let header_hashed = HeaderHashed::with_data(header.clone()).await?;
+                let signed_header = SignedHeaderHashed::with_presigned(header_hashed, signature);
+                workspace.cas.put(signed_header, None)?;
 
-            },
+                // register agent activity on this agents pub key
+                workspace
+                    .meta
+                    .register_activity(header, agent_pub_key.clone())
+                    .await?;
+            }
             DhtOp::RegisterReplacedBy(_, entry_update, _) => {
                 let old_entry_hash = match entry_update.update_basis {
                     UpdateBasis::Header => None,
@@ -367,14 +375,12 @@ mod tests {
                 .unwrap();
         }
 
-        // TODO: Add data to cache?
-
         // Call workflow
         {
             let reader = env_ref.reader().unwrap();
             let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let (mut qt, _rx) = TriggerSender::new();
-            integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+            integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt, fixt!(AgentPubKey))
                 .await
                 .unwrap();
         }

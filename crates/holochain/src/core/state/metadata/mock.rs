@@ -8,6 +8,11 @@ mock! {
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: LinkTag) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn sync_register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
+        fn sync_register_activity(
+            &mut self,
+            header: Header,
+            agent_pub_key: AgentPubKey,
+        ) -> DatabaseResult<()>;
         fn sync_add_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
         fn sync_add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -17,6 +22,10 @@ mock! {
             &self,
             entry_hash: EntryHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        fn get_activity(
+            &self,
+            header_hash: AgentPubKey,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
         fn get_updates(
             &self,
             hash: AnyDhtHash,
@@ -25,7 +34,7 @@ mock! {
             &self,
             header_hash: HeaderHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
-        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -52,6 +61,14 @@ impl MetadataBufT for MockMetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_headers(entry_hash)
+    }
+
+    fn get_activity(
+        &self,
+        header_hash: AgentPubKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        self.get_activity(header_hash)
     }
 
     fn get_updates(
@@ -86,6 +103,14 @@ impl MetadataBufT for MockMetadataBuf {
 
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         self.sync_register_header(new_entry_header)
+    }
+
+    async fn register_activity(
+        &mut self,
+        header: Header,
+        agent_pub_key: AgentPubKey,
+    ) -> DatabaseResult<()> {
+        self.sync_register_activity(header, agent_pub_key)
     }
 
     async fn add_update(

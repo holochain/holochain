@@ -5,6 +5,7 @@ use crate::core::state::workspace::Workspace;
 use crate::core::workflow::integrate_dht_ops_workflow::{
     integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
 };
+use holo_hash::AgentPubKey;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::env::ReadManager;
 
@@ -12,6 +13,7 @@ use holochain_state::env::ReadManager;
 pub fn spawn_integrate_dht_ops_consumer(
     env: EnvironmentWrite,
     mut trigger_publish: TriggerSender,
+    agent_pub_key: AgentPubKey,
 ) -> (TriggerSender, tokio::sync::oneshot::Receiver<()>) {
     let (tx, mut rx) = TriggerSender::new();
     let (tx_first, rx_first) = tokio::sync::oneshot::channel();
@@ -23,10 +25,14 @@ pub fn spawn_integrate_dht_ops_consumer(
             let reader = env_ref.reader().expect("Could not create LMDB reader");
             let workspace = IntegrateDhtOpsWorkspace::new(&reader, &env_ref)
                 .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                integrate_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_publish)
-                    .await
-                    .expect("Error running Workflow")
+            if let WorkComplete::Incomplete = integrate_dht_ops_workflow(
+                workspace,
+                env.clone().into(),
+                &mut trigger_publish,
+                agent_pub_key.clone(),
+            )
+            .await
+            .expect("Error running Workflow")
             {
                 trigger_self.trigger()
             };

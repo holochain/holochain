@@ -5,7 +5,7 @@
 //! [Entry]: holochain_types::Entry
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::HeaderHash;
+use holo_hash::{AgentPubKey, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{KvBuf, KvvBuf},
@@ -150,6 +150,13 @@ pub trait MetadataBufT {
     /// Adds a new [Header] that creates an [Entry] in the sys metadata
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
+    /// Register activity on an agents public key
+    async fn register_activity(
+        &mut self,
+        header: Header,
+        agent_pub_key: AgentPubKey,
+    ) -> DatabaseResult<()>;
+
     /// Adds a new [EntryUpdate] [Header] to an [Entry] in the sys metadata
     async fn add_update(
         &mut self,
@@ -164,6 +171,12 @@ pub trait MetadataBufT {
     fn get_headers(
         &self,
         entry_hash: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Returns all headers registered on an agents public key
+    fn get_activity(
+        &self,
+        header_hash: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the [HeaderHash]s of [EntryUpdates] headers on an [Entry]
@@ -198,10 +211,13 @@ pub enum SysMetaVal {
     Update(HeaderHash),
     /// [EntryDelete] [Header]
     Delete(HeaderHash),
+    /// Activity on an agents public key
+    Agent(HeaderHash),
 }
 
 /// Subset of headers for the sys meta db
 enum EntryHeader {
+    Agent(Header),
     NewEntry(Header),
     Update(Header),
     Delete(Header),
@@ -231,7 +247,10 @@ impl LinkMetaVal {
 impl From<SysMetaVal> for HeaderHash {
     fn from(v: SysMetaVal) -> Self {
         match v {
-            SysMetaVal::NewEntry(h) | SysMetaVal::Update(h) | SysMetaVal::Delete(h) => h,
+            SysMetaVal::NewEntry(h)
+            | SysMetaVal::Update(h)
+            | SysMetaVal::Delete(h)
+            | SysMetaVal::Agent(h) => h,
         }
     }
 }
@@ -239,9 +258,10 @@ impl From<SysMetaVal> for HeaderHash {
 impl EntryHeader {
     async fn into_hash(self) -> Result<HeaderHash, SerializedBytesError> {
         let header = match self {
-            EntryHeader::NewEntry(h) => h,
-            EntryHeader::Update(h) => h,
-            EntryHeader::Delete(h) => h,
+            EntryHeader::NewEntry(h)
+            | EntryHeader::Update(h)
+            | EntryHeader::Delete(h)
+            | EntryHeader::Agent(h) => h,
         };
         let (_, header_hash): (Header, HeaderHash) = HeaderHashed::with_data(header).await?.into();
         Ok(header_hash)
@@ -297,7 +317,7 @@ impl<'env> MetadataBuf<'env> {
         Self::new(reader, system_meta, links_meta)
     }
 
-    async fn add_entry_header<K, H>(&mut self, header: H, key: K) -> DatabaseResult<()>
+    async fn register_header_to<K, H>(&mut self, header: H, key: K) -> DatabaseResult<()>
     where
         H: Into<EntryHeader>,
         K: Into<SysMetaKey>,
@@ -306,6 +326,7 @@ impl<'env> MetadataBuf<'env> {
             h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash().await?),
             h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash().await?),
             h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash().await?),
+            h @ EntryHeader::Agent(_) => SysMetaVal::Agent(h.into_hash().await?),
         };
         self.system_meta.insert(key.into(), sys_val);
         Ok(())
@@ -359,7 +380,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     // Add register_header
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         let basis = new_entry_header.entry().clone();
-        self.add_entry_header(new_entry_header, basis).await
+        self.register_header_to(new_entry_header, basis).await
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -378,13 +399,23 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             }
             (header::UpdateBasis::Entry, Some(entry_hash)) => entry_hash.into(),
         };
-        self.add_entry_header(update, basis).await
+        self.register_header_to(update, basis).await
     }
 
     #[allow(clippy::needless_lifetimes)]
     async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
-        self.add_entry_header(delete, remove).await
+        self.register_header_to(delete, remove).await
+    }
+
+    #[allow(clippy::needless_lifetimes)]
+    async fn register_activity(
+        &mut self,
+        header: Header,
+        agent_pub_key: AgentPubKey,
+    ) -> DatabaseResult<()> {
+        self.register_header_to(EntryHeader::Agent(header), agent_pub_key)
+            .await
     }
 
     fn get_headers(
@@ -423,12 +454,31 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?).filter_map(|h| {
-                Ok(match h {
-                    SysMetaVal::Delete(h) => Some(h),
-                    _ => None,
-                })
-            }),
+            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?).filter_map(
+                |h| {
+                    Ok(match h {
+                        SysMetaVal::Delete(h) => Some(h),
+                        _ => None,
+                    })
+                },
+            ),
+        ))
+    }
+
+    fn get_activity(
+        &self,
+        header_hash: AgentPubKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?).filter_map(
+                |h| {
+                    Ok(match h {
+                        SysMetaVal::Agent(h) => Some(h),
+                        _ => None,
+                    })
+                },
+            ),
         ))
     }
 
