@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
+use crate::core::state::source_chain::SourceChainError;
 use crate::core::workflow::call_zome_workflow::unsafe_invoke_zome_workspace::error::UnsafeInvokeZomeWorkspaceError;
 use holochain_crypto::CryptoError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
@@ -47,6 +48,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     HoloHashError(#[from] holo_hash::HoloHashError),
+
+    /// ident
+    #[error(transparent)]
+    SourceChainError(#[from] SourceChainError),
 }
 
 /// Type alias

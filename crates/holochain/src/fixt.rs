@@ -4,6 +4,7 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
 use crate::core::state::metadata::LinkMetaVal;
+use crate::fixt::curve::AppEntry;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holo_hash::DnaHashFixturator;
@@ -216,6 +217,9 @@ fixturator!(
         CapClaim(CapClaim)
         CapGrant(ZomeCallCapGrant)
     ];
+    curve AppEntry {
+        Entry::App(SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap())
+    };
 );
 
 fixturator!(

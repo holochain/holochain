@@ -25,10 +25,36 @@ pub async fn debug(
 
 #[cfg(test)]
 pub mod wasm_test {
+    use super::debug;
+    use crate::core::ribosome::HostContextFixturator;
+    use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::debug_msg;
     use holochain_zome_types::DebugInput;
     use holochain_zome_types::DebugOutput;
+    use std::sync::Arc;
+
+    #[tokio::test(threaded_scheduler)]
+    /// we can get an entry hash out of the fn directly
+    async fn debug_test() {
+        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+            .next()
+            .unwrap();
+        let host_context = HostContextFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        let input = DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")));
+
+        let output: DebugOutput = tokio::task::spawn(async move {
+            debug(Arc::new(ribosome), Arc::new(host_context), input)
+                .await
+                .unwrap()
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(DebugOutput::new(()), output);
+    }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]

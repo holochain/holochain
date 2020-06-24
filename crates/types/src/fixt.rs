@@ -46,7 +46,7 @@ impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
         Some(AppEntryType::new(
             app_entry.id().to_vec(),
             *app_entry.zome_id(),
-            self.0.curve.clone(),
+            self.0.curve,
         ))
     }
 }
