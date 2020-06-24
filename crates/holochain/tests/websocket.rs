@@ -346,7 +346,7 @@ async fn call_zome() {
 
     // Call zome after resart
     let mut holochain = start_holochain(config_path).await;
-    let mut client = retry_admin_interface(port, 3, Duration::from_millis(100)).await;
+    let mut client = retry_admin_interface(port, 10, Duration::from_millis(200)).await;
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut client, &mut holochain).await;
