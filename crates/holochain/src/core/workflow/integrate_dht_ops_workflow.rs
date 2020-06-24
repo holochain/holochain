@@ -79,19 +79,24 @@ async fn integrate_dht_ops_workflow_inner(
             DhtOp::StoreElement(signature, header, maybe_entry) => {
                 let header = HeaderHashed::with_data(header).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                let entry_hashed = match maybe_entry {
+                    Some(entry) => Some(EntryHashed::with_data(*entry).await?),
+                    None => None,
+                };
                 // Store the entry
-                workspace.cas.put(signed_header, maybe_entry)?;
+                workspace.cas.put(signed_header, entry_hashed)?;
             }
             DhtOp::StoreEntry(signature, new_entry_header, entry) => {
                 // TODO: Reference to headers
                 // meta.register_header(new_entry_header)
                 let header = HeaderHashed::with_data(new_entry_header.into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                let entry = EntryHashed::with_data(*entry).await?;
                 // Store Header and Entry
-                workspace.cas.put(signed_header, Some(*entry))?;
+                workspace.cas.put(signed_header, Some(entry))?;
             }
             DhtOp::RegisterAgentActivity(_, _) => todo!(),
-            DhtOp::RegisterReplacedBy(_, header, _) => {
+            DhtOp::RegisterReplacedBy(_, entry_update, _) => {
                 let old_entry_hash = match entry_update.update_basis {
                     UpdateBasis::Header => None,
                     UpdateBasis::Entry => Some(
@@ -118,20 +123,20 @@ async fn integrate_dht_ops_workflow_inner(
             DhtOp::RegisterDeletedBy(_, entry_delete) => {
                 workspace.meta.add_delete(entry_delete).await?
             }
-            DhtOp::RegisterAddLink(_, link_add) => {
-                workspace.meta.add_link(link_add).await?;
+            DhtOp::RegisterAddLink(signature, link_add) => {
+                workspace.meta.add_link(link_add.clone()).await?;
                 // Store add Header
                 let header = HeaderHashed::with_data(link_add.into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
             }
-            DhtOp::RegisterRemoveLink(_, link_remove) => {
+            DhtOp::RegisterRemoveLink(signature, link_remove) => {
                 // TODO: Check whether they have the base address in the cas.
                 // If not then this should put the op back on the queue with a
                 // warning that it's unimplemented and later add this to the cache meta
 
                 // Store link delete Header
-                let header = HeaderHashed::with_data(link_remove.into()).await?;
+                let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
                 let link_add = workspace
