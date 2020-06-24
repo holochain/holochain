@@ -340,7 +340,7 @@ mod tests {
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         validate::ValidationStatus,
-        EntryHashed, Timestamp,
+        EntryHashed, Timestamp, Entry,
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::HostInput;
@@ -538,7 +538,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut entry_fixt = EntryFixturator::new(Predictable);
+        let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
 
         let base_entry = entry_fixt.next().unwrap();
         let base_entry_hash = EntryHashed::with_data(base_entry.clone())
@@ -563,13 +563,13 @@ mod tests {
                 entry_type: EntryType::App(fixt!(AppEntryType)),
                 entry_hash: base_entry_hash.clone(),
             };
-            sc.put(header_builder, Some(base_entry)).await.unwrap();
+            sc.put(header_builder, Some(base_entry.clone())).await.unwrap();
 
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::App(fixt!(AppEntryType)),
                 entry_hash: target_entry_hash.clone(),
             };
-            sc.put(header_builder, Some(target_entry)).await.unwrap();
+            sc.put(header_builder, Some(target_entry.clone())).await.unwrap();
 
             let header_builder = builder::LinkAdd {
                 base_address: base_entry_hash.clone(),
@@ -621,6 +621,18 @@ mod tests {
             let links = meta.get_links(&key).unwrap();
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
+
+            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let cascade = workspace.cascade();
+            let links = cascade.dht_get_links(&key).await.unwrap();
+            let link = links[0].clone();
+            assert_eq!(link.target, target_entry_hash);
+
+            let e = cascade.dht_get(&target_entry_hash).await.unwrap().unwrap();
+            assert_eq!(e.into_content(), target_entry);
+
+            let e = cascade.dht_get(&base_entry_hash).await.unwrap().unwrap();
+            assert_eq!(e.into_content(), base_entry);
         }
     }
 }
