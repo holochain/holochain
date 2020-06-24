@@ -77,99 +77,87 @@ async fn integrate_dht_ops_workflow_inner(
 
         match op.clone() {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
-                // let signed_header = workspace
-                //     .cascade()
-                //     .dht_get_header_raw(&header)
-                //     .await
-                //     // TODO: handle error
-                //     .unwrap()
-                //     // TODO: handle header not found
-                //     .unwrap();
-                // let maybe_entry = match signed_header.header().entry_data() {
-                //     Some((hash, _)) => Some(
-                //         workspace
-                //             .cascade()
-                //             .dht_get_entry_raw(hash)
-                //             .await
-                //             // TODO: handle error
-                //             .unwrap()
-                //             // TODO: handle entry not found
-                //             .unwrap(),
-                //     ),
-                //     None => None,
-                // };
-                let maybe_entry_hashed = match maybe_entry {
-                    Some(e) => Some(EntryHashed::with_data(*e).await?),
-                    None => None,
-                };
                 let header = HeaderHashed::with_data(header).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                // TODO: Put header into metadata
-                match signed_header.header().clone() {
-                    Header::LinkAdd(h) => workspace.meta.add_link(h).await?,
-                    Header::LinkRemove(link_remove) => {
-                        let link_add = workspace
-                            .cascade()
-                            .dht_get_header_raw(&link_remove.link_add_address)
-                            .await
-                            // TODO: Handle error
-                            .unwrap()
-                            // TODO: Handle link add missing
-                            .unwrap()
-                            .into_header_and_signature()
-                            .0
-                            .into_content();
-                        let link_add = match link_add {
-                            Header::LinkAdd(la) => la,
-                            _ => panic!("Must be a link add"),
-                        };
-
-                        // Remove the link
-                        workspace.meta.remove_link(
-                            link_remove,
-                            &link_add.base_address,
-                            link_add.zome_id,
-                            link_add.tag,
-                        )?;
-                    }
-                    Header::EntryCreate(entry_create) => {
-                        workspace.meta.add_create(entry_create).await?
-                    }
-                    Header::EntryUpdate(entry_update) => {
-                        let entry = match entry_update.update_basis {
-                            UpdateBasis::Header => None,
-                            UpdateBasis::Entry => Some(
-                                workspace
-                                    .cascade()
-                                    .dht_get_header_raw(&entry_update.replaces_address)
-                                    .await?
-                                    // TODO: Handle original header not found
-                                    .unwrap()
-                                    .header()
-                                    .entry_data()
-                                    // TODO: Handle update basis on entry but header has no entry
-                                    .unwrap()
-                                    .0
-                                    .clone(),
-                            ),
-                        };
-                        workspace.meta.add_update(entry_update, entry).await?;
-                    }
-                    Header::EntryDelete(entry_delete) => {
-                        workspace.meta.add_delete(entry_delete).await?
-                    }
-                    _ => {}
-                }
-                // TODO: If we want to avoid these clones we could get the op hash from
-                // the db but is it ok to trust an op hash from a db?
-                workspace.cas.put(signed_header, maybe_entry_hashed)?;
+                // Store the entry
+                workspace.cas.put(signed_header, maybe_entry)?;
             }
-            DhtOp::StoreEntry(_, _, _) => todo!(),
+            DhtOp::StoreEntry(signature, new_entry_header, entry) => {
+                // TODO: Reference to headers
+                // meta.register_header(new_entry_header)
+                let header = HeaderHashed::with_data(new_entry_header.into()).await?;
+                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                // Store Header and Entry
+                workspace.cas.put(signed_header, Some(*entry))?;
+            }
             DhtOp::RegisterAgentActivity(_, _) => todo!(),
-            DhtOp::RegisterReplacedBy(_, _, _) => todo!(),
-            DhtOp::RegisterDeletedBy(_, _) => todo!(),
-            DhtOp::RegisterAddLink(_, _) => todo!(),
-            DhtOp::RegisterRemoveLink(_, _) => todo!(),
+            DhtOp::RegisterReplacedBy(_, header, _) => {
+                let old_entry_hash = match entry_update.update_basis {
+                    UpdateBasis::Header => None,
+                    UpdateBasis::Entry => Some(
+                        workspace
+                            .cas
+                            .get_header(&entry_update.replaces_address)
+                            .await?
+                            // TODO: Handle missing original entry header. Same reason as below
+                            .unwrap()
+                            .header()
+                            .entry_data()
+                            // TODO: Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
+                            // This should just put the op back in the integration queue
+                            .unwrap()
+                            .0
+                            .clone(),
+                    ),
+                };
+                workspace
+                    .meta
+                    .add_update(entry_update, old_entry_hash)
+                    .await?;
+            }
+            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+                workspace.meta.add_delete(entry_delete).await?
+            }
+            DhtOp::RegisterAddLink(_, link_add) => {
+                workspace.meta.add_link(link_add).await?;
+                // Store add Header
+                let header = HeaderHashed::with_data(link_add.into()).await?;
+                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                workspace.cas.put(signed_header, None)?;
+            }
+            DhtOp::RegisterRemoveLink(_, link_remove) => {
+                // TODO: Check whether they have the base address in the cas.
+                // If not then this should put the op back on the queue with a
+                // warning that it's unimplemented and later add this to the cache meta
+
+                // Store link delete Header
+                let header = HeaderHashed::with_data(link_remove.into()).await?;
+                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                workspace.cas.put(signed_header, None)?;
+                let link_add = workspace
+                    .cas
+                    .get_header(&link_remove.link_add_address)
+                    .await?
+                    // TODO: Handle link add missing
+                    // Probably just waiting on StoreElement to arrive so put
+                    // back in queue with a log message
+                    .unwrap()
+                    .into_header_and_signature()
+                    .0
+                    .into_content();
+                let link_add = match link_add {
+                    Header::LinkAdd(la) => la,
+                    _ => panic!("Must be a link add"),
+                };
+
+                // Remove the link
+                workspace.meta.remove_link(
+                    link_remove,
+                    &link_add.base_address,
+                    link_add.zome_id,
+                    link_add.tag,
+                )?;
+            }
         }
         let (op, basis) = dht_op_to_light_basis(op, &workspace.cascade()).await?;
         let value = IntegrationValue {

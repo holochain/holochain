@@ -229,6 +229,7 @@ pub async fn dht_basis<M: MetadataBufT>(
                 .await?
                 .into(),
         },
+        // TODO: Maybe delete also needs to go to entry authority 
         DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
         DhtOp::RegisterAddLink(_, header) => header.base_address.clone().into(),
         DhtOp::RegisterRemoveLink(_, header) => header.base_address.clone().into(),

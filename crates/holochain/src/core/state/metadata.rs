@@ -354,6 +354,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.links_meta.delete(key.to_key())
     }
 
+    // TODO: Add register_header
+
+    // TODO: This no longer makes sense wih register_header
     #[allow(clippy::needless_lifetimes)]
     async fn add_create(&mut self, create: header::EntryCreate) -> DatabaseResult<()> {
         let entry_hash = create.entry_hash.to_owned();
@@ -385,6 +388,8 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.add_entry_header(delete, remove).await
     }
 
+    // TODO: Add get_headers
+    // Remove as this makes no sense with get_headers
     fn get_creates(
         &self,
         entry_hash: EntryHash,
