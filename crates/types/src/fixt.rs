@@ -412,7 +412,7 @@ impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
     }
 }
 
-type MaybeSerializedBytes = Option<SerializedBytes>;
+pub type MaybeSerializedBytes = Option<SerializedBytes>;
 
 fixturator! {
     MaybeSerializedBytes;

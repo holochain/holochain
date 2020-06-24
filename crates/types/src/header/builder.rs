@@ -2,14 +2,15 @@ use super::EntryType;
 use crate::header;
 use crate::{
     composite_hash::{EntryHash, HeaderAddress},
+    fixt::*,
     link::Tag,
     Timestamp,
 };
 use derive_more::Constructor;
+use fixt::prelude::*;
 use header::HeaderInner;
-use header::{UpdateBasis, ZomeId};
+use header::UpdateBasis;
 use holo_hash::*;
-use holochain_serialized_bytes::SerializedBytes;
 
 #[derive(Constructor)]
 pub struct HeaderBuilderCommon {
@@ -49,6 +50,11 @@ macro_rules! builder_variant {
                 }
             }
         }
+
+        fixturator!(
+            $name;
+            constructor fn new($($t),*);
+        );
 
         impl HeaderBuilder<header::$name> for $name {
             fn build(self, common: HeaderBuilderCommon) -> header::$name {
@@ -100,12 +106,12 @@ builder_variant!(InitZomesComplete {});
 builder_variant!(LinkAdd {
     base_address: EntryHash,
     target_address: EntryHash,
-    zome_id: ZomeId,
+    zome_id: u8, // Can't use ZomeId here because you can't have a fixturator on a type alias
     tag: Tag,
 });
 
 builder_variant!(LinkRemove {
-    link_add_address: HeaderAddress,
+    link_add_address: HeaderHash,
     base_address: EntryHash,
 });
 
@@ -131,9 +137,9 @@ builder_variant!(EntryUpdate {
 });
 
 builder_variant!(EntryDelete {
-    removes_address: HeaderAddress,
+    removes_address: HeaderHash,
 });
 
 builder_variant!(AgentValidationPkg {
-    membrane_proof: Option<SerializedBytes>,
+    membrane_proof: MaybeSerializedBytes, // needed for fixturator
 });
