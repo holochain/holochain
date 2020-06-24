@@ -1009,19 +1009,6 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a238f1532d5b432ff0470966ff539133fac120581d5beaf68c4e4d28312163f"
-dependencies = [
- "futures",
- "must_future",
- "paste",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "ghost_actor"
 version = "0.2.0-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13be371ec804669dec3baf546c02f1916c6c8eb5323e7f61d3d8d0aab68851d0"
@@ -1187,7 +1174,7 @@ dependencies = [
 name = "holochain_keystore"
 version = "0.0.1"
 dependencies = [
- "ghost_actor 0.2.0-alpha.10",
+ "ghost_actor",
  "holo_hash",
  "holochain_crypto",
  "holochain_serialized_bytes",
@@ -1203,7 +1190,7 @@ name = "holochain_p2p"
 version = "0.0.1"
 dependencies = [
  "futures",
- "ghost_actor 0.1.0",
+ "ghost_actor",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -1529,7 +1516,7 @@ dependencies = [
  "assert_matches",
  "derive_more",
  "futures",
- "ghost_actor 0.2.0-alpha.10",
+ "ghost_actor",
  "shrinkwraprs",
  "thiserror",
  "tokio",
@@ -1554,7 +1541,7 @@ name = "kitsune_p2p_types"
 version = "0.0.1"
 dependencies = [
  "futures",
- "ghost_actor 0.2.0-alpha.10",
+ "ghost_actor",
  "thiserror",
  "tokio",
  "url2",

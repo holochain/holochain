@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use futures::future::FutureExt;
+    use ghost_actor::GhostControlSender;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_call_remote_workflow() {
@@ -16,7 +18,7 @@ mod tests {
         )
         .into();
 
-        let (mut p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
@@ -24,7 +26,11 @@ mod tests {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     CallRemote { respond, .. } => {
-                        let _ = respond(Ok(UnsafeBytes::from(b"yada".to_vec()).into()));
+                        respond.r(Ok(
+                            async move { Ok(UnsafeBytes::from(b"yada".to_vec()).into()) }
+                                .boxed()
+                                .into(),
+                        ));
                     }
                     _ => panic!("unexpected event"),
                 }
@@ -68,7 +74,7 @@ mod tests {
         )
         .into();
 
-        let (mut p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
@@ -80,7 +86,7 @@ mod tests {
                     } => {
                         let receipt: Vec<u8> = UnsafeBytes::from(receipt).into();
                         assert_eq!(b"receipt-test".to_vec(), receipt);
-                        let _ = respond(Ok(()));
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     _ => panic!("unexpected event"),
                 }
@@ -116,7 +122,7 @@ mod tests {
         )
         .into();
 
-        let (mut p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
@@ -127,7 +133,7 @@ mod tests {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
                     Publish { respond, .. } => {
-                        let _ = respond(Ok(()));
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     _ => panic!("unexpected event"),
@@ -173,7 +179,7 @@ mod tests {
         )
         .into();
 
-        let (mut p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
         let test_1 = SerializedBytes::from(UnsafeBytes::from(b"resp-1".to_vec()));
         let test_2 = SerializedBytes::from(UnsafeBytes::from(b"resp-2".to_vec()));
@@ -190,7 +196,7 @@ mod tests {
                         } else {
                             panic!("too many requests!")
                         };
-                        let _ = respond(Ok(resp));
+                        respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
                     _ => panic!("unexpected event"),
                 }

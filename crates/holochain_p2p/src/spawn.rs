@@ -1,5 +1,3 @@
-use futures::future::FutureExt;
-
 use crate::actor::*;
 use crate::event::*;
 
@@ -7,15 +5,35 @@ mod actor;
 use actor::*;
 
 /// Spawn a new HolochainP2p actor.  Conductor will call this on initialization.
-pub async fn spawn_holochain_p2p(
-) -> HolochainP2pResult<(HolochainP2pSender, HolochainP2pEventReceiver)> {
+pub async fn spawn_holochain_p2p() -> HolochainP2pResult<(
+    ghost_actor::GhostSender<HolochainP2p>,
+    HolochainP2pEventReceiver,
+)> {
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
-    let (sender, driver) = HolochainP2pSender::ghost_actor_spawn(Box::new(|internal_sender| {
-        async move { Ok(HolochainP2pActor::new(internal_sender, evt_send).await?) }
-            .boxed()
-            .into()
-    }))
-    .await?;
-    tokio::task::spawn(driver);
+
+    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
+
+    let channel_factory = builder.channel_factory().clone();
+
+    /*
+    let internal_sender = builder
+        .channel_factory()
+        .create_channel::<Internal>()
+        .await?;
+    */
+
+    let sender = channel_factory.create_channel::<HolochainP2p>().await?;
+
+    tokio::task::spawn(
+        builder.spawn(
+            HolochainP2pActor::new(
+                //internal_sender,
+                channel_factory,
+                evt_send,
+            )
+            .await?,
+        ),
+    );
+
     Ok((sender, evt_recv))
 }

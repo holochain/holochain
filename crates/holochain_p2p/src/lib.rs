@@ -13,11 +13,13 @@ pub use types::*;
 mod spawn;
 pub use spawn::*;
 
+use types::actor::HolochainP2pSender;
+
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
 #[derive(Clone)]
 pub struct HolochainP2pCell {
-    sender: actor::HolochainP2pSender,
+    sender: ghost_actor::GhostSender<actor::HolochainP2p>,
     dna_hash: Arc<DnaHash>,
     from_agent: Arc<AgentPubKey>,
 }

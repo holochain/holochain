@@ -118,6 +118,7 @@ ghost_actor::ghost_actor! {
     }
 }
 
+/*
 impl HolochainP2pSender {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific cell context.
@@ -135,3 +136,4 @@ impl HolochainP2pSender {
         self.clone().into_cell(dna_hash, from_agent)
     }
 }
+*/

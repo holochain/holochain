@@ -18,10 +18,10 @@ impl From<&actor::GetOptions> for GetOptions {
     }
 }
 
-ghost_actor::ghost_chan! {
+ghost_actor::ghost_actor! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
-    pub chan HolochainP2pEvent<super::HolochainP2pError> {
+    pub actor HolochainP2pEvent<super::HolochainP2pError> {
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
             dna_hash: DnaHash,
