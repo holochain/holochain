@@ -17,7 +17,7 @@ use holochain_types::header;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
     header::{LinkAdd, LinkRemove, ZomeId},
-    link::Tag,
+    link::LinkTag,
     Header, HeaderHashed, Timestamp,
 };
 use std::fmt::Debug;
@@ -71,7 +71,7 @@ pub struct LinkMetaVal {
     /// The [ZomeId] of the zome this link belongs to
     pub zome_id: ZomeId,
     /// A tag used to find this link
-    pub tag: Tag,
+    pub tag: LinkTag,
 }
 
 /// Key for the LinkMeta database.
@@ -87,16 +87,16 @@ pub enum LinkMetaKey<'a> {
     /// Search for all links on a base, for a zome
     BaseZome(&'a EntryHash, ZomeId),
     /// Search for all links on a base, for a zome and with a tag
-    BaseZomeTag(&'a EntryHash, ZomeId, &'a Tag),
+    BaseZomeTag(&'a EntryHash, ZomeId, &'a LinkTag),
     /// This will match only the link created with a certain [LinkAdd] hash
-    Full(&'a EntryHash, ZomeId, &'a Tag, &'a HeaderHash),
+    Full(&'a EntryHash, ZomeId, &'a LinkTag, &'a HeaderHash),
 }
 
 /// The actual type the [LinkMetaKey] turns into
-type LinkKey = Vec<u8>;
+type LinkMetaKeyBytes = Vec<u8>;
 
 impl<'a> LinkMetaKey<'a> {
-    fn to_key(&self) -> LinkKey {
+    fn to_key(&self) -> LinkMetaKeyBytes {
         use LinkMetaKey::*;
         match self {
             Base(b) => b.as_ref().to_vec(),
@@ -143,7 +143,7 @@ pub trait MetadataBufT {
         link_remove: LinkRemove,
         base: &EntryHash,
         zome_id: ZomeId,
-        tag: Tag,
+        tag: LinkTag,
     ) -> DatabaseResult<()>;
 
     /// Adds a new [EntryCreate] [Header] to an [Entry] in the sys metadata
@@ -214,7 +214,7 @@ impl LinkMetaVal {
         target: EntryHash,
         timestamp: Timestamp,
         zome_id: ZomeId,
-        tag: Tag,
+        tag: LinkTag,
     ) -> Self {
         Self {
             link_add_hash,
@@ -267,7 +267,7 @@ impl From<header::EntryDelete> for EntryHeader {
 /// Updates and answers queries for the links and system meta databases
 pub struct MetadataBuf<'env> {
     system_meta: KvvBuf<'env, SysMetaKey, SysMetaVal, Reader<'env>>,
-    links_meta: KvBuf<'env, LinkKey, LinkMetaVal, Reader<'env>>,
+    links_meta: KvBuf<'env, LinkMetaKeyBytes, LinkMetaVal, Reader<'env>>,
 }
 
 impl<'env> MetadataBuf<'env> {
@@ -344,7 +344,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         link_remove: LinkRemove,
         base: &EntryHash,
         zome_id: ZomeId,
-        tag: Tag,
+        tag: LinkTag,
     ) -> DatabaseResult<()> {
         let key = LinkMetaKey::Full(base, zome_id, &tag, &link_remove.link_add_address);
         debug!(removing_key = ?key);

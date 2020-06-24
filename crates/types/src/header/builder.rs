@@ -2,7 +2,7 @@ use super::EntryType;
 use crate::header;
 use crate::{
     composite_hash::{EntryHash, HeaderAddress},
-    link::Tag,
+    link::LinkTag,
     Timestamp,
 };
 use derive_more::Constructor;
@@ -101,7 +101,7 @@ builder_variant!(LinkAdd {
     base_address: EntryHash,
     target_address: EntryHash,
     zome_id: ZomeId,
-    tag: Tag,
+    tag: LinkTag,
 });
 
 builder_variant!(LinkRemove {

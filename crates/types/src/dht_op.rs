@@ -28,6 +28,7 @@ pub enum DhtOp {
     ///   - Note: they do not become responsible for keeping the set of
     ///     references from that entry up-to-date.
     StoreElement(Signature, Header, Option<Box<Entry>>),
+
     /// Used to notify the authority for an entry that it has been created
     /// anew. (The same entry can be created more than once.)
     ///
@@ -43,6 +44,7 @@ pub enum DhtOp {
     /// TODO: document how those "created-by" references are stored in
     /// reality.
     StoreEntry(Signature, NewEntryHeader, Box<Entry>),
+
     /// Used to notify the authority for an agent's public key that that agent
     /// has committed a new header.
     ///
@@ -57,15 +59,19 @@ pub enum DhtOp {
     /// TODO: document how those "agent-activity" references are stored in
     /// reality.
     RegisterAgentActivity(Signature, Header),
+
     /// Op for updating an entry
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
     RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
+
     /// Op for deleting an entry
     RegisterDeletedBy(Signature, header::EntryDelete),
-    /// Op for adding a link  
+
+    /// Op for adding a link
     RegisterAddLink(Signature, header::LinkAdd),
+
     /// Op for removing a link
     RegisterRemoveLink(Signature, header::LinkRemove),
 }

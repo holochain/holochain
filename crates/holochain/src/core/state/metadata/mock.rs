@@ -5,7 +5,7 @@ mock! {
     {
         fn get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<LinkMetaVal>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
-        fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: Tag) -> DatabaseResult<()>;
+        fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: LinkTag) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn sync_add_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
         fn sync_add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
@@ -78,7 +78,7 @@ impl MetadataBufT for MockMetadataBuf {
         link_remove: LinkRemove,
         base: &EntryHash,
         zome_id: ZomeId,
-        tag: Tag,
+        tag: LinkTag,
     ) -> DatabaseResult<()> {
         self.remove_link(link_remove, base, zome_id, tag)
     }
