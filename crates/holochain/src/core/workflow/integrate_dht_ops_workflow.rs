@@ -46,7 +46,7 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
 
     // trigger other workflows
-    // TODO: only trigger if we have integrated ops that we have authored them
+    // TODO: only trigger if we have integrated ops that we have authored
     trigger_publish.trigger();
 
     Ok(result)
@@ -87,8 +87,12 @@ async fn integrate_dht_ops_workflow_inner(
                 workspace.cas.put(signed_header, entry_hashed)?;
             }
             DhtOp::StoreEntry(signature, new_entry_header, entry) => {
-                // TODO: Reference to headers
-                // meta.register_header(new_entry_header)
+                // Reference to headers
+                workspace
+                    .meta
+                    .register_header(new_entry_header.clone())
+                    .await?;
+
                 let header = HeaderHashed::with_data(new_entry_header.into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 let entry = EntryHashed::with_data(*entry).await?;
@@ -133,7 +137,17 @@ async fn integrate_dht_ops_workflow_inner(
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
                 // TODO: Check whether they have the base address in the cas.
                 // If not then this should put the op back on the queue with a
-                // warning that it's unimplemented and later add this to the cache meta
+                // warning that it's unimplemented and later add this to the cache meta.
+                // TODO: Base might be in cas due to this agent being an authority for a
+                // header on the Base 
+                if let None = workspace.cas.get_entry(&link_remove.base_address).await? {
+                    warn!(
+                        "Storing link data when not an author or authority requires the 
+                         cache metadata store.
+                         The cache metadata store is currently unimplemented"
+                    );
+                    // TODO: Add op back on queue
+                }
 
                 // Store link delete Header
                 let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
@@ -164,6 +178,9 @@ async fn integrate_dht_ops_workflow_inner(
                 )?;
             }
         }
+
+        // TODO: Instead of using the cascade use the cas and don't error
+        // The op should just be put back on the queue if the old entry isn't found
         let (op, basis) = dht_op_to_light_basis(op, &workspace.cascade()).await?;
         let value = IntegrationValue {
             validation_status,
@@ -192,7 +209,7 @@ pub struct IntegrateDhtOpsWorkspace<'env> {
 }
 
 impl<'env> IntegrateDhtOpsWorkspace<'env> {
-    pub fn cascade(&self) -> Cascade {
+    fn cascade(&self) -> Cascade {
         Cascade::new(&self.cas, &self.meta, &self.cache, &self.cache_meta)
     }
 }

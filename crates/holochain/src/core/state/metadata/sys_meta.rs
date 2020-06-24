@@ -10,7 +10,7 @@ mod tests {
     use crate::core::state::metadata::{MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use header::{HeaderBuilderCommon, UpdateBasis};
+    use header::{HeaderBuilderCommon, UpdateBasis, NewEntryHeader};
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn add_entry_get_creates() {
+    async fn add_entry_get_headers() {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
@@ -321,10 +321,10 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for create in entry_creates {
-                meta_buf.add_create(create).await.unwrap();
+                meta_buf.register_header(NewEntryHeader::Create(create)).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_creates(entry_hash.clone())
+                .get_headers(entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -337,7 +337,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
-                .get_creates(entry_hash.clone())
+                .get_headers(entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();

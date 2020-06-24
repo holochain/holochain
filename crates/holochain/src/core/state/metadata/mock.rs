@@ -7,12 +7,13 @@ mock! {
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: LinkTag) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
+        fn sync_register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
         fn sync_add_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
         fn sync_add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
-        fn get_creates(
+        fn get_headers(
             &self,
             entry_hash: EntryHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
@@ -45,12 +46,12 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_canonical_header_hash(header_hash)
     }
 
-    fn get_creates(
+    fn get_headers(
         &self,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
-        self.get_creates(entry_hash)
+        self.get_headers(entry_hash)
     }
 
     fn get_updates(
@@ -83,8 +84,8 @@ impl MetadataBufT for MockMetadataBuf {
         self.remove_link(link_remove, base, zome_id, tag)
     }
 
-    async fn add_create(&mut self, create: header::EntryCreate) -> DatabaseResult<()> {
-        self.sync_add_create(create)
+    async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+        self.sync_register_header(new_entry_header)
     }
 
     async fn add_update(

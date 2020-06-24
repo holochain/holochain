@@ -25,6 +25,7 @@ use std::fmt::Debug;
 pub use sys_meta::*;
 use tracing::*;
 
+use header::NewEntryHeader;
 #[cfg(test)]
 pub use mock::MockMetadataBuf;
 #[cfg(test)]
@@ -146,8 +147,8 @@ pub trait MetadataBufT {
         tag: LinkTag,
     ) -> DatabaseResult<()>;
 
-    /// Adds a new [EntryCreate] [Header] to an [Entry] in the sys metadata
-    async fn add_create(&mut self, create: header::EntryCreate) -> DatabaseResult<()>;
+    /// Adds a new [Header] that creates an [Entry] in the sys metadata
+    async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
     /// Adds a new [EntryUpdate] [Header] to an [Entry] in the sys metadata
     async fn add_update(
@@ -159,8 +160,8 @@ pub trait MetadataBufT {
     /// Adds a new [EntryDelete] [Header] to an [Entry] in the sys metadata
     async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
 
-    /// Returns all the [HeaderHash]s of [EntryCreate] headers on an [Entry]
-    fn get_creates(
+    /// Returns all the [HeaderHash]s of headers that created this [Entry]
+    fn get_headers(
         &self,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
@@ -190,8 +191,9 @@ pub trait MetadataBufT {
 /// Values of [Header]s stored by the sys meta db
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
-    /// [EntryCreate] [Header]
-    Create(HeaderHash),
+    /// A header that results in a new entry
+    /// Either a [EntryCreate] or [EntryUpdate]
+    NewEntry(HeaderHash),
     /// [EntryUpdate] [Header]
     Update(HeaderHash),
     /// [EntryDelete] [Header]
@@ -200,7 +202,7 @@ pub enum SysMetaVal {
 
 /// Subset of headers for the sys meta db
 enum EntryHeader {
-    Create(Header),
+    NewEntry(Header),
     Update(Header),
     Delete(Header),
 }
@@ -229,7 +231,7 @@ impl LinkMetaVal {
 impl From<SysMetaVal> for HeaderHash {
     fn from(v: SysMetaVal) -> Self {
         match v {
-            SysMetaVal::Create(h) | SysMetaVal::Update(h) | SysMetaVal::Delete(h) => h,
+            SysMetaVal::NewEntry(h) | SysMetaVal::Update(h) | SysMetaVal::Delete(h) => h,
         }
     }
 }
@@ -237,7 +239,7 @@ impl From<SysMetaVal> for HeaderHash {
 impl EntryHeader {
     async fn into_hash(self) -> Result<HeaderHash, SerializedBytesError> {
         let header = match self {
-            EntryHeader::Create(h) => h,
+            EntryHeader::NewEntry(h) => h,
             EntryHeader::Update(h) => h,
             EntryHeader::Delete(h) => h,
         };
@@ -246,9 +248,9 @@ impl EntryHeader {
     }
 }
 
-impl From<header::EntryCreate> for EntryHeader {
-    fn from(h: header::EntryCreate) -> Self {
-        EntryHeader::Create(Header::EntryCreate(h))
+impl From<NewEntryHeader> for EntryHeader {
+    fn from(h: NewEntryHeader) -> Self {
+        EntryHeader::NewEntry(h.into())
     }
 }
 
@@ -301,7 +303,7 @@ impl<'env> MetadataBuf<'env> {
         K: Into<SysMetaKey>,
     {
         let sys_val = match header.into() {
-            h @ EntryHeader::Create(_) => SysMetaVal::Create(h.into_hash().await?),
+            h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash().await?),
             h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash().await?),
             h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash().await?),
         };
@@ -354,13 +356,10 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.links_meta.delete(key.to_key())
     }
 
-    // TODO: Add register_header
-
-    // TODO: This no longer makes sense wih register_header
-    #[allow(clippy::needless_lifetimes)]
-    async fn add_create(&mut self, create: header::EntryCreate) -> DatabaseResult<()> {
-        let entry_hash = create.entry_hash.to_owned();
-        self.add_entry_header(create, entry_hash).await
+    // Add register_header
+    async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+        let basis = new_entry_header.entry().clone();
+        self.add_entry_header(new_entry_header, basis).await
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -388,16 +387,18 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.add_entry_header(delete, remove).await
     }
 
-    // TODO: Add get_headers
-    // Remove as this makes no sense with get_headers
-    fn get_creates(
+    fn get_headers(
         &self,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?)
-                .map(|h| Ok(h.into())),
+            fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?).filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::NewEntry(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
@@ -407,7 +408,12 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&hash)?).map(|h| Ok(h.into())),
+            fallible_iterator::convert(self.system_meta.get(&hash)?).filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::Update(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
@@ -417,14 +423,19 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?)
-                .map(|h| Ok(h.into())),
+            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?).filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::Delete(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
     // TODO: For now this isn't actually checking the meta data.
     // Once the meta data is finished this should be hooked up
     fn get_dht_status(&self, _entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        // TODO: implement this
         // if fallible_iterator::convert(self.system_meta.get(&entry_hash.clone().into())?)
         //     .filter(|sys_val| {
         //         if let SysMetaVal::Create(_) = sys_val {
