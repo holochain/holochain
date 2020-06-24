@@ -7,7 +7,7 @@
 #![allow(missing_docs)]
 
 use crate::composite_hash::{EntryHash, HeaderAddress};
-use crate::{link::Tag, prelude::*};
+use crate::{link::LinkTag, prelude::*};
 use holochain_zome_types::entry_def::EntryVisibility;
 
 pub mod builder;
@@ -245,7 +245,7 @@ pub struct LinkAdd {
     pub base_address: EntryHash,
     pub target_address: EntryHash,
     pub zome_id: ZomeId,
-    pub tag: Tag,
+    pub tag: LinkTag,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

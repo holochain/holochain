@@ -35,7 +35,7 @@ use holochain_types::header::EntryUpdate;
 use holochain_types::header::InitZomesComplete;
 use holochain_types::header::LinkAdd;
 use holochain_types::header::{Dna, LinkRemove, ZomeId};
-use holochain_types::link::Tag;
+use holochain_types::link::LinkTag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
@@ -512,18 +512,18 @@ fixturator!(
 );
 
 fixturator!(
-    Tag; from Bytes;
+    LinkTag; from Bytes;
 );
 
 fixturator!(
     LinkMetaVal;
-    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, Tag);
+    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
 );
 
 pub struct KnownLinkAdd {
     pub base_address: EntryHash,
     pub target_address: EntryHash,
-    pub tag: Tag,
+    pub tag: LinkTag,
     pub zome_id: ZomeId,
 }
 
@@ -552,7 +552,7 @@ impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
     }
 }
 
-impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
+impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
     type Item = LinkMetaVal;
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(LinkMetaVal);
@@ -574,7 +574,7 @@ fixturator!(
 
 fixturator!(
     LinkAdd;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, Tag);
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
 );
 
 type MaybeSerializedBytes = Option<SerializedBytes>;
