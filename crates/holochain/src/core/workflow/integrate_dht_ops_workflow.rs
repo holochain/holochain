@@ -26,9 +26,10 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     element::SignedHeaderHashed,
     header::UpdateBasis,
-    EntryHashed, Header, HeaderHashed,
+    EntryHashed, Header, HeaderHashed, Timestamp,
 };
 use produce_dht_ops_workflow::dht_op::dht_op_to_light_basis;
+use std::convert::TryInto;
 use tracing::*;
 
 pub async fn integrate_dht_ops_workflow(
@@ -99,25 +100,38 @@ async fn integrate_dht_ops_workflow_inner(
                 // Store Header and Entry
                 workspace.cas.put(signed_header, Some(entry))?;
             }
-            DhtOp::RegisterAgentActivity(_, _) => todo!(),
+            DhtOp::RegisterAgentActivity(signature, header) => {
+                // TODO: Store header
+                // TODO: meta.agent_activity(header)
+                // TODO: agent_activity is a header on this agents header
+
+            },
             DhtOp::RegisterReplacedBy(_, entry_update, _) => {
                 let old_entry_hash = match entry_update.update_basis {
                     UpdateBasis::Header => None,
-                    UpdateBasis::Entry => Some(
-                        workspace
+                    UpdateBasis::Entry => {
+                        match workspace
                             .cas
                             .get_header(&entry_update.replaces_address)
                             .await?
-                            // TODO: Handle missing original entry header. Same reason as below
-                            .unwrap()
-                            .header()
-                            .entry_data()
-                            // TODO: Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
-                            // This should just put the op back in the integration queue
-                            .unwrap()
-                            .0
-                            .clone(),
-                    ),
+                            // Handle missing old entry header. Same reason as below
+                            .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
+                        {
+                            Some(e) => Some(e),
+                            // Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
+                            // This is put the op back in the integration queue to try again later
+                            None => {
+                                workspace.integration_queue.put(
+                                    (Timestamp::now(), op_hash).try_into()?,
+                                    IntegrationQueueValue {
+                                        validation_status,
+                                        op,
+                                    },
+                                )?;
+                                continue;
+                            }
+                        }
+                    }
                 };
                 workspace
                     .meta
@@ -135,35 +149,54 @@ async fn integrate_dht_ops_workflow_inner(
                 workspace.cas.put(signed_header, None)?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                // TODO: Check whether they have the base address in the cas.
+                // Check whether they have the base address in the cas.
                 // If not then this should put the op back on the queue with a
                 // warning that it's unimplemented and later add this to the cache meta.
                 // TODO: Base might be in cas due to this agent being an authority for a
-                // header on the Base 
+                // header on the Base
                 if let None = workspace.cas.get_entry(&link_remove.base_address).await? {
                     warn!(
                         "Storing link data when not an author or authority requires the 
                          cache metadata store.
                          The cache metadata store is currently unimplemented"
                     );
-                    // TODO: Add op back on queue
+                    // Add op back on queue
+                    workspace.integration_queue.put(
+                        (Timestamp::now(), op_hash).try_into()?,
+                        IntegrationQueueValue {
+                            validation_status,
+                            op,
+                        },
+                    )?;
+                    continue;
                 }
 
                 // Store link delete Header
                 let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
-                let link_add = workspace
+                let link_add = match workspace
                     .cas
                     .get_header(&link_remove.link_add_address)
                     .await?
-                    // TODO: Handle link add missing
+                {
+                    Some(link_add) => link_add.into_header_and_signature().0.into_content(),
+                    // Handle link add missing
                     // Probably just waiting on StoreElement to arrive so put
                     // back in queue with a log message
-                    .unwrap()
-                    .into_header_and_signature()
-                    .0
-                    .into_content();
+                    None => {
+                        // Add op back on queue
+                        workspace.integration_queue.put(
+                            (Timestamp::now(), op_hash).try_into()?,
+                            IntegrationQueueValue {
+                                validation_status,
+                                op,
+                            },
+                        )?;
+                        continue;
+                    }
+                };
+
                 let link_add = match link_add {
                     Header::LinkAdd(la) => la,
                     _ => panic!("Must be a link add"),
@@ -239,11 +272,14 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         })
     }
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        // TODO: flush cas
+        // flush cas
         self.cas.flush_to_txn(writer)?;
-        // TODO: flush metadata store
-        // TODO: flush integrated
-        warn!("unimplemented");
+        // flush metadata store
+        self.meta.flush_to_txn(writer)?;
+        // flush integrated
+        self.integrated_dht_ops.flush_to_txn(writer)?;
+        // flush integration queue
+        self.integration_queue.flush_to_txn(writer)?;
         Ok(())
     }
 }
