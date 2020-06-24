@@ -54,10 +54,12 @@ pub async fn integrate_dht_ops_workflow(
     Ok(result)
 }
 
+#[instrument(skip(workspace))]
 async fn integrate_dht_ops_workflow_inner(
     workspace: &mut IntegrateDhtOpsWorkspace<'_>,
     agent_pub_key: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
+    debug!("Starting integrate dht ops workflow");
     // Pull ops out of queue
     // TODO: PERF: Not collect, iterator cannot cross awaits
     // Find a way to do this.
@@ -74,6 +76,8 @@ async fn integrate_dht_ops_workflow_inner(
         } = value;
 
         let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
+        debug!(?op_hash);
+        debug!(?op);
 
         // TODO: PERF: We don't really need this clone because dht_to_op_light_basis could
         // return the full op as it's not consumed when making hashes
@@ -228,9 +232,11 @@ async fn integrate_dht_ops_workflow_inner(
             basis,
             op,
         };
+        debug!(msg = "writing", ?op_hash);
         workspace.integrated_dht_ops.put(op_hash, value)?;
     }
 
+    debug!("complete");
     Ok(WorkComplete::Complete)
 }
 
@@ -298,16 +304,23 @@ mod tests {
 
     use crate::{
         conductor::{
-            api::{AdminInterfaceApi, AdminRequest, RealAdminInterfaceApi, AdminResponse},
+            api::{
+                AdminInterfaceApi, AdminRequest, AdminResponse, AppInterfaceApi, AppRequest,
+                RealAdminInterfaceApi, RealAppInterfaceApi,
+            },
             state::ConductorState,
             ConductorBuilder,
         },
         core::{
+            ribosome::{NamedInvocation, ZomeCallInvocationFixturator},
             state::{
                 cascade::{test_dbs_and_mocks, Cascade},
                 dht_op_integration::IntegrationValue,
+                metadata::LinkMetaKey,
+                source_chain::SourceChain,
             },
             workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
+            SourceChainError,
         },
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
@@ -323,16 +336,17 @@ mod tests {
         app::{InstallAppDnaPayload, InstallAppPayload},
         dht_op::{DhtOp, DhtOpHashed},
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        header::NewEntryHeader,
+        header::{builder, EntryType, NewEntryHeader},
         observability,
-        test_utils::{fake_dna_zomes, write_fake_dna_file},
+        test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         validate::ValidationStatus,
         EntryHashed, Timestamp,
     };
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::HostInput;
     use std::convert::TryInto;
-    use uuid::Uuid;
     use unwrap_to::unwrap_to;
+    use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry() {
@@ -474,6 +488,7 @@ mod tests {
     // Integration
     #[tokio::test(threaded_scheduler)]
     async fn commit_entry_add_link() {
+        observability::test_run().ok();
         let test_env = test_conductor_env();
         let _tmpdir = test_env.tmpdir.clone();
         let TestEnvironment {
@@ -484,7 +499,8 @@ mod tests {
             .test(test_env, wasm_env)
             .await
             .unwrap();
-        let interface = RealAdminInterfaceApi::new(conductor);
+        let interface = RealAdminInterfaceApi::new(conductor.clone());
+        let app_interface = RealAppInterfaceApi::new(conductor.clone());
 
         // Create dna
         let uuid = Uuid::new_v4();
@@ -492,25 +508,119 @@ mod tests {
             &uuid.to_string(),
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
-        let original_dna_hash = dna.dna_hash().clone();
 
         // Install Dna
         let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-        let agent_key = fixt!(AgentPubKey);
+        let agent_key = fake_agent_pubkey_1();
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],
             app_id: "test".to_string(),
-            agent_key,
+            agent_key: agent_key.clone(),
         };
         let request = AdminRequest::InstallApp(Box::new(payload));
         let r = interface.handle_admin_request(request).await;
+        debug!(?r);
         let installed_app = unwrap_to!(r => AdminResponse::AppInstalled).clone();
-        
+
+        let cell_id = installed_app.cell_data[0].as_id().clone();
         // Activate app
         let request = AdminRequest::ActivateApp {
             app_id: installed_app.app_id,
         };
         let r = interface.handle_admin_request(request).await;
+
+        let dna_hash = dna.dna_hash().clone();
+        conductor
+            .holochain_p2p()
+            .clone()
+            .join(dna_hash, agent_key)
+            .await
+            .unwrap();
+
+        let mut entry_fixt = EntryFixturator::new(Predictable);
+
+        let base_entry = entry_fixt.next().unwrap();
+        let base_entry_hash = EntryHashed::with_data(base_entry.clone())
+            .await
+            .unwrap()
+            .into_hash();
+        let target_entry = entry_fixt.next().unwrap();
+        let target_entry_hash = EntryHashed::with_data(target_entry.clone())
+            .await
+            .unwrap()
+            .into_hash();
+        // Put commit entry into source chain
+        {
+            let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
+            let dbs = cell_env.dbs().await;
+            let env_ref = cell_env.guard().await;
+
+            let reader = env_ref.reader().unwrap();
+            let mut sc = SourceChain::new(&reader, &dbs).unwrap();
+
+            let header_builder = builder::EntryCreate {
+                entry_type: EntryType::App(fixt!(AppEntryType)),
+                entry_hash: base_entry_hash.clone(),
+            };
+            sc.put(header_builder, Some(base_entry)).await.unwrap();
+
+            let header_builder = builder::EntryCreate {
+                entry_type: EntryType::App(fixt!(AppEntryType)),
+                entry_hash: target_entry_hash.clone(),
+            };
+            sc.put(header_builder, Some(target_entry)).await.unwrap();
+
+            let header_builder = builder::LinkAdd {
+                base_address: base_entry_hash.clone(),
+                target_address: target_entry_hash.clone(),
+                zome_id: 0,
+                tag: BytesFixturator::new(Unpredictable).next().unwrap().into(),
+            };
+            sc.put(header_builder, None).await.unwrap();
+            env_ref
+                .with_commit::<SourceChainError, _, _>(|writer| {
+                    sc.flush_to_txn(writer)?;
+                    Ok(())
+                })
+                .unwrap();
+        }
+
+        // Call zome to trigger a the produce workflow
+        let request = Box::new(
+            ZomeCallInvocationFixturator::new(NamedInvocation(
+                cell_id.clone(),
+                TestWasm::Foo,
+                "foo".into(),
+                HostInput::new(fixt!(SerializedBytes)),
+            ))
+            .next()
+            .unwrap(),
+        );
+        let request = AppRequest::ZomeCallInvocation(request);
+        let r = app_interface.handle_app_request(request).await;
+        debug!(?r);
+
+        tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+
+        // Check the ops
+        {
+            let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
+            let dbs = cell_env.dbs().await;
+            let env_ref = cell_env.guard().await;
+
+            let reader = env_ref.reader().unwrap();
+            let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+            let ops_db = IntegratedDhtOpsStore::new(&reader, db).unwrap();
+            let ops = ops_db.iter().unwrap().collect::<Vec<_>>().unwrap();
+            debug!(?ops);
+            assert!(!ops.is_empty());
+
+            let meta = MetadataBuf::primary(&reader, &dbs).unwrap();
+            let key = LinkMetaKey::Base(&base_entry_hash);
+            let links = meta.get_links(&key).unwrap();
+            let link = links[0].clone();
+            assert_eq!(link.target, target_entry_hash);
+        }
     }
 }
