@@ -371,14 +371,41 @@ mod tests {
         // If the Op has an entry check it's in the Cas
         // Check all ops are in integrated ops db
         // If Op has an entry reference it to the header in the metadata
+        todo!()
     }
 
-    // update basis in metadata for update
     #[tokio::test(threaded_scheduler)]
-    async fn test_update_basis() {
+    async fn test_integrate_single_register_replaced_by_for_header() {
         // For RegisterReplacedBy with update_basis Header
         // metadata has EntryUpdate on HeaderHash but not EntryHash
+        todo!()
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_integrate_single_register_replaced_by_for_entry() {
         // For RegisterReplacedBy with update_basis Entry
         // metadata has EntryUpdate on EntryHash but not HeaderHash
+        todo!()
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_integrate_single_register_deleted_by() {
+        // For RegisterDeletedBy
+        // metadata has EntryDelete on HeaderHash
+        todo!()
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_integrate_single_register_add_link() {
+        // For RegisterAddLink
+        // metadata has link on EntryHash
+        todo!()
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_integrate_single_register_remove_link() {
+        // For RegisterAddLink
+        // metadata has link on EntryHash
+        todo!()
     }
 }
