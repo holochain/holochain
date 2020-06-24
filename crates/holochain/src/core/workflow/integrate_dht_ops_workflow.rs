@@ -297,6 +297,11 @@ mod tests {
     use super::*;
 
     use crate::{
+        conductor::{
+            api::{AdminInterfaceApi, AdminRequest, RealAdminInterfaceApi, AdminResponse},
+            state::ConductorState,
+            ConductorBuilder,
+        },
         core::{
             state::{
                 cascade::{test_dbs_and_mocks, Cascade},
@@ -312,17 +317,22 @@ mod tests {
         buffer::BufferedStore,
         env::{EnvironmentRefRw, ReadManager, WriteManager},
         error::DatabaseError,
-        test_utils::test_cell_env,
+        test_utils::{test_cell_env, test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
+        app::{InstallAppDnaPayload, InstallAppPayload},
         dht_op::{DhtOp, DhtOpHashed},
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
         header::NewEntryHeader,
         observability,
+        test_utils::{fake_dna_zomes, write_fake_dna_file},
         validate::ValidationStatus,
         EntryHashed, Timestamp,
     };
+    use holochain_wasm_test_utils::TestWasm;
     use std::convert::TryInto;
+    use uuid::Uuid;
+    use unwrap_to::unwrap_to;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry() {
@@ -459,5 +469,48 @@ mod tests {
         // For RegisterAddLink
         // metadata has link on EntryHash
         todo!()
+    }
+
+    // Integration
+    #[tokio::test(threaded_scheduler)]
+    async fn commit_entry_add_link() {
+        let test_env = test_conductor_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let conductor = ConductorBuilder::new()
+            .test(test_env, wasm_env)
+            .await
+            .unwrap();
+        let interface = RealAdminInterfaceApi::new(conductor);
+
+        // Create dna
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let original_dna_hash = dna.dna_hash().clone();
+
+        // Install Dna
+        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
+        let agent_key = fixt!(AgentPubKey);
+        let payload = InstallAppPayload {
+            dnas: vec![dna_payload],
+            app_id: "test".to_string(),
+            agent_key,
+        };
+        let request = AdminRequest::InstallApp(Box::new(payload));
+        let r = interface.handle_admin_request(request).await;
+        let installed_app = unwrap_to!(r => AdminResponse::AppInstalled).clone();
+        
+        // Activate app
+        let request = AdminRequest::ActivateApp {
+            app_id: installed_app.app_id,
+        };
+        let r = interface.handle_admin_request(request).await;
     }
 }
