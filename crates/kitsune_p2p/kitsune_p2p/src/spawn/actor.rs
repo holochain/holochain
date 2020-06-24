@@ -23,8 +23,8 @@ const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 1000;
 /// if the user specifies None or zero (0) for race_timeout_ms
 const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
 
-ghost_actor::ghost_chan! {
-    pub(crate) chan Internal<crate::KitsuneP2pError> {
+ghost_actor::ghost_actor! {
+    pub(crate) actor Internal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
         /// otherwise, return an error.
         fn immediate_request(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
@@ -39,7 +39,7 @@ ghost_actor::ghost_chan! {
 
 pub(crate) struct KitsuneP2pActor {
     #[allow(dead_code)]
-    internal_sender: KitsuneP2pInternalSender<Internal>,
+    internal_sender: ghost_actor::GhostSender<Internal>,
     #[allow(dead_code)]
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     spaces: HashMap<Arc<KitsuneSpace>, Space>,
@@ -47,7 +47,7 @@ pub(crate) struct KitsuneP2pActor {
 
 impl KitsuneP2pActor {
     pub fn new(
-        internal_sender: KitsuneP2pInternalSender<Internal>,
+        internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
         Ok(Self {
@@ -55,51 +55,6 @@ impl KitsuneP2pActor {
             evt_sender,
             spaces: HashMap::new(),
         })
-    }
-
-    fn handle_internal_immediate_request(
-        &mut self,
-        space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
-        data: Arc<Vec<u8>>,
-    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
-        let space = match self.spaces.get_mut(&space) {
-            None => {
-                return Err(KitsuneP2pError::RoutingSpaceError(space));
-            }
-            Some(space) => space,
-        };
-        let space_request_fut = space.handle_internal_immediate_request(agent, data)?;
-        Ok(async move { space_request_fut.await }.boxed().into())
-    }
-
-    fn handle_check_prune_space(
-        &mut self,
-        space: Arc<KitsuneSpace>,
-    ) -> KitsuneP2pHandlerResult<()> {
-        if let std::collections::hash_map::Entry::Occupied(entry) = self.spaces.entry(space) {
-            if entry.get().len() == 0 {
-                entry.remove();
-            }
-        }
-        Ok(async move { Ok(()) }.boxed().into())
-    }
-
-    fn handle_list_online_agents_for_basis_hash(
-        &mut self,
-        space: Arc<KitsuneSpace>,
-        // during short-circuit / full-sync mode,
-        // we're ignoring the basis_hash and just returning everyone.
-        _basis: Arc<KitsuneBasis>,
-    ) -> KitsuneP2pHandlerResult<Vec<Arc<KitsuneAgent>>> {
-        let space = match self.spaces.get_mut(&space) {
-            None => {
-                return Err(KitsuneP2pError::RoutingSpaceError(space));
-            }
-            Some(space) => space,
-        };
-        let res = space.list_agents();
-        Ok(async move { Ok(res) }.boxed().into())
     }
 
     /// actual logic for handle_rpc_multi ...
@@ -153,7 +108,6 @@ impl KitsuneP2pActor {
             loop {
                 let mut i_s = internal_sender.clone();
                 if let Ok(agent_list) = i_s
-                    .ghost_actor_internal()
                     .list_online_agents_for_basis_hash(space.clone(), basis.clone())
                     .await
                 {
@@ -171,10 +125,8 @@ impl KitsuneP2pActor {
                             // make the call - the responses will be
                             // sent back to our channel
                             tokio::task::spawn(async move {
-                                if let Ok(response) = i_s
-                                    .ghost_actor_internal()
-                                    .immediate_request(space, agent.clone(), payload)
-                                    .await
+                                if let Ok(response) =
+                                    i_s.immediate_request(space, agent.clone(), payload).await
                                 {
                                     let _ = res_send
                                         .send(actor::RpcMultiResponse { agent, response })
@@ -289,7 +241,7 @@ impl KitsuneP2pActor {
         // encode the data to send
         let payload = Arc::new(wire::Wire::notify(payload).encode());
 
-        let mut internal_sender = self.internal_sender.clone();
+        let internal_sender = self.internal_sender.clone();
 
         // check 5(ish) times but with sane min/max
         // FYI - this strategy will likely change when we are no longer
@@ -310,7 +262,6 @@ impl KitsuneP2pActor {
 
             loop {
                 if let Ok(agent_list) = internal_sender
-                    .ghost_actor_internal()
                     .list_online_agents_for_basis_hash(space.clone(), basis.clone())
                     .await
                 {
@@ -319,13 +270,12 @@ impl KitsuneP2pActor {
                             sent_to.insert(agent.clone());
                             // send the notify here - but spawn
                             // so we're not holding up this loop
-                            let mut internal_sender = internal_sender.clone();
+                            let internal_sender = internal_sender.clone();
                             let space = space.clone();
                             let payload = payload.clone();
                             let send_success_count = send_success_count.clone();
                             tokio::task::spawn(async move {
                                 if let Ok(_) = internal_sender
-                                    .ghost_actor_internal()
                                     .immediate_request(space, agent, payload)
                                     .await
                                 {
@@ -348,7 +298,57 @@ impl KitsuneP2pActor {
     }
 }
 
-impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
+impl ghost_actor::GhostControlHandler for KitsuneP2pActor {}
+
+impl ghost_actor::GhostHandler<Internal> for KitsuneP2pActor {}
+
+impl InternalHandler for KitsuneP2pActor {
+    fn handle_immediate_request(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        data: Arc<Vec<u8>>,
+    ) -> InternalHandlerResult<Vec<u8>> {
+        let space = match self.spaces.get_mut(&space) {
+            None => {
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
+            Some(space) => space,
+        };
+        let space_request_fut = space.handle_internal_immediate_request(agent, data)?;
+        Ok(async move { space_request_fut.await }.boxed().into())
+    }
+
+    fn handle_check_prune_space(&mut self, space: Arc<KitsuneSpace>) -> InternalHandlerResult<()> {
+        if let std::collections::hash_map::Entry::Occupied(entry) = self.spaces.entry(space) {
+            if entry.get().len() == 0 {
+                entry.remove();
+            }
+        }
+        Ok(async move { Ok(()) }.boxed().into())
+    }
+
+    fn handle_list_online_agents_for_basis_hash(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        // during short-circuit / full-sync mode,
+        // we're ignoring the basis_hash and just returning everyone.
+        _basis: Arc<KitsuneBasis>,
+    ) -> InternalHandlerResult<Vec<Arc<KitsuneAgent>>> {
+        let space = match self.spaces.get_mut(&space) {
+            None => {
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
+            Some(space) => space,
+        };
+        let res = space.list_agents();
+        Ok(async move { Ok(res) }.boxed().into())
+    }
+}
+
+impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
+
+impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_join(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -376,13 +376,10 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
             Some(space) => space,
         };
         let space_leave_fut = space.handle_leave(agent)?;
-        let mut internal_sender = self.internal_sender.clone();
+        let internal_sender = self.internal_sender.clone();
         Ok(async move {
             space_leave_fut.await?;
-            internal_sender
-                .ghost_actor_internal()
-                .check_prune_space(kspace)
-                .await?;
+            internal_sender.check_prune_space(kspace).await?;
             Ok(())
         }
         .boxed()
@@ -483,65 +480,5 @@ impl KitsuneP2pHandler<(), Internal> for KitsuneP2pActor {
         } else {
             Ok(inner_fut)
         }
-    }
-
-    fn handle_ghost_actor_internal(&mut self, input: Internal) -> KitsuneP2pResult<()> {
-        match input {
-            Internal::ImmediateRequest {
-                span,
-                respond,
-                space,
-                agent,
-                data,
-            } => {
-                let _g = span.enter();
-                let res_fut = match self.handle_internal_immediate_request(space, agent, data) {
-                    Err(e) => {
-                        let _ = respond(Err(e));
-                        return Ok(());
-                    }
-                    Ok(f) => f,
-                };
-                tokio::task::spawn(async move {
-                    let _ = respond(res_fut.await);
-                });
-            }
-            Internal::CheckPruneSpace {
-                span,
-                respond,
-                space,
-            } => {
-                let _g = span.enter();
-                let res_fut = match self.handle_check_prune_space(space) {
-                    Err(e) => {
-                        let _ = respond(Err(e));
-                        return Ok(());
-                    }
-                    Ok(f) => f,
-                };
-                tokio::task::spawn(async move {
-                    let _ = respond(res_fut.await);
-                });
-            }
-            Internal::ListOnlineAgentsForBasisHash {
-                span,
-                respond,
-                space,
-                basis,
-            } => {
-                let _g = span.enter();
-                let res_fut = match self.handle_list_online_agents_for_basis_hash(space, basis) {
-                    Err(e) => {
-                        let _ = respond(Err(e));
-                        return Ok(());
-                    }
-                    Ok(f) => f,
-                };
-                tokio::task::spawn(async move {
-                    let _ = respond(res_fut.await);
-                });
-            }
-        }
-        Ok(())
     }
 }
