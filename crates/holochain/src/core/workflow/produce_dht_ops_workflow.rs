@@ -1,10 +1,9 @@
 use super::{error::WorkflowResult, InvokeZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationValue},
+    dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue},
     workspace::{Workspace, WorkspaceResult},
 };
-use dht_op::dht_op_to_light_basis;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
@@ -51,15 +50,11 @@ async fn produce_dht_ops_workflow_inner(
         for op in ops {
             let (op, hash) = DhtOpHashed::with_data(op).await.into();
             debug!(?hash);
-            let cascade = invoke_zome_workspace.cascade();
-            // put the op in (using the "light hash form")
-            let (op, basis) = dht_op_to_light_basis(op, &cascade).await?;
             workspace.integration_queue.put(
                 (Timestamp::now(), hash.clone()).try_into()?,
-                IntegrationValue {
+                IntegrationQueueValue {
                     validation_status: ValidationStatus::Valid,
                     op,
-                    basis,
                 },
             )?;
             workspace.authored_dht_ops.put(hash, 0)?;
@@ -106,7 +101,6 @@ mod tests {
     use fixt::prelude::*;
     use holo_hash::{DhtOpHash, Hashable, Hashed, HoloHashBaseExt};
 
-    use dht_op::light_to_op;
     use holochain_state::{
         env::{ReadManager, WriteManager},
         test_utils::test_cell_env,
@@ -120,7 +114,6 @@ mod tests {
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use matches::assert_matches;
-    use std::collections::HashSet;
 
     struct TestData {
         app_entry: Box<dyn Iterator<Item = Entry>>,
@@ -167,7 +160,7 @@ mod tests {
         let env_ref = env.guard().await;
 
         // Setup the database and expected data
-        let expected = {
+        let expected: Vec<_> = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
             let mut source_chain = ProduceDhtOpsWorkspace::new(&reader, &dbs)
@@ -211,14 +204,15 @@ mod tests {
                 .unwrap();
 
             // Turn all the ops into hashes
-            let mut expected = Vec::new();
-            for ops in all_ops {
-                for op in ops {
-                    let (_, hash) = DhtOpHashed::with_data(op).await.into();
-                    expected.push(hash);
-                }
-            }
-            expected
+            // let mut expected = Vec::new();
+            // for ops in all_ops {
+            //     for op in ops {
+            //         let (_, hash) = DhtOpHashed::with_data(op).await.into();
+            //         expected.push(hash);
+            //     }
+            // }
+            // expected
+            all_ops.into_iter().flatten().collect()
         };
 
         // Run the workflow and commit it
@@ -282,30 +276,37 @@ mod tests {
                 .unwrap();
 
             // Convert the results to light ops (hashes only)
-            let mut r = Vec::with_capacity(results.len());
-            for light_op in results {
-                let op = light_to_op(light_op, workspace.invoke_zome_workspace.source_chain.cas())
-                    .await
-                    .unwrap();
-                let (_, hash) = DhtOpHashed::with_data(op).await.into();
-                r.push(hash);
-            }
-            let r_h: HashSet<_> = r.iter().cloned().collect();
-            let e_h: HashSet<_> = expected.iter().cloned().collect();
-            let diff: HashSet<_> = r_h.difference(&e_h).collect();
+            // let mut r = Vec::with_capacity(results.len());
+            // for light_op in results {
+            //     let op = light_to_op(light_op, workspace.invoke_zome_workspace.source_chain.cas())
+            //         .await
+            //         .unwrap();
+            //     let (_, hash) = DhtOpHashed::with_data(op).await.into();
+            //     r.push(hash);
+            // }
+            // let r_h: HashSet<_> = results.iter().cloned().collect();
+            // let e_h: HashSet<_> = expected.iter().cloned().collect();
+            // let diff: HashSet<_> = r_h.difference(&e_h).collect();
 
             // Check for differences (redundant but useful for debugging)
-            assert_eq!(diff, HashSet::new());
+            // assert_eq!(diff, HashSet::new());
 
             // Check we got all the hashes
-            assert_eq!(r, expected);
+            assert_eq!(results, expected);
+
+            // Hash the results
+            let mut results_hashed = Vec::new();
+            for op in results {
+                let (_, hash) = DhtOpHashed::with_data(op).await.into();
+                results_hashed.push(hash);
+            }
 
             // authored are in a different order so need to sort
-            r.sort();
+            results_hashed.sort();
             authored_results.sort();
             // Check authored are all there
-            assert_eq!(r, authored_results);
-            r.len()
+            assert_eq!(results_hashed, authored_results);
+            results_hashed.len()
         };
 
         // Call the workflow again now the queue should be the same length as last time

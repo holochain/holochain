@@ -6,14 +6,16 @@ use crate::core::{
     state::{
         cascade::Cascade,
         chain_cas::ChainCasBuf,
-        dht_op_integration::{IntegratedDhtOpsStore, IntegrationQueueStore, IntegrationValue},
+        dht_op_integration::{
+            IntegratedDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue, IntegrationValue,
+        },
         metadata::{MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
     },
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::Hashed;
+use holo_hash::{Hashable, Hashed};
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
@@ -22,10 +24,11 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
+    element::SignedHeaderHashed,
     header::UpdateBasis,
-    Header,
+    EntryHashed, Header, HeaderHashed,
 };
-use produce_dht_ops_workflow::dht_op::DhtOpLight;
+use produce_dht_ops_workflow::dht_op::dht_op_to_light_basis;
 use tracing::*;
 
 pub async fn integrate_dht_ops_workflow(
@@ -62,30 +65,45 @@ async fn integrate_dht_ops_workflow_inner(
 
     for value in ops {
         // TODO: Process each op
-        let IntegrationValue { op, .. } = value.clone();
-        let op_hash = match op {
-            DhtOpLight::StoreElement(_, header, _) => {
-                let signed_header = workspace
-                    .cascade()
-                    .dht_get_header_raw(&header)
-                    .await
-                    // TODO: handle error
-                    .unwrap()
-                    // TODO: handle header not found
-                    .unwrap();
-                let maybe_entry = match signed_header.header().entry_data() {
-                    Some((hash, _)) => Some(
-                        workspace
-                            .cascade()
-                            .dht_get_entry_raw(hash)
-                            .await
-                            // TODO: handle error
-                            .unwrap()
-                            // TODO: handle entry not found
-                            .unwrap(),
-                    ),
+        let IntegrationQueueValue {
+            op,
+            validation_status,
+        } = value;
+
+        let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
+
+        // TODO: PERF: We don't really need this clone because dht_to_op_light_basis could
+        // return the full op as it's not consumed when making hashes
+
+        match op.clone() {
+            DhtOp::StoreElement(signature, header, maybe_entry) => {
+                // let signed_header = workspace
+                //     .cascade()
+                //     .dht_get_header_raw(&header)
+                //     .await
+                //     // TODO: handle error
+                //     .unwrap()
+                //     // TODO: handle header not found
+                //     .unwrap();
+                // let maybe_entry = match signed_header.header().entry_data() {
+                //     Some((hash, _)) => Some(
+                //         workspace
+                //             .cascade()
+                //             .dht_get_entry_raw(hash)
+                //             .await
+                //             // TODO: handle error
+                //             .unwrap()
+                //             // TODO: handle entry not found
+                //             .unwrap(),
+                //     ),
+                //     None => None,
+                // };
+                let maybe_entry_hashed = match maybe_entry {
+                    Some(e) => Some(EntryHashed::with_data(*e).await?),
                     None => None,
                 };
+                let header = HeaderHashed::with_data(header).await?;
+                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 // TODO: Put header into metadata
                 match signed_header.header().clone() {
                     Header::LinkAdd(h) => workspace.meta.add_link(h).await?,
@@ -144,25 +162,20 @@ async fn integrate_dht_ops_workflow_inner(
                 }
                 // TODO: If we want to avoid these clones we could get the op hash from
                 // the db but is it ok to trust an op hash from a db?
-                workspace
-                    .cas
-                    .put(signed_header.clone(), maybe_entry.clone())?;
-
-                let (header, sig) = signed_header.into_header_and_signature();
-                DhtOpHashed::with_data(DhtOp::StoreElement(
-                    sig,
-                    header.into_content(),
-                    maybe_entry.map(Hashed::into_content).map(Box::new),
-                ))
-                .await
-                .into_hash()
+                workspace.cas.put(signed_header, maybe_entry_hashed)?;
             }
-            DhtOpLight::StoreEntry(_, _, _) => todo!(),
-            DhtOpLight::RegisterAgentActivity(_, _) => todo!(),
-            DhtOpLight::RegisterReplacedBy(_, _, _) => todo!(),
-            DhtOpLight::RegisterDeletedBy(_, _) => todo!(),
-            DhtOpLight::RegisterAddLink(_, _) => todo!(),
-            DhtOpLight::RegisterRemoveLink(_, _) => todo!(),
+            DhtOp::StoreEntry(_, _, _) => todo!(),
+            DhtOp::RegisterAgentActivity(_, _) => todo!(),
+            DhtOp::RegisterReplacedBy(_, _, _) => todo!(),
+            DhtOp::RegisterDeletedBy(_, _) => todo!(),
+            DhtOp::RegisterAddLink(_, _) => todo!(),
+            DhtOp::RegisterRemoveLink(_, _) => todo!(),
+        }
+        let (op, basis) = dht_op_to_light_basis(op, &workspace.cascade()).await?;
+        let value = IntegrationValue {
+            validation_status,
+            basis,
+            op,
         };
         workspace.integrated_dht_ops.put(op_hash, value)?;
     }
@@ -282,19 +295,9 @@ mod tests {
         );
 
         // Create integration value
-        let val = {
-            let reader = env_ref.reader().unwrap();
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let cascade = workspace.cascade();
-
-            let (op, basis) = dht_op_to_light_basis(store_entry.clone(), &cascade)
-                .await
-                .unwrap();
-            IntegrationValue {
-                validation_status: ValidationStatus::Valid,
-                op,
-                basis,
-            }
+        let val = IntegrationQueueValue {
+            validation_status: ValidationStatus::Valid,
+            op: store_entry.clone(),
         };
 
         // Add to integration queue
