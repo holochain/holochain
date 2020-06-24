@@ -42,6 +42,10 @@ fn main() {
     {
         let cargo_toml = Path::new(m).join("Cargo.toml");
 
+        // Note: If you're trying to use `cargo udeps` and get an error, try
+        // replacing these two lines with:
+        //
+        // let cargo_command = "cargo";
         let cargo_command = std::env::var_os("CARGO");
         let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
 
