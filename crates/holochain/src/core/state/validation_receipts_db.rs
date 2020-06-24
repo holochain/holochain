@@ -7,7 +7,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufferedStore, KvvBuf},
     db::GetDb,
-    env::EnvironmentRefRo,
+    env::EnvironmentReadRef,
     error::{DatabaseError, DatabaseResult},
     prelude::{Reader, Writer},
 };
@@ -70,7 +70,7 @@ pub struct ValidationReceiptsBuf<'env>(
 impl<'env> ValidationReceiptsBuf<'env> {
     /// Constructor given read-only transaction and db ref.
     pub fn new(
-        env: &'env EnvironmentRefRo<'env>,
+        env: &'env EnvironmentReadRef<'env>,
         reader: &'env Reader<'env>,
     ) -> DatabaseResult<ValidationReceiptsBuf<'env>> {
         Ok(Self(KvvBuf::new_opts(

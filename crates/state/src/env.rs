@@ -76,8 +76,8 @@ impl EnvironmentRead {
     /// to get a lock in order to create a read-only transaction. The lock guard
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
-    pub async fn guard(&self) -> EnvironmentRefRo<'_> {
-        EnvironmentRefRo {
+    pub async fn guard(&self) -> EnvironmentReadRef<'_> {
+        EnvironmentReadRef {
             rkv: self.arc.read().await,
             path: &self.path,
             keystore: self.keystore.clone(),
@@ -99,7 +99,7 @@ impl EnvironmentRead {
     /// This function only exists because this was the pattern used by DbManager, which has
     /// since been removed
     // #[deprecated = "duplicate of EnvironmentRo::guard"]
-    pub async fn dbs(&self) -> EnvironmentRefRo<'_> {
+    pub async fn dbs(&self) -> EnvironmentReadRef<'_> {
         self.guard().await
     }
 
@@ -158,8 +158,8 @@ impl EnvironmentWrite {
 
     /// Get a read-only lock guard on the environment.
     /// This reference can create read-write transactions.
-    pub async fn guard(&self) -> EnvironmentRefRw<'_> {
-        EnvironmentRefRw(self.0.guard().await)
+    pub async fn guard(&self) -> EnvironmentWriteRef<'_> {
+        EnvironmentWriteRef(self.0.guard().await)
     }
 
     /// Remove the db and directory
@@ -196,8 +196,8 @@ impl EnvironmentKind {
 }
 /// A reference to a read-only EnvironmentRead.
 /// This has the distinction of being unable to create a read-write transaction,
-/// because unlike [EnvironmentRefRw], this does not implement WriteManager
-pub struct EnvironmentRefRo<'e> {
+/// because unlike [EnvironmentWriteRef], this does not implement WriteManager
+pub struct EnvironmentReadRef<'e> {
     rkv: RwLockReadGuard<'e, Rkv>,
     path: &'e Path,
     keystore: KeystoreSender,
@@ -231,7 +231,7 @@ pub trait WriteManager<'e> {
         F: FnOnce(&mut Writer) -> Result<R, E>;
 }
 
-impl<'e> ReadManager<'e> for EnvironmentRefRo<'e> {
+impl<'e> ReadManager<'e> for EnvironmentReadRef<'e> {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
         let reader = Reader::from(ThreadsafeRkvReader::from(self.rkv.read()?));
         Ok(reader)
@@ -246,7 +246,7 @@ impl<'e> ReadManager<'e> for EnvironmentRefRo<'e> {
     }
 }
 
-impl<'e> WriteManager<'e> for EnvironmentRefRw<'e> {
+impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
     fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -259,7 +259,7 @@ impl<'e> WriteManager<'e> for EnvironmentRefRw<'e> {
     }
 }
 
-impl GetDb for EnvironmentRefRo<'_> {
+impl GetDb for EnvironmentReadRef<'_> {
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
         get_db(self.path, key)
     }
@@ -269,13 +269,13 @@ impl GetDb for EnvironmentRefRo<'_> {
     }
 }
 
-impl<'e> EnvironmentRefRo<'e> {
+impl<'e> EnvironmentReadRef<'e> {
     pub(crate) fn keystore(&self) -> KeystoreSender {
         self.keystore.clone()
     }
 }
 
-impl<'e> EnvironmentRefRw<'e> {
+impl<'e> EnvironmentWriteRef<'e> {
     /// Access the underlying Rkv lock guard
     #[cfg(test)]
     pub(crate) fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
@@ -293,9 +293,9 @@ impl<'e> EnvironmentRefRw<'e> {
 
 /// A reference to a EnvironmentWrite
 #[derive(Shrinkwrap, Into)]
-pub struct EnvironmentRefRw<'e>(EnvironmentRefRo<'e>);
+pub struct EnvironmentWriteRef<'e>(EnvironmentReadRef<'e>);
 
-impl<'e> ReadManager<'e> for EnvironmentRefRw<'e> {
+impl<'e> ReadManager<'e> for EnvironmentWriteRef<'e> {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
         self.0.reader()
     }
@@ -309,7 +309,7 @@ impl<'e> ReadManager<'e> for EnvironmentRefRw<'e> {
     }
 }
 
-impl<'e> GetDb for EnvironmentRefRw<'e> {
+impl<'e> GetDb for EnvironmentWriteRef<'e> {
     fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
         self.0.get_db(key)
     }
