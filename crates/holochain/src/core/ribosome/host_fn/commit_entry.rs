@@ -27,13 +27,7 @@ pub async fn commit_entry<'a>(
 ) -> RibosomeResult<CommitEntryOutput> {
     let (entry_def_id, entry) = input.into_inner();
 
-    let entry_hash = entry_hash(
-        Arc::clone(&ribosome),
-        Arc::clone(&host_context),
-        EntryHashInput::new(entry.clone()),
-    )
-    .await?
-    .into_inner();
+    let (entry, entry_hash) = EntryHashed::with_data(entry).await?.into_inner();
 
     let entry_defs =
         match ribosome.run_entry_defs(host_context.workspace.clone(), EntryDefsInvocation)? {
