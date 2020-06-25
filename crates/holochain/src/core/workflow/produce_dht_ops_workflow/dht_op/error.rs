@@ -10,7 +10,7 @@ pub enum DhtOpConvertError {
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),
     #[error(
-        "The entry could not be found for a RegisterReplacedBy that has an UpdateBasis of Entry"
+        "The entry could not be found for a RegisterReplacedBy that has an IntendedFor of Entry"
     )]
     MissingEntry,
     #[error("Data for a DhtOp was missing from the source chain")]

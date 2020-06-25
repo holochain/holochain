@@ -7,7 +7,7 @@ use crate::{
 };
 use derive_more::Constructor;
 use header::HeaderInner;
-use header::{UpdateBasis, ZomeId};
+use header::{IntendedFor, ZomeId};
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
 
@@ -123,7 +123,7 @@ builder_variant!(EntryCreate {
 });
 
 builder_variant!(EntryUpdate {
-    update_basis: UpdateBasis,
+    intended_for: IntendedFor,
     replaces_address: HeaderHash,
 
     entry_type: EntryType,

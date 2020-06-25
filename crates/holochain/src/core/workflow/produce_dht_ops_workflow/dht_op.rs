@@ -1,6 +1,6 @@
 use crate::core::state::{cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBufT};
 use error::{DhtOpConvertError, DhtOpConvertResult};
-use header::{NewEntryHeader, UpdateBasis};
+use header::{IntendedFor, NewEntryHeader};
 use holo_hash::{Hashed, HeaderHash};
 use holochain_keystore::Signature;
 use holochain_types::{
@@ -26,6 +26,7 @@ pub enum DhtOpLight {
     RegisterAgentActivity(Signature, HeaderHash),
     RegisterReplacedBy(Signature, HeaderHash, EntryHash),
     RegisterDeletedBy(Signature, HeaderHash),
+    RegisterDeletedHeaderBy(Signature, HeaderHash),
     RegisterAddLink(Signature, HeaderHash),
     RegisterRemoveLink(Signature, HeaderHash),
 }
@@ -58,15 +59,19 @@ pub async fn dht_op_to_light_basis<C: MetadataBufT>(
         }
         DhtOp::RegisterDeletedBy(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok((DhtOpLight::RegisterAgentActivity(s, h), basis))
+            Ok((DhtOpLight::RegisterDeletedBy(s, h), basis))
+        }
+        DhtOp::RegisterDeletedHeaderBy(s, h) => {
+            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            Ok((DhtOpLight::RegisterDeletedHeaderBy(s, h), basis))
         }
         DhtOp::RegisterAddLink(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok((DhtOpLight::RegisterAgentActivity(s, h), basis))
+            Ok((DhtOpLight::RegisterAddLink(s, h), basis))
         }
         DhtOp::RegisterRemoveLink(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok((DhtOpLight::RegisterAgentActivity(s, h), basis))
+            Ok((DhtOpLight::RegisterRemoveLink(s, h), basis))
         }
     }
 }
@@ -149,24 +154,13 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
             };
             Ok(DhtOp::RegisterReplacedBy(sig, header, entry))
         }
-        DhtOpLight::RegisterDeletedBy(sig, h) => {
-            let (header, _sig) = cas
-                .get_element(&h)
-                .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_inner()
-                .0
-                .into_header_and_signature();
-            let header = match header.into_content() {
-                Header::EntryDelete(u) => u,
-                h => {
-                    return Err(DhtOpConvertError::HeaderMismatch(
-                        format!("{:?}", h),
-                        op_name,
-                    ));
-                }
-            };
+        DhtOpLight::RegisterDeletedBy(sig, header_hash) => {
+            let header = register_delete(header_hash, op_name.clone(), &cas).await?;
             Ok(DhtOp::RegisterDeletedBy(sig, header))
+        }
+        DhtOpLight::RegisterDeletedHeaderBy(sig, header_hash) => {
+            let header = register_delete(header_hash, op_name.clone(), &cas).await?;
+            Ok(DhtOp::RegisterDeletedHeaderBy(sig, header))
         }
         DhtOpLight::RegisterAddLink(sig, h) => {
             let (header, _sig) = cas
@@ -209,6 +203,26 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
     }
 }
 
+async fn register_delete(
+    header_hash: HeaderHash,
+    op_name: String,
+    cas: &ChainCasBuf<'_>,
+) -> DhtOpConvertResult<header::EntryDelete> {
+    let (header, _sig) = cas
+        .get_element(&header_hash)
+        .await?
+        .ok_or(DhtOpConvertError::MissingData)?
+        .into_inner()
+        .0
+        .into_header_and_signature();
+    match header.into_content() {
+        Header::EntryDelete(u) => Ok(u),
+        h => Err(DhtOpConvertError::HeaderMismatch(
+            format!("{:?}", h),
+            op_name,
+        )),
+    }
+}
 /// Returns the basis hash which determines which agents will receive this DhtOp
 pub async fn dht_basis<M: MetadataBufT>(
     op: &DhtOp,
@@ -223,13 +237,18 @@ pub async fn dht_basis<M: MetadataBufT>(
         }
         DhtOp::StoreEntry(_, header, _) => header.entry().clone().into(),
         DhtOp::RegisterAgentActivity(_, header) => header.author().clone().into(),
-        DhtOp::RegisterReplacedBy(_, header, _) => match &header.update_basis {
-            UpdateBasis::Header => header.replaces_address.clone().into(),
-            UpdateBasis::Entry => get_entry_hash_for_header(&header.replaces_address, &cascade)
+        DhtOp::RegisterReplacedBy(_, header, _) => match &header.intended_for {
+            IntendedFor::Header => header.replaces_address.clone().into(),
+            IntendedFor::Entry => get_entry_hash_for_header(&header.replaces_address, &cascade)
                 .await?
                 .into(),
         },
-        DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
+        DhtOp::RegisterDeletedBy(_, header) => {
+            get_entry_hash_for_header(&header.removes_address, &cascade)
+                .await?
+                .into()
+        }
+        DhtOp::RegisterDeletedHeaderBy(_, header) => header.removes_address.clone().into(),
         DhtOp::RegisterAddLink(_, header) => header.base_address.clone().into(),
         DhtOp::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
     })

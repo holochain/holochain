@@ -176,7 +176,7 @@ mod tests {
         dht_op::{DhtOp, DhtOpHashed},
         element::SignedHeaderHashed,
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        header::{EntryType, NewEntryHeader, UpdateBasis},
+        header::{EntryType, IntendedFor, NewEntryHeader},
         observability,
         validate::ValidationStatus,
         EntryHashed, Header, HeaderHashed,
@@ -452,7 +452,7 @@ mod tests {
         entry_update.entry_type = entry_type_fixt.next().unwrap();
 
         // Point update at entry
-        entry_update.update_basis = UpdateBasis::Header;
+        entry_update.intended_for = IntendedFor::Header;
 
         // Update the entry hashes
         entry_create.entry_hash = original_entry_hashed.as_hash().clone();
