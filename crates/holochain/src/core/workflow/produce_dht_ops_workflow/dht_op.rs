@@ -19,7 +19,7 @@ mod tests;
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DhtOpLight {
     StoreElement(Signature, HeaderHash, Option<EntryHash>),
     StoreEntry(Signature, HeaderHash, EntryHash),

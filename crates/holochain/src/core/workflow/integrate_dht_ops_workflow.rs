@@ -256,6 +256,7 @@ async fn integrate_dht_ops_workflow_inner(
             validation_status,
             basis,
             op,
+            when_integrated: Timestamp::now(),
         };
         debug!(msg = "writing", ?op_hash);
         workspace.integrated_dht_ops.put(op_hash, value)?;
