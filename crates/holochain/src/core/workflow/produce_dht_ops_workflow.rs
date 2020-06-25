@@ -203,15 +203,6 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            // Turn all the ops into hashes
-            // let mut expected = Vec::new();
-            // for ops in all_ops {
-            //     for op in ops {
-            //         let (_, hash) = DhtOpHashed::with_data(op).await.into();
-            //         expected.push(hash);
-            //     }
-            // }
-            // expected
             all_ops.into_iter().flatten().collect()
         };
 
@@ -274,22 +265,6 @@ mod tests {
                 })
                 .collect::<Vec<_>>()
                 .unwrap();
-
-            // Convert the results to light ops (hashes only)
-            // let mut r = Vec::with_capacity(results.len());
-            // for light_op in results {
-            //     let op = light_to_op(light_op, workspace.invoke_zome_workspace.source_chain.cas())
-            //         .await
-            //         .unwrap();
-            //     let (_, hash) = DhtOpHashed::with_data(op).await.into();
-            //     r.push(hash);
-            // }
-            // let r_h: HashSet<_> = results.iter().cloned().collect();
-            // let e_h: HashSet<_> = expected.iter().cloned().collect();
-            // let diff: HashSet<_> = r_h.difference(&e_h).collect();
-
-            // Check for differences (redundant but useful for debugging)
-            // assert_eq!(diff, HashSet::new());
 
             // Check we got all the hashes
             assert_eq!(results, expected);
