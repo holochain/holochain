@@ -200,7 +200,7 @@ pub type ZomeId = u8;
 
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub enum UpdateBasis {
+pub enum IntendedFor {
     Header,
     Entry,
 }
@@ -297,7 +297,7 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub update_basis: UpdateBasis,
+    pub intended_for: IntendedFor,
     pub replaces_address: HeaderHash,
 
     pub entry_type: EntryType,

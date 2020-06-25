@@ -14,7 +14,8 @@ mock! {
             agent_pub_key: AgentPubKey,
         ) -> DatabaseResult<()>;
         fn sync_add_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
-        fn sync_add_delete(&self, delete: header::EntryDelete) -> DatabaseResult<()>;
+        fn sync_add_delete(&self, delete: header::EntryDelete, entry_hash: EntryHash) -> DatabaseResult<()>;
+        fn sync_add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
@@ -32,7 +33,7 @@ mock! {
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
         fn get_deletes(
             &self,
-            header_hash: HeaderHash,
+            entry_or_new_entry_header: AnyDhtHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
     }
 }
@@ -81,10 +82,10 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_deletes(
         &self,
-        header_hash: HeaderHash,
+        entry_or_new_entry_header: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
-        self.get_deletes(header_hash)
+        self.get_deletes(entry_or_new_entry_header)
     }
 
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
@@ -120,7 +121,14 @@ impl MetadataBufT for MockMetadataBuf {
     ) -> DatabaseResult<()> {
         self.sync_add_update(update, entry)
     }
-    async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
-        self.sync_add_delete(delete)
+    async fn add_delete(
+        &mut self,
+        delete: header::EntryDelete,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<()> {
+        self.sync_add_delete(delete, entry_hash)
+    }
+    async fn add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
+        self.sync_add_header_delete(delete)
     }
 }

@@ -10,7 +10,7 @@ mod tests {
     use crate::core::state::metadata::{MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use header::{HeaderBuilderCommon, NewEntryHeader, UpdateBasis};
+    use header::{HeaderBuilderCommon, IntendedFor, NewEntryHeader};
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
@@ -63,11 +63,11 @@ mod tests {
     async fn test_update(
         replaces_address: HeaderHash,
         entry_hash: EntryHash,
-        update_basis: UpdateBasis,
+        intended_for: IntendedFor,
         fx: &mut TestFixtures,
     ) -> (header::EntryUpdate, HeaderHashed) {
         let builder = builder::EntryUpdate {
-            update_basis,
+            intended_for,
             replaces_address,
             entry_hash,
             entry_type: fx.entry_type(),
@@ -119,7 +119,7 @@ mod tests {
             let (update, expected) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
-                UpdateBasis::Header,
+                IntendedFor::Header,
                 &mut fx,
             )
             .await;
@@ -145,21 +145,21 @@ mod tests {
             let (update1, header1) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
-                UpdateBasis::Header,
+                IntendedFor::Header,
                 &mut fx,
             )
             .await;
             let (update2, header2) = test_update(
                 header1.into_hash().into(),
                 fx.entry_hash(),
-                UpdateBasis::Header,
+                IntendedFor::Header,
                 &mut fx,
             )
             .await;
             let (update3, expected) = test_update(
                 header2.into_hash().into(),
                 fx.entry_hash(),
-                UpdateBasis::Header,
+                IntendedFor::Header,
                 &mut fx,
             )
             .await;
@@ -193,7 +193,7 @@ mod tests {
                 .1;
 
             let (update, _) =
-                test_update(header_hash, fx.entry_hash(), UpdateBasis::Entry, &mut fx).await;
+                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
             let _ = buf
                 .add_update(update.clone(), Some(original_entry.clone()))
                 .await?;
@@ -223,18 +223,18 @@ mod tests {
                 .into_inner()
                 .1;
             let (update1, _) =
-                test_update(header_hash, fx.entry_hash(), UpdateBasis::Entry, &mut fx).await;
+                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
             let (update2, _) = test_update(
                 update1.replaces_address.clone(),
                 fx.entry_hash(),
-                UpdateBasis::Entry,
+                IntendedFor::Entry,
                 &mut fx,
             )
             .await;
             let (update3, _) = test_update(
                 update2.replaces_address.clone(),
                 fx.entry_hash(),
-                UpdateBasis::Entry,
+                IntendedFor::Entry,
                 &mut fx,
             )
             .await;
@@ -273,7 +273,7 @@ mod tests {
                 .into_inner()
                 .1;
             let (update_header, expected_header_hash) =
-                test_update(header_hash, fx.entry_hash(), UpdateBasis::Header, &mut fx).await;
+                test_update(header_hash, fx.entry_hash(), IntendedFor::Header, &mut fx).await;
 
             let original_entry_1 = fx.entry_hash();
             let header_hash = test_create(original_entry_1.clone(), &mut fx)
@@ -282,7 +282,7 @@ mod tests {
                 .into_inner()
                 .1;
             let (update_entry, _) =
-                test_update(header_hash, fx.entry_hash(), UpdateBasis::Entry, &mut fx).await;
+                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
 
             let _ = buf.add_update(update_header.clone(), None).await?;
             let _ = buf
@@ -366,7 +366,7 @@ mod tests {
             let (e, hash) = test_update(
                 original_header_hash.clone(),
                 fx.entry_hash(),
-                UpdateBasis::Entry,
+                IntendedFor::Entry,
                 &mut fx,
             )
             .await;
@@ -425,7 +425,7 @@ mod tests {
             let (e, hash) = test_update(
                 original_header_hash.clone(),
                 fx.entry_hash(),
-                UpdateBasis::Header,
+                IntendedFor::Header,
                 &mut fx,
             )
             .await;
@@ -484,10 +484,10 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf.add_delete(delete).await.unwrap();
+                meta_buf.add_header_delete(delete).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone())
+                .get_deletes(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -500,7 +500,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone())
+                .get_deletes(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();

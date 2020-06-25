@@ -16,11 +16,11 @@ use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
     dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
-    fixt::{HeaderBuilderCommonFixturator, SignatureFixturator, UpdateBasisFixturator},
+    fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},
     header::{
         builder::{self, HeaderBuilder},
         AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate,
-        HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove, NewEntryHeader, UpdateBasis,
+        HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove, NewEntryHeader,
     },
     observability, Entry, EntryHashed, Header, HeaderHashed,
 };
@@ -34,7 +34,7 @@ struct ChainElementTest {
     header_hash: HeaderHash,
     sig: Signature,
     entry: Entry,
-    update_basis: UpdateBasis,
+    intended_for: IntendedFor,
     link_add: LinkAdd,
     link_remove: LinkRemove,
     dna: Dna,
@@ -52,7 +52,7 @@ impl ChainElementTest {
         let header_hash = fixt!(HeaderHash);
         let sig = fixt!(Signature);
         let entry = fixt!(Entry);
-        let update_basis = fixt!(UpdateBasis);
+        let intended_for = fixt!(IntendedFor);
         let link_add = fixt!(LinkAdd);
         let link_remove = fixt!(LinkRemove);
         let dna = fixt!(Dna);
@@ -67,7 +67,7 @@ impl ChainElementTest {
             header_hash,
             sig,
             entry,
-            update_basis,
+            intended_for,
             link_add,
             link_remove,
             dna,
@@ -90,7 +90,7 @@ impl ChainElementTest {
 
     fn update_element(&mut self) -> (EntryUpdate, ChainElement) {
         let entry_update = builder::EntryUpdate {
-            update_basis: self.update_basis.clone(),
+            intended_for: self.intended_for.clone(),
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
             replaces_address: self.header_hash.clone().into(),
@@ -275,7 +275,7 @@ async fn test_dht_basis() {
 
         // Create the update header with the same hash
         let mut entry_update = fixt!(EntryUpdate);
-        entry_update.update_basis = UpdateBasis::Entry;
+        entry_update.intended_for = IntendedFor::Entry;
         entry_update.replaces_address = original_header_hash;
 
         // Create the op

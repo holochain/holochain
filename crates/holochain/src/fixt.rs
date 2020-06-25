@@ -23,8 +23,8 @@ use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
 use holochain_types::fixt::AppEntryTypeFixturator;
 use holochain_types::fixt::HeaderBuilderCommonFixturator;
+use holochain_types::fixt::IntendedForFixturator;
 use holochain_types::fixt::TimestampFixturator;
-use holochain_types::fixt::UpdateBasisFixturator;
 use holochain_types::header::AgentValidationPkg;
 use holochain_types::header::ChainClose;
 use holochain_types::header::ChainOpen;
@@ -647,7 +647,7 @@ fixturator!(
 
 fixturator!(
     EntryUpdate;
-    constructor fn from_builder(HeaderBuilderCommon, UpdateBasis, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, IntendedFor, HeaderHash, EntryType, EntryHash);
 );
 
 fixturator!(

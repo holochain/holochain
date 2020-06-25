@@ -25,7 +25,7 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     element::SignedHeaderHashed,
-    header::UpdateBasis,
+    header::IntendedFor,
     EntryHashed, Header, HeaderHashed, Timestamp,
 };
 use produce_dht_ops_workflow::dht_op::dht_op_to_light_basis;
@@ -119,9 +119,9 @@ async fn integrate_dht_ops_workflow_inner(
                     .await?;
             }
             DhtOp::RegisterReplacedBy(_, entry_update, _) => {
-                let old_entry_hash = match entry_update.update_basis {
-                    UpdateBasis::Header => None,
-                    UpdateBasis::Entry => {
+                let old_entry_hash = match entry_update.intended_for {
+                    IntendedFor::Header => None,
+                    IntendedFor::Entry => {
                         match workspace
                             .cas
                             .get_header(&entry_update.replaces_address)
@@ -151,7 +151,32 @@ async fn integrate_dht_ops_workflow_inner(
                     .await?;
             }
             DhtOp::RegisterDeletedBy(_, entry_delete) => {
-                workspace.meta.add_delete(entry_delete).await?
+                let entry_hash = match workspace
+                    .cas
+                    .get_header(&entry_delete.removes_address)
+                    .await?
+                    // Handle missing entry header. Same reason as below
+                    .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
+                {
+                    Some(e) => e,
+                    // TODO: VALIDATION: This could also be an invalid delete on a header without a delete
+                    // Handle missing Entry (Probably StoreEntry hasn't arrived been processed)
+                    // This is put the op back in the integration queue to try again later
+                    None => {
+                        workspace.integration_queue.put(
+                            (Timestamp::now(), op_hash).try_into()?,
+                            IntegrationQueueValue {
+                                validation_status,
+                                op,
+                            },
+                        )?;
+                        continue;
+                    }
+                };
+                workspace.meta.add_delete(entry_delete, entry_hash).await?
+            }
+            DhtOp::RegisterDeletedHeaderBy(_, entry_delete) => {
+                workspace.meta.add_header_delete(entry_delete).await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 workspace.meta.add_link(link_add.clone()).await?;
@@ -308,27 +333,20 @@ mod tests {
                 AdminInterfaceApi, AdminRequest, AdminResponse, AppInterfaceApi, AppRequest,
                 RealAdminInterfaceApi, RealAppInterfaceApi,
             },
-            state::ConductorState,
             ConductorBuilder,
         },
         core::{
             ribosome::{NamedInvocation, ZomeCallInvocationFixturator},
-            state::{
-                cascade::{test_dbs_and_mocks, Cascade},
-                dht_op_integration::IntegrationValue,
-                metadata::LinkMetaKey,
-                source_chain::SourceChain,
-            },
-            workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
+            state::{metadata::LinkMetaKey, source_chain::SourceChain},
             SourceChainError,
         },
-        fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
+        fixt::{EntryCreateFixturator, EntryFixturator},
     };
     use fixt::prelude::*;
-    use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashable, Hashed};
+    use holo_hash::{AgentPubKeyFixturator, Hashable, Hashed};
     use holochain_state::{
         buffer::BufferedStore,
-        env::{EnvironmentRefRw, ReadManager, WriteManager},
+        env::{ReadManager, WriteManager},
         error::DatabaseError,
         test_utils::{test_cell_env, test_conductor_env, test_wasm_env, TestEnvironment},
     };
@@ -340,10 +358,11 @@ mod tests {
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         validate::ValidationStatus,
-        EntryHashed, Timestamp, Entry,
+        Entry, EntryHashed, Timestamp,
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use std::convert::TryInto;
     use unwrap_to::unwrap_to;
     use uuid::Uuid;
@@ -424,6 +443,7 @@ mod tests {
 
     // Entries, Private Entries & Headers are stored to CAS
     #[tokio::test(threaded_scheduler)]
+    #[ignore]
     async fn test_cas_update() {
         // Pre state
         // TODO: Entry A
@@ -451,20 +471,23 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[ignore]
     async fn test_integrate_single_register_replaced_by_for_header() {
-        // For RegisterReplacedBy with update_basis Header
+        // For RegisterReplacedBy with intended_for Header
         // metadata has EntryUpdate on HeaderHash but not EntryHash
         todo!()
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[ignore]
     async fn test_integrate_single_register_replaced_by_for_entry() {
-        // For RegisterReplacedBy with update_basis Entry
+        // For RegisterReplacedBy with intended_for Entry
         // metadata has EntryUpdate on EntryHash but not HeaderHash
         todo!()
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[ignore]
     async fn test_integrate_single_register_deleted_by() {
         // For RegisterDeletedBy
         // metadata has EntryDelete on HeaderHash
@@ -472,6 +495,7 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[ignore]
     async fn test_integrate_single_register_add_link() {
         // For RegisterAddLink
         // metadata has link on EntryHash
@@ -479,6 +503,7 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[ignore]
     async fn test_integrate_single_register_remove_link() {
         // For RegisterAddLink
         // metadata has link on EntryHash
@@ -529,6 +554,7 @@ mod tests {
             app_id: installed_app.app_id,
         };
         let r = interface.handle_admin_request(request).await;
+        assert_matches!(r, AdminResponse::AppActivated);
 
         let dna_hash = dna.dna_hash().clone();
         conductor
@@ -563,13 +589,17 @@ mod tests {
                 entry_type: EntryType::App(fixt!(AppEntryType)),
                 entry_hash: base_entry_hash.clone(),
             };
-            sc.put(header_builder, Some(base_entry.clone())).await.unwrap();
+            sc.put(header_builder, Some(base_entry.clone()))
+                .await
+                .unwrap();
 
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::App(fixt!(AppEntryType)),
                 entry_hash: target_entry_hash.clone(),
             };
-            sc.put(header_builder, Some(target_entry.clone())).await.unwrap();
+            sc.put(header_builder, Some(target_entry.clone()))
+                .await
+                .unwrap();
 
             let header_builder = builder::LinkAdd {
                 base_address: base_entry_hash.clone(),

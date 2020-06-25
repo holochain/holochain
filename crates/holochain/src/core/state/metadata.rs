@@ -165,7 +165,14 @@ pub trait MetadataBufT {
     ) -> DatabaseResult<()>;
 
     /// Adds a new [EntryDelete] [Header] to an [Entry] in the sys metadata
-    async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
+    async fn add_delete(
+        &mut self,
+        delete: header::EntryDelete,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<()>;
+
+    /// Adds a [EntryDelete] header to a [NewEntryHeader]
+    async fn add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
 
     /// Returns all the [HeaderHash]s of headers that created this [Entry]
     fn get_headers(
@@ -185,10 +192,10 @@ pub trait MetadataBufT {
         hash: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the [HeaderHash]s of [EntryDeletes] headers on an [Entry]
+    /// Returns all the [HeaderHash]s of [EntryDeletes] headers on an [Entry] or [NewEntryDelete]
     fn get_deletes(
         &self,
-        header_hash: HeaderHash,
+        entry_or_new_entry_header: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns the current status of a [Entry]
@@ -389,21 +396,30 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()> {
-        let basis: AnyDhtHash = match (&update.update_basis, entry) {
-            (header::UpdateBasis::Header, None) => update.replaces_address.clone().into(),
-            (header::UpdateBasis::Header, Some(_)) => {
+        let basis: AnyDhtHash = match (&update.intended_for, entry) {
+            (header::IntendedFor::Header, None) => update.replaces_address.clone().into(),
+            (header::IntendedFor::Header, Some(_)) => {
                 panic!("Can't update to entry when EntryUpdate points to header")
             }
-            (header::UpdateBasis::Entry, None) => {
+            (header::IntendedFor::Entry, None) => {
                 panic!("Can't update to entry with no entry hash")
             }
-            (header::UpdateBasis::Entry, Some(entry_hash)) => entry_hash.into(),
+            (header::IntendedFor::Entry, Some(entry_hash)) => entry_hash.into(),
         };
         self.register_header_to(update, basis).await
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn add_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
+    async fn add_delete(
+        &mut self,
+        delete: header::EntryDelete,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<()> {
+        self.register_header_to(delete, entry_hash).await
+    }
+
+    #[allow(clippy::needless_lifetimes)]
+    async fn add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
         self.register_header_to(delete, remove).await
     }
@@ -450,18 +466,17 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     fn get_deletes(
         &self,
-        header_hash: HeaderHash,
+        entry_or_new_entry_header: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?).filter_map(
-                |h| {
+            fallible_iterator::convert(self.system_meta.get(&entry_or_new_entry_header)?)
+                .filter_map(|h| {
                     Ok(match h {
                         SysMetaVal::Delete(h) => Some(h),
                         _ => None,
                     })
-                },
-            ),
+                }),
         ))
     }
 
@@ -482,26 +497,16 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         ))
     }
 
-    // TODO: For now this isn't actually checking the meta data.
-    // Once the meta data is finished this should be hooked up
-    fn get_dht_status(&self, _entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        // TODO: implement this
-        // if fallible_iterator::convert(self.system_meta.get(&entry_hash.clone().into())?)
-        //     .filter(|sys_val| {
-        //         if let SysMetaVal::Create(_) = sys_val {
-        //             Ok(true)
-        //         } else {
-        //             Ok(false)
-        //         }
-        //     })
-        //     .count()?
-        //     > 0
-        // {
-        //     Ok(EntryDhtStatus::Live)
-        // } else {
-        //     Ok(EntryDhtStatus::Dead)
-        // }
-        Ok(EntryDhtStatus::Live)
+    // TODO: For now this is only checking for deletes
+    // Once the validation is finished this should check for that as well
+    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        if self.get_headers(entry_hash.clone())?.count()?
+            > self.get_deletes(entry_hash.clone().into())?.count()?
+        {
+            Ok(EntryDhtStatus::Live)
+        } else {
+            Ok(EntryDhtStatus::Dead)
+        }
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
