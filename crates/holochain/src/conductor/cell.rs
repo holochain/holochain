@@ -13,14 +13,22 @@ use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::state::workspace::Workspace;
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
-    core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
+    core::ribosome::{
+        guest_callback::{
+            entry_defs::{EntryDefsInvocation, EntryDefsResult},
+            init::InitResult,
+        },
+        wasm_ribosome::WasmRibosome,
+        RibosomeT,
+    },
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
             error::WorkflowError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
-            invoke_zome_workflow, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, InvokeZomeWorkflowArgs,
-            InvokeZomeWorkspace, ZomeCallInvocationResult,
+            invoke_zome_workflow, unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
+            GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
+            InitializeZomesWorkspace, InvokeZomeWorkflowArgs, InvokeZomeWorkspace,
+            ZomeCallInvocationResult,
         },
     },
 };
@@ -29,11 +37,14 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo};
+use holochain_types::{
+    autonomic::AutonomicProcess, cell::CellId, header::AppEntryType, prelude::Todo,
+};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::{entry_def::EntryDef, HostInput};
 use std::{
+    collections::HashMap,
     hash::{Hash, Hasher},
     path::Path,
 };
@@ -109,6 +120,13 @@ impl Cell {
         };
 
         if has_genesis {
+            let ribosome = WasmRibosome::new(
+                conductor_api
+                    .get_dna(id.dna_hash())
+                    .await
+                    .ok_or(CellError::DnaMissing)?,
+            );
+            let entry_defs = Self::entry_defs(ribosome, state_env.clone()).await;
             let queue_triggers =
                 spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
 
@@ -121,6 +139,41 @@ impl Cell {
             })
         } else {
             Err(CellError::CellWithoutGenesis(id))
+        }
+    }
+
+    async fn entry_defs(
+        ribosome: WasmRibosome,
+        state_env: EnvironmentWrite,
+    ) -> CellResult<HashMap<AppEntryType, EntryDef>> {
+        // TODO: I don't think an entry def call needs a workspace
+        // but it's tied to how we make calls
+        let arc = state_env.clone();
+        let env = arc.guard().await;
+        let reader = env.reader()?;
+        let mut workspace = InvokeZomeWorkspace::new(&reader, &env)?;
+        let result = {
+            let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+            // TODO: PERF: This is a sync call but should be fast enough for an async context
+            ribosome.run_entry_defs(raw_workspace, EntryDefsInvocation::new())?
+        };
+        match result {
+            EntryDefsResult::Defs(map) => Ok(map
+                .into_iter()
+                .flat_map(|(zome_name, entry_defs)| {
+                    entry_defs.into_inner().into_iter().map(|entry_def| {
+                        (
+                            AppEntryType::new(
+                                entry_def.id.clone().into(),
+                                todo!("zome id?"),
+                                entry_def.visibility.clone(),
+                            ),
+                            entry_def,
+                        )
+                    })
+                })
+                .collect()),
+            EntryDefsResult::Err(zome_name, error) => Err(CellError::EntryDefs(zome_name, error)),
         }
     }
 

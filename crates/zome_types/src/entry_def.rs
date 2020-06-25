@@ -19,6 +19,12 @@ impl From<&str> for EntryDefId {
     }
 }
 
+impl From<EntryDefId> for Vec<u8> {
+    fn from(e: EntryDefId) -> Self {
+        e.0.into_bytes()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum EntryVisibility {
     Public,
@@ -71,6 +77,12 @@ impl EntryDef {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EntryDefs(Vec<EntryDef>);
+
+impl EntryDefs {
+    pub fn into_inner(self) -> Vec<EntryDef> {
+        self.0
+    }
+}
 
 impl From<Vec<EntryDef>> for EntryDefs {
     fn from(v: Vec<EntryDef>) -> Self {

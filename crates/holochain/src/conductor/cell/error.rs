@@ -9,6 +9,7 @@ use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
 use std::path::PathBuf;
 use thiserror::Error;
+use holochain_zome_types::zome::ZomeName;
 
 #[derive(Error, Debug)]
 pub enum CellError {
@@ -32,6 +33,8 @@ pub enum CellError {
     RibosomeError(#[from] RibosomeError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
     InitFailed(InitResult),
+    #[error("The cell tried to run the get the entry definitions for {0} but failed because {0}")]
+    EntryDefs(ZomeName, String)
 }
 
 pub type CellResult<T> = Result<T, CellError>;
