@@ -135,7 +135,7 @@ where
     root_env_dir: EnvironmentRootPath,
 
     /// Handle to the network actor.
-    holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
+    holochain_p2p: holochain_p2p::HolochainP2pRef,
 }
 
 impl Conductor {
@@ -381,6 +381,8 @@ where
                         // Only create cells not already created
                         let cells_to_create =
                             cell_ids.filter(|cell_id| !self.cells.contains_key(cell_id));
+
+                        use holochain_p2p::actor::HolochainP2pRefToCell;
 
                         // Create each cell
                         let cells_tasks = cells_to_create.map(move |cell_id| {
@@ -657,7 +659,7 @@ where
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
-        holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
+        holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();

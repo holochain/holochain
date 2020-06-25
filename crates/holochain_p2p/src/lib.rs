@@ -8,12 +8,11 @@ use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use std::sync::Arc;
 
 mod types;
+pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
 pub use types::*;
 
 mod spawn;
 pub use spawn::*;
-
-use types::actor::HolochainP2pSender;
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
