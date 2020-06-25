@@ -156,6 +156,7 @@ impl ChainElementTest {
         let ops = vec![
             DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
             DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
+            DhtOp::RegisterDeletedHeaderBy(self.sig.clone(), entry_delete.clone()),
             DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete),
         ];
         (element, ops)
