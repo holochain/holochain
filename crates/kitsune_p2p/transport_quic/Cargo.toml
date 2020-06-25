@@ -17,5 +17,5 @@ quinn = "0.6.1"
 rcgen = "=0.8.0"
 rustls = { version = "0.17", features = [ "dangerous_configuration" ] }
 tokio = { version = "0.2", features = [ "full" ] }
-tokio_safe_block_on = "0.2.0"
+tokio_safe_block_on = "0.1.1"
 webpki = "0.21.2"

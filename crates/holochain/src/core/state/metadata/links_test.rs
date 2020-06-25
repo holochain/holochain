@@ -17,7 +17,7 @@ struct TestData {
     link_add: LinkAdd,
     link_remove: LinkRemove,
     base_hash: EntryHash,
-    zome_id: ZomeId,
+    zome_id: ZomePosition,
     tag: Tag,
     expected_link: LinkMetaVal,
 }

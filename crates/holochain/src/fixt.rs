@@ -35,7 +35,7 @@ use holochain_types::header::EntryType;
 use holochain_types::header::EntryUpdate;
 use holochain_types::header::InitZomesComplete;
 use holochain_types::header::LinkAdd;
-use holochain_types::header::{Dna, LinkRemove, ZomeId};
+use holochain_types::header::{Dna, LinkRemove, ZomePosition};
 use holochain_types::link::Tag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
@@ -528,7 +528,7 @@ pub struct KnownLinkAdd {
     pub base_address: EntryHash,
     pub target_address: EntryHash,
     pub tag: Tag,
-    pub zome_id: ZomeId,
+    pub zome_id: ZomePosition,
 }
 
 pub struct KnownLinkRemove {

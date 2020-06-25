@@ -51,7 +51,7 @@ pub fn commit_entry<'a>(
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
                     // build an app entry type from the entry def at the found position
                     Some(index) => Some(AppEntryType::new(
-                        vec![index as _],
+                        index as _,
                         index as _,
                         entry_defs[0].visibility,
                     )),

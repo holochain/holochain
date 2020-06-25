@@ -7,7 +7,7 @@ use crate::{
 };
 use derive_more::Constructor;
 use header::HeaderInner;
-use header::{UpdateBasis, ZomeId};
+use header::{UpdateBasis, ZomePosition};
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
 
@@ -100,7 +100,7 @@ builder_variant!(InitZomesComplete {});
 builder_variant!(LinkAdd {
     base_address: EntryHash,
     target_address: EntryHash,
-    zome_id: ZomeId,
+    zome_id: ZomePosition,
     tag: Tag,
 });
 

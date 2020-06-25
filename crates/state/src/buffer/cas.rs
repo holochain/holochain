@@ -12,13 +12,13 @@ use must_future::MustBoxFuture;
 
 /// A wrapper around a KvBuf where keys are always Addresses,
 /// and values are always AddressableContent.
-pub struct CasBuf<'env, H>(KvBuf<'env, H::HashType, H::Content, Reader<'env>>)
+pub struct CasBuf<'env, H: 'static>(KvBuf<'env, H::HashType, H::Content, Reader<'env>>)
 where
     H: Hashable + Send,
     H::HashType: BufKey,
     H::Content: BufVal + Send + Sync;
 
-impl<'env, H> CasBuf<'env, H>
+impl<'env, H: 'static> CasBuf<'env, H>
 where
     H: Hashable + Send,
     H::HashType: BufKey,
@@ -36,7 +36,7 @@ where
     ) -> MustBoxFuture<'env, DatabaseResult<Option<H>>> {
         async move {
             Ok(if let Some(content) = self.0.get(hash)? {
-                Some(Self::deserialize_and_hash(hash.get_bytes(), content).await)
+                Some(deserialize_and_hash(hash.get_bytes().to_vec(), content).await)
             } else {
                 None
             })
@@ -63,7 +63,7 @@ where
         &'env self,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
         Ok(Box::new(self.0.iter()?.map(|(h, c)| {
-            Ok(Self::deserialize_and_hash_blocking(&h[..], c))
+            Ok(deserialize_and_hash_blocking(&h[..], c))
         })))
     }
 
@@ -73,28 +73,36 @@ where
         &'env self,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
         Ok(Box::new(self.0.iter_raw()?.map(|(h, c)| {
-            Ok(Self::deserialize_and_hash_blocking(h, c))
+            Ok(deserialize_and_hash_blocking(h, c))
         })))
     }
+}
 
-    fn deserialize_and_hash_blocking(hash: &[u8], content: H::Content) -> H {
-        tokio_safe_block_on::tokio_safe_block_on(
-            Self::deserialize_and_hash(hash, content),
-            std::time::Duration::from_millis(500),
-        )
-        .expect("TODO: make into stream")
-        // TODO: make this a stream?
-    }
+fn deserialize_and_hash_blocking<H: 'static + Hashable + Send>(
+    hash: &[u8],
+    content: H::Content,
+) -> H where H::Content: Send + Clone {
+    let hash_owned = hash.to_owned();
+    let content_owned = content.to_owned();
+    tokio_safe_block_on::tokio_safe_block_forever_on(
+        // async move { tokio::task::spawn (async move {
+        //     let data =
+        //         fatal_db_hash_construction_check!("CasBuf::get", hash_owned, H::with_data(content_owned).await);
+        //     fatal_db_hash_integrity_check!("CasBuf::get", hash_owned, data.as_hash().get_bytes());
+        //     data
+        // }).await.unwrap() }
+        async move {
+            tokio::task::spawn (deserialize_and_hash(hash_owned, content_owned)).await.unwrap()
+        }
+    )
+    // TODO: make this a stream?
+}
 
-    async fn deserialize_and_hash(hash_bytes: &[u8], content: H::Content) -> H {
-        let data = fatal_db_hash_construction_check!(
-            "CasBuf::get",
-            hash_bytes,
-            H::with_data(content).await
-        );
-        fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
-        data
-    }
+async fn deserialize_and_hash<H: 'static + Hashable + Send>(hash_bytes: Vec<u8>, content: H::Content) -> H where H::Content: Send {
+    let data =
+        fatal_db_hash_construction_check!("CasBuf::get", hash_bytes, H::with_data(content).await);
+    fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
+    data
 }
 
 impl<'env, H> BufferedStore<'env> for CasBuf<'env, H>
