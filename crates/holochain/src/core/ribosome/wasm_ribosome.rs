@@ -127,20 +127,24 @@ impl WasmRibosome {
                     )?;
                     // this will be run in a tokio background thread
                     // designed for doing blocking work.
-                    let output_sb: holochain_wasmer_host::prelude::SerializedBytes =
-                        tokio_safe_block_on::tokio_safe_block_on(
-                            $host_function(
-                                std::sync::Arc::clone(&closure_self_arc),
-                                std::sync::Arc::clone(&closure_host_context_arc),
-                                input,
-                            ),
-                            // TODO: B-01647 Identify calls that are essentially synchronous vs those that
-                            // may be async, such as get, send, etc.
-                            // async calls should require timeouts specified by hApp devs
-                            // pluck those timeouts out, and apply them here:
-                            std::time::Duration::from_secs(60),
-                        )
-                        .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
+                    let output_sb: holochain_wasmer_host::prelude::SerializedBytes = $host_function(
+                        std::sync::Arc::clone(&closure_self_arc),
+                        std::sync::Arc::clone(&closure_host_context_arc),
+                        input,
+                    )
+                        // tokio_safe_block_on::tokio_safe_block_on(
+                        //     $host_function(
+                        //         std::sync::Arc::clone(&closure_self_arc),
+                        //         std::sync::Arc::clone(&closure_host_context_arc),
+                        //         input,
+                        //     ),
+                        //     // TODO: B-01647 Identify calls that are essentially synchronous vs those that
+                        //     // may be async, such as get, send, etc.
+                        //     // async calls should require timeouts specified by hApp devs
+                        //     // pluck those timeouts out, and apply them here:
+                        //     std::time::Duration::from_secs(60),
+                        // )
+                        // .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
 

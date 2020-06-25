@@ -9,7 +9,7 @@ use holochain_zome_types::GlobalsOutput;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-pub async fn globals(
+pub fn globals(
     ribosome: Arc<WasmRibosome>,
     host_context: Arc<HostContext>,
     _input: GlobalsInput,

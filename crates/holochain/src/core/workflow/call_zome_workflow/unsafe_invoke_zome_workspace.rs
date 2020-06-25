@@ -33,26 +33,38 @@ pub struct UnsafeInvokeZomeWorkspace {
 }
 
 fixturator!(
-    UnsafeInvokeZomeWorkspace,
-    {
+    UnsafeInvokeZomeWorkspace;
+    curve Empty {
         let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
         let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(fake_ptr)));
         let workspace = Arc::downgrade(&guard);
         // Make sure the weak Arc cannot be upgraded
         std::mem::drop(guard);
         UnsafeInvokeZomeWorkspace { workspace }
-    },
-    {
+    };
+    curve Unpredictable {
         UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
             .next()
             .unwrap()
-    },
-    {
+    };
+    curve Predictable {
         UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
             .next()
             .unwrap()
-    }
+    };
 );
+
+impl<'env> Iterator for UnsafeInvokeZomeWorkspaceFixturator<InvokeZomeWorkspace<'env>> {
+    type Item = UnsafeInvokeZomeWorkspace;
+    fn next(&mut self) -> Option<Self::Item> {
+        let original_index = self.0.index;
+        let (_, ret) = { UnsafeInvokeZomeWorkspace::from_mut(&mut self.0.curve) };
+        if original_index == self.0.index {
+            self.0.index += 1;
+        }
+        Some(ret)
+    }
+}
 
 // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
 /// If this guard is dropped the underlying

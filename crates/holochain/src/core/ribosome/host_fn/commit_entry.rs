@@ -6,6 +6,7 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
+// use crate::core::workflow::call_zome_workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
@@ -20,7 +21,7 @@ use holochain_zome_types::CommitEntryOutput;
 use std::sync::Arc;
 
 /// commit an entry
-pub async fn commit_entry<'a>(
+pub fn commit_entry<'a>(
     ribosome: Arc<WasmRibosome>,
     host_context: Arc<HostContext>,
     input: CommitEntryInput,
@@ -31,9 +32,11 @@ pub async fn commit_entry<'a>(
     dbg!("xxx");
 
     // build the entry hash
-    let entry_hash = holochain_types::entry::EntryHashed::with_data(entry.clone())
-        .await?
-        .into_hash();
+    let async_entry = entry.clone();
+    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        holochain_types::entry::EntryHashed::with_data(async_entry).await
+    })?
+    .into_hash();
     dbg!("xxx");
 
     // extract the entry defs for a zome
@@ -82,7 +85,13 @@ pub async fn commit_entry<'a>(
         .boxed()
     };
     dbg!("xxx");
-    unsafe { host_context.workspace.apply_mut(call).await }??;
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let x = unsafe { host_context.workspace.apply_mut(call) }.await;
+        // let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(host_context.workspace);
+        // let x = unsafe { raw_workspace.apply_mut(call).await };
+        dbg!(&x);
+        x
+    })??;
 
     dbg!("xxx");
     // return the hash of the committed entry
@@ -98,9 +107,9 @@ pub mod wasm_test {
     use crate::fixt::EntryDefIdFixturator;
     use crate::fixt::EntryFixturator;
     // use crate::fixt::WasmRibosomeFixturator;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CommitEntryInput;
     use holochain_zome_types::CommitEntryOutput;
-    use holochain_wasm_test_utils::TestWasm;
     // use super::commit_entry;
     // use std::sync::Arc;
 
@@ -136,14 +145,13 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     // #[serial_test::serial]
     async fn ribosome_commit_entry_test() {
-        let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry).next().unwrap();
-        let entry_def_id = EntryDefIdFixturator::new(fixt::Unpredictable).next().unwrap();
+        let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry)
+            .next()
+            .unwrap();
+        let entry_def_id = EntryDefIdFixturator::new(fixt::Predictable).next().unwrap();
         let input = CommitEntryInput::new((entry_def_id, app_entry));
-        let output: CommitEntryOutput = crate::call_test_ribosome!(
-            TestWasm::CommitEntry,
-            "commit_entry",
-            input
-        );
+        let output: CommitEntryOutput =
+            crate::call_test_ribosome!(TestWasm::CommitEntry, "commit_entry", input);
         println!("{:?}", output);
         // assert_eq!(output, DebugOutput::new(()));
     }

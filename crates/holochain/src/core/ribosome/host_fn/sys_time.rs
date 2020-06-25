@@ -5,7 +5,7 @@ use holochain_zome_types::SysTimeInput;
 use holochain_zome_types::SysTimeOutput;
 use std::sync::Arc;
 
-pub async fn sys_time(
+pub fn sys_time(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: SysTimeInput,

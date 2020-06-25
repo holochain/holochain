@@ -7,7 +7,7 @@ use holochain_zome_types::DebugOutput;
 use std::sync::Arc;
 use tracing::*;
 
-pub async fn debug(
+pub fn debug(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     input: DebugInput,
@@ -34,9 +34,9 @@ pub mod wasm_test {
     use holochain_zome_types::DebugOutput;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly
-    async fn debug_test() {
+    #[test]
+    fn debug_test() {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
@@ -45,13 +45,7 @@ pub mod wasm_test {
             .unwrap();
         let input = DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")));
 
-        let output: DebugOutput = tokio::task::spawn(async move {
-            debug(Arc::new(ribosome), Arc::new(host_context), input)
-                .await
-                .unwrap()
-        })
-        .await
-        .unwrap();
+        let output: DebugOutput = debug(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
 
         assert_eq!(DebugOutput::new(()), output);
     }

@@ -8,16 +8,17 @@ use holochain_zome_types::EntryHashInput;
 use holochain_zome_types::EntryHashOutput;
 use std::sync::Arc;
 
-pub async fn entry_hash(
+pub fn entry_hash(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     input: EntryHashInput,
 ) -> RibosomeResult<EntryHashOutput> {
     let entry: Entry = input.into_inner();
 
-    let entry_hash = holochain_types::entry::EntryHashed::with_data(entry)
-        .await?
-        .into_hash();
+    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        holochain_types::entry::EntryHashed::with_data(entry).await
+    })?
+    .into_hash();
 
     let core_hash: holo_hash_core::HoloHashCore = entry_hash.into();
 
@@ -48,13 +49,8 @@ pub mod wasm_test {
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = EntryHashInput::new(entry);
 
-        let output: EntryHashOutput = tokio::task::spawn(async move {
-            entry_hash(Arc::new(ribosome), Arc::new(host_context), input)
-                .await
-                .unwrap()
-        })
-        .await
-        .unwrap();
+        let output: EntryHashOutput =
+            entry_hash(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
 
         assert_eq!(
             vec![

@@ -330,7 +330,11 @@ impl EntryType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
-    pub(crate) id: Vec<u8>,
+    /// opaque bytes
+    pub(crate) id: u8,
+    /// u8 identifier of what zome this is for
+    /// this needs to be shared across the dna
+    /// comes from the numeric index position of a zome in dna config
     pub(crate) zome_id: ZomeId,
     // @todo don't do this, use entry defs instead
     pub(crate) visibility: EntryVisibility,

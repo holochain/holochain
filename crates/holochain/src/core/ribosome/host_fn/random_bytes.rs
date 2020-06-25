@@ -11,7 +11,7 @@ use holochain_zome_types::RandomBytesOutput;
 use std::sync::Arc;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
-pub async fn random_bytes(
+pub fn random_bytes(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     input: RandomBytesInput,
@@ -19,7 +19,9 @@ pub async fn random_bytes(
     let _ = crypto_init_sodium();
     let mut buf: DynCryptoBytes = crypto_secure_buffer(input.into_inner() as _)?;
 
-    crypto_randombytes_buf(&mut buf).await?;
+    tokio_safe_block_on::tokio_safe_block_forever_on(async {
+        crypto_randombytes_buf(&mut buf).await
+    })?;
 
     let random_bytes = buf.read();
 
@@ -49,13 +51,8 @@ pub mod wasm_test {
         const LEN: usize = 10;
         let input = RandomBytesInput::new(LEN.try_into().unwrap());
 
-        let output: RandomBytesOutput = tokio::task::spawn(async move {
-            random_bytes(Arc::new(ribosome), Arc::new(host_context), input)
-                .await
-                .unwrap()
-        })
-        .await
-        .unwrap();
+        let output: RandomBytesOutput =
+            random_bytes(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
 
         println!("{:?}", output);
 

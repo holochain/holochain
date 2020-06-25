@@ -379,6 +379,16 @@ pub mod wasm_test {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
                 use std::convert::TryInto;
+                use holochain_state::env::ReadManager;
+                use crate::core::state::workspace::Workspace;
+
+                let env = holochain_state::test_utils::test_cell_env();
+                let dbs = env.dbs().await;
+                let env_ref = env.guard().await;
+                let reader = env_ref.reader().unwrap();
+                let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+                crate::core::workflow::fake_genesis(&mut workspace.source_chain).await.unwrap();
+
                 let ribosome =
                     $crate::fixt::WasmRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
                         $test_wasm.into(),
@@ -388,7 +398,6 @@ pub mod wasm_test {
 
                 let timeout = $crate::start_hard_timeout!();
 
-                let workspace = $crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable).next().unwrap();
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
                         holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
@@ -401,8 +410,9 @@ pub mod wasm_test {
                 )
                 .next()
                 .unwrap();
-                let zome_invocation_response = ribosome.call_zome_function(workspace, invocation).unwrap();
-
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let zome_invocation_response = ribosome.call_zome_function(raw_workspace, invocation).unwrap();
+                dbg!("nn");
                 // instance building off a warm module should be the slowest part of a wasm test
                 // so if each instance (including inner callbacks) takes ~1ms this gives us
                 // headroom on 4 call(back)s

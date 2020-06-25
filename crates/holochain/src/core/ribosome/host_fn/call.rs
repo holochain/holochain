@@ -5,7 +5,7 @@ use holochain_zome_types::CallInput;
 use holochain_zome_types::CallOutput;
 use std::sync::Arc;
 
-pub async fn call(
+pub fn call(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: CallInput,
