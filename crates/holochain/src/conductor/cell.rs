@@ -89,7 +89,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
-        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
@@ -109,6 +109,7 @@ impl Cell {
         };
 
         if has_genesis {
+            holochain_p2p_cell.join().await?;
             let queue_triggers = spawn_queue_consumer_tasks(
                 &state_env,
                 holochain_p2p_cell.clone(),

@@ -556,14 +556,6 @@ mod tests {
         let r = interface.handle_admin_request(request).await;
         assert_matches!(r, AdminResponse::AppActivated);
 
-        let dna_hash = dna.dna_hash().clone();
-        conductor
-            .holochain_p2p()
-            .clone()
-            .join(dna_hash, agent_key)
-            .await
-            .unwrap();
-
         let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
 
         let base_entry = entry_fixt.next().unwrap();
