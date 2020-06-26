@@ -27,6 +27,10 @@ pub enum RibosomeError {
     #[error("Serialization error while working with Ribosome: {0}")]
     SerializationError(#[from] SerializedBytesError),
 
+    /// A Zome was referenced by name that doesn't exist
+    #[error("Referenced a zome that doesn't exist: Zome: {0}")]
+    ZomeNotExists(ZomeName),
+
     /// A ZomeFn was called by name that doesn't exist
     #[error("Attempted to call a zome function that doesn't exist: Zome: {0} Fn {1}")]
     ZomeFnNotExists(ZomeName, String),

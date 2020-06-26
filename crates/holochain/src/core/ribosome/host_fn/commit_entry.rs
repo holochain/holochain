@@ -36,8 +36,20 @@ pub fn commit_entry<'a>(
     })?
     .into_hash();
 
+    // extract the zome position
+    let zome_position: holochain_types::header::ZomePosition = match ribosome
+        .dna_file
+        .dna
+        .zomes
+        .iter()
+        .position(|(name, _)| name == &host_context.zome_name)
+    {
+        Some(index) => index as _,
+        None => Err(RibosomeError::ZomeNotExists(host_context.zome_name.clone()))?,
+    };
+
     // extract the entry defs for a zome
-    let app_entry_type = match match ribosome
+    let (entry_def_position, entry_visibility) = match match ribosome
         .run_entry_defs(host_context.workspace.clone(), EntryDefsInvocation)?
     {
         // the ribosome returned some defs
@@ -47,11 +59,7 @@ pub fn commit_entry<'a>(
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
                     // build an app entry type from the entry def at the found position
-                    Some(index) => Some(AppEntryType::new(
-                        index as _,
-                        index as _,
-                        entry_defs[0].visibility,
-                    )),
+                    Some(index) => Some((index as _, entry_defs[index].visibility)),
                     None => None,
                 },
                 None => None,
@@ -65,6 +73,8 @@ pub fn commit_entry<'a>(
             format!("entry def not found for {:?}", entry_def_id),
         ))?,
     };
+
+    let app_entry_type = AppEntryType::new(entry_def_position, zome_position, entry_visibility);
 
     // build a header for the entry being committed
     let header_builder = builder::EntryCreate {
