@@ -365,6 +365,8 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
+    // use crate::test_invoke_zome_workspace;
+    // use holo_hash_core::EntryContentHash;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -401,8 +403,10 @@ pub mod wasm_test {
                 )
                 .next()
                 .unwrap();
-                let zome_invocation_response = ribosome.call_zome_function($unsafe_workspace, invocation).unwrap();
-                dbg!("nn");
+                let zome_invocation_response = ribosome
+                    .call_zome_function($unsafe_workspace, invocation)
+                    .unwrap();
+
                 // instance building off a warm module should be the slowest part of a wasm test
                 // so if each instance (including inner callbacks) takes ~1ms this gives us
                 // headroom on 4 call(back)s
@@ -464,20 +468,24 @@ pub mod wasm_test {
     }
 
     // #[tokio::test(threaded_scheduler)]
-    // // #[serial_test::serial]
     // async fn pass_validate_test() {
+    //     let (mut _db, mut _r, mut workspace) = test_invoke_zome_workspace!();
+    //     let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+    //
     //     assert_eq!(
-    //         HeaderHash::new(vec![0xdb; 36]),
-    //         call_test_ribosome!(TestWasm::Validate, "always_validates", ()),
+    //         CommitEntryOutput::new(EntryContentHash::new(vec![0xdb; 36]).into()),
+    //         call_test_ribosome!(raw_workspace, TestWasm::Validate, "always_validates", ()),
     //     );
     // }
     //
     // #[tokio::test(threaded_scheduler)]
-    // // #[serial_test::serial]
     // async fn fail_validate_test() {
+    //     let (mut _db, mut _r, mut workspace) = test_invoke_zome_workspace!();
+    //     let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+    //
     //     assert_eq!(
-    //         CommitEntryResult::Fail("Invalid(\"NeverValidates never validates\")".to_string()),
-    //         call_test_ribosome!(TestWasm::Validate, "never_validates", ()),
+    //         CommitEntryOutput::new(EntryContentHash::new(vec![0xdb; 36]).into()),
+    //         call_test_ribosome!(raw_workspace, TestWasm::Validate, "never_validates", ()),
     //     );
     // }
 }

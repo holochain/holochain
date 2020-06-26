@@ -1,11 +1,11 @@
 use super::error::{WorkflowError, WorkflowResult};
-use super::Workspace;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
 use crate::core::state::source_chain::SourceChainError;
+use crate::core::state::workspace::Workspace;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender},
     state::{

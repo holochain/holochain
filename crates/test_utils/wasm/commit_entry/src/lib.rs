@@ -16,6 +16,8 @@ holochain_wasmer_guest::host_externs!(__entry_hash);
 const POST_ID: &str = "post";
 const POST_VALIDATIONS: u8 = 8;
 #[derive(Default, SerializedBytes, Serialize, Deserialize)]
+#[repr(transparent)]
+#[serde(transparent)]
 struct Post(String);
 
 impl From<&Post> for EntryDefId {
@@ -91,10 +93,10 @@ pub extern "C" fn commit_entry(_: GuestPtr) -> GuestPtr {
     );
 }
 
-fn _get_entry() -> Result<holo_hash_core::HoloHashCore, WasmError> {
+fn _get_entry() -> Result<GetEntryOutput, WasmError> {
     let hash = host_call!(__entry_hash, EntryHashInput::new((&Post("foo".into())).try_into()?))?;
-    let post = host_call!(__get_entry, GetEntryInput::new((hash, GetOptions)))?;
-    Ok(post)
+    let output: GetEntryOutput = host_call!(__get_entry, GetEntryInput::new((hash, GetOptions)))?;
+    Ok(output)
 }
 
 #[no_mangle]

@@ -6,7 +6,6 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
-// use crate::core::workflow::call_zome_workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
@@ -26,10 +25,8 @@ pub fn commit_entry<'a>(
     host_context: Arc<HostContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
-    dbg!("xxx");
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
-    dbg!("xxx");
 
     // build the entry hash
     let async_entry = entry.clone();
@@ -37,7 +34,6 @@ pub fn commit_entry<'a>(
         holochain_types::entry::EntryHashed::with_data(async_entry).await
     })?
     .into_hash();
-    dbg!("xxx");
 
     // extract the entry defs for a zome
     let app_entry_type = match match ribosome
@@ -68,14 +64,12 @@ pub fn commit_entry<'a>(
             format!("entry def not found for {:?}", entry_def_id),
         ))?,
     };
-    dbg!("xxx");
 
     // build a header for the entry being committed
     let header_builder = builder::EntryCreate {
         entry_type: EntryType::App(app_entry_type),
         entry_hash: entry_hash.clone(),
     };
-    dbg!("xxx");
     let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderAddress>> {
         async move {
             let source_chain = &mut workspace.source_chain;
@@ -84,20 +78,10 @@ pub fn commit_entry<'a>(
         }
         .boxed()
     };
-    dbg!("xxx");
     tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
         unsafe { host_context.workspace.apply_mut(call).await }
     }))???;
-    // let block_host_context = host_context.clone();
-    // tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-    //     // let x = unsafe { block_host_context.workspace.apply_mut(call) }.await;
-    //     let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(host_context.workspace);
-    //     let x = unsafe { raw_workspace.apply_mut(call).await };
-    //     dbg!(&x);
-    //     x
-    // })??;
 
-    dbg!("xxx");
     // return the hash of the committed entry
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
@@ -107,76 +91,146 @@ pub fn commit_entry<'a>(
 
 #[cfg(test)]
 pub mod wasm_test {
-    // use crate::core::ribosome::HostContextFixturator;
-    use crate::fixt::EntryDefIdFixturator;
+    use super::commit_entry;
+    use crate::core::ribosome::error::RibosomeError;
+    use crate::core::ribosome::HostContextFixturator;
+    use crate::core::state::source_chain::ChainInvalidReason;
+    use crate::core::state::source_chain::SourceChainError;
     use crate::fixt::EntryFixturator;
-    // use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::WasmRibosomeFixturator;
+    use holo_hash::Hashable;
+    use holo_hash::Hashed;
+    use holo_hash_core::HoloHashCoreHash;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CommitEntryInput;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::GetEntryOutput;
-    use holochain_state::env::ReadManager;
-    use crate::core::state::workspace::Workspace;
-    // use super::commit_entry;
-    // use std::sync::Arc;
-
-    // #[tokio::test(threaded_scheduler)]
-    // /// we can get an entry hash out of the fn directly
-    // async fn commit_entry_test() {
-    //     let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
-    //         .next()
-    //         .unwrap();
-    //     let host_context = HostContextFixturator::new(fixt::Unpredictable)
-    //         .next()
-    //         .unwrap();
-    //     let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry)
-    //         .next()
-    //         .unwrap();
-    //     let entry_def_id = EntryDefIdFixturator::new(fixt::Unpredictable)
-    //         .next()
-    //         .unwrap();
-    //     let input = CommitEntryInput::new((entry_def_id, app_entry));
-    //
-    //     let output: CommitEntryOutput = tokio::task::spawn(async move {
-    //         commit_entry(Arc::new(ribosome), Arc::new(host_context), input)
-    //             .await
-    //             .unwrap()
-    //     })
-    //     .await
-    //     .unwrap();
-    //
-    //     // assert_eq!(DebugOutput::new(()), output);
-    //     println!("{:?}", output);
-    // }
+    use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
-    // #[serial_test::serial]
-    async fn ribosome_commit_entry_test() {
+    /// we cannot commit before genesis
+    async fn commit_pre_genesis_test() {
+        // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain).await.unwrap();
+        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
+        let ribosome =
+            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
+                .next()
+                .unwrap();
+        let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        host_context.zome_name = TestWasm::CommitEntry.into();
+        host_context.workspace = raw_workspace;
         let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry)
             .next()
             .unwrap();
-        let entry_def_id = EntryDefIdFixturator::new(fixt::Predictable).next().unwrap();
+        let entry_def_id = EntryDefId::from("post");
+        let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
+        let output = commit_entry(Arc::new(ribosome), Arc::new(host_context), input);
+
+        assert_eq!(
+            format!("{:?}", output.unwrap_err()),
+            format!(
+                "{:?}",
+                RibosomeError::SourceChainError(SourceChainError::InvalidStructure(
+                    ChainInvalidReason::GenesisDataMissing
+                ))
+            ),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    /// we can get an entry hash out of the fn directly
+    async fn commit_entry_test() {
+        // test workspace boilerplate
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+
+        let ribosome =
+            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
+                .next()
+                .unwrap();
+        let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        host_context.zome_name = TestWasm::CommitEntry.into();
+        host_context.workspace = raw_workspace;
+        let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry)
+            .next()
+            .unwrap();
+        let entry_def_id = EntryDefId::from("post");
+        let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
+
+        let output = commit_entry(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
+
+        let app_entry_hash = holochain_types::entry::EntryHashed::with_data(app_entry.clone())
+            .await
+            .unwrap()
+            .into_hash();
+
+        // this should be the hash of the newly committed entry
+        assert_eq!(app_entry_hash.get_raw(), output.into_inner().get_raw(),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_commit_entry_test() {
+        // test workspace boilerplate
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        // get the result of a commit entry
         let output: CommitEntryOutput = {
             let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-            let input = CommitEntryInput::new((entry_def_id, app_entry));
-            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", input)
+            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
         };
 
-        println!("{:?}", output);
+        // this should be the hash of the newly committed entry
+        assert_eq!(
+            vec![
+                62, 54, 23, 199, 14, 51, 180, 172, 119, 192, 27, 49, 206, 111, 170, 221, 23, 232,
+                203, 86, 215, 89, 178, 16, 162, 24, 159, 168, 45, 255, 28, 217, 94, 223, 228, 142
+            ]
+            .as_slice(),
+            output.into_inner().get_raw(),
+        );
+
         let round: GetEntryOutput = {
             let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
             crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "get_entry", ())
         };
-        println!("{:?}", round);
-        // assert_eq!(output, DebugOutput::new(()));
+
+        let sb = match round.into_inner() {
+            Some(holochain_zome_types::entry::Entry::App(serialized_bytes)) => serialized_bytes,
+            _ => unreachable!(),
+        };
+        // this should be the content "foo" of the committed post
+        assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
     }
 }
