@@ -4,7 +4,7 @@ use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
     element::SignedHeaderHashed,
     header::{EntryCreate, EntryType},
-    test_utils::{fake_header_hash},
+    test_utils::fake_header_hash,
     Entry, EntryHashed, Header, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -18,7 +18,9 @@ pub async fn fake_unique_element(
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
     let content = UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned());
     let entry = EntryHashed::with_data(Entry::App(content.try_into().unwrap())).await?;
-    let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility).next().unwrap();
+    let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+        .next()
+        .unwrap();
     let header_1 = Header::EntryCreate(EntryCreate {
         author: agent_key,
         timestamp: Timestamp::now(),

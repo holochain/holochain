@@ -8,13 +8,15 @@ use holochain_zome_types::entry_def::EntryDefs;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use holochain_zome_types::entry::GetOptions;
 
 holochain_wasmer_guest::holochain_externs!();
+holochain_wasmer_guest::host_externs!(__entry_hash);
 
 const POST_ID: &str = "post";
 const POST_VALIDATIONS: u8 = 8;
-#[derive(SerializedBytes, Serialize, Deserialize)]
-struct Post;
+#[derive(Default, SerializedBytes, Serialize, Deserialize)]
+struct Post(String);
 
 impl From<&Post> for EntryDefId {
     fn from(_: &Post) -> Self {
@@ -63,7 +65,7 @@ pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
     let globals: ZomeGlobals = try_result!(host_call!(__globals, ()), "failed to get globals");
 
     let defs: EntryDefs = vec![
-        (&Post).into(),
+        (&Post::default()).into(),
     ].into();
 
     ret!(GuestOutput::new(try_result!(EntryDefsCallbackResult::Defs(
@@ -73,7 +75,8 @@ pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
 }
 
 fn _commit_entry() -> Result<holo_hash_core::HoloHashCore, WasmError> {
-    Ok(host_call!(__commit_entry, CommitEntryInput::new(((&Post).into(), (&Post).try_into()?)))?)
+    let post = Post("foo".into());
+    Ok(host_call!(__commit_entry, CommitEntryInput::new(((&post).into(), (&post).try_into()?)))?)
 }
 
 #[no_mangle]
@@ -83,6 +86,24 @@ pub extern "C" fn commit_entry(_: GuestPtr) -> GuestPtr {
             try_result!(
                 try_result!(_commit_entry(), "failed to commit post").try_into(),
                 "failed to serialize commit post return"
+            )
+        )
+    );
+}
+
+fn _get_entry() -> Result<holo_hash_core::HoloHashCore, WasmError> {
+    let hash = host_call!(__entry_hash, EntryHashInput::new((&Post("foo".into())).try_into()?))?;
+    let post = host_call!(__get_entry, GetEntryInput::new((hash, GetOptions)))?;
+    Ok(post)
+}
+
+#[no_mangle]
+pub extern "C" fn get_entry(_: GuestPtr) -> GuestPtr {
+    ret!(
+        GuestOutput::new(
+            try_result!(
+                try_result!(_get_entry(), "failed to get post").try_into(),
+                "failed to serialize get post return"
             )
         )
     );

@@ -9,6 +9,8 @@ use holochain_types::dna::error::DnaError;
 use holochain_wasmer_host::prelude::WasmError;
 use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
+use tokio::task::JoinError;
+use tokio_safe_block_on::BlockOnError;
 
 /// Errors occurring during a [Ribosome] call
 #[derive(Error, Debug)]
@@ -52,6 +54,14 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+
+    /// ident
+    #[error(transparent)]
+    BlockOnError(#[from] BlockOnError),
+
+    /// ident
+    #[error(transparent)]
+    JoinError(#[from] JoinError),
 }
 
 /// Type alias

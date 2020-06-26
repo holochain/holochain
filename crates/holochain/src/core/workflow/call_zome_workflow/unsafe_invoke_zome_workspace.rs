@@ -118,12 +118,15 @@ impl UnsafeInvokeZomeWorkspace {
             // Check that no-one else can write
             Some(lock) => {
                 let guard = lock.read().await;
-                let sc = guard.load(Ordering::SeqCst);
-                let sc = sc as *const InvokeZomeWorkspace;
-                match sc.as_ref() {
-                    Some(s) => Ok(f(s).await),
-                    None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
-                }
+                let s = {
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *const InvokeZomeWorkspace;
+                    match sc.as_ref() {
+                        Some(s) => s,
+                        None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped)?,
+                    }
+                };
+                Ok(f(s).await)
             }
             None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
         }
@@ -143,12 +146,15 @@ impl UnsafeInvokeZomeWorkspace {
             // Check that no-one else can write
             Some(lock) => {
                 let guard = lock.write().await;
-                let sc = guard.load(Ordering::SeqCst);
-                let sc = sc as *mut InvokeZomeWorkspace;
-                match sc.as_mut() {
-                    Some(s) => Ok(f(s).await),
-                    None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
-                }
+                let s = {
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *mut InvokeZomeWorkspace;
+                    match sc.as_mut() {
+                        Some(s) => s,
+                        None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped)?,
+                    }
+                };
+                Ok(f(s).await)
             }
             None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
         }

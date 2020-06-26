@@ -33,11 +33,13 @@ pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
     use crate::core::ribosome::HostContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use holochain_wasm_test_utils::TestWasm;
+    // use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::RandomBytesInput;
     use holochain_zome_types::RandomBytesOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
+    // use holochain_state::env::ReadManager;
+    // use crate::core::state::workspace::Workspace;
 
     #[tokio::test(threaded_scheduler)]
     /// we can get some random data out of the fn directly
@@ -59,16 +61,23 @@ pub mod wasm_test {
         assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
-    /// we can get some random data out of the fn via. a wasm call
-    async fn ribosome_random_bytes_test() {
-        const LEN: usize = 5;
-        let output: RandomBytesOutput = crate::call_test_ribosome!(
-            TestWasm::Imports,
-            "random_bytes",
-            RandomBytesInput::new(5 as _)
-        );
-        assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
-    }
+    // #[tokio::test(threaded_scheduler)]
+    // // #[serial_test::serial]
+    // /// we can get some random data out of the fn via. a wasm call
+    // async fn ribosome_random_bytes_test() {
+    //     let env = holochain_state::test_utils::test_cell_env();
+    //     let dbs = env.dbs().await;
+    //     let env_ref = env.guard().await;
+    //     let reader = env_ref.reader().unwrap();
+    //     let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+    //
+    //     const LEN: usize = 5;
+    //     let output: RandomBytesOutput = crate::call_test_ribosome!(
+    //         workspace,
+    //         TestWasm::Imports,
+    //         "random_bytes",
+    //         RandomBytesInput::new(5 as _)
+    //     );
+    //     assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
+    // }
 }

@@ -85,13 +85,17 @@ pub fn commit_entry<'a>(
         .boxed()
     };
     dbg!("xxx");
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let x = unsafe { host_context.workspace.apply_mut(call) }.await;
-        // let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(host_context.workspace);
-        // let x = unsafe { raw_workspace.apply_mut(call).await };
-        dbg!(&x);
-        x
-    })??;
+    tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+        unsafe { host_context.workspace.apply_mut(call).await }
+    }))???;
+    // let block_host_context = host_context.clone();
+    // tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    //     // let x = unsafe { block_host_context.workspace.apply_mut(call) }.await;
+    //     let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(host_context.workspace);
+    //     let x = unsafe { raw_workspace.apply_mut(call).await };
+    //     dbg!(&x);
+    //     x
+    // })??;
 
     dbg!("xxx");
     // return the hash of the committed entry
@@ -110,6 +114,9 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CommitEntryInput;
     use holochain_zome_types::CommitEntryOutput;
+    use holochain_zome_types::GetEntryOutput;
+    use holochain_state::env::ReadManager;
+    use crate::core::state::workspace::Workspace;
     // use super::commit_entry;
     // use std::sync::Arc;
 
@@ -145,14 +152,31 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     // #[serial_test::serial]
     async fn ribosome_commit_entry_test() {
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = env_ref.reader().unwrap();
+        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain).await.unwrap();
+
         let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry)
             .next()
             .unwrap();
         let entry_def_id = EntryDefIdFixturator::new(fixt::Predictable).next().unwrap();
-        let input = CommitEntryInput::new((entry_def_id, app_entry));
-        let output: CommitEntryOutput =
-            crate::call_test_ribosome!(TestWasm::CommitEntry, "commit_entry", input);
+
+        let output: CommitEntryOutput = {
+            let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+            let input = CommitEntryInput::new((entry_def_id, app_entry));
+            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", input)
+        };
+
         println!("{:?}", output);
+        let round: GetEntryOutput = {
+            let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "get_entry", ())
+        };
+        println!("{:?}", round);
         // assert_eq!(output, DebugOutput::new(()));
     }
 }

@@ -72,16 +72,21 @@ where
     pub fn iter_fail_raw(
         &'env self,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = H, Error = DatabaseError> + 'env>> {
-        Ok(Box::new(self.0.iter_raw()?.map(|(h, c)| {
-            Ok(deserialize_and_hash_blocking(h, c))
-        })))
+        Ok(Box::new(
+            self.0
+                .iter_raw()?
+                .map(|(h, c)| Ok(deserialize_and_hash_blocking(h, c))),
+        ))
     }
 }
 
 fn deserialize_and_hash_blocking<H: 'static + Hashable + Send>(
     hash: &[u8],
     content: H::Content,
-) -> H where H::Content: Send + Clone {
+) -> H
+where
+    H::Content: Send + Clone,
+{
     let hash_owned = hash.to_owned();
     let content_owned = content.to_owned();
     tokio_safe_block_on::tokio_safe_block_forever_on(
@@ -92,13 +97,21 @@ fn deserialize_and_hash_blocking<H: 'static + Hashable + Send>(
         //     data
         // }).await.unwrap() }
         async move {
-            tokio::task::spawn (deserialize_and_hash(hash_owned, content_owned)).await.unwrap()
-        }
+            tokio::task::spawn(deserialize_and_hash(hash_owned, content_owned))
+                .await
+                .unwrap()
+        },
     )
     // TODO: make this a stream?
 }
 
-async fn deserialize_and_hash<H: 'static + Hashable + Send>(hash_bytes: Vec<u8>, content: H::Content) -> H where H::Content: Send {
+async fn deserialize_and_hash<H: 'static + Hashable + Send>(
+    hash_bytes: Vec<u8>,
+    content: H::Content,
+) -> H
+where
+    H::Content: Send,
+{
     let data =
         fatal_db_hash_construction_check!("CasBuf::get", hash_bytes, H::with_data(content).await);
     fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
