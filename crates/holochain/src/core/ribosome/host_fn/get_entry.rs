@@ -19,7 +19,6 @@ pub fn get_entry<'a>(
     input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
     let (hash, _options) = input.into_inner();
-    dbg!(&hash);
     let cascade_hash = hash.try_into()?;
     let call =
         |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
@@ -39,6 +38,5 @@ pub fn get_entry<'a>(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             unsafe { host_context.workspace.apply_ref(call).await }
         })??;
-    dbg!(&maybe_entry);
     Ok(GetEntryOutput::new(maybe_entry))
 }
