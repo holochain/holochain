@@ -1138,7 +1138,7 @@ dependencies = [
  "test_wasm_common",
  "thiserror",
  "tokio",
- "tokio_safe_block_on 0.1.2",
+ "tokio_safe_block_on",
  "toml",
  "tracing",
  "tracing-futures",
@@ -1257,7 +1257,7 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
- "tokio_safe_block_on 0.1.2",
+ "tokio_safe_block_on",
  "tracing",
 ]
 
@@ -1295,7 +1295,7 @@ dependencies = [
  "tempdir",
  "thiserror",
  "tokio",
- "tokio_safe_block_on 0.2.0",
+ "tokio_safe_block_on",
  "tracing",
  "tracing-core",
  "tracing-serde",
@@ -1532,7 +1532,7 @@ dependencies = [
  "rcgen",
  "rustls",
  "tokio",
- "tokio_safe_block_on 0.1.2",
+ "tokio_safe_block_on",
  "webpki",
 ]
 
@@ -3419,16 +3419,6 @@ name = "tokio_safe_block_on"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c6fb7c6fbaf80432ed3ab96e1a5bf33ec1ed66a5206d4edf44910ba3ba3207d"
-dependencies = [
- "futures",
- "tokio",
-]
-
-[[package]]
-name = "tokio_safe_block_on"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a06720c04479a951e0d5dbf1f63feb3a11cc96a71b2a848d32894cc3b47ab610"
 dependencies = [
  "futures",
  "tokio",
