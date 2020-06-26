@@ -12,6 +12,7 @@ use must_future::MustBoxFuture;
 use std::convert::TryInto;
 use std::sync::Arc;
 
+#[allow(clippy::extra_unused_lifetimes)]
 pub fn get_entry<'a>(
     _ribosome: Arc<WasmRibosome>,
     host_context: Arc<HostContext>,

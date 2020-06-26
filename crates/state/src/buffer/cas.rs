@@ -88,14 +88,8 @@ where
     H::Content: Send + Clone,
 {
     let hash_owned = hash.to_owned();
-    let content_owned = content.to_owned();
+    let content_owned = content;
     tokio_safe_block_on::tokio_safe_block_forever_on(
-        // async move { tokio::task::spawn (async move {
-        //     let data =
-        //         fatal_db_hash_construction_check!("CasBuf::get", hash_owned, H::with_data(content_owned).await);
-        //     fatal_db_hash_integrity_check!("CasBuf::get", hash_owned, data.as_hash().get_bytes());
-        //     data
-        // }).await.unwrap() }
         async move {
             tokio::task::spawn(deserialize_and_hash(hash_owned, content_owned))
                 .await

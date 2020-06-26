@@ -384,6 +384,13 @@ mod test {
         let output: CommitEntryOutput =
             crate::call_test_ribosome!(raw_workspace, TestWasm::Validate, "never_validates", ());
 
-        assert_eq!(vec![0].as_slice(), output.into_inner().get_raw(),);
+        assert_eq!(
+            vec![
+                76, 230, 153, 63, 221, 14, 217, 80, 6, 139, 12, 225, 82, 74, 160, 244, 168, 172,
+                79, 168, 122, 95, 86, 33, 1, 98, 133, 173, 215, 49, 252, 75, 200, 146, 2, 126
+            ]
+            .as_slice(),
+            output.into_inner().get_raw(),
+        );
     }
 }
