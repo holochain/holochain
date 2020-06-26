@@ -15,25 +15,9 @@ pub async fn spawn_holochain_p2p() -> HolochainP2pResult<(
 
     let channel_factory = builder.channel_factory().clone();
 
-    /*
-    let internal_sender = builder
-        .channel_factory()
-        .create_channel::<Internal>()
-        .await?;
-    */
-
     let sender = channel_factory.create_channel::<HolochainP2p>().await?;
 
-    tokio::task::spawn(
-        builder.spawn(
-            HolochainP2pActor::new(
-                //internal_sender,
-                channel_factory,
-                evt_send,
-            )
-            .await?,
-        ),
-    );
+    tokio::task::spawn(builder.spawn(HolochainP2pActor::new(channel_factory, evt_send).await?));
 
     Ok((sender, evt_recv))
 }

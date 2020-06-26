@@ -52,9 +52,9 @@ pub mod transport {
 
     /// Defines an established connection to a remote peer.
     pub mod transport_connection {
-        ghost_actor::ghost_actor! {
+        ghost_actor::ghost_chan! {
             /// Event stream for handling incoming requests from a remote.
-            pub actor TransportConnectionEvent<super::TransportError> {
+            pub chan TransportConnectionEvent<super::TransportError> {
                 /// Event for handling incoming requests from a remote.
                 fn incoming_request(url: url2::Url2, data: Vec<u8>) -> Vec<u8>;
             }
@@ -64,9 +64,9 @@ pub mod transport {
         pub type TransportConnectionEventReceiver =
             futures::channel::mpsc::Receiver<TransportConnectionEvent>;
 
-        ghost_actor::ghost_actor! {
+        ghost_actor::ghost_chan! {
             /// Represents a connection to a remote node.
-            pub actor TransportConnection<super::TransportError> {
+            pub chan TransportConnection<super::TransportError> {
                 /// Retrieve the current url (address) of the remote end of this connection.
                 fn remote_url() -> url2::Url2;
 
@@ -80,9 +80,9 @@ pub mod transport {
     /// (1) for accepting incoming connections and
     /// (2) for making outgoing connections.
     pub mod transport_listener {
-        ghost_actor::ghost_actor! {
+        ghost_actor::ghost_chan! {
             /// Event stream for handling incoming connections.
-            pub actor TransportListenerEvent<super::TransportError> {
+            pub chan TransportListenerEvent<super::TransportError> {
                 /// Event for handling incoming connections from a remote.
                 fn incoming_connection(
                     sender: ghost_actor::GhostSender<super::transport_connection::TransportConnection>,
@@ -95,9 +95,9 @@ pub mod transport {
         pub type TransportListenerEventReceiver =
             futures::channel::mpsc::Receiver<TransportListenerEvent>;
 
-        ghost_actor::ghost_actor! {
+        ghost_actor::ghost_chan! {
             /// Represents a socket binding for establishing connections.
-            pub actor TransportListener<super::TransportError> {
+            pub chan TransportListener<super::TransportError> {
                 /// Retrieve the current url (address) this listener is bound to.
                 fn bound_url() -> url2::Url2;
 

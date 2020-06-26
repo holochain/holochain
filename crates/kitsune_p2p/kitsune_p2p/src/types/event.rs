@@ -38,10 +38,10 @@ pub struct SignNetworkDataEvt {
     pub data: Arc<Vec<u8>>,
 }
 
-ghost_actor::ghost_actor! {
+ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
-    pub actor KitsuneP2pEvent<super::KitsuneP2pError> {
+    pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
         /// We are receiving a request from a remote node.
         fn call(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
 

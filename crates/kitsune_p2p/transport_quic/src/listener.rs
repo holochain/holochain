@@ -6,8 +6,8 @@ use kitsune_p2p_types::{
     transport::*,
 };
 
-ghost_actor::ghost_actor! {
-    actor ListenerInner<TransportError> {
+ghost_actor::ghost_chan! {
+    chan ListenerInner<TransportError> {
         /// our incoming task has produced a connection instance
         fn register_incoming(
             sender: ghost_actor::GhostSender<TransportConnection>,

@@ -60,9 +60,9 @@ pub struct NotifyMulti {
     pub payload: Vec<u8>,
 }
 
-ghost_actor::ghost_actor! {
+ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
-    pub actor KitsuneP2p<super::KitsuneP2pError> {
+    pub chan KitsuneP2p<super::KitsuneP2pError> {
         /// Announce a space/agent pair on this network.
         fn join(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
 

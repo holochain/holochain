@@ -68,10 +68,10 @@ pub struct GetLinks {
     // TODO - parameters
 }
 
-ghost_actor::ghost_actor! {
+ghost_actor::ghost_chan! {
     /// The HolochainP2pSender struct allows controlling the HolochainP2p
     /// actor instance.
-    pub actor HolochainP2p<HolochainP2pError> {
+    pub chan HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
         fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
 

@@ -23,8 +23,8 @@ const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 1000;
 /// if the user specifies None or zero (0) for race_timeout_ms
 const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
 
-ghost_actor::ghost_actor! {
-    pub(crate) actor Internal<crate::KitsuneP2pError> {
+ghost_actor::ghost_chan! {
+    pub(crate) chan Internal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
         /// otherwise, return an error.
         fn immediate_request(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;

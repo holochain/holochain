@@ -5,8 +5,8 @@ use kitsune_p2p_types::{
     transport::*,
 };
 
-ghost_actor::ghost_actor! {
-    actor ConnectionInner<TransportError> {
+ghost_actor::ghost_chan! {
+    chan ConnectionInner<TransportError> {
         /// we received an incoming request - publish it
         fn publish_incoming(url: Url2, data: Vec<u8>) -> Vec<u8>;
     }
