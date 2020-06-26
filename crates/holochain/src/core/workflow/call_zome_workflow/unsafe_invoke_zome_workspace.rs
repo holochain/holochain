@@ -54,18 +54,6 @@ fixturator!(
     };
 );
 
-impl<'env> Iterator for UnsafeInvokeZomeWorkspaceFixturator<InvokeZomeWorkspace<'env>> {
-    type Item = UnsafeInvokeZomeWorkspace;
-    fn next(&mut self) -> Option<Self::Item> {
-        let original_index = self.0.index;
-        let (_, ret) = { UnsafeInvokeZomeWorkspace::from_mut(&mut self.0.curve) };
-        if original_index == self.0.index {
-            self.0.index += 1;
-        }
-        Some(ret)
-    }
-}
-
 // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
 /// If this guard is dropped the underlying
 /// ptr cannot be used.
