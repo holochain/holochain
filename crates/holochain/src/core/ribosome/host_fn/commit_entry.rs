@@ -25,6 +25,7 @@ pub fn commit_entry<'a>(
     host_context: Arc<HostContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
+    dbg!(&input);
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
 
@@ -65,6 +66,9 @@ pub fn commit_entry<'a>(
         ))?,
     };
 
+    dbg!(&app_entry_type);
+    dbg!(&entry);
+
     // build a header for the entry being committed
     let header_builder = builder::EntryCreate {
         entry_type: EntryType::App(app_entry_type),
@@ -81,6 +85,8 @@ pub fn commit_entry<'a>(
     tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
         unsafe { host_context.workspace.apply_mut(call).await }
     }))???;
+
+    dbg!(&entry_hash);
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow

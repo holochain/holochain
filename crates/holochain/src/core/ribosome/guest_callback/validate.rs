@@ -112,11 +112,13 @@ mod test {
     use crate::fixt::ZomeCallCapGrantFixturator;
     use fixt::prelude::*;
     use holo_hash::AgentPubKeyFixturator;
+    use holo_hash_core::HoloHashCoreHash;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::fixt::CapClaimFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
+    use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::HostInput;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
@@ -332,5 +334,56 @@ mod test {
             .run_validate(workspace, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn pass_validate_test() {
+        // test workspace boilerplate
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+
+        let output: CommitEntryOutput =
+            crate::call_test_ribosome!(raw_workspace, TestWasm::Validate, "always_validates", ());
+
+        assert_eq!(
+            vec![
+                65, 163, 251, 163, 192, 168, 221, 213, 231, 24, 5, 83, 106, 135, 117, 197, 241, 60,
+                21, 12, 68, 95, 184, 246, 149, 236, 172, 56, 91, 253, 174, 12, 149, 48, 124, 63
+            ]
+            .as_slice(),
+            output.into_inner().get_raw(),
+        );
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn fail_validate_test() {
+        // test workspace boilerplate
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+
+        let output: CommitEntryOutput =
+            crate::call_test_ribosome!(raw_workspace, TestWasm::Validate, "never_validates", ());
+
+        assert_eq!(vec![0].as_slice(), output.into_inner().get_raw(),);
     }
 }

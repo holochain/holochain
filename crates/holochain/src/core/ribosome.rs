@@ -403,9 +403,14 @@ pub mod wasm_test {
                 )
                 .next()
                 .unwrap();
-                let zome_invocation_response = ribosome
-                    .call_zome_function($unsafe_workspace, invocation)
-                    .unwrap();
+                let zome_invocation_response =
+                    match ribosome.call_zome_function($unsafe_workspace, invocation.clone()) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            dbg!("call_zome_function error", &invocation, &e);
+                            panic!();
+                        }
+                    };
 
                 // instance building off a warm module should be the slowest part of a wasm test
                 // so if each instance (including inner callbacks) takes ~1ms this gives us
@@ -466,26 +471,4 @@ pub mod wasm_test {
             ribosome.call_zome_function(workspace, invocation).unwrap()
         );
     }
-
-    // #[tokio::test(threaded_scheduler)]
-    // async fn pass_validate_test() {
-    //     let (mut _db, mut _r, mut workspace) = test_invoke_zome_workspace!();
-    //     let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-    //
-    //     assert_eq!(
-    //         CommitEntryOutput::new(EntryContentHash::new(vec![0xdb; 36]).into()),
-    //         call_test_ribosome!(raw_workspace, TestWasm::Validate, "always_validates", ()),
-    //     );
-    // }
-    //
-    // #[tokio::test(threaded_scheduler)]
-    // async fn fail_validate_test() {
-    //     let (mut _db, mut _r, mut workspace) = test_invoke_zome_workspace!();
-    //     let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-    //
-    //     assert_eq!(
-    //         CommitEntryOutput::new(EntryContentHash::new(vec![0xdb; 36]).into()),
-    //         call_test_ribosome!(raw_workspace, TestWasm::Validate, "never_validates", ()),
-    //     );
-    // }
 }
