@@ -89,13 +89,11 @@ where
 {
     let hash_owned = hash.to_owned();
     let content_owned = content;
-    tokio_safe_block_on::tokio_safe_block_forever_on(
-        async move {
-            tokio::task::spawn(deserialize_and_hash(hash_owned, content_owned))
-                .await
-                .unwrap()
-        },
-    )
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        tokio::task::spawn(deserialize_and_hash(hash_owned, content_owned))
+            .await
+            .unwrap()
+    })
     // TODO: make this a stream?
 }
 

@@ -32,12 +32,12 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holo_hash_core::HoloHashCoreHash;
-    // use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;
     use holochain_zome_types::EntryHashOutput;
     use std::sync::Arc;
-    // use holochain_state::env::ReadManager;
-    // use crate::core::state::workspace::Workspace;
+    use holochain_state::env::ReadManager;
+    use crate::core::state::workspace::Workspace;
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly
@@ -63,26 +63,27 @@ pub mod wasm_test {
         );
     }
 
-    // #[tokio::test(threaded_scheduler)]
-    // #[serial_test::serial]
-    // /// we can get an entry hash out of the fn via. a wasm call
-    // async fn ribosome_entry_hash_test() {
-    //     let env = holochain_state::test_utils::test_cell_env();
-    //     let dbs = env.dbs().await;
-    //     let env_ref = env.guard().await;
-    //     let reader = env_ref.reader().unwrap();
-    //     let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
-    //
-    //     let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
-    //     let input = EntryHashInput::new(entry);
-    //     let output: EntryHashOutput =
-    //         crate::call_test_ribosome!(workspace, TestWasm::Imports, "entry_hash", input);
-    //     assert_eq!(
-    //         vec![
-    //             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    //             0, 0, 0, 0, 153, 246, 31, 194
-    //         ],
-    //         output.into_inner().get_raw().to_vec()
-    //     );
-    // }
+    #[tokio::test(threaded_scheduler)]
+    /// we can get an entry hash out of the fn via. a wasm call
+    async fn ribosome_entry_hash_test() {
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = env_ref.reader().unwrap();
+        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+
+        let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
+        let input = EntryHashInput::new(entry);
+        let output: EntryHashOutput =
+            crate::call_test_ribosome!(raw_workspace, TestWasm::Imports, "entry_hash", input);
+        assert_eq!(
+            vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 153, 246, 31, 194
+            ],
+            output.into_inner().get_raw().to_vec()
+        );
+    }
 }
