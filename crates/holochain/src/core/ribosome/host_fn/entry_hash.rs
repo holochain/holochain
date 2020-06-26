@@ -29,15 +29,15 @@ pub fn entry_hash(
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::entry_hash::entry_hash;
     use crate::core::ribosome::HostContextFixturator;
+    use crate::core::state::workspace::Workspace;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holo_hash_core::HoloHashCoreHash;
+    use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;
     use holochain_zome_types::EntryHashOutput;
     use std::sync::Arc;
-    use holochain_state::env::ReadManager;
-    use crate::core::state::workspace::Workspace;
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly
