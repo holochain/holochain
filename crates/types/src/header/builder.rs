@@ -9,7 +9,7 @@ use crate::{
 use derive_more::Constructor;
 use fixt::prelude::*;
 use header::HeaderInner;
-use header::UpdateBasis;
+use header::{UpdateBasis, ZomeId};
 use holo_hash::*;
 
 #[derive(Constructor)]
@@ -106,7 +106,7 @@ builder_variant!(InitZomesComplete {});
 builder_variant!(LinkAdd {
     base_address: EntryHash,
     target_address: EntryHash,
-    zome_id: u8, // Can't use ZomeId here because you can't have a fixturator on a type alias
+    zome_id: ZomeId,
     tag: Tag,
 });
 

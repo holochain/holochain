@@ -3,7 +3,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
     element::SignedHeaderHashed,
-    header::{EntryCreate, EntryType},
+    header::{EntryCreate, EntryType, ZomeId},
     test_utils::{fake_app_entry_type, fake_header_hash},
     Entry, EntryHashed, Header, HeaderHashed, Timestamp,
 };
@@ -24,7 +24,7 @@ pub async fn fake_unique_element(
         header_seq: 0,
         prev_header: fake_header_hash("1"),
 
-        entry_type: EntryType::App(fake_app_entry_type(1, visibility)),
+        entry_type: EntryType::App(fake_app_entry_type(ZomeId::from(1), visibility)),
         entry_hash: entry.as_hash().to_owned(),
     });
 
