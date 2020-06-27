@@ -16,7 +16,7 @@ use holochain_state::{
 use holochain_types::header;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
-    header::{LinkAdd, LinkRemove, ZomePosition},
+    header::{LinkAdd, LinkRemove, ZomeId},
     link::Tag,
     Header, HeaderHashed, Timestamp,
 };
@@ -69,7 +69,7 @@ pub struct LinkMetaVal {
     /// When the link was added
     pub timestamp: Timestamp,
     /// The [ZomePosition] of the zome this link belongs to
-    pub zome_id: ZomePosition,
+    pub zome_id: ZomeId,
     /// A tag used to find this link
     pub tag: Tag,
 }
@@ -85,11 +85,11 @@ pub enum LinkMetaKey<'a> {
     /// Search for all links on a base
     Base(&'a EntryHash),
     /// Search for all links on a base, for a zome
-    BaseZome(&'a EntryHash, ZomePosition),
+    BaseZome(&'a EntryHash, ZomeId),
     /// Search for all links on a base, for a zome and with a tag
-    BaseZomeTag(&'a EntryHash, ZomePosition, &'a Tag),
+    BaseZomeTag(&'a EntryHash, ZomeId, &'a Tag),
     /// This will match only the link created with a certain [LinkAdd] hash
-    Full(&'a EntryHash, ZomePosition, &'a Tag, &'a HeaderHash),
+    Full(&'a EntryHash, ZomeId, &'a Tag, &'a HeaderHash),
 }
 
 /// The actual type the [LinkMetaKey] turns into
@@ -142,7 +142,7 @@ pub trait MetadataBufT {
         &mut self,
         link_remove: LinkRemove,
         base: &EntryHash,
-        zome_id: ZomePosition,
+        zome_id: ZomeId,
         tag: Tag,
     ) -> DatabaseResult<()>;
 
@@ -213,7 +213,7 @@ impl LinkMetaVal {
         link_add_hash: HeaderHash,
         target: EntryHash,
         timestamp: Timestamp,
-        zome_id: ZomePosition,
+        zome_id: ZomeId,
         tag: Tag,
     ) -> Self {
         Self {
@@ -343,7 +343,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         &mut self,
         link_remove: LinkRemove,
         base: &EntryHash,
-        zome_id: ZomePosition,
+        zome_id: ZomeId,
         tag: Tag,
     ) -> DatabaseResult<()> {
         let key = LinkMetaKey::Full(base, zome_id, &tag, &link_remove.link_add_address);

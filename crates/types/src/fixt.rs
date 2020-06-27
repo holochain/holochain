@@ -51,6 +51,9 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 
+/// a curve to spit out Entry::App values
+pub struct AppEntry;
+
 fixturator!(
     Zome;
     constructor fn from_hash(WasmHash);
@@ -257,6 +260,10 @@ fixturator!(
         CapClaim(CapClaim)
         CapGrant(ZomeCallCapGrant)
     ];
+
+    curve AppEntry {
+        Entry::App(SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap())
+    };
 );
 
 fixturator!(

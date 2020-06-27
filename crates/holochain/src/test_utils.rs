@@ -3,8 +3,8 @@ use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
     element::SignedHeaderHashed,
-    header::{EntryCreate, EntryType, ZomeId},
-    test_utils::{fake_app_entry_type, fake_header_hash},
+    header::{EntryCreate, EntryType},
+    test_utils::fake_header_hash,
     Entry, EntryHashed, Header, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::entry_def::EntryVisibility;

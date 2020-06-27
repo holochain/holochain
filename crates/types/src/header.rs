@@ -204,6 +204,22 @@ impl From<NewEntryHeader> for Header {
 )]
 pub struct ZomeId(u8);
 
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    derive_more::Display,
+    derive_more::From,
+    derive_more::Into,
+)]
+pub struct EntryDefId(u8);
+
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum UpdateBasis {
@@ -250,7 +266,7 @@ pub struct LinkAdd {
 
     pub base_address: EntryHash,
     pub target_address: EntryHash,
-    pub zome_id: ZomePosition,
+    pub zome_id: ZomeId,
     pub tag: Tag,
 }
 
@@ -346,17 +362,17 @@ impl EntryType {
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
     /// this needs to match the position of the entry type returned by entry defs
-    pub(crate) id: EntryDefPosition,
+    pub(crate) id: EntryDefId,
     /// u8 identifier of what zome this is for
     /// this needs to be shared across the dna
     /// comes from the numeric index position of a zome in dna config
-    pub(crate) zome_id: ZomePosition,
+    pub(crate) zome_id: ZomeId,
     // @todo don't do this, use entry defs instead
     pub(crate) visibility: EntryVisibility,
 }
 
 impl AppEntryType {
-    pub fn new(id: EntryDefPosition, zome_id: ZomePosition, visibility: EntryVisibility) -> Self {
+    pub fn new(id: EntryDefId, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
         Self {
             id,
             zome_id,
@@ -364,10 +380,10 @@ impl AppEntryType {
         }
     }
 
-    pub fn id(&self) -> EntryDefPosition {
+    pub fn id(&self) -> EntryDefId {
         self.id
     }
-    pub fn zome_id(&self) -> ZomePosition {
+    pub fn zome_id(&self) -> ZomeId {
         self.zome_id
     }
     pub fn visibility(&self) -> &EntryVisibility {

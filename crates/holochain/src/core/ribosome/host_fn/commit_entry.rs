@@ -37,19 +37,19 @@ pub fn commit_entry<'a>(
     .into_hash();
 
     // extract the zome position
-    let zome_position: holochain_types::header::ZomePosition = match ribosome
+    let header_zome_id: holochain_types::header::ZomeId = match ribosome
         .dna_file
         .dna
         .zomes
         .iter()
         .position(|(name, _)| name == &host_context.zome_name)
     {
-        Some(index) => index as _,
+        Some(index) => holochain_types::header::ZomeId::from(index as u8),
         None => Err(RibosomeError::ZomeNotExists(host_context.zome_name.clone()))?,
     };
 
     // extract the entry defs for a zome
-    let (entry_def_position, entry_visibility) = match match ribosome
+    let (header_entry_def_id, entry_visibility) = match match ribosome
         .run_entry_defs(host_context.workspace.clone(), EntryDefsInvocation)?
     {
         // the ribosome returned some defs
@@ -59,7 +59,10 @@ pub fn commit_entry<'a>(
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
                     // build an app entry type from the entry def at the found position
-                    Some(index) => Some((index as _, entry_defs[index].visibility)),
+                    Some(index) => Some((
+                        holochain_types::header::EntryDefId::from(index as u8),
+                        entry_defs[index].visibility,
+                    )),
                     None => None,
                 },
                 None => None,
@@ -74,7 +77,7 @@ pub fn commit_entry<'a>(
         ))?,
     };
 
-    let app_entry_type = AppEntryType::new(entry_def_position, zome_position, entry_visibility);
+    let app_entry_type = AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
 
     // build a header for the entry being committed
     let header_builder = builder::EntryCreate {
@@ -112,6 +115,7 @@ pub mod wasm_test {
     use holo_hash::Hashable;
     use holo_hash::Hashed;
     use holo_hash_core::HoloHashCoreHash;
+    use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CommitEntryInput;
@@ -140,9 +144,7 @@ pub mod wasm_test {
             .unwrap();
         host_context.zome_name = TestWasm::CommitEntry.into();
         host_context.workspace = raw_workspace;
-        let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry)
-            .next()
-            .unwrap();
+        let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
@@ -185,9 +187,7 @@ pub mod wasm_test {
             .unwrap();
         host_context.zome_name = TestWasm::CommitEntry.into();
         host_context.workspace = raw_workspace;
-        let app_entry = EntryFixturator::new(crate::fixt::curve::AppEntry)
-            .next()
-            .unwrap();
+        let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
