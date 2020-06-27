@@ -64,6 +64,11 @@ fixturator!(
 );
 
 fixturator!(
+    ZomeId;
+    from u8;
+);
+
+fixturator!(
     CapClaim;
     constructor fn new(String, AgentPubKey, CapSecret);
 );
@@ -412,7 +417,7 @@ impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
     }
 }
 
-type MaybeSerializedBytes = Option<SerializedBytes>;
+pub type MaybeSerializedBytes = Option<SerializedBytes>;
 
 fixturator! {
     MaybeSerializedBytes;
