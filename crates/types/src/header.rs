@@ -185,15 +185,24 @@ impl From<NewEntryHeader> for Header {
     }
 }
 
-/// this id in an internal reference, which also serves as a canonical ordering
+/// this id is an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 // TODO: Check this can never be written to > 255
-pub type ZomePosition = u8;
-
-/// this is analagous to ZomePosition but for entry type definitions
-/// the value must be provided by a wasm and is static/hardcoded to that wasm
-/// it is the index/position of the entry def for this entry returned by entry defs
-pub type EntryDefPosition = u8;
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    derive_more::Display,
+    derive_more::From,
+    derive_more::Into,
+)]
+pub struct ZomeId(u8);
 
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

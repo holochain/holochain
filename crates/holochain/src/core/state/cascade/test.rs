@@ -3,7 +3,7 @@ use crate::core::state::{
     metadata::{EntryDhtStatus, LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
-use crate::fixt::LinkMetaValFixturator;
+use crate::fixt::{LinkMetaValFixturator, ZomeIdFixturator};
 use fixt::prelude::*;
 use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
@@ -287,7 +287,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     let target = jessy_entry.as_hash().clone();
 
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
-    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+    let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
 
     let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
         .next()
@@ -356,7 +356,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     let target = jessy_entry.as_hash().clone();
 
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
-    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+    let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
 
     let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
         .next()
@@ -430,7 +430,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let target = jessy_entry.as_hash().clone();
 
     let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
-    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+    let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
 
     let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
         .next()
