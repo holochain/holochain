@@ -100,9 +100,9 @@ impl<'a> LinkMetaKey<'a> {
         use LinkMetaKey::*;
         match self {
             Base(b) => b.as_ref().to_vec(),
-            BaseZome(b, z) => [b.as_ref(), &[*z]].concat(),
-            BaseZomeTag(b, z, t) => [b.as_ref(), &[*z], t.as_ref()].concat(),
-            Full(b, z, t, l) => [b.as_ref(), &[*z], t.as_ref(), l.as_ref()].concat(),
+            BaseZome(b, z) => [b.as_ref(), &[u8::from(*z)]].concat(),
+            BaseZomeTag(b, z, t) => [b.as_ref(), &[u8::from(*z)], t.as_ref()].concat(),
+            Full(b, z, t, l) => [b.as_ref(), &[u8::from(*z)], t.as_ref(), l.as_ref()].concat(),
         }
     }
 
