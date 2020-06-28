@@ -29,6 +29,7 @@ use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
+use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 use crate::core::ribosome::host_fn::remove_entry::remove_entry;
 use crate::core::ribosome::host_fn::remove_link::remove_link;
 use crate::core::ribosome::host_fn::schedule::schedule;
@@ -171,6 +172,7 @@ impl WasmRibosome {
         ns.insert("__keystore", func!(invoke_host_function!(keystore)));
         ns.insert("__property", func!(invoke_host_function!(property)));
         ns.insert("__query", func!(invoke_host_function!(query)));
+        ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
         ns.insert("__sign", func!(invoke_host_function!(sign)));
         ns.insert("__show_env", func!(invoke_host_function!(show_env)));
         ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));

@@ -100,9 +100,9 @@ impl<'a> LinkMetaKey<'a> {
         use LinkMetaKey::*;
         match self {
             Base(b) => b.as_ref().to_vec(),
-            BaseZome(b, z) => [b.as_ref(), &[*z]].concat(),
-            BaseZomeTag(b, z, t) => [b.as_ref(), &[*z], t.as_ref()].concat(),
-            Full(b, z, t, l) => [b.as_ref(), &[*z], t.as_ref(), l.as_ref()].concat(),
+            BaseZome(b, z) => [b.as_ref(), &[u8::from(*z)]].concat(),
+            BaseZomeTag(b, z, t) => [b.as_ref(), &[u8::from(*z)], t.as_ref()].concat(),
+            Full(b, z, t, l) => [b.as_ref(), &[u8::from(*z)], t.as_ref(), l.as_ref()].concat(),
         }
     }
 
@@ -419,22 +419,23 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     // TODO: For now this isn't actually checking the meta data.
     // Once the meta data is finished this should be hooked up
-    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        if fallible_iterator::convert(self.system_meta.get(&entry_hash.clone().into())?)
-            .filter(|sys_val| {
-                if let SysMetaVal::Create(_) = sys_val {
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            })
-            .count()?
-            > 0
-        {
-            Ok(EntryDhtStatus::Live)
-        } else {
-            Ok(EntryDhtStatus::Dead)
-        }
+    fn get_dht_status(&self, _entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        // if fallible_iterator::convert(self.system_meta.get(&entry_hash.clone().into())?)
+        //     .filter(|sys_val| {
+        //         if let SysMetaVal::Create(_) = sys_val {
+        //             Ok(true)
+        //         } else {
+        //             Ok(false)
+        //         }
+        //     })
+        //     .count()?
+        //     > 0
+        // {
+        //     Ok(EntryDhtStatus::Live)
+        // } else {
+        //     Ok(EntryDhtStatus::Dead)
+        // }
+        Ok(EntryDhtStatus::Live)
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {

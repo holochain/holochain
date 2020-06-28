@@ -219,12 +219,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "boolinator"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfa8873f51c92e232f9bac4065cddef41b714152812bfc5f7672ba16d6ef8cd9"
-
-[[package]]
 name = "bstr"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -482,16 +476,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam-channel"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cced8691919c02aac3cb0a1bc2e9b73d89e832bf9a06fc579d4e71b68a2da061"
-dependencies = [
- "crossbeam-utils",
- "maybe-uninit",
-]
-
-[[package]]
 name = "crossbeam-deque"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -629,16 +613,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
 dependencies = [
  "generic-array 0.12.3",
-]
-
-[[package]]
-name = "directories"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72d337a64190607d4fcca2cb78982c5dd57f4916e19696b48a575fa746b6cb0f"
-dependencies = [
- "libc",
- "winapi 0.3.8",
 ]
 
 [[package]]
@@ -799,12 +773,6 @@ dependencies = [
  "redox_syscall",
  "winapi 0.3.8",
 ]
-
-[[package]]
-name = "fixedbitset"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "fixt"
@@ -1069,15 +1037,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bcc8e0c9bce37868955864dbecd2b1ab2bdf967e6f28066d65aaac620444b65c"
 
 [[package]]
-name = "hcid"
-version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e5ea27f6b17df2ded5dcfc492ecd0db719d00b144dbaaf2df1658a7e38cfd2e"
-dependencies = [
- "reed-solomon",
-]
-
-[[package]]
 name = "heck"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1117,7 +1076,6 @@ dependencies = [
  "serde_bytes",
  "thiserror",
  "tokio",
- "tokio_safe_block_on",
 ]
 
 [[package]]
@@ -1137,22 +1095,18 @@ dependencies = [
  "assert_cmd",
  "async-trait",
  "base64 0.10.1",
- "boolinator",
  "cfg-if",
  "chrono",
  "criterion",
- "crossbeam-channel",
  "derive_more",
- "directories 2.0.2",
+ "directories",
  "either",
  "fallible-iterator",
  "fixt",
  "futures",
- "hcid",
  "holo_hash",
  "holo_hash_core",
  "holochain_2020_legacy",
- "holochain_common",
  "holochain_crypto",
  "holochain_keystore",
  "holochain_p2p",
@@ -1165,15 +1119,12 @@ dependencies = [
  "holochain_zome_types",
  "human-panic",
  "lazy_static",
- "maplit",
  "matches",
  "mockall",
  "must_future",
  "nanoid",
  "num_cpus",
- "owning_ref",
  "parking_lot",
- "petgraph",
  "predicates",
  "pretty_assertions",
  "rand 0.7.3",
@@ -1203,16 +1154,6 @@ name = "holochain_2020_legacy"
 version = "0.0.1"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "holochain_common"
-version = "0.0.49-alpha1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea1848fd6b8c5386eb048cfff0c49b7b1063752271015994bac645775b1f29b5"
-dependencies = [
- "directories 1.0.2",
- "lazy_static",
 ]
 
 [[package]]
@@ -1292,7 +1233,6 @@ name = "holochain_state"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "async-trait",
  "derive_more",
  "either",
  "failure",
@@ -1305,10 +1245,8 @@ dependencies = [
  "holochain_keystore",
  "holochain_types",
  "lazy_static",
- "mockall",
  "must_future",
  "nanoid",
- "owning_ref",
  "parking_lot",
  "rand 0.7.3",
  "rkv",
@@ -1321,7 +1259,6 @@ dependencies = [
  "tokio",
  "tokio_safe_block_on",
  "tracing",
- "tracing-futures",
 ]
 
 [[package]]
@@ -1336,17 +1273,13 @@ dependencies = [
  "fixt",
  "flate2",
  "futures",
- "hcid",
  "holo_hash",
  "holo_hash_core",
  "holochain_crypto",
  "holochain_keystore",
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
  "holochain_zome_types",
  "lazy_static",
- "maplit",
- "matches",
  "multihash",
  "must_future",
  "nanoid",
@@ -1358,7 +1291,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "shrinkwraprs",
- "snowflake",
  "strum",
  "tempdir",
  "thiserror",
@@ -1440,6 +1372,7 @@ dependencies = [
  "nanoid",
  "rust-base58",
  "serde",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -1686,12 +1619,6 @@ dependencies = [
  "generator",
  "scoped-tls",
 ]
-
-[[package]]
-name = "maplit"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "matchers"
@@ -2137,15 +2064,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "owning_ref"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ff55baddef9e4ad00f88b6c743a2a8062d4c6ade126c2a528644b8e444d52ce"
-dependencies = [
- "stable_deref_trait",
-]
-
-[[package]]
 name = "page_size"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2223,16 +2141,6 @@ name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
-
-[[package]]
-name = "petgraph"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "467d164a6de56270bd7c4d070df81d07beace25012d5103ced4e9ff08d6afdb7"
-dependencies = [
- "fixedbitset",
- "indexmap",
-]
 
 [[package]]
 name = "phf"
@@ -2730,12 +2638,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "reed-solomon"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13de68c877a77f35885442ac72c8beb7c2f0b09380c43b734b9d63d1db69ee54"
-
-[[package]]
 name = "regex"
 version = "1.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3184,12 +3086,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7cb5678e1615754284ec264d9bb5b4c27d2018577fd90ac0ceb578591ed5ee4"
 
 [[package]]
-name = "snowflake"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27207bb65232eda1f588cf46db2fee75c0808d557f6b3cf19a75f5d6d7c94df1"
-
-[[package]]
 name = "socket2"
 version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3206,12 +3102,6 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
-
-[[package]]
-name = "stable_deref_trait"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 
 [[package]]
 name = "strsim"
@@ -3387,7 +3277,6 @@ name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
  "serde",
  "serde_bytes",
 ]

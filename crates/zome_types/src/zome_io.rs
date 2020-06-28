@@ -56,6 +56,9 @@ wasm_io_types!(
     // @TODO
     pub struct QueryInput(());
     pub struct QueryOutput(());
+    // the length of random bytes to create
+    pub struct RandomBytesInput(u32);
+    pub struct RandomBytesOutput(crate::bytes::Bytes);
     // @TODO
     pub struct RemoveLinkInput(());
     pub struct RemoveLinkOutput(());
@@ -86,9 +89,9 @@ wasm_io_types!(
     // @TODO
     pub struct GetLinksInput(());
     pub struct GetLinksOutput(());
-    // @TODO
-    pub struct GetEntryInput(());
-    pub struct GetEntryOutput(());
+    // get an entry from the cascade
+    pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
+    pub struct GetEntryOutput(Option<crate::entry::Entry>);
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
