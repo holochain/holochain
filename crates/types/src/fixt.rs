@@ -7,7 +7,6 @@
 use crate::composite_hash::AnyDhtHash;
 use crate::composite_hash::EntryHash;
 use crate::dna::zome::Zome;
-use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::dna::DnaDef;
 use crate::dna::Zomes;
 use crate::header::AgentValidationPkg;
@@ -19,6 +18,7 @@ use crate::header::EntryType;
 use crate::header::EntryUpdate;
 use crate::header::InitZomesComplete;
 use crate::header::LinkAdd;
+use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::link::Tag;
 use crate::Timestamp;
