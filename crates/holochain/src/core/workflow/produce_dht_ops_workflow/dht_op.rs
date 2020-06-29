@@ -155,11 +155,11 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
             Ok(DhtOp::RegisterReplacedBy(sig, header, entry))
         }
         DhtOpLight::RegisterDeletedBy(sig, header_hash) => {
-            let header = register_delete(header_hash, op_name.clone(), &cas).await?;
+            let header = register_header_delete(header_hash, op_name.clone(), &cas).await?;
             Ok(DhtOp::RegisterDeletedBy(sig, header))
         }
         DhtOpLight::RegisterDeletedHeaderBy(sig, header_hash) => {
-            let header = register_delete(header_hash, op_name.clone(), &cas).await?;
+            let header = register_header_delete(header_hash, op_name.clone(), &cas).await?;
             Ok(DhtOp::RegisterDeletedHeaderBy(sig, header))
         }
         DhtOpLight::RegisterAddLink(sig, h) => {
@@ -203,7 +203,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
     }
 }
 
-async fn register_delete(
+async fn register_header_delete(
     header_hash: HeaderHash,
     op_name: String,
     cas: &ChainCasBuf<'_>,

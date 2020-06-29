@@ -123,7 +123,7 @@ mod tests {
                 &mut fx,
             )
             .await;
-            buf.add_update(update.clone(), None).await?;
+            buf.register_update(update.clone(), None).await?;
             let original = update.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
@@ -163,9 +163,9 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let _ = buf.add_update(update1.clone(), None).await?;
-            let _ = buf.add_update(update2, None).await?;
-            buf.add_update(update3.clone(), None).await?;
+            let _ = buf.register_update(update1.clone(), None).await?;
+            let _ = buf.register_update(update2, None).await?;
+            buf.register_update(update3.clone(), None).await?;
 
             let original = update1.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
@@ -195,7 +195,7 @@ mod tests {
             let (update, _) =
                 test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
             let _ = buf
-                .add_update(update.clone(), Some(original_entry.clone()))
+                .register_update(update.clone(), Some(original_entry.clone()))
                 .await?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
@@ -239,13 +239,13 @@ mod tests {
             )
             .await;
             let _ = buf
-                .add_update(update1.clone(), Some(original_entry.clone()))
+                .register_update(update1.clone(), Some(original_entry.clone()))
                 .await?;
             let _ = buf
-                .add_update(update2.clone(), Some(original_entry.clone()))
+                .register_update(update2.clone(), Some(original_entry.clone()))
                 .await?;
             let _ = buf
-                .add_update(update3.clone(), Some(original_entry.clone()))
+                .register_update(update3.clone(), Some(original_entry.clone()))
                 .await?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
@@ -284,9 +284,9 @@ mod tests {
             let (update_entry, _) =
                 test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
 
-            let _ = buf.add_update(update_header.clone(), None).await?;
+            let _ = buf.register_update(update_header.clone(), None).await?;
             let _ = buf
-                .add_update(update_entry.clone(), Some(original_entry.clone()))
+                .register_update(update_entry.clone(), Some(original_entry.clone()))
                 .await?;
             let expected_entry_hash = update_entry.entry_hash;
 
@@ -381,7 +381,7 @@ mod tests {
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for update in entry_updates {
                 meta_buf
-                    .add_update(update, Some(original_entry_hash.clone()))
+                    .register_update(update, Some(original_entry_hash.clone()))
                     .await
                     .unwrap();
             }
@@ -439,7 +439,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for update in entry_updates {
-                meta_buf.add_update(update, None).await.unwrap();
+                meta_buf.register_update(update, None).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_updates(original_header_hash.clone().into())
@@ -484,7 +484,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf.add_header_delete(delete).await.unwrap();
+                meta_buf.register_header_delete(delete).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_deletes(header_hash.clone().into())

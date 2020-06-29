@@ -146,7 +146,7 @@ async fn integrate_dht_ops_workflow_inner(
                 };
                 workspace
                     .meta
-                    .add_update(entry_update, old_entry_hash)
+                    .register_update(entry_update, old_entry_hash)
                     .await?;
             }
             DhtOp::RegisterDeletedBy(_, entry_delete) => {
@@ -172,10 +172,13 @@ async fn integrate_dht_ops_workflow_inner(
                         continue;
                     }
                 };
-                workspace.meta.add_delete(entry_delete, entry_hash).await?
+                workspace
+                    .meta
+                    .register_entry_delete(entry_delete, entry_hash)
+                    .await?
             }
             DhtOp::RegisterDeletedHeaderBy(_, entry_delete) => {
-                workspace.meta.add_header_delete(entry_delete).await?
+                workspace.meta.register_header_delete(entry_delete).await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 workspace.meta.add_link(link_add.clone()).await?;
@@ -828,7 +831,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     #[ignore]
-    async fn test_integrate_single_register_deleted_by() {
+    async fn test_integrate_single_register_header_deleted_by() {
         // For RegisterDeletedBy
         // metadata has EntryDelete on HeaderHash
         todo!()

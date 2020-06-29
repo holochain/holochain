@@ -68,9 +68,11 @@ pub enum DhtOp {
 
     /// Op for deleting an entry
     RegisterDeletedBy(Signature, header::EntryDelete),
+
     /// Op for deleting a header
     RegisterDeletedHeaderBy(Signature, header::EntryDelete),
-    /// Op for adding a link  
+
+    /// Op for adding a link
     RegisterAddLink(Signature, header::LinkAdd),
 
     /// Op for removing a link

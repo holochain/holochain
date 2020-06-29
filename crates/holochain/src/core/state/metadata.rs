@@ -147,58 +147,58 @@ pub trait MetadataBufT {
         tag: LinkTag,
     ) -> DatabaseResult<()>;
 
-    /// Adds a new [Header] that creates an [Entry] in the sys metadata
+    /// Registers a [Header::NewEntryHeader] with the referenced [Entry]
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
-    /// Register activity on an agents public key
+    /// Registers a published [Header] with the authoring agent's public key
     async fn register_activity(
         &mut self,
         header: Header,
         agent_pub_key: AgentPubKey,
     ) -> DatabaseResult<()>;
 
-    /// Adds a new [EntryUpdate] [Header] to an [Entry] in the sys metadata
-    async fn add_update(
+    /// Registers a [Header::EntryUpdate] with the referenced [Header] or [Entry]
+    async fn register_update(
         &mut self,
         update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()>;
 
-    /// Adds a new [EntryDelete] [Header] to an [Entry] in the sys metadata
-    async fn add_delete(
+    /// Registers a [Header::EntryDelete] with the Entry of the referenced Header
+    async fn register_entry_delete(
         &mut self,
         delete: header::EntryDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()>;
 
-    /// Adds a [EntryDelete] header to a [NewEntryHeader]
-    async fn add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
+    /// Registers a [Header::EntryDelete] with the referenced [Header]
+    async fn register_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
 
-    /// Returns all the [HeaderHash]s of headers that created this [Entry]
+    /// Returns all the [HeaderHash]es of headers that created this [Entry]
     fn get_headers(
         &self,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all headers registered on an agents public key
+    /// Returns all headers registered on an agent's public key
     fn get_activity(
         &self,
         header_hash: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the [HeaderHash]s of [EntryUpdates] headers on an [Entry]
+    /// Returns all the hashes of [EntryUpdate] headers registered on an [Entry]
     fn get_updates(
         &self,
         hash: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the [HeaderHash]s of [EntryDeletes] headers on an [Entry] or [NewEntryDelete]
+    /// Returns all the hashes of [EntryDelete] headers registered on a Header
     fn get_deletes(
         &self,
         entry_or_new_entry_header: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns the current status of a [Entry]
+    /// Returns the current [EntryDhtStatus] of an [Entry]
     fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
 
     /// Finds the redirect path and returns the final [Entry]
@@ -214,17 +214,17 @@ pub enum SysMetaVal {
     /// A header that results in a new entry
     /// Either a [EntryCreate] or [EntryUpdate]
     NewEntry(HeaderHash),
-    /// [EntryUpdate] [Header]
+    /// An [EntryUpdate] [Header]
     Update(HeaderHash),
-    /// [EntryDelete] [Header]
+    /// An [Header::EntryDelete]
     Delete(HeaderHash),
-    /// Activity on an agents public key
-    Agent(HeaderHash),
+    /// Activity on an agent's public key
+    Activity(HeaderHash),
 }
 
 /// Subset of headers for the sys meta db
 enum EntryHeader {
-    Agent(Header),
+    Activity(Header),
     NewEntry(Header),
     Update(Header),
     Delete(Header),
@@ -257,7 +257,7 @@ impl From<SysMetaVal> for HeaderHash {
             SysMetaVal::NewEntry(h)
             | SysMetaVal::Update(h)
             | SysMetaVal::Delete(h)
-            | SysMetaVal::Agent(h) => h,
+            | SysMetaVal::Activity(h) => h,
         }
     }
 }
@@ -268,7 +268,7 @@ impl EntryHeader {
             EntryHeader::NewEntry(h)
             | EntryHeader::Update(h)
             | EntryHeader::Delete(h)
-            | EntryHeader::Agent(h) => h,
+            | EntryHeader::Activity(h) => h,
         };
         let (_, header_hash): (Header, HeaderHash) = HeaderHashed::with_data(header).await?.into();
         Ok(header_hash)
@@ -324,7 +324,7 @@ impl<'env> MetadataBuf<'env> {
         Self::new(reader, system_meta, links_meta)
     }
 
-    async fn register_header_to<K, H>(&mut self, header: H, key: K) -> DatabaseResult<()>
+    async fn register_header_to_basis<K, H>(&mut self, header: H, key: K) -> DatabaseResult<()>
     where
         H: Into<EntryHeader>,
         K: Into<SysMetaKey>,
@@ -333,7 +333,7 @@ impl<'env> MetadataBuf<'env> {
             h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash().await?),
             h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash().await?),
             h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash().await?),
-            h @ EntryHeader::Agent(_) => SysMetaVal::Agent(h.into_hash().await?),
+            h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash().await?),
         };
         self.system_meta.insert(key.into(), sys_val);
         Ok(())
@@ -390,14 +390,13 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.links_meta.delete(key.to_key())
     }
 
-    // Add register_header
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         let basis = new_entry_header.entry().clone();
-        self.register_header_to(new_entry_header, basis).await
+        self.register_header_to_basis(new_entry_header, basis).await
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn add_update(
+    async fn register_update(
         &mut self,
         update: header::EntryUpdate,
         entry: Option<EntryHash>,
@@ -412,22 +411,23 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             }
             (header::IntendedFor::Entry, Some(entry_hash)) => entry_hash.into(),
         };
-        self.register_header_to(update, basis).await
+        self.register_header_to_basis(update, basis).await
     }
 
+    // MDD: This seems like it should be replaced by register_header_delete
     #[allow(clippy::needless_lifetimes)]
-    async fn add_delete(
+    async fn register_entry_delete(
         &mut self,
         delete: header::EntryDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()> {
-        self.register_header_to(delete, entry_hash).await
+        self.register_header_to_basis(delete, entry_hash).await
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
+    async fn register_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
-        self.register_header_to(delete, remove).await
+        self.register_header_to_basis(delete, remove).await
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -436,7 +436,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         header: Header,
         agent_pub_key: AgentPubKey,
     ) -> DatabaseResult<()> {
-        self.register_header_to(EntryHeader::Agent(header), agent_pub_key)
+        self.register_header_to_basis(EntryHeader::Activity(header), agent_pub_key)
             .await
     }
 
@@ -495,7 +495,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             fallible_iterator::convert(self.system_meta.get(&header_hash.into())?).filter_map(
                 |h| {
                     Ok(match h {
-                        SysMetaVal::Agent(h) => Some(h),
+                        SysMetaVal::Activity(h) => Some(h),
                         _ => None,
                     })
                 },
