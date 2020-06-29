@@ -4,6 +4,7 @@ use holochain_2020::core::state::{
     metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
+use holochain_2020::fixt::ZomeIdFixturator;
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
@@ -102,7 +103,7 @@ async fn get_links() -> SourceChainResult<()> {
         &cache_meta,
     );
     let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
-    let zome_id = U8Fixturator::new(Unpredictable).next().unwrap();
+    let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
     let links = cascade.dht_get_links(&key).await?;

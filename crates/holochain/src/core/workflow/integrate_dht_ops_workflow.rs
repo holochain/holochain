@@ -596,7 +596,7 @@ mod tests {
             let header_builder = builder::LinkAdd {
                 base_address: base_entry_hash.clone(),
                 target_address: target_entry_hash.clone(),
-                zome_id: 0,
+                zome_id: 0.into(),
                 tag: BytesFixturator::new(Unpredictable).next().unwrap().into(),
             };
             sc.put(header_builder, None).await.unwrap();
