@@ -193,7 +193,7 @@ async fn integrate_dht_ops_workflow_inner(
                 // header on the Base
                 if let None = workspace.cas.get_entry(&link_remove.base_address).await? {
                     warn!(
-                        "Storing link data when not an author or authority requires the 
+                        "Storing link data when not an author or authority requires the
                          cache metadata store.
                          The cache metadata store is currently unimplemented"
                     );
@@ -597,7 +597,7 @@ mod tests {
             let header_builder = builder::LinkAdd {
                 base_address: base_entry_hash.clone(),
                 target_address: target_entry_hash.clone(),
-                zome_id: 0,
+                zome_id: 0.into(),
                 tag: BytesFixturator::new(Unpredictable).next().unwrap().into(),
             };
             sc.put(header_builder, None).await.unwrap();

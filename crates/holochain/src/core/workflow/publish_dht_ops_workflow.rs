@@ -169,7 +169,7 @@ mod tests {
     use holochain_p2p::{actor::HolochainP2pSender, spawn_holochain_p2p};
     use holochain_state::{
         buffer::BufferedStore,
-        env::{EnvironmentRefRw, ReadManager, WriteManager},
+        env::{EnvironmentWriteRef, ReadManager, WriteManager},
         error::DatabaseError,
         test_utils::test_cell_env,
     };
@@ -203,7 +203,7 @@ mod tests {
 
     // publish ops setup
     async fn setup<'env>(
-        env_ref: &EnvironmentRefRw<'env>,
+        env_ref: &EnvironmentWriteRef<'env>,
         dbs: &impl GetDb,
         num_agents: u32,
         num_hash: u32,
@@ -302,7 +302,7 @@ mod tests {
 
     // Call the workflow
     async fn call_workflow<'env>(
-        env_ref: &EnvironmentRefRw<'env>,
+        env_ref: &EnvironmentWriteRef<'env>,
         dbs: &impl GetDb,
         mut cell_network: HolochainP2pCell,
         delay: Duration,

@@ -136,7 +136,7 @@ mod tests {
             source_chain
                 .put(
                     builder::EntryCreate {
-                        entry_type: EntryType::App(fake_app_entry_type(0, visibility)),
+                        entry_type: EntryType::App(fake_app_entry_type(0.into(), visibility)),
                         entry_hash,
                     },
                     Some(app_entry),

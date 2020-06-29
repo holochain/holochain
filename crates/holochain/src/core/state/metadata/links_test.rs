@@ -1,6 +1,7 @@
 use super::*;
 use crate::fixt::{
     EntryHashFixturator, KnownLinkAdd, KnownLinkRemove, LinkAddFixturator, LinkRemoveFixturator,
+    ZomeIdFixturator,
 };
 use fixt::prelude::*;
 use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
@@ -24,7 +25,7 @@ struct TestData {
 
 async fn fixtures(n: usize) -> Vec<TestData> {
     let mut tag_fix = BytesFixturator::new(Predictable);
-    let mut zome_id = U8Fixturator::new(Predictable);
+    let mut zome_id = ZomeIdFixturator::new(Predictable);
     let mut data = Vec::new();
     let mut base_hash_fixt = EntryHashFixturator::new(Predictable);
     let mut target_hash_fixt = EntryHashFixturator::new(Unpredictable);
