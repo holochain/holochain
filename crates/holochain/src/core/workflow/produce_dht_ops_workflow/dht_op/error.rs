@@ -15,7 +15,7 @@ pub enum DhtOpConvertError {
     MissingEntry,
     #[error("Data for a DhtOp was missing from the source chain")]
     MissingData,
-    #[error("Tried to create a StoreEntry with a header that is not EntryCreate or EntryUpdate")]
+    #[error("Tried to create a StoreEntry with a header that is not EntryCreate or ElementUpdate")]
     HeaderEntryMismatch,
     #[error(
         "Entry was missing for StoreEntry when private. Maybe the database doesn't have access"

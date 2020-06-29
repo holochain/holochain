@@ -157,22 +157,22 @@ pub trait MetadataBufT {
         agent_pub_key: AgentPubKey,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::EntryUpdate] with the referenced [Header] or [Entry]
+    /// Registers a [Header::ElementUpdate] with the referenced [Header] or [Entry]
     async fn register_update(
         &mut self,
-        update: header::EntryUpdate,
+        update: header::ElementUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::EntryDelete] with the Entry of the referenced Header
+    /// Registers a [Header::ElementDelete] with the Entry of the referenced Header
     async fn register_entry_delete(
         &mut self,
-        delete: header::EntryDelete,
+        delete: header::ElementDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::EntryDelete] with the referenced [Header]
-    async fn register_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
+    /// Registers a [Header::ElementDelete] with the referenced [Header]
+    async fn register_header_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
 
     /// Returns all the [HeaderHash]es of headers that created this [Entry]
     fn get_headers(
@@ -186,13 +186,13 @@ pub trait MetadataBufT {
         header_hash: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the hashes of [EntryUpdate] headers registered on an [Entry]
+    /// Returns all the hashes of [ElementUpdate] headers registered on an [Entry]
     fn get_updates(
         &self,
         hash: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the hashes of [EntryDelete] headers registered on a Header
+    /// Returns all the hashes of [ElementDelete] headers registered on a Header
     fn get_deletes(
         &self,
         entry_or_new_entry_header: AnyDhtHash,
@@ -212,11 +212,11 @@ pub trait MetadataBufT {
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
-    /// Either a [EntryCreate] or [EntryUpdate]
+    /// Either a [EntryCreate] or [ElementUpdate]
     NewEntry(HeaderHash),
-    /// An [EntryUpdate] [Header]
+    /// An [ElementUpdate] [Header]
     Update(HeaderHash),
-    /// An [Header::EntryDelete]
+    /// An [Header::ElementDelete]
     Delete(HeaderHash),
     /// Activity on an agent's public key
     Activity(HeaderHash),
@@ -281,15 +281,15 @@ impl From<NewEntryHeader> for EntryHeader {
     }
 }
 
-impl From<header::EntryUpdate> for EntryHeader {
-    fn from(h: header::EntryUpdate) -> Self {
-        EntryHeader::Update(Header::EntryUpdate(h))
+impl From<header::ElementUpdate> for EntryHeader {
+    fn from(h: header::ElementUpdate) -> Self {
+        EntryHeader::Update(Header::ElementUpdate(h))
     }
 }
 
-impl From<header::EntryDelete> for EntryHeader {
-    fn from(h: header::EntryDelete) -> Self {
-        EntryHeader::Delete(Header::EntryDelete(h))
+impl From<header::ElementDelete> for EntryHeader {
+    fn from(h: header::ElementDelete) -> Self {
+        EntryHeader::Delete(Header::ElementDelete(h))
     }
 }
 
@@ -398,13 +398,13 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     #[allow(clippy::needless_lifetimes)]
     async fn register_update(
         &mut self,
-        update: header::EntryUpdate,
+        update: header::ElementUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()> {
         let basis: AnyDhtHash = match (&update.intended_for, entry) {
             (header::IntendedFor::Header, None) => update.replaces_address.clone().into(),
             (header::IntendedFor::Header, Some(_)) => {
-                panic!("Can't update to entry when EntryUpdate points to header")
+                panic!("Can't update to entry when ElementUpdate points to header")
             }
             (header::IntendedFor::Entry, None) => {
                 panic!("Can't update to entry with no entry hash")
@@ -418,14 +418,14 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     #[allow(clippy::needless_lifetimes)]
     async fn register_entry_delete(
         &mut self,
-        delete: header::EntryDelete,
+        delete: header::ElementDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()> {
         self.register_header_to_basis(delete, entry_hash).await
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn register_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
+    async fn register_header_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
         self.register_header_to_basis(delete, remove).await
     }

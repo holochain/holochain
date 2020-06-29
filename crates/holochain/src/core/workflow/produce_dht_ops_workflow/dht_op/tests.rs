@@ -3,9 +3,8 @@ use crate::{
     core::state::chain_cas::ChainCasBuf,
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
-        EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
-        EntryUpdateFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
-        LinkRemoveFixturator,
+        ElementUpdateFixturator, EntryCreateFixturator, EntryFixturator, EntryHashFixturator,
+        EntryTypeFixturator, InitZomesCompleteFixturator, LinkAddFixturator, LinkRemoveFixturator,
     },
 };
 use fixt::prelude::*;
@@ -19,7 +18,7 @@ use holochain_types::{
     fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},
     header::{
         builder::{self, HeaderBuilder},
-        AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate,
+        AgentValidationPkg, ChainClose, ChainOpen, Dna, ElementUpdate, EntryCreate, EntryType,
         HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove, NewEntryHeader,
     },
     observability, Entry, EntryHashed, Header, HeaderHashed,
@@ -88,8 +87,8 @@ impl ChainElementTest {
         (entry_create, element)
     }
 
-    fn update_element(&mut self) -> (EntryUpdate, ChainElement) {
-        let entry_update = builder::EntryUpdate {
+    fn update_element(&mut self) -> (ElementUpdate, ChainElement) {
+        let entry_update = builder::ElementUpdate {
             intended_for: self.intended_for.clone(),
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
@@ -146,7 +145,7 @@ impl ChainElementTest {
     }
 
     fn entry_delete(mut self) -> (ChainElement, Vec<DhtOp>) {
-        let entry_delete = builder::EntryDelete {
+        let entry_delete = builder::ElementDelete {
             removes_address: self.header_hash.clone().into(),
         }
         .build(self.commons.next().unwrap());
@@ -274,7 +273,7 @@ async fn test_dht_basis() {
         cas.put(signed_header, Some(entry_hashed)).unwrap();
 
         // Create the update header with the same hash
-        let mut entry_update = fixt!(EntryUpdate);
+        let mut entry_update = fixt!(ElementUpdate);
         entry_update.intended_for = IntendedFor::Entry;
         entry_update.replaces_address = original_header_hash;
 

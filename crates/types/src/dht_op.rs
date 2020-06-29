@@ -64,13 +64,13 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
+    RegisterReplacedBy(Signature, header::ElementUpdate, Option<Box<Entry>>),
 
     /// Op for deleting an entry
-    RegisterDeletedBy(Signature, header::EntryDelete),
+    RegisterDeletedBy(Signature, header::ElementDelete),
 
     /// Op for deleting a header
-    RegisterDeletedHeaderBy(Signature, header::EntryDelete),
+    RegisterDeletedHeaderBy(Signature, header::ElementDelete),
 
     /// Op for adding a link
     RegisterAddLink(Signature, header::LinkAdd),
@@ -101,9 +101,9 @@ enum UniqueForm<'a> {
     StoreElement(&'a Header),
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
-    RegisterReplacedBy(&'a header::EntryUpdate),
-    RegisterDeletedBy(&'a header::EntryDelete),
-    RegisterDeletedHeaderBy(&'a header::EntryDelete),
+    RegisterReplacedBy(&'a header::ElementUpdate),
+    RegisterDeletedBy(&'a header::ElementDelete),
+    RegisterDeletedHeaderBy(&'a header::ElementDelete),
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
@@ -146,7 +146,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 maybe_entry.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
             ),
         )),
-        Header::EntryUpdate(entry_update) => {
+        Header::ElementUpdate(entry_update) => {
             let entry = maybe_entry
                 .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?;
             ops.push(DhtOp::StoreEntry(
@@ -160,9 +160,9 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 Some(Box::new(entry)),
             ));
         }
-        Header::EntryDelete(entry_delete) => {
+        Header::ElementDelete(entry_delete) => {
             // TODO: VALIDATION: This only works if entry_delete.remove_address is either EntryCreate
-            // or EntryUpdate
+            // or ElementUpdate
             ops.push(DhtOp::RegisterDeletedHeaderBy(
                 sig.clone(),
                 entry_delete.clone(),

@@ -363,10 +363,10 @@ mod tests {
         composite_hash::{AnyDhtHash, EntryHash},
         dht_op::{DhtOp, DhtOpHashed},
         fixt::{
-            AppEntryTypeFixturator, EntryHashFixturator, EntryUpdateFixturator, HeaderFixturator,
+            AppEntryTypeFixturator, ElementUpdateFixturator, EntryHashFixturator, HeaderFixturator,
             NewEntryHeaderFixturator, SignatureFixturator,
         },
-        header::{builder, EntryType, EntryUpdate, NewEntryHeader},
+        header::{builder, ElementUpdate, EntryType, NewEntryHeader},
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         validate::ValidationStatus,
@@ -385,8 +385,8 @@ mod tests {
         entry: Entry,
         any_header: Header,
         agent_key: AgentPubKey,
-        entry_update_header: EntryUpdate,
-        entry_update_entry: EntryUpdate,
+        entry_update_header: ElementUpdate,
+        entry_update_entry: ElementUpdate,
         original_header_hash: HeaderHash,
         original_entry_hash: EntryHash,
         original_header: NewEntryHeader,
@@ -423,13 +423,13 @@ mod tests {
                 .into_hash();
 
             // Entry update for header
-            let mut entry_update_header = fixt!(EntryUpdate);
+            let mut entry_update_header = fixt!(ElementUpdate);
             entry_update_header.entry_hash = entry_hash.clone();
             entry_update_header.intended_for = IntendedFor::Header;
             entry_update_header.replaces_address = original_header_hash.clone();
 
             // Entry update for entry
-            let mut entry_update_entry = fixt!(EntryUpdate);
+            let mut entry_update_entry = fixt!(ElementUpdate);
             entry_update_entry.entry_hash = entry_hash.clone();
             entry_update_entry.intended_for = IntendedFor::Entry;
             entry_update_header.replaces_address = original_header_hash.clone();
@@ -686,7 +686,7 @@ mod tests {
 
     fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         let entry = match &a.any_header {
-            Header::EntryCreate(_) | Header::EntryUpdate(_) => Some(a.entry.clone().into()),
+            Header::EntryCreate(_) | Header::ElementUpdate(_) => Some(a.entry.clone().into()),
             _ => None,
         };
         let op = DhtOp::StoreElement(
@@ -817,7 +817,7 @@ mod tests {
     #[ignore]
     async fn test_integrate_single_register_replaced_by_for_header() {
         // For RegisterReplacedBy with intended_for Header
-        // metadata has EntryUpdate on HeaderHash but not EntryHash
+        // metadata has ElementUpdate on HeaderHash but not EntryHash
         todo!()
     }
 
@@ -825,7 +825,7 @@ mod tests {
     #[ignore]
     async fn test_integrate_single_register_replaced_by_for_entry() {
         // For RegisterReplacedBy with intended_for Entry
-        // metadata has EntryUpdate on EntryHash but not HeaderHash
+        // metadata has ElementUpdate on EntryHash but not HeaderHash
         todo!()
     }
 
@@ -833,7 +833,7 @@ mod tests {
     #[ignore]
     async fn test_integrate_single_register_header_deleted_by() {
         // For RegisterDeletedBy
-        // metadata has EntryDelete on HeaderHash
+        // metadata has ElementDelete on HeaderHash
         todo!()
     }
 

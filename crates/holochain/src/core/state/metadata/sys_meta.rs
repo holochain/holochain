@@ -65,8 +65,8 @@ mod tests {
         entry_hash: EntryHash,
         intended_for: IntendedFor,
         fx: &mut TestFixtures,
-    ) -> (header::EntryUpdate, HeaderHashed) {
-        let builder = builder::EntryUpdate {
+    ) -> (header::ElementUpdate, HeaderHashed) {
+        let builder = builder::ElementUpdate {
             intended_for,
             replaces_address,
             entry_hash,
@@ -97,8 +97,8 @@ mod tests {
     async fn test_delete(
         removes_address: HeaderAddress,
         fx: &mut TestFixtures,
-    ) -> (header::EntryDelete, HeaderHashed) {
-        let builder = builder::EntryDelete { removes_address };
+    ) -> (header::ElementDelete, HeaderHashed) {
+        let builder = builder::ElementDelete { removes_address };
         let delete = builder.build(fx.common());
         let header = HeaderHashed::with_data(delete.clone().into())
             .await
