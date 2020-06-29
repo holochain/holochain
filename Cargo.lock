@@ -1009,9 +1009,9 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.2.0-alpha.11"
+version = "0.2.0-alpha.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c05b6364f0173b004f6f19d4d9b5e01d694bdd0d2d94aabf7629f6a9549b1096"
+checksum = "0996625f3afbdea2b7f76995bf1cc3523c2fc501f3486b3cd6e656f68184b805"
 dependencies = [
  "futures",
  "must_future",

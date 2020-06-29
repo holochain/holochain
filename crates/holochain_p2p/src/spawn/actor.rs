@@ -171,16 +171,12 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let request = crate::wire::WireMessage::decode(payload).map_err(HolochainP2pError::from)?;
 
         match request {
-            // this is a request type, not a broadcast
-            crate::wire::WireMessage::CallRemote { .. } => {
+            // error on these call type messages
+            crate::wire::WireMessage::CallRemote { .. }
+            | crate::wire::WireMessage::Get { .. }
+            | crate::wire::WireMessage::ValidationReceipt { .. } => {
                 return Err(HolochainP2pError::invalid_p2p_message(
-                    "invalid: call_remote is a request type, not a broadcast".to_string(),
-                )
-                .into())
-            }
-            crate::wire::WireMessage::Get { .. } => {
-                return Err(HolochainP2pError::invalid_p2p_message(
-                    "invalid: get is a request type, not a broadcast".to_string(),
+                    "invalid call type message in a notify".to_string(),
                 )
                 .into())
             }
@@ -197,13 +193,6 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 dht_hash,
                 ops,
             ),
-            // this is a request type, not a broadcast
-            crate::wire::WireMessage::ValidationReceipt { .. } => {
-                return Err(HolochainP2pError::invalid_p2p_message(
-                    "invalid: validation_receipt is a request type, not a broadcast".to_string(),
-                )
-                .into())
-            }
         }
     }
 
