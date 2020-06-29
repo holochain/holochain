@@ -147,32 +147,35 @@ pub trait MetadataBufT {
         tag: LinkTag,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::NewEntryHeader] with the referenced [Entry]
+    /// Registers a [Header::NewEntryHeader] on the referenced [Entry]
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
-    /// Registers a published [Header] with the authoring agent's public key
+    /// Registers a published [Header] on the authoring agent's public key
     async fn register_activity(
         &mut self,
         header: Header,
         agent_pub_key: AgentPubKey,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::ElementUpdate] with the referenced [Header] or [Entry]
+    /// Registers a [Header::ElementUpdate] on the referenced [Header] or [Entry]
     async fn register_update(
         &mut self,
         update: header::ElementUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::ElementDelete] with the Entry of the referenced Header
-    async fn register_entry_delete(
+    /// Registers a [Header::ElementDelete] on the Entry of the referenced Header
+    async fn register_delete_on_entry(
         &mut self,
         delete: header::ElementDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::ElementDelete] with the referenced [Header]
-    async fn register_header_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
+    /// Registers a [Header::ElementDelete] on the referenced [Header]
+    async fn register_delete_on_header(
+        &mut self,
+        delete: header::ElementDelete,
+    ) -> DatabaseResult<()>;
 
     /// Returns all the [HeaderHash]es of headers that created this [Entry]
     fn get_headers(
@@ -414,9 +417,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.register_header_to_basis(update, basis).await
     }
 
-    // MDD: This seems like it should be replaced by register_header_delete
+    // MDD: This seems like it should be replaced by register_delete_on_header
     #[allow(clippy::needless_lifetimes)]
-    async fn register_entry_delete(
+    async fn register_delete_on_entry(
         &mut self,
         delete: header::ElementDelete,
         entry_hash: EntryHash,
@@ -425,7 +428,10 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn register_header_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+    async fn register_delete_on_header(
+        &mut self,
+        delete: header::ElementDelete,
+    ) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
         self.register_header_to_basis(delete, remove).await
     }

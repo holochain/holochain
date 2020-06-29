@@ -484,7 +484,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf.register_header_delete(delete).await.unwrap();
+                meta_buf.register_delete_on_header(delete).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_deletes(header_hash.clone().into())

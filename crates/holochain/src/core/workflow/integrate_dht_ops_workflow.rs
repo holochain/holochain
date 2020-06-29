@@ -149,7 +149,7 @@ async fn integrate_dht_ops_workflow_inner(
                     .register_update(entry_update, old_entry_hash)
                     .await?;
             }
-            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+            DhtOp::RegisterDeletedHeader(_, entry_delete) => {
                 let entry_hash = match workspace
                     .cas
                     .get_header(&entry_delete.removes_address)
@@ -174,11 +174,14 @@ async fn integrate_dht_ops_workflow_inner(
                 };
                 workspace
                     .meta
-                    .register_entry_delete(entry_delete, entry_hash)
+                    .register_delete_on_entry(entry_delete, entry_hash)
                     .await?
             }
-            DhtOp::RegisterDeletedHeaderBy(_, entry_delete) => {
-                workspace.meta.register_header_delete(entry_delete).await?
+            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+                workspace
+                    .meta
+                    .register_delete_on_header(entry_delete)
+                    .await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 workspace.meta.add_link(link_add.clone()).await?;
@@ -831,8 +834,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     #[ignore]
-    async fn test_integrate_single_register_header_deleted_by() {
-        // For RegisterDeletedBy
+    async fn test_integrate_single_register_delete_on_headerd_by() {
+        // For RegisterDeletedHeader
         // metadata has ElementDelete on HeaderHash
         todo!()
     }
