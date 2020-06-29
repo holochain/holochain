@@ -193,7 +193,7 @@ async fn integrate_dht_ops_workflow_inner(
                 // header on the Base
                 if let None = workspace.cas.get_entry(&link_remove.base_address).await? {
                     warn!(
-                        "Storing link data when not an author or authority requires the 
+                        "Storing link data when not an author or authority requires the
                          cache metadata store.
                          The cache metadata store is currently unimplemented"
                     );
