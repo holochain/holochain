@@ -338,6 +338,12 @@ impl<'env> MetadataBuf<'env> {
         self.system_meta.insert(key.into(), sys_val);
         Ok(())
     }
+
+    #[cfg(test)]
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.links_meta.clear_all(writer)?;
+        self.system_meta.clear_all(writer)
+    }
 }
 
 #[async_trait::async_trait]

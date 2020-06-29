@@ -51,7 +51,7 @@ impl TryFrom<IntegrationQueueKey> for (Timestamp, DhtOpHash) {
 }
 
 /// A type for storing in databases that only need the hashes.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct IntegrationValue {
     /// Thi ops validation status
     pub validation_status: ValidationStatus,
@@ -62,7 +62,7 @@ pub struct IntegrationValue {
 }
 
 /// A type for storing in databases that only need the hashes.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct IntegrationQueueValue {
     /// Thi ops validation status
     pub validation_status: ValidationStatus,

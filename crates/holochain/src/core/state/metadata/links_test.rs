@@ -3,15 +3,10 @@ use crate::fixt::{
     EntryHashFixturator, KnownLinkAdd, KnownLinkRemove, LinkAddFixturator, LinkRemoveFixturator,
     ZomeIdFixturator,
 };
+use crate::here;
 use fixt::prelude::*;
 use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
 use holochain_types::observability;
-
-macro_rules! here {
-    ($test: expr) => {
-        concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
-    };
-}
 
 #[derive(Clone)]
 struct TestData {

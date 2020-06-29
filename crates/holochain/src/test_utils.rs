@@ -10,6 +10,13 @@ use holochain_types::{
 use holochain_zome_types::entry_def::EntryVisibility;
 use std::convert::TryInto;
 
+#[macro_export]
+macro_rules! here {
+    ($test: expr) => {
+        concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
+    };
+}
+
 /// Create a fake SignedHeaderHashed and EntryHashed pair with random content
 pub async fn fake_unique_element(
     keystore: &KeystoreSender,

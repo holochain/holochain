@@ -158,10 +158,7 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
 mod tests {
     use super::*;
     use crate::{
-        core::{
-            state::cascade::{test_dbs_and_mocks, Cascade},
-            workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
-        },
+        core::workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
     use fixt::prelude::*;
@@ -491,9 +488,7 @@ mod tests {
         }
         let (store_element, store_entry, register_replaced_by) = {
             let reader = env_ref.reader().unwrap();
-            // Create easy way to create test cascade
-            let (cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
-            let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+            let cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
 
             let op = DhtOp::StoreElement(
                 sig.clone(),
@@ -501,14 +496,14 @@ mod tests {
                 Some(original_entry.clone().into()),
             );
             let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+            let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
             let store_element = (op_hash, light, basis, expected_op);
 
             // Create StoreEntry
             let header = NewEntryHeader::Create(entry_create.clone());
             let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+            let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
             let store_entry = (op_hash, light, basis);
 
@@ -519,7 +514,7 @@ mod tests {
                 Some(new_entry.clone().into()),
             );
             let expected_op = DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+            let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
             let register_replaced_by = (op_hash, light, basis, expected_op);
 

@@ -4,7 +4,6 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        cascade::Cascade,
         chain_cas::ChainCasBuf,
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue, IntegrationValue,
@@ -28,7 +27,7 @@ use holochain_types::{
     header::IntendedFor,
     EntryHashed, Header, HeaderHashed, Timestamp,
 };
-use produce_dht_ops_workflow::dht_op::dht_op_to_light_basis;
+use produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, error::DhtOpConvertError};
 use std::convert::TryInto;
 use tracing::*;
 
@@ -249,9 +248,21 @@ async fn integrate_dht_ops_workflow_inner(
             }
         }
 
-        // TODO: Instead of using the cascade use the cas and don't error
-        // The op should just be put back on the queue if the old entry isn't found
-        let (op, basis) = dht_op_to_light_basis(op, &workspace.cascade()).await?;
+        // TODO: PERF: Aviod this clone by returning the op on error
+        let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.cas).await {
+            Ok(l) => l,
+            Err(DhtOpConvertError::MissingEntry) => {
+                workspace.integration_queue.put(
+                    (Timestamp::now(), op_hash).try_into()?,
+                    IntegrationQueueValue {
+                        validation_status,
+                        op,
+                    },
+                )?;
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+        };
         let value = IntegrationValue {
             validation_status,
             basis,
@@ -274,21 +285,10 @@ pub struct IntegrateDhtOpsWorkspace<'env> {
     cas: ChainCasBuf<'env>,
     // metadata store
     meta: MetadataBuf<'env>,
-    // cache for looking up entries
-    cache: ChainCasBuf<'env>,
-    // cached meta for the cascade
-    cache_meta: MetadataBuf<'env>,
-}
-
-impl<'env> IntegrateDhtOpsWorkspace<'env> {
-    fn cascade(&self) -> Cascade {
-        Cascade::new(&self.cas, &self.meta, &self.cache, &self.cache_meta)
-    }
 }
 
 impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
     /// Constructor
-    #[allow(dead_code)]
     fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBuf::new(reader, db)?;
@@ -297,17 +297,13 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let integration_queue = KvBuf::new(reader, db)?;
 
         let cas = ChainCasBuf::primary(reader, dbs, true)?;
-        let cache = ChainCasBuf::cache(reader, dbs)?;
         let meta = MetadataBuf::primary(reader, dbs)?;
-        let cache_meta = MetadataBuf::cache(reader, dbs)?;
 
         Ok(Self {
             integration_queue,
             integrated_dht_ops,
             cas,
             meta,
-            cache,
-            cache_meta,
         })
     }
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
@@ -327,6 +323,7 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
 mod tests {
     use super::*;
 
+    use crate::here;
     use crate::{
         conductor::{
             api::{
@@ -337,24 +334,36 @@ mod tests {
         },
         core::{
             ribosome::{NamedInvocation, ZomeCallInvocationFixturator},
-            state::{metadata::LinkMetaKey, source_chain::SourceChain},
+            state::{
+                cascade::{test_dbs_and_mocks, Cascade},
+                metadata::LinkMetaKey,
+                source_chain::SourceChain,
+                workspace::WorkspaceError,
+            },
             SourceChainError,
         },
-        fixt::{EntryCreateFixturator, EntryFixturator},
+        fixt::EntryFixturator,
     };
     use fixt::prelude::*;
-    use holo_hash::{AgentPubKeyFixturator, Hashable, Hashed};
+    use holo_hash::{AgentPubKeyFixturator, Hashable, Hashed, HeaderHash};
+    use holochain_keystore::Signature;
     use holochain_state::{
         buffer::BufferedStore,
-        env::{ReadManager, WriteManager},
+        env::{
+            EnvironmentReadRef, EnvironmentWrite, EnvironmentWriteRef, ReadManager, WriteManager,
+        },
         error::DatabaseError,
         test_utils::{test_cell_env, test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload},
+        composite_hash::{AnyDhtHash, EntryHash},
         dht_op::{DhtOp, DhtOpHashed},
-        fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        header::{builder, EntryType, NewEntryHeader},
+        fixt::{
+            AppEntryTypeFixturator, EntryHashFixturator, EntryUpdateFixturator, HeaderFixturator,
+            NewEntryHeaderFixturator, SignatureFixturator,
+        },
+        header::{builder, EntryType, EntryUpdate, NewEntryHeader},
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         validate::ValidationStatus,
@@ -367,107 +376,438 @@ mod tests {
     use unwrap_to::unwrap_to;
     use uuid::Uuid;
 
+    struct TestData {
+        signature: Signature,
+        new_entry_header: NewEntryHeader,
+        entry: Entry,
+        any_header: Header,
+        agent_key: AgentPubKey,
+        entry_update_header: EntryUpdate,
+        entry_update_entry: EntryUpdate,
+        original_header_hash: HeaderHash,
+        original_entry_hash: EntryHash,
+        original_header: NewEntryHeader,
+    }
+
+    impl TestData {
+        async fn new() -> Self {
+            // New entry
+            let entry = fixt!(Entry);
+            let entry_hash = EntryHashed::with_data(entry.clone())
+                .await
+                .unwrap()
+                .into_hash();
+
+            // Header for the new entry
+            let mut new_entry_header = fixt!(NewEntryHeader);
+
+            // Update to new entry
+            match &mut new_entry_header {
+                NewEntryHeader::Create(c) => c.entry_hash = entry_hash.clone(),
+                NewEntryHeader::Update(u) => u.entry_hash = entry_hash.clone(),
+            }
+
+            // Original entry and header for updates
+            let original_entry_hash = fixt!(EntryHash);
+            let mut original_header = fixt!(NewEntryHeader);
+            match &mut original_header {
+                NewEntryHeader::Create(c) => c.entry_hash = original_entry_hash.clone(),
+                NewEntryHeader::Update(u) => u.entry_hash = original_entry_hash.clone(),
+            }
+            let original_header_hash = HeaderHashed::with_data(original_header.clone().into())
+                .await
+                .unwrap()
+                .into_hash();
+
+            // Entry update for header
+            let mut entry_update_header = fixt!(EntryUpdate);
+            entry_update_header.entry_hash = entry_hash.clone();
+            entry_update_header.intended_for = IntendedFor::Header;
+            entry_update_header.replaces_address = original_header_hash.clone();
+
+            // Entry update for entry
+            let mut entry_update_entry = fixt!(EntryUpdate);
+            entry_update_entry.entry_hash = entry_hash.clone();
+            entry_update_entry.intended_for = IntendedFor::Entry;
+            entry_update_header.replaces_address = original_header_hash.clone();
+
+            Self {
+                signature: fixt!(Signature),
+                entry,
+                any_header: fixt!(Header),
+                agent_key: fixt!(AgentPubKey),
+                entry_update_header,
+                entry_update_entry,
+                original_header,
+                original_header_hash,
+                original_entry_hash,
+                new_entry_header,
+            }
+        }
+    }
+
+    enum Db {
+        Integrated(DhtOp),
+        IntegratedEmpty,
+        IntQueue(DhtOp),
+        CasHeader(Header, Option<Signature>),
+        CasEntry(Entry, Option<Header>, Option<Signature>),
+        MetaEmpty,
+        MetaHeader(Entry, Header),
+        MetaActivity(AgentPubKey, Header),
+        MetaUpdate(AnyDhtHash, Header),
+    }
+
+    impl Db {
+        async fn check<'env>(
+            expects: Vec<Self>,
+            env_ref: &'env EnvironmentReadRef<'env>,
+            dbs: &'env impl GetDb,
+            here: String,
+        ) {
+            let reader = env_ref.reader().unwrap();
+            let workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
+            for expect in expects {
+                match expect {
+                    Db::Integrated(op) => {
+                        let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                        let (op, basis) = dht_op_to_light_basis(op, &workspace.cas)
+                            .await
+                            .expect(&format!("Failed to generate light for {}", here));
+                        let value = IntegrationValue {
+                            validation_status: ValidationStatus::Valid,
+                            basis,
+                            op,
+                        };
+                        assert_eq!(
+                            workspace.integrated_dht_ops.get(&op_hash).unwrap(),
+                            Some(value),
+                            "{}",
+                            here
+                        );
+                    }
+                    Db::IntQueue(op) => {
+                        let value = IntegrationQueueValue {
+                            validation_status: ValidationStatus::Valid,
+                            op,
+                        };
+                        let res = workspace
+                            .integration_queue
+                            .iter()
+                            .unwrap()
+                            .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [value];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
+                    Db::CasHeader(header, _) => {
+                        let hash = HeaderHashed::with_data(header.clone()).await.unwrap();
+                        assert_eq!(
+                            workspace
+                                .cas
+                                .get_header(hash.as_hash())
+                                .await
+                                .unwrap()
+                                .expect(&format!("Header {:?} not in cas for {}", header, here))
+                                .header(),
+                            &header,
+                            "{}",
+                            here,
+                        );
+                    }
+                    Db::CasEntry(entry, _, _) => {
+                        let hash = EntryHashed::with_data(entry.clone())
+                            .await
+                            .unwrap()
+                            .into_hash();
+                        assert_eq!(
+                            workspace
+                                .cas
+                                .get_entry(&hash)
+                                .await
+                                .unwrap()
+                                .expect(&format!("Entry {:?} not in cas for {}", entry, here))
+                                .into_content(),
+                            entry,
+                            "{}",
+                            here,
+                        );
+                    }
+                    Db::MetaHeader(entry, header) => {
+                        let header_hash = HeaderHashed::with_data(header.clone())
+                            .await
+                            .unwrap()
+                            .into_hash();
+                        let entry_hash = EntryHashed::with_data(entry.clone())
+                            .await
+                            .unwrap()
+                            .into_hash();
+                        let res = workspace
+                            .meta
+                            .get_headers(entry_hash)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
+                    Db::MetaActivity(agent_key, header) => {
+                        let header_hash = HeaderHashed::with_data(header.clone())
+                            .await
+                            .unwrap()
+                            .into_hash();
+                        let res = workspace
+                            .meta
+                            .get_activity(agent_key)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
+                    Db::MetaUpdate(base, header) => {
+                        let header_hash = HeaderHashed::with_data(header.clone())
+                            .await
+                            .unwrap()
+                            .into_hash();
+                        let res = workspace
+                            .meta
+                            .get_updates(base)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
+                    Db::IntegratedEmpty => {
+                        assert_eq!(
+                            workspace
+                                .integrated_dht_ops
+                                .iter()
+                                .unwrap()
+                                .count()
+                                .unwrap(),
+                            0,
+                            "{}",
+                            here
+                        );
+                    }
+                    Db::MetaEmpty => {
+                        // TODO: Not currently possible because kvv bufs have no iterator over all keys
+                    }
+                }
+            }
+        }
+
+        async fn set<'env>(
+            pre_state: Vec<Self>,
+            env_ref: &'env EnvironmentWriteRef<'env>,
+            dbs: &impl GetDb,
+        ) {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
+            for state in pre_state {
+                match state {
+                    Db::Integrated(_) => {}
+                    Db::IntQueue(op) => {
+                        let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                        let val = IntegrationQueueValue {
+                            validation_status: ValidationStatus::Valid,
+                            op,
+                        };
+                        workspace
+                            .integration_queue
+                            .put((Timestamp::now(), op_hash).try_into().unwrap(), val)
+                            .unwrap();
+                    }
+                    Db::CasHeader(header, signature) => {
+                        let header_hash = HeaderHashed::with_data(header.clone()).await.unwrap();
+                        let signed_header =
+                            SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
+                        workspace.cas.put(signed_header, None).unwrap();
+                    }
+                    Db::CasEntry(entry, header, signature) => {
+                        let header_hash = HeaderHashed::with_data(header.unwrap().clone())
+                            .await
+                            .unwrap();
+                        let entry_hash = EntryHashed::with_data(entry.clone()).await.unwrap();
+                        let signed_header =
+                            SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
+                        workspace.cas.put(signed_header, Some(entry_hash)).unwrap();
+                    }
+                    Db::MetaHeader(_, _) => {}
+                    Db::MetaActivity(_, _) => {}
+                    Db::MetaUpdate(_, _) => {}
+                    Db::IntegratedEmpty => {}
+                    Db::MetaEmpty => {}
+                }
+            }
+            // Commit workspace
+            env_ref
+                .with_commit::<WorkspaceError, _, _>(|writer| {
+                    workspace.flush_to_txn(writer)?;
+                    Ok(())
+                })
+                .unwrap();
+        }
+    }
+
+    async fn call_workflow<'env>(
+        env_ref: &'env EnvironmentReadRef<'env>,
+        dbs: &'env impl GetDb,
+        env: EnvironmentWrite,
+        agent_key: AgentPubKey,
+    ) {
+        let reader = env_ref.reader().unwrap();
+        let workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
+        let (mut qt, _rx) = TriggerSender::new();
+        integrate_dht_ops_workflow(workspace, env.into(), &mut qt, agent_key)
+            .await
+            .unwrap();
+    }
+
+    fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl GetDb) {
+        let reader = env_ref.reader().unwrap();
+        let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
+        env_ref
+            .with_commit::<DatabaseError, _, _>(|writer| {
+                workspace.integration_queue.clear_all(writer)?;
+                workspace.integrated_dht_ops.clear_all(writer)?;
+                workspace.cas.clear_all(writer)?;
+                workspace.meta.clear_all(writer)?;
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let entry = match &a.any_header {
+            Header::EntryCreate(_) | Header::EntryUpdate(_) => Some(a.entry.clone().into()),
+            _ => None,
+        };
+        let op = DhtOp::StoreElement(
+            a.signature.clone(),
+            a.any_header.clone().into(),
+            entry.clone(),
+        );
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let mut expect = vec![
+            Db::Integrated(op.clone()),
+            Db::CasHeader(a.any_header.clone().into(), None),
+        ];
+        if let Some(_) = &entry {
+            expect.push(Db::CasEntry(a.entry.clone(), None, None));
+        }
+        (pre_state, expect, "store element")
+    }
+
+    fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::StoreEntry(
+            a.signature.clone(),
+            a.new_entry_header.clone(),
+            a.entry.clone().into(),
+        );
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![
+            Db::Integrated(op.clone()),
+            Db::CasHeader(a.new_entry_header.clone().into(), None),
+            Db::CasEntry(a.entry.clone(), None, None),
+            Db::MetaHeader(a.entry.clone(), a.new_entry_header.clone().into()),
+        ];
+        (pre_state, expect, "store entry")
+    }
+
+    fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.any_header.clone());
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![
+            Db::Integrated(op.clone()),
+            Db::MetaActivity(a.agent_key.clone(), a.any_header.clone()),
+        ];
+        (pre_state, expect, "register agent activity")
+    }
+
+    fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterReplacedBy(
+            a.signature.clone(),
+            a.entry_update_header.clone(),
+            Some(a.entry.clone().into()),
+        );
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![
+            Db::Integrated(op.clone()),
+            Db::MetaUpdate(
+                a.original_header_hash.clone().into(),
+                a.entry_update_header.clone().into(),
+            ),
+        ];
+        (pre_state, expect, "register replaced by for header")
+    }
+
+    fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterReplacedBy(
+            a.signature.clone(),
+            a.entry_update_entry.clone(),
+            Some(a.entry.clone().into()),
+        );
+        let pre_state = vec![
+            Db::IntQueue(op.clone()),
+            Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        ];
+        let expect = vec![
+            Db::CasHeader(a.original_header.clone().into(), None),
+            Db::Integrated(op.clone()),
+            Db::MetaUpdate(
+                a.original_entry_hash.clone().into(),
+                a.entry_update_entry.clone().into(),
+            ),
+        ];
+        (pre_state, expect, "register replaced by for entry")
+    }
+
+    // TODO: Register replaced by without store entry
+    fn register_replaced_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterReplacedBy(
+            a.signature.clone(),
+            a.entry_update_entry.clone(),
+            Some(a.entry.clone().into()),
+        );
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
+        (
+            pre_state,
+            expect,
+            "register replaced by for entry missing entry",
+        )
+    }
+
+    // Entries, Private Entries & Headers are stored to CAS
     #[tokio::test(threaded_scheduler)]
-    async fn test_store_entry() {
-        // Create test env
+    async fn test_ops_state() {
         observability::test_run().ok();
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
-        // Setup test data
-        let mut entry_create = fixt!(EntryCreate);
-        let entry = fixt!(Entry);
-        let entry_hash = EntryHashed::with_data(entry.clone())
-            .await
-            .unwrap()
-            .into_hash();
-        entry_create.entry_hash = entry_hash.clone();
+        let tests = [
+            store_element,
+            store_entry,
+            register_agent_activity,
+            register_replaced_by_for_header,
+            register_replaced_by_for_entry,
+            register_replaced_by_missing_entry,
+        ];
 
-        // create store entry
-        let store_entry = DhtOp::StoreEntry(
-            fixt!(Signature),
-            NewEntryHeader::Create(entry_create.clone()),
-            Box::new(entry.clone()),
-        );
-
-        // Create integration value
-        let val = IntegrationQueueValue {
-            validation_status: ValidationStatus::Valid,
-            op: store_entry.clone(),
-        };
-
-        // Add to integration queue
-        {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let op_hash = DhtOpHashed::with_data(store_entry.clone())
-                .await
-                .into_hash();
-
-            workspace
-                .integration_queue
-                .put((Timestamp::now(), op_hash.clone()).try_into().unwrap(), val)
-                .unwrap();
-
-            env_ref
-                .with_commit::<DatabaseError, _, _>(|writer| {
-                    workspace.integration_queue.flush_to_txn(writer)?;
-                    Ok(())
-                })
-                .unwrap();
+        for t in tests.iter() {
+            clear_dbs(&env_ref, &dbs);
+            let td = TestData::new().await;
+            let agent_key = td.agent_key.clone();
+            let (pre_state, expect, name) = t(td);
+            Db::set(pre_state, &env_ref, &dbs).await;
+            call_workflow(&env_ref, &dbs, env.clone(), agent_key).await;
+            Db::check(expect, &env_ref, &dbs, format!("{}: {}", name, here!(""))).await;
         }
-
-        // Call workflow
-        {
-            let reader = env_ref.reader().unwrap();
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let (mut qt, _rx) = TriggerSender::new();
-            integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt, fixt!(AgentPubKey))
-                .await
-                .unwrap();
-        }
-
-        // Check the entry is now in the Cas
-        {
-            let reader = env_ref.reader().unwrap();
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            workspace
-                .cas
-                .get_entry(&entry_hash)
-                .await
-                .unwrap()
-                .expect("Entry is not in cas");
-        }
-    }
-
-    // Entries, Private Entries & Headers are stored to CAS
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn test_cas_update() {
-        // Pre state
-        // TODO: Entry A
-        // TODO: Header A: EntryCreate creates Entry A
-        // TODO: DhtOp A: StoreElement with Header A and Entry A
-        // TODO: Integration Queue has Op A
-        // TODO: Cache has Entry A and Header A
-        // Test
-        // TODO: Run workflow
-        // Post state
-        // TODO: Check Cas has Entry A and Header A
-        // TODO: Check DhtOp A is in integrated ops db
-        // TODO: Check metadata has Header A on Entry A
-
-        // More general
-        // For all DhtOp (private and public):
-        // Put associated data into cache
-        // Add DhtOps to integration queue
-        // Run workflow
-        // Check all headers from ops are in Cas
-        // If the Op has an entry check it's in the Cas
-        // Check all ops are in integrated ops db
-        // If Op has an entry reference it to the header in the metadata
-        todo!()
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -644,8 +984,9 @@ mod tests {
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let cascade = workspace.cascade();
+            let (cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+            let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);

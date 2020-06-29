@@ -1,4 +1,4 @@
-use crate::core::state::{cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBufT};
+use crate::core::state::chain_cas::ChainCasBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use header::{IntendedFor, NewEntryHeader};
 use holo_hash::{Hashed, HeaderHash};
@@ -19,7 +19,7 @@ mod tests;
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DhtOpLight {
     StoreElement(Signature, HeaderHash, Option<EntryHash>),
     StoreEntry(Signature, HeaderHash, EntryHash),
@@ -32,11 +32,11 @@ pub enum DhtOpLight {
 }
 
 /// Convert a [DhtOp] to a [DhtOpLight] and basis
-pub async fn dht_op_to_light_basis<C: MetadataBufT>(
+pub async fn dht_op_to_light_basis(
     op: DhtOp,
-    cascade: &Cascade<'_, C>,
+    cas: &ChainCasBuf<'_>,
 ) -> DhtOpConvertResult<(DhtOpLight, AnyDhtHash)> {
-    let basis = dht_basis(&op, &cascade).await?;
+    let basis = dht_basis(&op, &cas).await?;
     match op {
         DhtOp::StoreElement(s, h, _) => {
             let e = h.entry_data().map(|(e, _)| e.clone());
@@ -224,10 +224,7 @@ async fn register_delete(
     }
 }
 /// Returns the basis hash which determines which agents will receive this DhtOp
-pub async fn dht_basis<M: MetadataBufT>(
-    op: &DhtOp,
-    cascade: &Cascade<'_, M>,
-) -> DhtOpConvertResult<AnyDhtHash> {
+pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<AnyDhtHash> {
     Ok(match op {
         DhtOp::StoreElement(_, header, _) => {
             let (_, hash): (_, HeaderHash) = header::HeaderHashed::with_data(header.clone())
@@ -239,12 +236,12 @@ pub async fn dht_basis<M: MetadataBufT>(
         DhtOp::RegisterAgentActivity(_, header) => header.author().clone().into(),
         DhtOp::RegisterReplacedBy(_, header, _) => match &header.intended_for {
             IntendedFor::Header => header.replaces_address.clone().into(),
-            IntendedFor::Entry => get_entry_hash_for_header(&header.replaces_address, &cascade)
+            IntendedFor::Entry => get_entry_hash_for_header(&header.replaces_address, &cas)
                 .await?
                 .into(),
         },
         DhtOp::RegisterDeletedBy(_, header) => {
-            get_entry_hash_for_header(&header.removes_address, &cascade)
+            get_entry_hash_for_header(&header.removes_address, &cas)
                 .await?
                 .into()
         }
@@ -254,13 +251,13 @@ pub async fn dht_basis<M: MetadataBufT>(
     })
 }
 
-async fn get_entry_hash_for_header<M: MetadataBufT>(
+async fn get_entry_hash_for_header(
     header_hash: &HeaderHash,
-    cascade: &Cascade<'_, M>,
+    cas: &ChainCasBuf<'_>,
 ) -> DhtOpConvertResult<EntryHash> {
-    let entry = match cascade.dht_get_header_raw(header_hash).await? {
-        Some(header) => header.header().entry_data().map(|(hash, _)| hash.clone()),
-        None => todo!("try getting from the network"),
-    };
+    let entry = cas
+        .get_header(header_hash)
+        .await?
+        .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()));
     entry.ok_or(DhtOpConvertError::MissingEntry)
 }

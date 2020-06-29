@@ -16,8 +16,10 @@ use crate::header::EntryCreate;
 use crate::header::EntryDelete;
 use crate::header::EntryType;
 use crate::header::EntryUpdate;
+use crate::header::Header;
 use crate::header::InitZomesComplete;
 use crate::header::LinkAdd;
+use crate::header::NewEntryHeader;
 use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::link::LinkTag;
@@ -493,4 +495,28 @@ fixturator!(
 fixturator!(
     EntryDelete;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash);
+);
+
+fixturator!(
+    Header;
+    variants [
+        Dna(Dna)
+        AgentValidationPkg(AgentValidationPkg)
+        InitZomesComplete(InitZomesComplete)
+        LinkAdd(LinkAdd)
+        LinkRemove(LinkRemove)
+        ChainOpen(ChainOpen)
+        ChainClose(ChainClose)
+        EntryCreate(EntryCreate)
+        EntryUpdate(EntryUpdate)
+        EntryDelete(EntryDelete)
+    ];
+);
+
+fixturator!(
+    NewEntryHeader;
+    variants [
+        Create(EntryCreate)
+        Update(EntryUpdate)
+    ];
 );
