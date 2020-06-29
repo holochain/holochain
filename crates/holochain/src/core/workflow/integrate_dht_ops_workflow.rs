@@ -980,7 +980,7 @@ mod tests {
 
             let meta = MetadataBuf::primary(&reader, &dbs).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
-            let links = meta.get_links(&key).unwrap();
+            let links = meta.get_links(&key).unwrap(); 
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
