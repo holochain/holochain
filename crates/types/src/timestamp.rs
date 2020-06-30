@@ -84,18 +84,59 @@ impl std::convert::TryFrom<&str> for Timestamp {
     }
 }
 
+/// A representation of a Timestamp which can go into and out of a byte slice
+/// in-place without allocation. Useful for LMDB keys.
+///
+/// The mapping to byte slice involves some bit shifting, and so the bytes
+/// should not be directly used. However, ordering is preserved when mapping
+/// to a TimestampKey, which is what allows us to use it for an LMDB key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TimestampKey([u32; 3]);
+
+impl From<Timestamp> for TimestampKey {
+    fn from(t: Timestamp) -> TimestampKey {
+        let (sec, nsec) = (t.0, t.1);
+        let sec: i128 = (sec as i128) - (i64::MIN as i128);
+        let hi: u32 = ((sec & 0xffffffff00000000) >> 32) as u32;
+        let lo: u32 = (sec & 0x00000000ffffffff) as u32;
+        TimestampKey([hi, lo, nsec])
+    }
+}
+
+impl From<TimestampKey> for Timestamp {
+    fn from(k: TimestampKey) -> Timestamp {
+        let [hi, lo, nsec] = k.0;
+        let sec: i128 = ((hi as i128) << 32) + (lo as i128) + (i64::MIN as i128);
+        Timestamp(sec as i64, nsec)
+    }
+}
+
+impl AsRef<[u8]> for TimestampKey {
+    fn as_ref(&self) -> &[u8] {
+        assert_eq!(self.0.len(), 3);
+        unsafe { core::slice::from_raw_parts(self.0.as_ptr() as *const u8, 12) }
+    }
+}
+
+impl From<&[u8]> for TimestampKey {
+    fn from(bytes: &[u8]) -> Self {
+        assert_eq!(bytes.len(), 12);
+        let slice = unsafe { core::slice::from_raw_parts(bytes.as_ptr() as *const u32, 3) };
+        Self([slice[0], slice[1], slice[2]])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_serialized_bytes::prelude::*;
+    use std::convert::TryInto;
 
     const TEST_TS: &'static str = "2020-05-05T19:16:04.266431045Z";
     const TEST_EN: &'static [u8] = b"\x92\xce\x5e\xb1\xbb\x74\xce\x0f\xe1\x6a\x45";
 
     #[test]
     fn test_timestamp_serialization() {
-        use holochain_serialized_bytes::prelude::*;
-        use std::convert::TryInto;
-
         let t: Timestamp = TEST_TS.try_into().unwrap();
         assert_eq!(t.0, 1588706164);
         assert_eq!(t.1, 266431045);
@@ -110,5 +151,52 @@ mod tests {
         let s: S = sb.try_into().unwrap();
         let t = s.0;
         assert_eq!(TEST_TS, &t.to_string());
+    }
+
+    #[test]
+    fn test_timestamp_key_roundtrips() {
+        // create test timestamps
+        let t1 = Timestamp(i64::MIN, u32::MAX);
+        let t2 = Timestamp(i64::MIN / 4, u32::MAX);
+        let t3: Timestamp = "1930-01-01T00:00:00.999999999Z".try_into().unwrap();
+        let t4: Timestamp = "1970-11-11T14:34:00.000000000Z".try_into().unwrap();
+        let t5: Timestamp = "2020-05-05T19:16:04.266431045Z".try_into().unwrap();
+        let t6 = Timestamp(i64::MAX / 4, u32::MAX);
+        let t7 = Timestamp(i64::MAX, u32::MAX);
+
+        // build corresponding keys
+        let k1 = TimestampKey::from(t1.clone());
+        let k2 = TimestampKey::from(t2.clone());
+        let k3 = TimestampKey::from(t3.clone());
+        let k4 = TimestampKey::from(t4.clone());
+        let k5 = TimestampKey::from(t5.clone());
+        let k6 = TimestampKey::from(t6.clone());
+        let k7 = TimestampKey::from(t7.clone());
+
+        // test Timestamp <-> TimestampKey roundtrip
+        assert_eq!(t1, Timestamp::from(k1.clone()));
+        assert_eq!(t2, Timestamp::from(k2.clone()));
+        assert_eq!(t3, Timestamp::from(k3.clone()));
+        assert_eq!(t4, Timestamp::from(k4.clone()));
+        assert_eq!(t5, Timestamp::from(k5.clone()));
+        assert_eq!(t6, Timestamp::from(k6.clone()));
+        assert_eq!(t7, Timestamp::from(k7.clone()));
+
+        // test TimestampKey::as_ref() <-> TimestampKey roundtrip
+        assert_eq!(k1, k1.as_ref().into());
+        assert_eq!(k2, k2.as_ref().into());
+        assert_eq!(k3, k3.as_ref().into());
+        assert_eq!(k4, k4.as_ref().into());
+        assert_eq!(k5, k5.as_ref().into());
+        assert_eq!(k6, k6.as_ref().into());
+        assert_eq!(k7, k7.as_ref().into());
+
+        // test absolute ordering is preserved when mapping to TimestampKey
+        assert!(k1 < k2);
+        assert!(k2 < k3);
+        assert!(k3 < k4);
+        assert!(k4 < k5);
+        assert!(k5 < k6);
+        assert!(k6 < k7);
     }
 }
