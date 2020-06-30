@@ -417,7 +417,7 @@ mod tests {
     // - No StoreEntry
     // - This workflow does not have access to private entries
     // - Add / Remove links: Currently publish all.
-    // ## Explication 
+    // ## Explication
     // This test is a little big so a quick run down:
     // 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterReplacedBy)
     // 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
