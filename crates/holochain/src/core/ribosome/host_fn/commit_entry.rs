@@ -109,7 +109,14 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::HostContextFixturator;
     use crate::core::state::source_chain::ChainInvalidReason;
-    use crate::core::state::source_chain::SourceChainError;
+    use crate::core::{
+        queue_consumer::TriggerSender,
+        state::source_chain::SourceChainError,
+        workflow::{
+            integrate_dht_ops_workflow::{integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace},
+            produce_dht_ops_workflow::{ProduceDhtOpsWorkspace, produce_dht_ops_workflow},
+        },
+    };
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holo_hash::Hashable;
@@ -231,6 +238,30 @@ pub mod wasm_test {
             .as_slice(),
             output.into_inner().get_raw(),
         );
+
+        // Needs metadata to return get
+        {
+            use crate::core::state::workspace::Workspace;
+            use fixt::prelude::*;
+            use holo_hash::AgentPubKeyFixturator;
+            use holochain_state::env::ReadManager;
+
+            let reader = env_ref.reader().unwrap();
+            let (mut qt, _rx) = TriggerSender::new();
+            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                .await
+                .unwrap();
+            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            integrate_dht_ops_workflow(
+                workspace,
+                env.env.clone().into(),
+                &mut qt,
+                fixt!(AgentPubKey),
+            )
+            .await
+            .unwrap();
+        }
 
         let round: GetEntryOutput = {
             let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
