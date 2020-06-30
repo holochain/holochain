@@ -1092,6 +1092,10 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn test_metadata_from_wasm() {
+    }
+
+    #[tokio::test(threaded_scheduler)]
     #[ignore]
     async fn test_integrate_single_register_replaced_by_for_header() {
         // For RegisterReplacedBy with intended_for Header
