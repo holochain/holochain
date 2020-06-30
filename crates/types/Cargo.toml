@@ -42,7 +42,7 @@ strum = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.10"
 tokio = { version = "0.2", features = [ "blocking" ] }
-tokio_safe_block_on = "0.1.1"
+tokio_safe_block_on = "0.1.2"
 tracing = "=0.1.13"
 tracing-core = "=0.1.10"
 tracing-serde = "=0.1.1"

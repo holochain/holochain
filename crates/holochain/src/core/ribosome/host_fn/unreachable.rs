@@ -5,7 +5,7 @@ use holochain_zome_types::UnreachableInput;
 use holochain_zome_types::UnreachableOutput;
 use std::sync::Arc;
 
-pub async fn unreachable(
+pub fn unreachable(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: UnreachableInput,
