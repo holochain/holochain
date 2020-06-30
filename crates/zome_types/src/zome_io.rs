@@ -39,8 +39,8 @@ wasm_io_types!(
     pub struct CapabilityInput(());
     pub struct CapabilityOutput(());
     // the SerializedBytes will be stuffed into an Entry::App(SB) host side
-    pub struct CommitEntryInput(crate::entry::Entry);
-    pub struct CommitEntryOutput(crate::commit::CommitEntryResult);
+    pub struct CommitEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry));
+    pub struct CommitEntryOutput(holo_hash_core::HoloHashCore);
     // @TODO
     pub struct DecryptInput(());
     pub struct DecryptOutput(());

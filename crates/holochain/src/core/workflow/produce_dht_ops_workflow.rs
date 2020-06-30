@@ -108,9 +108,7 @@ mod tests {
     use holochain_types::{
         dht_op::{ops_from_element, DhtOp, DhtOpHashed},
         header::{builder, EntryType},
-        observability,
-        test_utils::fake_app_entry_type,
-        Entry, EntryHashed,
+        observability, Entry, EntryHashed,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use matches::assert_matches;
@@ -133,10 +131,13 @@ mod tests {
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
             let (app_entry, entry_hash) = EntryHashed::with_data(app_entry).await.unwrap().into();
+            let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+                .next()
+                .unwrap();
             source_chain
                 .put(
                     builder::EntryCreate {
-                        entry_type: EntryType::App(fake_app_entry_type(0.into(), visibility)),
+                        entry_type: EntryType::App(app_entry_type),
                         entry_hash,
                     },
                     Some(app_entry),
