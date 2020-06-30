@@ -114,7 +114,7 @@ pub mod wasm_test {
         state::source_chain::SourceChainError,
         workflow::{
             integrate_dht_ops_workflow::{integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace},
-            produce_dht_ops_workflow::{ProduceDhtOpsWorkspace, produce_dht_ops_workflow},
+            produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
         },
     };
     use crate::fixt::EntryFixturator;
@@ -270,7 +270,7 @@ pub mod wasm_test {
 
         let sb = match round.into_inner() {
             Some(holochain_zome_types::entry::Entry::App(serialized_bytes)) => serialized_bytes,
-            _ => unreachable!(),
+            other => panic!(format!("unexpected output: {:?}", other)),
         };
         // this should be the content "foo" of the committed post
         assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
