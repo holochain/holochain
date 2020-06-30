@@ -1265,8 +1265,8 @@ mod tests {
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
-            let (cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
-            let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+            let (cas, _metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+            let cascade = Cascade::new(&cas, &meta, &cache, &metadata_cache);
 
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();

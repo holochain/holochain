@@ -53,12 +53,13 @@ use tracing::*;
 #[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, C = MetadataBuf<'env>>
+pub struct Cascade<'env, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
 where
+    M: MetadataBufT,
     C: MetadataBufT,
 {
     primary: &'env ChainCasBuf<'env>,
-    primary_meta: &'env C,
+    primary_meta: &'env M,
 
     cache: &'env ChainCasBuf<'env>,
     cache_meta: &'env C,
@@ -80,14 +81,15 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'env, C> Cascade<'env, C>
+impl<'env, M, C> Cascade<'env, M, C>
 where
     C: MetadataBufT,
+    M: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
         primary: &'env ChainCasBuf<'env>,
-        primary_meta: &'env C,
+        primary_meta: &'env M,
         cache: &'env ChainCasBuf<'env>,
         cache_meta: &'env C,
     ) -> Self {
