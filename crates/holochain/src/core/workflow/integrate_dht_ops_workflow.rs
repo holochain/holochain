@@ -26,6 +26,7 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     element::SignedHeaderHashed,
     header::IntendedFor,
+    validate::ValidationStatus,
     EntryHashed, Header, HeaderHashed, Timestamp,
 };
 use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
@@ -39,7 +40,79 @@ pub async fn integrate_dht_ops_workflow(
     writer: OneshotWriter,
     trigger_publish: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    let result = integrate_dht_ops_workflow_inner(&mut workspace).await?;
+    // Pull ops out of queue
+    // TODO: PERF: we collect() only because this iterator cannot cross awaits,
+    // but is there a way to do this without collect()?
+    let ops: Vec<_> = workspace
+        .integration_queue
+        .drain_iter()?
+        .iterator()
+        .collect();
+
+    // Compute hashes for all dht_ops, include in tuples alongside db values
+    let mut ops = futures::future::join_all(
+        ops.into_iter()
+            .map(|val| {
+                val.map(|val| async move {
+                    let IntegrationQueueValue {
+                        op,
+                        validation_status,
+                    } = val;
+                    let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
+                    (
+                        op_hash,
+                        IntegrationQueueValue {
+                            op,
+                            validation_status,
+                        },
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    )
+    .await;
+
+    // Try to process the queue over and over again, until we either exhaust
+    // the queue, or we can no longer integrate anything in the queue.
+    // We do this because items in the queue may depend on one another but may
+    // be out-of-order wrt. dependencies, so there is a chance that by repeating
+    // integration, we may be able to integrate at least one more item.
+    //
+    // A less naive approach would be to intelligently reorder the queue to
+    // guarantee that intra-queue dependencies are correctly ordered, but ain't
+    // nobody got time for that right now! TODO: make time for this?
+    while {
+        let mut num_integrated: usize = 0;
+        let mut next_ops = Vec::new();
+        for (op_hash, value) in ops {
+            match integrate_single_dht_op(&mut workspace, value).await? {
+                Outcome::Integrated(value) => {
+                    workspace.integrated_dht_ops.put(op_hash, value)?;
+                    num_integrated += 1;
+                }
+                Outcome::Deferred(value) => next_ops.push((op_hash, value)),
+            }
+        }
+        ops = next_ops;
+        ops.len() > 0 && num_integrated > 0
+    } { /* NB: this is actually a do-while loop! */ }
+
+    let result = if ops.len() == 0 {
+        // There were no ops deferred, meaning we exhausted the queue
+        WorkComplete::Complete
+    } else {
+        // Re-add the remaining ops to the queue, to be picked up next time.
+        for (op_hash, value) in ops {
+            // TODO: it may be desirable to retain the original timestamp
+            // when re-adding items to the queue for later processing. This is
+            // challenging for now since we don't have access to that original
+            // key. Just a possible note for the future.
+            workspace
+                .integration_queue
+                .put((Timestamp::now(), op_hash).try_into()?, value)?;
+        }
+        WorkComplete::Incomplete
+    };
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -56,28 +129,21 @@ pub async fn integrate_dht_ops_workflow(
 }
 
 #[instrument(skip(workspace))]
-async fn integrate_dht_ops_workflow_inner(
+async fn integrate_single_dht_op(
     workspace: &mut IntegrateDhtOpsWorkspace<'_>,
-) -> WorkflowResult<WorkComplete> {
+    value: IntegrationQueueValue,
+) -> WorkflowResult<Outcome> {
     debug!("Starting integrate dht ops workflow");
-    // Pull ops out of queue
-    // TODO: PERF: Not collect, iterator cannot cross awaits
-    // Find a way to do this.
-    let ops = workspace
-        .integration_queue
-        .drain_iter_reverse()?
-        .collect::<Vec<_>>()?;
-
-    for value in ops {
+    {
         // Process each op
         let IntegrationQueueValue {
             op,
             validation_status,
         } = value;
 
-        let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
-        debug!(?op_hash);
-        debug!(?op);
+        // let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
+        // debug!(?op_hash);
+        // debug!(?op);
 
         // TODO: PERF: We don't really need this clone because dht_to_op_light_basis could
         // return the full op as it's not consumed when making hashes
@@ -129,16 +195,7 @@ async fn integrate_dht_ops_workflow_inner(
                             Some(e) => Some(e),
                             // Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
                             // This is put the op back in the integration queue to try again later
-                            None => {
-                                workspace.integration_queue.put(
-                                    (Timestamp::now(), op_hash).try_into()?,
-                                    IntegrationQueueValue {
-                                        validation_status,
-                                        op,
-                                    },
-                                )?;
-                                continue;
-                            }
+                            None => return Outcome::deferred(op, validation_status),
                         }
                     }
                 };
@@ -159,16 +216,7 @@ async fn integrate_dht_ops_workflow_inner(
                     // TODO: VALIDATION: This could also be an invalid delete on a header without a delete
                     // Handle missing Entry (Probably StoreEntry hasn't arrived been processed)
                     // This is put the op back in the integration queue to try again later
-                    None => {
-                        workspace.integration_queue.put(
-                            (Timestamp::now(), op_hash).try_into()?,
-                            IntegrationQueueValue {
-                                validation_status,
-                                op,
-                            },
-                        )?;
-                        continue;
-                    }
+                    None => return Outcome::deferred(op, validation_status),
                 };
                 workspace
                     .meta
@@ -200,15 +248,7 @@ async fn integrate_dht_ops_workflow_inner(
                          cache metadata store.
                          The cache metadata store is currently unimplemented"
                     );
-                    // Add op back on queue
-                    workspace.integration_queue.put(
-                        (Timestamp::now(), op_hash).try_into()?,
-                        IntegrationQueueValue {
-                            validation_status,
-                            op,
-                        },
-                    )?;
-                    continue;
+                    return Outcome::deferred(op, validation_status);
                 }
 
                 // Store link delete Header
@@ -245,17 +285,7 @@ async fn integrate_dht_ops_workflow_inner(
                     // Handle link add missing
                     // Probably just waiting on StoreElement or RegisterAddLink
                     // to arrive so put back in queue with a log message
-                    None => {
-                        // Add op back on queue
-                        workspace.integration_queue.put(
-                            (Timestamp::now(), op_hash).try_into()?,
-                            IntegrationQueueValue {
-                                validation_status,
-                                op,
-                            },
-                        )?;
-                        continue;
-                    }
+                    None => return Outcome::deferred(op, validation_status),
                 };
 
                 // Remove the link
@@ -272,14 +302,7 @@ async fn integrate_dht_ops_workflow_inner(
         let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.cas).await {
             Ok(l) => l,
             Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
-                workspace.integration_queue.put(
-                    (Timestamp::now(), op_hash).try_into()?,
-                    IntegrationQueueValue {
-                        validation_status,
-                        op,
-                    },
-                )?;
-                continue;
+                return Outcome::deferred(op, validation_status)
             }
             Err(e) => return Err(e.into()),
         };
@@ -288,12 +311,23 @@ async fn integrate_dht_ops_workflow_inner(
             basis,
             op,
         };
-        debug!(msg = "writing", ?op_hash);
-        workspace.integrated_dht_ops.put(op_hash, value)?;
+        Ok(Outcome::Integrated(value))
     }
+}
 
-    debug!("complete");
-    Ok(WorkComplete::Complete)
+/// The outcome of integrating a single DhtOp: either it was, or it wasn't
+enum Outcome {
+    Integrated(IntegratedDhtOpsValue),
+    Deferred(IntegrationQueueValue),
+}
+
+impl Outcome {
+    fn deferred(op: DhtOp, validation_status: ValidationStatus) -> WorkflowResult<Self> {
+        Ok(Outcome::Deferred(IntegrationQueueValue {
+            op,
+            validation_status,
+        }))
+    }
 }
 
 pub struct IntegrateDhtOpsWorkspace<'env> {
