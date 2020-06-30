@@ -149,7 +149,7 @@ async fn integrate_dht_ops_workflow_inner(
                     .register_update(entry_update, old_entry_hash)
                     .await?;
             }
-            DhtOp::RegisterDeletedHeader(_, entry_delete) => {
+            DhtOp::RegisterDeletedBy(_, entry_delete) => {
                 let entry_hash = match workspace
                     .cas
                     .get_header(&entry_delete.removes_address)
@@ -177,7 +177,7 @@ async fn integrate_dht_ops_workflow_inner(
                     .register_delete_on_entry(entry_delete, entry_hash)
                     .await?
             }
-            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+            DhtOp::RegisterDeletedHeader(_, entry_delete) => {
                 workspace
                     .meta
                     .register_delete_on_header(entry_delete)

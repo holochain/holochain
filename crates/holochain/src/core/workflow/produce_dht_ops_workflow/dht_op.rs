@@ -245,12 +245,12 @@ pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<
                 .await?
                 .into(),
         },
-        DhtOp::RegisterDeletedHeader(_, header) => {
+        DhtOp::RegisterDeletedBy(_, header) => {
             get_entry_hash_for_header(&header.removes_address, &cas)
                 .await?
                 .into()
         }
-        DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
+        DhtOp::RegisterDeletedHeader(_, header) => header.removes_address.clone().into(),
         DhtOp::RegisterAddLink(_, header) => header.base_address.clone().into(),
         DhtOp::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
     })

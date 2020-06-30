@@ -66,11 +66,11 @@ pub enum DhtOp {
     // need to remove the Entry here or add it to link.
     RegisterReplacedBy(Signature, header::ElementUpdate, Option<Box<Entry>>),
 
-    /// Op for registering a Header deletion with the Header authority
-    RegisterDeletedBy(Signature, header::ElementDelete),
-
     /// Op for registering a Header deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Headers have been deleted
+    RegisterDeletedBy(Signature, header::ElementDelete),
+
+    /// Op for registering a Header deletion with the Header authority
     RegisterDeletedHeader(Signature, header::ElementDelete),
 
     /// Op for adding a link
