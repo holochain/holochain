@@ -230,7 +230,7 @@ mod tests {
             let light = IntegrationValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
-                op: DhtOpLight::RegisterAddLink(sig.clone(), header_hash.as_hash().clone()),
+                op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
             };
             data.push((sig, op_hashed, light, header_hash));
         }
