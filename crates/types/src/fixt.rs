@@ -13,9 +13,9 @@ use crate::header::AgentValidationPkg;
 use crate::header::ChainClose;
 use crate::header::ChainOpen;
 use crate::header::ElementDelete;
-use crate::header::ElementUpdate;
 use crate::header::EntryCreate;
 use crate::header::EntryType;
+use crate::header::EntryUpdate;
 use crate::header::Header;
 use crate::header::InitZomesComplete;
 use crate::header::LinkAdd;
@@ -488,7 +488,7 @@ fixturator!(
 );
 
 fixturator!(
-    ElementUpdate;
+    EntryUpdate;
     constructor fn from_builder(HeaderBuilderCommon, IntendedFor, HeaderHash, EntryType, EntryHash);
 );
 
@@ -508,7 +508,7 @@ fixturator!(
         ChainOpen(ChainOpen)
         ChainClose(ChainClose)
         EntryCreate(EntryCreate)
-        ElementUpdate(ElementUpdate)
+        EntryUpdate(EntryUpdate)
         ElementDelete(ElementDelete)
     ];
 );
@@ -517,6 +517,6 @@ fixturator!(
     NewEntryHeader;
     variants [
         Create(EntryCreate)
-        Update(ElementUpdate)
+        Update(EntryUpdate)
     ];
 );

@@ -3,7 +3,7 @@ use crate::{
     core::state::chain_cas::ChainCasBuf,
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
-        ElementUpdateFixturator, EntryCreateFixturator, EntryFixturator, EntryHashFixturator,
+        EntryUpdateFixturator, EntryCreateFixturator, EntryFixturator, EntryHashFixturator,
         EntryTypeFixturator, InitZomesCompleteFixturator, LinkAddFixturator, LinkRemoveFixturator,
     },
 };
@@ -18,7 +18,7 @@ use holochain_types::{
     fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},
     header::{
         builder::{self, HeaderBuilder},
-        AgentValidationPkg, ChainClose, ChainOpen, Dna, ElementUpdate, EntryCreate, EntryType,
+        AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryUpdate, EntryCreate, EntryType,
         HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove, NewEntryHeader,
     },
     observability, Entry, EntryHashed, Header, HeaderHashed,
@@ -87,8 +87,8 @@ impl ChainElementTest {
         (entry_create, element)
     }
 
-    fn update_element(&mut self) -> (ElementUpdate, ChainElement) {
-        let entry_update = builder::ElementUpdate {
+    fn update_element(&mut self) -> (EntryUpdate, ChainElement) {
+        let entry_update = builder::EntryUpdate {
             intended_for: self.intended_for.clone(),
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
@@ -273,7 +273,7 @@ async fn test_dht_basis() {
         cas.put(signed_header, Some(entry_hashed)).unwrap();
 
         // Create the update header with the same hash
-        let mut entry_update = fixt!(ElementUpdate);
+        let mut entry_update = fixt!(EntryUpdate);
         entry_update.intended_for = IntendedFor::Entry;
         entry_update.replaces_address = original_header_hash;
 

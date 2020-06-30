@@ -64,7 +64,7 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterReplacedBy(Signature, header::ElementUpdate, Option<Box<Entry>>),
+    RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
 
     /// Op for registering a Header deletion with the Header authority
     RegisterDeletedBy(Signature, header::ElementDelete),
@@ -104,7 +104,7 @@ enum UniqueForm<'a> {
     StoreElement(&'a Header),
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
-    RegisterReplacedBy(&'a header::ElementUpdate),
+    RegisterReplacedBy(&'a header::EntryUpdate),
     RegisterDeletedBy(&'a header::ElementDelete),
     RegisterDeletedEntryHeader(&'a header::ElementDelete),
     RegisterAddLink(&'a header::LinkAdd),
@@ -149,7 +149,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 maybe_entry.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
             ),
         )),
-        Header::ElementUpdate(entry_update) => {
+        Header::EntryUpdate(entry_update) => {
             let entry = maybe_entry
                 .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?;
             ops.push(DhtOp::StoreEntry(
@@ -165,12 +165,9 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
         }
         Header::ElementDelete(entry_delete) => {
             // TODO: VALIDATION: This only works if entry_delete.remove_address is either EntryCreate
-            // or ElementUpdate
-            ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()));
-            ops.push(DhtOp::RegisterDeletedEntryHeader(
-                sig.clone(),
-                entry_delete.clone(),
-            ));
+            // or EntryUpdate
+            ops.push(DhtOp::RegisterDeletedBy(sig.clone(), entry_delete.clone()));
+            ops.push(DhtOp::RegisterDeletedEntryHeader(sig, entry_delete.clone()));
         }
     }
     Ok(ops)

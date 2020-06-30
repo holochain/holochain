@@ -128,7 +128,7 @@ builder_variant!(EntryCreate {
     entry_hash: EntryHash,
 });
 
-builder_variant!(ElementUpdate {
+builder_variant!(EntryUpdate {
     intended_for: IntendedFor,
     replaces_address: HeaderHash,
 

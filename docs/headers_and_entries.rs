@@ -26,7 +26,7 @@ pub enum Header {
     ChainOpen(header::ChainOpen),
     ChainClose(header::ChainClose),
     EntryCreate(header::EntryCreate),
-    ElementUpdate(header::ElementUpdate),
+    EntryUpdate(header::EntryUpdate),
     ElementDelete(header::ElementDelete),
 }
 
@@ -90,7 +90,7 @@ pub mod header {
         pub entry_hash: EntryContentHash,
     }
 
-    pub struct ElementUpdate {
+    pub struct EntryUpdate {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -133,7 +133,7 @@ impl Header {
             Self::ChainClose(header::ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(header::ChainOpen { prev_header, .. }) => prev_header,
             Self::EntryCreate(header::EntryCreate { prev_header, .. }) => prev_header,
-            Self::ElementUpdate(header::ElementUpdate { prev_header, .. }) => prev_header,
+            Self::EntryUpdate(header::EntryUpdate { prev_header, .. }) => prev_header,
         })
     }
 }

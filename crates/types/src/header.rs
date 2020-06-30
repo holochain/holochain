@@ -32,7 +32,7 @@ pub enum Header {
     ChainOpen(ChainOpen),
     ChainClose(ChainClose),
     EntryCreate(EntryCreate),
-    ElementUpdate(ElementUpdate),
+    EntryUpdate(EntryUpdate),
     ElementDelete(ElementDelete),
 }
 
@@ -70,7 +70,7 @@ write_into_header! {
     ChainOpen,
     ChainClose,
     EntryCreate,
-    ElementUpdate,
+    EntryUpdate,
     ElementDelete,
 }
 
@@ -86,7 +86,7 @@ macro_rules! match_header {
             Header::ChainOpen($i) => { $($t)* }
             Header::ChainClose($i) => { $($t)* }
             Header::EntryCreate($i) => { $($t)* }
-            Header::ElementUpdate($i) => { $($t)* }
+            Header::EntryUpdate($i) => { $($t)* }
             Header::ElementDelete($i) => { $($t)* }
         }
     };
@@ -95,7 +95,7 @@ macro_rules! match_header {
 impl Header {
     /// Returns the address and entry type of the Entry, if applicable.
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
-    // EntryCreate and ElementUpdate
+    // EntryCreate and EntryUpdate
     pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
         match self {
             Self::EntryCreate(EntryCreate {
@@ -103,7 +103,7 @@ impl Header {
                 entry_type,
                 ..
             }) => Some((entry_hash, entry_type)),
-            Self::ElementUpdate(ElementUpdate {
+            Self::EntryUpdate(EntryUpdate {
                 entry_hash,
                 entry_type,
                 ..
@@ -139,7 +139,7 @@ impl Header {
             Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
             Self::EntryCreate(EntryCreate { prev_header, .. }) => prev_header,
-            Self::ElementUpdate(ElementUpdate { prev_header, .. }) => prev_header,
+            Self::EntryUpdate(EntryUpdate { prev_header, .. }) => prev_header,
         })
     }
 }
@@ -169,7 +169,7 @@ pub enum NewEntryHeader {
     Create(EntryCreate),
     /// A header which creates a new entry that is semantically related to a
     /// previously created entry or header
-    Update(ElementUpdate),
+    Update(EntryUpdate),
 }
 
 impl NewEntryHeader {
@@ -177,7 +177,7 @@ impl NewEntryHeader {
     pub fn entry(&self) -> &EntryHash {
         match self {
             NewEntryHeader::Create(EntryCreate { entry_hash, .. })
-            | NewEntryHeader::Update(ElementUpdate { entry_hash, .. }) => entry_hash,
+            | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
         }
     }
 
@@ -185,7 +185,7 @@ impl NewEntryHeader {
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
             NewEntryHeader::Create(EntryCreate { entry_type, .. })
-            | NewEntryHeader::Update(ElementUpdate { entry_type, .. }) => entry_type.visibility(),
+            | NewEntryHeader::Update(EntryUpdate { entry_type, .. }) => entry_type.visibility(),
         }
     }
 }
@@ -194,7 +194,7 @@ impl From<NewEntryHeader> for Header {
     fn from(h: NewEntryHeader) -> Self {
         match h {
             NewEntryHeader::Create(h) => Header::EntryCreate(h),
-            NewEntryHeader::Update(h) => Header::ElementUpdate(h),
+            NewEntryHeader::Update(h) => Header::EntryUpdate(h),
         }
     }
 }
@@ -218,7 +218,7 @@ impl From<NewEntryHeader> for Header {
 )]
 pub struct ZomeId(u8);
 
-/// Specifies whether an [ElementUpdate] refers to an [Entry] or a [Header]
+/// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum IntendedFor {
     Header,
@@ -329,7 +329,7 @@ pub struct EntryCreate {
 /// have a tree of such metadata update references. Entries get "updated" to
 /// other entries, and Headers get "updated" to other headers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct ElementUpdate {
+pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,

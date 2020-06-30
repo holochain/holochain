@@ -13,7 +13,7 @@ mock! {
             header: Header,
             agent_pub_key: AgentPubKey,
         ) -> DatabaseResult<()>;
-        fn sync_register_update(&mut self, update: header::ElementUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
+        fn sync_register_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
         fn sync_register_delete_on_entry(&self, delete: header::ElementDelete, entry_hash: EntryHash) -> DatabaseResult<()>;
         fn sync_register_delete_on_header(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -116,7 +116,7 @@ impl MetadataBufT for MockMetadataBuf {
 
     async fn register_update(
         &mut self,
-        update: header::ElementUpdate,
+        update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()> {
         self.sync_register_update(update, entry)

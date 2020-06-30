@@ -160,7 +160,7 @@ mod tests {
     use crate::{
         core::workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
         fixt::{
-            ElementUpdateFixturator, EntryCreateFixturator, EntryFixturator, LinkAddFixturator,
+            EntryUpdateFixturator, EntryCreateFixturator, EntryFixturator, LinkAddFixturator,
         },
     };
     use fixt::prelude::*;
@@ -442,7 +442,7 @@ mod tests {
         // Create StoreElement
         // Create the headers
         let mut entry_create = fixt!(EntryCreate);
-        let mut entry_update = fixt!(ElementUpdate);
+        let mut entry_update = fixt!(EntryUpdate);
 
         // Make them private
         let visibility = EntryVisibility::Private;
@@ -477,7 +477,7 @@ mod tests {
             let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
             cas.put(signed_header, Some(original_entry_hashed)).unwrap();
 
-            let entry_update_header = Header::ElementUpdate(entry_update.clone());
+            let entry_update_header = Header::EntryUpdate(entry_update.clone());
             let header_hash = HeaderHashed::with_data(entry_update_header).await.unwrap();
             let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
             cas.put(signed_header, Some(new_entry_hashed)).unwrap();

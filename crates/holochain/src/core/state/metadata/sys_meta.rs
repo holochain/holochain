@@ -65,8 +65,8 @@ mod tests {
         entry_hash: EntryHash,
         intended_for: IntendedFor,
         fx: &mut TestFixtures,
-    ) -> (header::ElementUpdate, HeaderHashed) {
-        let builder = builder::ElementUpdate {
+    ) -> (header::EntryUpdate, HeaderHashed) {
+        let builder = builder::EntryUpdate {
             intended_for,
             replaces_address,
             entry_hash,

@@ -106,7 +106,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
             let (header, _sig) = header.into_header_and_signature();
             let header = match header.into_content() {
                 Header::EntryCreate(c) => NewEntryHeader::Create(c),
-                Header::ElementUpdate(c) => NewEntryHeader::Update(c),
+                Header::EntryUpdate(c) => NewEntryHeader::Update(c),
                 _ => return Err(DhtOpConvertError::HeaderEntryMismatch),
             };
 
@@ -138,7 +138,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
                 .into_inner();
             let (header, _sig) = header.into_header_and_signature();
             let header = match header.into_content() {
-                Header::ElementUpdate(u) => u,
+                Header::EntryUpdate(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),

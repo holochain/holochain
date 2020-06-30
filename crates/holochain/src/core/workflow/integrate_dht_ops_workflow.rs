@@ -382,12 +382,12 @@ mod tests {
         composite_hash::{AnyDhtHash, EntryHash},
         dht_op::{DhtOp, DhtOpHashed},
         fixt::{
-            AppEntryTypeFixturator, ElementDeleteFixturator, ElementUpdateFixturator,
+            AppEntryTypeFixturator, ElementDeleteFixturator, EntryUpdateFixturator,
             HeaderFixturator, LinkAddFixturator, LinkRemoveFixturator, LinkTagFixturator,
             NewEntryHeaderFixturator, SignatureFixturator, ZomeIdFixturator,
         },
         header::{
-            builder, ElementDelete, ElementUpdate, EntryType, LinkAdd, LinkRemove, NewEntryHeader,
+            builder, ElementDelete, EntryUpdate, EntryType, LinkAdd, LinkRemove, NewEntryHeader,
         },
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
@@ -407,8 +407,8 @@ mod tests {
         new_entry: Entry,
         any_header: Header,
         agent_key: AgentPubKey,
-        entry_update_header: ElementUpdate,
-        entry_update_entry: ElementUpdate,
+        entry_update_header: EntryUpdate,
+        entry_update_entry: EntryUpdate,
         original_header_hash: HeaderHash,
         original_entry_hash: EntryHash,
         new_entry_hash: EntryHash,
@@ -458,13 +458,13 @@ mod tests {
             }
 
             // Entry update for header
-            let mut entry_update_header = fixt!(ElementUpdate);
+            let mut entry_update_header = fixt!(EntryUpdate);
             entry_update_header.entry_hash = new_entry_hash.clone();
             entry_update_header.intended_for = IntendedFor::Header;
             entry_update_header.replaces_address = original_header_hash.clone();
 
             // Entry update for entry
-            let mut entry_update_entry = fixt!(ElementUpdate);
+            let mut entry_update_entry = fixt!(EntryUpdate);
             entry_update_entry.entry_hash = new_entry_hash.clone();
             entry_update_entry.intended_for = IntendedFor::Entry;
             entry_update_entry.replaces_address = original_header_hash.clone();
@@ -841,7 +841,7 @@ mod tests {
 
     fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         let entry = match &a.any_header {
-            Header::EntryCreate(_) | Header::ElementUpdate(_) => {
+            Header::EntryCreate(_) | Header::EntryUpdate(_) => {
                 Some(a.original_entry.clone().into())
             }
             _ => None,
@@ -1101,7 +1101,7 @@ mod tests {
     #[ignore]
     async fn test_integrate_single_register_replaced_by_for_header() {
         // For RegisterReplacedBy with intended_for Header
-        // metadata has ElementUpdate on HeaderHash but not EntryHash
+        // metadata has EntryUpdate on HeaderHash but not EntryHash
         todo!()
     }
 
@@ -1109,7 +1109,7 @@ mod tests {
     #[ignore]
     async fn test_integrate_single_register_replaced_by_for_entry() {
         // For RegisterReplacedBy with intended_for Entry
-        // metadata has ElementUpdate on EntryHash but not HeaderHash
+        // metadata has EntryUpdate on EntryHash but not HeaderHash
         todo!()
     }
 

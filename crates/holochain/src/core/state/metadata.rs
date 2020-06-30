@@ -157,10 +157,10 @@ pub trait MetadataBufT {
         agent_pub_key: AgentPubKey,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::ElementUpdate] on the referenced [Header] or [Entry]
+    /// Registers a [Header::EntryUpdate] on the referenced [Header] or [Entry]
     async fn register_update(
         &mut self,
-        update: header::ElementUpdate,
+        update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()>;
 
@@ -189,7 +189,7 @@ pub trait MetadataBufT {
         header_hash: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the hashes of [ElementUpdate] headers registered on an [Entry]
+    /// Returns all the hashes of [EntryUpdate] headers registered on an [Entry]
     fn get_updates(
         &self,
         hash: AnyDhtHash,
@@ -215,9 +215,9 @@ pub trait MetadataBufT {
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
-    /// Either a [EntryCreate] or [ElementUpdate]
+    /// Either a [EntryCreate] or [EntryUpdate]
     NewEntry(HeaderHash),
-    /// An [ElementUpdate] [Header]
+    /// An [EntryUpdate] [Header]
     Update(HeaderHash),
     /// An [Header::ElementDelete]
     Delete(HeaderHash),
@@ -284,9 +284,9 @@ impl From<NewEntryHeader> for EntryHeader {
     }
 }
 
-impl From<header::ElementUpdate> for EntryHeader {
-    fn from(h: header::ElementUpdate) -> Self {
-        EntryHeader::Update(Header::ElementUpdate(h))
+impl From<header::EntryUpdate> for EntryHeader {
+    fn from(h: header::EntryUpdate) -> Self {
+        EntryHeader::Update(Header::EntryUpdate(h))
     }
 }
 
@@ -401,13 +401,13 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     #[allow(clippy::needless_lifetimes)]
     async fn register_update(
         &mut self,
-        update: header::ElementUpdate,
+        update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()> {
         let basis: AnyDhtHash = match (&update.intended_for, entry) {
             (header::IntendedFor::Header, None) => update.replaces_address.clone().into(),
             (header::IntendedFor::Header, Some(_)) => {
-                panic!("Can't update to entry when ElementUpdate points to header")
+                panic!("Can't update to entry when EntryUpdate points to header")
             }
             (header::IntendedFor::Entry, None) => {
                 panic!("Can't update to entry with no entry hash")
