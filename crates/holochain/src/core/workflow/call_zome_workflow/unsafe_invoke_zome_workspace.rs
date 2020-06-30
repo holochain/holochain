@@ -33,25 +33,25 @@ pub struct UnsafeInvokeZomeWorkspace {
 }
 
 fixturator!(
-    UnsafeInvokeZomeWorkspace,
-    {
+    UnsafeInvokeZomeWorkspace;
+    curve Empty {
         let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
         let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(fake_ptr)));
         let workspace = Arc::downgrade(&guard);
         // Make sure the weak Arc cannot be upgraded
         std::mem::drop(guard);
         UnsafeInvokeZomeWorkspace { workspace }
-    },
-    {
+    };
+    curve Unpredictable {
         UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
             .next()
             .unwrap()
-    },
-    {
+    };
+    curve Predictable {
         UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
             .next()
             .unwrap()
-    }
+    };
 );
 
 // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
@@ -106,12 +106,15 @@ impl UnsafeInvokeZomeWorkspace {
             // Check that no-one else can write
             Some(lock) => {
                 let guard = lock.read().await;
-                let sc = guard.load(Ordering::SeqCst);
-                let sc = sc as *const InvokeZomeWorkspace;
-                match sc.as_ref() {
-                    Some(s) => Ok(f(s).await),
-                    None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
-                }
+                let s = {
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *const InvokeZomeWorkspace;
+                    match sc.as_ref() {
+                        Some(s) => s,
+                        None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped)?,
+                    }
+                };
+                Ok(f(s).await)
             }
             None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
         }
@@ -131,12 +134,15 @@ impl UnsafeInvokeZomeWorkspace {
             // Check that no-one else can write
             Some(lock) => {
                 let guard = lock.write().await;
-                let sc = guard.load(Ordering::SeqCst);
-                let sc = sc as *mut InvokeZomeWorkspace;
-                match sc.as_mut() {
-                    Some(s) => Ok(f(s).await),
-                    None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
-                }
+                let s = {
+                    let sc = guard.load(Ordering::SeqCst);
+                    let sc = sc as *mut InvokeZomeWorkspace;
+                    match sc.as_mut() {
+                        Some(s) => s,
+                        None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped)?,
+                    }
+                };
+                Ok(f(s).await)
             }
             None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
         }

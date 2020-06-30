@@ -11,7 +11,6 @@
 
 pub mod bytes;
 pub mod capability;
-pub mod commit;
 #[allow(missing_docs)]
 pub mod crdt;
 pub mod debug;
