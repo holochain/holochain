@@ -95,6 +95,7 @@ const NSEC: usize = std::mem::size_of::<u32>();
 /// should not be directly used. However, ordering is preserved when mapping
 /// to a TimestampKey, which is what allows us to use it for an LMDB key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
 pub struct TimestampKey([u8; SEC + NSEC]);
 
 impl From<Timestamp> for TimestampKey {
