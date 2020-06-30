@@ -391,7 +391,7 @@ mod tests {
             NewEntryHeaderFixturator, SignatureFixturator, ZomeIdFixturator,
         },
         header::{
-            builder, ElementDelete, EntryUpdate, EntryType, LinkAdd, LinkRemove, NewEntryHeader,
+            builder, ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader,
         },
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},

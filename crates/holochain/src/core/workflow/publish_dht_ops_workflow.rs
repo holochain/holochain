@@ -159,9 +159,7 @@ mod tests {
     use super::*;
     use crate::{
         core::workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
-        fixt::{
-            EntryUpdateFixturator, EntryCreateFixturator, EntryFixturator, LinkAddFixturator,
-        },
+        fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
     use fixt::prelude::*;
     use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashable, Hashed};
