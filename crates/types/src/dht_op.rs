@@ -66,12 +66,12 @@ pub enum DhtOp {
     // need to remove the Entry here or add it to link.
     RegisterReplacedBy(Signature, header::ElementUpdate, Option<Box<Entry>>),
 
+    /// Op for registering a Header deletion with the Header authority
+    RegisterDeletedBy(Signature, header::ElementDelete),
+
     /// Op for registering a Header deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Headers have been deleted
     RegisterDeletedEntryHeader(Signature, header::ElementDelete),
-
-    /// Op for registering a Header deletion with the Header authority
-    RegisterDeletedBy(Signature, header::ElementDelete),
 
     /// Op for adding a link
     RegisterAddLink(Signature, header::LinkAdd),
@@ -87,10 +87,10 @@ impl DhtOp {
             Self::StoreEntry(_, header, _) => UniqueForm::StoreEntry(header),
             Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
             Self::RegisterReplacedBy(_, header, _) => UniqueForm::RegisterReplacedBy(header),
+            Self::RegisterDeletedBy(_, header) => UniqueForm::RegisterDeletedBy(header),
             Self::RegisterDeletedEntryHeader(_, header) => {
                 UniqueForm::RegisterDeletedEntryHeader(header)
             }
-            Self::RegisterDeletedBy(_, header) => UniqueForm::RegisterDeletedBy(header),
             Self::RegisterAddLink(_, header) => UniqueForm::RegisterAddLink(header),
             Self::RegisterRemoveLink(_, header) => UniqueForm::RegisterRemoveLink(header),
         }
@@ -105,8 +105,8 @@ enum UniqueForm<'a> {
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
     RegisterReplacedBy(&'a header::ElementUpdate),
-    RegisterDeletedEntryHeader(&'a header::ElementDelete),
     RegisterDeletedBy(&'a header::ElementDelete),
+    RegisterDeletedEntryHeader(&'a header::ElementDelete),
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
@@ -166,11 +166,11 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
         Header::ElementDelete(entry_delete) => {
             // TODO: VALIDATION: This only works if entry_delete.remove_address is either EntryCreate
             // or ElementUpdate
+            ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()));
             ops.push(DhtOp::RegisterDeletedEntryHeader(
                 sig.clone(),
                 entry_delete.clone(),
             ));
-            ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()));
         }
     }
     Ok(ops)
