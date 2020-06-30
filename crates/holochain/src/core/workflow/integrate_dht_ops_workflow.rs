@@ -251,7 +251,7 @@ async fn integrate_dht_ops_workflow_inner(
         // TODO: PERF: Aviod this clone by returning the op on error
         let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.cas).await {
             Ok(l) => l,
-            Err(DhtOpConvertError::MissingEntry) => {
+            Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
                 workspace.integration_queue.put(
                     (Timestamp::now(), op_hash).try_into()?,
                     IntegrationQueueValue {
@@ -360,10 +360,13 @@ mod tests {
         composite_hash::{AnyDhtHash, EntryHash},
         dht_op::{DhtOp, DhtOpHashed},
         fixt::{
-            AppEntryTypeFixturator, EntryHashFixturator, EntryUpdateFixturator, HeaderFixturator,
-            NewEntryHeaderFixturator, SignatureFixturator,
+            AppEntryTypeFixturator, EntryDeleteFixturator, EntryUpdateFixturator, HeaderFixturator,
+            LinkAddFixturator, LinkRemoveFixturator, LinkTagFixturator, NewEntryHeaderFixturator,
+            SignatureFixturator, ZomeIdFixturator,
         },
-        header::{builder, EntryType, EntryUpdate, NewEntryHeader},
+        header::{
+            builder, EntryDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader,
+        },
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         validate::ValidationStatus,
@@ -378,22 +381,47 @@ mod tests {
 
     struct TestData {
         signature: Signature,
-        new_entry_header: NewEntryHeader,
-        entry: Entry,
+        original_entry: Entry,
+        new_entry: Entry,
         any_header: Header,
         agent_key: AgentPubKey,
         entry_update_header: EntryUpdate,
         entry_update_entry: EntryUpdate,
         original_header_hash: HeaderHash,
         original_entry_hash: EntryHash,
+        new_entry_hash: EntryHash,
         original_header: NewEntryHeader,
+        entry_delete: EntryDelete,
+        link_add: LinkAdd,
+        link_remove: LinkRemove,
     }
 
     impl TestData {
+        #[instrument()]
         async fn new() -> Self {
+            // original entry
+            let original_entry = fixt!(Entry);
+            let original_entry_hash = EntryHashed::with_data(original_entry.clone())
+                .await
+                .unwrap()
+                .into_hash();
+
             // New entry
-            let entry = fixt!(Entry);
-            let entry_hash = EntryHashed::with_data(entry.clone())
+            let new_entry = fixt!(Entry);
+            let new_entry_hash = EntryHashed::with_data(new_entry.clone())
+                .await
+                .unwrap()
+                .into_hash();
+
+            // Original entry and header for updates
+            let mut original_header = fixt!(NewEntryHeader);
+
+            match &mut original_header {
+                NewEntryHeader::Create(c) => c.entry_hash = original_entry_hash.clone(),
+                NewEntryHeader::Update(u) => u.entry_hash = original_entry_hash.clone(),
+            }
+
+            let original_header_hash = HeaderHashed::with_data(original_header.clone().into())
                 .await
                 .unwrap()
                 .into_hash();
@@ -403,37 +431,47 @@ mod tests {
 
             // Update to new entry
             match &mut new_entry_header {
-                NewEntryHeader::Create(c) => c.entry_hash = entry_hash.clone(),
-                NewEntryHeader::Update(u) => u.entry_hash = entry_hash.clone(),
+                NewEntryHeader::Create(c) => c.entry_hash = new_entry_hash.clone(),
+                NewEntryHeader::Update(u) => u.entry_hash = new_entry_hash.clone(),
             }
-
-            // Original entry and header for updates
-            let original_entry_hash = fixt!(EntryHash);
-            let mut original_header = fixt!(NewEntryHeader);
-            match &mut original_header {
-                NewEntryHeader::Create(c) => c.entry_hash = original_entry_hash.clone(),
-                NewEntryHeader::Update(u) => u.entry_hash = original_entry_hash.clone(),
-            }
-            let original_header_hash = HeaderHashed::with_data(original_header.clone().into())
-                .await
-                .unwrap()
-                .into_hash();
 
             // Entry update for header
             let mut entry_update_header = fixt!(EntryUpdate);
-            entry_update_header.entry_hash = entry_hash.clone();
+            entry_update_header.entry_hash = new_entry_hash.clone();
             entry_update_header.intended_for = IntendedFor::Header;
             entry_update_header.replaces_address = original_header_hash.clone();
 
             // Entry update for entry
             let mut entry_update_entry = fixt!(EntryUpdate);
-            entry_update_entry.entry_hash = entry_hash.clone();
+            entry_update_entry.entry_hash = new_entry_hash.clone();
             entry_update_entry.intended_for = IntendedFor::Entry;
-            entry_update_header.replaces_address = original_header_hash.clone();
+            entry_update_entry.replaces_address = original_header_hash.clone();
+
+            // Entry delete
+            let mut entry_delete = fixt!(EntryDelete);
+            entry_delete.removes_address = original_header_hash.clone();
+
+            // Link add
+            let mut link_add = fixt!(LinkAdd);
+            link_add.base_address = original_entry_hash.clone();
+            link_add.target_address = new_entry_hash.clone();
+            link_add.zome_id = fixt!(ZomeId);
+            link_add.tag = fixt!(LinkTag);
+
+            let link_add_hash = HeaderHashed::with_data(link_add.clone().into())
+                .await
+                .unwrap()
+                .into_hash();
+
+            // Link remove
+            let mut link_remove = fixt!(LinkRemove);
+            link_remove.base_address = original_entry_hash.clone();
+            link_remove.link_add_address = link_add_hash.clone();
 
             Self {
                 signature: fixt!(Signature),
-                entry,
+                original_entry,
+                new_entry,
                 any_header: fixt!(Header),
                 agent_key: fixt!(AgentPubKey),
                 entry_update_header,
@@ -441,7 +479,10 @@ mod tests {
                 original_header,
                 original_header_hash,
                 original_entry_hash,
-                new_entry_header,
+                entry_delete,
+                link_add,
+                link_remove,
+                new_entry_hash,
             }
         }
     }
@@ -456,9 +497,13 @@ mod tests {
         MetaHeader(Entry, Header),
         MetaActivity(AgentPubKey, Header),
         MetaUpdate(AnyDhtHash, Header),
+        MetaDelete(AnyDhtHash, Header),
+        MetaLink(LinkAdd, EntryHash),
+        MetaLinkEmpty(LinkAdd),
     }
 
     impl Db {
+        #[instrument(skip(expects, env_ref, dbs))]
         async fn check<'env>(
             expects: Vec<Self>,
             env_ref: &'env EnvironmentReadRef<'env>,
@@ -471,9 +516,13 @@ mod tests {
                 match expect {
                     Db::Integrated(op) => {
                         let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
-                        let (op, basis) = dht_op_to_light_basis(op, &workspace.cas)
-                            .await
-                            .expect(&format!("Failed to generate light for {}", here));
+                        let (op, basis) =
+                            dht_op_to_light_basis(op, &workspace.cas)
+                                .await
+                                .expect(&format!(
+                                    "Failed to generate light {} for {}",
+                                    op_hash, here
+                                ));
                         let value = IntegrationValue {
                             validation_status: ValidationStatus::Valid,
                             basis,
@@ -580,6 +629,20 @@ mod tests {
                         let exp = [header_hash];
                         assert_eq!(&res[..], &exp[..], "{}", here,);
                     }
+                    Db::MetaDelete(base, header) => {
+                        let header_hash = HeaderHashed::with_data(header.clone())
+                            .await
+                            .unwrap()
+                            .into_hash();
+                        let res = workspace
+                            .meta
+                            .get_deletes(base)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
+                        let exp = [header_hash];
+                        assert_eq!(&res[..], &exp[..], "{}", here,);
+                    }
                     Db::IntegratedEmpty => {
                         assert_eq!(
                             workspace
@@ -596,10 +659,77 @@ mod tests {
                     Db::MetaEmpty => {
                         // TODO: Not currently possible because kvv bufs have no iterator over all keys
                     }
+                    Db::MetaLink(link_add, target_hash) => {
+                        let link_add_hash = HeaderHashed::with_data(link_add.clone().into())
+                            .await
+                            .unwrap()
+                            .into_hash();
+
+                        // LinkMetaKey
+                        let mut link_meta_keys = Vec::new();
+                        link_meta_keys.push(LinkMetaKey::Full(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                            &link_add_hash,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZomeTag(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZome(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
+
+                        for link_meta_key in link_meta_keys {
+                            let res = workspace.meta.get_links(&link_meta_key).unwrap();
+
+                            assert_eq!(res.len(), 1, "{}", here);
+                            assert_eq!(res[0].link_add_hash, link_add_hash, "{}", here);
+                            assert_eq!(res[0].target, target_hash, "{}", here);
+                            assert_eq!(res[0].zome_id, link_add.zome_id, "{}", here);
+                            assert_eq!(res[0].tag, link_add.tag, "{}", here);
+                        }
+                    }
+                    Db::MetaLinkEmpty(link_add) => {
+                        let link_add_hash = HeaderHashed::with_data(link_add.clone().into())
+                            .await
+                            .unwrap()
+                            .into_hash();
+
+                        // LinkMetaKey
+                        let mut link_meta_keys = Vec::new();
+                        link_meta_keys.push(LinkMetaKey::Full(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                            &link_add_hash,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZomeTag(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                            &link_add.tag,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::BaseZome(
+                            &link_add.base_address,
+                            link_add.zome_id,
+                        ));
+                        link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
+
+                        for link_meta_key in link_meta_keys {
+                            let res = workspace.meta.get_links(&link_meta_key).unwrap();
+
+                            assert_eq!(res.len(), 0, "{}", here);
+                        }
+                    }
                 }
             }
         }
 
+        #[instrument(skip(pre_state, env_ref, dbs))]
         async fn set<'env>(
             pre_state: Vec<Self>,
             env_ref: &'env EnvironmentWriteRef<'env>,
@@ -623,6 +753,7 @@ mod tests {
                     }
                     Db::CasHeader(header, signature) => {
                         let header_hash = HeaderHashed::with_data(header.clone()).await.unwrap();
+                        debug!(header_hash = %header_hash.as_hash());
                         let signed_header =
                             SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
                         workspace.cas.put(signed_header, None).unwrap();
@@ -641,6 +772,9 @@ mod tests {
                     Db::MetaUpdate(_, _) => {}
                     Db::IntegratedEmpty => {}
                     Db::MetaEmpty => {}
+                    Db::MetaDelete(_, _) => {}
+                    Db::MetaLink(_, _) => {}
+                    Db::MetaLinkEmpty(_) => {}
                 }
             }
             // Commit workspace
@@ -683,7 +817,9 @@ mod tests {
 
     fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         let entry = match &a.any_header {
-            Header::EntryCreate(_) | Header::EntryUpdate(_) => Some(a.entry.clone().into()),
+            Header::EntryCreate(_) | Header::EntryUpdate(_) => {
+                Some(a.original_entry.clone().into())
+            }
             _ => None,
         };
         let op = DhtOp::StoreElement(
@@ -697,7 +833,7 @@ mod tests {
             Db::CasHeader(a.any_header.clone().into(), None),
         ];
         if let Some(_) = &entry {
-            expect.push(Db::CasEntry(a.entry.clone(), None, None));
+            expect.push(Db::CasEntry(a.original_entry.clone(), None, None));
         }
         (pre_state, expect, "store element")
     }
@@ -705,15 +841,15 @@ mod tests {
     fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         let op = DhtOp::StoreEntry(
             a.signature.clone(),
-            a.new_entry_header.clone(),
-            a.entry.clone().into(),
+            a.original_header.clone(),
+            a.original_entry.clone().into(),
         );
         let pre_state = vec![Db::IntQueue(op.clone())];
         let expect = vec![
             Db::Integrated(op.clone()),
-            Db::CasHeader(a.new_entry_header.clone().into(), None),
-            Db::CasEntry(a.entry.clone(), None, None),
-            Db::MetaHeader(a.entry.clone(), a.new_entry_header.clone().into()),
+            Db::CasHeader(a.original_header.clone().into(), None),
+            Db::CasEntry(a.original_entry.clone(), None, None),
+            Db::MetaHeader(a.original_entry.clone(), a.original_header.clone().into()),
         ];
         (pre_state, expect, "store entry")
     }
@@ -732,7 +868,7 @@ mod tests {
         let op = DhtOp::RegisterReplacedBy(
             a.signature.clone(),
             a.entry_update_header.clone(),
-            Some(a.entry.clone().into()),
+            Some(a.new_entry.clone().into()),
         );
         let pre_state = vec![Db::IntQueue(op.clone())];
         let expect = vec![
@@ -749,14 +885,13 @@ mod tests {
         let op = DhtOp::RegisterReplacedBy(
             a.signature.clone(),
             a.entry_update_entry.clone(),
-            Some(a.entry.clone().into()),
+            Some(a.new_entry.clone().into()),
         );
         let pre_state = vec![
             Db::IntQueue(op.clone()),
             Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
         ];
         let expect = vec![
-            Db::CasHeader(a.original_header.clone().into(), None),
             Db::Integrated(op.clone()),
             Db::MetaUpdate(
                 a.original_entry_hash.clone().into(),
@@ -766,12 +901,12 @@ mod tests {
         (pre_state, expect, "register replaced by for entry")
     }
 
-    // TODO: Register replaced by without store entry
+    // Register replaced by without store entry
     fn register_replaced_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         let op = DhtOp::RegisterReplacedBy(
             a.signature.clone(),
             a.entry_update_entry.clone(),
-            Some(a.entry.clone().into()),
+            Some(a.new_entry.clone().into()),
         );
         let pre_state = vec![Db::IntQueue(op.clone())];
         let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
@@ -779,6 +914,126 @@ mod tests {
             pre_state,
             expect,
             "register replaced by for entry missing entry",
+        )
+    }
+
+    fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+        let pre_state = vec![
+            Db::IntQueue(op.clone()),
+            Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        ];
+        let expect = vec![
+            Db::Integrated(op.clone()),
+            Db::MetaDelete(
+                a.original_entry_hash.clone().into(),
+                a.entry_delete.clone().into(),
+            ),
+        ];
+        (pre_state, expect, "register deleted by")
+    }
+
+    fn register_deleted_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
+        (
+            pre_state,
+            expect,
+            "register deleted by for entry missing entry",
+        )
+    }
+
+    fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterDeletedHeaderBy(a.signature.clone(), a.entry_delete.clone());
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![
+            Db::Integrated(op.clone()),
+            Db::MetaDelete(
+                a.original_header_hash.clone().into(),
+                a.entry_delete.clone().into(),
+            ),
+        ];
+        (pre_state, expect, "register deleted header by")
+    }
+
+    fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![
+            Db::Integrated(op.clone()),
+            Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
+        ];
+        (pre_state, expect, "register link add")
+    }
+
+    fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+        let pre_state = vec![
+            Db::IntQueue(op.clone()),
+            Db::CasHeader(a.link_add.clone().into(), Some(a.signature.clone())),
+            Db::CasEntry(
+                a.original_entry.clone().into(),
+                Some(a.original_header.clone().into()),
+                Some(a.signature.clone()),
+            ),
+            Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
+        ];
+        let expect = vec![
+            Db::Integrated(op.clone()),
+            Db::MetaLinkEmpty(a.link_add.clone()),
+        ];
+        (pre_state, expect, "register link remove")
+    }
+
+    // The header isn't stored yet
+    fn register_remove_link_missing_add_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+        let pre_state = vec![
+            Db::IntQueue(op.clone()),
+            Db::CasEntry(
+                a.original_entry.clone().into(),
+                Some(a.original_header.clone().into()),
+                Some(a.signature.clone()),
+            ),
+        ];
+        let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
+        (
+            pre_state,
+            expect,
+            "register remove link remove missing add header",
+        )
+    }
+
+    // Link add is there but metadata is missing
+    fn register_remove_link_missing_add_metadata(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+        let pre_state = vec![
+            Db::IntQueue(op.clone()),
+            Db::CasHeader(a.link_add.clone().into(), Some(a.signature.clone())),
+            Db::CasEntry(
+                a.original_entry.clone().into(),
+                Some(a.original_header.clone().into()),
+                Some(a.signature.clone()),
+            ),
+        ];
+        let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
+        (
+            pre_state,
+            expect,
+            "register remove link remove missing add metadata",
+        )
+    }
+
+    // Link remove when not an author
+    fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+        let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
+        let pre_state = vec![Db::IntQueue(op.clone())];
+        let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
+        (
+            pre_state,
+            expect,
+            "register remove link remove missing base",
         )
     }
 
@@ -797,6 +1052,14 @@ mod tests {
             register_replaced_by_for_header,
             register_replaced_by_for_entry,
             register_replaced_by_missing_entry,
+            register_deleted_by,
+            register_deleted_by_missing_entry,
+            register_deleted_header_by,
+            register_add_link,
+            register_remove_link,
+            register_remove_link_missing_add_header,
+            register_remove_link_missing_add_metadata,
+            register_remove_link_missing_base,
         ];
 
         for t in tests.iter() {
@@ -980,7 +1243,7 @@ mod tests {
 
             let meta = MetadataBuf::primary(&reader, &dbs).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
-            let links = meta.get_links(&key).unwrap(); 
+            let links = meta.get_links(&key).unwrap();
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
