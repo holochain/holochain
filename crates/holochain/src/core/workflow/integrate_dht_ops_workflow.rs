@@ -149,7 +149,7 @@ async fn integrate_dht_ops_workflow_inner(
                     .register_update(entry_update, old_entry_hash)
                     .await?;
             }
-            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+            DhtOp::RegisterDeletedEntryHeader(_, entry_delete) => {
                 let entry_hash = match workspace
                     .cas
                     .get_header(&entry_delete.removes_address)
@@ -177,7 +177,7 @@ async fn integrate_dht_ops_workflow_inner(
                     .register_delete_on_entry(entry_delete, entry_hash)
                     .await?
             }
-            DhtOp::RegisterDeletedHeader(_, entry_delete) => {
+            DhtOp::RegisterDeletedBy(_, entry_delete) => {
                 workspace
                     .meta
                     .register_delete_on_header(entry_delete)
@@ -942,7 +942,7 @@ mod tests {
     }
 
     fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+        let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
         let pre_state = vec![
             Db::IntQueue(op.clone()),
             Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
@@ -958,7 +958,7 @@ mod tests {
     }
 
     fn register_deleted_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+        let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
         let pre_state = vec![Db::IntQueue(op.clone())];
         let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
         (
@@ -969,7 +969,7 @@ mod tests {
     }
 
     fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-        let op = DhtOp::RegisterDeletedHeader(a.signature.clone(), a.entry_delete.clone());
+        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
         let pre_state = vec![Db::IntQueue(op.clone())];
         let expect = vec![
             Db::Integrated(op.clone()),
@@ -1116,7 +1116,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     #[ignore]
     async fn test_integrate_single_register_delete_on_headerd_by() {
-        // For RegisterDeletedHeader
+        // For RegisterDeletedBy
         // metadata has ElementDelete on HeaderHash
         todo!()
     }

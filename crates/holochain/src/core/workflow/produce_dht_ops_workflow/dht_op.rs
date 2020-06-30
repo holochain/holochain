@@ -27,8 +27,8 @@ pub enum DhtOpLight {
     StoreEntry(Signature, HeaderHash, EntryHash),
     RegisterAgentActivity(Signature, HeaderHash),
     RegisterReplacedBy(Signature, HeaderHash, EntryHash),
-    RegisterDeletedHeader(Signature, HeaderHash),
     RegisterDeletedBy(Signature, HeaderHash),
+    RegisterDeletedEntryHeader(Signature, HeaderHash),
     RegisterAddLink(Signature, HeaderHash),
     RegisterRemoveLink(Signature, HeaderHash),
 }
@@ -60,13 +60,13 @@ pub async fn dht_op_to_light_basis(
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::RegisterReplacedBy(s, h, e), basis))
         }
-        DhtOp::RegisterDeletedHeader(s, h) => {
-            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
-            Ok((DhtOpLight::RegisterDeletedHeader(s, h), basis))
-        }
         DhtOp::RegisterDeletedBy(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::RegisterDeletedBy(s, h), basis))
+        }
+        DhtOp::RegisterDeletedEntryHeader(s, h) => {
+            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            Ok((DhtOpLight::RegisterDeletedEntryHeader(s, h), basis))
         }
         DhtOp::RegisterAddLink(s, h) => {
             let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
@@ -157,13 +157,13 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
             };
             Ok(DhtOp::RegisterReplacedBy(sig, header, entry))
         }
-        DhtOpLight::RegisterDeletedHeader(sig, header_hash) => {
-            let header = register_delete_on_header(header_hash, op_name.clone(), &cas).await?;
-            Ok(DhtOp::RegisterDeletedHeader(sig, header))
-        }
         DhtOpLight::RegisterDeletedBy(sig, header_hash) => {
             let header = register_delete_on_header(header_hash, op_name.clone(), &cas).await?;
             Ok(DhtOp::RegisterDeletedBy(sig, header))
+        }
+        DhtOpLight::RegisterDeletedEntryHeader(sig, header_hash) => {
+            let header = register_delete_on_header(header_hash, op_name.clone(), &cas).await?;
+            Ok(DhtOp::RegisterDeletedEntryHeader(sig, header))
         }
         DhtOpLight::RegisterAddLink(sig, h) => {
             let (header, _sig) = cas
@@ -245,12 +245,12 @@ pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<
                 .await?
                 .into(),
         },
-        DhtOp::RegisterDeletedBy(_, header) => {
+        DhtOp::RegisterDeletedEntryHeader(_, header) => {
             get_entry_hash_for_header(&header.removes_address, &cas)
                 .await?
                 .into()
         }
-        DhtOp::RegisterDeletedHeader(_, header) => header.removes_address.clone().into(),
+        DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
         DhtOp::RegisterAddLink(_, header) => header.base_address.clone().into(),
         DhtOp::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
     })
