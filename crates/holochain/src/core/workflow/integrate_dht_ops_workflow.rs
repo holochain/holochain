@@ -349,10 +349,12 @@ mod tests {
             ConductorBuilder,
         },
         core::{
-            ribosome::{NamedInvocation, ZomeCallInvocationFixturator},
+            ribosome::{
+                HostContext, HostContextFixturator, NamedInvocation, ZomeCallInvocationFixturator,
+            },
             state::{
                 cascade::{test_dbs_and_mocks, Cascade},
-                metadata::LinkMetaKey,
+                metadata::{LinkMetaKey, LinkMetaVal},
                 source_chain::SourceChain,
                 workspace::WorkspaceError,
             },
@@ -361,6 +363,8 @@ mod tests {
         fixt::EntryFixturator,
     };
     use fixt::prelude::*;
+    use futures::future::BoxFuture;
+    use futures::future::FutureExt;
     use holo_hash::{AgentPubKeyFixturator, Hashable, Hashed, HeaderHash};
     use holochain_keystore::Signature;
     use holochain_state::{
@@ -368,7 +372,7 @@ mod tests {
         env::{
             EnvironmentReadRef, EnvironmentWrite, EnvironmentWriteRef, ReadManager, WriteManager,
         },
-        error::DatabaseError,
+        error::{DatabaseError, DatabaseResult},
         test_utils::{test_cell_env, test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{
@@ -391,7 +395,7 @@ mod tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::HostInput;
     use matches::assert_matches;
-    use std::convert::TryInto;
+    use std::{convert::TryInto, sync::Arc};
     use unwrap_to::unwrap_to;
     use uuid::Uuid;
 
@@ -977,7 +981,14 @@ mod tests {
 
     fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         let op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
-        let pre_state = vec![Db::IntQueue(op.clone())];
+        let pre_state = vec![
+            Db::IntQueue(op.clone()),
+            Db::CasEntry(
+                a.original_entry.clone().into(),
+                Some(a.original_header.clone().into()),
+                Some(a.signature.clone()),
+            ),
+        ];
         let expect = vec![
             Db::Integrated(op.clone()),
             Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
@@ -1091,8 +1102,62 @@ mod tests {
         }
     }
 
+    fn sync_call<'a>(host_context: Arc<HostContext>, base: EntryHash) -> Vec<LinkMetaVal> {
+        let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
+            async move {
+                // TODO: Add link 
+                // This is a commit though so we can't do that here
+                // Get link
+                let key = LinkMetaKey::Base(&base);
+                let val = workspace.cascade().dht_get_links(&key).await?;
+                assert_eq!(val.len(), 1);
+                Ok(val)
+            }
+            .boxed()
+        };
+        tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+            unsafe { host_context.workspace().apply_mut(call).await }
+        }))
+        .unwrap()
+        .unwrap()
+        .unwrap()
+    }
+
     #[tokio::test(threaded_scheduler)]
     async fn test_metadata_from_wasm() {
+        // test workspace boilerplate
+        observability::test_run().ok();
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let (base_entry_hash, target_entry_hash) = {
+            clear_dbs(&env_ref, &dbs);
+            let td = TestData::new().await;
+            let agent_key = td.agent_key.clone();
+            let base_entry_hash = td.original_entry_hash.clone();
+            let target_entry_hash = td.new_entry_hash.clone();
+            let (pre_state, expect, _) = register_add_link(td);
+            Db::set(pre_state, &env_ref, &dbs).await;
+            call_workflow(&env_ref, &dbs, env.clone(), agent_key).await;
+            Db::check(
+                expect,
+                &env_ref,
+                &dbs,
+                format!("{}: {}", "metadata from wasm", here!("")),
+            )
+            .await;
+            (base_entry_hash, target_entry_hash)
+        };
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+            .next()
+            .unwrap();
+        host_context.change_workspace(raw_workspace);
+        let r = sync_call(Arc::new(host_context), base_entry_hash);
+        assert_eq!(r[0].target, target_entry_hash);
     }
 
     #[tokio::test(threaded_scheduler)]
