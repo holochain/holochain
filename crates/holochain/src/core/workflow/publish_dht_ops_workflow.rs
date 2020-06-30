@@ -12,13 +12,13 @@
 
 use super::{
     error::WorkflowResult,
-    produce_dht_ops_workflow::dht_op::{error::DhtOpConvertError, light_to_op},
+    produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
 };
 use crate::core::{
     queue_consumer::WorkComplete,
     state::{
         chain_cas::ChainCasBuf,
-        dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegrationValue},
+        dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegratedDhtOpsValue},
     },
 };
 use fallible_iterator::FallibleIterator;
@@ -107,7 +107,7 @@ pub async fn publish_dht_ops_workflow_inner(
                 continue;
             }
         };
-        let IntegrationValue { basis, op, .. } = op;
+        let IntegratedDhtOpsValue { basis, op, .. } = op;
         let op = match light_to_op(op, workspace.cas()).await {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
@@ -158,7 +158,9 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
 mod tests {
     use super::*;
     use crate::{
-        core::workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
+        core::workflow::produce_dht_ops_workflow::dht_op_light::{
+            dht_op_to_light_basis, DhtOpLight,
+        },
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
     use fixt::prelude::*;
@@ -227,7 +229,7 @@ mod tests {
             let header_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
                 .await
                 .unwrap();
-            let light = IntegrationValue {
+            let light = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
                 op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
@@ -556,7 +558,7 @@ mod tests {
             let reader = env_ref.reader().unwrap();
             let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let (op_hash, light, basis, _) = store_element;
-            let integration = IntegrationValue {
+            let integration = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 op: light,
                 basis,
@@ -569,7 +571,7 @@ mod tests {
                 .unwrap();
 
             let (op_hash, light, basis) = store_entry;
-            let integration = IntegrationValue {
+            let integration = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 op: light,
                 basis,
@@ -582,7 +584,7 @@ mod tests {
                 .unwrap();
 
             let (op_hash, light, basis, _) = register_replaced_by;
-            let integration = IntegrationValue {
+            let integration = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 op: light,
                 basis,

@@ -250,7 +250,7 @@ where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = (&'env [u8], V);
+    type Item = IterItem<'env, V>;
     #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let item = self.iter.next()?;
@@ -297,7 +297,7 @@ where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = (&'env [u8], V);
+    type Item = IterItem<'env, V>;
     #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         self.iter.next()
@@ -354,11 +354,12 @@ pub struct SingleIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    scratch_iter: Box<dyn DoubleEndedIterator<Item = (&'a [u8], V)> + 'a>,
-    iter:
-        Box<dyn DoubleEndedFallibleIterator<Item = (&'env [u8], V), Error = DatabaseError> + 'env>,
-    current: Option<(&'env [u8], V)>,
-    scratch_current: Option<(&'a [u8], V)>,
+    scratch_iter: Box<dyn DoubleEndedIterator<Item = IterItem<'a, V>> + 'a>,
+    iter: Box<
+        dyn DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+    >,
+    current: Option<IterItem<'env, V>>,
+    scratch_current: Option<IterItem<'a, V>>,
 }
 
 impl<'env, 'a: 'env, V> SingleIter<'env, 'a, V>

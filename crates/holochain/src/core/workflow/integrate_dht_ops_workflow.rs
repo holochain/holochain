@@ -6,7 +6,8 @@ use crate::core::{
     state::{
         chain_cas::ChainCasBuf,
         dht_op_integration::{
-            IntegratedDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue, IntegrationValue,
+            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
+            IntegrationQueueValue,
         },
         metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
@@ -27,7 +28,7 @@ use holochain_types::{
     header::IntendedFor,
     EntryHashed, Header, HeaderHashed, Timestamp,
 };
-use produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, error::DhtOpConvertError};
+use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use std::convert::TryInto;
 use tracing::*;
 
@@ -285,7 +286,7 @@ async fn integrate_dht_ops_workflow_inner(
             }
             Err(e) => return Err(e.into()),
         };
-        let value = IntegrationValue {
+        let value = IntegratedDhtOpsValue {
             validation_status,
             basis,
             op,
@@ -549,7 +550,7 @@ mod tests {
                                     "Failed to generate light {} for {}",
                                     op_hash, here
                                 ));
-                        let value = IntegrationValue {
+                        let value = IntegratedDhtOpsValue {
                             validation_status: ValidationStatus::Valid,
                             basis,
                             op,
@@ -1111,7 +1112,7 @@ mod tests {
     fn sync_call<'a>(host_context: Arc<HostContext>, base: EntryHash) -> Vec<LinkMetaVal> {
         let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
-                // TODO: Add link 
+                // TODO: Add link
                 // This is a commit though so we can't do that here
                 // Get link
                 let key = LinkMetaKey::Base(&base);

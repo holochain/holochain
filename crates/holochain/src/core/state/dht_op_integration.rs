@@ -1,6 +1,6 @@
 //! Various types for the databases involved in the DhtOp integration workflow
 
-use crate::core::workflow::produce_dht_ops_workflow::dht_op::DhtOpLight;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{buffer::KvBuf, prelude::Reader};
@@ -19,7 +19,7 @@ pub type IntegrationQueueStore<'env> =
 
 /// Database type for IntegratedDhtOps
 /// [DhtOp]s that have already been integrated
-pub type IntegratedDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, IntegrationValue, Reader<'env>>;
+pub type IntegratedDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, IntegratedDhtOpsValue, Reader<'env>>;
 
 /// The key type for the IntegrationQueue db
 /// Key for the Integration Queue that ensures they are ordered by time
@@ -52,8 +52,8 @@ impl TryFrom<IntegrationQueueKey> for (Timestamp, DhtOpHash) {
 
 /// A type for storing in databases that only need the hashes.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct IntegrationValue {
-    /// Thi ops validation status
+pub struct IntegratedDhtOpsValue {
+    /// The op's validation status
     pub validation_status: ValidationStatus,
     /// Where to send this op
     pub basis: AnyDhtHash,
@@ -64,7 +64,7 @@ pub struct IntegrationValue {
 /// A type for storing in databases that only need the hashes.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct IntegrationQueueValue {
-    /// Thi ops validation status
+    /// The op's validation status
     pub validation_status: ValidationStatus,
     /// Signatures and hashes of the op
     pub op: DhtOp,
