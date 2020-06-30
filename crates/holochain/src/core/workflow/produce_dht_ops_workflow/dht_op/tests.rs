@@ -3,8 +3,9 @@ use crate::{
     core::state::chain_cas::ChainCasBuf,
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
-        EntryUpdateFixturator, EntryCreateFixturator, EntryFixturator, EntryHashFixturator,
-        EntryTypeFixturator, InitZomesCompleteFixturator, LinkAddFixturator, LinkRemoveFixturator,
+        EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
+        EntryUpdateFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
+        LinkRemoveFixturator,
     },
 };
 use fixt::prelude::*;
@@ -18,7 +19,7 @@ use holochain_types::{
     fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},
     header::{
         builder::{self, HeaderBuilder},
-        AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryUpdate, EntryCreate, EntryType,
+        AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate,
         HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove, NewEntryHeader,
     },
     observability, Entry, EntryHashed, Header, HeaderHashed,
@@ -155,8 +156,8 @@ impl ChainElementTest {
         let ops = vec![
             DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
             DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-            DhtOp::RegisterDeletedEntryHeader(self.sig.clone(), entry_delete.clone()),
-            DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete),
+            DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete.clone()),
+            DhtOp::RegisterDeletedEntryHeader(self.sig, entry_delete),
         ];
         (element, ops)
     }
