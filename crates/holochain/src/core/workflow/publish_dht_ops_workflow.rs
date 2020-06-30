@@ -402,7 +402,7 @@ mod tests {
         let delay = Duration::from_millis((20 * std::cmp::max(num_agents, num_hash)).into());
         call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
-        // Check the handler receives the no broadcasts
+        // Check that the handler receives no publish messages
         assert_eq!(0, recv_count.load(Ordering::SeqCst));
 
         // Shutdown
