@@ -1,3 +1,5 @@
+use std::convert::{TryFrom, TryInto};
+
 /// A UTC timestamp for use in Holochain's headers.
 ///
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings.
@@ -83,6 +85,8 @@ impl std::convert::TryFrom<&str> for Timestamp {
         Ok(t.into())
     }
 }
+const SEC: usize = std::mem::size_of::<i64>();
+const NSEC: usize = std::mem::size_of::<u32>();
 
 /// A representation of a Timestamp which can go into and out of a byte slice
 /// in-place without allocation. Useful for LMDB keys.
@@ -91,38 +95,44 @@ impl std::convert::TryFrom<&str> for Timestamp {
 /// should not be directly used. However, ordering is preserved when mapping
 /// to a TimestampKey, which is what allows us to use it for an LMDB key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TimestampKey([u32; 3]);
+pub struct TimestampKey([u8; SEC + NSEC]);
 
 impl From<Timestamp> for TimestampKey {
     fn from(t: Timestamp) -> TimestampKey {
         let (sec, nsec) = (t.0, t.1);
+        // We have to add 2^64, so that negative numbers become positive,
+        // so that correct ordering relative to other byte arrays is maintained.
         let sec: i128 = (sec as i128) - (i64::MIN as i128);
-        let hi: u32 = ((sec & 0xffffffff00000000) >> 32) as u32;
-        let lo: u32 = (sec & 0x00000000ffffffff) as u32;
-        TimestampKey([hi, lo, nsec])
+        let sec: u64 = sec as u64;
+        let mut a = [0; SEC + NSEC];
+        a[0..SEC].copy_from_slice(&sec.to_be_bytes());
+        a[SEC..].copy_from_slice(&nsec.to_be_bytes());
+        TimestampKey(a)
     }
 }
 
 impl From<TimestampKey> for Timestamp {
     fn from(k: TimestampKey) -> Timestamp {
-        let [hi, lo, nsec] = k.0;
-        let sec: i128 = ((hi as i128) << 32) + (lo as i128) + (i64::MIN as i128);
+        let sec = u64::from_be_bytes(k.0[0..SEC].try_into().unwrap());
+        let nsec = u32::from_be_bytes(k.0[SEC..].try_into().unwrap());
+        // Since we added 2^64 during encoding, we must subtract it during
+        // decoding
+        let sec: i128 = (sec as i128) + (i64::MIN as i128);
         Timestamp(sec as i64, nsec)
     }
 }
 
 impl AsRef<[u8]> for TimestampKey {
     fn as_ref(&self) -> &[u8] {
-        assert_eq!(self.0.len(), 3);
-        unsafe { core::slice::from_raw_parts(self.0.as_ptr() as *const u8, 12) }
+        assert_eq!(self.0.len(), 12);
+        &self.0
     }
 }
 
 impl From<&[u8]> for TimestampKey {
     fn from(bytes: &[u8]) -> Self {
         assert_eq!(bytes.len(), 12);
-        let slice = unsafe { core::slice::from_raw_parts(bytes.as_ptr() as *const u32, 3) };
-        Self([slice[0], slice[1], slice[2]])
+        Self(<[u8; SEC + NSEC]>::try_from(bytes).unwrap())
     }
 }
 
@@ -156,12 +166,12 @@ mod tests {
     #[test]
     fn test_timestamp_key_roundtrips() {
         // create test timestamps
-        let t1 = Timestamp(i64::MIN, u32::MAX);
+        let t1 = Timestamp(i64::MIN, u32::MIN);
         let t2 = Timestamp(i64::MIN / 4, u32::MAX);
-        let t3: Timestamp = "1930-01-01T00:00:00.999999999Z".try_into().unwrap();
-        let t4: Timestamp = "1970-11-11T14:34:00.000000000Z".try_into().unwrap();
-        let t5: Timestamp = "2020-05-05T19:16:04.266431045Z".try_into().unwrap();
-        let t6 = Timestamp(i64::MAX / 4, u32::MAX);
+        let t3 = Timestamp::try_from("1930-01-01T00:00:00.999999999Z").unwrap();
+        let t4 = Timestamp::try_from("1970-11-11T14:34:00.000000000Z").unwrap();
+        let t5 = Timestamp::try_from("2020-05-05T19:16:04.266431045Z").unwrap();
+        let t6 = Timestamp(i64::MAX / 4, u32::MIN);
         let t7 = Timestamp(i64::MAX, u32::MAX);
 
         // build corresponding keys
