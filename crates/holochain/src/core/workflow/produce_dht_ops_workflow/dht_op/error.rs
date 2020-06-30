@@ -22,6 +22,8 @@ pub enum DhtOpConvertError {
         "Entry was missing for StoreEntry when private. Maybe the database doesn't have access"
     )]
     StoreEntryOnPrivate,
+    #[error("A LinkRemove contained a link_add_address to a header that is not a LinkAdd")]
+    LinkRemoveRequiresLinkAdd,
     #[error("The Header: {0} is the wrong type for this DhtOp: {1}")]
     HeaderMismatch(String, String),
     #[error(transparent)]

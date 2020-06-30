@@ -8,7 +8,7 @@ use crate::core::{
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue, IntegrationValue,
         },
-        metadata::{MetadataBuf, MetadataBufT},
+        metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
     },
 };
@@ -217,15 +217,36 @@ async fn integrate_dht_ops_workflow_inner(
                 let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
-                let link_add = match workspace
+
+                // Get the link add header
+                let maybe_link_add = match workspace
                     .cas
                     .get_header(&link_remove.link_add_address)
                     .await?
                 {
-                    Some(link_add) => link_add.into_header_and_signature().0.into_content(),
+                    Some(link_add) => {
+                        let header = link_add.into_header_and_signature().0;
+                        let (header, hash) = header.into_inner();
+                        let link_add = match header {
+                            Header::LinkAdd(la) => la,
+                            _ => return Err(DhtOpConvertError::LinkRemoveRequiresLinkAdd.into()),
+                        };
+
+                        // Create a full link key and check if the link add exists
+                        let key = LinkMetaKey::from((&link_add, &hash));
+                        if workspace.meta.get_links(&key)?.is_empty() {
+                            None
+                        } else {
+                            Some(link_add)
+                        }
+                    }
+                    None => None,
+                };
+                let link_add = match maybe_link_add {
+                    Some(link_add) => link_add,
                     // Handle link add missing
-                    // Probably just waiting on StoreElement to arrive so put
-                    // back in queue with a log message
+                    // Probably just waiting on StoreElement or RegisterAddLink
+                    // to arrive so put back in queue with a log message
                     None => {
                         // Add op back on queue
                         workspace.integration_queue.put(
@@ -237,11 +258,6 @@ async fn integrate_dht_ops_workflow_inner(
                         )?;
                         continue;
                     }
-                };
-
-                let link_add = match link_add {
-                    Header::LinkAdd(la) => la,
-                    _ => panic!("Must be a link add"),
                 };
 
                 // Remove the link
@@ -779,7 +795,9 @@ mod tests {
                     Db::IntegratedEmpty => {}
                     Db::MetaEmpty => {}
                     Db::MetaDelete(_, _) => {}
-                    Db::MetaLink(_, _) => {}
+                    Db::MetaLink(link_add, _) => {
+                        workspace.meta.add_link(link_add).await.unwrap();
+                    }
                     Db::MetaLinkEmpty(_) => {}
                 }
             }
