@@ -146,7 +146,7 @@ impl ChainElementTest {
     }
 
     fn entry_delete(mut self) -> (ChainElement, Vec<DhtOp>) {
-        let entry_delete = builder::EntryDelete {
+        let entry_delete = builder::ElementDelete {
             removes_address: self.header_hash.clone().into(),
         }
         .build(self.commons.next().unwrap());
@@ -156,8 +156,8 @@ impl ChainElementTest {
         let ops = vec![
             DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
             DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-            DhtOp::RegisterDeletedHeaderBy(self.sig.clone(), entry_delete.clone()),
-            DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete),
+            DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete.clone()),
+            DhtOp::RegisterDeletedEntryHeader(self.sig, entry_delete),
         ];
         (element, ops)
     }

@@ -33,7 +33,7 @@ pub enum Header {
     ChainClose(ChainClose),
     EntryCreate(EntryCreate),
     EntryUpdate(EntryUpdate),
-    EntryDelete(EntryDelete),
+    ElementDelete(ElementDelete),
 }
 
 /// a utility wrapper to write intos for our data types
@@ -49,7 +49,9 @@ macro_rules! write_into_header {
     };
 }
 
+/// A trait to specify the common parts of a Header
 pub trait HeaderInner {
+    /// Get a full header from the subset
     fn into_header(self) -> Header;
 }
 
@@ -69,7 +71,7 @@ write_into_header! {
     ChainClose,
     EntryCreate,
     EntryUpdate,
-    EntryDelete,
+    ElementDelete,
 }
 
 /// a utility macro just to not have to type in the match statement everywhere.
@@ -85,7 +87,7 @@ macro_rules! match_header {
             Header::ChainClose($i) => { $($t)* }
             Header::EntryCreate($i) => { $($t)* }
             Header::EntryUpdate($i) => { $($t)* }
-            Header::EntryDelete($i) => { $($t)* }
+            Header::ElementDelete($i) => { $($t)* }
         }
     };
 }
@@ -133,7 +135,7 @@ impl Header {
             Self::InitZomesComplete(InitZomesComplete { prev_header, .. }) => prev_header,
             Self::LinkAdd(LinkAdd { prev_header, .. }) => prev_header,
             Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
-            Self::EntryDelete(EntryDelete { prev_header, .. }) => prev_header,
+            Self::ElementDelete(ElementDelete { prev_header, .. }) => prev_header,
             Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
             Self::EntryCreate(EntryCreate { prev_header, .. }) => prev_header,
@@ -150,6 +152,7 @@ make_hashed_base! {
 }
 
 impl HeaderHashed {
+    /// Constructor
     pub async fn with_data(header: Header) -> Result<Self, SerializedBytesError> {
         let sb = SerializedBytes::try_from(&header)?;
         Ok(HeaderHashed::with_pre_hashed(
@@ -162,7 +165,10 @@ impl HeaderHashed {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
+    /// A header which simply creates a new entry
     Create(EntryCreate),
+    /// A header which creates a new entry that is semantically related to a
+    /// previously created entry or header
     Update(EntryUpdate),
 }
 
@@ -235,7 +241,7 @@ pub enum IntendedFor {
     Entry,
 }
 
-/// header for a DNA entry
+/// The Dna Header is always the first header in a source chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
     pub author: AgentPubKey,
@@ -245,7 +251,8 @@ pub struct Dna {
     pub hash: DnaHash,
 }
 
-/// header for a agent validation entry
+/// Header for an agent validation package, used to determine whether an agent
+/// is allowed to participate in this DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
@@ -256,7 +263,8 @@ pub struct AgentValidationPkg {
     pub membrane_proof: Option<SerializedBytes>,
 }
 
-/// header for a zome init entry to mark chain ready.  Contains no entry data.
+/// A header which declares that all zome init functions have successfully
+/// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
@@ -265,6 +273,7 @@ pub struct InitZomesComplete {
     pub prev_header: HeaderAddress,
 }
 
+/// Declares that a metadata Link should be made between two EntryHashes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct LinkAdd {
     pub author: AgentPubKey,
@@ -278,6 +287,7 @@ pub struct LinkAdd {
     pub tag: LinkTag,
 }
 
+/// Declares that a previously made Link should be nullified and considered removed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct LinkRemove {
     pub author: AgentPubKey,
@@ -289,6 +299,8 @@ pub struct LinkRemove {
     pub link_add_address: HeaderAddress,
 }
 
+/// When migrating to a new version of a DNA, this header is committed to the
+/// new chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainOpen {
     pub author: AgentPubKey,
@@ -299,6 +311,8 @@ pub struct ChainOpen {
     pub prev_dna_hash: DnaHash,
 }
 
+/// When migrating to a new version of a DNA, this header is committed to the
+/// old chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct ChainClose {
     pub author: AgentPubKey,
@@ -309,6 +323,8 @@ pub struct ChainClose {
     pub new_dna_hash: DnaHash,
 }
 
+/// A header which "speaks" Entry content into being. The same content can be
+/// referenced by multiple such headers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryCreate {
     pub author: AgentPubKey,
@@ -320,6 +336,14 @@ pub struct EntryCreate {
     pub entry_hash: EntryHash,
 }
 
+/// A header which specifies that some new Entry content is intended to be an
+/// update to some old Entry.
+///
+/// The update may refer to either a previous Header, or a previous Entry, via
+/// the `intended_for` field. The update is registered as metadata on the
+/// intended target, the result of which is is that both Headers and Entries can
+/// have a tree of such metadata update references. Entries get "updated" to
+/// other entries, and Headers get "updated" to other headers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct EntryUpdate {
     pub author: AgentPubKey,
@@ -334,8 +358,14 @@ pub struct EntryUpdate {
     pub entry_hash: EntryHash,
 }
 
+/// Declare that a previously published Header should be nullified and
+/// considered deleted.
+///
+/// Via the associated [DhtOp], this also has an effect on Entries: namely,
+/// that a previously published Entry will become inaccessible if all of its
+/// Headers are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct EntryDelete {
+pub struct ElementDelete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -345,13 +375,18 @@ pub struct EntryDelete {
     pub removes_address: HeaderAddress,
 }
 
+/// Allows Headers which reference Entries to know what type of Entry it is
+/// referencing. Useful for examining Headers without needing to fetch the
+/// corresponding Entries.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum EntryType {
+    /// An AgentPubKey
     AgentPubKey,
-    // Stores the App's provided filtration data
-    // FIXME: Change this if we are keeping Zomes
+    /// An app-provided entry, along with its app-provided AppEntryType
     App(AppEntryType),
+    /// A Capability claim
     CapClaim,
+    /// A Capability grant.
     CapGrant,
 }
 
@@ -366,6 +401,7 @@ impl EntryType {
     }
 }
 
+/// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
@@ -400,7 +436,8 @@ impl AppEntryType {
 }
 
 impl Dna {
-    /// Dna cannot implement the trait as it doesn't have a previous header
+    /// The Dna header can't implement HeaderBuilder because it lacks a
+    /// `prev_header` field, so this helper is provided as a special case
     pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
         Self {
             author: builder.author,

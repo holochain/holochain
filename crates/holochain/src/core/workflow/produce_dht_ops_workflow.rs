@@ -13,7 +13,7 @@ use holochain_state::{
 use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp};
 use tracing::*;
 
-pub mod dht_op;
+pub mod dht_op_light;
 
 // TODO: #[instrument]
 pub async fn produce_dht_ops_workflow(

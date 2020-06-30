@@ -6,7 +6,8 @@ use crate::core::{
     state::{
         chain_cas::ChainCasBuf,
         dht_op_integration::{
-            IntegratedDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue, IntegrationValue,
+            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
+            IntegrationQueueValue,
         },
         metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
@@ -27,7 +28,7 @@ use holochain_types::{
     header::IntendedFor,
     EntryHashed, Header, HeaderHashed, Timestamp,
 };
-use produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, error::DhtOpConvertError};
+use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use std::convert::TryInto;
 use tracing::*;
 
@@ -146,10 +147,10 @@ async fn integrate_dht_ops_workflow_inner(
                 };
                 workspace
                     .meta
-                    .add_update(entry_update, old_entry_hash)
+                    .register_update(entry_update, old_entry_hash)
                     .await?;
             }
-            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+            DhtOp::RegisterDeletedEntryHeader(_, entry_delete) => {
                 let entry_hash = match workspace
                     .cas
                     .get_header(&entry_delete.removes_address)
@@ -172,10 +173,16 @@ async fn integrate_dht_ops_workflow_inner(
                         continue;
                     }
                 };
-                workspace.meta.add_delete(entry_delete, entry_hash).await?
+                workspace
+                    .meta
+                    .register_delete_on_entry(entry_delete, entry_hash)
+                    .await?
             }
-            DhtOp::RegisterDeletedHeaderBy(_, entry_delete) => {
-                workspace.meta.add_header_delete(entry_delete).await?
+            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+                workspace
+                    .meta
+                    .register_delete_on_header(entry_delete)
+                    .await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 workspace.meta.add_link(link_add.clone()).await?;
@@ -279,7 +286,7 @@ async fn integrate_dht_ops_workflow_inner(
             }
             Err(e) => return Err(e.into()),
         };
-        let value = IntegrationValue {
+        let value = IntegratedDhtOpsValue {
             validation_status,
             basis,
             op,
@@ -380,12 +387,12 @@ mod tests {
         composite_hash::{AnyDhtHash, EntryHash},
         dht_op::{DhtOp, DhtOpHashed},
         fixt::{
-            AppEntryTypeFixturator, EntryDeleteFixturator, EntryUpdateFixturator, HeaderFixturator,
-            LinkAddFixturator, LinkRemoveFixturator, LinkTagFixturator, NewEntryHeaderFixturator,
-            SignatureFixturator, ZomeIdFixturator,
+            AppEntryTypeFixturator, ElementDeleteFixturator, EntryUpdateFixturator,
+            HeaderFixturator, LinkAddFixturator, LinkRemoveFixturator, LinkTagFixturator,
+            NewEntryHeaderFixturator, SignatureFixturator, ZomeIdFixturator,
         },
         header::{
-            builder, EntryDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader,
+            builder, ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader,
         },
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
@@ -411,7 +418,7 @@ mod tests {
         original_entry_hash: EntryHash,
         new_entry_hash: EntryHash,
         original_header: NewEntryHeader,
-        entry_delete: EntryDelete,
+        entry_delete: ElementDelete,
         link_add: LinkAdd,
         link_remove: LinkRemove,
     }
@@ -468,7 +475,7 @@ mod tests {
             entry_update_entry.replaces_address = original_header_hash.clone();
 
             // Entry delete
-            let mut entry_delete = fixt!(EntryDelete);
+            let mut entry_delete = fixt!(ElementDelete);
             entry_delete.removes_address = original_header_hash.clone();
 
             // Link add
@@ -543,7 +550,7 @@ mod tests {
                                     "Failed to generate light {} for {}",
                                     op_hash, here
                                 ));
-                        let value = IntegrationValue {
+                        let value = IntegratedDhtOpsValue {
                             validation_status: ValidationStatus::Valid,
                             basis,
                             op,
@@ -940,7 +947,7 @@ mod tests {
     }
 
     fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+        let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
         let pre_state = vec![
             Db::IntQueue(op.clone()),
             Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
@@ -956,7 +963,7 @@ mod tests {
     }
 
     fn register_deleted_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
+        let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
         let pre_state = vec![Db::IntQueue(op.clone())];
         let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
         (
@@ -967,7 +974,7 @@ mod tests {
     }
 
     fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-        let op = DhtOp::RegisterDeletedHeaderBy(a.signature.clone(), a.entry_delete.clone());
+        let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
         let pre_state = vec![Db::IntQueue(op.clone())];
         let expect = vec![
             Db::Integrated(op.clone()),
@@ -1105,7 +1112,7 @@ mod tests {
     fn sync_call<'a>(host_context: Arc<HostContext>, base: EntryHash) -> Vec<LinkMetaVal> {
         let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
-                // TODO: Add link 
+                // TODO: Add link
                 // This is a commit though so we can't do that here
                 // Get link
                 let key = LinkMetaKey::Base(&base);
@@ -1178,9 +1185,9 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     #[ignore]
-    async fn test_integrate_single_register_deleted_by() {
+    async fn test_integrate_single_register_delete_on_headerd_by() {
         // For RegisterDeletedBy
-        // metadata has EntryDelete on HeaderHash
+        // metadata has ElementDelete on HeaderHash
         todo!()
     }
 

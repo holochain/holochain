@@ -13,9 +13,9 @@ mock! {
             header: Header,
             agent_pub_key: AgentPubKey,
         ) -> DatabaseResult<()>;
-        fn sync_add_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
-        fn sync_add_delete(&self, delete: header::EntryDelete, entry_hash: EntryHash) -> DatabaseResult<()>;
-        fn sync_add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()>;
+        fn sync_register_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
+        fn sync_register_delete_on_entry(&self, delete: header::ElementDelete, entry_hash: EntryHash) -> DatabaseResult<()>;
+        fn sync_register_delete_on_header(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
@@ -114,21 +114,24 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_activity(header, agent_pub_key)
     }
 
-    async fn add_update(
+    async fn register_update(
         &mut self,
         update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()> {
-        self.sync_add_update(update, entry)
+        self.sync_register_update(update, entry)
     }
-    async fn add_delete(
+    async fn register_delete_on_entry(
         &mut self,
-        delete: header::EntryDelete,
+        delete: header::ElementDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()> {
-        self.sync_add_delete(delete, entry_hash)
+        self.sync_register_delete_on_entry(delete, entry_hash)
     }
-    async fn add_header_delete(&mut self, delete: header::EntryDelete) -> DatabaseResult<()> {
-        self.sync_add_header_delete(delete)
+    async fn register_delete_on_header(
+        &mut self,
+        delete: header::ElementDelete,
+    ) -> DatabaseResult<()> {
+        self.sync_register_delete_on_header(delete)
     }
 }

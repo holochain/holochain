@@ -12,8 +12,8 @@ use crate::dna::Zomes;
 use crate::header::AgentValidationPkg;
 use crate::header::ChainClose;
 use crate::header::ChainOpen;
+use crate::header::ElementDelete;
 use crate::header::EntryCreate;
-use crate::header::EntryDelete;
 use crate::header::EntryType;
 use crate::header::EntryUpdate;
 use crate::header::Header;
@@ -500,7 +500,7 @@ fixturator!(
 );
 
 fixturator!(
-    EntryDelete;
+    ElementDelete;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash);
 );
 
@@ -516,7 +516,7 @@ fixturator!(
         ChainClose(ChainClose)
         EntryCreate(EntryCreate)
         EntryUpdate(EntryUpdate)
-        EntryDelete(EntryDelete)
+        ElementDelete(ElementDelete)
     ];
 );
 

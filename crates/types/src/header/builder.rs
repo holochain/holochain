@@ -136,7 +136,7 @@ builder_variant!(EntryUpdate {
     entry_hash: EntryHash,
 });
 
-builder_variant!(EntryDelete {
+builder_variant!(ElementDelete {
     removes_address: HeaderHash,
 });
 
