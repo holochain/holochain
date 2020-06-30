@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod error;
 
+use tracing::*;
+
 #[cfg(test)]
 mod tests;
 
@@ -31,6 +33,7 @@ pub enum DhtOpLight {
     RegisterRemoveLink(Signature, HeaderHash),
 }
 
+#[instrument(skip(cas))]
 /// Convert a [DhtOp] to a [DhtOpLight] and basis
 pub async fn dht_op_to_light_basis(
     op: DhtOp,
@@ -223,6 +226,8 @@ async fn register_delete_on_header(
         )),
     }
 }
+
+#[instrument(skip(op, cas))]
 /// Returns the basis hash which determines which agents will receive this DhtOp
 pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<AnyDhtHash> {
     Ok(match op {
@@ -251,13 +256,15 @@ pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<
     })
 }
 
+#[instrument(skip(cas))]
 async fn get_entry_hash_for_header(
     header_hash: &HeaderHash,
     cas: &ChainCasBuf<'_>,
 ) -> DhtOpConvertResult<EntryHash> {
+    debug!(%header_hash);
     let entry = cas
         .get_header(header_hash)
         .await?
         .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()));
-    entry.ok_or(DhtOpConvertError::MissingEntry)
+    entry.ok_or_else(|| DhtOpConvertError::MissingHeaderEntry(header_hash.clone()))
 }
