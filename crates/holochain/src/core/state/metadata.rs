@@ -151,11 +151,7 @@ pub trait MetadataBufT {
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
     /// Registers a published [Header] on the authoring agent's public key
-    async fn register_activity(
-        &mut self,
-        header: Header,
-        agent_pub_key: AgentPubKey,
-    ) -> DatabaseResult<()>;
+    async fn register_activity(&mut self, header: Header) -> DatabaseResult<()>;
 
     /// Registers a [Header::EntryUpdate] on the referenced [Header] or [Entry]
     async fn register_update(
@@ -186,7 +182,7 @@ pub trait MetadataBufT {
     /// Returns all headers registered on an agent's public key
     fn get_activity(
         &self,
-        header_hash: AgentPubKey,
+        agent_pubkey: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [EntryUpdate] headers registered on an [Entry]
@@ -437,12 +433,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn register_activity(
-        &mut self,
-        header: Header,
-        agent_pub_key: AgentPubKey,
-    ) -> DatabaseResult<()> {
-        self.register_header_to_basis(EntryHeader::Activity(header), agent_pub_key)
+    async fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
+        let author = header.author().clone();
+        self.register_header_to_basis(EntryHeader::Activity(header), author)
             .await
     }
 
@@ -494,11 +487,11 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     fn get_activity(
         &self,
-        header_hash: AgentPubKey,
+        agent_pubkey: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&header_hash.into())?).filter_map(
+            fallible_iterator::convert(self.system_meta.get(&agent_pubkey.into())?).filter_map(
                 |h| {
                     Ok(match h {
                         SysMetaVal::Activity(h) => Some(h),

@@ -242,8 +242,6 @@ pub mod wasm_test {
         // Needs metadata to return get
         {
             use crate::core::state::workspace::Workspace;
-            use fixt::prelude::*;
-            use holo_hash::AgentPubKeyFixturator;
             use holochain_state::env::ReadManager;
 
             let reader = env_ref.reader().unwrap();
@@ -253,14 +251,9 @@ pub mod wasm_test {
                 .await
                 .unwrap();
             let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            integrate_dht_ops_workflow(
-                workspace,
-                env.env.clone().into(),
-                &mut qt,
-                fixt!(AgentPubKey),
-            )
-            .await
-            .unwrap();
+            integrate_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                .await
+                .unwrap();
         }
 
         let round: GetEntryOutput = {

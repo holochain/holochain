@@ -28,7 +28,7 @@ use crate::{
 use fixt::prelude::*;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash::{AgentPubKeyFixturator, Hashable, Hashed, HeaderHash};
+use holo_hash::{Hashable, Hashed, HeaderHash};
 use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
@@ -63,7 +63,6 @@ struct TestData {
     original_entry: Entry,
     new_entry: Entry,
     any_header: Header,
-    agent_key: AgentPubKey,
     entry_update_header: EntryUpdate,
     entry_update_entry: EntryUpdate,
     original_header_hash: HeaderHash,
@@ -152,7 +151,6 @@ impl TestData {
             original_entry,
             new_entry,
             any_header: fixt!(Header),
-            agent_key: fixt!(AgentPubKey),
             entry_update_header,
             entry_update_entry,
             original_header,
@@ -174,7 +172,7 @@ enum Db {
     CasEntry(Entry, Option<Header>, Option<Signature>),
     MetaEmpty,
     MetaHeader(Entry, Header),
-    MetaActivity(AgentPubKey, Header),
+    MetaActivity(Header),
     MetaUpdate(AnyDhtHash, Header),
     MetaDelete(AnyDhtHash, Header),
     MetaLink(LinkAdd, EntryHash),
@@ -280,14 +278,14 @@ impl Db {
                     let exp = [header_hash];
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
-                Db::MetaActivity(agent_key, header) => {
+                Db::MetaActivity(header) => {
                     let header_hash = HeaderHashed::with_data(header.clone())
                         .await
                         .unwrap()
                         .into_hash();
                     let res = workspace
                         .meta
-                        .get_activity(agent_key)
+                        .get_activity(header.author().clone())
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -447,7 +445,7 @@ impl Db {
                     workspace.cas.put(signed_header, Some(entry_hash)).unwrap();
                 }
                 Db::MetaHeader(_, _) => {}
-                Db::MetaActivity(_, _) => {}
+                Db::MetaActivity(_) => {}
                 Db::MetaUpdate(_, _) => {}
                 Db::IntegratedEmpty => {}
                 Db::MetaEmpty => {}
@@ -472,12 +470,11 @@ async fn call_workflow<'env>(
     env_ref: &'env EnvironmentReadRef<'env>,
     dbs: &'env impl GetDb,
     env: EnvironmentWrite,
-    agent_key: AgentPubKey,
 ) {
     let reader = env_ref.reader().unwrap();
     let workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
     let (mut qt, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.into(), &mut qt, agent_key)
+    integrate_dht_ops_workflow(workspace, env.into(), &mut qt)
         .await
         .unwrap();
 }
@@ -538,7 +535,7 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
-        Db::MetaActivity(a.agent_key.clone(), a.any_header.clone()),
+        Db::MetaActivity(a.any_header.clone()),
     ];
     (pre_state, expect, "register agent activity")
 }
@@ -751,10 +748,9 @@ async fn test_ops_state() {
     for t in tests.iter() {
         clear_dbs(&env_ref, &dbs);
         let td = TestData::new().await;
-        let agent_key = td.agent_key.clone();
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, &env_ref, &dbs).await;
-        call_workflow(&env_ref, &dbs, env.clone(), agent_key).await;
+        call_workflow(&env_ref, &dbs, env.clone()).await;
         Db::check(expect, &env_ref, &dbs, format!("{}: {}", name, here!(""))).await;
     }
 }
@@ -790,12 +786,11 @@ async fn test_metadata_from_wasm() {
     let (base_entry_hash, target_entry_hash) = {
         clear_dbs(&env_ref, &dbs);
         let td = TestData::new().await;
-        let agent_key = td.agent_key.clone();
         let base_entry_hash = td.original_entry_hash.clone();
         let target_entry_hash = td.new_entry_hash.clone();
         let (pre_state, expect, _) = register_add_link(td);
         Db::set(pre_state, &env_ref, &dbs).await;
-        call_workflow(&env_ref, &dbs, env.clone(), agent_key).await;
+        call_workflow(&env_ref, &dbs, env.clone()).await;
         Db::check(
             expect,
             &env_ref,

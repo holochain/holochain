@@ -15,7 +15,7 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AgentPubKey, Hashable, Hashed};
+use holo_hash::{Hashable, Hashed};
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
@@ -38,9 +38,8 @@ pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
     trigger_publish: &mut TriggerSender,
-    agent_pub_key: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
-    let result = integrate_dht_ops_workflow_inner(&mut workspace, agent_pub_key).await?;
+    let result = integrate_dht_ops_workflow_inner(&mut workspace).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -59,7 +58,6 @@ pub async fn integrate_dht_ops_workflow(
 #[instrument(skip(workspace))]
 async fn integrate_dht_ops_workflow_inner(
     workspace: &mut IntegrateDhtOpsWorkspace<'_>,
-    agent_pub_key: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     debug!("Starting integrate dht ops workflow");
     // Pull ops out of queue
@@ -115,10 +113,7 @@ async fn integrate_dht_ops_workflow_inner(
                 workspace.cas.put(signed_header, None)?;
 
                 // register agent activity on this agents pub key
-                workspace
-                    .meta
-                    .register_activity(header, agent_pub_key.clone())
-                    .await?;
+                workspace.meta.register_activity(header).await?;
             }
             DhtOp::RegisterReplacedBy(_, entry_update, _) => {
                 let old_entry_hash = match entry_update.intended_for {
@@ -273,7 +268,7 @@ async fn integrate_dht_ops_workflow_inner(
             }
         }
 
-        // TODO: PERF: Aviod this clone by returning the op on error
+        // TODO: PERF: Avoid this clone by returning the op on error
         let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.cas).await {
             Ok(l) => l,
             Err(DhtOpConvertError::MissingHeaderEntry(_)) => {

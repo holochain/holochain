@@ -11,7 +11,6 @@ mock! {
         fn sync_register_activity(
             &mut self,
             header: Header,
-            agent_pub_key: AgentPubKey,
         ) -> DatabaseResult<()>;
         fn sync_register_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
         fn sync_register_delete_on_entry(&self, delete: header::ElementDelete, entry_hash: EntryHash) -> DatabaseResult<()>;
@@ -66,10 +65,10 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn get_activity(
         &self,
-        header_hash: AgentPubKey,
+        agent_pubkey: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
-        self.get_activity(header_hash)
+        self.get_activity(agent_pubkey)
     }
 
     fn get_updates(
@@ -106,12 +105,8 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_header(new_entry_header)
     }
 
-    async fn register_activity(
-        &mut self,
-        header: Header,
-        agent_pub_key: AgentPubKey,
-    ) -> DatabaseResult<()> {
-        self.sync_register_activity(header, agent_pub_key)
+    async fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
+        self.sync_register_activity(header)
     }
 
     async fn register_update(
