@@ -5,7 +5,7 @@ use holochain_zome_types::DecryptInput;
 use holochain_zome_types::DecryptOutput;
 use std::sync::Arc;
 
-pub async fn decrypt(
+pub fn decrypt(
     _ribosome: Arc<WasmRibosome>,
     _host_context: Arc<HostContext>,
     _input: DecryptInput,

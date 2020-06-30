@@ -70,10 +70,10 @@ pub async fn publish_dht_ops_workflow(
     Ok(WorkComplete::Complete)
 }
 
+/// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
     workspace: &PublishDhtOpsWorkspace<'_>,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
-    // Read the authored for ops with receipt count < R
     // TODO: PERF: We need to check all ops every time this runs
     // instead we could have a queue of ops where count < R and a kv for count > R.
     // Then if the count for an ops reduces below R move it to the queue.
@@ -232,7 +232,7 @@ mod tests {
             let light = IntegrationValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
-                op: DhtOpLight::RegisterAddLink(sig.clone(), header_hash.as_hash().clone()),
+                op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
             };
             data.push((sig, op_hashed, light, header_hash));
         }
@@ -402,7 +402,7 @@ mod tests {
         let delay = Duration::from_millis((20 * std::cmp::max(num_agents, num_hash)).into());
         call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
-        // Check the handler receives the no broadcasts
+        // Check that the handler receives no publish messages
         assert_eq!(0, recv_count.load(Ordering::SeqCst));
 
         // Shutdown
@@ -417,6 +417,15 @@ mod tests {
     // - No StoreEntry
     // - This workflow does not have access to private entries
     // - Add / Remove links: Currently publish all.
+    // ## Explication
+    // This test is a little big so a quick run down:
+    // 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterReplacedBy)
+    // 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
+    // 3. The workflow is run and the ops are sent to the network receiver
+    // 4. We check that the correct number of ops are received (so we know there were no other ops sent)
+    // 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
+    // 6. Every op that is received (StoreElement and RegisterReplacedBy) is checked to match the expected versions (entries removed)
+    // 7. Each op also has a count to check for duplicates
     #[tokio::test(threaded_scheduler)]
     async fn test_private_entries() {
         // Create test env
@@ -497,6 +506,7 @@ mod tests {
                 entry_create_header.clone(),
                 Some(original_entry.clone().into()),
             );
+            // Op is expected to not contain the Entry even though the above contains the entry
             let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
             let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
@@ -515,6 +525,7 @@ mod tests {
                 entry_update.clone(),
                 Some(new_entry.clone().into()),
             );
+            // Op is expected to not contain the Entry even though the above contains the entry
             let expected_op = DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
             let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
@@ -524,6 +535,7 @@ mod tests {
         };
 
         // Gather the expected op hashes, ops and basis
+        // We are only expecting Store Element and Register Replaced By ops and nothing else
         let store_element_count = Arc::new(AtomicU32::new(0));
         let register_replaced_by_count = Arc::new(AtomicU32::new(0));
         let expected = {

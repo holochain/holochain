@@ -10,11 +10,11 @@ use holochain_zome_types::HostInput;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
-pub struct EntryDefsInvocation {}
+pub struct EntryDefsInvocation;
 
 impl EntryDefsInvocation {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 

@@ -21,6 +21,7 @@ fn main() {
 
     for &m in [
         "bench",
+        "commit_entry",
         "debug",
         "entry_defs",
         "foo",

@@ -8,7 +8,7 @@ pub struct SerializedBytes;
 pub struct EntryContentHash;
 pub struct CapClaim;
 pub struct CapGrant;
-pub struct ZomeId;
+pub struct ZomePosition;
 
 mod holo_hash {
     pub struct Hash;
@@ -147,7 +147,7 @@ pub enum Entry {
 }
 
 pub struct AppEntry {
-    pub zome_id: ZomeId,
+    pub zome_id: ZomePosition,
     pub entry: Vec<u8>,
 }
 
@@ -156,7 +156,7 @@ pub enum EntryType {
     // Stores the App's provided filtration data
     // FIXME: Change this if we are keeping Zomes
     App {
-        zome_id: ZomeId,
+        zome_id: ZomePosition,
         app_entry_type: AppEntryType,
         is_public: bool,
     },

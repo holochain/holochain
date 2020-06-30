@@ -77,6 +77,15 @@ impl HostContext {
     pub fn allow_side_effects(&self) -> bool {
         self.allow_side_effects
     }
+    #[cfg(test)]
+    pub(crate) fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
+        &self.workspace
+    }
+
+    #[cfg(test)]
+    pub(crate) fn change_workspace(&mut self, workspace: UnsafeInvokeZomeWorkspace) {
+        self.workspace = workspace;
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -346,7 +355,7 @@ pub trait RibosomeT: Sized {
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
-        self,
+        &self,
         workspace: UnsafeInvokeZomeWorkspace,
         // TODO: ConductorHandle
         invocation: ZomeCallInvocation,
@@ -361,10 +370,8 @@ pub mod wasm_test {
     use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
-    use holo_hash::holo_hash_core::HeaderHash;
     use holochain_serialized_bytes::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::commit::CommitEntryResult;
     use holochain_zome_types::*;
     use test_wasm_common::TestString;
 
@@ -376,11 +383,12 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $test_wasm:expr, $fn_name:literal, $input:expr ) => {
+        ( $unsafe_workspace:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
                 use std::convert::TryInto;
+
                 let ribosome =
                     $crate::fixt::WasmRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
                         $test_wasm.into(),
@@ -390,7 +398,6 @@ pub mod wasm_test {
 
                 let timeout = $crate::start_hard_timeout!();
 
-                let workspace = $crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable).next().unwrap();
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
                         holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
@@ -403,7 +410,14 @@ pub mod wasm_test {
                 )
                 .next()
                 .unwrap();
-                let zome_invocation_response = ribosome.call_zome_function(workspace, invocation).unwrap();
+                let zome_invocation_response =
+                    match ribosome.call_zome_function($unsafe_workspace, invocation.clone()) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            dbg!("call_zome_function error", &invocation, &e);
+                            panic!();
+                        }
+                    };
 
                 // instance building off a warm module should be the slowest part of a wasm test
                 // so if each instance (including inner callbacks) takes ~1ms this gives us
@@ -462,24 +476,6 @@ pub mod wasm_test {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome.call_zome_function(workspace, invocation).unwrap()
-        );
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
-    async fn pass_validate_test() {
-        assert_eq!(
-            CommitEntryResult::Success(HeaderHash::new(vec![0xdb; 36])),
-            call_test_ribosome!(TestWasm::Validate, "always_validates", ()),
-        );
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
-    async fn fail_validate_test() {
-        assert_eq!(
-            CommitEntryResult::Fail("Invalid(\"NeverValidates never validates\")".to_string()),
-            call_test_ribosome!(TestWasm::Validate, "never_validates", ()),
         );
     }
 }
