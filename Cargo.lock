@@ -1104,6 +1104,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
+ "ghost_actor",
  "holo_hash",
  "holo_hash_core",
  "holochain_2020_legacy",
