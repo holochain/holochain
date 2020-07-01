@@ -12,7 +12,8 @@ use must_future::MustBoxFuture;
 use std::convert::TryInto;
 use std::sync::Arc;
 
-pub async fn get_entry<'a>(
+#[allow(clippy::extra_unused_lifetimes)]
+pub fn get_entry<'a>(
     _ribosome: Arc<WasmRibosome>,
     host_context: Arc<HostContext>,
     input: GetEntryInput,
@@ -23,6 +24,7 @@ pub async fn get_entry<'a>(
         |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
                 let cascade = workspace.cascade();
+                // safe block on
                 let maybe_entry = cascade
                     .dht_get(&cascade_hash)
                     .await?
@@ -32,6 +34,9 @@ pub async fn get_entry<'a>(
             .boxed()
             .into()
         };
-    let maybe_entry: Option<Entry> = unsafe { host_context.workspace.apply_ref(call).await?? };
+    let maybe_entry: Option<Entry> =
+        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            unsafe { host_context.workspace.apply_ref(call).await }
+        })??;
     Ok(GetEntryOutput::new(maybe_entry))
 }

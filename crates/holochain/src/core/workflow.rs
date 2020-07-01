@@ -21,7 +21,6 @@
 //! committing changes to the associated Workspace and triggering other
 //! workflows.
 
-use crate::core::state::workspace::Workspace;
 pub mod error;
 
 pub mod app_validation_workflow;

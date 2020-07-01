@@ -68,7 +68,7 @@ pub struct LinkMetaVal {
     pub target: EntryHash,
     /// When the link was added
     pub timestamp: Timestamp,
-    /// The [ZomeId] of the zome this link belongs to
+    /// The [ZomePosition] of the zome this link belongs to
     pub zome_id: ZomeId,
     /// A tag used to find this link
     pub tag: Tag,
