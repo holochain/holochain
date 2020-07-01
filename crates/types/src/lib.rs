@@ -36,4 +36,4 @@ pub use entry::{Entry, EntryHashed};
 #[doc(inline)]
 pub use header::{Header, HeaderHashed};
 
-pub use timestamp::Timestamp;
+pub use timestamp::{Timestamp, TimestampKey};
