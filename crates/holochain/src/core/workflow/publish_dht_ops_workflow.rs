@@ -337,7 +337,10 @@ mod tests {
 
         // Call the workflow
         // Get a reasonable delay for the number of agents
-        let delay = Duration::from_millis((20 * std::cmp::max(num_agents, num_hash)).into());
+        // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
+        let delay = Duration::from_millis(
+            std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
+        );
         call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
         // Check the handler receives the correct number of broadcasts
