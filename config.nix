@@ -12,8 +12,8 @@
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "be5f9edb42f6e60db32e518ca10a7f62ae421526";
-   # ^^ this is HEAD of 2020-02-27-rust-stable-2-flags as of 2020-06-23 (freesig)
+   ref = "63a93bd49bbe11e13caa26957b45f7fb1cf7412c";
+   # ^^ this is HEAD of 2020-06-04-rust-stable as of 2020-07-02 (freesig)
 
    # the sha of what is downloaded from the above ref
    # note: even if you change the above ref it will not be redownloaded until
