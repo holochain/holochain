@@ -38,6 +38,7 @@ pub mod cascade;
 pub mod chain_cas;
 #[allow(missing_docs)]
 pub mod chain_sequence;
+pub mod dht_op_integration;
 pub mod metadata;
 #[allow(missing_docs)]
 pub mod source_chain;

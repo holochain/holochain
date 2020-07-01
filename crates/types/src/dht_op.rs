@@ -44,7 +44,7 @@ pub enum DhtOp {
     /// reality.
     StoreEntry(Signature, NewEntryHeader, Box<Entry>),
     /// Used to notify the authority for an agent's public key that that agent
-    /// has commited a new header.
+    /// has committed a new header.
     ///
     /// Conceptually, authorities receiving this `DhtOp` do three things:
     ///
@@ -64,6 +64,8 @@ pub enum DhtOp {
     RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
     /// Op for deleting an entry
     RegisterDeletedBy(Signature, header::EntryDelete),
+    /// Op for deleting a header
+    RegisterDeletedHeaderBy(Signature, header::EntryDelete),
     /// Op for adding a link  
     RegisterAddLink(Signature, header::LinkAdd),
     /// Op for removing a link
@@ -78,6 +80,7 @@ impl DhtOp {
             Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
             Self::RegisterReplacedBy(_, header, _) => UniqueForm::RegisterReplacedBy(header),
             Self::RegisterDeletedBy(_, header) => UniqueForm::RegisterDeletedBy(header),
+            Self::RegisterDeletedHeaderBy(_, header) => UniqueForm::RegisterDeletedHeaderBy(header),
             Self::RegisterAddLink(_, header) => UniqueForm::RegisterAddLink(header),
             Self::RegisterRemoveLink(_, header) => UniqueForm::RegisterRemoveLink(header),
         }
@@ -93,6 +96,7 @@ enum UniqueForm<'a> {
     RegisterAgentActivity(&'a Header),
     RegisterReplacedBy(&'a header::EntryUpdate),
     RegisterDeletedBy(&'a header::EntryDelete),
+    RegisterDeletedHeaderBy(&'a header::EntryDelete),
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
@@ -150,7 +154,11 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
             ));
         }
         Header::EntryDelete(entry_delete) => {
-            ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()))
+            ops.push(DhtOp::RegisterDeletedHeaderBy(
+                sig.clone(),
+                entry_delete.clone(),
+            ));
+            ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()));
         }
     }
     Ok(ops)

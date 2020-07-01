@@ -174,6 +174,14 @@ impl NewEntryHeader {
             | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
         }
     }
+
+    /// Get the visibility of this header
+    pub fn visibility(&self) -> &EntryVisibility {
+        match self {
+            NewEntryHeader::Create(EntryCreate { entry_type, .. })
+            | NewEntryHeader::Update(EntryUpdate { entry_type, .. }) => entry_type.visibility(),
+        }
+    }
 }
 
 impl From<NewEntryHeader> for Header {
@@ -222,7 +230,7 @@ pub struct EntryDefId(u8);
 
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub enum UpdateBasis {
+pub enum IntendedFor {
     Header,
     Entry,
 }
@@ -319,7 +327,7 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub update_basis: UpdateBasis,
+    pub intended_for: IntendedFor,
     pub replaces_address: HeaderHash,
 
     pub entry_type: EntryType,
