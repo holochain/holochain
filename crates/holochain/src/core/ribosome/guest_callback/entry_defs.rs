@@ -234,7 +234,6 @@ mod test {
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
     }
 
-    // TODO: Use this same style to load in the entry defs to memory
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_entry_defs_implemented_defs() {

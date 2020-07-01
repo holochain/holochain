@@ -180,6 +180,7 @@ enum Db {
 }
 
 impl Db {
+    /// Checks that the database is in a state
     #[instrument(skip(expects, env_ref, dbs))]
     async fn check<'env>(
         expects: Vec<Self>,
@@ -406,6 +407,7 @@ impl Db {
         }
     }
 
+    // Sets the database to a certain state
     #[instrument(skip(pre_state, env_ref, dbs))]
     async fn set<'env>(
         pre_state: Vec<Self>,
@@ -479,6 +481,7 @@ async fn call_workflow<'env>(
         .unwrap();
 }
 
+// Need to clear the data from the previous test
 fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl GetDb) {
     let reader = env_ref.reader().unwrap();
     let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
@@ -492,6 +495,11 @@ fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl Get
         })
         .unwrap();
 }
+
+// TESTS BEGIN HERE
+// The following show an op or ops that you want to test
+// with a desired pre-state that you want the database in
+// and the expected state of the database after the workflow is run
 
 fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let entry = match &a.any_header {
@@ -720,7 +728,7 @@ fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
     )
 }
 
-// Entries, Private Entries & Headers are stored to CAS
+// This runs the above tests
 #[tokio::test(threaded_scheduler)]
 async fn test_ops_state() {
     observability::test_run().ok();
@@ -755,6 +763,8 @@ async fn test_ops_state() {
     }
 }
 
+// TODO: Actually use the wasm host functions instead of
+// implementing these mocks
 fn sync_call<'a>(host_context: Arc<HostContext>, base: EntryHash) -> Vec<LinkMetaVal> {
     let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
@@ -777,7 +787,7 @@ fn sync_call<'a>(host_context: Arc<HostContext>, base: EntryHash) -> Vec<LinkMet
 }
 
 #[tokio::test(threaded_scheduler)]
-async fn test_metadata_from_wasm() {
+async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
@@ -855,6 +865,9 @@ async fn test_integrate_single_register_remove_link() {
     todo!()
 }
 
+// TODO: Document this test
+// TODO: Use the wasm calls directly instead of setting the databases to
+// a state
 // Integration
 #[tokio::test(threaded_scheduler)]
 async fn commit_entry_add_link() {

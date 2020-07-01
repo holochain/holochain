@@ -141,13 +141,8 @@ async fn integrate_single_dht_op(
             validation_status,
         } = value;
 
-        // let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
-        // debug!(?op_hash);
-        // debug!(?op);
-
         // TODO: PERF: We don't really need this clone because dht_to_op_light_basis could
         // return the full op as it's not consumed when making hashes
-
         match op.clone() {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
                 let header = HeaderHashed::with_data(header).await?;
