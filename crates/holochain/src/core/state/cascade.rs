@@ -188,3 +188,21 @@ where
         }
     }
 }
+
+#[cfg(test)]
+/// Helper function for easily setting up cascades during tests
+pub fn test_dbs_and_mocks<'env>(
+    reader: &'env holochain_state::transaction::Reader<'env>,
+    dbs: &impl holochain_state::db::GetDb,
+) -> (
+    ChainCasBuf<'env>,
+    super::metadata::MockMetadataBuf,
+    ChainCasBuf<'env>,
+    super::metadata::MockMetadataBuf,
+) {
+    let cas = ChainCasBuf::primary(&reader, dbs, true).unwrap();
+    let cache = ChainCasBuf::cache(&reader, dbs).unwrap();
+    let metadata = super::metadata::MockMetadataBuf::new();
+    let metadata_cache = super::metadata::MockMetadataBuf::new();
+    (cas, metadata, cache, metadata_cache)
+}

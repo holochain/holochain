@@ -18,7 +18,7 @@ use crate::header::EntryType;
 use crate::header::EntryUpdate;
 use crate::header::InitZomesComplete;
 use crate::header::LinkAdd;
-use crate::header::{builder::HeaderBuilderCommon, AppEntryType, UpdateBasis};
+use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::link::Tag;
 use crate::Timestamp;
@@ -111,7 +111,7 @@ fixturator!(
 newtype_fixturator!(Signature<Bytes>);
 
 fixturator!(
-    UpdateBasis;
+    IntendedFor;
     unit variants [ Entry Header ] empty Entry;
 );
 
@@ -494,7 +494,7 @@ fixturator!(
 
 fixturator!(
     EntryUpdate;
-    constructor fn from_builder(HeaderBuilderCommon, UpdateBasis, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, IntendedFor, HeaderHash, EntryType, EntryHash);
 );
 
 fixturator!(

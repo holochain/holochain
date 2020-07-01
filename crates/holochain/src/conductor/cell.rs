@@ -110,7 +110,8 @@ impl Cell {
         };
 
         if has_genesis {
-            let queue_triggers = spawn_queue_consumer_tasks(&state_env).await;
+            let queue_triggers =
+                spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
 
             Ok(Self {
                 id,
