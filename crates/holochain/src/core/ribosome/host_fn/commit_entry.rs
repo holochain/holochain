@@ -230,7 +230,7 @@ pub mod wasm_test {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
             };
-            
+
             // Write the database to file
             holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
                 crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
