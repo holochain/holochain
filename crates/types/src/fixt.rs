@@ -18,7 +18,7 @@ use crate::header::EntryType;
 use crate::header::EntryUpdate;
 use crate::header::InitZomesComplete;
 use crate::header::LinkAdd;
-use crate::header::{builder::HeaderBuilderCommon, AppEntryType, UpdateBasis};
+use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::link::Tag;
 use crate::Timestamp;
@@ -51,6 +51,9 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 
+/// a curve to spit out Entry::App values
+pub struct AppEntry;
+
 fixturator!(
     Zome;
     constructor fn from_hash(WasmHash);
@@ -80,7 +83,7 @@ fixturator!(
 
 fixturator!(
     AppEntryType;
-    constructor fn new(Bytes, U8, EntryVisibility);
+    constructor fn new(U8, U8, EntryVisibility);
 );
 
 impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
@@ -88,9 +91,9 @@ impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
     fn next(&mut self) -> Option<Self::Item> {
         let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
         Some(AppEntryType::new(
-            app_entry.id().to_vec(),
-            *app_entry.zome_id(),
-            self.0.curve.clone(),
+            app_entry.id(),
+            app_entry.zome_id(),
+            self.0.curve,
         ))
     }
 }
@@ -108,7 +111,7 @@ fixturator!(
 newtype_fixturator!(Signature<Bytes>);
 
 fixturator!(
-    UpdateBasis;
+    IntendedFor;
     unit variants [ Entry Header ] empty Entry;
 );
 
@@ -257,6 +260,10 @@ fixturator!(
         CapClaim(CapClaim)
         CapGrant(ZomeCallCapGrant)
     ];
+
+    curve AppEntry {
+        Entry::App(SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap())
+    };
 );
 
 fixturator!(
@@ -487,7 +494,7 @@ fixturator!(
 
 fixturator!(
     EntryUpdate;
-    constructor fn from_builder(HeaderBuilderCommon, UpdateBasis, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, IntendedFor, HeaderHash, EntryType, EntryHash);
 );
 
 fixturator!(

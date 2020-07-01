@@ -10,6 +10,7 @@ use crate::{
         state::{source_chain::SourceChainError, workspace::WorkspaceError},
     },
 };
+use holochain_p2p::HolochainP2pError;
 use holochain_state::error::DatabaseError;
 use holochain_types::prelude::*;
 use thiserror::Error;
@@ -38,7 +39,7 @@ pub enum WorkflowError {
     CapabilityMissing,
 
     #[error(transparent)]
-    FailedToHash(#[from] SerializedBytesError),
+    SerializedBytesError(#[from] SerializedBytesError),
 
     #[error(transparent)]
     DhtOpConvertError(#[from] DhtOpConvertError),
@@ -48,6 +49,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     QueueTriggerClosedError(#[from] QueueTriggerClosedError),
+
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
 }
 
 /// Internal type to handle running workflows

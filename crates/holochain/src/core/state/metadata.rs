@@ -68,7 +68,7 @@ pub struct LinkMetaVal {
     pub target: EntryHash,
     /// When the link was added
     pub timestamp: Timestamp,
-    /// The [ZomeId] of the zome this link belongs to
+    /// The [ZomePosition] of the zome this link belongs to
     pub zome_id: ZomeId,
     /// A tag used to find this link
     pub tag: Tag,
@@ -366,15 +366,15 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()> {
-        let basis: AnyDhtHash = match (&update.update_basis, entry) {
-            (header::UpdateBasis::Header, None) => update.replaces_address.clone().into(),
-            (header::UpdateBasis::Header, Some(_)) => {
+        let basis: AnyDhtHash = match (&update.intended_for, entry) {
+            (header::IntendedFor::Header, None) => update.replaces_address.clone().into(),
+            (header::IntendedFor::Header, Some(_)) => {
                 panic!("Can't update to entry when EntryUpdate points to header")
             }
-            (header::UpdateBasis::Entry, None) => {
+            (header::IntendedFor::Entry, None) => {
                 panic!("Can't update to entry with no entry hash")
             }
-            (header::UpdateBasis::Entry, Some(entry_hash)) => entry_hash.into(),
+            (header::IntendedFor::Entry, Some(entry_hash)) => entry_hash.into(),
         };
         self.add_entry_header(update, basis).await
     }

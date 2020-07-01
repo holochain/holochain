@@ -43,6 +43,7 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
+use holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work
@@ -50,8 +51,11 @@ use publish_dht_ops_consumer::*;
 ///
 /// Waits for the initial loop to complete before returning, to prevent causing
 /// a race condition by trying to run a workflow too soon after cell creation.
-pub async fn spawn_queue_consumer_tasks(env: &EnvironmentWrite) -> InitialQueueTriggers {
-    let (tx_publish, rx1) = spawn_publish_dht_ops_consumer(env.clone());
+pub async fn spawn_queue_consumer_tasks(
+    env: &EnvironmentWrite,
+    cell_network: HolochainP2pCell,
+) -> InitialQueueTriggers {
+    let (tx_publish, rx1) = spawn_publish_dht_ops_consumer(env.clone(), cell_network);
     let (tx_integration, rx2) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish);
     let (tx_app, rx3) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
     let (tx_sys, rx4) = spawn_sys_validation_consumer(env.clone(), tx_app);

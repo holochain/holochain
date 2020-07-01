@@ -25,6 +25,7 @@ use crate::{
     },
 };
 use error::CellError;
+use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
@@ -109,7 +110,8 @@ impl Cell {
         };
 
         if has_genesis {
-            let queue_triggers = spawn_queue_consumer_tasks(&state_env).await;
+            let queue_triggers =
+                spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
 
             Ok(Self {
                 id,
@@ -209,11 +211,11 @@ impl Cell {
                 ..
             } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_call_remote(to_agent, zome_name, fn_name, cap, request)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_call_remote(to_agent, zome_name, fn_name, cap, request)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             Publish {
                 span,
@@ -225,19 +227,19 @@ impl Cell {
                 ..
             } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetValidationPackage { span, respond, .. } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_get_validation_package()
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_get_validation_package()
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             Get {
                 span,
@@ -247,19 +249,19 @@ impl Cell {
                 ..
             } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_get(dht_hash, options)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_get(dht_hash, options)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetLinks { span, respond, .. } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_get_links()
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_get_links()
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             ValidationReceiptReceived {
                 span,
@@ -268,35 +270,35 @@ impl Cell {
                 ..
             } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_validation_receipt(receipt)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_validation_receipt(receipt)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             ListDhtOpHashes { span, respond, .. } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_list_dht_op_hashes()
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_list_dht_op_hashes()
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             FetchDhtOps { span, respond, .. } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_fetch_dht_ops()
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_fetch_dht_ops()
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
             SignNetworkData { span, respond, .. } => {
                 let _g = span.enter();
-                let _ = respond(
-                    self.handle_sign_network_data()
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other),
-                );
+                let res = self
+                    .handle_sign_network_data()
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
             }
         }
         Ok(())

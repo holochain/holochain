@@ -1,8 +1,11 @@
 use super::error::{WorkflowError, WorkflowResult};
-use super::Workspace;
+use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
+use crate::core::state::source_chain::SourceChainError;
+use crate::core::state::workspace::Workspace;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender},
     state::{
@@ -13,6 +16,8 @@ use crate::core::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_state::prelude::*;
+use holochain_types::element::ChainElement;
+use std::sync::Arc;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 pub mod unsafe_invoke_zome_workspace;
@@ -56,7 +61,9 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
         invocation,
     } = args;
 
-    // Get te current head
+    let zome_name = invocation.zome_name.clone();
+
+    // Get the current head
     let chain_head_start = workspace.source_chain.chain_head()?.clone();
 
     let agent_key = invocation.provenance.clone();
@@ -71,6 +78,9 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
 
     // Get the new head
     let chain_head_end = workspace.source_chain.chain_head()?;
+
+    // collect all the elements we need to validate in wasm
+    let mut to_app_validate: Vec<ChainElement> = vec![];
 
     // Has there been changes?
     if chain_head_start != *chain_head_end {
@@ -104,7 +114,41 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
             if let Some(ref chain_element) = chain_element {
                 sys_validate_element(&agent_key, chain_element, prev_chain_element.as_ref())
                     .await?;
+                to_app_validate.push(chain_element.to_owned());
             }
+        }
+    }
+
+    for chain_element in to_app_validate {
+        match chain_element.entry() {
+            holochain_types::element::ChainElementEntry::Present(entry) => {
+                let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(workspace);
+                let validate: ValidateResult = ribosome.run_validate(
+                    raw_workspace,
+                    ValidateInvocation {
+                        zome_name: zome_name.clone(),
+                        entry: Arc::new(entry.clone()),
+                    },
+                )?;
+                match validate {
+                    ValidateResult::Valid => {}
+                    // when the wasm is being called directly in a zome invocation any
+                    // state other than valid is not allowed for new entries
+                    // e.g. we require that all dependencies are met when committing an
+                    // entry to a local source chain
+                    // this is different to the case where we are validating data coming in
+                    // from the network where unmet dependencies would need to be
+                    // rescheduled to attempt later due to partitions etc.
+                    ValidateResult::Invalid(reason) => {
+                        Err(SourceChainError::InvalidCommit(reason))?
+                    }
+                    ValidateResult::UnresolvedDependencies(hashes) => {
+                        Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)))?
+                    }
+                }
+            }
+            // if there is no entry this is a noop
+            _ => {}
         }
     }
 

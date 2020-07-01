@@ -40,8 +40,8 @@ mod types;
 pub use types::*;
 
 pub mod keystore_actor;
-pub use keystore_actor::KeystoreSender;
 use keystore_actor::*;
+pub use keystore_actor::{KeystoreApiSender, KeystoreSender};
 
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
