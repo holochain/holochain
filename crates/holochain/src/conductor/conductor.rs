@@ -40,7 +40,7 @@ use crate::{
 use holo_hash::Hashable;
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
-    KeystoreSender,
+    KeystoreApiSender, KeystoreSender,
 };
 use holochain_state::{
     buffer::BufferedStore,
@@ -135,7 +135,7 @@ where
     root_env_dir: EnvironmentRootPath,
 
     /// Handle to the network actor.
-    holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
+    holochain_p2p: holochain_p2p::HolochainP2pRef,
 }
 
 impl Conductor {
@@ -382,6 +382,8 @@ where
                         let cells_to_create =
                             cell_ids.filter(|cell_id| !self.cells.contains_key(cell_id));
 
+                        use holochain_p2p::actor::HolochainP2pRefToCell;
+
                         // Create each cell
                         let cells_tasks = cells_to_create.map(move |cell_id| {
                             let holochain_p2p_cell = self.holochain_p2p.to_cell(
@@ -599,7 +601,7 @@ where
 async fn delete_me_create_test_keystore() -> KeystoreSender {
     use std::convert::TryFrom;
     let _ = holochain_crypto::crypto_init_sodium();
-    let mut keystore = spawn_test_keystore(vec![
+    let keystore = spawn_test_keystore(vec![
         MockKeypair {
             pub_key: holo_hash::AgentPubKey::try_from(
                 "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
@@ -657,7 +659,7 @@ where
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
-        holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
+        holochain_p2p: holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();

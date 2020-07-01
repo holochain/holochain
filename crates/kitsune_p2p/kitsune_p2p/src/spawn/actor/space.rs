@@ -19,7 +19,7 @@ struct AgentInfo {
 /// areas that share common transport infrastructure for communication.
 pub(crate) struct Space {
     space: Arc<KitsuneSpace>,
-    internal_sender: KitsuneP2pInternalSender<Internal>,
+    internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     agents: HashMap<Arc<KitsuneAgent>, AgentInfo>,
 }
@@ -28,7 +28,7 @@ impl Space {
     /// space constructor
     pub fn new(
         space: Arc<KitsuneSpace>,
-        internal_sender: KitsuneP2pInternalSender<Internal>,
+        internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> Self {
         Self {
@@ -85,7 +85,7 @@ impl Space {
         let space = self.space.clone();
 
         // clone the event sender
-        let mut evt_sender = self.evt_sender.clone();
+        let evt_sender = self.evt_sender.clone();
 
         // As this is a short-circuit - we need to decode the data inline - here.
         // In the future, we will probably need to branch here, so the real
@@ -118,14 +118,13 @@ impl Space {
         payload: Arc<Vec<u8>>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
-        let mut internal_sender = self.internal_sender.clone();
+        let internal_sender = self.internal_sender.clone();
         Ok(async move {
             let start = std::time::Instant::now();
 
             loop {
                 // attempt to send the request right now
                 let err = match internal_sender
-                    .ghost_actor_internal()
                     .immediate_request(space.clone(), agent.clone(), payload.clone())
                     .await
                 {

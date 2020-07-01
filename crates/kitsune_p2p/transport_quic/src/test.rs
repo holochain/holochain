@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use futures::stream::StreamExt;
+    use futures::{future::FutureExt, stream::StreamExt};
     use kitsune_p2p_types::{transport::transport_connection::*, transport::transport_listener::*};
 
     #[tokio::test(threaded_scheduler)]
     async fn test_message() {
-        let (mut listener1, _events1) =
+        let (listener1, _events1) =
             spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"))
                 .await
                 .unwrap();
@@ -14,7 +14,7 @@ mod tests {
         let bound1 = listener1.bound_url().await.unwrap();
         println!("listener1 bound to: {}", bound1);
 
-        let (mut listener2, mut events2) =
+        let (listener2, mut events2) =
             spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"))
                 .await
                 .unwrap();
@@ -24,11 +24,11 @@ mod tests {
                 match evt {
                     TransportListenerEvent::IncomingConnection {
                         respond,
-                        sender: mut con,
+                        sender: con,
                         receiver: mut evt,
                         ..
                     } => {
-                        let _ = respond(Ok(()));
+                        respond.respond(Ok(async move { Ok(()) }.boxed().into()));
                         println!(
                             "events2 incoming connection: {}",
                             con.remote_url().await.unwrap(),
@@ -46,11 +46,9 @@ mod tests {
                                         url,
                                         String::from_utf8_lossy(&data),
                                     );
-                                    let _ = respond(Ok(format!(
-                                        "echo: {}",
-                                        String::from_utf8_lossy(&data),
-                                    )
-                                    .into_bytes()));
+                                    let out = format!("echo: {}", String::from_utf8_lossy(&data),)
+                                        .into_bytes();
+                                    respond.respond(Ok(async move { Ok(out) }.boxed().into()));
                                 }
                             }
                         }
@@ -62,7 +60,7 @@ mod tests {
         let bound2 = listener2.bound_url().await.unwrap();
         println!("listener2 bound to: {}", bound2);
 
-        let (mut con1, _evt_con_1) = listener1.connect(bound2).await.unwrap();
+        let (con1, _evt_con_1) = listener1.connect(bound2).await.unwrap();
 
         println!(
             "listener1 opened connection to 2 - remote_url: {}",

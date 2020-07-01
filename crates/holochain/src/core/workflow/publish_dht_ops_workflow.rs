@@ -164,8 +164,13 @@ mod tests {
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
     use fixt::prelude::*;
+    use futures::future::FutureExt;
+    use ghost_actor::GhostControlSender;
     use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashable, Hashed};
-    use holochain_p2p::{actor::HolochainP2pSender, spawn_holochain_p2p};
+    use holochain_p2p::{
+        actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
+        spawn_holochain_p2p,
+    };
     use holochain_state::{
         buffer::BufferedStore,
         env::{EnvironmentWriteRef, ReadManager, WriteManager},
@@ -208,7 +213,7 @@ mod tests {
         num_hash: u32,
     ) -> (
         Arc<AtomicU32>,
-        HolochainP2pSender,
+        ghost_actor::GhostSender<HolochainP2p>,
         HolochainP2pCell,
         JoinHandle<()>,
     ) {
@@ -268,7 +273,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (mut network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
         let cell_network = network.to_cell(dna.clone(), agents[0].clone());
         let recv_count = Arc::new(AtomicU32::new(0));
 
@@ -281,7 +286,7 @@ mod tests {
                     use holochain_p2p::event::HolochainP2pEvent::*;
                     match evt {
                         Publish { respond, .. } => {
-                            let _ = respond(Ok(()));
+                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
                             recv_count.fetch_add(1, Ordering::SeqCst);
                         }
                         _ => panic!("unexpected event"),
@@ -332,7 +337,7 @@ mod tests {
         let num_hash = random_number();
         // Make Unpredictable with fixt (min 1)
         let num_agents = random_number();
-        let (recv_count, mut network, cell_network, recv_task) =
+        let (recv_count, network, cell_network, recv_task) =
             setup(&env_ref, &dbs, num_agents, num_hash).await;
 
         // Call the workflow
@@ -368,7 +373,7 @@ mod tests {
         let num_hash = random_number();
         // Make Unpredictable with fixt (min 1)
         let num_agents = random_number();
-        let (recv_count, mut network, cell_network, recv_task) =
+        let (recv_count, network, cell_network, recv_task) =
             setup(&env_ref, &dbs, num_agents, num_hash).await;
 
         // Update the authored to have > R counts
@@ -619,7 +624,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (mut network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
         let cell_network = network.to_cell(dna.clone(), agents[0].clone());
         let recv_count = Arc::new(AtomicU32::new(0));
 
@@ -655,7 +660,7 @@ mod tests {
                                     }
                                 }
                             }
-                            let _ = respond(Ok(()));
+                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
                             recv_count.fetch_add(1, Ordering::SeqCst);
                         }
                         _ => panic!("unexpected event"),
