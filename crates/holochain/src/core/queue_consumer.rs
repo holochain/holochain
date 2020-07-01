@@ -43,7 +43,6 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
-use holo_hash::AgentPubKey;
 use holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 
@@ -55,11 +54,9 @@ use publish_dht_ops_consumer::*;
 pub async fn spawn_queue_consumer_tasks(
     env: &EnvironmentWrite,
     cell_network: HolochainP2pCell,
-    agent_pub_key: AgentPubKey,
 ) -> InitialQueueTriggers {
     let (tx_publish, rx1) = spawn_publish_dht_ops_consumer(env.clone(), cell_network);
-    let (tx_integration, rx2) =
-        spawn_integrate_dht_ops_consumer(env.clone(), tx_publish, agent_pub_key);
+    let (tx_integration, rx2) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish);
     let (tx_app, rx3) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
     let (tx_sys, rx4) = spawn_sys_validation_consumer(env.clone(), tx_app);
     let (tx_produce, rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
