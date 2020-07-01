@@ -68,10 +68,10 @@ pub struct GetLinks {
     // TODO - parameters
 }
 
-ghost_actor::ghost_actor! {
+ghost_actor::ghost_chan! {
     /// The HolochainP2pSender struct allows controlling the HolochainP2p
     /// actor instance.
-    pub actor HolochainP2p<HolochainP2pError> {
+    pub chan HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
         fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
 
@@ -118,10 +118,22 @@ ghost_actor::ghost_actor! {
     }
 }
 
-impl HolochainP2pSender {
+/// Convenience type for referring to the HolochainP2p GhostSender
+pub type HolochainP2pRef = ghost_actor::GhostSender<HolochainP2p>;
+
+/// Extension trait for converting GhostSender<HolochainP2p> into HolochainP2pCell
+pub trait HolochainP2pRefToCell {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific cell context.
-    pub fn into_cell(self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
+    fn into_cell(self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell;
+
+    /// Clone and partially apply dna_hash && agent_pub_key to this sender,
+    /// binding it to a specific cell context.
+    fn to_cell(&self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell;
+}
+
+impl HolochainP2pRefToCell for HolochainP2pRef {
+    fn into_cell(self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
         crate::HolochainP2pCell {
             sender: self,
             dna_hash: Arc::new(dna_hash),
@@ -129,9 +141,7 @@ impl HolochainP2pSender {
         }
     }
 
-    /// Clone and partially apply dna_hash && agent_pub_key to this sender,
-    /// binding it to a specific cell context.
-    pub fn to_cell(&self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
+    fn to_cell(&self, dna_hash: DnaHash, from_agent: AgentPubKey) -> crate::HolochainP2pCell {
         self.clone().into_cell(dna_hash, from_agent)
     }
 }

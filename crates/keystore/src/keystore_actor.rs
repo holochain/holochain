@@ -3,10 +3,10 @@
 
 use crate::*;
 
-ghost_actor::ghost_actor! {
+ghost_actor::ghost_chan! {
     /// A "Keystore" actor keeps private keys secure while allowing them to be
     /// used for signing, encryption, etc.
-    pub actor Keystore<KeystoreError> {
+    pub chan KeystoreApi<KeystoreError> {
         /// Generates a new pure entropy keypair in the keystore, returning the public key.
         fn generate_sign_keypair_from_pure_entropy() -> holo_hash::AgentPubKey;
 
@@ -17,3 +17,6 @@ ghost_actor::ghost_actor! {
         fn sign(input: SignInput) -> Signature;
     }
 }
+
+/// GhostSender type for the KeystoreApi
+pub type KeystoreSender = ghost_actor::GhostSender<KeystoreApi>;

@@ -1009,9 +1009,9 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a238f1532d5b432ff0470966ff539133fac120581d5beaf68c4e4d28312163f"
+checksum = "03fa610da5e5289ec282e7094e7a6def7a7cc164b44bf52d500400b0e1a3f42f"
 dependencies = [
  "futures",
  "must_future",
@@ -1104,6 +1104,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
+ "ghost_actor",
  "holo_hash",
  "holo_hash_core",
  "holochain_2020_legacy",
