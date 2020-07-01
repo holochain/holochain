@@ -10,7 +10,7 @@ use holochain_state::{
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp, TimestampKey};
+use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, TimestampKey};
 use tracing::*;
 
 pub mod dht_op_light;

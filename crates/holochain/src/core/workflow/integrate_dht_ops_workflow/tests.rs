@@ -49,7 +49,7 @@ use holochain_types::{
     observability,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
     validate::ValidationStatus,
-    Entry, EntryHashed, Timestamp,
+    Entry, EntryHashed,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::HostInput;

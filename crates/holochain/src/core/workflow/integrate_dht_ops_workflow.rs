@@ -27,7 +27,7 @@ use holochain_types::{
     element::SignedHeaderHashed,
     header::IntendedFor,
     validate::ValidationStatus,
-    EntryHashed, Header, HeaderHashed, Timestamp, TimestampKey,
+    EntryHashed, Header, HeaderHashed, TimestampKey,
 };
 use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use std::convert::TryInto;
