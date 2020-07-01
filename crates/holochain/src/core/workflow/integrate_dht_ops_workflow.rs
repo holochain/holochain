@@ -27,7 +27,7 @@ use holochain_types::{
     element::SignedHeaderHashed,
     header::IntendedFor,
     validate::ValidationStatus,
-    EntryHashed, Header, HeaderHashed, Timestamp,
+    EntryHashed, Header, HeaderHashed, Timestamp, TimestampKey,
 };
 use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use std::convert::TryInto;
@@ -109,7 +109,7 @@ pub async fn integrate_dht_ops_workflow(
             // key. Just a possible note for the future.
             workspace
                 .integration_queue
-                .put((Timestamp::now(), op_hash).try_into()?, value)?;
+                .put((TimestampKey::now(), op_hash).try_into()?, value)?;
         }
         WorkComplete::Incomplete
     };

@@ -98,6 +98,13 @@ const NSEC: usize = std::mem::size_of::<u32>();
 #[repr(transparent)]
 pub struct TimestampKey([u8; SEC + NSEC]);
 
+impl TimestampKey {
+    /// Constructor based on current time
+    pub fn now() -> Self {
+        Timestamp::now().into()
+    }
+}
+
 impl From<Timestamp> for TimestampKey {
     fn from(t: Timestamp) -> TimestampKey {
         let (sec, nsec) = (t.0, t.1);

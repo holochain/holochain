@@ -427,7 +427,7 @@ impl Db {
                     };
                     workspace
                         .integration_queue
-                        .put((Timestamp::now(), op_hash).try_into().unwrap(), val)
+                        .put((TimestampKey::now(), op_hash).try_into().unwrap(), val)
                         .unwrap();
                 }
                 Db::CasHeader(header, signature) => {

@@ -10,7 +10,7 @@ use holochain_state::{
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp};
+use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp, TimestampKey};
 use tracing::*;
 
 pub mod dht_op_light;
@@ -51,7 +51,7 @@ async fn produce_dht_ops_workflow_inner(
             let (op, hash) = DhtOpHashed::with_data(op).await.into();
             debug!(?hash);
             workspace.integration_queue.put(
-                (Timestamp::now(), hash.clone()).try_into()?,
+                (TimestampKey::now(), hash.clone()).try_into()?,
                 IntegrationQueueValue {
                     validation_status: ValidationStatus::Valid,
                     op,
@@ -232,10 +232,8 @@ mod tests {
                 .map(|(k, v)| {
                     let s = debug_span!("times");
                     let _g = s.enter();
-                    let key = IntegrationQueueKey::from(SerializedBytes::from(UnsafeBytes::from(
-                        k.to_vec(),
-                    )));
-                    let t: (Timestamp, DhtOpHash) = key.try_into().unwrap();
+                    let t: (TimestampKey, DhtOpHash) =
+                        IntegrationQueueKey::from(k).try_into().unwrap();
                     debug!(time = ?t.0);
                     debug!(hash = ?t.1);
                     times.push(t.0);
