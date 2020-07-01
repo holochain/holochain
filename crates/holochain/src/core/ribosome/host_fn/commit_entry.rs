@@ -211,22 +211,30 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_commit_entry_test() {
+        holochain_types::observability::test_run().ok();
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let output = {
+            let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+            let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
+            // commits fail validation if we don't do genesis
+            crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+                .await
+                .unwrap();
+
+            // get the result of a commit entry
+            let output: CommitEntryOutput = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
+            };
+            holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
+                crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
+            })
             .unwrap();
-
-        // get the result of a commit entry
-        let output: CommitEntryOutput = {
-            let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
+            output
         };
 
         // this should be the hash of the newly committed entry
@@ -246,24 +254,33 @@ pub mod wasm_test {
             use holo_hash::AgentPubKeyFixturator;
             use holochain_state::env::ReadManager;
 
-            let reader = env_ref.reader().unwrap();
-            let (mut qt, _rx) = TriggerSender::new();
-            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+            let (mut qt, mut rx) = TriggerSender::new();
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                rx.listen().await.unwrap();
+            }
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                integrate_dht_ops_workflow(
+                    workspace,
+                    env.env.clone().into(),
+                    &mut qt,
+                    fixt!(AgentPubKey),
+                )
                 .await
                 .unwrap();
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            integrate_dht_ops_workflow(
-                workspace,
-                env.env.clone().into(),
-                &mut qt,
-                fixt!(AgentPubKey),
-            )
-            .await
-            .unwrap();
+                rx.listen().await.unwrap();
+            }
         }
 
         let round: GetEntryOutput = {
+            let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+            let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
             let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
             crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "get_entry", ())
         };
