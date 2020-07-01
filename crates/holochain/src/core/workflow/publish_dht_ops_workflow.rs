@@ -402,7 +402,11 @@ mod tests {
         }
 
         // Call the workflow
-        let delay = Duration::from_millis((20 * std::cmp::max(num_agents, num_hash)).into());
+        // Get a reasonable delay for the number of agents
+        // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
+        let delay = Duration::from_millis(
+            std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
+        );
         call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
         // Check that the handler receives no publish messages
