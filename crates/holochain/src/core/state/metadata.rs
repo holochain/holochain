@@ -504,14 +504,8 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     // TODO: For now this is only checking for deletes
     // Once the validation is finished this should check for that as well
-    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        if self.get_headers(entry_hash.clone())?.count()?
-            > self.get_deletes(entry_hash.clone().into())?.count()?
-        {
-            Ok(EntryDhtStatus::Live)
-        } else {
-            Ok(EntryDhtStatus::Dead)
-        }
+    fn get_dht_status(&self, _entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        Ok(EntryDhtStatus::Live)
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {

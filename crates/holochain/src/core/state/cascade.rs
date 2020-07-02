@@ -123,6 +123,8 @@ where
         }
     }
 
+    // TODO: dht_get_header -> Header
+
     #[instrument(skip(self))]
     /// Gets an entry from the cas or cache depending on it's metadata
     // TODO asyncify slow blocking functions here
