@@ -174,6 +174,14 @@ impl NewEntryHeader {
             | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
         }
     }
+
+    /// Get the visibility of this header
+    pub fn visibility(&self) -> &EntryVisibility {
+        match self {
+            NewEntryHeader::Create(EntryCreate { entry_type, .. })
+            | NewEntryHeader::Update(EntryUpdate { entry_type, .. }) => entry_type.visibility(),
+        }
+    }
 }
 
 impl From<NewEntryHeader> for Header {
@@ -185,14 +193,44 @@ impl From<NewEntryHeader> for Header {
     }
 }
 
-/// this id in an internal reference, which also serves as a canonical ordering
+/// this id is an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 // TODO: Check this can never be written to > 255
-pub type ZomeId = u8;
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    derive_more::Display,
+    derive_more::From,
+    derive_more::Into,
+)]
+pub struct ZomeId(u8);
+
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+    derive_more::Display,
+    derive_more::From,
+    derive_more::Into,
+)]
+pub struct EntryDefId(u8);
 
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub enum UpdateBasis {
+pub enum IntendedFor {
     Header,
     Entry,
 }
@@ -289,7 +327,7 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
 
-    pub update_basis: UpdateBasis,
+    pub intended_for: IntendedFor,
     pub replaces_address: HeaderHash,
 
     pub entry_type: EntryType,
@@ -321,7 +359,7 @@ impl EntryType {
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
             EntryType::AgentPubKey => &EntryVisibility::Public,
-            EntryType::App(t) => &t.visibility,
+            EntryType::App(t) => &t.visibility(),
             EntryType::CapClaim => &EntryVisibility::Private,
             EntryType::CapGrant => &EntryVisibility::Private,
         }
@@ -330,13 +368,19 @@ impl EntryType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct AppEntryType {
-    pub(crate) id: Vec<u8>,
+    /// u8 identifier of what entry type this is
+    /// this needs to match the position of the entry type returned by entry defs
+    pub(crate) id: EntryDefId,
+    /// u8 identifier of what zome this is for
+    /// this needs to be shared across the dna
+    /// comes from the numeric index position of a zome in dna config
     pub(crate) zome_id: ZomeId,
+    // @todo don't do this, use entry defs instead
     pub(crate) visibility: EntryVisibility,
 }
 
 impl AppEntryType {
-    pub fn new(id: Vec<u8>, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
+    pub fn new(id: EntryDefId, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
         Self {
             id,
             zome_id,
@@ -344,11 +388,11 @@ impl AppEntryType {
         }
     }
 
-    pub fn id(&self) -> &[u8] {
-        &self.id
+    pub fn id(&self) -> EntryDefId {
+        self.id
     }
-    pub fn zome_id(&self) -> &ZomeId {
-        &self.zome_id
+    pub fn zome_id(&self) -> ZomeId {
+        self.zome_id
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility

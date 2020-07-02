@@ -1,25 +1,23 @@
-use super::Workspace;
-use super::{
-    error::{WorkflowError, WorkflowResult},
-    Workflow, WorkflowEffects,
-};
+use super::error::{WorkflowError, WorkflowResult};
+use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
+use crate::core::state::source_chain::SourceChainError;
+use crate::core::state::workspace::Workspace;
 use crate::core::{
+    queue_consumer::{OneshotWriter, TriggerSender},
     state::{
-        cascade::Cascade,
-        chain_cas::ChainCasBuf,
-        metadata::MetadataBuf,
-        source_chain::SourceChain,
-        workspace::{WorkspaceError, WorkspaceResult},
+        cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBuf, source_chain::SourceChain,
+        workspace::WorkspaceResult,
     },
     sys_validate_element,
 };
 use fallible_iterator::FallibleIterator;
-use futures::future::FutureExt;
 use holochain_state::prelude::*;
-use must_future::MustBoxFuture;
+use holochain_types::element::ChainElement;
+use std::sync::Arc;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
 pub mod unsafe_invoke_zome_workspace;
@@ -28,98 +26,133 @@ pub mod unsafe_invoke_zome_workspace;
 /// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
 pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallInvocationResponse>;
 
-pub(crate) struct InvokeZomeWorkflow<Ribosome: RibosomeT> {
+pub struct InvokeZomeWorkflowArgs<Ribosome: RibosomeT> {
     pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
 }
 
-impl<'env, Ribosome> Workflow<'env> for InvokeZomeWorkflow<Ribosome>
-where
-    Ribosome: RibosomeT + Send + Sync + 'env,
-{
-    type Output = ZomeCallInvocationResult;
-    type Workspace = InvokeZomeWorkspace<'env>;
-    type Triggers = ();
+// TODO: #[instrument]
+pub async fn invoke_zome_workflow<'env, Ribosome: RibosomeT>(
+    mut workspace: InvokeZomeWorkspace<'env>,
+    writer: OneshotWriter,
+    args: InvokeZomeWorkflowArgs<Ribosome>,
+    mut trigger_produce_dht_ops: TriggerSender,
+) -> WorkflowResult<ZomeCallInvocationResult> {
+    let result = invoke_zome_workflow_inner(&mut workspace, args).await?;
 
-    fn workflow(
-        self,
-        mut workspace: Self::Workspace,
-    ) -> MustBoxFuture<'env, WorkflowResult<'env, Self>> {
-        async {
-            let Self {
-                ribosome,
-                invocation,
-            } = self;
+    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-            // Get te current head
-            let chain_head_start = workspace.source_chain.chain_head()?.clone();
+    // commit the workspace
+    writer
+        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .await?;
 
-            let agent_key = invocation.provenance.clone();
+    trigger_produce_dht_ops.trigger();
 
-            tracing::trace!(line = line!());
-            // Create the unsafe sourcechain for use with wasm closure
-            let result = {
-                let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                ribosome.call_zome_function(raw_workspace, invocation)
+    Ok(result)
+}
+
+async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
+    workspace: &mut InvokeZomeWorkspace<'env>,
+    args: InvokeZomeWorkflowArgs<Ribosome>,
+) -> WorkflowResult<ZomeCallInvocationResult> {
+    let InvokeZomeWorkflowArgs {
+        ribosome,
+        invocation,
+    } = args;
+
+    let zome_name = invocation.zome_name.clone();
+
+    // Get the current head
+    let chain_head_start = workspace.source_chain.chain_head()?.clone();
+
+    let agent_key = invocation.provenance.clone();
+
+    tracing::trace!(line = line!());
+    // Create the unsafe sourcechain for use with wasm closure
+    let result = {
+        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(workspace);
+        ribosome.call_zome_function(raw_workspace, invocation)
+    };
+    tracing::trace!(line = line!());
+
+    // Get the new head
+    let chain_head_end = workspace.source_chain.chain_head()?;
+
+    // collect all the elements we need to validate in wasm
+    let mut to_app_validate: Vec<ChainElement> = vec![];
+
+    // Has there been changes?
+    if chain_head_start != *chain_head_end {
+        // get the changes
+        let mut new_headers = workspace
+            .source_chain
+            .iter_back()
+            .scan(None, |current_header, element| {
+                let my_header = current_header.clone();
+                *current_header = element.header().prev_header().cloned();
+                let r = match my_header {
+                    Some(current_header) if current_header == chain_head_start => None,
+                    _ => Some(element),
+                };
+                Ok(r)
+            })
+            .map_err(WorkflowError::from);
+
+        while let Some(header) = new_headers.next()? {
+            let chain_element = workspace
+                .source_chain
+                .get_element(header.header_address())
+                .await?;
+            let prev_chain_element = match chain_element {
+                Some(ref c) => match c.header().prev_header() {
+                    Some(h) => workspace.source_chain.get_element(&h).await?,
+                    None => None,
+                },
+                None => None,
             };
-            tracing::trace!(line = line!());
+            if let Some(ref chain_element) = chain_element {
+                sys_validate_element(&agent_key, chain_element, prev_chain_element.as_ref())
+                    .await?;
+                to_app_validate.push(chain_element.to_owned());
+            }
+        }
+    }
 
-            // Get the new head
-            let chain_head_end = workspace.source_chain.chain_head()?;
-
-            // Has there been changes?
-            if chain_head_start != *chain_head_end {
-                // get the changes
-                let mut new_headers = workspace
-                    .source_chain
-                    .iter_back()
-                    .scan(None, |current_header, element| {
-                        let my_header = current_header.clone();
-                        *current_header = element.header().prev_header().cloned();
-                        let r = match my_header {
-                            Some(current_header) if current_header == chain_head_start => None,
-                            _ => Some(element),
-                        };
-                        Ok(r)
-                    })
-                    .map_err(WorkflowError::from);
-
-                while let Some(header) = new_headers.next()? {
-                    let chain_element = workspace
-                        .source_chain
-                        .get_element(header.header_address())
-                        .await?;
-                    let prev_chain_element = match chain_element {
-                        Some(ref c) => match c.header().prev_header() {
-                            Some(h) => workspace.source_chain.get_element(&h).await?,
-                            None => None,
-                        },
-                        None => None,
-                    };
-                    if let Some(ref chain_element) = chain_element {
-                        sys_validate_element(
-                            &agent_key,
-                            chain_element,
-                            prev_chain_element.as_ref(),
-                        )
-                        .await?;
+    for chain_element in to_app_validate {
+        match chain_element.entry() {
+            holochain_types::element::ChainElementEntry::Present(entry) => {
+                let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(workspace);
+                let validate: ValidateResult = ribosome.run_validate(
+                    raw_workspace,
+                    ValidateInvocation {
+                        zome_name: zome_name.clone(),
+                        entry: Arc::new(entry.clone()),
+                    },
+                )?;
+                match validate {
+                    ValidateResult::Valid => {}
+                    // when the wasm is being called directly in a zome invocation any
+                    // state other than valid is not allowed for new entries
+                    // e.g. we require that all dependencies are met when committing an
+                    // entry to a local source chain
+                    // this is different to the case where we are validating data coming in
+                    // from the network where unmet dependencies would need to be
+                    // rescheduled to attempt later due to partitions etc.
+                    ValidateResult::Invalid(reason) => {
+                        Err(SourceChainError::InvalidCommit(reason))?
+                    }
+                    ValidateResult::UnresolvedDependencies(hashes) => {
+                        Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)))?
                     }
                 }
             }
-
-            // TODO: B-01567: Trigger ProduceDhtOps workflow
-            let fx = WorkflowEffects {
-                workspace,
-                callbacks: Default::default(),
-                signals: Default::default(),
-                triggers: Default::default(),
-            };
-
-            Ok((result, fx))
+            // if there is no entry this is a noop
+            _ => {}
         }
-        .boxed()
-        .into()
     }
+
+    Ok(result)
 }
 
 pub struct InvokeZomeWorkspace<'env> {
@@ -130,7 +163,18 @@ pub struct InvokeZomeWorkspace<'env> {
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    pub fn cascade(&self) -> Cascade {
+        Cascade::new(
+            &self.source_chain.cas(),
+            &self.meta,
+            &self.cache_cas,
+            &self.cache_meta,
+        )
+    }
+}
+
+impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(reader, dbs)?;
 
         let cache_cas = ChainCasBuf::cache(reader, dbs)?;
@@ -145,29 +189,8 @@ impl<'env> InvokeZomeWorkspace<'env> {
         })
     }
 
-    pub fn cascade(&self) -> Cascade {
-        Cascade::new(
-            &self.source_chain.cas(),
-            &self.meta,
-            &self.cache_cas,
-            &self.cache_meta,
-        )
-    }
-}
-
-impl<'env> Workspace<'env> for InvokeZomeWorkspace<'env> {
-    fn commit_txn(self, mut writer: Writer) -> WorkspaceResult<()> {
-        self.flush_to_txn(&mut writer)?;
-        writer.commit()?;
-        Ok(())
-    }
-}
-
-impl<'env> BufferedStore<'env> for InvokeZomeWorkspace<'env> {
-    type Error = WorkspaceError;
-
-    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
-        self.source_chain.flush_to_txn(writer)?;
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.into_inner().flush_to_txn(writer)?;
         self.meta.flush_to_txn(writer)?;
         self.cache_cas.flush_to_txn(writer)?;
         self.cache_meta.flush_to_txn(writer)?;
@@ -178,8 +201,10 @@ impl<'env> BufferedStore<'env> for InvokeZomeWorkspace<'env> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::core::ribosome::MockRibosomeT;
-    use crate::core::workflow::{effects::WorkflowTriggers, fake_genesis, WorkflowError};
+    use crate::core::{
+        ribosome::MockRibosomeT,
+        workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
+    };
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
@@ -195,15 +220,15 @@ pub mod tests {
     }
 
     async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
-        workspace: InvokeZomeWorkspace<'env>,
+        workspace: &mut InvokeZomeWorkspace<'env>,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
-    ) -> WorkflowResult<'env, InvokeZomeWorkflow<Ribosome>> {
-        let workflow = InvokeZomeWorkflow {
+    ) -> WorkflowResult<ZomeCallInvocationResult> {
+        let args = InvokeZomeWorkflowArgs {
             invocation,
             ribosome,
         };
-        workflow.workflow(workspace).await
+        invoke_zome_workflow_inner(workspace, args).await
     }
 
     // 1.  Check if there is a Capability token secret in the parameters.
@@ -234,7 +259,7 @@ pub mod tests {
         .next()
         .unwrap();
         invocation.cap = todo!("Make secret cap token");
-        let error = run_call_zome(workspace, ribosome, invocation)
+        let error = run_call_zome(&mut workspace, ribosome, invocation)
             .await
             .unwrap_err();
         assert_matches!(error, WorkflowError::CapabilityMissing);
@@ -318,12 +343,9 @@ pub mod tests {
             .returning(|_entry_hash| Ok(()));
         */
 
-        let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
+        let _result = run_call_zome(&mut workspace, ribosome, invocation)
             .await
             .unwrap();
-        assert!(effects.triggers.is_empty());
-        assert!(effects.callbacks.is_empty());
-        assert!(effects.signals.is_empty());
     }
 
     // 4.2. Call app validation of list of entries and headers: (MVI)
@@ -337,7 +359,7 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
@@ -354,12 +376,9 @@ pub mod tests {
         // TODO: B-01093: Mock the app validation and check it's called
         // TODO: B-01093: How can I pass a app validation into this?
         // These are just static calls
-        let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
+        let _result = run_call_zome(&mut workspace, ribosome, invocation)
             .await
             .unwrap();
-        assert!(effects.triggers.is_empty());
-        assert!(effects.callbacks.is_empty());
-        assert!(effects.signals.is_empty());
     }
 
     // 4.3. Write output results via SC gatekeeper (wrap in transaction): (MVI)
@@ -372,7 +391,7 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -387,12 +406,9 @@ pub mod tests {
         )
         .next()
         .unwrap();
-        let (_result, effects) = run_call_zome(workspace, ribosome, invocation)
+        let _result = run_call_zome(&mut workspace, ribosome, invocation)
             .await
             .unwrap();
-        assert!(effects.triggers.is_empty());
-        assert!(effects.callbacks.is_empty());
-        assert!(effects.signals.is_empty());
         // TODO: Check the workspace has changes
     }
 }

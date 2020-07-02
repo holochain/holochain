@@ -4,7 +4,7 @@ fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
 
     println!("cargo:rerun-if-changed=Cargo.toml");
-    println!("cargo:rerun-if-changed=*");
+    // println!("cargo:rerun-if-changed=*");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
@@ -22,6 +22,7 @@ fn main() {
     for &m in [
         "anchor",
         "bench",
+        "commit_entry",
         "debug",
         "entry_defs",
         "foo",
@@ -42,6 +43,10 @@ fn main() {
     {
         let cargo_toml = Path::new(m).join("Cargo.toml");
 
+        // Note: If you're trying to use `cargo udeps` and get an error, try
+        // replacing these two lines with:
+        //
+        // let cargo_command = "cargo";
         let cargo_command = std::env::var_os("CARGO");
         let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
 

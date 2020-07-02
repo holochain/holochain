@@ -19,7 +19,7 @@ struct AgentInfo {
 /// areas that share common transport infrastructure for communication.
 pub(crate) struct Space {
     space: Arc<KitsuneSpace>,
-    internal_sender: KitsuneP2pInternalSender<Internal>,
+    internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     agents: HashMap<Arc<KitsuneAgent>, AgentInfo>,
 }
@@ -28,7 +28,7 @@ impl Space {
     /// space constructor
     pub fn new(
         space: Arc<KitsuneSpace>,
-        internal_sender: KitsuneP2pInternalSender<Internal>,
+        internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> Self {
         Self {
@@ -85,7 +85,7 @@ impl Space {
         let space = self.space.clone();
 
         // clone the event sender
-        let mut evt_sender = self.evt_sender.clone();
+        let evt_sender = self.evt_sender.clone();
 
         // As this is a short-circuit - we need to decode the data inline - here.
         // In the future, we will probably need to branch here, so the real
@@ -94,14 +94,14 @@ impl Space {
         let data = wire::Wire::decode((*data).clone())?;
 
         match data {
-            wire::Wire::Request(data) => {
-                Ok(async move { evt_sender.request(space, agent, data).await }
+            wire::Wire::Call(payload) => {
+                Ok(async move { evt_sender.call(space, agent, payload).await }
                     .boxed()
                     .into())
             }
-            wire::Wire::Broadcast(data) => {
+            wire::Wire::Notify(payload) => {
                 Ok(async move {
-                    evt_sender.broadcast(space, agent, data).await?;
+                    evt_sender.notify(space, agent, payload).await?;
                     // broadcast doesn't return anything...
                     Ok(vec![])
                 }
@@ -112,21 +112,20 @@ impl Space {
     }
 
     /// send / process a request - waiting / retrying as appropriate
-    pub fn handle_request(
+    pub fn handle_rpc_single(
         &mut self,
         agent: Arc<KitsuneAgent>,
-        data: Arc<Vec<u8>>,
+        payload: Arc<Vec<u8>>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
-        let mut internal_sender = self.internal_sender.clone();
+        let internal_sender = self.internal_sender.clone();
         Ok(async move {
             let start = std::time::Instant::now();
 
             loop {
                 // attempt to send the request right now
                 let err = match internal_sender
-                    .ghost_actor_internal()
-                    .immediate_request(space.clone(), agent.clone(), data.clone())
+                    .immediate_request(space.clone(), agent.clone(), payload.clone())
                     .await
                 {
                     Ok(res) => return Ok(res),

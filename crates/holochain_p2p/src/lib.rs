@@ -8,6 +8,7 @@ use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use std::sync::Arc;
 
 mod types;
+pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
 pub use types::*;
 
 mod spawn;
@@ -17,7 +18,7 @@ pub use spawn::*;
 /// I.e. a sender that is tied to a specific cell.
 #[derive(Clone)]
 pub struct HolochainP2pCell {
-    sender: actor::HolochainP2pSender,
+    sender: ghost_actor::GhostSender<actor::HolochainP2p>,
     dna_hash: Arc<DnaHash>,
     from_agent: Arc<AgentPubKey>,
 }
@@ -63,7 +64,7 @@ impl HolochainP2pCell {
     pub async fn publish(
         &mut self,
         request_validation_receipt: bool,
-        entry_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
@@ -72,7 +73,7 @@ impl HolochainP2pCell {
                 (*self.dna_hash).clone(),
                 (*self.from_agent).clone(),
                 request_validation_receipt,
-                entry_hash,
+                dht_hash,
                 ops,
                 timeout_ms,
             )
@@ -90,12 +91,18 @@ impl HolochainP2pCell {
     }
 
     /// Get an entry from the DHT.
-    pub async fn get(&mut self) -> actor::HolochainP2pResult<()> {
+    pub async fn get(
+        &mut self,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        options: actor::GetOptions,
+    ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
         self.sender
-            .get(actor::Get {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.from_agent).clone(),
-            })
+            .get(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                dht_hash,
+                options,
+            )
             .await
     }
 

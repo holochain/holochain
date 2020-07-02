@@ -20,7 +20,7 @@ use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::decrypt::decrypt;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
-use crate::core::ribosome::host_fn::entry_address::entry_address;
+use crate::core::ribosome::host_fn::entry_hash::entry_hash;
 use crate::core::ribosome::host_fn::entry_type_properties::entry_type_properties;
 use crate::core::ribosome::host_fn::get_entry::get_entry;
 use crate::core::ribosome::host_fn::get_links::get_links;
@@ -29,6 +29,7 @@ use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
+use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 use crate::core::ribosome::host_fn::remove_entry::remove_entry;
 use crate::core::ribosome::host_fn::remove_link::remove_link;
 use crate::core::ribosome::host_fn::schedule::schedule;
@@ -117,9 +118,7 @@ impl WasmRibosome {
             ( $host_function:ident ) => {{
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_host_context_arc = std::sync::Arc::clone(&host_context_arc);
-                move |ctx: &mut Ctx,
-                      guest_allocation_ptr: GuestPtr|
-                      -> Result<Len, WasmError> {
+                move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
                     let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
@@ -127,23 +126,17 @@ impl WasmRibosome {
                     // this will be run in a tokio background thread
                     // designed for doing blocking work.
                     let output_sb: holochain_wasmer_host::prelude::SerializedBytes =
-                        tokio_safe_block_on::tokio_safe_block_on(
-                            $host_function(
-                                std::sync::Arc::clone(&closure_self_arc),
-                                std::sync::Arc::clone(&closure_host_context_arc),
-                                input,
-                            ),
-                            // TODO: B-01647 Identify calls that are essentially synchronous vs those that
-                            // may be async, such as get, send, etc.
-                            // async calls should require timeouts specified by hApp devs
-                            // pluck those timeouts out, and apply them here:
-                            std::time::Duration::from_secs(60),
+                        $host_function(
+                            std::sync::Arc::clone(&closure_self_arc),
+                            std::sync::Arc::clone(&closure_host_context_arc),
+                            input,
                         )
-                        .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
 
-                    Ok($crate::holochain_wasmer_host::import::set_context_data(ctx, output_sb))
+                    Ok($crate::holochain_wasmer_host::import::set_context_data(
+                        ctx, output_sb,
+                    ))
                 }
             }};
         }
@@ -161,10 +154,7 @@ impl WasmRibosome {
         ns.insert("__debug", func!(invoke_host_function!(debug)));
         ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
         ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
-        ns.insert(
-            "__entry_address",
-            func!(invoke_host_function!(entry_address)),
-        );
+        ns.insert("__entry_hash", func!(invoke_host_function!(entry_hash)));
         ns.insert(
             "__entry_type_properties",
             func!(invoke_host_function!(entry_type_properties)),
@@ -174,6 +164,7 @@ impl WasmRibosome {
         ns.insert("__keystore", func!(invoke_host_function!(keystore)));
         ns.insert("__property", func!(invoke_host_function!(property)));
         ns.insert("__query", func!(invoke_host_function!(query)));
+        ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
         ns.insert("__sign", func!(invoke_host_function!(sign)));
         ns.insert("__show_env", func!(invoke_host_function!(show_env)));
         ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
@@ -297,7 +288,7 @@ impl RibosomeT for WasmRibosome {
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
-        self,
+        &self,
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ZomeCallInvocation,
         // cell_conductor_api: CellConductorApi,

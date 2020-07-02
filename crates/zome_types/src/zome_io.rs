@@ -39,8 +39,8 @@ wasm_io_types!(
     pub struct CapabilityInput(());
     pub struct CapabilityOutput(());
     // the SerializedBytes will be stuffed into an Entry::App(SB) host side
-    pub struct CommitEntryInput(crate::entry::Entry);
-    pub struct CommitEntryOutput(crate::commit::CommitEntryResult);
+    pub struct CommitEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry));
+    pub struct CommitEntryOutput(holo_hash_core::HoloHashCore);
     // @TODO
     pub struct DecryptInput(());
     pub struct DecryptOutput(());
@@ -56,6 +56,9 @@ wasm_io_types!(
     // @TODO
     pub struct QueryInput(());
     pub struct QueryOutput(());
+    // the length of random bytes to create
+    pub struct RandomBytesInput(u32);
+    pub struct RandomBytesOutput(crate::bytes::Bytes);
     // @TODO
     pub struct RemoveLinkInput(());
     pub struct RemoveLinkOutput(());
@@ -86,15 +89,15 @@ wasm_io_types!(
     // @TODO
     pub struct GetLinksInput(());
     pub struct GetLinksOutput(());
-    // @TODO
-    pub struct GetEntryInput(());
+    // get an entry from the cascade
+    pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
     pub struct GetEntryOutput(Option<crate::Entry>);
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
-    // @TODO
-    pub struct EntryHashInput(());
-    pub struct EntryHashOutput(());
+    // hash an entry on the host and get a core hash back
+    pub struct EntryHashInput(crate::entry::Entry);
+    pub struct EntryHashOutput(holo_hash_core::HoloHashCore);
     // the current system time, in the opinion of the host, as a Duration
     pub struct SysTimeInput(());
     pub struct SysTimeOutput(core::time::Duration);

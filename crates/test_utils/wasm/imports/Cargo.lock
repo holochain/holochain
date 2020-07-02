@@ -157,6 +157,7 @@ dependencies = [
  "nanoid",
  "rust-base58",
  "serde",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -561,16 +562,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_common"
-version = "0.0.1"
-dependencies = [
- "holochain_serialized_bytes",
- "holochain_wasmer_common",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
 name = "test_wasm_imports"
 version = "0.0.1"
 dependencies = [
@@ -579,7 +570,6 @@ dependencies = [
  "holochain_zome_types",
  "lazy_static",
  "serde",
- "test_wasm_common",
 ]
 
 [[package]]

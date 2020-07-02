@@ -4,6 +4,12 @@ version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
 
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+
 # Ensure that this is not inside of any other workspace.
 # This crate should be an implementation detail of test_utils_wasm and
 # therefore shouldn't be mentioned in the top-level Cargo.toml
@@ -20,6 +26,5 @@ holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 lazy_static = "1.4.0"
 
 serde = "=1.0.104"
-test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 
 [patch.crates-io]

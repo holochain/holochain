@@ -12,20 +12,17 @@ edition = "2018"
 anyhow = "1.0.26"
 async-trait = "0.1.24"
 base64 = "0.10.1"
-boolinator = "2.4.0"
 cfg-if = "0.1"
 chrono = "0.4.6"
-crossbeam-channel = "0.4.0"
 derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
 fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
-hcid = "0.0.6"
+ghost_actor = "0.2.0"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
-holochain_common = "0.0.49-alpha1"
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
@@ -43,9 +40,7 @@ mockall = "0.7.0"
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
-owning_ref = "0.4.1"
 parking_lot = "0.10.0"
-petgraph = "0.5.0"
 predicates = "1.0.4"
 rand = "0.7"
 serde = { version = "1.0.104", features = [ "derive" ] }
@@ -56,7 +51,7 @@ strum = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.10"
 tokio = { version = "0.2.11", features = [ "full" ] }
-tokio_safe_block_on = "0.1.1"
+tokio_safe_block_on = "0.1.2"
 toml = "0.5.6"
 tracing = "=0.1.13"
 tracing-futures = "0.2.3"
@@ -68,7 +63,6 @@ uuid = { version = "0.7", features = [ "serde", "v4" ] }
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-maplit = "1.0.2"
 matches = "0.1.8"
 serial_test = "0.4.0"
 test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common" }
