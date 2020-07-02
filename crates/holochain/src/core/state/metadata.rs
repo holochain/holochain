@@ -127,6 +127,18 @@ impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
     }
 }
 
+impl LinkMetaVal {
+    /// Turn into a zome friendly type
+    pub fn into_link(self) -> holochain_zome_types::links::Link {
+        let timestamp: chrono::DateTime<chrono::Utc> = self.timestamp.into();
+        holochain_zome_types::links::Link {
+            target: self.target.into(),
+            timestamp: timestamp.into(),
+            tag: self.tag,
+        }
+    }
+}
+
 /// Trait for the [MetadataBuf]
 /// Needed for mocking
 #[async_trait::async_trait]

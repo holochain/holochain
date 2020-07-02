@@ -10,14 +10,13 @@ use holochain_state::{
 };
 use holochain_types::{
     entry::EntryHashed,
-    header,
-    observability,
+    header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
 };
-use holochain_zome_types::links::LinkTag;
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::links::LinkTag;
 use mockall::*;
 
 #[allow(dead_code)]

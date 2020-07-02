@@ -7,7 +7,6 @@ use crate::core::{
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use holochain_types::{composite_hash::HeaderAddress, header::builder};
-use holochain_zome_types::links::LinkTag;
 use holochain_zome_types::LinkEntriesInput;
 use holochain_zome_types::LinkEntriesOutput;
 use std::convert::TryInto;

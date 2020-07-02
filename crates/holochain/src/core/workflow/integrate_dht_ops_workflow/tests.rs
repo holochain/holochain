@@ -50,8 +50,8 @@ use holochain_types::{
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
-use holochain_zome_types::links::LinkTag;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::links::LinkTag;
 use holochain_zome_types::{
     entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetLinksInput, HostInput,
     LinkEntriesInput,
@@ -925,15 +925,8 @@ async fn link_entries<'env>(
         .unwrap();
     host_context.zome_name = zome_name.clone();
 
-    // Get the link tag bytes out
-    let link_tag_bytes: Vec<u8> = link_tag.as_ref().clone();
     // Call link_entries
-    let input = LinkEntriesInput::new((
-        base_address.into(),
-        target_address.into(),
-        zome_name.clone(),
-        holochain_zome_types::bytes::Bytes::from(link_tag_bytes),
-    ));
+    let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
 
     let output = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
@@ -979,14 +972,10 @@ async fn get_links<'env>(
     let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
         .next()
         .unwrap();
+    host_context.zome_name = zome_name.clone();
 
     // Call get links
-    let link_tag_bytes: Vec<u8> = link_tag.as_ref().clone();
-    let input = GetLinksInput::new((
-        base_address.into(),
-        zome_name,
-        holochain_zome_types::bytes::Bytes::from(link_tag_bytes),
-    ));
+    let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
 
     let output = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
@@ -999,7 +988,10 @@ async fn get_links<'env>(
             .into_inner()
     };
 
-    output.into_iter().map(|h| h.try_into().unwrap()).collect()
+    output
+        .into_iter()
+        .map(|h| h.target.try_into().unwrap())
+        .collect()
 }
 
 #[tokio::test(threaded_scheduler)]

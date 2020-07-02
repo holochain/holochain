@@ -5,12 +5,12 @@ use crate::{
     fixt::*,
     Timestamp,
 };
-use holochain_zome_types::links::LinkTag;
 use derive_more::Constructor;
 use fixt::prelude::*;
 use header::HeaderInner;
 use header::{IntendedFor, ZomeId};
 use holo_hash::*;
+use holochain_zome_types::links::LinkTag;
 
 #[derive(Constructor)]
 pub struct HeaderBuilderCommon {

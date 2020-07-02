@@ -6,13 +6,12 @@ use crate::core::{
 };
 use futures::future::FutureExt;
 use holochain_state::error::DatabaseResult;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::links::Link;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::GetLinksOutput;
 use must_future::MustBoxFuture;
 use std::convert::TryInto;
 use std::sync::Arc;
-use holo_hash_core::HoloHashCore;
 
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
@@ -39,7 +38,10 @@ pub fn get_links<'a>(
         |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
                 let cascade = workspace.cascade();
-                let key = LinkMetaKey::BaseZomeTag(&base_address, zome_id, &tag);
+                let key = match tag.as_ref() {
+                    Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
+                    None => LinkMetaKey::BaseZome(&base_address, zome_id),
+                };
                 // safe block on
                 cascade
                     .dht_get_links(&key)
@@ -52,7 +54,7 @@ pub fn get_links<'a>(
         unsafe { host_context.workspace.apply_ref(call).await }
     })??;
 
-    let links: Vec<HoloHashCore> = links.into_iter().map(|l| l.target.into()).collect();
+    let links: Vec<Link> = links.into_iter().map(|l| l.into_link()).collect();
 
     Ok(GetLinksOutput::new(links))
 }
