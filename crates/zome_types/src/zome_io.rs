@@ -81,13 +81,26 @@ wasm_io_types!(
     pub struct RemoveEntryInput(());
     pub struct RemoveEntryOutput(());
     // @TODO
-    pub struct LinkEntriesInput(());
-    pub struct LinkEntriesOutput(());
+    pub struct LinkEntriesInput(
+        (
+            holo_hash_core::HoloHashCore,
+            holo_hash_core::HoloHashCore,
+            crate::zome::ZomeName,
+            crate::bytes::Bytes,
+        ),
+    );
+    pub struct LinkEntriesOutput(holo_hash_core::HoloHashCore);
     // @TODO
     pub struct KeystoreInput(());
     pub struct KeystoreOutput(());
     // @TODO
-    pub struct GetLinksInput(());
+    pub struct GetLinksInput(
+        (
+            holo_hash_core::HoloHashCore,
+            crate::zome::ZomeName,
+            crate::bytes::Bytes,
+        ),
+    );
     pub struct GetLinksOutput(());
     // get an entry from the cascade
     pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));

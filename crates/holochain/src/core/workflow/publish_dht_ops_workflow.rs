@@ -674,7 +674,8 @@ mod tests {
             network.join(dna.clone(), agent).await.unwrap();
         }
         // Call the workflow
-        let delay = Duration::from_millis((20 * num_agents * 2).into());
+        let delay =
+            Duration::from_millis(std::cmp::max(50, std::cmp::min(2000, num_agents * 20)).into());
         call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
         // Check the handler receives the one broadcast per agent because they are on the same basis

@@ -90,7 +90,7 @@ fixturator!(
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_on(
                     async { WasmHash::with_data(wasm.code().to_vec()).await },
-                    std::time::Duration::from_millis(10),
+                    std::time::Duration::from_millis(100),
                 )
                 .unwrap()
                 .into(),
