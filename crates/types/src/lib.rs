@@ -18,7 +18,7 @@ pub mod header;
 pub mod link;
 pub mod observability;
 pub mod prelude;
-mod timestamp;
+pub mod timestamp;
 pub mod validate;
 
 /// Placeholders to allow other things to compile
@@ -36,4 +36,4 @@ pub use entry::{Entry, EntryHashed};
 #[doc(inline)]
 pub use header::{Header, HeaderHashed};
 
-pub use timestamp::Timestamp;
+pub use timestamp::{Timestamp, TimestampKey};
