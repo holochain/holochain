@@ -48,7 +48,7 @@ use holochain_types::{
     observability,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
     validate::ValidationStatus,
-    Entry, EntryHashed, Timestamp,
+    Entry, EntryHashed,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::links::LinkTag;
@@ -444,7 +444,7 @@ impl Db {
                     };
                     workspace
                         .integration_queue
-                        .put((Timestamp::now(), op_hash).try_into().unwrap(), val)
+                        .put((TimestampKey::now(), op_hash).try_into().unwrap(), val)
                         .unwrap();
                 }
                 Db::CasHeader(header, signature) => {
