@@ -2,10 +2,12 @@
 
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use holo_hash::DhtOpHash;
+use holo_hash::HoloHashBaseExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{buffer::KvBuf, prelude::Reader};
 use holochain_types::{
-    composite_hash::AnyDhtHash, dht_op::DhtOp, validate::ValidationStatus, TimestampKey,
+    composite_hash::AnyDhtHash, dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus,
+    TimestampKey,
 };
 
 /// Database type for AuthoredDhtOps
@@ -40,28 +42,30 @@ impl From<&[u8]> for IntegrationQueueKey {
     }
 }
 
-impl TryFrom<(TimestampKey, DhtOpHash)> for IntegrationQueueKey {
-    type Error = SerializedBytesError;
-    fn try_from((timestamp, hash): (TimestampKey, DhtOpHash)) -> Result<Self, Self::Error> {
-        Ok(Self(
-            bincode::serialize(&(timestamp.as_ref(), hash)).unwrap(),
-        ))
+impl From<(TimestampKey, DhtOpHash)> for IntegrationQueueKey {
+    fn from((timestamp, hash): (TimestampKey, DhtOpHash)) -> Self {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(timestamp.as_ref());
+        bytes.extend_from_slice(hash.as_ref());
+        Self(bytes)
     }
 }
 
-impl TryFrom<&IntegrationQueueKey> for (TimestampKey, DhtOpHash) {
-    type Error = SerializedBytesError;
-    fn try_from(k: &IntegrationQueueKey) -> Result<Self, Self::Error> {
+impl From<&IntegrationQueueKey> for (TimestampKey, DhtOpHash) {
+    fn from(k: &IntegrationQueueKey) -> Self {
         let slice: &[u8] = k.0.as_ref();
-        let (bytes, hash): (Vec<u8>, DhtOpHash) = bincode::deserialize(slice).unwrap();
-        Ok((TimestampKey::from(bytes.as_ref()), hash))
+        let ts = &slice[0..TS_SIZE];
+        let hash = &slice[TS_SIZE..];
+        (
+            TimestampKey::from(ts),
+            DhtOpHash::with_pre_hashed(hash.to_vec()),
+        )
     }
 }
 
-impl TryFrom<IntegrationQueueKey> for (TimestampKey, DhtOpHash) {
-    type Error = SerializedBytesError;
-    fn try_from(k: IntegrationQueueKey) -> Result<Self, Self::Error> {
-        Ok((&k).try_into()?)
+impl From<IntegrationQueueKey> for (TimestampKey, DhtOpHash) {
+    fn from(k: IntegrationQueueKey) -> Self {
+        (&k).into()
     }
 }
 

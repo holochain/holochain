@@ -4,7 +4,6 @@ use crate::core::state::{
     dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue},
     workspace::{Workspace, WorkspaceResult},
 };
-use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
@@ -51,7 +50,7 @@ async fn produce_dht_ops_workflow_inner(
             let (op, hash) = DhtOpHashed::with_data(op).await.into();
             debug!(?hash);
             workspace.integration_queue.put(
-                (TimestampKey::now(), hash.clone()).try_into()?,
+                (TimestampKey::now(), hash.clone()).into(),
                 IntegrationQueueValue {
                     validation_status: ValidationStatus::Valid,
                     op,
@@ -232,8 +231,7 @@ mod tests {
                 .map(|(k, v)| {
                     let s = debug_span!("times");
                     let _g = s.enter();
-                    let t: (TimestampKey, DhtOpHash) =
-                        IntegrationQueueKey::from(k).try_into().unwrap();
+                    let t: (TimestampKey, DhtOpHash) = IntegrationQueueKey::from(k).into();
                     debug!(time = ?t.0);
                     debug!(hash = ?t.1);
                     times.push(t.0);

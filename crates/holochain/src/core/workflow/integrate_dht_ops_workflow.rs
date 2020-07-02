@@ -30,7 +30,6 @@ use holochain_types::{
     EntryHashed, Header, HeaderHashed, TimestampKey,
 };
 use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
-use std::convert::TryInto;
 use tracing::*;
 
 mod tests;
@@ -109,7 +108,7 @@ pub async fn integrate_dht_ops_workflow(
             // key. Just a possible note for the future.
             workspace
                 .integration_queue
-                .put((TimestampKey::now(), op_hash).try_into()?, value)?;
+                .put((TimestampKey::now(), op_hash).into(), value)?;
         }
         WorkComplete::Incomplete
     };

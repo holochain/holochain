@@ -18,7 +18,7 @@ pub mod header;
 pub mod link;
 pub mod observability;
 pub mod prelude;
-mod timestamp;
+pub mod timestamp;
 pub mod validate;
 
 /// Placeholders to allow other things to compile

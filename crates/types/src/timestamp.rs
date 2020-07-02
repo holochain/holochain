@@ -1,3 +1,8 @@
+//! A UTC timestamp for use in Holochain's headers.
+//!
+//! Includes a struct that gives a uniform well-ordered byte representation
+//! of a timestamp, used for chronologically ordered database keys
+
 use std::convert::{TryFrom, TryInto};
 
 /// A UTC timestamp for use in Holochain's headers.
@@ -88,6 +93,9 @@ impl std::convert::TryFrom<&str> for Timestamp {
 const SEC: usize = std::mem::size_of::<i64>();
 const NSEC: usize = std::mem::size_of::<u32>();
 
+/// Total size in bytes of a [TimestampKey]
+pub const TS_SIZE: usize = SEC + NSEC;
+
 /// A representation of a Timestamp which can go into and out of a byte slice
 /// in-place without allocation. Useful for LMDB keys.
 ///
@@ -96,7 +104,7 @@ const NSEC: usize = std::mem::size_of::<u32>();
 /// to a TimestampKey, which is what allows us to use it for an LMDB key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct TimestampKey([u8; SEC + NSEC]);
+pub struct TimestampKey([u8; TS_SIZE]);
 
 impl TimestampKey {
     /// Constructor based on current time
@@ -112,7 +120,7 @@ impl From<Timestamp> for TimestampKey {
         // so that correct ordering relative to other byte arrays is maintained.
         let sec: i128 = (sec as i128) - (i64::MIN as i128);
         let sec: u64 = sec as u64;
-        let mut a = [0; SEC + NSEC];
+        let mut a = [0; TS_SIZE];
         a[0..SEC].copy_from_slice(&sec.to_be_bytes());
         a[SEC..].copy_from_slice(&nsec.to_be_bytes());
         TimestampKey(a)
@@ -140,7 +148,7 @@ impl AsRef<[u8]> for TimestampKey {
 impl From<&[u8]> for TimestampKey {
     fn from(bytes: &[u8]) -> Self {
         assert_eq!(bytes.len(), 12);
-        Self(<[u8; SEC + NSEC]>::try_from(bytes).unwrap())
+        Self(<[u8; TS_SIZE]>::try_from(bytes).unwrap())
     }
 }
 
