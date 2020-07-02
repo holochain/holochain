@@ -12,6 +12,7 @@ use holochain_zome_types::LinkEntriesOutput;
 use std::convert::TryInto;
 use std::sync::Arc;
 
+#[allow(clippy::extra_unused_lifetimes)]
 pub fn link_entries<'a>(
     ribosome: Arc<impl RibosomeT>,
     host_context: Arc<HostContext>,

@@ -13,6 +13,7 @@ use must_future::MustBoxFuture;
 use std::convert::TryInto;
 use std::sync::Arc;
 
+#[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
     host_context: Arc<HostContext>,
