@@ -45,12 +45,12 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     fixt::*,
     header::{builder, ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader},
-    link::LinkTag,
     observability,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
+use holochain_zome_types::links::LinkTag;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
     entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetLinksInput, HostInput,
@@ -957,30 +957,49 @@ async fn get_links<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
     base_address: EntryHash,
-) {
+    zome_name: ZomeName,
+    link_tag: LinkTag,
+) -> Vec<EntryHash> {
     let reader = env_ref.reader().unwrap();
     let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
 
+    // Create data for calls
+    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    dna_file.dna.zomes.clear();
+    dna_file
+        .dna
+        .zomes
+        .push((zome_name.clone().into(), fixt!(Zome)));
+
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
-    let ribosome = MockRibosomeT::new();
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_dna_file().return_const(dna_file);
 
     let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
         .next()
         .unwrap();
 
     // Call get links
-    let input = GetLinksInput::new(());
+    let link_tag_bytes: Vec<u8> = link_tag.as_ref().clone();
+    let input = GetLinksInput::new((
+        base_address.into(),
+        zome_name,
+        holochain_zome_types::bytes::Bytes::from(link_tag_bytes),
+    ));
 
-    {
+    let output = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
         host_context.change_workspace(raw_workspace);
         let ribosome = Arc::new(ribosome);
         let host_context = Arc::new(host_context);
-        let _output =
-            host_fn::get_links::get_links(ribosome.clone(), host_context.clone(), input).unwrap();
-    }
+        host_fn::get_links::get_links(ribosome.clone(), host_context.clone(), input)
+            .unwrap()
+            .into_inner()
+    };
+
+    output.into_iter().map(|h| h.try_into().unwrap()).collect()
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -998,19 +1017,18 @@ async fn test_metadata_from_wasm_api() {
         let link_tag = td.link_add.tag.clone();
         let base_entry_hash = td.original_entry_hash.clone();
         let target_entry_hash = td.new_entry_hash.clone();
-        let (pre_state, expect, _) = register_add_link(td);
-        // TODO: replace this with real calls
-        // Db::set(pre_state, &env_ref, &dbs).await;
+        let (pre_state, _expect, _) = register_add_link(td);
+
         genesis(&env_ref, &dbs).await;
         let zome_name = fixt!(ZomeName);
         let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
-        let link_add_address = link_entries(
+        let _link_add_address = link_entries(
             &env_ref,
             &dbs,
             base_address.clone(),
             target_entry_hash.clone(),
-            zome_name,
-            link_tag,
+            zome_name.clone(),
+            link_tag.clone(),
         )
         .await;
 
@@ -1021,8 +1039,10 @@ async fn test_metadata_from_wasm_api() {
         call_workflow(&env_ref, &dbs, env.clone()).await;
 
         // Check the database is correct
-        get_links(&env_ref, &dbs, base_address).await;
+        let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
 
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0], target_entry_hash);
         // TODO: create the expect from the result of the commit and link entries
         // Db::check(
         //     expect,

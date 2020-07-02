@@ -24,6 +24,8 @@ pub mod header;
 #[allow(missing_docs)]
 pub mod init;
 #[allow(missing_docs)]
+pub mod links;
+#[allow(missing_docs)]
 pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod post_commit;

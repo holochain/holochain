@@ -3,7 +3,7 @@ use holochain_serialized_bytes::prelude::*;
 /// all wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way
 macro_rules! wasm_io_types {
-    ( $( pub struct $t:ident($t_inner:ty); )* ) => {
+    ( $( pub struct $t:ident($t_inner:ty $(,)?); )* ) => {
         $(
             #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
             pub struct $t($t_inner);
@@ -85,8 +85,7 @@ wasm_io_types!(
         (
             holo_hash_core::HoloHashCore,
             holo_hash_core::HoloHashCore,
-            crate::zome::ZomeName,
-            crate::bytes::Bytes,
+            crate::links::LinkTag,
         ),
     );
     pub struct LinkEntriesOutput(holo_hash_core::HoloHashCore);
@@ -97,11 +96,10 @@ wasm_io_types!(
     pub struct GetLinksInput(
         (
             holo_hash_core::HoloHashCore,
-            crate::zome::ZomeName,
-            crate::bytes::Bytes,
+            crate::links::LinkTag,
         ),
     );
-    pub struct GetLinksOutput(());
+    pub struct GetLinksOutput(Vec<holo_hash_core::HoloHashCore>);
     // get an entry from the cascade
     pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
     pub struct GetEntryOutput(Option<crate::entry::Entry>);

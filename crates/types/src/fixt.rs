@@ -22,7 +22,7 @@ use crate::header::LinkAdd;
 use crate::header::NewEntryHeader;
 use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
-use crate::link::LinkTag;
+use holochain_zome_types::links::LinkTag;
 use crate::Timestamp;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;

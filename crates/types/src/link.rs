@@ -3,24 +3,7 @@
 use crate::composite_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use regex::Regex;
-use shrinkwraprs::Shrinkwrap;
-
-/// Opaque tag for the link applied at the app layer, used to differentiate
-/// between different semantics and validation rules for different links
-#[derive(
-    Shrinkwrap,
-    Debug,
-    Clone,
-    Hash,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    SerializedBytes,
-    derive_more::From,
-)]
-#[shrinkwrap(mutable)]
-pub struct LinkTag(pub Vec<u8>);
+use holochain_zome_types::links::LinkTag;
 
 /// Links interrelate entries in a source chain.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, SerializedBytes)]
@@ -53,16 +36,6 @@ impl Link {
     /// Get the tag of this link.
     pub fn tag(&self) -> &LinkTag {
         &self.tag
-    }
-}
-
-impl LinkTag {
-    /// New tag from bytes
-    pub fn new<T>(t: T) -> Self
-    where
-        T: Into<Vec<u8>>,
-    {
-        Self(t.into())
     }
 }
 

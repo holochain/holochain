@@ -17,9 +17,9 @@ use holochain_types::header;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
     header::{LinkAdd, LinkRemove, ZomeId},
-    link::LinkTag,
     Header, HeaderHashed, Timestamp,
 };
+use holochain_zome_types::links::LinkTag;
 use std::fmt::Debug;
 
 pub use sys_meta::*;

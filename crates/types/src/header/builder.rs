@@ -3,9 +3,9 @@ use crate::header;
 use crate::{
     composite_hash::{EntryHash, HeaderAddress},
     fixt::*,
-    link::LinkTag,
     Timestamp,
 };
+use holochain_zome_types::links::LinkTag;
 use derive_more::Constructor;
 use fixt::prelude::*;
 use header::HeaderInner;
