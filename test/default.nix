@@ -5,8 +5,20 @@ let
   set -euxo pipefail
   RUST_BACKTRACE=1 \
   cargo test -- --nocapture
+
+  # we need some output so circle doesn't break
+  # print a line every minute
+  for i in $(seq 60); do
+    echo "tick still testing ($i)"
+    sleep 60
+  done &
+  _jid=$!
+
   # alas, we cannot specify --features in the virtual workspace
   cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
+
+  # stop our background ticker
+  kill $_jid
   '';
 
   t-merge = pkgs.writeShellScriptBin "hc-merge-test"
