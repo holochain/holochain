@@ -343,7 +343,7 @@ mod tests {
             // Get a reasonable delay for the number of agents
             // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
             let delay = Duration::from_millis(
-                std::cmp::min(50, std::cmp::max(2000, num_agents * num_hash)).into(),
+                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
             );
             call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
@@ -416,7 +416,7 @@ mod tests {
             // Get a reasonable delay for the number of agents
             // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
             let delay = Duration::from_millis(
-                std::cmp::min(50, std::cmp::max(2000, num_agents * num_hash)).into(),
+                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
             );
             call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
