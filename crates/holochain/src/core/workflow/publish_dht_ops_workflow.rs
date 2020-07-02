@@ -195,15 +195,8 @@ mod tests {
         },
         time::Duration,
     };
+    use test_case::test_case;
     use tokio::task::JoinHandle;
-
-    // Bounded for tests
-    fn random_number() -> u32 {
-        std::cmp::min(
-            std::cmp::max(U32Fixturator::new(Unpredictable).next().unwrap(), 1),
-            100,
-        )
-    }
 
     // publish ops setup
     async fn setup<'env>(
@@ -324,102 +317,116 @@ mod tests {
     }
 
     // There is a test that shows that network messages would be sent to all agents via broadcast.
-    #[tokio::test(threaded_scheduler)]
-    async fn test_sent_to_r_nodes() {
-        // Create test env
-        observability::test_run().ok();
-        let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+    #[test_case(1, 1)]
+    #[test_case(1, 10)]
+    #[test_case(1, 100)]
+    #[test_case(10, 1)]
+    #[test_case(10, 10)]
+    #[test_case(10, 100)]
+    #[test_case(100, 1)]
+    #[test_case(100, 10)]
+    #[test_case(100, 100)]
+    fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            observability::test_run().ok();
 
-        // Setup
-        // Make Unpredictable with fixt (min 1)
-        let num_hash = random_number();
-        // Make Unpredictable with fixt (min 1)
-        let num_agents = random_number();
-        let (recv_count, network, cell_network, recv_task) =
-            setup(&env_ref, &dbs, num_agents, num_hash).await;
+            // Create test env
+            let env = test_cell_env();
+            let dbs = env.dbs().await;
+            let env_ref = env.guard().await;
 
-        // Call the workflow
-        // Get a reasonable delay for the number of agents
-        // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
-        let delay = Duration::from_millis(
-            std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
-        );
-        call_workflow(&env_ref, &dbs, cell_network, delay).await;
+            // Setup
+            let (recv_count, network, cell_network, recv_task) =
+                setup(&env_ref, &dbs, num_agents, num_hash).await;
 
-        // Check the handler receives the correct number of broadcasts
-        assert_eq!(
-            (num_agents * num_hash) as u32,
-            recv_count.load(Ordering::SeqCst)
-        );
+            // Call the workflow
+            // Get a reasonable delay for the number of agents
+            // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
+            let delay = Duration::from_millis(
+                std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
+            );
+            call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
-        // Shutdown
-        network.ghost_actor_shutdown().await.unwrap();
-        recv_task.await.unwrap();
+            // Check the handler receives the correct number of broadcasts
+            assert_eq!(
+                (num_agents * num_hash) as u32,
+                recv_count.load(Ordering::SeqCst)
+            );
+
+            // Shutdown
+            network.ghost_actor_shutdown().await.unwrap();
+            recv_task.await.unwrap();
+        });
     }
 
     // There is a test that shows that if the validation_receipt_count > R for a DHTOp we don't re-publish it
-    #[tokio::test(threaded_scheduler)]
-    async fn test_no_republish() {
-        // Create test env
-        observability::test_run().ok();
-        let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+    #[test_case(1, 1)]
+    #[test_case(1, 10)]
+    #[test_case(1, 100)]
+    #[test_case(10, 1)]
+    #[test_case(10, 10)]
+    #[test_case(10, 100)]
+    #[test_case(100, 1)]
+    #[test_case(100, 10)]
+    #[test_case(100, 100)]
+    fn test_no_republish(num_agents: u32, num_hash: u32) {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            observability::test_run().ok();
 
-        // Setup
-        // Make Unpredictable with fixt (min 1)
-        let num_hash = random_number();
-        // Make Unpredictable with fixt (min 1)
-        let num_agents = random_number();
-        let (recv_count, network, cell_network, recv_task) =
-            setup(&env_ref, &dbs, num_agents, num_hash).await;
+            // Create test env
+            let env = test_cell_env();
+            let dbs = env.dbs().await;
+            let env_ref = env.guard().await;
 
-        // Update the authored to have > R counts
-        {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            // Setup
+            let (recv_count, network, cell_network, recv_task) =
+                setup(&env_ref, &dbs, num_agents, num_hash).await;
 
-            // Update authored to R
-            let ops = workspace
-                .authored_dht_ops
-                .iter()
-                .unwrap()
-                .map(|(k, _)| Ok(DhtOpHash::with_pre_hashed(k.to_vec())))
-                .collect::<Vec<_>>()
-                .unwrap();
+            // Update the authored to have > R counts
+            {
+                let reader = env_ref.reader().unwrap();
+                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
 
-            for op in ops {
-                workspace
+                // Update authored to R
+                let ops = workspace
                     .authored_dht_ops
-                    .put(op, DEFAULT_RECEIPT_BUNDLE_SIZE)
+                    .iter()
+                    .unwrap()
+                    .map(|(k, _)| Ok(DhtOpHash::with_pre_hashed(k.to_vec())))
+                    .collect::<Vec<_>>()
+                    .unwrap();
+
+                for op in ops {
+                    workspace
+                        .authored_dht_ops
+                        .put(op, DEFAULT_RECEIPT_BUNDLE_SIZE)
+                        .unwrap();
+                }
+
+                // Manually commit because this workspace doesn't commit to all dbs
+                env_ref
+                    .with_commit::<DatabaseError, _, _>(|writer| {
+                        workspace.authored_dht_ops.flush_to_txn(writer)?;
+                        Ok(())
+                    })
                     .unwrap();
             }
 
-            // Manually commit because this workspace doesn't commit to all dbs
-            env_ref
-                .with_commit::<DatabaseError, _, _>(|writer| {
-                    workspace.authored_dht_ops.flush_to_txn(writer)?;
-                    Ok(())
-                })
-                .unwrap();
-        }
+            // Call the workflow
+            // Get a reasonable delay for the number of agents
+            // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
+            let delay = Duration::from_millis(
+                std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
+            );
+            call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
-        // Call the workflow
-        // Get a reasonable delay for the number of agents
-        // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
-        let delay = Duration::from_millis(
-            std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
-        );
-        call_workflow(&env_ref, &dbs, cell_network, delay).await;
+            // Check that the handler receives no publish messages
+            assert_eq!(0, recv_count.load(Ordering::SeqCst));
 
-        // Check that the handler receives no publish messages
-        assert_eq!(0, recv_count.load(Ordering::SeqCst));
-
-        // Shutdown
-        network.ghost_actor_shutdown().await.unwrap();
-        recv_task.await.unwrap();
+            // Shutdown
+            network.ghost_actor_shutdown().await.unwrap();
+            recv_task.await.unwrap();
+        });
     }
 
     // There is a test to shows that DHTOps that were produced on private entries are not published.
@@ -438,259 +445,261 @@ mod tests {
     // 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
     // 6. Every op that is received (StoreElement and RegisterReplacedBy) is checked to match the expected versions (entries removed)
     // 7. Each op also has a count to check for duplicates
-    #[tokio::test(threaded_scheduler)]
-    async fn test_private_entries() {
-        // Create test env
-        observability::test_run().ok();
-        let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+    #[test_case(1)]
+    #[test_case(10)]
+    #[test_case(100)]
+    fn test_private_entries(num_agents: u32) {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            observability::test_run().ok();
 
-        // Setup
-        // Make Unpredictable with fixt (min 1)
-        let num_agents = random_number();
+            // Create test env
+            let env = test_cell_env();
+            let dbs = env.dbs().await;
+            let env_ref = env.guard().await;
 
-        // Setup data
-        let mut sig_fixt = SignatureFixturator::new(Unpredictable);
-        let sig = sig_fixt.next().unwrap();
-        let original_entry = fixt!(Entry);
-        let new_entry = fixt!(Entry);
-        let original_entry_hashed = EntryHashed::with_data(original_entry.clone())
-            .await
-            .unwrap();
-        let new_entry_hashed = EntryHashed::with_data(new_entry.clone()).await.unwrap();
-
-        // Create StoreElement
-        // Create the headers
-        let mut entry_create = fixt!(EntryCreate);
-        let mut entry_update = fixt!(EntryUpdate);
-
-        // Make them private
-        let visibility = EntryVisibility::Private;
-        let mut entry_type_fixt =
-            AppEntryTypeFixturator::new(visibility.clone()).map(EntryType::App);
-        entry_create.entry_type = entry_type_fixt.next().unwrap();
-        entry_update.entry_type = entry_type_fixt.next().unwrap();
-
-        // Point update at entry
-        entry_update.intended_for = IntendedFor::Header;
-
-        // Update the entry hashes
-        entry_create.entry_hash = original_entry_hashed.as_hash().clone();
-        entry_update.entry_hash = new_entry_hashed.as_hash().clone();
-
-        let entry_create_header = Header::EntryCreate(entry_create.clone());
-
-        // Put data in cas
-        {
-            let reader = env_ref.reader().unwrap();
-
-            let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
-
-            let header_hash = HeaderHashed::with_data(entry_create_header.clone())
+            // Setup data
+            let mut sig_fixt = SignatureFixturator::new(Unpredictable);
+            let sig = sig_fixt.next().unwrap();
+            let original_entry = fixt!(Entry);
+            let new_entry = fixt!(Entry);
+            let original_entry_hashed = EntryHashed::with_data(original_entry.clone())
                 .await
                 .unwrap();
+            let new_entry_hashed = EntryHashed::with_data(new_entry.clone()).await.unwrap();
 
-            // Update the replaces to the header of the original
-            entry_update.replaces_address = header_hash.as_hash().clone();
+            // Create StoreElement
+            // Create the headers
+            let mut entry_create = fixt!(EntryCreate);
+            let mut entry_update = fixt!(EntryUpdate);
 
-            // Put data into cas
-            let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-            cas.put(signed_header, Some(original_entry_hashed)).unwrap();
+            // Make them private
+            let visibility = EntryVisibility::Private;
+            let mut entry_type_fixt =
+                AppEntryTypeFixturator::new(visibility.clone()).map(EntryType::App);
+            entry_create.entry_type = entry_type_fixt.next().unwrap();
+            entry_update.entry_type = entry_type_fixt.next().unwrap();
 
-            let entry_update_header = Header::EntryUpdate(entry_update.clone());
-            let header_hash = HeaderHashed::with_data(entry_update_header).await.unwrap();
-            let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-            cas.put(signed_header, Some(new_entry_hashed)).unwrap();
-            env_ref
-                .with_commit::<DatabaseError, _, _>(|writer| {
-                    cas.flush_to_txn(writer)?;
-                    Ok(())
-                })
-                .unwrap();
-        }
-        let (store_element, store_entry, register_replaced_by) = {
-            let reader = env_ref.reader().unwrap();
-            // Create easy way to create test cascade
-            let (cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
-            let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+            // Point update at entry
+            entry_update.intended_for = IntendedFor::Header;
 
-            let op = DhtOp::StoreElement(
-                sig.clone(),
-                entry_create_header.clone(),
-                Some(original_entry.clone().into()),
-            );
-            // Op is expected to not contain the Entry even though the above contains the entry
-            let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
-            let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
-            let store_element = (op_hash, light, basis, expected_op);
+            // Update the entry hashes
+            entry_create.entry_hash = original_entry_hashed.as_hash().clone();
+            entry_update.entry_hash = new_entry_hashed.as_hash().clone();
 
-            // Create StoreEntry
-            let header = NewEntryHeader::Create(entry_create.clone());
-            let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
-            let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
-            let store_entry = (op_hash, light, basis);
+            let entry_create_header = Header::EntryCreate(entry_create.clone());
 
-            // Create RegisterReplacedBy
-            let op = DhtOp::RegisterReplacedBy(
-                sig.clone(),
-                entry_update.clone(),
-                Some(new_entry.clone().into()),
-            );
-            // Op is expected to not contain the Entry even though the above contains the entry
-            let expected_op = DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
-            let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
-            let register_replaced_by = (op_hash, light, basis, expected_op);
+            // Put data in cas
+            {
+                let reader = env_ref.reader().unwrap();
 
-            (store_element, store_entry, register_replaced_by)
-        };
+                let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
 
-        // Gather the expected op hashes, ops and basis
-        // We are only expecting Store Element and Register Replaced By ops and nothing else
-        let store_element_count = Arc::new(AtomicU32::new(0));
-        let register_replaced_by_count = Arc::new(AtomicU32::new(0));
-        let expected = {
-            let mut map = HashMap::new();
-            let op_hash = store_element.0.clone();
-            let expected_op = store_element.3.clone();
-            let basis = store_element.2.clone();
-            let store_element_count = store_element_count.clone();
-            map.insert(op_hash, (expected_op, basis, store_element_count));
-            let op_hash = register_replaced_by.0.clone();
-            let expected_op = register_replaced_by.3.clone();
-            let basis = register_replaced_by.2.clone();
-            let register_replaced_by_count = register_replaced_by_count.clone();
-            map.insert(op_hash, (expected_op, basis, register_replaced_by_count));
-            map
-        };
+                let header_hash = HeaderHashed::with_data(entry_create_header.clone())
+                    .await
+                    .unwrap();
 
-        // Create and fill authored ops db in the workspace
-        {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let (op_hash, light, basis, _) = store_element;
-            let integration = IntegrationValue {
-                validation_status: ValidationStatus::Valid,
-                op: light,
-                basis,
+                // Update the replaces to the header of the original
+                entry_update.replaces_address = header_hash.as_hash().clone();
+
+                // Put data into cas
+                let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
+                cas.put(signed_header, Some(original_entry_hashed)).unwrap();
+
+                let entry_update_header = Header::EntryUpdate(entry_update.clone());
+                let header_hash = HeaderHashed::with_data(entry_update_header).await.unwrap();
+                let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
+                cas.put(signed_header, Some(new_entry_hashed)).unwrap();
+                env_ref
+                    .with_commit::<DatabaseError, _, _>(|writer| {
+                        cas.flush_to_txn(writer)?;
+                        Ok(())
+                    })
+                    .unwrap();
+            }
+            let (store_element, store_entry, register_replaced_by) = {
+                let reader = env_ref.reader().unwrap();
+                // Create easy way to create test cascade
+                let (cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+                let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+
+                let op = DhtOp::StoreElement(
+                    sig.clone(),
+                    entry_create_header.clone(),
+                    Some(original_entry.clone().into()),
+                );
+                // Op is expected to not contain the Entry even though the above contains the entry
+                let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+                let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                let store_element = (op_hash, light, basis, expected_op);
+
+                // Create StoreEntry
+                let header = NewEntryHeader::Create(entry_create.clone());
+                let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+                let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                let store_entry = (op_hash, light, basis);
+
+                // Create RegisterReplacedBy
+                let op = DhtOp::RegisterReplacedBy(
+                    sig.clone(),
+                    entry_update.clone(),
+                    Some(new_entry.clone().into()),
+                );
+                // Op is expected to not contain the Entry even though the above contains the entry
+                let expected_op =
+                    DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+                let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                let register_replaced_by = (op_hash, light, basis, expected_op);
+
+                (store_element, store_entry, register_replaced_by)
             };
-            workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
-            // Put DhtOpLight into the integrated db
-            workspace
-                .integrated_dht_ops
-                .put(op_hash, integration)
-                .unwrap();
 
-            let (op_hash, light, basis) = store_entry;
-            let integration = IntegrationValue {
-                validation_status: ValidationStatus::Valid,
-                op: light,
-                basis,
+            // Gather the expected op hashes, ops and basis
+            // We are only expecting Store Element and Register Replaced By ops and nothing else
+            let store_element_count = Arc::new(AtomicU32::new(0));
+            let register_replaced_by_count = Arc::new(AtomicU32::new(0));
+            let expected = {
+                let mut map = HashMap::new();
+                let op_hash = store_element.0.clone();
+                let expected_op = store_element.3.clone();
+                let basis = store_element.2.clone();
+                let store_element_count = store_element_count.clone();
+                map.insert(op_hash, (expected_op, basis, store_element_count));
+                let op_hash = register_replaced_by.0.clone();
+                let expected_op = register_replaced_by.3.clone();
+                let basis = register_replaced_by.2.clone();
+                let register_replaced_by_count = register_replaced_by_count.clone();
+                map.insert(op_hash, (expected_op, basis, register_replaced_by_count));
+                map
             };
-            workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
-            // Put DhtOpLight into the integrated db
-            workspace
-                .integrated_dht_ops
-                .put(op_hash, integration)
-                .unwrap();
 
-            let (op_hash, light, basis, _) = register_replaced_by;
-            let integration = IntegrationValue {
-                validation_status: ValidationStatus::Valid,
-                op: light,
-                basis,
-            };
-            workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
-            // Put DhtOpLight into the integrated db
-            workspace
-                .integrated_dht_ops
-                .put(op_hash, integration)
-                .unwrap();
-            // Manually commit because this workspace doesn't commit to all dbs
-            env_ref
-                .with_commit::<DatabaseError, _, _>(|writer| {
-                    workspace.authored_dht_ops.flush_to_txn(writer)?;
-                    workspace.integrated_dht_ops.flush_to_txn(writer)?;
-                    Ok(())
-                })
-                .unwrap();
-        }
+            // Create and fill authored ops db in the workspace
+            {
+                let reader = env_ref.reader().unwrap();
+                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                let (op_hash, light, basis, _) = store_element;
+                let integration = IntegrationValue {
+                    validation_status: ValidationStatus::Valid,
+                    op: light,
+                    basis,
+                };
+                workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
+                // Put DhtOpLight into the integrated db
+                workspace
+                    .integrated_dht_ops
+                    .put(op_hash, integration)
+                    .unwrap();
 
-        // Create cell data
-        let dna = fixt!(DnaHash);
-        let agents = AgentPubKeyFixturator::new(Unpredictable)
-            .take(num_agents as usize)
-            .collect::<Vec<_>>();
+                let (op_hash, light, basis) = store_entry;
+                let integration = IntegrationValue {
+                    validation_status: ValidationStatus::Valid,
+                    op: light,
+                    basis,
+                };
+                workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
+                // Put DhtOpLight into the integrated db
+                workspace
+                    .integrated_dht_ops
+                    .put(op_hash, integration)
+                    .unwrap();
 
-        // Create the network
-        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
-        let cell_network = network.to_cell(dna.clone(), agents[0].clone());
-        let recv_count = Arc::new(AtomicU32::new(0));
+                let (op_hash, light, basis, _) = register_replaced_by;
+                let integration = IntegrationValue {
+                    validation_status: ValidationStatus::Valid,
+                    op: light,
+                    basis,
+                };
+                workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
+                // Put DhtOpLight into the integrated db
+                workspace
+                    .integrated_dht_ops
+                    .put(op_hash, integration)
+                    .unwrap();
+                // Manually commit because this workspace doesn't commit to all dbs
+                env_ref
+                    .with_commit::<DatabaseError, _, _>(|writer| {
+                        workspace.authored_dht_ops.flush_to_txn(writer)?;
+                        workspace.integrated_dht_ops.flush_to_txn(writer)?;
+                        Ok(())
+                    })
+                    .unwrap();
+            }
 
-        // Receive events and increment count
-        let recv_task = tokio::task::spawn({
-            let recv_count = recv_count.clone();
-            async move {
-                use tokio::stream::StreamExt;
-                while let Some(evt) = recv.next().await {
-                    use holochain_p2p::event::HolochainP2pEvent::*;
-                    match evt {
-                        Publish {
-                            respond,
-                            span,
-                            dht_hash,
-                            ops,
-                            ..
-                        } => {
-                            let _g = span.enter();
-                            debug!(?dht_hash);
-                            debug!(?ops);
+            // Create cell data
+            let dna = fixt!(DnaHash);
+            let agents = AgentPubKeyFixturator::new(Unpredictable)
+                .take(num_agents as usize)
+                .collect::<Vec<_>>();
 
-                            // Check the ops are correct
-                            for (op_hash, op) in ops {
-                                match expected.get(&op_hash) {
-                                    Some((expected_op, expected_basis, count)) => {
-                                        assert_eq!(&op, expected_op);
-                                        assert_eq!(&dht_hash, expected_basis);
-                                        count.fetch_add(1, Ordering::SeqCst);
-                                    }
-                                    None => {
-                                        panic!("This DhtOpHash was not expected: {:?}", op_hash)
+            // Create the network
+            let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+            let cell_network = network.to_cell(dna.clone(), agents[0].clone());
+            let recv_count = Arc::new(AtomicU32::new(0));
+
+            // Receive events and increment count
+            let recv_task = tokio::task::spawn({
+                let recv_count = recv_count.clone();
+                async move {
+                    use tokio::stream::StreamExt;
+                    while let Some(evt) = recv.next().await {
+                        use holochain_p2p::event::HolochainP2pEvent::*;
+                        match evt {
+                            Publish {
+                                respond,
+                                span,
+                                dht_hash,
+                                ops,
+                                ..
+                            } => {
+                                let _g = span.enter();
+                                debug!(?dht_hash);
+                                debug!(?ops);
+
+                                // Check the ops are correct
+                                for (op_hash, op) in ops {
+                                    match expected.get(&op_hash) {
+                                        Some((expected_op, expected_basis, count)) => {
+                                            assert_eq!(&op, expected_op);
+                                            assert_eq!(&dht_hash, expected_basis);
+                                            count.fetch_add(1, Ordering::SeqCst);
+                                        }
+                                        None => {
+                                            panic!("This DhtOpHash was not expected: {:?}", op_hash)
+                                        }
                                     }
                                 }
+                                respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                                recv_count.fetch_add(1, Ordering::SeqCst);
                             }
-                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                            recv_count.fetch_add(1, Ordering::SeqCst);
+                            _ => panic!("unexpected event"),
                         }
-                        _ => panic!("unexpected event"),
                     }
                 }
+            });
+
+            // Join some agents onto the network
+            for agent in agents {
+                network.join(dna.clone(), agent).await.unwrap();
             }
+            // Call the workflow
+            let delay = Duration::from_millis((20 * num_agents * 2).into());
+            call_workflow(&env_ref, &dbs, cell_network, delay).await;
+
+            // Check the handler receives the one broadcast per agent because they are on the same basis
+            assert_eq!(num_agents, recv_count.load(Ordering::SeqCst));
+            // Check there is no ops left that didn't come through
+            assert_eq!(
+                num_agents,
+                register_replaced_by_count.load(Ordering::SeqCst)
+            );
+            assert_eq!(num_agents, store_element_count.load(Ordering::SeqCst));
+
+            // Shutdown
+            network.ghost_actor_shutdown().await.unwrap();
+            recv_task.await.unwrap();
         });
-
-        // Join some agents onto the network
-        for agent in agents {
-            network.join(dna.clone(), agent).await.unwrap();
-        }
-        // Call the workflow
-        let delay = Duration::from_millis((20 * num_agents * 2).into());
-        call_workflow(&env_ref, &dbs, cell_network, delay).await;
-
-        // Check the handler receives the one broadcast per agent because they are on the same basis
-        assert_eq!(num_agents, recv_count.load(Ordering::SeqCst));
-        // Check there is no ops left that didn't come through
-        assert_eq!(
-            num_agents,
-            register_replaced_by_count.load(Ordering::SeqCst)
-        );
-        assert_eq!(num_agents, store_element_count.load(Ordering::SeqCst));
-
-        // Shutdown
-        network.ghost_actor_shutdown().await.unwrap();
-        recv_task.await.unwrap();
     }
 
     // TODO: COVERAGE: Test public ops do publish
