@@ -5,6 +5,8 @@ let
   set -euxo pipefail
   RUST_BACKTRACE=1 \
   cargo test -- --nocapture
+  # alas, we cannot specify --features in the virtual workspace
+  cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
   '';
 
   t-merge = pkgs.writeShellScriptBin "hc-merge-test"
