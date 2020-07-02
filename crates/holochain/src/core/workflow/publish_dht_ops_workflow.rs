@@ -198,17 +198,20 @@ mod tests {
     use test_case::test_case;
     use tokio::task::JoinHandle;
 
-    // publish ops setup
+    const RECV_TIMEOUT: Duration = Duration::from_millis(3000);
+
+    /// publish ops setup
     async fn setup<'env>(
         env_ref: &EnvironmentRefRw<'env>,
         dbs: &impl GetDb,
         num_agents: u32,
         num_hash: u32,
+        panic_on_publish: bool,
     ) -> (
-        Arc<AtomicU32>,
         ghost_actor::GhostSender<HolochainP2p>,
         HolochainP2pCell,
         JoinHandle<()>,
+        tokio::sync::oneshot::Receiver<()>,
     ) {
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
@@ -267,20 +270,29 @@ mod tests {
 
         // Create the network
         let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
         let cell_network = network.to_cell(dna.clone(), agents[0].clone());
-        let recv_count = Arc::new(AtomicU32::new(0));
+        let mut recv_count: u32 = 0;
+        let total_expected = num_agents * num_hash;
 
         // Receive events and increment count
         let recv_task = tokio::task::spawn({
-            let recv_count = recv_count.clone();
             async move {
                 use tokio::stream::StreamExt;
+                let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.next().await {
                     use holochain_p2p::event::HolochainP2pEvent::*;
                     match evt {
                         Publish { respond, .. } => {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                            recv_count.fetch_add(1, Ordering::SeqCst);
+                            if panic_on_publish {
+                                panic!("Published, when expecting not to")
+                            }
+                            recv_count += 1;
+                            if recv_count == total_expected {
+                                // notify the test that all items have been received
+                                tx_complete.take().unwrap().send(()).unwrap()
+                            }
                         }
                         _ => panic!("unexpected event"),
                     }
@@ -293,15 +305,14 @@ mod tests {
             network.join(dna.clone(), agent).await.unwrap();
         }
 
-        (recv_count, network, cell_network, recv_task)
+        (network, cell_network, recv_task, rx_complete)
     }
 
-    // Call the workflow
+    /// Call the workflow
     async fn call_workflow<'env>(
         env_ref: &EnvironmentRefRw<'env>,
         dbs: &impl GetDb,
         mut cell_network: HolochainP2pCell,
-        delay: Duration,
     ) {
         let reader = env_ref.reader().unwrap();
         let mut workspace = PublishDhtOpsWorkspace::new(&reader, dbs).unwrap();
@@ -312,11 +323,9 @@ mod tests {
         for (basis, ops) in to_publish {
             cell_network.publish(true, basis, ops, None).await.unwrap();
         }
-        // Wait a little bit for responses
-        tokio::time::delay_for(delay).await;
     }
 
-    // There is a test that shows that network messages would be sent to all agents via broadcast.
+    /// There is a test that shows that network messages would be sent to all agents via broadcast.
     #[test_case(1, 1)]
     #[test_case(1, 10)]
     #[test_case(1, 100)]
@@ -336,22 +345,18 @@ mod tests {
             let env_ref = env.guard().await;
 
             // Setup
-            let (recv_count, network, cell_network, recv_task) =
-                setup(&env_ref, &dbs, num_agents, num_hash).await;
+            let (network, cell_network, recv_task, rx_complete) =
+                setup(&env_ref, &dbs, num_agents, num_hash, false).await;
 
-            // Call the workflow
-            // Get a reasonable delay for the number of agents
-            // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
-            let delay = Duration::from_millis(
-                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
-            );
-            call_workflow(&env_ref, &dbs, cell_network, delay).await;
+            call_workflow(&env_ref, &dbs, cell_network).await;
 
-            // Check the handler receives the correct number of broadcasts
-            assert_eq!(
-                (num_agents * num_hash) as u32,
-                recv_count.load(Ordering::SeqCst)
-            );
+            // Wait for expected # of responses, or timeout
+            tokio::select! {
+                _ = rx_complete => {}
+                _ = tokio::time::delay_for(RECV_TIMEOUT) => {
+                    panic!("Timed out while waiting for expected responses.")
+                }
+            };
 
             // Shutdown
             network.ghost_actor_shutdown().await.unwrap();
@@ -359,7 +364,8 @@ mod tests {
         });
     }
 
-    // There is a test that shows that if the validation_receipt_count > R for a DHTOp we don't re-publish it
+    /// There is a test that shows that if the validation_receipt_count > R
+    /// for a DHTOp we don't re-publish it
     #[test_case(1, 1)]
     #[test_case(1, 10)]
     #[test_case(1, 100)]
@@ -379,8 +385,8 @@ mod tests {
             let env_ref = env.guard().await;
 
             // Setup
-            let (recv_count, network, cell_network, recv_task) =
-                setup(&env_ref, &dbs, num_agents, num_hash).await;
+            let (network, cell_network, recv_task, _) =
+                setup(&env_ref, &dbs, num_agents, num_hash, true).await;
 
             // Update the authored to have > R counts
             {
@@ -413,15 +419,13 @@ mod tests {
             }
 
             // Call the workflow
-            // Get a reasonable delay for the number of agents
-            // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
-            let delay = Duration::from_millis(
-                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
-            );
-            call_workflow(&env_ref, &dbs, cell_network, delay).await;
+            call_workflow(&env_ref, &dbs, cell_network).await;
 
-            // Check that the handler receives no publish messages
-            assert_eq!(0, recv_count.load(Ordering::SeqCst));
+            // If we can wait a while without receiving any publish, we have succeeded
+            tokio::time::delay_for(Duration::from_millis(
+                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
+            ))
+            .await;
 
             // Shutdown
             network.ghost_actor_shutdown().await.unwrap();
@@ -429,22 +433,22 @@ mod tests {
         });
     }
 
-    // There is a test to shows that DHTOps that were produced on private entries are not published.
-    // Some do get published
-    // Current private constraints:
-    // - No private Entry is ever published in any op
-    // - No StoreEntry
-    // - This workflow does not have access to private entries
-    // - Add / Remove links: Currently publish all.
-    // ## Explication
-    // This test is a little big so a quick run down:
-    // 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterReplacedBy)
-    // 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
-    // 3. The workflow is run and the ops are sent to the network receiver
-    // 4. We check that the correct number of ops are received (so we know there were no other ops sent)
-    // 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
-    // 6. Every op that is received (StoreElement and RegisterReplacedBy) is checked to match the expected versions (entries removed)
-    // 7. Each op also has a count to check for duplicates
+    /// There is a test to shows that DHTOps that were produced on private entries are not published.
+    /// Some do get published
+    /// Current private constraints:
+    /// - No private Entry is ever published in any op
+    /// - No StoreEntry
+    /// - This workflow does not have access to private entries
+    /// - Add / Remove links: Currently publish all.
+    /// ## Explication
+    /// This test is a little big so a quick run down:
+    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterReplacedBy)
+    /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
+    /// 3. The workflow is run and the ops are sent to the network receiver
+    /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
+    /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
+    /// 6. Every op that is received (StoreElement and RegisterReplacedBy) is checked to match the expected versions (entries removed)
+    /// 7. Each op also has a count to check for duplicates
     #[test_case(1)]
     #[test_case(10)]
     #[test_case(100)]
@@ -636,13 +640,15 @@ mod tests {
             // Create the network
             let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
             let cell_network = network.to_cell(dna.clone(), agents[0].clone());
-            let recv_count = Arc::new(AtomicU32::new(0));
+            let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
+            let total_expected = num_agents;
+            let mut recv_count: u32 = 0;
 
             // Receive events and increment count
             let recv_task = tokio::task::spawn({
-                let recv_count = recv_count.clone();
                 async move {
                     use tokio::stream::StreamExt;
+                    let mut tx_complete = Some(tx_complete);
                     while let Some(evt) = recv.next().await {
                         use holochain_p2p::event::HolochainP2pEvent::*;
                         match evt {
@@ -671,7 +677,10 @@ mod tests {
                                     }
                                 }
                                 respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                                recv_count.fetch_add(1, Ordering::SeqCst);
+                                recv_count += 1;
+                                if recv_count == total_expected {
+                                    tx_complete.take().unwrap().send(()).unwrap();
+                                }
                             }
                             _ => panic!("unexpected event"),
                         }
@@ -683,12 +692,17 @@ mod tests {
             for agent in agents {
                 network.join(dna.clone(), agent).await.unwrap();
             }
-            // Call the workflow
-            let delay = Duration::from_millis((20 * num_agents * 2).into());
-            call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
-            // Check the handler receives the one broadcast per agent because they are on the same basis
-            assert_eq!(num_agents, recv_count.load(Ordering::SeqCst));
+            call_workflow(&env_ref, &dbs, cell_network).await;
+
+            // Wait for expected # of responses, or timeout
+            tokio::select! {
+                _ = rx_complete => {}
+                _ = tokio::time::delay_for(RECV_TIMEOUT) => {
+                    panic!("Timed out while waiting for expected responses.")
+                }
+            };
+
             // Check there is no ops left that didn't come through
             assert_eq!(
                 num_agents,
