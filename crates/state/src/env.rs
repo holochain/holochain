@@ -23,8 +23,28 @@ const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024;
 const MAX_DBS: u32 = 32;
 
 lazy_static! {
-    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, EnvironmentWrite>> =
-        RwLockSync::new(HashMap::new());
+    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, EnvironmentWrite>> = {
+        // This is just a convenient place that we know gets initialized
+        // both in the final binary holochain && in all relevant tests
+        //
+        // Holochain (and most binaries) are left in invalid states
+        // if a thread panic!s - switch to failing fast in that case.
+        //
+        // We tried putting `panic = "abort"` in the Cargo.toml,
+        // but somehow that breaks the wasmer / test_utils integration.
+
+        let orig_handler = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |panic_info| {
+            // print the panic message
+            eprintln!("FATAL PANIC {:#?}", panic_info);
+            // invoke the original handler
+            orig_handler(panic_info);
+            // Abort the process
+            std::process::abort();
+        }));
+
+        RwLockSync::new(HashMap::new())
+    };
 }
 
 fn default_flags() -> EnvironmentFlags {

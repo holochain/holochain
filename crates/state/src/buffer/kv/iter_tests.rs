@@ -398,6 +398,7 @@ async fn kv_single_iter_found_1() {
 
 #[tokio::test(threaded_scheduler)]
 #[should_panic]
+#[ignore] // david.b - should_panic tests don't work with abort TODO FIXME
 async fn kv_single_iter_found_2() {
     holochain_types::observability::test_run().ok();
     let in_scratch = vec![
