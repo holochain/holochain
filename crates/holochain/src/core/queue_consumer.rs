@@ -59,7 +59,7 @@ pub async fn spawn_queue_consumer_tasks(
     let (tx_integration, rx2) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish);
     let (tx_app, rx3) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
     let (tx_sys, rx4) = spawn_sys_validation_consumer(env.clone(), tx_app);
-    let (tx_produce, rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration);
+    let (tx_produce, rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration.clone());
 
     // Wait for initial loop to complete for each consumer
     futures::future::join_all(vec![rx1, rx2, rx3, rx4, rx5].into_iter())
@@ -71,6 +71,7 @@ pub async fn spawn_queue_consumer_tasks(
     InitialQueueTriggers {
         sys_validation: tx_sys,
         produce_dht_ops: tx_produce,
+        integrate_dht_ops: tx_integration,
     }
 }
 
@@ -80,6 +81,8 @@ pub struct InitialQueueTriggers {
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
     pub produce_dht_ops: TriggerSender,
+    /// Notify the IntegrateDhtOps workflow to run, i.e. after HandlePublish
+    pub integrate_dht_ops: TriggerSender,
 }
 
 /// The means of nudging a queue consumer to tell it to look for more work

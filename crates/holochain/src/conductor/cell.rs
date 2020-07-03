@@ -310,9 +310,43 @@ impl Cell {
         _from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holochain_types::composite_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        unimplemented!()
+        // TODO - We are temporarily just integrating everything...
+        //        Really this should go to validation first!
+
+        // set up our workspace
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader().expect("Could not create LMDB reader");
+        let mut workspace =
+            crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace::new(
+                &reader, &env_ref,
+            )
+            .expect("Could not create Workspace");
+
+        // add incoming ops to the integration queue transaction
+        for (hash, op) in ops {
+            let iqv = crate::core::state::dht_op_integration::IntegrationQueueValue {
+                validation_status: holochain_types::validate::ValidationStatus::Valid,
+                op,
+            };
+            workspace.integration_queue.put(
+                std::convert::TryInto::try_into((holochain_types::Timestamp::now(), hash))?,
+                iqv,
+            )?;
+        }
+
+        // commit our transaction
+        let writer: crate::core::queue_consumer::OneshotWriter = self.state_env.clone().into();
+
+        writer
+            .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+            .await?;
+
+        // trigger integration of queued ops
+        self.queue_triggers.integrate_dht_ops.clone().trigger();
+
+        Ok(())
     }
 
     /// a remote node is attempting to retreive a validation package
