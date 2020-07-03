@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::dna::DnaFile;
-use holochain_types::{autonomic::AutonomicCue, cell::CellId, prelude::Todo};
+use holochain_types::{autonomic::AutonomicCue, cell::CellId};
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
@@ -25,13 +25,6 @@ mock! {
             cell_id: &CellId,
             invocation: ZomeCallInvocation,
         ) -> ConductorApiResult<ZomeCallInvocationResult>;
-
-        fn sync_network_send(&self, message: Todo) -> ConductorApiResult<()>;
-
-        fn sync_network_request(
-            &self,
-            _message: Todo,
-        ) -> ConductorApiResult<Todo>;
 
         fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
@@ -60,14 +53,6 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_dpki_request(method, args)
     }
 
-    async fn network_send(&self, message: Todo) -> ConductorApiResult<()> {
-        self.sync_network_send(message)
-    }
-
-    async fn network_request(&self, message: Todo) -> ConductorApiResult<Todo> {
-        self.sync_network_request(message)
-    }
-
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
         self.sync_autonomic_cue(cue)
     }
@@ -75,7 +60,7 @@ impl CellConductorApiT for MockCellConductorApi {
     fn keystore(&self) -> &KeystoreSender {
         self.mock_keystore()
     }
-    async fn get_dna<'a>(&'a self, dna_hash: &'a DnaHash) -> Option<DnaFile> {
+    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.sync_get_dna(dna_hash)
     }
 }

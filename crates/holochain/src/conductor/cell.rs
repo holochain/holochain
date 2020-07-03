@@ -30,7 +30,7 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo};
+use holochain_types::{autonomic::AutonomicProcess, cell::CellId};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -523,16 +523,5 @@ impl Cell {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-// The following is a sketch from the skunkworx phase, and can probably be removed
-
-// These are possibly composable traits that describe how to get a resource,
-// so instead of explicitly building resources, we can downcast a Cell to exactly
-// the right set of resource getter traits
-trait NetSend {
-    fn network_send(&self, msg: Todo) -> Result<(), NetError>;
-}
-
-#[allow(dead_code)]
-/// TODO - this is a shim until we need a real NetError
-enum NetError {}
+#[cfg(test)]
+mod test;
