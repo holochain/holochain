@@ -10,7 +10,7 @@ use fixt::prelude::*;
 use header::HeaderInner;
 use header::{IntendedFor, ZomeId};
 use holo_hash::*;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::link::LinkTag;
 
 #[derive(Constructor)]
 pub struct HeaderBuilderCommon {

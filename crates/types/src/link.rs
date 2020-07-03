@@ -2,7 +2,7 @@
 
 use crate::composite_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::link::LinkTag;
 use regex::Regex;
 
 /// Links interrelate entries in a source chain.

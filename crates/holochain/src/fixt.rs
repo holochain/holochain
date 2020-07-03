@@ -21,7 +21,7 @@ use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::header::HeaderHashes;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::HostInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
