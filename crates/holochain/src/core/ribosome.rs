@@ -439,6 +439,21 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[ignore]
+    async fn warm_wasm_tests() {
+        holochain_types::observability::test_run().ok();
+        use strum::IntoEnumIterator;
+
+        // If HC_WASM_CACHE_PATH is set warm the cache
+        if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
+            let wasms: Vec<_> = TestWasm::iter().collect();
+            crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+                .next()
+                .unwrap();
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn invoke_foo_test() {
         let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)

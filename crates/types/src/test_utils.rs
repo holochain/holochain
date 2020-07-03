@@ -58,7 +58,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
             }
             DnaFile::new(dna, wasm_code).await
         },
-        std::time::Duration::from_secs(10),
+        std::time::Duration::from_secs(600),
     )
     .unwrap()
     .unwrap()

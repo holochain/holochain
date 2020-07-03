@@ -61,6 +61,9 @@ use holochain_zome_types::CallbackResult;
 use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
 
+/// Path to the wasm cache path
+const WASM_CACHE_PATH_ENV: &'static str = "HC_WASM_CACHE_PATH";
+
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone)]
@@ -84,6 +87,7 @@ impl WasmRibosome {
         Ok(holochain_wasmer_host::instantiate::module(
             &self.wasm_cache_key(&zome_name)?,
             &wasm,
+            std::env::var_os(WASM_CACHE_PATH_ENV),
         )?)
     }
 
@@ -102,6 +106,7 @@ impl WasmRibosome {
             self.wasm_cache_key(&zome_name)?,
             &wasm,
             &imports,
+            std::env::var_os(WASM_CACHE_PATH_ENV),
         )?)
     }
 
