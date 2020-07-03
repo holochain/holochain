@@ -14,5 +14,10 @@ edition = "2018"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-holochain_wasmer_guest = "=0.0.33"
+holochain_wasmer_guest = "=0.0.34"
 holochain_zome_types = { path = "../zome_types" }
+serde = "=1.0.104"
+serde_bytes = "0.11"
+
+[dev-dependencies]
+fixt = { path = "../fixt" }
