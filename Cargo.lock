@@ -1321,8 +1321,6 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4c9c9ec24070197551422eac1f235cd33589683fecb7a4b96ccfd67e428dd09"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -1332,8 +1330,6 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c089b96a47c7d59fddd7fb90e77cde70ac373779d8ec2a68994a1330c7a0041"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",

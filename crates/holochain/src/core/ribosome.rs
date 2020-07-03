@@ -439,7 +439,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[ignore]
     async fn warm_wasm_tests() {
         holochain_types::observability::test_run().ok();
         use strum::IntoEnumIterator;
