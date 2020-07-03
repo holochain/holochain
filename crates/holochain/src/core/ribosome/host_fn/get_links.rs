@@ -6,7 +6,7 @@ use crate::core::{
 };
 use futures::future::FutureExt;
 use holochain_state::error::DatabaseResult;
-use holochain_zome_types::links::Link;
+use holochain_zome_types::link::Link;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::GetLinksOutput;
 use must_future::MustBoxFuture;
@@ -39,11 +39,14 @@ pub fn get_links<'a>(
         |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
                 let cascade = workspace.cascade();
+
+                // Create the key
                 let key = match tag.as_ref() {
                     Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
                     None => LinkMetaKey::BaseZome(&base_address, zome_id),
                 };
-                // safe block on
+
+                // Get te links from the dht
                 cascade
                     .dht_get_links(&key)
                     .await
@@ -51,6 +54,7 @@ pub fn get_links<'a>(
             .boxed()
             .into()
         };
+
     let links = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         unsafe { host_context.workspace.apply_ref(call).await }
     })??;

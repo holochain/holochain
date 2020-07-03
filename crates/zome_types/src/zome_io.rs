@@ -85,7 +85,7 @@ wasm_io_types!(
         (
             holo_hash_core::HoloHashCore,
             holo_hash_core::HoloHashCore,
-            crate::links::LinkTag,
+            crate::link::LinkTag,
         ),
     );
     pub struct LinkEntriesOutput(holo_hash_core::HoloHashCore);
@@ -93,8 +93,8 @@ wasm_io_types!(
     pub struct KeystoreInput(());
     pub struct KeystoreOutput(());
     // @TODO
-    pub struct GetLinksInput((holo_hash_core::HoloHashCore, Option<crate::links::LinkTag>));
-    pub struct GetLinksOutput(Vec<crate::links::Link>);
+    pub struct GetLinksInput((holo_hash_core::HoloHashCore, Option<crate::link::LinkTag>));
+    pub struct GetLinksOutput(Vec<crate::link::Link>);
     // get an entry from the cascade
     pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
     pub struct GetEntryOutput(Option<crate::entry::Entry>);

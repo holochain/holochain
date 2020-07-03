@@ -14,7 +14,7 @@ use holochain_types::{
     Header,
 };
 use holochain_zome_types::entry::Entry;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::link::LinkTag;
 
 fn fixtures() -> (
     AgentPubKey,
