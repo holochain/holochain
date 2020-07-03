@@ -9,12 +9,12 @@ use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
     header,
-    link::Tag,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
 };
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::link::LinkTag;
 
 fn fixtures() -> (
     AgentPubKey,
@@ -102,7 +102,7 @@ async fn get_links() -> SourceChainResult<()> {
         &cache.cas(),
         &cache_meta,
     );
-    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 

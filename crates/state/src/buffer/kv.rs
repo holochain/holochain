@@ -104,6 +104,29 @@ where
         ))
     }
 
+    /// Iterator that tracks elements so they can be deleted
+    pub fn drain_iter(&mut self) -> DatabaseResult<DrainIter<V>> {
+        Ok(DrainIter::new(
+            &mut self.scratch,
+            SingleIterRaw::new(
+                self.db.iter_start(self.reader)?,
+                self.db.iter_end(self.reader)?,
+            ),
+        ))
+    }
+
+    /// Iterator that tracks elements so they can be deleted but in reverse
+    pub fn drain_iter_reverse(&mut self) -> DatabaseResult<fallible_iterator::Rev<DrainIter<V>>> {
+        Ok(DrainIter::new(
+            &mut self.scratch,
+            SingleIterRaw::new(
+                self.db.iter_start(self.reader)?,
+                self.db.iter_end(self.reader)?,
+            ),
+        )
+        .rev())
+    }
+
     /// Iterator that returns all partial matches to this key
     pub fn iter_all_key_matches(&self, k: K) -> DatabaseResult<SingleKeyIter<V>> {
         Self::empty_key(&k)?;
@@ -165,6 +188,13 @@ where
             Ok(())
         }
     }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.scratch.clear();
+        Ok(self.db.clear(writer)?)
+    }
 }
 
 impl<'env, K, V, R> BufferedStore<'env> for KvBuf<'env, K, V, R>
@@ -220,7 +250,7 @@ where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = (&'env [u8], V);
+    type Item = IterItem<'env, V>;
     #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let item = self.iter.next()?;
@@ -267,23 +297,69 @@ where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = (&'env [u8], V);
+    type Item = IterItem<'env, V>;
     #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         self.iter.next()
     }
 }
 
+/// Draining iterator that only touches the db on commit
+pub struct DrainIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    scratch: &'a mut BTreeMap<Vec<u8>, Op<V>>,
+    iter: SingleIterRaw<'env, V>,
+}
+
+impl<'env, 'a, V> DrainIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    fn new(scratch: &'a mut BTreeMap<Vec<u8>, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
+        Self { scratch, iter }
+    }
+}
+
+impl<'env, 'a, V> FallibleIterator for DrainIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    type Error = DatabaseError;
+    type Item = V;
+    #[instrument(skip(self))]
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        Ok(self.iter.next()?.map(|(k, v)| {
+            self.scratch.insert(k.to_vec(), Op::Delete);
+            v
+        }))
+    }
+}
+
+impl<'env, 'a: 'env, V> DoubleEndedFallibleIterator for DrainIter<'env, 'a, V>
+where
+    V: BufVal,
+{
+    #[instrument(skip(self))]
+    fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        Ok(self.iter.next_back()?.map(|(k, v)| {
+            self.scratch.insert(k.to_vec(), Op::Delete);
+            v
+        }))
+    }
+}
 /// Iterate taking into account the scratch
 pub struct SingleIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    scratch_iter: Box<dyn DoubleEndedIterator<Item = (&'a [u8], V)> + 'a>,
-    iter:
-        Box<dyn DoubleEndedFallibleIterator<Item = (&'env [u8], V), Error = DatabaseError> + 'env>,
-    current: Option<(&'env [u8], V)>,
-    scratch_current: Option<(&'a [u8], V)>,
+    scratch_iter: Box<dyn DoubleEndedIterator<Item = IterItem<'a, V>> + 'a>,
+    iter: Box<
+        dyn DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+    >,
+    current: Option<IterItem<'env, V>>,
+    scratch_current: Option<IterItem<'a, V>>,
 }
 
 impl<'env, 'a: 'env, V> SingleIter<'env, 'a, V>

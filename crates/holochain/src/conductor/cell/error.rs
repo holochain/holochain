@@ -5,6 +5,7 @@ use crate::{
         workflow::error::WorkflowError,
     },
 };
+use holochain_p2p::HolochainP2pError;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
 use std::path::PathBuf;
@@ -32,6 +33,8 @@ pub enum CellError {
     RibosomeError(#[from] RibosomeError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
     InitFailed(InitResult),
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

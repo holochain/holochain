@@ -95,6 +95,12 @@ where
         fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
         data
     }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.0.clear_all(writer)
+    }
 }
 
 impl<'env, H> BufferedStore<'env> for CasBuf<'env, H>

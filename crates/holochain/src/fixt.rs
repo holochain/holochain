@@ -17,11 +17,11 @@ use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
 pub use holochain_types::fixt::*;
-use holochain_types::link::Tag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::header::HeaderHashes;
+use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::HostInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
@@ -90,7 +90,7 @@ fixturator!(
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_on(
                     async { WasmHash::with_data(wasm.code().to_vec()).await },
-                    std::time::Duration::from_millis(10),
+                    std::time::Duration::from_millis(100),
                 )
                 .unwrap()
                 .into(),
@@ -183,10 +183,10 @@ fixturator!(
 
 fixturator!(
     LinkMetaVal;
-    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, Tag);
+    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
 );
 
-impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
+impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
     type Item = LinkMetaVal;
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(LinkMetaVal);
