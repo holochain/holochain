@@ -4,6 +4,7 @@
 //! ChainElements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::manager::ManagedTaskAdd;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -38,6 +39,7 @@ use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
+use tokio::sync;
 use tracing::*;
 
 #[allow(missing_docs)]
@@ -91,6 +93,8 @@ impl Cell {
         env_path: P,
         keystore: KeystoreSender,
         holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
@@ -110,8 +114,13 @@ impl Cell {
         };
 
         if has_genesis {
-            let queue_triggers =
-                spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
+            let queue_triggers = spawn_queue_consumer_tasks(
+                &state_env,
+                holochain_p2p_cell.clone(),
+                managed_task_add_sender,
+                managed_task_stop_broadcaster,
+            )
+            .await;
 
             Ok(Self {
                 id,

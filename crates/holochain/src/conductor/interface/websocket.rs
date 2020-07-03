@@ -331,7 +331,7 @@ mod test {
     async fn setup_app(
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
-    ) -> (Arc<TempDir>, RealAppInterfaceApi) {
+    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
@@ -359,7 +359,9 @@ mod test {
 
         assert!(errors.is_empty());
 
-        (tmpdir, RealAppInterfaceApi::new(conductor_handle))
+        let handle = conductor_handle.clone();
+
+        (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -466,8 +468,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
-    #[ignore] // david.b - THIS TEST PANIC!s TODO FIXME
     async fn websocket_call_zome_function() {
         observability::test_run().ok();
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -501,7 +501,7 @@ mod test {
             .times(1)
             .return_const(());
 
-        let (_tmpdir, app_api) = setup_app(vec![(installed_cell, None)], dna_store).await;
+        let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
         let mut request = Box::new(
             crate::core::ribosome::ZomeCallInvocationFixturator::new(
                 crate::core::ribosome::NamedInvocation(
@@ -530,6 +530,9 @@ mod test {
         // the time here should be almost the same (about +0.1ms) vs. the raw wasm_ribosome call
         // the overhead of a websocket request locally is small
         crate::end_hard_timeout!(websocket_timeout, crate::perf::ONE_WASM_CALL);
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
