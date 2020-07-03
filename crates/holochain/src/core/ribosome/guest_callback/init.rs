@@ -87,6 +87,7 @@ impl From<Vec<InitCallbackResult>> for InitResult {
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::InitInvocationFixturator;
