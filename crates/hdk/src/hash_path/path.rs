@@ -1,10 +1,20 @@
 use holochain_wasmer_guest::*;
+use crate::prelude::*;
 
 /// allows for "foo/bar/baz" to automatically move to/from ["foo", "bar", "baz"] components
 /// technically it's moving each string component in as bytes
 /// if this is a problem for you simply built the components yourself
 /// @see `impl From<String> for Path` below
 pub const DELIMITER: &str = "/";
+
+/// "hdk.path" as utf8 bytes
+/// all paths use the same link tag and entry def id
+/// different pathing schemes/systems/implementations should namespace themselves by their path
+/// components rather than trying to layer different link namespaces over the same path components
+/// similarly there is no need to define different entry types for different pathing strategies
+/// @todo - revisit whether there is a need/use-case for different link tags or entries
+/// @see anchors implementation
+pub const NAME: [u8; 8] = [ 0x68, 0x64, 0x6b, 0x2e, 0x70, 0x61, 0x74, 0x68 ];
 
 /// each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants
@@ -109,15 +119,82 @@ impl From<&str> for Path {
     }
 }
 
+impl From<&Path> for EntryDefId {
+    fn from(_: &Path) -> Self {
+        Path::entry_def_id()
+    }
+}
+
+impl Pathable for Path { }
+
+pub trait Pathable {
+
+    fn entry_def_id() -> EntryDefId {
+        core::str::from_utf8(&NAME).unwrap().into()
+    }
+
+    fn crdt_type() -> CrdtType {
+        CrdtType
+    }
+
+    fn required_validations() -> RequiredValidations {
+        RequiredValidations::default()
+    }
+
+    fn entry_visibility() -> EntryVisibility {
+        EntryVisibility::Public
+    }
+
+    fn entry_def() -> EntryDef {
+        EntryDef {
+            id: Self::entry_def_id(),
+            crdt_type: Self::crdt_type(),
+            required_validations: Self::required_validations(),
+            visibility: Self::entry_visibility(),
+        }
+    }
+
+    /// does an entry exist at the hash we expect?
+    /// something like `[ -d $DIR ]`
+    fn exists(&self) -> Result<bool, WasmError> {
+        Ok(get_entry!(entry_hash!(self)?)?.is_some())
+    }
+
+    /// recursively touch this and every parent that doesn't exist yet
+    /// something like `mkdir -p $DIR`
+    fn touch(&self) -> Result<(), WasmError> {
+        if ! self.exists()? {
+            commit_entry!(self)?;
+            let parent = Self::from(self.as_ref()[0..self.as_ref().len()-1].to_vec()).touch()?;
+            link_entries!(parent, self, holochain_zome_types::link::LinkTag::from(NAME))?;
+        }
+    }
+
+    /// touch and list all the links from this anchor to anchors below it
+    /// only returns links between anchors, not to other entries that might have their own links
+    /// something like `mkdir -p $DIR && ls -d $DIR`
+    fn ls(&self) -> Result<Vec<holochain_zome_types::link::Link>, WasmError> {
+        Self::touch(&self)?;
+        get_links!(&self, holochain_zome_types::link::LinkTag::from(NAME))?;
+    }
+
+}
+
 #[test]
 #[cfg(test)]
-fn anchor_delimiter() {
+fn hash_path_delimiter() {
     assert_eq!("/", DELIMITER,);
 }
 
 #[test]
 #[cfg(test)]
-fn anchor_component() {
+fn hash_path_linktag() {
+    assert_eq!("hdk.path".as_bytes(), NAME);
+}
+
+#[test]
+#[cfg(test)]
+fn hash_path_component() {
     use fixt::prelude::*;
 
     let bytes: Vec<u8> = U8Fixturator::new(fixt::Unpredictable).take(5).collect();
@@ -129,7 +206,7 @@ fn anchor_component() {
 
 #[test]
 #[cfg(test)]
-fn anchor_path() {
+fn hash_path_path() {
     use fixt::prelude::*;
 
     let components: Vec<Component> = {
