@@ -47,22 +47,36 @@ impl From<Component> for Vec<u8> {
 
 /// build a component from a string
 /// for many simple use cases we can construct a path out of a string similar to a URI
+/// we represent this using the utf32 bytes rather than the utf8 bytes for the chars in the string
+/// which gives us a fixed width encoding for strings, which gives us a clean/easy way to support
+/// sharding based on strings by iterating over u32s rather than deciding what to do with variable
+/// width u8 or u16 characters
 impl From<&str> for Component {
     fn from(s: &str) -> Self {
-        Self(s.as_bytes().to_vec())
+        let bytes: Vec<u8> = s
+            .chars()
+            .flat_map(|c| (c as u32).to_le_bytes().to_vec())
+            .collect();
+        Self::from(bytes)
+    }
+}
+impl From<&String> for Component {
+    fn from(s: &String) -> Self {
+        Self::from(s.as_str())
     }
 }
 
-/// building a string from a Component can fail because a Component can contain arbitrary bytes
-/// in general it is only safe to create strings from components that were themselves built from a
-/// string
-/// @see `impl From<&str> for Component`
-impl std::convert::TryFrom<Component> for String {
-    type Error = std::str::Utf8Error;
-    fn try_from(component: Component) -> Result<Self, Self::Error> {
-        Ok(std::str::from_utf8(&component.0)?.to_string())
-    }
-}
+// /// building a string from a Component can fail because a Component can contain arbitrary bytes
+// /// in general it is only safe to create strings from components that were themselves built from a
+// /// string
+// /// @see `impl From<&str> for Component`
+// impl std::convert::TryFrom<Component> for String {
+//     type Error = std::str::Utf8Error;
+//     fn try_from(component: Component) -> Result<Self, Self::Error> {
+//
+//         Ok(std::str::from_utf8(&component.0)?.to_string())
+//     }
+// }
 
 /// a Path is a vector of components
 /// it represents a single traversal of a tree structure down to some arbitrary point
@@ -113,7 +127,7 @@ impl From<&str> for Path {
         Self(
             s.split(DELIMITER)
                 .filter(|s| !s.is_empty())
-                .map(|s| Component::from(s.as_bytes().to_vec()))
+                .map(|s| Component::from(s))
                 .collect(),
         )
     }
