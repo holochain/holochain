@@ -149,7 +149,8 @@ pub fn attach_external_conductor_api<A: AppInterfaceApi>(
 /// it is important that the serialization technique is not altered.
 //
 // TODO: write test that ensures the serialization is unaltered
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InterfaceDriver {
     Websocket { port: u16 },
