@@ -1054,6 +1054,7 @@ name = "hdk3"
 version = "0.0.1"
 dependencies = [
  "fixt",
+ "holo_hash_core",
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "serde",

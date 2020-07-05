@@ -1,5 +1,5 @@
-use holochain_wasmer_guest::*;
 use crate::prelude::*;
+use holochain_wasmer_guest::*;
 
 /// allows for "foo/bar/baz" to automatically move to/from ["foo", "bar", "baz"] components
 /// technically it's moving each string component in as bytes
@@ -14,7 +14,7 @@ pub const DELIMITER: &str = "/";
 /// similarly there is no need to define different entry types for different pathing strategies
 /// @todo - revisit whether there is a need/use-case for different link tags or entries
 /// @see anchors implementation
-pub const NAME: [u8; 8] = [ 0x68, 0x64, 0x6b, 0x2e, 0x70, 0x61, 0x74, 0x68 ];
+pub const NAME: [u8; 8] = [0x68, 0x64, 0x6b, 0x2e, 0x70, 0x61, 0x74, 0x68];
 
 /// each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants
@@ -113,9 +113,14 @@ impl From<&str> for Path {
         Self(
             s.split(DELIMITER)
                 .filter(|s| !s.is_empty())
-                .map(|s| Component::from(s.as_bytes().to_vec()) )
+                .map(|s| Component::from(s.as_bytes().to_vec()))
                 .collect(),
         )
+    }
+}
+impl From<&String> for Path {
+    fn from(s: &String) -> Self {
+        Self::from(s.as_str())
     }
 }
 
@@ -125,27 +130,24 @@ impl From<&Path> for EntryDefId {
     }
 }
 
-impl Pathable for Path { }
-
-pub trait Pathable {
-
-    fn entry_def_id() -> EntryDefId {
+impl Path {
+    pub fn entry_def_id() -> EntryDefId {
         core::str::from_utf8(&NAME).unwrap().into()
     }
 
-    fn crdt_type() -> CrdtType {
+    pub fn crdt_type() -> CrdtType {
         CrdtType
     }
 
-    fn required_validations() -> RequiredValidations {
+    pub fn required_validations() -> RequiredValidations {
         RequiredValidations::default()
     }
 
-    fn entry_visibility() -> EntryVisibility {
+    pub fn entry_visibility() -> EntryVisibility {
         EntryVisibility::Public
     }
 
-    fn entry_def() -> EntryDef {
+    pub fn entry_def() -> EntryDef {
         EntryDef {
             id: Self::entry_def_id(),
             crdt_type: Self::crdt_type(),
@@ -154,30 +156,43 @@ pub trait Pathable {
         }
     }
 
+    /// what is the hash for the current Path
+    /// something like `$PWD` for the Path, but from a DHT perspective (i.e. a hash)
+    pub fn pwd(&self) -> Result<holo_hash_core::HoloHashCore, WasmError> {
+        Ok(entry_hash!(self)?)
+    }
+
     /// does an entry exist at the hash we expect?
     /// something like `[ -d $DIR ]`
-    fn exists(&self) -> Result<bool, WasmError> {
-        Ok(get_entry!(entry_hash!(self)?)?.is_some())
+    pub fn exists(&self) -> Result<bool, WasmError> {
+        Ok(get_entry!(self.pwd()?)?.is_some())
     }
 
     /// recursively touch this and every parent that doesn't exist yet
     /// something like `mkdir -p $DIR`
-    fn touch(&self) -> Result<(), WasmError> {
-        if ! self.exists()? {
+    pub fn touch(&self) -> Result<(), WasmError> {
+        Ok(if !self.exists()? {
             commit_entry!(self)?;
-            let parent = Self::from(self.as_ref()[0..self.as_ref().len()-1].to_vec()).touch()?;
-            link_entries!(parent, self, holochain_zome_types::link::LinkTag::from(NAME))?;
-        }
+            let parent = Self::from(self.as_ref()[0..self.as_ref().len() - 1].to_vec());
+            parent.touch()?;
+            link_entries!(
+                parent.pwd()?,
+                self.pwd()?,
+                holochain_zome_types::link::LinkTag::new(NAME)
+            )?;
+        })
     }
 
     /// touch and list all the links from this anchor to anchors below it
     /// only returns links between anchors, not to other entries that might have their own links
     /// something like `mkdir -p $DIR && ls -d $DIR`
-    fn ls(&self) -> Result<Vec<holochain_zome_types::link::Link>, WasmError> {
+    pub fn ls(&self) -> Result<Vec<holochain_zome_types::link::Link>, WasmError> {
         Self::touch(&self)?;
-        get_links!(&self, holochain_zome_types::link::LinkTag::from(NAME))?;
+        Ok(get_links!(
+            self.pwd()?,
+            holochain_zome_types::link::LinkTag::new(NAME)
+        )?)
     }
-
 }
 
 #[test]
@@ -227,11 +242,26 @@ fn hash_path_path() {
         ("foo", vec![Component::from("foo")]),
         ("foo/", vec![Component::from("foo")]),
         ("/foo/", vec![Component::from("foo")]),
-        ("/foo/bar", vec![Component::from("foo"), Component::from("bar")]),
-        ("/foo/bar/", vec![Component::from("foo"), Component::from("bar")]),
-        ("foo/bar", vec![Component::from("foo"), Component::from("bar")]),
-        ("foo/bar/", vec![Component::from("foo"), Component::from("bar")]),
-        ("foo//bar", vec![Component::from("foo"), Component::from("bar")]),
+        (
+            "/foo/bar",
+            vec![Component::from("foo"), Component::from("bar")],
+        ),
+        (
+            "/foo/bar/",
+            vec![Component::from("foo"), Component::from("bar")],
+        ),
+        (
+            "foo/bar",
+            vec![Component::from("foo"), Component::from("bar")],
+        ),
+        (
+            "foo/bar/",
+            vec![Component::from("foo"), Component::from("bar")],
+        ),
+        (
+            "foo//bar",
+            vec![Component::from("foo"), Component::from("bar")],
+        ),
     ] {
         assert_eq!(Path::from(input), Path::from(output),);
     }
