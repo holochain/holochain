@@ -60,23 +60,18 @@ impl From<&str> for Component {
         Self::from(bytes)
     }
 }
+/// alias From<&str>
 impl From<&String> for Component {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
-
-// /// building a string from a Component can fail because a Component can contain arbitrary bytes
-// /// in general it is only safe to create strings from components that were themselves built from a
-// /// string
-// /// @see `impl From<&str> for Component`
-// impl std::convert::TryFrom<Component> for String {
-//     type Error = std::str::Utf8Error;
-//     fn try_from(component: Component) -> Result<Self, Self::Error> {
-//
-//         Ok(std::str::from_utf8(&component.0)?.to_string())
-//     }
-// }
+/// alias From<&str>
+impl From<String> for Component {
+    fn from(s: String) -> Self {
+        Self::from(s.as_str())
+    }
+}
 
 /// a Path is a vector of components
 /// it represents a single traversal of a tree structure down to some arbitrary point
@@ -132,6 +127,7 @@ impl From<&str> for Path {
         )
     }
 }
+/// alias From<&str>
 impl From<&String> for Path {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())

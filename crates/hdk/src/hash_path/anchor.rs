@@ -60,6 +60,8 @@ impl Anchor {
     }
 }
 
+/// simple string interface to simple string based paths
+/// a.k.a "the anchor pattern" that predates paths by a few years
 pub fn anchor(
     anchor_type: String,
     anchor_text: String,

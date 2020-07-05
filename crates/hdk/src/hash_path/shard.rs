@@ -16,25 +16,18 @@ impl ShardStrategy {
     }
 }
 
-impl From<(&ShardStrategy, &str)> for Path {
-    fn from((strategy, s): (&ShardStrategy, &str)) -> Path {
+impl From<(&ShardStrategy, &[u8])> for Path {
+    fn from((strategy, bytes): (&ShardStrategy, &[u8])) -> Path {
         let full_length = strategy.width() * strategy.depth();
-
-        let shard_string: String = s.chars().take(full_length as _).collect();
-
-        // defer to the standard utf32 string handling to get the fixed size byte and endian
-        // handling correct
-        let intermediate_component = Component::from(&shard_string);
-
-        let sharded_component: Vec<Component> = intermediate_component
-            .as_ref()
+        // fold a flat slice of bytes into `strategy.depth` number of `strategy.width` length byte
+        // Components
+        let sharded: Vec<Component> = bytes
             .iter()
-            .fold((vec![], vec![]), |acc, c| {
+            .take(full_length as _)
+            .fold((vec![], vec![]), |acc, b| {
                 let (mut ret, mut build) = acc;
-                build.push(c);
-                // relies on the fact that we're encoding string characters as fixed width u32 bytes
-                // rather than variable width utf8 bytes
-                if build.len() == strategy.width() as usize * std::mem::size_of::<u32>() {
+                build.push(b);
+                if build.len() == strategy.width() as usize {
                     ret.push(build.clone());
                     build.clear();
                 }
@@ -47,8 +40,98 @@ impl From<(&ShardStrategy, &str)> for Path {
                 Component::from(bytes_vec)
             })
             .collect();
+        Path::from(sharded)
+    }
+}
+impl From<(&ShardStrategy, &Vec<u8>)> for Path {
+    fn from((strategy, bytes): (&ShardStrategy, &Vec<u8>)) -> Path {
+        let bytes: &[u8] = bytes.as_ref();
+        Path::from((strategy, bytes))
+    }
+}
+impl From<(&ShardStrategy, Vec<u8>)> for Path {
+    fn from((strategy, bytes): (&ShardStrategy, Vec<u8>)) -> Path {
+        let bytes: &[u8] = bytes.as_ref();
+        Path::from((strategy, bytes))
+    }
+}
 
-        Path::from(sharded_component)
+impl From<(&ShardStrategy, &str)> for Path {
+    fn from((strategy, s): (&ShardStrategy, &str)) -> Path {
+        // truncate the string to only relevant chars
+        let full_length = strategy.width() * strategy.depth();
+        let shard_string: String = s.chars().take(full_length as _).collect();
+
+        Path::from((
+            &ShardStrategy(
+                // relies on the fact that we're encoding string characters as fixed width u32
+                // bytes rather than variable width utf8 bytes
+                strategy.width() * std::mem::size_of::<u32>() as u32,
+                strategy.depth(),
+            ),
+            // defer to the standard utf32 string handling to get the fixed size byte and endian
+            // handling correct
+            Component::from(&shard_string).as_ref(),
+        ))
+    }
+}
+impl From<(&ShardStrategy, &String)> for Path {
+    fn from((strategy, s): (&ShardStrategy, &String)) -> Path {
+        Path::from((strategy, s.as_str()))
+    }
+}
+impl From<(&ShardStrategy, String)> for Path {
+    fn from((strategy, s): (&ShardStrategy, String)) -> Path {
+        Path::from((strategy, s.as_str()))
+    }
+}
+
+#[test]
+#[cfg(test)]
+fn hash_path_shard_bytes() {
+    for (width, depth, b, output) in vec![
+        // anything with a zero results in an empty path
+        (0, 0, vec![1, 2, 3, 4, 5], Path::from(vec![])),
+        (0, 1, vec![1, 2, 3, 4, 5], Path::from(vec![])),
+        (1, 0, vec![1, 2, 3, 4, 5], Path::from(vec![])),
+        (0, 2, vec![1, 2, 3, 4, 5], Path::from(vec![])),
+        (2, 0, vec![1, 2, 3, 4, 5], Path::from(vec![])),
+        // basic sharding behaviour
+        (
+            1,
+            1,
+            vec![1, 2, 3, 4, 5],
+            Path::from(vec![Component::from(vec![1_u8])]),
+        ),
+        (
+            2,
+            1,
+            vec![1, 2, 3, 4, 5],
+            Path::from(vec![Component::from(vec![1_u8, 2_u8])]),
+        ),
+        (
+            1,
+            2,
+            vec![1, 2, 3, 4, 5],
+            Path::from(vec![
+                Component::from(vec![1_u8]),
+                Component::from(vec![2_u8]),
+            ]),
+        ),
+        (
+            2,
+            2,
+            vec![1, 2, 3, 4, 5],
+            Path::from(vec![
+                Component::from(vec![1_u8, 2_u8]),
+                Component::from(vec![3_u8, 4_u8]),
+            ]),
+        ),
+    ] {
+        assert_eq!(output, Path::from((&ShardStrategy(width, depth), &b)));
+        let bytes: &[u8] = b.as_ref();
+        assert_eq!(output, Path::from((&ShardStrategy(width, depth), bytes)));
+        assert_eq!(output, Path::from((&ShardStrategy(width, depth), b)));
     }
 }
 
@@ -78,5 +161,13 @@ fn hash_path_shard_string() {
         (4, 4, "€€€€€€€€€", Path::from("€€€€/€€€€")),
     ] {
         assert_eq!(output, Path::from((&ShardStrategy(width, depth), s)));
+        assert_eq!(
+            output,
+            Path::from((&ShardStrategy(width, depth), s.to_string()))
+        );
+        assert_eq!(
+            output,
+            Path::from((&ShardStrategy(width, depth), &s.to_string()))
+        );
     }
 }
