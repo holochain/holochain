@@ -1,5 +1,8 @@
+use crate::hash_path::shard::ShardStrategy;
+use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
+use std::str::FromStr;
 
 /// allows for "foo/bar/baz" to automatically move to/from ["foo", "bar", "baz"] components
 /// technically it's moving each string component in as bytes
@@ -94,6 +97,13 @@ impl From<Vec<Component>> for Path {
     }
 }
 
+/// unwrap components vector
+impl From<Path> for Vec<Component> {
+    fn from(path: Path) -> Self {
+        path.0
+    }
+}
+
 /// access components vector
 impl AsRef<Vec<Component>> for Path {
     fn as_ref(&self) -> &Vec<Component> {
@@ -117,12 +127,35 @@ impl AsRef<Vec<Component>> for Path {
 /// there is no normalisation of paths, e.g. to guarantee a specific root component exists, at this
 /// layer so there is a risk that there are hash collisions with other data on the DHT network if
 /// some disambiguation logic is not included in higher level abstractions.
+///
+/// this supports sharding strategies from a small inline DSL
+/// start each component with <width>:<depth># to get shards out of the string
+///
+/// e.g.
+/// - foo/barbaz => normal path as above ["foo", "barbaz"]
+/// - foo/1:3#barbazii => width 1, depth 3, ["foo", "b", "a", "r", "barbazii"]
+/// - foo/2:3#barbazii => width 2, depth 3, ["foo", "ba", "rb", "az", "barbazii"]
+///
+/// note that this all works because the components and sharding for strings maps to fixed-width
+/// utf32 bytes under the hood rather than variable width bytes
 impl From<&str> for Path {
     fn from(s: &str) -> Self {
         Self(
             s.split(DELIMITER)
                 .filter(|s| !s.is_empty())
-                .map(|s| Component::from(s))
+                .flat_map(|s| match ShardStrategy::from_str(s) {
+                    // handle a strategy if one is found
+                    Ok(strategy) => {
+                        let (_strategy, component) = s.split_at(s.find(SHARDEND).unwrap());
+                        let component = component.trim_start_matches(SHARDEND);
+                        let shard_path = Path::from((&strategy, component));
+                        let mut shard_components: Vec<Component> = shard_path.into();
+                        shard_components.push(Component::from(component));
+                        shard_components
+                    },
+                    // no strategy just use the component directly
+                    Err(_) => vec![Component::from(s)],
+                })
                 .collect(),
         )
     }
@@ -271,6 +304,37 @@ fn hash_path_path() {
         (
             "foo//bar",
             vec![Component::from("foo"), Component::from("bar")],
+        ),
+        (
+            "foo/1:3#abcdef",
+            vec![
+                Component::from("foo"),
+                Component::from("a"),
+                Component::from("b"),
+                Component::from("c"),
+                Component::from("abcdef"),
+            ],
+        ),
+        (
+            "foo/2:3#zzzzzzzzzz",
+            vec![
+                Component::from("foo"),
+                Component::from("zz"),
+                Component::from("zz"),
+                Component::from("zz"),
+                Component::from("zzzzzzzzzz"),
+            ],
+        ),
+        (
+            "foo/1:3#abcdef/bar",
+            vec![
+                Component::from("foo"),
+                Component::from("a"),
+                Component::from("b"),
+                Component::from("c"),
+                Component::from("abcdef"),
+                Component::from("bar"),
+            ],
         ),
     ] {
         assert_eq!(Path::from(input), Path::from(output),);

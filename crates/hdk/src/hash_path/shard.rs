@@ -1,9 +1,14 @@
 use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
+use std::str::FromStr;
+
+pub const SHARDSPLIT: &str = ":";
+pub const SHARDEND: &str = "#";
 
 pub type ShardWidth = u32;
 pub type ShardDepth = u32;
 
+#[derive(Debug)]
 pub struct ShardStrategy(ShardWidth, ShardDepth);
 
 impl ShardStrategy {
@@ -13,6 +18,62 @@ impl ShardStrategy {
 
     fn depth(&self) -> ShardDepth {
         self.1
+    }
+}
+
+#[derive(Debug)]
+pub enum ParseShardStrategyError {
+    BadDepth,
+    BadWidth,
+    ShardSplitNotFound,
+    ShardEndNotFound,
+    FirstCharNotADigit,
+    EmptyString,
+}
+
+impl FromStr for ShardStrategy {
+    type Err = ParseShardStrategyError;
+
+    /// a shard strategy is parsed as "width:depth#..." at the start of a string
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // the first char needs to be a digit
+        match s.chars().nth(0) {
+            Some(first_char) => {
+                match u32::from_str(&first_char.to_string()) {
+                    Ok(_) => {
+                        // there needs to be a #
+                        match s.find(SHARDEND) {
+                            Some(end_index) => {
+                                let (maybe_strategy, _) = s.split_at(end_index);
+                                match maybe_strategy.find(SHARDSPLIT) {
+                                    Some(split_index) => {
+                                        let (maybe_width, maybe_depth) =
+                                            maybe_strategy.split_at(split_index);
+                                        match u32::from_str(maybe_width) {
+                                            Ok(width) => {
+                                                match u32::from_str(
+                                                    maybe_depth.trim_start_matches(SHARDSPLIT),
+                                                ) {
+                                                    Ok(depth) => Ok(ShardStrategy(width, depth)),
+                                                    Err(_) => {
+                                                        Err(ParseShardStrategyError::BadDepth)
+                                                    }
+                                                }
+                                            }
+                                            Err(_) => Err(ParseShardStrategyError::BadWidth),
+                                        }
+                                    }
+                                    None => Err(ParseShardStrategyError::ShardSplitNotFound),
+                                }
+                            }
+                            None => Err(ParseShardStrategyError::ShardEndNotFound),
+                        }
+                    }
+                    Err(_) => Err(ParseShardStrategyError::FirstCharNotADigit),
+                }
+            }
+            None => Err(ParseShardStrategyError::EmptyString),
+        }
     }
 }
 
