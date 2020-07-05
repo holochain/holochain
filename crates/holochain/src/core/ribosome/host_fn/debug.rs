@@ -24,6 +24,7 @@ pub fn debug(
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::debug;
     use crate::core::ribosome::HostContextFixturator;
