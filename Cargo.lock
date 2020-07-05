@@ -1321,6 +1321,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.33"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=wasm_cache#393b997887c30f51eb461243fc59065a09a2ed75"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -1330,6 +1331,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.33"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=wasm_cache#393b997887c30f51eb461243fc59065a09a2ed75"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",

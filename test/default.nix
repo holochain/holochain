@@ -3,6 +3,9 @@ let
   t-test = pkgs.writeShellScriptBin "hc-test"
   ''
   set -euxo pipefail
+  mkdir .wasm_cache &&
+  HC_WASM_CACHE_PATH=".wasm_cache" &&
+  cargo test warm_wasm_tests &&
   RUST_BACKTRACE=1 \
   cargo test -- --nocapture
 
