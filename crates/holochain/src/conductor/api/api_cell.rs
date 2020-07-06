@@ -7,7 +7,7 @@ use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_types::{autonomic::AutonomicCue, cell::CellId, dna::DnaFile, prelude::Todo};
+use holochain_types::{autonomic::AutonomicCue, cell::CellId, dna::DnaFile};
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -54,14 +54,6 @@ impl CellConductorApiT for CellConductorApi {
         Ok("TODO".to_string())
     }
 
-    async fn network_send(&self, _message: Todo) -> ConductorApiResult<()> {
-        unimplemented!()
-    }
-
-    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo> {
-        unimplemented!()
-    }
-
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()> {
         self.conductor_handle
             .autonomic_cue(cue, &self.cell_id)
@@ -72,7 +64,7 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    async fn get_dna<'a>(&'a self, dna_hash: &'a DnaHash) -> Option<DnaFile> {
+    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.conductor_handle.get_dna(dna_hash).await
     }
 }
@@ -92,12 +84,6 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     /// TODO: decide on actual signature
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
-    /// Send a message to the network engine, ignoring the response
-    async fn network_send(&self, message: Todo) -> ConductorApiResult<()>;
-
-    /// Send a message to the network engine, and await the response
-    async fn network_request(&self, _message: Todo) -> ConductorApiResult<Todo>;
-
     /// Cue the autonomic system to run an [AutonomicProcess] earlier than its scheduled time.
     /// This is basically a heuristic designed to help things run more smoothly.
     async fn autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
@@ -106,5 +92,5 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Get a [Dna] from the [DnaStore]
-    async fn get_dna<'a>(&'a self, dna_hash: &'a DnaHash) -> Option<DnaFile>;
+    async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 }

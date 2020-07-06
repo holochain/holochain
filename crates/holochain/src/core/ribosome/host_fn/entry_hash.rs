@@ -29,6 +29,7 @@ pub fn entry_hash(
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::*;
     use crate::core::ribosome::host_fn::entry_hash::entry_hash;

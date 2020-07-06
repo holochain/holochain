@@ -18,6 +18,7 @@ pub fn sys_time(
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::core::state::workspace::Workspace;
     use holochain_state::env::ReadManager;

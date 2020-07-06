@@ -90,6 +90,7 @@ impl From<Vec<MigrateAgentCallbackResult>> for MigrateAgentResult {
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::MigrateAgentInvocationFixturator;

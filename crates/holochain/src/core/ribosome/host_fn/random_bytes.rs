@@ -29,6 +29,7 @@ pub fn random_bytes(
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
     use crate::core::ribosome::HostContextFixturator;

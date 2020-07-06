@@ -72,6 +72,7 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::PostCommitInvocationFixturator;

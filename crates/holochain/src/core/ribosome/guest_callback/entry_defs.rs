@@ -76,6 +76,7 @@ impl From<Vec<EntryDefsCallbackResult>> for EntryDefsResult {
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::EntryDefsInvocationFixturator;
