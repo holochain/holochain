@@ -313,7 +313,8 @@ impl Cell {
         _dht_hash: holochain_types::composite_hash::AnyDhtHash,
         _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        unimplemented!()
+        warn!("handle publish unimplemented");
+        Ok(())
     }
 
     /// a remote node is attempting to retreive a validation package
