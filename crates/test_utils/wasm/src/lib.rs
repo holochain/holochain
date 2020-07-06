@@ -11,6 +11,7 @@ pub enum TestWasm {
     Debug,
     EntryDefs,
     Foo,
+    HashPath,
     Imports,
     InitPass,
     InitFail,
@@ -33,6 +34,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::Foo => "foo",
+            TestWasm::HashPath => "hash_path",
             TestWasm::Imports => "imports",
             TestWasm::InitPass => "init_pass",
             TestWasm::InitFail => "init_fail",
@@ -75,6 +77,11 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Foo => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
+            ))
+            .to_vec(),
+            TestWasm::HashPath => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             ))
             .to_vec(),
             TestWasm::Imports => include_bytes!(concat!(

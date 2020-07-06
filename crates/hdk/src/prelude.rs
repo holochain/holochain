@@ -1,9 +1,13 @@
 pub use crate::commit_entry;
+pub use crate::debug;
 pub use crate::entry_hash;
 pub use crate::get_entry;
 pub use crate::get_links;
+pub use crate::globals;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::link_entries;
+pub use crate::map_extern;
+pub use holo_hash_core::HoloHashCore;
 pub use holochain_wasmer_guest::holochain_externs;
 pub use holochain_wasmer_guest::host_call;
 pub use holochain_wasmer_guest::ret;

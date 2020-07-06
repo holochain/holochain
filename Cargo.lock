@@ -1130,6 +1130,7 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor",
+ "hdk3",
  "holo_hash",
  "holo_hash_core",
  "holochain_2020_legacy",

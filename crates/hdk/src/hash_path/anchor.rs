@@ -17,7 +17,7 @@ impl From<&Anchor> for Path {
             "{}/{}/{}",
             ROOT,
             anchor.anchor_type,
-            (&anchor).anchor_text.as_ref().unwrap_or(&String::default())
+            anchor.anchor_text.as_ref().unwrap_or(&String::default())
         ))
     }
 }
@@ -55,7 +55,7 @@ impl Anchor {
         Path::from(self).touch()
     }
 
-    pub fn ls(&self) -> Result<Vec<holochain_zome_types::link::Link>, WasmError> {
+    pub fn ls(&self) -> Result<holochain_zome_types::link::Links, WasmError> {
         Path::from(self).ls()
     }
 }

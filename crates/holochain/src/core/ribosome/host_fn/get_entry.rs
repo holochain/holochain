@@ -18,6 +18,7 @@ pub fn get_entry<'a>(
     host_context: Arc<HostContext>,
     input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
+    dbg!(&input);
     let (hash, _options) = input.into_inner();
     let cascade_hash = hash.try_into()?;
     let call =

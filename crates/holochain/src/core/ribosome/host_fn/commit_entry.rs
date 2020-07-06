@@ -25,6 +25,7 @@ pub fn commit_entry<'a>(
     host_context: Arc<HostContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
+    dbg!(&input);
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
 

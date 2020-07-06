@@ -152,7 +152,7 @@ impl From<&str> for Path {
                         let mut shard_components: Vec<Component> = shard_path.into();
                         shard_components.push(Component::from(component));
                         shard_components
-                    },
+                    }
                     // no strategy just use the component directly
                     Err(_) => vec![Component::from(s)],
                 })
@@ -163,6 +163,12 @@ impl From<&str> for Path {
 /// alias From<&str>
 impl From<&String> for Path {
     fn from(s: &String) -> Self {
+        Self::from(s.as_str())
+    }
+}
+/// alias From<&str>
+impl From<String> for Path {
+    fn from(s: String) -> Self {
         Self::from(s.as_str())
     }
 }
@@ -208,28 +214,33 @@ impl Path {
     /// does an entry exist at the hash we expect?
     /// something like `[ -d $DIR ]`
     pub fn exists(&self) -> Result<bool, WasmError> {
+        debug!(get_entry!(self.pwd()?))?;
         Ok(get_entry!(self.pwd()?)?.is_some())
     }
 
     /// recursively touch this and every parent that doesn't exist yet
     /// something like `mkdir -p $DIR`
     pub fn touch(&self) -> Result<(), WasmError> {
-        Ok(if !self.exists()? {
+        if !self.exists()? {
             commit_entry!(self)?;
-            let parent = Self::from(self.as_ref()[0..self.as_ref().len() - 1].to_vec());
-            parent.touch()?;
-            link_entries!(
-                parent.pwd()?,
-                self.pwd()?,
-                holochain_zome_types::link::LinkTag::new(NAME)
-            )?;
-        })
+            let parent_vec: Vec<Component> = self.as_ref()[0..self.as_ref().len() - 1].to_vec();
+            if parent_vec.len() > 0 {
+                let parent = Self::from(parent_vec);
+                parent.touch()?;
+                link_entries!(
+                    parent.pwd()?,
+                    self.pwd()?,
+                    holochain_zome_types::link::LinkTag::new(NAME)
+                )?;
+            }
+        }
+        Ok(())
     }
 
     /// touch and list all the links from this anchor to anchors below it
     /// only returns links between anchors, not to other entries that might have their own links
     /// something like `mkdir -p $DIR && ls -d $DIR`
-    pub fn ls(&self) -> Result<Vec<holochain_zome_types::link::Link>, WasmError> {
+    pub fn ls(&self) -> Result<holochain_zome_types::link::Links, WasmError> {
         Self::touch(&self)?;
         Ok(get_links!(
             self.pwd()?,
