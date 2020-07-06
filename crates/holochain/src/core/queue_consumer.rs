@@ -71,6 +71,7 @@ pub async fn spawn_queue_consumer_tasks(
     InitialQueueTriggers {
         sys_validation: tx_sys,
         produce_dht_ops: tx_produce,
+        /// TODO - this may go away when we're actually running validation
         integrate_dht_ops: tx_integration,
     }
 }
@@ -82,6 +83,7 @@ pub struct InitialQueueTriggers {
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
     pub produce_dht_ops: TriggerSender,
     /// Notify the IntegrateDhtOps workflow to run, i.e. after HandlePublish
+    /// TODO - this may go away when we're actually running validation
     pub integrate_dht_ops: TriggerSender,
 }
 
