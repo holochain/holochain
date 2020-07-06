@@ -245,11 +245,6 @@ async fn integrate_single_dht_op(
                     return Outcome::deferred(op, validation_status);
                 }
 
-                // Store link delete Header
-                let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                workspace.cas.put(signed_header, None)?;
-
                 // Get the link add header
                 let maybe_link_add = match workspace
                     .cas
@@ -281,6 +276,11 @@ async fn integrate_single_dht_op(
                     // to arrive so put back in queue with a log message
                     None => return Outcome::deferred(op, validation_status),
                 };
+
+                // Store link delete Header
+                let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
+                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                workspace.cas.put(signed_header, None)?;
 
                 // Remove the link
                 workspace.meta.remove_link(
