@@ -15,9 +15,7 @@ use crate::{
 };
 use fallible_iterator::FallibleIterator;
 use fixt::prelude::*;
-use holo_hash::{
-    AgentPubKeyFixturator, DhtOpHashFixturator, DnaHash, DnaHashFixturator, HeaderHashFixturator,
-};
+use holo_hash::{DhtOpHashFixturator, DnaHash, HeaderHashFixturator};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_state::{
@@ -134,13 +132,10 @@ async fn test_cell_handle_publish() {
     let keystore = env.keystore().clone();
     let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
     let cell_id = fake_cell_id("dr. cell");
+    let dna = cell_id.dna_hash().clone();
+    let agent = cell_id.agent_pubkey().clone();
 
-    let dna = fixt!(DnaHash);
-    let agents = AgentPubKeyFixturator::new(Unpredictable)
-        .take(2)
-        .collect::<Vec<_>>();
-
-    let holochain_p2p_cell = holochain_p2p.to_cell(dna.clone(), agents[0].clone());
+    let holochain_p2p_cell = holochain_p2p.to_cell(dna.clone(), agent.clone());
 
     let path = tmpdir.path().to_path_buf();
 
@@ -162,7 +157,7 @@ async fn test_cell_handle_publish() {
     let op_hash = fixt!(DhtOpHash);
     let sig = fixt!(Signature);
     let header = header::Header::Dna(header::Dna {
-        author: agents[0].clone(),
+        author: agent.clone(),
         timestamp: Timestamp::now(),
         hash: dna.clone(),
         header_seq: 42,
@@ -170,7 +165,7 @@ async fn test_cell_handle_publish() {
     let op = DhtOp::StoreElement(sig, header, None);
 
     cell.handle_publish(
-        agents[0].clone(),
+        agent.clone(),
         true,
         header_hash.into(),
         vec![(op_hash, op.clone())],
