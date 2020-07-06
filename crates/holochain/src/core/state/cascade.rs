@@ -175,11 +175,14 @@ where
         key: &'a LinkMetaKey<'a>,
     ) -> DatabaseResult<Vec<LinkMetaVal>> {
         // Am I an authority?
+        // TODO: Not a good check for authority as the base could be in the cas because 
+        // you authored it.
         let authority = self.primary.contains(&key.base()).await?;
         if authority {
             // Cas
             let links = self.primary_meta.get_links(key)?;
 
+            // TODO: Why check cache if you are the authority?
             // Cache
             if links.is_empty() {
                 self.cache_meta.get_links(key)
@@ -187,6 +190,7 @@ where
                 Ok(links)
             }
         } else {
+            // TODO: Why check cache if you need to go to the authority?
             // Cache
             self.cache_meta.get_links(key)
         }
