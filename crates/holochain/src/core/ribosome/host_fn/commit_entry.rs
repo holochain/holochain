@@ -2,7 +2,6 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
@@ -22,7 +21,7 @@ use std::sync::Arc;
 /// commit an entry
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn commit_entry<'a>(
-    ribosome: Arc<WasmRibosome>,
+    ribosome: Arc<impl RibosomeT>,
     host_context: Arc<HostContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
@@ -38,7 +37,7 @@ pub fn commit_entry<'a>(
 
     // extract the zome position
     let header_zome_id: holochain_types::header::ZomeId = match ribosome
-        .dna_file
+        .dna_file()
         .dna
         .zomes
         .iter()

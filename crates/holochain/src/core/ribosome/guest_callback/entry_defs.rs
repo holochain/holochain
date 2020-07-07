@@ -46,7 +46,7 @@ impl TryFrom<EntryDefsInvocation> for HostInput {
 }
 
 /// the aggregate result of _all_ entry defs callbacks
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum EntryDefsResult {
     /// simple mapping between zome and defs
     Defs(BTreeMap<ZomeName, EntryDefs>),

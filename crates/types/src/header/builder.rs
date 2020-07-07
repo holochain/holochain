@@ -3,7 +3,6 @@ use crate::header;
 use crate::{
     composite_hash::{EntryHash, HeaderAddress},
     fixt::*,
-    link::LinkTag,
     Timestamp,
 };
 use derive_more::Constructor;
@@ -11,6 +10,7 @@ use fixt::prelude::*;
 use header::HeaderInner;
 use header::{IntendedFor, ZomeId};
 use holo_hash::*;
+use holochain_zome_types::link::LinkTag;
 
 #[derive(Constructor)]
 pub struct HeaderBuilderCommon {
