@@ -9,7 +9,7 @@
 use crate::composite_hash::{EntryHash, HeaderAddress};
 use crate::prelude::*;
 use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::link::LinkTag;
 
 pub mod builder;
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};

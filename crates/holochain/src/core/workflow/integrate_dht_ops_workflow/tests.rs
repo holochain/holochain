@@ -51,7 +51,7 @@ use holochain_types::{
     Entry, EntryHashed,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::link::{Link, LinkTag};
 use holochain_zome_types::{
     entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetLinksInput, HostInput,
     LinkEntriesInput,
@@ -803,6 +803,7 @@ fn sync_call<'a>(host_context: Arc<HostContext>, base: EntryHash) -> Vec<LinkMet
     .unwrap()
 }
 
+/// Call the produce dht ops workflow
 async fn produce_dht_ops<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     env: EnvironmentWrite,
@@ -816,6 +817,7 @@ async fn produce_dht_ops<'env>(
         .unwrap();
 }
 
+/// Run genesis on the source chain
 async fn genesis<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &impl GetDb) {
     let reader = env_ref.reader().unwrap();
     let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
@@ -834,7 +836,7 @@ async fn commit_entry<'env>(
     let reader = env_ref.reader().unwrap();
     let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
 
-    // Entry defs
+    // Create entry def with the correct zome name
     let entry_def_id = fixt!(EntryDefId);
     let mut entry_def = fixt!(EntryDef);
     entry_def.id = entry_def_id.clone();
@@ -844,6 +846,7 @@ async fn commit_entry<'env>(
         EntryDefs::from(vec![entry_def]),
     );
 
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
     dna_file.dna.zomes.clear();
     dna_file
@@ -865,6 +868,7 @@ async fn commit_entry<'env>(
         .unwrap();
     host_context.zome_name = zome_name.clone();
 
+    // Collect the entry from the pre-state to commit
     let entry = pre_state
         .into_iter()
         .filter_map(|state| match state {
@@ -934,13 +938,16 @@ async fn link_entries<'env>(
         host_context.change_workspace(raw_workspace);
         let ribosome = Arc::new(ribosome);
         let host_context = Arc::new(host_context);
+        // Call the real link_entries host fn
         host_fn::link_entries::link_entries(ribosome.clone(), host_context.clone(), input).unwrap()
     };
 
+    // Write the changes
     env_ref
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
+    // Get the LinkAdd HeaderHash back
     unwrap_to!(output.into_inner() => HoloHashCore::HeaderHash)
         .clone()
         .into()
@@ -952,7 +959,7 @@ async fn get_links<'env>(
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
-) -> Vec<EntryHash> {
+) -> Vec<Link> {
     let reader = env_ref.reader().unwrap();
     let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -989,11 +996,11 @@ async fn get_links<'env>(
     };
 
     output
-        .into_iter()
-        .map(|h| h.target.try_into().unwrap())
-        .collect()
 }
 
+// This test is designed to run like the
+// register_add_link test except all the
+// pre-state is added through real host fn calls
 #[tokio::test(threaded_scheduler)]
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
@@ -1003,17 +1010,26 @@ async fn test_metadata_from_wasm_api() {
     let env_ref = env.guard().await;
     let (base_entry_hash, target_entry_hash) = {
         clear_dbs(&env_ref, &dbs);
+
+        // Generate fixture data
         let mut td = TestData::with_app_entry_type().await;
         // Only one zome in this test
         td.link_add.zome_id = 0.into();
         let link_tag = td.link_add.tag.clone();
         let base_entry_hash = td.original_entry_hash.clone();
         let target_entry_hash = td.new_entry_hash.clone();
+        let zome_name = fixt!(ZomeName);
+
+        // Get db states for an add link op
         let (pre_state, _expect, _) = register_add_link(td);
 
+        // Setup the source chain
         genesis(&env_ref, &dbs).await;
-        let zome_name = fixt!(ZomeName);
+
+        // Commit the base
         let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+
+        // Link the base to the target
         let _link_add_address = link_entries(
             &env_ref,
             &dbs,
@@ -1030,10 +1046,16 @@ async fn test_metadata_from_wasm_api() {
         // Call integrate
         call_workflow(&env_ref, &dbs, env.clone()).await;
 
-        // Check the database is correct
+        // Call get links and get back the targets
         let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
+        let links = links
+            .into_iter()
+            .map(|h| h.target.try_into().unwrap())
+            .collect::<Vec<EntryHash>>();
 
+        // Check we only go a single link
         assert_eq!(links.len(), 1);
+        // Check we got correct target_entry_hash
         assert_eq!(links[0], target_entry_hash);
         // TODO: create the expect from the result of the commit and link entries
         // Db::check(

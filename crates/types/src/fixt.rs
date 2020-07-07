@@ -43,7 +43,7 @@ use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::entry_def::RequiredValidations;
-use holochain_zome_types::links::LinkTag;
+use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
