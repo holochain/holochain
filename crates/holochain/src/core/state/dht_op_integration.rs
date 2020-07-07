@@ -1,12 +1,12 @@
 //! Various types for the databases involved in the DhtOp integration workflow
 
 use crate::core::workflow::produce_dht_ops_workflow::dht_op::DhtOpLight;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
-use holo_hash_core::HoloHashCoreHash;
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use holo_hash::DhtOpHash;
 use holo_hash::HoloHashBaseExt;
+use holo_hash_core::HoloHashCoreHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
