@@ -679,6 +679,7 @@ mod test {
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
         let conductor_handle = activate(conductor_handle).await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Set some state
         let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
@@ -691,7 +692,7 @@ mod test {
             source_chain.dump_as_json().await.unwrap()
         };
 
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
         };
@@ -704,5 +705,7 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 }
