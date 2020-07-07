@@ -281,7 +281,7 @@ mod test {
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let conductor_handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
-        (tmpdir, onductor_handle)
+        (tmpdir, conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
@@ -383,7 +383,7 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        handle.shutdown().await;
+        conductor_handle.shutdown().await;
         shutdown.await.unwrap();
     }
 
@@ -415,7 +415,7 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        handle.shutdown().await;
+        conductor_handle.shutdown().await;
         shutdown.await.unwrap();
     }
 
@@ -467,7 +467,7 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        handle.shutdown().await;
+        conductor_handle.shutdown().await;
         shutdown.await.unwrap();
     }
 
@@ -543,7 +543,7 @@ mod test {
         // the overhead of a websocket request locally is small
         crate::end_hard_timeout!(websocket_timeout, crate::perf::ONE_WASM_CALL);
         let shutdown = handle.take_shutdown_handle().await.unwrap();
-        handle.shutdown().await;
+        conductor_handle.shutdown().await;
         shutdown.await.unwrap();
     }
 
