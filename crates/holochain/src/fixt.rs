@@ -88,11 +88,9 @@ fixturator!(
         for _ in (0..number_of_wasms) {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                tokio_safe_block_on::tokio_safe_block_on(
+                tokio_safe_block_on::tokio_safe_block_forever_on(
                     async { WasmHash::with_data(wasm.code().to_vec()).await },
-                    std::time::Duration::from_millis(100),
                 )
-                .unwrap()
                 .into(),
                 wasm,
             );
@@ -105,11 +103,9 @@ fixturator!(
         for _ in (0..3) {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                tokio_safe_block_on::tokio_safe_block_on(
+                tokio_safe_block_on::tokio_safe_block_forever_on(
                     async { WasmHash::with_data(wasm.code().to_vec()).await },
-                    std::time::Duration::from_millis(10),
                 )
-                .unwrap()
                 .into(),
                 wasm,
             );

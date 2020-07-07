@@ -28,6 +28,7 @@ pub fn globals(
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 pub mod test {
     use crate::core::state::workspace::Workspace;
     use holochain_state::env::ReadManager;

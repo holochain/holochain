@@ -103,6 +103,7 @@ pub fn commit_entry<'a>(
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::commit_entry;
     use crate::core::ribosome::error::RibosomeError;
