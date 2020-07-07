@@ -397,6 +397,8 @@ where
                                 root_env_dir.clone(),
                                 keystore.clone(),
                                 holochain_p2p_cell,
+                                self.managed_task_add_sender.clone(),
+                                self.managed_task_stop_broadcaster.clone(),
                             )
                         });
 
