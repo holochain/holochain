@@ -1,10 +1,10 @@
 [package]
-name = "holochain_2020"
+name = "holochain"
 version = "0.0.1"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
-homepage = "https://github.com/Holo-host/holochain-2020"
-documentation = "https://github.com/Holo-host/holochain-2020"
+homepage = "https://github.com/Holo-host/holochain"
+documentation = "https://github.com/Holo-host/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
@@ -35,7 +35,7 @@ holochain_websocket = { version = "0.0.1", path = "../websocket" }
 holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
-legacy = { path = "../legacy", package = "holochain_2020_legacy" }
+legacy = { path = "../legacy", package = "holochain_legacy" }
 mockall = "0.7.0"
 must_future = "0.1.1"
 nanoid = "0.3"
@@ -76,11 +76,11 @@ name = "bench"
 harness = false
 
 [lib]
-name = "holochain_2020"
+name = "holochain"
 path = "src/lib.rs"
 
 [[bin]]
-name = "holochain-2020"
+name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]

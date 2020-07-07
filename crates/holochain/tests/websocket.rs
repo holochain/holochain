@@ -1,14 +1,14 @@
 use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
-use holochain_2020::conductor::{
+use holochain::conductor::{
     api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
     config::*,
     error::ConductorError,
     Conductor, ConductorHandle,
 };
-use holochain_2020::core::ribosome::NamedInvocation;
-use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
+use holochain::core::ribosome::NamedInvocation;
+use holochain::core::ribosome::ZomeCallInvocationFixturator;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -136,7 +136,7 @@ async fn call_admin() {
     let config = create_config(port, environment_path);
     let config_path = write_config(path, &config);
 
-    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
+    let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("--structured")
         .arg("--config-path")
@@ -200,7 +200,7 @@ async fn call_admin() {
 }
 
 async fn start_holochain(config_path: PathBuf) -> Child {
-    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
+    let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("--structured")
         .arg("--config-path")

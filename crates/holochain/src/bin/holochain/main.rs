@@ -1,4 +1,4 @@
-use holochain_2020::conductor::{
+use holochain::conductor::{
     compat::load_conductor_from_legacy_config, config::ConductorConfig, error::ConductorError,
     interactive, paths::ConfigFilePath, Conductor, ConductorHandle,
 };
@@ -50,7 +50,7 @@ struct Opt {
 }
 
 fn main() {
-    holochain_2020::conductor::tokio_runtime()
+    holochain::conductor::tokio_runtime()
         // the async_main function should only end if our program is done
         .block_on(async_main())
 }
