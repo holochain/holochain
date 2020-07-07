@@ -360,10 +360,9 @@ impl Cell {
             };
             // NB: it is possible we may put the same op into the integration
             // queue twice, but this shouldn't be a problem.
-            workspace.integration_queue.put(
-                std::convert::TryInto::try_into((holochain_types::Timestamp::now(), hash))?,
-                iqv,
-            )?;
+            workspace
+                .integration_queue
+                .put((holochain_types::TimestampKey::now(), hash).into(), iqv)?;
         }
 
         // commit our transaction
