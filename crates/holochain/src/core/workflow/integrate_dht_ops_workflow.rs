@@ -127,7 +127,7 @@ pub async fn integrate_dht_ops_workflow(
     Ok(result)
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip(workspace, value))]
 async fn integrate_single_dht_op(
     workspace: &mut IntegrateDhtOpsWorkspace<'_>,
     value: IntegrationQueueValue,
@@ -227,6 +227,7 @@ async fn integrate_single_dht_op(
                 workspace.meta.add_link(link_add.clone()).await?;
                 // Store add Header
                 let header = HeaderHashed::with_data(link_add.into()).await?;
+                debug!(link_add = ?header.as_hash());
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
             }
@@ -306,6 +307,7 @@ async fn integrate_single_dht_op(
             op,
             when_integrated: Timestamp::now(),
         };
+        debug!("integrating");
         Ok(Outcome::Integrated(value))
     }
 }

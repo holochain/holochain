@@ -9,12 +9,12 @@ use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
     header,
-    link::LinkTag,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
 };
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::link::LinkTag;
 
 fn fixtures() -> (
     AgentPubKey,

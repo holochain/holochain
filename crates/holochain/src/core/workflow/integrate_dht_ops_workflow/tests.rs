@@ -13,7 +13,8 @@ use crate::{
     },
     core::{
         ribosome::{
-            HostContext, HostContextFixturator, NamedInvocation, ZomeCallInvocationFixturator,
+            guest_callback::entry_defs::EntryDefsResult, host_fn, HostContext,
+            HostContextFixturator, MockRibosomeT, NamedInvocation, ZomeCallInvocationFixturator,
         },
         state::{
             cascade::{test_dbs_and_mocks, Cascade},
@@ -21,14 +22,16 @@ use crate::{
             source_chain::SourceChain,
             workspace::WorkspaceError,
         },
+        workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
         SourceChainError,
     },
-    fixt::EntryFixturator,
+    fixt::*,
 };
 use fixt::prelude::*;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use holo_hash::{Hashable, Hashed, HeaderHash};
+use holo_hash_core::HoloHashCore;
 use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
@@ -40,11 +43,7 @@ use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     composite_hash::{AnyDhtHash, EntryHash},
     dht_op::{DhtOp, DhtOpHashed},
-    fixt::{
-        AppEntryTypeFixturator, ElementDeleteFixturator, EntryUpdateFixturator, HeaderFixturator,
-        LinkAddFixturator, LinkRemoveFixturator, LinkTagFixturator, NewEntryHeaderFixturator,
-        SignatureFixturator, ZomeIdFixturator,
-    },
+    fixt::*,
     header::{builder, ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader},
     observability,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
@@ -52,9 +51,14 @@ use holochain_types::{
     Entry, EntryHashed,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::link::{Link, LinkTag};
+use holochain_zome_types::{
+    entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetLinksInput, HostInput,
+    LinkEntriesInput,
+};
 use matches::assert_matches;
-use std::{convert::TryInto, sync::Arc};
+use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
+use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
 use unwrap_to::unwrap_to;
 use uuid::Uuid;
 
@@ -75,17 +79,23 @@ struct TestData {
 }
 
 impl TestData {
-    #[instrument()]
     async fn new() -> Self {
         // original entry
         let original_entry = fixt!(Entry);
+        // New entry
+        let new_entry = fixt!(Entry);
+        Self::new_inner(original_entry, new_entry).await
+    }
+
+    #[instrument()]
+    async fn new_inner(original_entry: Entry, new_entry: Entry) -> Self {
+        // original entry
         let original_entry_hash = EntryHashed::with_data(original_entry.clone())
             .await
             .unwrap()
             .into_hash();
 
         // New entry
-        let new_entry = fixt!(Entry);
         let new_entry_hash = EntryHashed::with_data(new_entry.clone())
             .await
             .unwrap()
@@ -161,6 +171,13 @@ impl TestData {
             link_remove,
             new_entry_hash,
         }
+    }
+
+    /// Sets the Entries to App types
+    async fn with_app_entry_type() -> Self {
+        let original_entry = EntryFixturator::new(AppEntry).next().unwrap();
+        let new_entry = EntryFixturator::new(AppEntry).next().unwrap();
+        Self::new_inner(original_entry, new_entry).await
     }
 }
 
@@ -784,6 +801,204 @@ fn sync_call<'a>(host_context: Arc<HostContext>, base: EntryHash) -> Vec<LinkMet
     .unwrap()
 }
 
+/// Call the produce dht ops workflow
+async fn produce_dht_ops<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: EnvironmentWrite,
+    dbs: &impl GetDb,
+) {
+    let (mut qt, _rx) = TriggerSender::new();
+    let reader = env_ref.reader().unwrap();
+    let workspace = ProduceDhtOpsWorkspace::new(&reader, dbs).unwrap();
+    produce_dht_ops_workflow(workspace, env.into(), &mut qt)
+        .await
+        .unwrap();
+}
+
+/// Run genesis on the source chain
+async fn genesis<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &impl GetDb) {
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+    fake_genesis(&mut workspace.source_chain).await.unwrap();
+    env_ref
+        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .unwrap();
+}
+
+async fn commit_entry<'env>(
+    pre_state: Vec<Db>,
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    zome_name: ZomeName,
+) -> EntryHash {
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+
+    // Create entry def with the correct zome name
+    let entry_def_id = fixt!(EntryDefId);
+    let mut entry_def = fixt!(EntryDef);
+    entry_def.id = entry_def_id.clone();
+    let mut entry_defs_map = BTreeMap::new();
+    entry_defs_map.insert(
+        ZomeName::from(zome_name.clone()),
+        EntryDefs::from(vec![entry_def]),
+    );
+
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
+    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    dna_file.dna.zomes.clear();
+    dna_file
+        .dna
+        .zomes
+        .push((zome_name.clone().into(), fixt!(Zome)));
+
+    // Create ribosome mock to return fixtures
+    // This is a lot faster then compiling a zome
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_dna_file().return_const(dna_file);
+
+    ribosome
+        .expect_run_entry_defs()
+        .returning(move |_, _| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
+
+    let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+        .next()
+        .unwrap();
+    host_context.zome_name = zome_name.clone();
+
+    // Collect the entry from the pre-state to commit
+    let entry = pre_state
+        .into_iter()
+        .filter_map(|state| match state {
+            Db::IntQueue(_) => {
+                // Will be provided by triggering the produce workflow
+                None
+            }
+            Db::CasEntry(entry, _, _) => Some(entry),
+            _ => unreachable!("This test only needs integration queue and an entry in the cas"),
+        })
+        .next()
+        .unwrap();
+
+    let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
+
+    let output = {
+        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        host_context.change_workspace(raw_workspace);
+        let ribosome = Arc::new(ribosome);
+        let host_context = Arc::new(host_context);
+        host_fn::commit_entry::commit_entry(ribosome.clone(), host_context.clone(), input).unwrap()
+    };
+
+    // Write
+    env_ref
+        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .unwrap();
+
+    output.into_inner().try_into().unwrap()
+}
+
+async fn link_entries<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    base_address: EntryHash,
+    target_address: EntryHash,
+    zome_name: ZomeName,
+    link_tag: LinkTag,
+) -> HeaderHash {
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+
+    // Create data for calls
+    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    dna_file.dna.zomes.clear();
+    dna_file
+        .dna
+        .zomes
+        .push((zome_name.clone().into(), fixt!(Zome)));
+
+    // Create ribosome mock to return fixtures
+    // This is a lot faster then compiling a zome
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_dna_file().return_const(dna_file);
+
+    let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+        .next()
+        .unwrap();
+    host_context.zome_name = zome_name.clone();
+
+    // Call link_entries
+    let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
+
+    let output = {
+        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+
+        host_context.change_workspace(raw_workspace);
+        let ribosome = Arc::new(ribosome);
+        let host_context = Arc::new(host_context);
+        // Call the real link_entries host fn
+        host_fn::link_entries::link_entries(ribosome.clone(), host_context.clone(), input).unwrap()
+    };
+
+    // Write the changes
+    env_ref
+        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .unwrap();
+
+    // Get the LinkAdd HeaderHash back
+    unwrap_to!(output.into_inner() => HoloHashCore::HeaderHash)
+        .clone()
+        .into()
+}
+
+async fn get_links<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    base_address: EntryHash,
+    zome_name: ZomeName,
+    link_tag: LinkTag,
+) -> Vec<Link> {
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+
+    // Create data for calls
+    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    dna_file.dna.zomes.clear();
+    dna_file
+        .dna
+        .zomes
+        .push((zome_name.clone().into(), fixt!(Zome)));
+
+    // Create ribosome mock to return fixtures
+    // This is a lot faster then compiling a zome
+    let mut ribosome = MockRibosomeT::new();
+    ribosome.expect_dna_file().return_const(dna_file);
+
+    let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+        .next()
+        .unwrap();
+    host_context.zome_name = zome_name.clone();
+
+    // Call get links
+    let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
+
+    let output = {
+        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+
+        host_context.change_workspace(raw_workspace);
+        let ribosome = Arc::new(ribosome);
+        let host_context = Arc::new(host_context);
+        host_fn::get_links::get_links(ribosome.clone(), host_context.clone(), input)
+            .unwrap()
+            .into_inner()
+    };
+
+    output
+}
+
+// This test is designed to run like the
+// register_add_link test except all the
+// pre-state is added through real host fn calls
 #[tokio::test(threaded_scheduler)]
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
@@ -793,28 +1008,68 @@ async fn test_metadata_from_wasm_api() {
     let env_ref = env.guard().await;
     let (base_entry_hash, target_entry_hash) = {
         clear_dbs(&env_ref, &dbs);
-        let td = TestData::new().await;
+
+        // Generate fixture data
+        let mut td = TestData::with_app_entry_type().await;
+        // Only one zome in this test
+        td.link_add.zome_id = 0.into();
+        let link_tag = td.link_add.tag.clone();
         let base_entry_hash = td.original_entry_hash.clone();
         let target_entry_hash = td.new_entry_hash.clone();
-        let (pre_state, expect, _) = register_add_link(td);
-        Db::set(pre_state, &env_ref, &dbs).await;
-        call_workflow(&env_ref, &dbs, env.clone()).await;
-        Db::check(
-            expect,
+        let zome_name = fixt!(ZomeName);
+
+        // Get db states for an add link op
+        let (pre_state, _expect, _) = register_add_link(td);
+
+        // Setup the source chain
+        genesis(&env_ref, &dbs).await;
+
+        // Commit the base
+        let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+
+        // Link the base to the target
+        let _link_add_address = link_entries(
             &env_ref,
             &dbs,
-            format!("{}: {}", "metadata from wasm", here!("")),
+            base_address.clone(),
+            target_entry_hash.clone(),
+            zome_name.clone(),
+            link_tag.clone(),
         )
         .await;
+
+        // Trigger the produce workflow
+        produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
+
+        // Call integrate
+        call_workflow(&env_ref, &dbs, env.clone()).await;
+
+        // Call get links and get back the targets
+        let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
+        let links = links
+            .into_iter()
+            .map(|h| h.target.try_into().unwrap())
+            .collect::<Vec<EntryHash>>();
+
+        // Check we only go a single link
+        assert_eq!(links.len(), 1);
+        // Check we got correct target_entry_hash
+        assert_eq!(links[0], target_entry_hash);
+        // TODO: create the expect from the result of the commit and link entries
+        // Db::check(
+        //     expect,
+        //     &env_ref,
+        //     &dbs,
+        //     format!("{}: {}", "metadata from wasm", here!("")),
+        // )
+        // .await;
         (base_entry_hash, target_entry_hash)
     };
+
     let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
     let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
-    let (_g, raw_workspace) =
-        crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(
-            &mut workspace,
-        );
+    let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
     let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
         .next()
         .unwrap();

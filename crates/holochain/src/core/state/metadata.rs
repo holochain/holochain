@@ -17,9 +17,9 @@ use holochain_types::header;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash},
     header::{LinkAdd, LinkRemove, ZomeId},
-    link::LinkTag,
     Header, HeaderHashed, Timestamp,
 };
+use holochain_zome_types::link::LinkTag;
 use std::fmt::Debug;
 
 pub use sys_meta::*;
@@ -124,6 +124,18 @@ impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
             &link_add.tag,
             hash,
         )
+    }
+}
+
+impl LinkMetaVal {
+    /// Turn into a zome friendly type
+    pub fn into_link(self) -> holochain_zome_types::link::Link {
+        let timestamp: chrono::DateTime<chrono::Utc> = self.timestamp.into();
+        holochain_zome_types::link::Link {
+            target: self.target.into(),
+            timestamp: timestamp.into(),
+            tag: self.tag,
+        }
     }
 }
 
