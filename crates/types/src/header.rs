@@ -7,8 +7,9 @@
 #![allow(missing_docs)]
 
 use crate::composite_hash::{EntryHash, HeaderAddress};
-use crate::{link::LinkTag, prelude::*};
+use crate::prelude::*;
 use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::link::LinkTag;
 
 pub mod builder;
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
