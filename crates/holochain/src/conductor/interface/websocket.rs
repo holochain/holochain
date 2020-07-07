@@ -367,7 +367,6 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
@@ -389,7 +388,6 @@ mod test {
     async fn invalid_request() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload =
             InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into(), "".to_string());
@@ -443,7 +441,6 @@ mod test {
             .test(test_env, wasm_env)
             .await
             .unwrap();
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
         let agent_key = fake_agent_pubkey_1();
