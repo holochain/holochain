@@ -1101,7 +1101,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_2020"
+name = "holochain"
 version = "0.0.1"
 dependencies = [
  "anyhow",
@@ -1120,9 +1120,9 @@ dependencies = [
  "ghost_actor",
  "holo_hash",
  "holo_hash_core",
- "holochain_2020_legacy",
  "holochain_crypto",
  "holochain_keystore",
+ "holochain_legacy",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_state",
@@ -1165,13 +1165,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_2020_legacy"
-version = "0.0.1"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "holochain_crypto"
 version = "0.0.1"
 dependencies = [
@@ -1198,6 +1191,13 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "holochain_legacy"
+version = "0.0.1"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
