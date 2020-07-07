@@ -367,7 +367,6 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdmonRequest::InstallsDna("".into());
@@ -391,7 +390,6 @@ mod test {
     async fn invalid_request() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload =
@@ -577,7 +575,6 @@ mod test {
             .return_const(());
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
-        let conductor_handle = activate(conductor_handle.clone()).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Activate the app
@@ -665,7 +662,6 @@ mod test {
     async fn attach_app_interface() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let conductor_handle = activate(conductor_handle).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
