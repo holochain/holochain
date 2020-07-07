@@ -13,6 +13,7 @@ use super::{
     api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
     dna_store::{DnaDefBuf, DnaStore, RealDnaStore},
+    entry_def_store::get_entry_defs,
     error::{ConductorError, CreateAppError},
     handle::ConductorHandleImpl,
     interface::{
@@ -558,7 +559,16 @@ where
         let env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
         let reader = env.reader()?;
+
+        let entry_defs = get_entry_defs(&dna).await;
+
+        let mut entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
+
+        for (zome_name, entry_def) in entry_defs {
+            entry_def_buf.put(zome_name, entry_def)?;
+        }
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
         let mut dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;

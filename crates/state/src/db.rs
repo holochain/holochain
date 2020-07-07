@@ -44,6 +44,8 @@ pub enum DbName {
     Wasm,
     /// database to store the [DnaDef]
     DnaDef,
+    /// database to store the [EntryDef] Kvv store
+    EntryDef,
     /// Authored [DhtOp]s KV store
     AuthoredDhtOps,
     /// Integrated [DhtOp]s KV store
@@ -71,6 +73,7 @@ impl std::fmt::Display for DbName {
             ConductorState => write!(f, "ConductorState"),
             Wasm => write!(f, "Wasm"),
             DnaDef => write!(f, "DnaDef"),
+            EntryDef => write!(f, "EntryDef"),
             AuthoredDhtOps => write!(f, "AuthoredDhtOps"),
             IntegratedDhtOps => write!(f, "IntegratedDhtOps"),
             IntegrationQueue => write!(f, "IntegrationQueue"),
@@ -98,6 +101,7 @@ impl DbName {
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
+            EntryDef => Multi,
             AuthoredDhtOps => Single,
             IntegratedDhtOps => Single,
             IntegrationQueue => Single,
@@ -155,6 +159,8 @@ lazy_static! {
     pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
     /// The key to access the DnaDef database
     pub static ref DNA_DEF: DbKey<SingleStore> = DbKey::new(DbName::DnaDef);
+    /// The key to access the EntryDef database
+    pub static ref ENTRY_DEF: DbKey<SingleStore> = DbKey::new(DbName::EntryDef);
     /// The key to access the AuthoredDhtOps database
     pub static ref AUTHORED_DHT_OPS: DbKey<SingleStore> = DbKey::new(DbName::AuthoredDhtOps);
     /// The key to access the IntegratedDhtOps database
@@ -225,6 +231,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
         EnvironmentKind::Wasm => {
             register_db(env, um, &*WASM)?;
             register_db(env, um, &*DNA_DEF)?;
+            register_db(env, um, &*ENTRY_DEF)?;
         }
     }
     Ok(())
