@@ -136,9 +136,16 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
 impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
     type Error = SourceChainError;
 
+    fn is_clean(&self) -> bool {
+        self.db.is_clean()
+    }
+
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
     fn flush_to_txn(self, writer: &'env mut Writer) -> SourceChainResult<()> {
+        if self.is_clean() {
+            return Ok(());
+        }
         let fresh = self.with_reader(writer)?;
         let (old, new) = (self.persisted_head, fresh.persisted_head);
         if old != new {

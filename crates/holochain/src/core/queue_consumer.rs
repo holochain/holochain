@@ -83,7 +83,7 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
     let (tx_produce, rx5, handle) =
-        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_integration);
+        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
@@ -99,6 +99,8 @@ pub async fn spawn_queue_consumer_tasks(
     InitialQueueTriggers {
         sys_validation: tx_sys,
         produce_dht_ops: tx_produce,
+        /// TODO - this may go away when we're actually running validation
+        integrate_dht_ops: tx_integration,
     }
 }
 
@@ -108,6 +110,9 @@ pub struct InitialQueueTriggers {
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
     pub produce_dht_ops: TriggerSender,
+    /// Notify the IntegrateDhtOps workflow to run, i.e. after HandlePublish
+    /// TODO - this may go away when we're actually running validation
+    pub integrate_dht_ops: TriggerSender,
 }
 
 /// The means of nudging a queue consumer to tell it to look for more work

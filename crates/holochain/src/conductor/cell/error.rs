@@ -32,6 +32,8 @@ pub enum CellError {
     RibosomeError(#[from] RibosomeError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
     InitFailed(InitResult),
+    #[error(transparent)]
+    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 }
 
 pub type CellResult<T> = Result<T, CellError>;
