@@ -383,7 +383,6 @@ mod test {
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -414,11 +413,11 @@ mod test {
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn cache_failure() {
+        observability::test_run().ok();
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
@@ -467,7 +466,6 @@ mod test {
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 
     #[ignore]
