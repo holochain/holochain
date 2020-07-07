@@ -67,15 +67,17 @@ pub fn get_links<'a>(
 
 #[cfg(test)]
 pub mod wasm_test {
+    use crate::core::queue_consumer::TriggerSender;
     use crate::core::state::workspace::Workspace;
+    use crate::core::workflow::integrate_dht_ops_workflow::{
+        integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
+    };
+    use crate::core::workflow::produce_dht_ops_workflow::{
+        produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
+    };
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::TestString;
-    use crate::core::workflow::produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
-    use crate::core::workflow::integrate_dht_ops_workflow::{integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace};
-    use crate::core::{
-        queue_consumer::TriggerSender,
-    };
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_ls() {
@@ -85,7 +87,8 @@ pub mod wasm_test {
 
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
             // commits fail validation if we don't do genesis
             crate::core::workflow::fake_genesis(&mut workspace.source_chain)
@@ -150,7 +153,8 @@ pub mod wasm_test {
 
         let ls_output = {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
             let output: holochain_zome_types::link::Links = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
