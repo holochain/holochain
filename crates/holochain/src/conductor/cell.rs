@@ -4,6 +4,7 @@
 //! ChainElements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::manager::ManagedTaskAdd;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -30,7 +31,7 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo};
+use holochain_types::{autonomic::AutonomicProcess, cell::CellId};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -38,6 +39,7 @@ use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
+use tokio::sync;
 use tracing::*;
 
 #[allow(missing_docs)]
@@ -91,6 +93,8 @@ impl Cell {
         env_path: P,
         keystore: KeystoreSender,
         holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
@@ -110,8 +114,13 @@ impl Cell {
         };
 
         if has_genesis {
-            let queue_triggers =
-                spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
+            let queue_triggers = spawn_queue_consumer_tasks(
+                &state_env,
+                holochain_p2p_cell.clone(),
+                managed_task_add_sender,
+                managed_task_stop_broadcaster,
+            )
+            .await;
 
             Ok(Self {
                 id,
@@ -310,9 +319,43 @@ impl Cell {
         _from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holochain_types::composite_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        unimplemented!()
+        // TODO - We are temporarily just integrating everything...
+        //        Really this should go to validation first!
+
+        // set up our workspace
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader().expect("Could not create LMDB reader");
+        let mut workspace =
+            crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace::new(
+                &reader, &env_ref,
+            )
+            .expect("Could not create Workspace");
+
+        // add incoming ops to the integration queue transaction
+        for (hash, op) in ops {
+            let iqv = crate::core::state::dht_op_integration::IntegrationQueueValue {
+                validation_status: holochain_types::validate::ValidationStatus::Valid,
+                op,
+            };
+            workspace.integration_queue.put(
+                std::convert::TryInto::try_into((holochain_types::Timestamp::now(), hash))?,
+                iqv,
+            )?;
+        }
+
+        // commit our transaction
+        let writer: crate::core::queue_consumer::OneshotWriter = self.state_env.clone().into();
+
+        writer
+            .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+            .await?;
+
+        // trigger integration of queued ops
+        self.queue_triggers.integrate_dht_ops.clone().trigger();
+
+        Ok(())
     }
 
     /// a remote node is attempting to retreive a validation package
@@ -489,16 +532,5 @@ impl Cell {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-// The following is a sketch from the skunkworx phase, and can probably be removed
-
-// These are possibly composable traits that describe how to get a resource,
-// so instead of explicitly building resources, we can downcast a Cell to exactly
-// the right set of resource getter traits
-trait NetSend {
-    fn network_send(&self, msg: Todo) -> Result<(), NetError>;
-}
-
-#[allow(dead_code)]
-/// TODO - this is a shim until we need a real NetError
-enum NetError {}
+#[cfg(test)]
+mod test;

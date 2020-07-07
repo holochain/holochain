@@ -63,6 +63,12 @@ impl Future for ManagedTaskAdd {
     }
 }
 
+impl std::fmt::Debug for ManagedTaskAdd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ManagedTaskAdd").finish()
+    }
+}
+
 struct TaskManager {
     stream: FuturesUnordered<ManagedTaskAdd>,
 }

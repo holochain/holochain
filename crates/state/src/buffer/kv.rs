@@ -175,8 +175,15 @@ where
 {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
+        if self.is_clean() {
+            return Ok(());
+        }
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
