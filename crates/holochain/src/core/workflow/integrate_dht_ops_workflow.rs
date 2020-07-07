@@ -88,7 +88,7 @@ pub async fn integrate_dht_ops_workflow(
         for (op_hash, value) in ops {
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
-            if !workspace.integrated_dht_ops.get(&op_hash)?.is_some() {
+            if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
                 match integrate_single_dht_op(&mut workspace, value).await? {
                     Outcome::Integrated(integrated) => {
                         workspace.integrated_dht_ops.put(op_hash, integrated)?;
