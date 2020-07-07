@@ -221,7 +221,20 @@ impl<'env> ChainCasBuf<'env> {
 impl<'env> BufferedStore<'env> for ChainCasBuf<'env> {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.headers.is_clean()
+            && self.public_entries.is_clean()
+            && self
+                .private_entries
+                .as_ref()
+                .map(|db| db.is_clean())
+                .unwrap_or(true)
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+        if self.is_clean() {
+            return Ok(());
+        }
         self.public_entries.flush_to_txn(writer)?;
         if let Some(db) = self.private_entries {
             db.flush_to_txn(writer)?
