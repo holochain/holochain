@@ -291,7 +291,14 @@ mod tests {
                             recv_count += 1;
                             if recv_count == total_expected {
                                 // notify the test that all items have been received
-                                tx_complete.take().unwrap().send(()).unwrap()
+                                tx_complete.take().unwrap().send(()).unwrap();
+                                // Small delay to check for extra
+                                if let Ok(Some(_)) =
+                                    tokio::time::timeout(Duration::from_secs(1), recv.next()).await
+                                {
+                                    panic!("Publish got extra messages {:?}");
+                                }
+                                break;
                             }
                         }
                         _ => panic!("unexpected event"),
@@ -336,7 +343,7 @@ mod tests {
     #[test_case(100, 10)]
     #[test_case(100, 100)]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
-        tokio::runtime::Runtime::new().unwrap().block_on(async {
+        crate::conductor::tokio_runtime().block_on(async {
             observability::test_run().ok();
 
             // Create test env
@@ -376,7 +383,7 @@ mod tests {
     #[test_case(100, 10)]
     #[test_case(100, 100)]
     fn test_no_republish(num_agents: u32, num_hash: u32) {
-        tokio::runtime::Runtime::new().unwrap().block_on(async {
+        crate::conductor::tokio_runtime().block_on(async {
             observability::test_run().ok();
 
             // Create test env
@@ -453,7 +460,7 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn test_private_entries(num_agents: u32) {
-        tokio::runtime::Runtime::new().unwrap().block_on(async {
+        crate::conductor::tokio_runtime().block_on(async {
             observability::test_run().ok();
 
             // Create test env
