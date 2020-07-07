@@ -273,7 +273,7 @@ mod test {
         InstallsDna(String),
     }
 
-    async fn setup_admin() -> (Arc<TempDir>, RealAdminInterfaceApi) {
+    async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
@@ -281,7 +281,7 @@ mod test {
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let conductor_handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
-        (tmpdir, RealAdminInterfaceApi::new(conductor_handle))
+        (tmpdir, onductor_handle)
     }
 
     async fn setup_admin_fake_cells(
@@ -366,7 +366,10 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
-        let (_tmpdir, admin_api) = setup_admin().await;
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let conductor_handle = activate(conductor_handle).await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -380,12 +383,17 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn invalid_request() {
         observability::test_run().ok();
-        let (_tmpdir, admin_api) = setup_admin().await;
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let conductor_handle = activate(conductor_handle).await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload =
             InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into(), "".to_string());
         let agent_key = fake_agent_pubkey_1();
@@ -406,7 +414,9 @@ mod test {
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap()
+        handle_incoming_message(msg, admin_api).await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -456,7 +466,9 @@ mod test {
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap()
+        handle_incoming_message(msg, admin_api).await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[ignore]
@@ -563,6 +575,8 @@ mod test {
             .times(1)
             .return_const(());
         let (_tmpdir, handle) = setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
+        let conductor_handle = activate(conductor_handle).await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Activate the app
         let msg = AdminRequest::ActivateApp {
@@ -641,12 +655,17 @@ mod test {
             .collect();
 
         assert_eq!(expected, cell_ids);
+        conductor_handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn attach_app_interface() {
         observability::test_run().ok();
-        let (_tmpdir, admin_api) = setup_admin().await;
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let conductor_handle = activate(conductor_handle).await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -657,6 +676,8 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
