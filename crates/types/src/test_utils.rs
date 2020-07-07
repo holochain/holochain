@@ -44,7 +44,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         uuid: uuid.to_string(),
         zomes: Vec::new(),
     };
-    tokio_safe_block_on::tokio_safe_block_on(
+    tokio_safe_block_on::tokio_safe_block_forever_on(
         async move {
             let mut wasm_code = Vec::new();
             for (zome_name, wasm) in zomes {
@@ -57,8 +57,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
                 wasm_code.push(wasm);
             }
             DnaFile::new(dna, wasm_code).await
-        },
-        std::time::Duration::from_secs(600),
+        }
     )
     .unwrap()
     .unwrap()
