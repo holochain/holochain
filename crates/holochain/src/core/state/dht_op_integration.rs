@@ -1,9 +1,7 @@
 //! Various types for the databases involved in the DhtOp integration workflow
 
-use crate::core::workflow::produce_dht_ops_workflow::dht_op::DhtOpLight;
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use fallible_iterator::FallibleIterator;
-use holo_hash::DhtOpHash;
 use holo_hash::DhtOpHash;
 use holo_hash::HoloHashBaseExt;
 use holo_hash_core::HoloHashCoreHash;
@@ -16,7 +14,7 @@ use holochain_state::{
 };
 use holochain_types::{
     composite_hash::AnyDhtHash, dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus,
-    TimestampKey,
+    Timestamp, TimestampKey,
 };
 
 /// Database type for AuthoredDhtOps
@@ -128,71 +126,6 @@ pub struct IntegrationQueueValue {
     pub op: DhtOp,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use holo_hash::{DhtOpHash, HoloHashBaseExt};
-    use holochain_types::Timestamp;
-
-    #[test]
-    fn test_integration_queue_key_roundtrips() {
-        // create test timestamps
-        let ts1 = Timestamp(i64::MIN, u32::MIN);
-        let ts3 = Timestamp::try_from("1930-01-01T00:00:00.999999999Z").unwrap();
-        let ts5 = Timestamp::try_from("2020-05-05T19:16:04.266431045Z").unwrap();
-        let ts7 = Timestamp(i64::MAX, u32::MAX);
-
-        // build corresponding timestamp keys
-        let tk1 = TimestampKey::from(ts1.clone());
-        let tk3 = TimestampKey::from(ts3.clone());
-        let tk5 = TimestampKey::from(ts5.clone());
-        let tk7 = TimestampKey::from(ts7.clone());
-
-        // dummy hash
-        let h0 = DhtOpHash::with_pre_hashed([0; 32].to_vec());
-        let h1 = DhtOpHash::with_pre_hashed([1; 32].to_vec());
-
-        // create tuples to check roundtrips
-        let p1 = (tk1, h0.clone());
-        let p2 = (tk1, h1.clone());
-        let p3 = (tk3, h0.clone());
-        let p4 = (tk3, h1.clone());
-        let p5 = (tk5, h0.clone());
-        let p6 = (tk5, h1.clone());
-        let p7 = (tk7, h0.clone());
-        let p8 = (tk7, h1.clone());
-
-        // tuple -> bytes
-        let ik1 = IntegrationQueueKey::try_from(p1.clone()).unwrap();
-        let ik2 = IntegrationQueueKey::try_from(p2.clone()).unwrap();
-        let ik3 = IntegrationQueueKey::try_from(p3.clone()).unwrap();
-        let ik4 = IntegrationQueueKey::try_from(p4.clone()).unwrap();
-        let ik5 = IntegrationQueueKey::try_from(p5.clone()).unwrap();
-        let ik6 = IntegrationQueueKey::try_from(p6.clone()).unwrap();
-        let ik7 = IntegrationQueueKey::try_from(p7.clone()).unwrap();
-        let ik8 = IntegrationQueueKey::try_from(p8.clone()).unwrap();
-
-        // bytes -> tuple
-        assert_eq!(p1, (&ik1).try_into().unwrap());
-        assert_eq!(p2, (&ik2).try_into().unwrap());
-        assert_eq!(p3, (&ik3).try_into().unwrap());
-        assert_eq!(p4, (&ik4).try_into().unwrap());
-        assert_eq!(p5, (&ik5).try_into().unwrap());
-        assert_eq!(p6, (&ik6).try_into().unwrap());
-        assert_eq!(p7, (&ik7).try_into().unwrap());
-        assert_eq!(p8, (&ik8).try_into().unwrap());
-
-        // test absolute ordering
-        assert!(ik1 < ik2);
-        assert!(ik2 < ik3);
-        assert!(ik3 < ik4);
-        assert!(ik4 < ik5);
-        assert!(ik5 < ik6);
-        assert!(ik6 < ik7);
-        assert!(ik7 < ik8);
-    }
-}
-
 impl<'env> IntegratedDhtOpsBuf<'env> {
     /// Create a new buffer for the IntegratedDhtOpsStore
     pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
@@ -211,7 +144,7 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
         to: Option<Timestamp>,
         dht_loc: Option<u32>,
     ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = IntegrationValue, Error = DatabaseError> + 'env>,
+        Box<dyn FallibleIterator<Item = IntegratedDhtOpsValue, Error = DatabaseError> + 'env>,
     > {
         Ok(Box::new(
             self.store
@@ -240,13 +173,14 @@ mod tests {
     use crate::fixt::AnyDhtHashFixturator;
     use chrono::{Duration, Utc};
     use fixt::prelude::*;
+    use holo_hash::{DhtOpHash, HoloHashBaseExt};
     use holo_hash::{DhtOpHashFixturator, HeaderHashFixturator};
     use holochain_state::test_utils::test_cell_env;
     use holochain_state::{
         buffer::BufferedStore,
         env::{ReadManager, WriteManager},
     };
-    use holochain_types::fixt::SignatureFixturator;
+    use holochain_types::Timestamp;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(threaded_scheduler)]
@@ -265,12 +199,14 @@ mod tests {
         times.push(now);
         times.push(now + Duration::hours(100));
         let times_exp = times.clone();
-        let values = times.into_iter().map(|when_integrated| IntegrationValue {
-            validation_status: ValidationStatus::Valid,
-            basis: basis.next().unwrap(),
-            op: DhtOpLight::RegisterAgentActivity(fixt!(Signature), fixt!(HeaderHash)),
-            when_integrated: when_integrated.into(),
-        });
+        let values = times
+            .into_iter()
+            .map(|when_integrated| IntegratedDhtOpsValue {
+                validation_status: ValidationStatus::Valid,
+                basis: basis.next().unwrap(),
+                op: DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash)),
+                when_integrated: when_integrated.into(),
+            });
 
         // Put them in the db
         {
@@ -356,5 +292,63 @@ mod tests {
             assert!(r.contains(&expected[5]));
             assert_eq!(r.len(), 3);
         }
+    }
+
+    #[test]
+    fn test_integration_queue_key_roundtrips() {
+        // create test timestamps
+        let ts1 = Timestamp(i64::MIN, u32::MIN);
+        let ts3 = Timestamp::try_from("1930-01-01T00:00:00.999999999Z").unwrap();
+        let ts5 = Timestamp::try_from("2020-05-05T19:16:04.266431045Z").unwrap();
+        let ts7 = Timestamp(i64::MAX, u32::MAX);
+
+        // build corresponding timestamp keys
+        let tk1 = TimestampKey::from(ts1.clone());
+        let tk3 = TimestampKey::from(ts3.clone());
+        let tk5 = TimestampKey::from(ts5.clone());
+        let tk7 = TimestampKey::from(ts7.clone());
+
+        // dummy hash
+        let h0 = DhtOpHash::with_pre_hashed([0; 32].to_vec());
+        let h1 = DhtOpHash::with_pre_hashed([1; 32].to_vec());
+
+        // create tuples to check roundtrips
+        let p1 = (tk1, h0.clone());
+        let p2 = (tk1, h1.clone());
+        let p3 = (tk3, h0.clone());
+        let p4 = (tk3, h1.clone());
+        let p5 = (tk5, h0.clone());
+        let p6 = (tk5, h1.clone());
+        let p7 = (tk7, h0.clone());
+        let p8 = (tk7, h1.clone());
+
+        // tuple -> bytes
+        let ik1 = IntegrationQueueKey::try_from(p1.clone()).unwrap();
+        let ik2 = IntegrationQueueKey::try_from(p2.clone()).unwrap();
+        let ik3 = IntegrationQueueKey::try_from(p3.clone()).unwrap();
+        let ik4 = IntegrationQueueKey::try_from(p4.clone()).unwrap();
+        let ik5 = IntegrationQueueKey::try_from(p5.clone()).unwrap();
+        let ik6 = IntegrationQueueKey::try_from(p6.clone()).unwrap();
+        let ik7 = IntegrationQueueKey::try_from(p7.clone()).unwrap();
+        let ik8 = IntegrationQueueKey::try_from(p8.clone()).unwrap();
+
+        // bytes -> tuple
+        assert_eq!(p1, (&ik1).try_into().unwrap());
+        assert_eq!(p2, (&ik2).try_into().unwrap());
+        assert_eq!(p3, (&ik3).try_into().unwrap());
+        assert_eq!(p4, (&ik4).try_into().unwrap());
+        assert_eq!(p5, (&ik5).try_into().unwrap());
+        assert_eq!(p6, (&ik6).try_into().unwrap());
+        assert_eq!(p7, (&ik7).try_into().unwrap());
+        assert_eq!(p8, (&ik8).try_into().unwrap());
+
+        // test absolute ordering
+        assert!(ik1 < ik2);
+        assert!(ik2 < ik3);
+        assert!(ik3 < ik4);
+        assert!(ik4 < ik5);
+        assert!(ik5 < ik6);
+        assert!(ik6 < ik7);
+        assert!(ik7 < ik8);
     }
 }
