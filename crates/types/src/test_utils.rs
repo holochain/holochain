@@ -58,7 +58,6 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         DnaFile::new(dna, wasm_code).await
     })
     .unwrap()
-    .unwrap()
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
