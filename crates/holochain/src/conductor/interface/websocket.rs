@@ -446,7 +446,8 @@ mod test {
             .test(test_env, wasm_env)
             .await
             .unwrap();
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
         let agent_key = fake_agent_pubkey_1();
         let payload = InstallAppPayload {
@@ -543,7 +544,7 @@ mod test {
         // the overhead of a websocket request locally is small
         crate::end_hard_timeout!(websocket_timeout, crate::perf::ONE_WASM_CALL);
         let shutdown = handle.take_shutdown_handle().await.unwrap();
-        conductor_handle.shutdown().await;
+        handle.shutdown().await;
         shutdown.await.unwrap();
     }
 
@@ -574,8 +575,9 @@ mod test {
             .expect_add_dnas::<Vec<_>>()
             .times(1)
             .return_const(());
-        let (_tmpdir, handle) = setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
-        let conductor_handle = activate(conductor_handle).await;
+        let (_tmpdir, conductor_handle) =
+            setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
+        let conductor_handle = activate(conductor_handle.clone()).await;
         let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Activate the app
@@ -591,12 +593,12 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
 
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
             .await
             .unwrap();
 
         // Get the state
-        let state: ConductorState = handle.get_state_from_handle().await.unwrap();
+        let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
 
         // Check it is not in inactive apps
         let r = state.inactive_apps.get("test app");
@@ -633,12 +635,12 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
 
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
             .await
             .unwrap();
 
         // Get the state
-        let state = handle.get_state_from_handle().await.unwrap();
+        let state = conductor_handle.get_state_from_handle().await.unwrap();
 
         // Check it's removed from active
         let r = state.active_apps.get("test app");
