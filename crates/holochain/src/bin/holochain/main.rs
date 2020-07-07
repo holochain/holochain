@@ -96,16 +96,10 @@ async fn async_main() {
 }
 
 async fn conductor_handle_from_legacy_config_path(legacy_config_path: &Path) -> ConductorHandle {
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-
     let toml =
         fs::read_to_string(legacy_config_path).expect("Couldn't read legacy config from file");
-    // We ignore the specified agent config for now, and use a pregenerated test AgentPubKey
-    // FIXME: use a real agent!
-    warn!("Using a constant fake agent. FIXME: use a proper test agent");
-    let fake_agent = fake_agent_pubkey_1();
     let legacy_config = toml::from_str(&toml).expect("Couldn't deserialize legacy config");
-    load_conductor_from_legacy_config(legacy_config, Conductor::builder(), fake_agent)
+    load_conductor_from_legacy_config(legacy_config, Conductor::builder())
         .await
         .expect("Couldn't initialize conductor from legacy config")
 }

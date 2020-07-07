@@ -5,6 +5,8 @@ use super::{
     ConductorBuilder, ConductorHandle,
 };
 use holo_hash::*;
+use holochain_keystore::keystore_actor::KeystoreApiSender;
+use holochain_keystore::{test_keystore::spawn_test_keystore, KeystoreError};
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
@@ -28,16 +30,23 @@ pub enum CompatConfigError {
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    KeystoreError(#[from] KeystoreError),
 }
 
 pub async fn load_conductor_from_legacy_config(
     legacy: legacy::Config,
     builder: ConductorBuilder,
-    agent_pubkey: AgentPubKey,
 ) -> Result<ConductorHandle, CompatConfigError> {
     let config = config_from_legacy(&legacy);
+    let keystore = spawn_test_keystore(Vec::new()).await?;
 
-    let conductor: ConductorHandle = builder.config(config).build().await?;
+    let conductor: ConductorHandle = builder
+        .config(config)
+        .with_keystore(keystore.clone())
+        .build()
+        .await?;
 
     fn dna_key(path: &Path, uuid: &Option<String>) -> String {
         format!("{:?} ; {:?}", path, uuid)
@@ -58,34 +67,34 @@ pub async fn load_conductor_from_legacy_config(
         );
         conductor.install_dna(dna_file).await?;
     }
+    let mut cell_ids = Vec::new();
 
-    let cell_ids = legacy
-        .instances
-        .iter()
-        .map(|i| {
-            let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
-                CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
-            })?;
+    for i in &legacy.instances {
+        let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
+            CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
+        })?;
 
-            // make sure we have installed this DNA
-            let dna_hash = dna_hashes
-                .get(&dna_key(Path::new(&dna_config.file), &dna_config.uuid))
-                .ok_or_else(|| {
-                    CompatConfigError::BrokenReference(format!(
-                        "No DNA for path: {}",
-                        dna_config.file
-                    ))
-                })?
-                .clone();
+        // make sure we have installed this DNA
+        let dna_hash = dna_hashes
+            .get(&dna_key(Path::new(&dna_config.file), &dna_config.uuid))
+            .ok_or_else(|| {
+                CompatConfigError::BrokenReference(format!("No DNA for path: {}", dna_config.file))
+            })?
+            .clone();
 
-            // NB: disregarding agent config, using a hard-coded pre-made one
-            // for now. In the future we can actually pay attention to
-            // `i.agent` to get agent info
-            let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
-            let cell_handle = i.id.clone();
-            Ok((InstalledCell::new(cell_id, cell_handle), None))
-        })
-        .collect::<Result<Vec<_>, CompatConfigError>>()?;
+        // FIXME [ B-01893 ]:
+        // currently we can't specify a seed for generating a keypair
+        // via TestKeystore, so for now we are limited to generating a
+        // unique agent every time. Once we have same-agent tests, this will
+        // have to be addressed.
+        let _agent_name = i.agent.clone();
+        let agent_pubkey = keystore.generate_sign_keypair_from_pure_entropy().await?;
+        dbg!(&agent_pubkey);
+
+        let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
+        let cell_handle = i.id.clone();
+        cell_ids.push((InstalledCell::new(cell_id, cell_handle), None));
+    }
 
     let app_interfaces = extract_app_interfaces(legacy.interfaces);
 
@@ -173,10 +182,7 @@ pub mod tests {
     use crate::conductor::{
         handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
     };
-    use holochain_types::{
-        app::MembraneProof,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file},
-    };
+    use holochain_types::{app::MembraneProof, test_utils::fake_dna_file};
     use matches::assert_matches;
     use mockall::predicate;
     use std::path::PathBuf;
@@ -273,7 +279,6 @@ pub mod tests {
         let (legacy_config, _, dir) = legacy_fixtures();
         let dna1 = fake_dna_file("A8d8nifNnj");
         let dna2 = fake_dna_file("90jmi9oINoiO");
-        let agent_pubkey = fake_agent_pubkey_1();
 
         tokio::fs::write(
             dir.path().join("a.dna.gz"),
@@ -295,44 +300,32 @@ pub mod tests {
             .await
             .unwrap();
 
-        let expected_cell_data: Vec<(InstalledCell, Option<MembraneProof>)> = vec![
-            (
-                InstalledCell::new(
-                    CellId::new(dna1.dna_hash().clone(), agent_pubkey.clone()),
-                    "i1".to_string(),
-                ),
-                None,
-            ),
-            (
-                InstalledCell::new(
-                    CellId::new(dna1a.dna_hash().clone(), agent_pubkey.clone()),
-                    "i2".to_string(),
-                ),
-                None,
-            ),
-        ];
-
         let mut handle = MockConductorHandle::new();
         handle
             .expect_sync_install_dna()
-            .with(predicate::eq(dna1))
+            .with(predicate::eq(dna1.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
             .expect_sync_install_dna()
-            .with(predicate::eq(dna1a))
+            .with(predicate::eq(dna1a.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
             .expect_sync_install_dna()
-            .with(predicate::eq(dna2))
+            .with(predicate::eq(dna2.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
             .expect_sync_install_app()
             .with(
                 predicate::eq("LEGACY".to_string()),
-                predicate::eq(expected_cell_data),
+                predicate::function(move |data: &Vec<(InstalledCell, Option<MembraneProof>)>| {
+                    data[0].0.as_id().dna_hash() == dna1.clone().dna_hash()
+                        && data[0].0.as_nick() == "i1"
+                        && data[1].0.as_id().dna_hash() == dna1a.clone().dna_hash()
+                        && data[1].0.as_nick() == "i2"
+                }),
             )
             .times(1)
             .returning(|_, _| Ok(()));
@@ -351,8 +344,8 @@ pub mod tests {
             .times(1)
             .returning(|port| Ok(port));
 
-        let builder = Conductor::builder().with_mock_handle(handle).await;
-        let _ = load_conductor_from_legacy_config(legacy_config, builder, agent_pubkey)
+        let builder = Conductor::builder().with_mock_handle(handle);
+        let _ = load_conductor_from_legacy_config(legacy_config, builder)
             .await
             .unwrap();
     }
