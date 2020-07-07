@@ -1136,6 +1136,7 @@ dependencies = [
  "structopt",
  "strum",
  "tempdir",
+ "test-case",
  "test_wasm_common",
  "thiserror",
  "tokio",
@@ -3271,6 +3272,18 @@ dependencies = [
  "nom",
  "phf",
  "phf_codegen",
+]
+
+[[package]]
+name = "test-case"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "199464148b42bcf3da8b2a56f6ee87ca68f47402496d1268849291ec9fb463c8"
+dependencies = [
+ "proc-macro2 1.0.18",
+ "quote 1.0.7",
+ "syn 1.0.31",
+ "version_check",
 ]
 
 [[package]]
