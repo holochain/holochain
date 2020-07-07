@@ -215,8 +215,15 @@ where
 {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
+        if self.is_clean() {
+            return Ok(());
+        }
         for (k, ValuesDelta { delete_all, deltas }) in self.scratch {
             // If delete_all is set, that we should delete everything persisted,
             // but then continue to add inserts from the ops, if present
