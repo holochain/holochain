@@ -5,31 +5,37 @@ use holochain_serialized_bytes::prelude::*;
 use regex::Regex;
 use shrinkwraprs::Shrinkwrap;
 
-#[derive(Shrinkwrap, Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+/// Opaque tag for the link applied at the app layer, used to differentiate
+/// between different semantics and validation rules for different links
+#[derive(
+    Shrinkwrap,
+    Debug,
+    Clone,
+    Hash,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    SerializedBytes,
+    derive_more::From,
+)]
 #[shrinkwrap(mutable)]
-/// Opaque Tag for the link type
-pub struct Tag(pub Vec<u8>);
-
-// TODO: reove these?
-type LinkType = String;
-type LinkTag = String;
+pub struct LinkTag(pub Vec<u8>);
 
 /// Links interrelate entries in a source chain.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, SerializedBytes)]
 pub struct Link {
     base: EntryHash,
     target: EntryHash,
-    link_type: LinkType,
     tag: LinkTag,
 }
 
 impl Link {
     /// Construct a new link.
-    pub fn new(base: &EntryHash, target: &EntryHash, link_type: &str, tag: &str) -> Self {
+    pub fn new(base: &EntryHash, target: &EntryHash, tag: &LinkTag) -> Self {
         Link {
             base: base.to_owned(),
             target: target.to_owned(),
-            link_type: link_type.to_owned(),
             tag: tag.to_owned(),
         }
     }
@@ -44,30 +50,19 @@ impl Link {
         &self.target
     }
 
-    /// Get the type of this link.
-    pub fn link_type(&self) -> &LinkType {
-        &self.link_type
-    }
-
     /// Get the tag of this link.
     pub fn tag(&self) -> &LinkTag {
         &self.tag
     }
 }
 
-impl Tag {
+impl LinkTag {
     /// New tag from bytes
     pub fn new<T>(t: T) -> Self
     where
         T: Into<Vec<u8>>,
     {
         Self(t.into())
-    }
-}
-
-impl From<Vec<u8>> for Tag {
-    fn from(b: Vec<u8>) -> Self {
-        Self(b)
     }
 }
 

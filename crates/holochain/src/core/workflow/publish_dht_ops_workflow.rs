@@ -12,13 +12,13 @@
 
 use super::{
     error::WorkflowResult,
-    produce_dht_ops_workflow::dht_op::{error::DhtOpConvertError, light_to_op},
+    produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
 };
 use crate::core::{
     queue_consumer::WorkComplete,
     state::{
         chain_cas::ChainCasBuf,
-        dht_op_integration::{AuthoredDhtOps, IntegratedDhtOps, IntegrationValue},
+        dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegratedDhtOpsValue},
     },
 };
 use fallible_iterator::FallibleIterator;
@@ -37,16 +37,17 @@ use tracing::*;
 /// Default redundancy factor for validation receipts
 // TODO: Pull this from the wasm entry def and only use this if it's missing
 // TODO: Put a default in the DnaBundle
+// TODO: build zome_types/entry_def map to get the (AppEntryType map to entry def)
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 
 /// Database buffers required for publishing [DhtOp]s
 pub struct PublishDhtOpsWorkspace<'env> {
     /// Database of authored [DhtOpHash]
-    authored_dht_ops: AuthoredDhtOps<'env>,
+    authored_dht_ops: AuthoredDhtOpsStore<'env>,
     /// Cas for looking up data to construct ops
     cas: ChainCasBuf<'env>,
     // Integrated Ops database for looking up [DhtOp]s
-    integrated_dht_ops: IntegratedDhtOps<'env>,
+    integrated_dht_ops: IntegratedDhtOpsStore<'env>,
 }
 
 pub async fn publish_dht_ops_workflow(
@@ -106,7 +107,7 @@ pub async fn publish_dht_ops_workflow_inner(
                 continue;
             }
         };
-        let IntegrationValue { basis, op, .. } = op;
+        let IntegratedDhtOpsValue { basis, op, .. } = op;
         let op = match light_to_op(op, workspace.cas()).await {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
@@ -140,11 +141,11 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         })
     }
 
-    fn authored(&self) -> &AuthoredDhtOps<'env> {
+    fn authored(&self) -> &AuthoredDhtOpsStore<'env> {
         &self.authored_dht_ops
     }
 
-    fn integrated(&self) -> &IntegratedDhtOps<'env> {
+    fn integrated(&self) -> &IntegratedDhtOpsStore<'env> {
         &self.integrated_dht_ops
     }
 
@@ -157,9 +158,8 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
 mod tests {
     use super::*;
     use crate::{
-        core::{
-            state::cascade::{test_dbs_and_mocks, Cascade},
-            workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
+        core::workflow::produce_dht_ops_workflow::dht_op_light::{
+            dht_op_to_light_basis, DhtOpLight,
         },
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
@@ -173,7 +173,7 @@ mod tests {
     };
     use holochain_state::{
         buffer::BufferedStore,
-        env::{EnvironmentRefRw, ReadManager, WriteManager},
+        env::{EnvironmentWriteRef, ReadManager, WriteManager},
         error::DatabaseError,
         test_utils::test_cell_env,
     };
@@ -202,7 +202,7 @@ mod tests {
 
     /// publish ops setup
     async fn setup<'env>(
-        env_ref: &EnvironmentRefRw<'env>,
+        env_ref: &EnvironmentWriteRef<'env>,
         dbs: &impl GetDb,
         num_agents: u32,
         num_hash: u32,
@@ -230,10 +230,10 @@ mod tests {
             let header_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
                 .await
                 .unwrap();
-            let light = IntegrationValue {
+            let light = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
-                op: DhtOpLight::RegisterAddLink(sig.clone(), header_hash.as_hash().clone()),
+                op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
             };
             data.push((sig, op_hashed, light, header_hash));
         }
@@ -310,7 +310,7 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow<'env>(
-        env_ref: &EnvironmentRefRw<'env>,
+        env_ref: &EnvironmentWriteRef<'env>,
         dbs: &impl GetDb,
         mut cell_network: HolochainP2pCell,
     ) {
@@ -523,8 +523,7 @@ mod tests {
             let (store_element, store_entry, register_replaced_by) = {
                 let reader = env_ref.reader().unwrap();
                 // Create easy way to create test cascade
-                let (cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
-                let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+                let cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
 
                 let op = DhtOp::StoreElement(
                     sig.clone(),
@@ -533,14 +532,14 @@ mod tests {
                 );
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
                 let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
                 let store_element = (op_hash, light, basis, expected_op);
 
                 // Create StoreEntry
                 let header = NewEntryHeader::Create(entry_create.clone());
                 let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
                 let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
                 let store_entry = (op_hash, light, basis);
 
@@ -553,7 +552,7 @@ mod tests {
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op =
                     DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
                 let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
                 let register_replaced_by = (op_hash, light, basis, expected_op);
 
@@ -584,7 +583,7 @@ mod tests {
                 let reader = env_ref.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
                 let (op_hash, light, basis, _) = store_element;
-                let integration = IntegrationValue {
+                let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
@@ -597,7 +596,7 @@ mod tests {
                     .unwrap();
 
                 let (op_hash, light, basis) = store_entry;
-                let integration = IntegrationValue {
+                let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
@@ -610,7 +609,7 @@ mod tests {
                     .unwrap();
 
                 let (op_hash, light, basis, _) = register_replaced_by;
-                let integration = IntegrationValue {
+                let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,

@@ -92,7 +92,7 @@ impl Cell {
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
-        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
@@ -114,6 +114,7 @@ impl Cell {
         };
 
         if has_genesis {
+            holochain_p2p_cell.join().await?;
             let queue_triggers = spawn_queue_consumer_tasks(
                 &state_env,
                 holochain_p2p_cell.clone(),
@@ -359,10 +360,9 @@ impl Cell {
             };
             // NB: it is possible we may put the same op into the integration
             // queue twice, but this shouldn't be a problem.
-            workspace.integration_queue.put(
-                std::convert::TryInto::try_into((holochain_types::Timestamp::now(), hash))?,
-                iqv,
-            )?;
+            workspace
+                .integration_queue
+                .put((holochain_types::TimestampKey::now(), hash).into(), iqv)?;
         }
 
         // commit our transaction

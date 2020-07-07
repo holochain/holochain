@@ -17,7 +17,7 @@ use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
 pub use holochain_types::fixt::*;
-use holochain_types::link::Tag;
+use holochain_types::link::LinkTag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
@@ -180,10 +180,10 @@ fixturator!(
 
 fixturator!(
     LinkMetaVal;
-    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, Tag);
+    constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
 );
 
-impl Iterator for LinkMetaValFixturator<(EntryHash, Tag)> {
+impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
     type Item = LinkMetaVal;
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(LinkMetaVal);

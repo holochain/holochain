@@ -77,6 +77,15 @@ impl HostContext {
     pub fn allow_side_effects(&self) -> bool {
         self.allow_side_effects
     }
+    #[cfg(test)]
+    pub(crate) fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
+        &self.workspace
+    }
+
+    #[cfg(test)]
+    pub(crate) fn change_workspace(&mut self, workspace: UnsafeInvokeZomeWorkspace) {
+        self.workspace = workspace;
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -205,6 +205,13 @@ where
             Err(err) => Err(err),
         }
     }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.scratch.clear();
+        Ok(self.db.clear(writer)?)
+    }
 }
 
 impl<'env, K, V, R> BufferedStore<'env> for KvvBuf<'env, K, V, R>

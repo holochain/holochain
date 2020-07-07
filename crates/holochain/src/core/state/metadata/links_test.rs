@@ -3,15 +3,10 @@ use crate::fixt::{
     EntryHashFixturator, KnownLinkAdd, KnownLinkRemove, LinkAddFixturator, LinkRemoveFixturator,
     ZomeIdFixturator,
 };
+use crate::here;
 use fixt::prelude::*;
 use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
 use holochain_types::observability;
-
-macro_rules! here {
-    ($test: expr) => {
-        concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
-    };
-}
 
 #[derive(Clone)]
 struct TestData {
@@ -19,7 +14,7 @@ struct TestData {
     link_remove: LinkRemove,
     base_hash: EntryHash,
     zome_id: ZomeId,
-    tag: Tag,
+    tag: LinkTag,
     expected_link: LinkMetaVal,
 }
 
@@ -34,7 +29,7 @@ async fn fixtures(n: usize) -> Vec<TestData> {
         let base_address = base_hash_fixt.next().unwrap();
         let target_address = target_hash_fixt.next().unwrap();
 
-        let tag = Tag::new(tag_fix.next().unwrap());
+        let tag = LinkTag::new(tag_fix.next().unwrap());
         let zome_id = zome_id.next().unwrap();
 
         let link_add = KnownLinkAdd {
@@ -170,7 +165,7 @@ impl TestData {
         let tag_len = self.tag.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
-        let half_tag = Tag::new(&self.tag[..half_tag]);
+        let half_tag = LinkTag::new(&self.tag[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert_eq!(
             &meta_buf.get_links(&key).unwrap()[..],
@@ -184,7 +179,7 @@ impl TestData {
         let tag_len = self.tag.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
-        let half_tag = Tag::new(&self.tag[..half_tag]);
+        let half_tag = LinkTag::new(&self.tag[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert!(
             meta_buf
@@ -285,7 +280,7 @@ impl TestData {
         let tag_len = td[0].tag.len();
         // Make sure there is at least some tag
         let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };
-        let half_tag = Tag::new(&td[0].tag[..tag_len]);
+        let half_tag = LinkTag::new(&td[0].tag[..tag_len]);
         // Check all base hash, zome_id, half tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);

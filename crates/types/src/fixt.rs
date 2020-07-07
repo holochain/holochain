@@ -12,15 +12,17 @@ use crate::dna::Zomes;
 use crate::header::AgentValidationPkg;
 use crate::header::ChainClose;
 use crate::header::ChainOpen;
+use crate::header::ElementDelete;
 use crate::header::EntryCreate;
-use crate::header::EntryDelete;
 use crate::header::EntryType;
 use crate::header::EntryUpdate;
+use crate::header::Header;
 use crate::header::InitZomesComplete;
 use crate::header::LinkAdd;
+use crate::header::NewEntryHeader;
 use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
-use crate::link::Tag;
+use crate::link::LinkTag;
 use crate::Timestamp;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
@@ -374,7 +376,7 @@ fixturator!(
 );
 
 fixturator!(
-    Tag; from Bytes;
+    LinkTag; from Bytes;
 );
 
 fixturator!(
@@ -389,13 +391,13 @@ fixturator!(
 
 fixturator!(
     LinkAdd;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, Tag);
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
 );
 
 pub struct KnownLinkAdd {
     pub base_address: EntryHash,
     pub target_address: EntryHash,
-    pub tag: Tag,
+    pub tag: LinkTag,
     pub zome_id: ZomeId,
 }
 
@@ -498,6 +500,30 @@ fixturator!(
 );
 
 fixturator!(
-    EntryDelete;
+    ElementDelete;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash);
+);
+
+fixturator!(
+    Header;
+    variants [
+        Dna(Dna)
+        AgentValidationPkg(AgentValidationPkg)
+        InitZomesComplete(InitZomesComplete)
+        LinkAdd(LinkAdd)
+        LinkRemove(LinkRemove)
+        ChainOpen(ChainOpen)
+        ChainClose(ChainClose)
+        EntryCreate(EntryCreate)
+        EntryUpdate(EntryUpdate)
+        ElementDelete(ElementDelete)
+    ];
+);
+
+fixturator!(
+    NewEntryHeader;
+    variants [
+        Create(EntryCreate)
+        Update(EntryUpdate)
+    ];
 );
