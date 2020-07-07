@@ -4,6 +4,7 @@
 //! ChainElements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::manager::ManagedTaskAdd;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -38,6 +39,7 @@ use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
+use tokio::sync;
 use tracing::*;
 
 #[allow(missing_docs)]
@@ -91,6 +93,8 @@ impl Cell {
         env_path: P,
         keystore: KeystoreSender,
         mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
@@ -111,8 +115,13 @@ impl Cell {
 
         if has_genesis {
             holochain_p2p_cell.join().await?;
-            let queue_triggers =
-                spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
+            let queue_triggers = spawn_queue_consumer_tasks(
+                &state_env,
+                holochain_p2p_cell.clone(),
+                managed_task_add_sender,
+                managed_task_stop_broadcaster,
+            )
+            .await;
 
             Ok(Self {
                 id,
@@ -313,9 +322,7 @@ impl Cell {
         _dht_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        let my_pubkey = self.id().agent_pubkey();
-        dbg!("agents", &from_agent, my_pubkey, from_agent == *my_pubkey);
-        if from_agent == *my_pubkey {
+        if from_agent == *self.id().agent_pubkey() {
             // Don't handle messages we published to ourselves, because that
             // would trigger another publish, and cause an infinite loop.
             //
@@ -351,6 +358,8 @@ impl Cell {
                 validation_status: holochain_types::validate::ValidationStatus::Valid,
                 op,
             };
+            // NB: it is possible we may put the same op into the integration
+            // queue twice, but this shouldn't be a problem.
             workspace
                 .integration_queue
                 .put((holochain_types::TimestampKey::now(), hash).into(), iqv)?;

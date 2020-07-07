@@ -1,4 +1,5 @@
 use crate::{
+    conductor::manager::spawn_task_manager,
     core::state::{dht_op_integration::IntegrationQueueValue, workspace::Workspace},
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
@@ -10,8 +11,14 @@ use holochain_state::{
     env::ReadManager,
     test_utils::{test_conductor_env, TestEnvironment},
 };
-use holochain_types::{dht_op::DhtOp, header, test_utils::fake_cell_id, Timestamp};
+use holochain_types::{
+    dht_op::DhtOp,
+    header,
+    test_utils::{fake_agent_pubkey_2, fake_cell_id},
+    Timestamp,
+};
 use std::sync::Arc;
+use tokio::sync;
 
 #[tokio::test(threaded_scheduler)]
 async fn test_cell_handle_publish() {
@@ -43,9 +50,20 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let cell = super::Cell::create(cell_id, mock_handler, path, keystore, holochain_p2p_cell)
-        .await
-        .unwrap();
+    let (add_task_sender, shutdown) = spawn_task_manager();
+    let (stop_tx, _) = sync::broadcast::channel(1);
+
+    let cell = super::Cell::create(
+        cell_id,
+        mock_handler,
+        path,
+        keystore,
+        holochain_p2p_cell,
+        add_task_sender,
+        stop_tx.clone(),
+    )
+    .await
+    .unwrap();
 
     let header_hash = fixt!(HeaderHash);
     let op_hash = fixt!(DhtOpHash);
@@ -59,7 +77,7 @@ async fn test_cell_handle_publish() {
     let op = DhtOp::StoreElement(sig, header, None);
 
     cell.handle_publish(
-        agent.clone(),
+        fake_agent_pubkey_2(),
         true,
         header_hash.into(),
         vec![(op_hash, op.clone())],
@@ -98,4 +116,6 @@ async fn test_cell_handle_publish() {
             ..
         } if hash == &dna
     );
+    stop_tx.send(()).unwrap();
+    shutdown.await.unwrap();
 }

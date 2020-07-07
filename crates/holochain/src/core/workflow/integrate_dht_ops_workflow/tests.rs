@@ -882,6 +882,7 @@ async fn commit_entry_add_link() {
         .test(test_env, wasm_env)
         .await
         .unwrap();
+    let shutdown = conductor.take_shutdown_handle().await.unwrap();
     let interface = RealAdminInterfaceApi::new(conductor.clone());
     let app_interface = RealAppInterfaceApi::new(conductor.clone());
 
@@ -1015,4 +1016,6 @@ async fn commit_entry_add_link() {
         let e = cascade.dht_get(&base_entry_hash).await.unwrap().unwrap();
         assert_eq!(e.into_content(), base_entry);
     }
+    conductor.shutdown().await;
+    shutdown.await.unwrap();
 }
