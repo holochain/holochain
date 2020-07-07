@@ -10,7 +10,12 @@ use holochain_state::{
     env::ReadManager,
     test_utils::{test_conductor_env, TestEnvironment},
 };
-use holochain_types::{dht_op::DhtOp, header, test_utils::fake_cell_id, Timestamp};
+use holochain_types::{
+    dht_op::DhtOp,
+    header,
+    test_utils::{fake_agent_pubkey_2, fake_cell_id},
+    Timestamp,
+};
 use std::sync::Arc;
 
 #[tokio::test(threaded_scheduler)]
@@ -59,7 +64,7 @@ async fn test_cell_handle_publish() {
     let op = DhtOp::StoreElement(sig, header, None);
 
     cell.handle_publish(
-        agent.clone(),
+        fake_agent_pubkey_2(),
         true,
         header_hash.into(),
         vec![(op_hash, op.clone())],
