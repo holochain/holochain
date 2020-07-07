@@ -8,6 +8,7 @@ use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use std::sync::Arc;
 
 mod types;
+pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
 pub use types::*;
 
 mod spawn;
@@ -17,7 +18,7 @@ pub use spawn::*;
 /// I.e. a sender that is tied to a specific cell.
 #[derive(Clone)]
 pub struct HolochainP2pCell {
-    sender: actor::HolochainP2pSender,
+    sender: ghost_actor::GhostSender<actor::HolochainP2p>,
     dna_hash: Arc<DnaHash>,
     from_agent: Arc<AgentPubKey>,
 }

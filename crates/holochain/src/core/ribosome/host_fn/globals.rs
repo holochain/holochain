@@ -9,7 +9,7 @@ use holochain_zome_types::GlobalsOutput;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-pub async fn globals(
+pub fn globals(
     ribosome: Arc<WasmRibosome>,
     host_context: Arc<HostContext>,
     _input: GlobalsInput,
@@ -28,16 +28,30 @@ pub async fn globals(
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 pub mod test {
+    use crate::core::state::workspace::Workspace;
+    use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::GlobalsInput;
     use holochain_zome_types::GlobalsOutput;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn invoke_import_globals_test() {
-        let globals: GlobalsOutput =
-            crate::call_test_ribosome!(TestWasm::Imports, "globals", GlobalsInput::new(()));
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = env_ref.reader().unwrap();
+        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+
+        let globals: GlobalsOutput = crate::call_test_ribosome!(
+            raw_workspace,
+            TestWasm::Imports,
+            "globals",
+            GlobalsInput::new(())
+        );
         assert_eq!(globals.inner_ref().dna_name, "test",);
     }
 }

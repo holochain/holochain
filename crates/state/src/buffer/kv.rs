@@ -188,6 +188,13 @@ where
             Ok(())
         }
     }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.scratch.clear();
+        Ok(self.db.clear(writer)?)
+    }
 }
 
 impl<'env, K, V, R> BufferedStore<'env> for KvBuf<'env, K, V, R>
@@ -198,8 +205,15 @@ where
 {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
+        if self.is_clean() {
+            return Ok(());
+        }
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
@@ -243,7 +257,7 @@ where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = (&'env [u8], V);
+    type Item = IterItem<'env, V>;
     #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let item = self.iter.next()?;
@@ -290,7 +304,7 @@ where
     V: BufVal,
 {
     type Error = DatabaseError;
-    type Item = (&'env [u8], V);
+    type Item = IterItem<'env, V>;
     #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         self.iter.next()
@@ -347,11 +361,12 @@ pub struct SingleIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    scratch_iter: Box<dyn DoubleEndedIterator<Item = (&'a [u8], V)> + 'a>,
-    iter:
-        Box<dyn DoubleEndedFallibleIterator<Item = (&'env [u8], V), Error = DatabaseError> + 'env>,
-    current: Option<(&'env [u8], V)>,
-    scratch_current: Option<(&'a [u8], V)>,
+    scratch_iter: Box<dyn DoubleEndedIterator<Item = IterItem<'a, V>> + 'a>,
+    iter: Box<
+        dyn DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+    >,
+    current: Option<IterItem<'env, V>>,
+    scratch_current: Option<IterItem<'a, V>>,
 }
 
 impl<'env, 'a: 'env, V> SingleIter<'env, 'a, V>

@@ -4,18 +4,18 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        cascade::Cascade,
         chain_cas::ChainCasBuf,
         dht_op_integration::{
-            IntegratedDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue, IntegrationValue,
+            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
+            IntegrationQueueValue,
         },
-        metadata::{MetadataBuf, MetadataBufT},
+        metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
     },
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AgentPubKey, Hashable, Hashed};
+use holo_hash::{Hashable, Hashed};
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
@@ -26,19 +26,92 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     element::SignedHeaderHashed,
     header::IntendedFor,
-    EntryHashed, Header, HeaderHashed, Timestamp,
+    validate::ValidationStatus,
+    EntryHashed, Header, HeaderHashed, TimestampKey,
 };
-use produce_dht_ops_workflow::dht_op::dht_op_to_light_basis;
-use std::convert::TryInto;
+use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use tracing::*;
+
+mod tests;
 
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
     trigger_publish: &mut TriggerSender,
-    agent_pub_key: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
-    let result = integrate_dht_ops_workflow_inner(&mut workspace, agent_pub_key).await?;
+    // Pull ops out of queue
+    // TODO: PERF: we collect() only because this iterator cannot cross awaits,
+    // but is there a way to do this without collect()?
+    let ops: Vec<_> = workspace
+        .integration_queue
+        .drain_iter()?
+        .iterator()
+        .collect();
+
+    // Compute hashes for all dht_ops, include in tuples alongside db values
+    let mut ops = futures::future::join_all(
+        ops.into_iter()
+            .map(|val| {
+                val.map(|val| async move {
+                    let IntegrationQueueValue {
+                        op,
+                        validation_status,
+                    } = val;
+                    let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
+                    (
+                        op_hash,
+                        IntegrationQueueValue {
+                            op,
+                            validation_status,
+                        },
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    )
+    .await;
+
+    // Try to process the queue over and over again, until we either exhaust
+    // the queue, or we can no longer integrate anything in the queue.
+    // We do this because items in the queue may depend on one another but may
+    // be out-of-order wrt. dependencies, so there is a chance that by repeating
+    // integration, we may be able to integrate at least one more item.
+    //
+    // A less naive approach would be to intelligently reorder the queue to
+    // guarantee that intra-queue dependencies are correctly ordered, but ain't
+    // nobody got time for that right now! TODO: make time for this?
+    while {
+        let mut num_integrated: usize = 0;
+        let mut next_ops = Vec::new();
+        for (op_hash, value) in ops {
+            match integrate_single_dht_op(&mut workspace, value).await? {
+                Outcome::Integrated(value) => {
+                    workspace.integrated_dht_ops.put(op_hash, value)?;
+                    num_integrated += 1;
+                }
+                Outcome::Deferred(value) => next_ops.push((op_hash, value)),
+            }
+        }
+        ops = next_ops;
+        ops.len() > 0 && num_integrated > 0
+    } { /* NB: this is actually a do-while loop! */ }
+
+    let result = if ops.len() == 0 {
+        // There were no ops deferred, meaning we exhausted the queue
+        WorkComplete::Complete
+    } else {
+        // Re-add the remaining ops to the queue, to be picked up next time.
+        for (op_hash, value) in ops {
+            // TODO: it may be desirable to retain the original timestamp
+            // when re-adding items to the queue for later processing. This is
+            // challenging for now since we don't have access to that original
+            // key. Just a possible note for the future.
+            workspace
+                .integration_queue
+                .put((TimestampKey::now(), op_hash).into(), value)?;
+        }
+        WorkComplete::Incomplete
+    };
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -55,33 +128,20 @@ pub async fn integrate_dht_ops_workflow(
 }
 
 #[instrument(skip(workspace))]
-async fn integrate_dht_ops_workflow_inner(
+async fn integrate_single_dht_op(
     workspace: &mut IntegrateDhtOpsWorkspace<'_>,
-    agent_pub_key: AgentPubKey,
-) -> WorkflowResult<WorkComplete> {
+    value: IntegrationQueueValue,
+) -> WorkflowResult<Outcome> {
     debug!("Starting integrate dht ops workflow");
-    // Pull ops out of queue
-    // TODO: PERF: Not collect, iterator cannot cross awaits
-    // Find a way to do this.
-    let ops = workspace
-        .integration_queue
-        .drain_iter_reverse()?
-        .collect::<Vec<_>>()?;
-
-    for value in ops {
+    {
         // Process each op
         let IntegrationQueueValue {
             op,
             validation_status,
         } = value;
 
-        let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
-        debug!(?op_hash);
-        debug!(?op);
-
         // TODO: PERF: We don't really need this clone because dht_to_op_light_basis could
         // return the full op as it's not consumed when making hashes
-
         match op.clone() {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
                 let header = HeaderHashed::with_data(header).await?;
@@ -113,10 +173,7 @@ async fn integrate_dht_ops_workflow_inner(
                 workspace.cas.put(signed_header, None)?;
 
                 // register agent activity on this agents pub key
-                workspace
-                    .meta
-                    .register_activity(header, agent_pub_key.clone())
-                    .await?;
+                workspace.meta.register_activity(header).await?;
             }
             DhtOp::RegisterReplacedBy(_, entry_update, _) => {
                 let old_entry_hash = match entry_update.intended_for {
@@ -132,25 +189,16 @@ async fn integrate_dht_ops_workflow_inner(
                             Some(e) => Some(e),
                             // Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
                             // This is put the op back in the integration queue to try again later
-                            None => {
-                                workspace.integration_queue.put(
-                                    (Timestamp::now(), op_hash).try_into()?,
-                                    IntegrationQueueValue {
-                                        validation_status,
-                                        op,
-                                    },
-                                )?;
-                                continue;
-                            }
+                            None => return Outcome::deferred(op, validation_status),
                         }
                     }
                 };
                 workspace
                     .meta
-                    .add_update(entry_update, old_entry_hash)
+                    .register_update(entry_update, old_entry_hash)
                     .await?;
             }
-            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+            DhtOp::RegisterDeletedEntryHeader(_, entry_delete) => {
                 let entry_hash = match workspace
                     .cas
                     .get_header(&entry_delete.removes_address)
@@ -162,21 +210,18 @@ async fn integrate_dht_ops_workflow_inner(
                     // TODO: VALIDATION: This could also be an invalid delete on a header without a delete
                     // Handle missing Entry (Probably StoreEntry hasn't arrived been processed)
                     // This is put the op back in the integration queue to try again later
-                    None => {
-                        workspace.integration_queue.put(
-                            (Timestamp::now(), op_hash).try_into()?,
-                            IntegrationQueueValue {
-                                validation_status,
-                                op,
-                            },
-                        )?;
-                        continue;
-                    }
+                    None => return Outcome::deferred(op, validation_status),
                 };
-                workspace.meta.add_delete(entry_delete, entry_hash).await?
+                workspace
+                    .meta
+                    .register_delete_on_entry(entry_delete, entry_hash)
+                    .await?
             }
-            DhtOp::RegisterDeletedHeaderBy(_, entry_delete) => {
-                workspace.meta.add_header_delete(entry_delete).await?
+            DhtOp::RegisterDeletedBy(_, entry_delete) => {
+                workspace
+                    .meta
+                    .register_delete_on_header(entry_delete)
+                    .await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 workspace.meta.add_link(link_add.clone()).await?;
@@ -197,47 +242,45 @@ async fn integrate_dht_ops_workflow_inner(
                          cache metadata store.
                          The cache metadata store is currently unimplemented"
                     );
-                    // Add op back on queue
-                    workspace.integration_queue.put(
-                        (Timestamp::now(), op_hash).try_into()?,
-                        IntegrationQueueValue {
-                            validation_status,
-                            op,
-                        },
-                    )?;
-                    continue;
+                    return Outcome::deferred(op, validation_status);
                 }
+
+                // Get the link add header
+                let maybe_link_add = match workspace
+                    .cas
+                    .get_header(&link_remove.link_add_address)
+                    .await?
+                {
+                    Some(link_add) => {
+                        let header = link_add.into_header_and_signature().0;
+                        let (header, hash) = header.into_inner();
+                        let link_add = match header {
+                            Header::LinkAdd(la) => la,
+                            _ => return Err(DhtOpConvertError::LinkRemoveRequiresLinkAdd.into()),
+                        };
+
+                        // Create a full link key and check if the link add exists
+                        let key = LinkMetaKey::from((&link_add, &hash));
+                        if workspace.meta.get_links(&key)?.is_empty() {
+                            None
+                        } else {
+                            Some(link_add)
+                        }
+                    }
+                    None => None,
+                };
+                let link_add = match maybe_link_add {
+                    Some(link_add) => link_add,
+                    // Handle link add missing
+                    // Probably just waiting on StoreElement or RegisterAddLink
+                    // to arrive so put back in queue with a log message
+                    None => return Outcome::deferred(op, validation_status),
+                };
 
                 // Store link delete Header
                 let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
-                let link_add = match workspace
-                    .cas
-                    .get_header(&link_remove.link_add_address)
-                    .await?
-                {
-                    Some(link_add) => link_add.into_header_and_signature().0.into_content(),
-                    // Handle link add missing
-                    // Probably just waiting on StoreElement to arrive so put
-                    // back in queue with a log message
-                    None => {
-                        // Add op back on queue
-                        workspace.integration_queue.put(
-                            (Timestamp::now(), op_hash).try_into()?,
-                            IntegrationQueueValue {
-                                validation_status,
-                                op,
-                            },
-                        )?;
-                        continue;
-                    }
-                };
-
-                let link_add = match link_add {
-                    Header::LinkAdd(la) => la,
-                    _ => panic!("Must be a link add"),
-                };
 
                 // Remove the link
                 workspace.meta.remove_link(
@@ -249,21 +292,37 @@ async fn integrate_dht_ops_workflow_inner(
             }
         }
 
-        // TODO: Instead of using the cascade use the cas and don't error
-        // The op should just be put back on the queue if the old entry isn't found
-        let (op, basis) = dht_op_to_light_basis(op, &workspace.cascade()).await?;
-        let value = IntegrationValue {
+        // TODO: PERF: Avoid this clone by returning the op on error
+        let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.cas).await {
+            Ok(l) => l,
+            Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
+                return Outcome::deferred(op, validation_status)
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let value = IntegratedDhtOpsValue {
             validation_status,
             basis,
             op,
             when_integrated: Timestamp::now(),
         };
-        debug!(msg = "writing", ?op_hash);
-        workspace.integrated_dht_ops.put(op_hash, value)?;
+        Ok(Outcome::Integrated(value))
     }
+}
 
-    debug!("complete");
-    Ok(WorkComplete::Complete)
+/// The outcome of integrating a single DhtOp: either it was, or it wasn't
+enum Outcome {
+    Integrated(IntegratedDhtOpsValue),
+    Deferred(IntegrationQueueValue),
+}
+
+impl Outcome {
+    fn deferred(op: DhtOp, validation_status: ValidationStatus) -> WorkflowResult<Self> {
+        Ok(Outcome::Deferred(IntegrationQueueValue {
+            op,
+            validation_status,
+        }))
+    }
 }
 
 pub struct IntegrateDhtOpsWorkspace<'env> {
@@ -275,21 +334,10 @@ pub struct IntegrateDhtOpsWorkspace<'env> {
     cas: ChainCasBuf<'env>,
     // metadata store
     meta: MetadataBuf<'env>,
-    // cache for looking up entries
-    cache: ChainCasBuf<'env>,
-    // cached meta for the cascade
-    cache_meta: MetadataBuf<'env>,
-}
-
-impl<'env> IntegrateDhtOpsWorkspace<'env> {
-    fn cascade(&self) -> Cascade {
-        Cascade::new(&self.cas, &self.meta, &self.cache, &self.cache_meta)
-    }
 }
 
 impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
     /// Constructor
-    #[allow(dead_code)]
     fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBuf::new(reader, db)?;
@@ -298,17 +346,13 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let integration_queue = KvBuf::new(reader, db)?;
 
         let cas = ChainCasBuf::primary(reader, dbs, true)?;
-        let cache = ChainCasBuf::cache(reader, dbs)?;
         let meta = MetadataBuf::primary(reader, dbs)?;
-        let cache_meta = MetadataBuf::cache(reader, dbs)?;
 
         Ok(Self {
             integration_queue,
             integrated_dht_ops,
             cas,
             meta,
-            cache,
-            cache_meta,
         })
     }
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
@@ -321,341 +365,5 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         // flush integration queue
         self.integration_queue.flush_to_txn(writer)?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::{
-        conductor::{
-            api::{
-                AdminInterfaceApi, AdminRequest, AdminResponse, AppInterfaceApi, AppRequest,
-                RealAdminInterfaceApi, RealAppInterfaceApi,
-            },
-            ConductorBuilder,
-        },
-        core::{
-            ribosome::{NamedInvocation, ZomeCallInvocationFixturator},
-            state::{metadata::LinkMetaKey, source_chain::SourceChain},
-            SourceChainError,
-        },
-        fixt::{EntryCreateFixturator, EntryFixturator},
-    };
-    use fixt::prelude::*;
-    use holo_hash::{AgentPubKeyFixturator, Hashable, Hashed};
-    use holochain_state::{
-        buffer::BufferedStore,
-        env::{ReadManager, WriteManager},
-        error::DatabaseError,
-        test_utils::{test_cell_env, test_conductor_env, test_wasm_env, TestEnvironment},
-    };
-    use holochain_types::{
-        app::{InstallAppDnaPayload, InstallAppPayload},
-        dht_op::{DhtOp, DhtOpHashed},
-        fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        header::{builder, EntryType, NewEntryHeader},
-        observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
-        validate::ValidationStatus,
-        Entry, EntryHashed, Timestamp,
-    };
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::HostInput;
-    use matches::assert_matches;
-    use std::convert::TryInto;
-    use unwrap_to::unwrap_to;
-    use uuid::Uuid;
-
-    #[tokio::test(threaded_scheduler)]
-    async fn test_store_entry() {
-        // Create test env
-        observability::test_run().ok();
-        let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-
-        // Setup test data
-        let mut entry_create = fixt!(EntryCreate);
-        let entry = fixt!(Entry);
-        let entry_hash = EntryHashed::with_data(entry.clone())
-            .await
-            .unwrap()
-            .into_hash();
-        entry_create.entry_hash = entry_hash.clone();
-
-        // create store entry
-        let store_entry = DhtOp::StoreEntry(
-            fixt!(Signature),
-            NewEntryHeader::Create(entry_create.clone()),
-            Box::new(entry.clone()),
-        );
-
-        // Create integration value
-        let val = IntegrationQueueValue {
-            validation_status: ValidationStatus::Valid,
-            op: store_entry.clone(),
-        };
-
-        // Add to integration queue
-        {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let op_hash = DhtOpHashed::with_data(store_entry.clone())
-                .await
-                .into_hash();
-
-            workspace
-                .integration_queue
-                .put((Timestamp::now(), op_hash.clone()).try_into().unwrap(), val)
-                .unwrap();
-
-            env_ref
-                .with_commit::<DatabaseError, _, _>(|writer| {
-                    workspace.integration_queue.flush_to_txn(writer)?;
-                    Ok(())
-                })
-                .unwrap();
-        }
-
-        // Call workflow
-        {
-            let reader = env_ref.reader().unwrap();
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let (mut qt, _rx) = TriggerSender::new();
-            integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt, fixt!(AgentPubKey))
-                .await
-                .unwrap();
-        }
-
-        // Check the entry is now in the Cas
-        {
-            let reader = env_ref.reader().unwrap();
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            workspace
-                .cas
-                .get_entry(&entry_hash)
-                .await
-                .unwrap()
-                .expect("Entry is not in cas");
-        }
-    }
-
-    // Entries, Private Entries & Headers are stored to CAS
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn test_cas_update() {
-        // Pre state
-        // TODO: Entry A
-        // TODO: Header A: EntryCreate creates Entry A
-        // TODO: DhtOp A: StoreElement with Header A and Entry A
-        // TODO: Integration Queue has Op A
-        // TODO: Cache has Entry A and Header A
-        // Test
-        // TODO: Run workflow
-        // Post state
-        // TODO: Check Cas has Entry A and Header A
-        // TODO: Check DhtOp A is in integrated ops db
-        // TODO: Check metadata has Header A on Entry A
-
-        // More general
-        // For all DhtOp (private and public):
-        // Put associated data into cache
-        // Add DhtOps to integration queue
-        // Run workflow
-        // Check all headers from ops are in Cas
-        // If the Op has an entry check it's in the Cas
-        // Check all ops are in integrated ops db
-        // If Op has an entry reference it to the header in the metadata
-        todo!()
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn test_integrate_single_register_replaced_by_for_header() {
-        // For RegisterReplacedBy with intended_for Header
-        // metadata has EntryUpdate on HeaderHash but not EntryHash
-        todo!()
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn test_integrate_single_register_replaced_by_for_entry() {
-        // For RegisterReplacedBy with intended_for Entry
-        // metadata has EntryUpdate on EntryHash but not HeaderHash
-        todo!()
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn test_integrate_single_register_deleted_by() {
-        // For RegisterDeletedBy
-        // metadata has EntryDelete on HeaderHash
-        todo!()
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn test_integrate_single_register_add_link() {
-        // For RegisterAddLink
-        // metadata has link on EntryHash
-        todo!()
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn test_integrate_single_register_remove_link() {
-        // For RegisterAddLink
-        // metadata has link on EntryHash
-        todo!()
-    }
-
-    // Integration
-    #[tokio::test(threaded_scheduler)]
-    async fn commit_entry_add_link() {
-        observability::test_run().ok();
-        let test_env = test_conductor_env();
-        let _tmpdir = test_env.tmpdir.clone();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let conductor = ConductorBuilder::new()
-            .test(test_env, wasm_env)
-            .await
-            .unwrap();
-        let interface = RealAdminInterfaceApi::new(conductor.clone());
-        let app_interface = RealAppInterfaceApi::new(conductor.clone());
-
-        // Create dna
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_zomes(
-            &uuid.to_string(),
-            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-        );
-
-        // Install Dna
-        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-        let agent_key = fake_agent_pubkey_1();
-        let payload = InstallAppPayload {
-            dnas: vec![dna_payload],
-            app_id: "test".to_string(),
-            agent_key: agent_key.clone(),
-        };
-        let request = AdminRequest::InstallApp(Box::new(payload));
-        let r = interface.handle_admin_request(request).await;
-        debug!(?r);
-        let installed_app = unwrap_to!(r => AdminResponse::AppInstalled).clone();
-
-        let cell_id = installed_app.cell_data[0].as_id().clone();
-        // Activate app
-        let request = AdminRequest::ActivateApp {
-            app_id: installed_app.app_id,
-        };
-        let r = interface.handle_admin_request(request).await;
-        assert_matches!(r, AdminResponse::AppActivated);
-
-        let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
-
-        let base_entry = entry_fixt.next().unwrap();
-        let base_entry_hash = EntryHashed::with_data(base_entry.clone())
-            .await
-            .unwrap()
-            .into_hash();
-        let target_entry = entry_fixt.next().unwrap();
-        let target_entry_hash = EntryHashed::with_data(target_entry.clone())
-            .await
-            .unwrap()
-            .into_hash();
-        // Put commit entry into source chain
-        {
-            let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs().await;
-            let env_ref = cell_env.guard().await;
-
-            let reader = env_ref.reader().unwrap();
-            let mut sc = SourceChain::new(&reader, &dbs).unwrap();
-
-            let header_builder = builder::EntryCreate {
-                entry_type: EntryType::App(fixt!(AppEntryType)),
-                entry_hash: base_entry_hash.clone(),
-            };
-            sc.put(header_builder, Some(base_entry.clone()))
-                .await
-                .unwrap();
-
-            let header_builder = builder::EntryCreate {
-                entry_type: EntryType::App(fixt!(AppEntryType)),
-                entry_hash: target_entry_hash.clone(),
-            };
-            sc.put(header_builder, Some(target_entry.clone()))
-                .await
-                .unwrap();
-
-            let header_builder = builder::LinkAdd {
-                base_address: base_entry_hash.clone(),
-                target_address: target_entry_hash.clone(),
-                zome_id: 0.into(),
-                tag: BytesFixturator::new(Unpredictable).next().unwrap().into(),
-            };
-            sc.put(header_builder, None).await.unwrap();
-            env_ref
-                .with_commit::<SourceChainError, _, _>(|writer| {
-                    sc.flush_to_txn(writer)?;
-                    Ok(())
-                })
-                .unwrap();
-        }
-
-        // Call zome to trigger a the produce workflow
-        let request = Box::new(
-            ZomeCallInvocationFixturator::new(NamedInvocation(
-                cell_id.clone(),
-                TestWasm::Foo,
-                "foo".into(),
-                HostInput::new(fixt!(SerializedBytes)),
-            ))
-            .next()
-            .unwrap(),
-        );
-        let request = AppRequest::ZomeCallInvocation(request);
-        let r = app_interface.handle_app_request(request).await;
-        debug!(?r);
-
-        tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
-
-        // Check the ops
-        {
-            let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs().await;
-            let env_ref = cell_env.guard().await;
-
-            let reader = env_ref.reader().unwrap();
-            let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
-            let ops_db = IntegratedDhtOpsStore::new(&reader, db).unwrap();
-            let ops = ops_db.iter().unwrap().collect::<Vec<_>>().unwrap();
-            debug!(?ops);
-            assert!(!ops.is_empty());
-
-            let meta = MetadataBuf::primary(&reader, &dbs).unwrap();
-            let key = LinkMetaKey::Base(&base_entry_hash);
-            let links = meta.get_links(&key).unwrap();
-            let link = links[0].clone();
-            assert_eq!(link.target, target_entry_hash);
-
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let cascade = workspace.cascade();
-            let links = cascade.dht_get_links(&key).await.unwrap();
-            let link = links[0].clone();
-            assert_eq!(link.target, target_entry_hash);
-
-            let e = cascade.dht_get(&target_entry_hash).await.unwrap().unwrap();
-            assert_eq!(e.into_content(), target_entry);
-
-            let e = cascade.dht_get(&base_entry_hash).await.unwrap().unwrap();
-            assert_eq!(e.into_content(), base_entry);
-        }
     }
 }

@@ -131,6 +131,7 @@ impl<'env> BufferedStore<'env> for ValidationReceiptsBuf<'env> {
 mod tests {
     use super::*;
     use holo_hash::HoloHashExt;
+    use holochain_keystore::KeystoreApiSender;
     use holochain_state::{env::ReadManager, prelude::*};
 
     async fn fake_dht_op_hash(fake_data: &str) -> DhtOpHash {

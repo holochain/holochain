@@ -29,7 +29,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 * Connect with us on our [forum](https://forum.holochain.org)
 
 ## License
- [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
+ [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
 Copyright (C) 2019 - 2020, Holochain Foundation
 

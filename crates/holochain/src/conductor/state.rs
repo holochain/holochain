@@ -15,7 +15,8 @@ use std::collections::HashMap;
 /// References between structs (cell configs pointing to
 /// the agent and DNA to be instantiated) are implemented
 /// via string IDs.
-#[derive(Deserialize, Serialize, Clone, PartialEq, Default, Debug)]
+#[derive(Clone, Deserialize, Serialize, Default, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
@@ -60,7 +61,8 @@ impl ConductorState {
 /// * Unix domain sockets
 ///
 /// The cells (referenced by ID) that are to be made available via that interface should be listed.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct AppInterfaceConfig {
     /// The list of CellIds which this app interface applies to
     // FIXME: [ B-01607 ] currently not hooked up, doesn't make sense until

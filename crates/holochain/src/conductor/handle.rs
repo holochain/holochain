@@ -141,7 +141,7 @@ pub trait ConductorHandleT: Send + Sync {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Request access to this conductor's networking handle
-    fn holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender;
+    fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -187,7 +187,7 @@ pub trait ConductorHandleT: Send + Sync {
 pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(crate) conductor: RwLock<Conductor<DS>>,
     pub(crate) keystore: KeystoreSender,
-    pub(crate) holochain_p2p: holochain_p2p::actor::HolochainP2pSender,
+    pub(crate) holochain_p2p: holochain_p2p::HolochainP2pRef,
 }
 
 #[async_trait::async_trait]
@@ -285,7 +285,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.keystore
     }
 
-    fn holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender {
+    fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
         &self.holochain_p2p
     }
 
@@ -440,7 +440,7 @@ pub mod mock {
 
             fn sync_keystore(&self) -> &KeystoreSender;
 
-            fn sync_holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender;
+            fn sync_holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
 
             fn sync_install_app(
                 &self,
@@ -542,7 +542,7 @@ pub mod mock {
             self.sync_keystore()
         }
 
-        fn holochain_p2p(&self) -> &holochain_p2p::actor::HolochainP2pSender {
+        fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
             self.sync_holochain_p2p()
         }
 

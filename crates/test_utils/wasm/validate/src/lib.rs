@@ -1,6 +1,14 @@
 use holochain_wasmer_guest::*;
 use holochain_zome_types::*;
 use holochain_zome_types::validate::ValidateCallbackResult;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use holochain_zome_types::globals::ZomeGlobals;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::crdt::CrdtType;
+use holochain_zome_types::entry_def::RequiredValidations;
+use holochain_zome_types::entry_def::EntryVisibility;
 
 holochain_wasmer_guest::holochain_externs!();
 
@@ -9,6 +17,59 @@ holochain_wasmer_guest::holochain_externs!();
 enum ThisWasmEntry {
     AlwaysValidates,
     NeverValidates,
+}
+
+impl From<&ThisWasmEntry> for EntryDefId {
+    fn from(entry: &ThisWasmEntry) -> Self {
+        match entry {
+            ThisWasmEntry::AlwaysValidates => "always_validates",
+            ThisWasmEntry::NeverValidates => "never_validates",
+        }.into()
+    }
+}
+
+impl From<&ThisWasmEntry> for CrdtType {
+    fn from(_: &ThisWasmEntry) -> Self {
+        Self
+    }
+}
+
+impl From<&ThisWasmEntry> for RequiredValidations {
+    fn from(_: &ThisWasmEntry) -> Self {
+        5.into()
+    }
+}
+
+impl From<&ThisWasmEntry> for EntryVisibility {
+    fn from(_: &ThisWasmEntry) -> Self {
+        Self::Public
+    }
+}
+
+impl From<&ThisWasmEntry> for EntryDef {
+    fn from(entry: &ThisWasmEntry) -> Self {
+        Self {
+            id: entry.into(),
+            crdt_type: entry.into(),
+            required_validations: entry.into(),
+            visibility: entry.into(),
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
+    let globals: ZomeGlobals = try_result!(host_call!(__globals, ()), "failed to get globals");
+
+    let defs: EntryDefs = vec![
+        (&ThisWasmEntry::AlwaysValidates).into(),
+        (&ThisWasmEntry::NeverValidates).into(),
+    ].into();
+
+    ret!(GuestOutput::new(try_result!(EntryDefsCallbackResult::Defs(
+        globals.zome_name,
+        defs,
+    ).try_into(), "failed to serialize entry defs return value")));
 }
 
 #[no_mangle]
@@ -36,7 +97,7 @@ pub extern "C" fn validate(host_allocation_ptr: GuestPtr) -> GuestPtr {
 
 /// we can write normal rust code with Results outside our externs
 fn _commit_validate(to_commit: ThisWasmEntry) -> Result<GuestOutput, String> {
-    let commit_output: CommitEntryOutput = host_call!(__commit_entry, CommitEntryInput::new(Entry::App(to_commit.try_into()?)))?;
+    let commit_output: CommitEntryOutput = host_call!(__commit_entry, CommitEntryInput::new(((&to_commit).into(), Entry::App(to_commit.try_into()?))))?;
     Ok(GuestOutput::new(commit_output.try_into()?))
 }
 

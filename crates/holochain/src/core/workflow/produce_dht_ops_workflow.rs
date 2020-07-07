@@ -4,16 +4,15 @@ use crate::core::state::{
     dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue},
     workspace::{Workspace, WorkspaceResult},
 };
-use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp};
+use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, TimestampKey};
 use tracing::*;
 
-pub mod dht_op;
+pub mod dht_op_light;
 
 // TODO: #[instrument]
 pub async fn produce_dht_ops_workflow(
@@ -51,7 +50,7 @@ async fn produce_dht_ops_workflow_inner(
             let (op, hash) = DhtOpHashed::with_data(op).await.into();
             debug!(?hash);
             workspace.integration_queue.put(
-                (Timestamp::now(), hash.clone()).try_into()?,
+                (TimestampKey::now(), hash.clone()).into(),
                 IntegrationQueueValue {
                     validation_status: ValidationStatus::Valid,
                     op,
@@ -108,9 +107,7 @@ mod tests {
     use holochain_types::{
         dht_op::{ops_from_element, DhtOp, DhtOpHashed},
         header::{builder, EntryType},
-        observability,
-        test_utils::fake_app_entry_type,
-        Entry, EntryHashed,
+        observability, Entry, EntryHashed,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use matches::assert_matches;
@@ -133,10 +130,13 @@ mod tests {
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
             let (app_entry, entry_hash) = EntryHashed::with_data(app_entry).await.unwrap().into();
+            let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+                .next()
+                .unwrap();
             source_chain
                 .put(
                     builder::EntryCreate {
-                        entry_type: EntryType::App(fake_app_entry_type(0.into(), visibility)),
+                        entry_type: EntryType::App(app_entry_type),
                         entry_hash,
                     },
                     Some(app_entry),
@@ -231,10 +231,7 @@ mod tests {
                 .map(|(k, v)| {
                     let s = debug_span!("times");
                     let _g = s.enter();
-                    let key = IntegrationQueueKey::from(SerializedBytes::from(UnsafeBytes::from(
-                        k.to_vec(),
-                    )));
-                    let t: (Timestamp, DhtOpHash) = key.try_into().unwrap();
+                    let t: (TimestampKey, DhtOpHash) = IntegrationQueueKey::from(k).into();
                     debug!(time = ?t.0);
                     debug!(hash = ?t.1);
                     times.push(t.0);

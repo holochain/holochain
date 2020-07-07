@@ -24,12 +24,13 @@ pub fn test_wasm_env() -> TestEnvironment {
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
+    use holochain_keystore::KeystoreApiSender;
     use std::convert::TryFrom;
     let _ = holochain_crypto::crypto_init_sodium();
 
     tokio_safe_block_on::tokio_safe_block_on(
         async move {
-            let mut keystore = holochain_keystore::test_keystore::spawn_test_keystore(vec![
+            let keystore = holochain_keystore::test_keystore::spawn_test_keystore(vec![
                 holochain_keystore::test_keystore::MockKeypair {
                     pub_key: holo_hash::AgentPubKey::try_from(
                         "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",

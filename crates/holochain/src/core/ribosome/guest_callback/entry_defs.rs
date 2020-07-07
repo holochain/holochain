@@ -10,11 +10,11 @@ use holochain_zome_types::HostInput;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
-pub struct EntryDefsInvocation {}
+pub struct EntryDefsInvocation;
 
 impl EntryDefsInvocation {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -76,6 +76,7 @@ impl From<Vec<EntryDefsCallbackResult>> for EntryDefsResult {
 }
 
 #[cfg(test)]
+#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::EntryDefsInvocationFixturator;
@@ -234,7 +235,6 @@ mod test {
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
     }
 
-    // TODO: Use this same style to load in the entry defs to memory
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_entry_defs_implemented_defs() {

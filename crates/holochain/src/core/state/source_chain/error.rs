@@ -42,6 +42,9 @@ pub enum SourceChainError {
     #[error("Element previous header reference is invalid: {0}")]
     InvalidPreviousHeader(String),
 
+    #[error("InvalidCommit error: {0}")]
+    InvalidCommit(String),
+
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
 

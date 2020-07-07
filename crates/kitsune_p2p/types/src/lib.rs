@@ -64,9 +64,9 @@ pub mod transport {
         pub type TransportConnectionEventReceiver =
             futures::channel::mpsc::Receiver<TransportConnectionEvent>;
 
-        ghost_actor::ghost_actor! {
+        ghost_actor::ghost_chan! {
             /// Represents a connection to a remote node.
-            pub actor TransportConnection<super::TransportError> {
+            pub chan TransportConnection<super::TransportError> {
                 /// Retrieve the current url (address) of the remote end of this connection.
                 fn remote_url() -> url2::Url2;
 
@@ -85,7 +85,7 @@ pub mod transport {
             pub chan TransportListenerEvent<super::TransportError> {
                 /// Event for handling incoming connections from a remote.
                 fn incoming_connection(
-                    sender: super::transport_connection::TransportConnectionSender,
+                    sender: ghost_actor::GhostSender<super::transport_connection::TransportConnection>,
                     receiver: super::transport_connection::TransportConnectionEventReceiver,
                 ) -> ();
             }
@@ -95,15 +95,15 @@ pub mod transport {
         pub type TransportListenerEventReceiver =
             futures::channel::mpsc::Receiver<TransportListenerEvent>;
 
-        ghost_actor::ghost_actor! {
+        ghost_actor::ghost_chan! {
             /// Represents a socket binding for establishing connections.
-            pub actor TransportListener<super::TransportError> {
+            pub chan TransportListener<super::TransportError> {
                 /// Retrieve the current url (address) this listener is bound to.
                 fn bound_url() -> url2::Url2;
 
                 /// Attempt to establish an outgoing connection to a remote.
                 fn connect(url: url2::Url2) -> (
-                    super::transport_connection::TransportConnectionSender,
+                    ghost_actor::GhostSender<super::transport_connection::TransportConnection>,
                     super::transport_connection::TransportConnectionEventReceiver,
                 );
             }

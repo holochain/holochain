@@ -4,12 +4,10 @@ use crate::{
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, JsonProperties},
     dna::{DnaDef, DnaFile},
-    header::{AppEntryType, ZomeId},
     prelude::*,
 };
 use holo_hash::AgentPubKey;
 use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::path::PathBuf;
@@ -46,23 +44,19 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         uuid: uuid.to_string(),
         zomes: Vec::new(),
     };
-    tokio_safe_block_on::tokio_safe_block_on(
-        async move {
-            let mut wasm_code = Vec::new();
-            for (zome_name, wasm) in zomes {
-                let wasm = crate::dna::wasm::DnaWasmHashed::with_data(wasm)
-                    .await
-                    .unwrap();
-                let (wasm, wasm_hash) = wasm.into_inner();
-                let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
-                dna.zomes.push((zome_name, Zome { wasm_hash }));
-                wasm_code.push(wasm);
-            }
-            DnaFile::new(dna, wasm_code).await
-        },
-        std::time::Duration::from_secs(1),
-    )
-    .unwrap()
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let mut wasm_code = Vec::new();
+        for (zome_name, wasm) in zomes {
+            let wasm = crate::dna::wasm::DnaWasmHashed::with_data(wasm)
+                .await
+                .unwrap();
+            let (wasm, wasm_hash) = wasm.into_inner();
+            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+            dna.zomes.push((zome_name, Zome { wasm_hash }));
+            wasm_code.push(wasm);
+        }
+        DnaFile::new(dna, wasm_code).await
+    })
     .unwrap()
 }
 
@@ -118,13 +112,4 @@ pub fn fake_cap_secret() -> CapSecret {
 /// A fixture example ZomeCallInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> HostInput {
     HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
-}
-
-/// A fixture example AppEntryType for unit testing.
-pub fn fake_app_entry_type(zome_id: ZomeId, visibility: EntryVisibility) -> AppEntryType {
-    AppEntryType {
-        id: Vec::new(),
-        zome_id,
-        visibility,
-    }
 }

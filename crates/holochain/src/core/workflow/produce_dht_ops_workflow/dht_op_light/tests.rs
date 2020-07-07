@@ -1,6 +1,6 @@
 use super::dht_basis;
 use crate::{
-    core::state::cascade::{test_dbs_and_mocks, Cascade},
+    core::state::chain_cas::ChainCasBuf,
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
         EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
@@ -146,7 +146,7 @@ impl ChainElementTest {
     }
 
     fn entry_delete(mut self) -> (ChainElement, Vec<DhtOp>) {
-        let entry_delete = builder::EntryDelete {
+        let entry_delete = builder::ElementDelete {
             removes_address: self.header_hash.clone().into(),
         }
         .build(self.commons.next().unwrap());
@@ -156,8 +156,8 @@ impl ChainElementTest {
         let ops = vec![
             DhtOp::StoreElement(self.sig.clone(), header.clone(), None),
             DhtOp::RegisterAgentActivity(self.sig.clone(), header.clone()),
-            DhtOp::RegisterDeletedHeaderBy(self.sig.clone(), entry_delete.clone()),
-            DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete),
+            DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete.clone()),
+            DhtOp::RegisterDeletedEntryHeader(self.sig, entry_delete),
         ];
         (element, ops)
     }
@@ -268,11 +268,10 @@ async fn test_dht_basis() {
 
         // Setup a cascade
         let reader = env_ref.reader().unwrap();
-        let (mut cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+        let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
 
         // Put the header into the db
         cas.put(signed_header, Some(entry_hashed)).unwrap();
-        let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
 
         // Create the update header with the same hash
         let mut entry_update = fixt!(EntryUpdate);
@@ -283,7 +282,7 @@ async fn test_dht_basis() {
         let op = DhtOp::RegisterReplacedBy(fixt!(Signature), entry_update, Some(new_entry.into()));
 
         // Get the basis
-        let result = dht_basis(&op, &cascade).await.unwrap();
+        let result = dht_basis(&op, &cas).await.unwrap();
 
         // Check the hash matches
         assert_eq!(expected_entry_hash, result);

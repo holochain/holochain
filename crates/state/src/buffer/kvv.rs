@@ -205,6 +205,13 @@ where
             Err(err) => Err(err),
         }
     }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.scratch.clear();
+        Ok(self.db.clear(writer)?)
+    }
 }
 
 impl<'env, K, V, R> BufferedStore<'env> for KvvBuf<'env, K, V, R>
@@ -215,8 +222,15 @@ where
 {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
+        if self.is_clean() {
+            return Ok(());
+        }
         for (k, ValuesDelta { delete_all, deltas }) in self.scratch {
             // If delete_all is set, that we should delete everything persisted,
             // but then continue to add inserts from the ops, if present

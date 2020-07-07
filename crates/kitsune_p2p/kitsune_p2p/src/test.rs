@@ -1,6 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use crate::{event::*, spawn::*, types::*};
+    use crate::{
+        event::*,
+        spawn::*,
+        types::{actor::KitsuneP2pSender, *},
+    };
+    use futures::future::FutureExt;
+    use ghost_actor::GhostControlSender;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
@@ -12,7 +18,7 @@ mod tests {
         let a2: Arc<KitsuneAgent> =
             Arc::new(b"222222222222222222222222222222222222".to_vec().into());
 
-        let (mut p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
 
         let space1_clone = space1.clone();
         let a2_clone = a2.clone();
@@ -37,7 +43,9 @@ mod tests {
                         if &*payload != b"hello" {
                             panic!("unexpected request");
                         }
-                        let _ = respond(Ok(b"echo: hello".to_vec()));
+                        respond.r(Ok(async move { Ok(b"echo: hello".to_vec()) }
+                            .boxed()
+                            .into()));
                     }
                     _ => panic!("unexpected event"),
                 }
@@ -65,7 +73,7 @@ mod tests {
         let a3: Arc<KitsuneAgent> =
             Arc::new(b"333333333333333333333333333333333333".to_vec().into());
 
-        let (mut p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
 
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
@@ -88,7 +96,7 @@ mod tests {
                         if &*payload != b"test-broadcast" {
                             panic!("unexpected request");
                         }
-                        let _ = respond(Ok(()));
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     _ => panic!("unexpected event"),
@@ -130,7 +138,7 @@ mod tests {
         let a3: Arc<KitsuneAgent> =
             Arc::new(b"333333333333333333333333333333333333".to_vec().into());
 
-        let (mut p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
 
         let space1_clone = space1.clone();
         let r_task = tokio::task::spawn(async move {
@@ -149,7 +157,9 @@ mod tests {
                         }
                         let payload = String::from_utf8_lossy(&payload);
                         assert_eq!(&payload, "test-multi-request");
-                        let _ = respond(Ok(b"echo: test-multi-request".to_vec()));
+                        respond.r(Ok(async move { Ok(b"echo: test-multi-request".to_vec()) }
+                            .boxed()
+                            .into()));
                     }
                     _ => panic!("unexpected event"),
                 }

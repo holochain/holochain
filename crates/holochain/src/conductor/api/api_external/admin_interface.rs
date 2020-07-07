@@ -9,6 +9,7 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holo_hash::*;
+use holochain_keystore::KeystoreApiSender;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},
@@ -227,7 +228,8 @@ impl InterfaceApi for RealAdminInterfaceApi {
 }
 
 /// The set of messages that a conductor understands how to handle over an Admin interface
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(test, derive(Clone))]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminRequest {
     /// Set up and register an Admin interface task
@@ -266,7 +268,8 @@ pub enum AdminRequest {
 }
 
 /// Responses to messages received on an Admin interface
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(test, derive(Clone))]
 #[serde(rename = "snake-case", tag = "type", content = "data")]
 pub enum AdminResponse {
     /// This response is unimplemented

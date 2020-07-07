@@ -12,13 +12,13 @@
 
 use super::{
     error::WorkflowResult,
-    produce_dht_ops_workflow::dht_op::{error::DhtOpConvertError, light_to_op},
+    produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
 };
 use crate::core::{
     queue_consumer::WorkComplete,
     state::{
         chain_cas::ChainCasBuf,
-        dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegrationValue},
+        dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegratedDhtOpsValue},
     },
 };
 use fallible_iterator::FallibleIterator;
@@ -70,10 +70,10 @@ pub async fn publish_dht_ops_workflow(
     Ok(WorkComplete::Complete)
 }
 
+/// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
     workspace: &PublishDhtOpsWorkspace<'_>,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
-    // Read the authored for ops with receipt count < R
     // TODO: PERF: We need to check all ops every time this runs
     // instead we could have a queue of ops where count < R and a kv for count > R.
     // Then if the count for an ops reduces below R move it to the queue.
@@ -107,7 +107,7 @@ pub async fn publish_dht_ops_workflow_inner(
                 continue;
             }
         };
-        let IntegrationValue { basis, op, .. } = op;
+        let IntegratedDhtOpsValue { basis, op, .. } = op;
         let op = match light_to_op(op, workspace.cas()).await {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
@@ -158,15 +158,19 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
 mod tests {
     use super::*;
     use crate::{
-        core::{
-            state::cascade::{test_dbs_and_mocks, Cascade},
-            workflow::produce_dht_ops_workflow::dht_op::{dht_op_to_light_basis, DhtOpLight},
+        core::workflow::produce_dht_ops_workflow::dht_op_light::{
+            dht_op_to_light_basis, DhtOpLight,
         },
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
     use fixt::prelude::*;
+    use futures::future::FutureExt;
+    use ghost_actor::GhostControlSender;
     use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashable, Hashed};
-    use holochain_p2p::{actor::HolochainP2pSender, spawn_holochain_p2p};
+    use holochain_p2p::{
+        actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
+        spawn_holochain_p2p,
+    };
     use holochain_state::{
         buffer::BufferedStore,
         env::{EnvironmentWriteRef, ReadManager, WriteManager},
@@ -209,7 +213,7 @@ mod tests {
         num_hash: u32,
     ) -> (
         Arc<AtomicU32>,
-        HolochainP2pSender,
+        ghost_actor::GhostSender<HolochainP2p>,
         HolochainP2pCell,
         JoinHandle<()>,
     ) {
@@ -230,10 +234,10 @@ mod tests {
             let header_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
                 .await
                 .unwrap();
-            let light = IntegrationValue {
+            let light = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
-                op: DhtOpLight::RegisterAddLink(sig.clone(), header_hash.as_hash().clone()),
+                op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
                 when_integrated: Timestamp::now(),
             };
             data.push((sig, op_hashed, light, header_hash));
@@ -270,7 +274,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (mut network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
         let cell_network = network.to_cell(dna.clone(), agents[0].clone());
         let recv_count = Arc::new(AtomicU32::new(0));
 
@@ -283,7 +287,7 @@ mod tests {
                     use holochain_p2p::event::HolochainP2pEvent::*;
                     match evt {
                         Publish { respond, .. } => {
-                            let _ = respond(Ok(()));
+                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
                             recv_count.fetch_add(1, Ordering::SeqCst);
                         }
                         _ => panic!("unexpected event"),
@@ -334,12 +338,15 @@ mod tests {
         let num_hash = random_number();
         // Make Unpredictable with fixt (min 1)
         let num_agents = random_number();
-        let (recv_count, mut network, cell_network, recv_task) =
+        let (recv_count, network, cell_network, recv_task) =
             setup(&env_ref, &dbs, num_agents, num_hash).await;
 
         // Call the workflow
         // Get a reasonable delay for the number of agents
-        let delay = Duration::from_millis((20 * std::cmp::max(num_agents, num_hash)).into());
+        // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
+        let delay = Duration::from_millis(
+            std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
+        );
         call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
         // Check the handler receives the correct number of broadcasts
@@ -367,7 +374,7 @@ mod tests {
         let num_hash = random_number();
         // Make Unpredictable with fixt (min 1)
         let num_agents = random_number();
-        let (recv_count, mut network, cell_network, recv_task) =
+        let (recv_count, network, cell_network, recv_task) =
             setup(&env_ref, &dbs, num_agents, num_hash).await;
 
         // Update the authored to have > R counts
@@ -401,10 +408,14 @@ mod tests {
         }
 
         // Call the workflow
-        let delay = Duration::from_millis((20 * std::cmp::max(num_agents, num_hash)).into());
+        // Get a reasonable delay for the number of agents
+        // min 50ms scaled by num_agents * num_hash and capped at 2 seconds
+        let delay = Duration::from_millis(
+            std::cmp::max(50, std::cmp::min(2000, num_agents * num_hash)).into(),
+        );
         call_workflow(&env_ref, &dbs, cell_network, delay).await;
 
-        // Check the handler receives the no broadcasts
+        // Check that the handler receives no publish messages
         assert_eq!(0, recv_count.load(Ordering::SeqCst));
 
         // Shutdown
@@ -419,6 +430,15 @@ mod tests {
     // - No StoreEntry
     // - This workflow does not have access to private entries
     // - Add / Remove links: Currently publish all.
+    // ## Explication
+    // This test is a little big so a quick run down:
+    // 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterReplacedBy)
+    // 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
+    // 3. The workflow is run and the ops are sent to the network receiver
+    // 4. We check that the correct number of ops are received (so we know there were no other ops sent)
+    // 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
+    // 6. Every op that is received (StoreElement and RegisterReplacedBy) is checked to match the expected versions (entries removed)
+    // 7. Each op also has a count to check for duplicates
     #[tokio::test(threaded_scheduler)]
     async fn test_private_entries() {
         // Create test env
@@ -492,24 +512,23 @@ mod tests {
         }
         let (store_element, store_entry, register_replaced_by) = {
             let reader = env_ref.reader().unwrap();
-            // Create easy way to create test cascade
-            let (cas, metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
-            let cascade = Cascade::new(&cas, &metadata, &cache, &metadata_cache);
+            let cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
 
             let op = DhtOp::StoreElement(
                 sig.clone(),
                 entry_create_header.clone(),
                 Some(original_entry.clone().into()),
             );
+            // Op is expected to not contain the Entry even though the above contains the entry
             let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+            let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
             let store_element = (op_hash, light, basis, expected_op);
 
             // Create StoreEntry
             let header = NewEntryHeader::Create(entry_create.clone());
             let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+            let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
             let store_entry = (op_hash, light, basis);
 
@@ -519,8 +538,9 @@ mod tests {
                 entry_update.clone(),
                 Some(new_entry.clone().into()),
             );
+            // Op is expected to not contain the Entry even though the above contains the entry
             let expected_op = DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
-            let (light, basis) = dht_op_to_light_basis(op.clone(), &cascade).await.unwrap();
+            let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
             let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
             let register_replaced_by = (op_hash, light, basis, expected_op);
 
@@ -528,6 +548,7 @@ mod tests {
         };
 
         // Gather the expected op hashes, ops and basis
+        // We are only expecting Store Element and Register Replaced By ops and nothing else
         let store_element_count = Arc::new(AtomicU32::new(0));
         let register_replaced_by_count = Arc::new(AtomicU32::new(0));
         let expected = {
@@ -550,7 +571,7 @@ mod tests {
             let reader = env_ref.reader().unwrap();
             let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let (op_hash, light, basis, _) = store_element;
-            let integration = IntegrationValue {
+            let integration = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 op: light,
                 basis,
@@ -564,7 +585,7 @@ mod tests {
                 .unwrap();
 
             let (op_hash, light, basis) = store_entry;
-            let integration = IntegrationValue {
+            let integration = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 op: light,
                 basis,
@@ -578,7 +599,7 @@ mod tests {
                 .unwrap();
 
             let (op_hash, light, basis, _) = register_replaced_by;
-            let integration = IntegrationValue {
+            let integration = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 op: light,
                 basis,
@@ -607,7 +628,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (mut network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
         let cell_network = network.to_cell(dna.clone(), agents[0].clone());
         let recv_count = Arc::new(AtomicU32::new(0));
 
@@ -643,7 +664,7 @@ mod tests {
                                     }
                                 }
                             }
-                            let _ = respond(Ok(()));
+                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
                             recv_count.fetch_add(1, Ordering::SeqCst);
                         }
                         _ => panic!("unexpected event"),

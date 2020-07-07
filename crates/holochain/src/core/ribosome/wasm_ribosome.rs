@@ -61,6 +61,9 @@ use holochain_zome_types::CallbackResult;
 use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
 
+/// Path to the wasm cache path
+const WASM_CACHE_PATH_ENV: &'static str = "HC_WASM_CACHE_PATH";
+
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone)]
@@ -84,6 +87,7 @@ impl WasmRibosome {
         Ok(holochain_wasmer_host::instantiate::module(
             &self.wasm_cache_key(&zome_name)?,
             &wasm,
+            std::env::var_os(WASM_CACHE_PATH_ENV),
         )?)
     }
 
@@ -102,6 +106,7 @@ impl WasmRibosome {
             self.wasm_cache_key(&zome_name)?,
             &wasm,
             &imports,
+            std::env::var_os(WASM_CACHE_PATH_ENV),
         )?)
     }
 
@@ -118,9 +123,7 @@ impl WasmRibosome {
             ( $host_function:ident ) => {{
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_host_context_arc = std::sync::Arc::clone(&host_context_arc);
-                move |ctx: &mut Ctx,
-                      guest_allocation_ptr: GuestPtr|
-                      -> Result<Len, WasmError> {
+                move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
                     let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
@@ -128,23 +131,17 @@ impl WasmRibosome {
                     // this will be run in a tokio background thread
                     // designed for doing blocking work.
                     let output_sb: holochain_wasmer_host::prelude::SerializedBytes =
-                        tokio_safe_block_on::tokio_safe_block_on(
-                            $host_function(
-                                std::sync::Arc::clone(&closure_self_arc),
-                                std::sync::Arc::clone(&closure_host_context_arc),
-                                input,
-                            ),
-                            // TODO: B-01647 Identify calls that are essentially synchronous vs those that
-                            // may be async, such as get, send, etc.
-                            // async calls should require timeouts specified by hApp devs
-                            // pluck those timeouts out, and apply them here:
-                            std::time::Duration::from_secs(60),
+                        $host_function(
+                            std::sync::Arc::clone(&closure_self_arc),
+                            std::sync::Arc::clone(&closure_host_context_arc),
+                            input,
                         )
-                        .map_err(|_| WasmError::GuestResultHandling("async timeout".to_string()))?
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
 
-                    Ok($crate::holochain_wasmer_host::import::set_context_data(ctx, output_sb))
+                    Ok($crate::holochain_wasmer_host::import::set_context_data(
+                        ctx, output_sb,
+                    ))
                 }
             }};
         }
@@ -296,7 +293,7 @@ impl RibosomeT for WasmRibosome {
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
-        self,
+        &self,
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ZomeCallInvocation,
         // cell_conductor_api: CellConductorApi,

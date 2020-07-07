@@ -4,7 +4,8 @@ use crate::conductor::interface::InterfaceDriver;
 use serde::{self, Deserialize, Serialize};
 
 /// Information neeeded to spawn an Admin interface
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct AdminInterfaceConfig {
     /// By what means will the interface be exposed?
     /// Current only option is a local websocket running on a configurable port.

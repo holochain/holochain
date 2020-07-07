@@ -216,12 +216,35 @@ impl<'env> ChainCasBuf<'env> {
     pub fn private_entries(&self) -> Option<&EntryCas<'env>> {
         self.private_entries.as_ref()
     }
+
+    #[cfg(test)]
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.public_entries.clear_all(writer)?;
+        if let Some(private) = &mut self.private_entries {
+            private.clear_all(writer)?
+        }
+        self.headers.clear_all(writer)
+    }
 }
 
 impl<'env> BufferedStore<'env> for ChainCasBuf<'env> {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.headers.is_clean()
+            && self.public_entries.is_clean()
+            && self
+                .private_entries
+                .as_ref()
+                .map(|db| db.is_clean())
+                .unwrap_or(true)
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+        if self.is_clean() {
+            return Ok(());
+        }
         self.public_entries.flush_to_txn(writer)?;
         if let Some(db) = self.private_entries {
             db.flush_to_txn(writer)?
