@@ -1,10 +1,10 @@
 [package]
-name = "holochain_2020_legacy"
+name = "holochain_legacy"
 version = "0.0.1"
 description = "Holochain legacy types"
 license = "CAL-1.0"
-homepage = "https://github.com/Holo-host/holochain-2020"
-documentation = "https://github.com/Holo-host/holochain-2020"
+homepage = "https://github.com/Holo-host/holochain"
+documentation = "https://github.com/Holo-host/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
