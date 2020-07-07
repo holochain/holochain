@@ -84,12 +84,16 @@ pub async fn integrate_dht_ops_workflow(
         let mut num_integrated: usize = 0;
         let mut next_ops = Vec::new();
         for (op_hash, value) in ops {
-            match integrate_single_dht_op(&mut workspace, value).await? {
-                Outcome::Integrated(value) => {
-                    workspace.integrated_dht_ops.put(op_hash, value)?;
-                    num_integrated += 1;
+            // only integrate this op if it hasn't been integrated already!
+            // TODO: test for this [ B-01894 ]
+            if !workspace.integrated_dht_ops.get(&op_hash)?.is_some() {
+                match integrate_single_dht_op(&mut workspace, value).await? {
+                    Outcome::Integrated(integrated) => {
+                        workspace.integrated_dht_ops.put(op_hash, integrated)?;
+                        num_integrated += 1;
+                    }
+                    Outcome::Deferred(deferred) => next_ops.push((op_hash, deferred)),
                 }
-                Outcome::Deferred(value) => next_ops.push((op_hash, value)),
             }
         }
         ops = next_ops;
