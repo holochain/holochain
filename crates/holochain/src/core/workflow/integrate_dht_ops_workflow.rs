@@ -71,6 +71,8 @@ pub async fn integrate_dht_ops_workflow(
     )
     .await;
 
+    let mut total_integrated: usize = 0;
+
     // Try to process the queue over and over again, until we either exhaust
     // the queue, or we can no longer integrate anything in the queue.
     // We do this because items in the queue may depend on one another but may
@@ -91,6 +93,7 @@ pub async fn integrate_dht_ops_workflow(
                     Outcome::Integrated(integrated) => {
                         workspace.integrated_dht_ops.put(op_hash, integrated)?;
                         num_integrated += 1;
+                        total_integrated += 1;
                     }
                     Outcome::Deferred(deferred) => next_ops.push((op_hash, deferred)),
                 }
@@ -125,8 +128,15 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
 
     // trigger other workflows
+
+    // Only trigger publish if we have done any work during this workflow,
+    // to prevent endless cascades of publishing. Ideally, we shouldn't trigger
+    // publish unless we have integrated something we've authored, but this is
+    // a step in that direction.
     // TODO: only trigger if we have integrated ops that we have authored
-    trigger_publish.trigger();
+    if total_integrated > 0 {
+        trigger_publish.trigger();
+    }
 
     Ok(result)
 }
