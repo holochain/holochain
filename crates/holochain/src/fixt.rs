@@ -53,6 +53,7 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
                 .map(|t| (t.into(), t.into()))
                 .collect(),
         );
+
         let ribosome = WasmRibosome::new(dna_file);
 
         // warm the module cache for each wasm in the ribosome
