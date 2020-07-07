@@ -63,28 +63,6 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
             ribosome.module(host_context).unwrap();
         }
 
-        // let mut handles = Vec::new();
-
-        // // warm the module cache for each wasm in the ribosome
-        // for zome in self.0.curve.0.clone() {
-        //     let ribosome = ribosome.clone();
-        //     let h = tokio::task::spawn_blocking(move || {
-        //         let mut host_context = HostContextFixturator::new(Empty).next().unwrap();
-        //         host_context.zome_name = zome.into();
-        //         ribosome.module(host_context).unwrap();
-        //     });
-        //     handles.push(h);
-        // }
-
-        // // Join all the cache handles
-        // tokio_safe_block_on::tokio_safe_block_on(
-        //     futures::future::try_join_all(handles),
-        //     // Compiling can take some time the first time
-        //     std::time::Duration::from_secs(600),
-        // )
-        // .unwrap()
-        // .unwrap();
-
         self.0.index += 1;
 
         Some(ribosome)
