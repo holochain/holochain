@@ -397,6 +397,8 @@ where
                                 root_env_dir.clone(),
                                 keystore.clone(),
                                 holochain_p2p_cell,
+                                self.managed_task_add_sender.clone(),
+                                self.managed_task_stop_broadcaster.clone(),
                             )
                         });
 
@@ -600,7 +602,6 @@ where
 
 async fn delete_me_create_test_keystore() -> KeystoreSender {
     use std::convert::TryFrom;
-    let _ = holochain_crypto::crypto_init_sodium();
     let keystore = spawn_test_keystore(vec![
         MockKeypair {
             pub_key: holo_hash::AgentPubKey::try_from(
@@ -729,6 +730,7 @@ mod builder {
     pub struct ConductorBuilder<DS = RealDnaStore> {
         config: ConductorConfig,
         dna_store: DS,
+        keystore: Option<KeystoreSender>,
         #[cfg(test)]
         state: Option<ConductorState>,
         #[cfg(test)]
@@ -774,7 +776,13 @@ mod builder {
                 }
             }
 
-            let keystore = delete_me_create_test_keystore().await;
+            let _ = holochain_crypto::crypto_init_sodium();
+
+            let keystore = if let Some(keystore) = self.keystore {
+                keystore
+            } else {
+                delete_me_create_test_keystore().await
+            };
             let env_path = self.config.environment_path.clone();
 
             let environment = EnvironmentWrite::new(
@@ -849,6 +857,13 @@ mod builder {
             Ok(handle)
         }
 
+        /// Pass a test keystore in, to ensure that generated test agents
+        /// are actually available for signing (especially for tryorama compat)
+        pub fn with_keystore(mut self, keystore: KeystoreSender) -> Self {
+            self.keystore = Some(keystore);
+            self
+        }
+
         #[cfg(test)]
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
@@ -859,7 +874,7 @@ mod builder {
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
         #[cfg(test)]
-        pub async fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
+        pub fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
             self.mock_handle = Some(handle);
             self
         }

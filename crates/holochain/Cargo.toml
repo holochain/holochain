@@ -30,7 +30,7 @@ holochain_serialized_bytes = "=0.0.40"
 holochain_state = { version = "0.0.1", path = "../state" }
 holochain_types = { version = "0.0.1", path = "../types" }
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
-holochain_wasmer_host = "=0.0.33"
+holochain_wasmer_host = "=0.0.35"
 holochain_websocket = { version = "0.0.1", path = "../websocket" }
 holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 human-panic = "1.0.3"
@@ -63,13 +63,13 @@ uuid = { version = "0.7", features = [ "serde", "v4" ] }
 [dev-dependencies]
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
+criterion = "0.3"
 matches = "0.1.8"
+pretty_assertions = "0.6.1"
 serial_test = "0.4.0"
+test-case = "1.0.0"
 test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common" }
 unwrap_to = "0.1.0"
-pretty_assertions = "0.6.1"
-criterion = "0.3"
-hdk3 = { path = "../hdk" }
 
 [[bench]]
 name = "bench"
