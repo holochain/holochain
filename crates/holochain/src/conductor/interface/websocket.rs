@@ -692,7 +692,7 @@ mod test {
             source_chain.dump_as_json().await.unwrap()
         };
 
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
         };
