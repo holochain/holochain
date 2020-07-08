@@ -27,15 +27,3 @@ fn _touch(path_string: TestString) -> Result<(), WasmError> {
 fn _ls(path_string: TestString) -> Result<holochain_zome_types::link::Links, WasmError> {
     Path::from(path_string.0).ls()
 }
-
-#[test]
-#[cfg(test)]
-fn hash_path_delimiter() {
-    assert_eq!(hdk3::hash_path::path::DELIMITER, "/",);
-}
-
-#[test]
-#[cfg(test)]
-fn hash_path_name() {
-    assert_eq!(hdk3::hash_path::path::NAME, "hdk.path".as_bytes(),);
-}
