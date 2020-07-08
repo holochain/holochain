@@ -74,6 +74,13 @@ pub fn anchor(
     Ok(anchor.pwd()?)
 }
 
+pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
+    Ok(match get_entry!(anchor_address)? {
+        Some(Entry::App(sb)) => Some(Anchor::try_from(sb)?),
+        _ => None,
+    })
+}
+
 #[cfg(test)]
 #[test]
 fn hash_path_root() {

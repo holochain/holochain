@@ -19,6 +19,19 @@ macro_rules! map_extern {
 }
 
 #[macro_export]
+macro_rules! entry_defs {
+    ( $defs_vec:expr ) => {
+        fn __entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {
+            Ok(EntryDefsCallbackResult::Defs(
+                globals!()?.zome_name,
+                $defs_vec.into(),
+            ))
+        }
+        map_extern!(entry_defs, __entry_defs);
+    };
+}
+
+#[macro_export]
 macro_rules! api_call {
     ( $f:ident, $input:expr, $outputt:ty ) => {{
         holochain_wasmer_guest::holochain_externs!();

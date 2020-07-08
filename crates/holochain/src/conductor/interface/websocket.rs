@@ -256,10 +256,7 @@ mod test {
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
         observability,
-        test_utils::{
-            fake_agent_pubkey_1, fake_agent_pubkey_2, fake_dna_file, fake_dna_zomes,
-            write_fake_dna_file,
-        },
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;

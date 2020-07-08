@@ -5,13 +5,7 @@ use test_wasm_common::TestString;
 
 holochain_externs!();
 
-fn _entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {
-    Ok(EntryDefsCallbackResult::Defs(
-        globals!()?.zome_name,
-        vec![Path::entry_def()].into(),
-    ))
-}
-map_extern!(entry_defs, _entry_defs);
+entry_defs!(vec![Path::entry_def()]);
 
 fn _pwd(path_string: TestString) -> Result<HoloHashCore, WasmError> {
     Path::from(path_string.0).pwd()
@@ -24,7 +18,6 @@ fn _exists(path_string: TestString) -> Result<TestBool, WasmError> {
 map_extern!(exists, _exists);
 
 fn _touch(path_string: TestString) -> Result<(), WasmError> {
-    debug!(&path_string)?;
     Path::from(path_string.0).touch()
 }
 map_extern!(touch, _touch);
