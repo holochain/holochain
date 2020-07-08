@@ -1,22 +1,18 @@
 use hdk3::prelude::*;
 use link::LinkTag;
 use test_wasm_common::TestString;
+use test_wasm_common::AnchorInput;
+use test_wasm_common::MaybeAnchor;
 
 holochain_externs!();
 
 entry_defs!(vec![Anchor::entry_def()]);
 
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
-struct AnchorInput(String, String);
 fn _anchor(input: AnchorInput) -> Result<HoloHashCore, WasmError> {
     hdk3::prelude::anchor(input.0, input.1)
 }
 map_extern!(anchor, _anchor);
 
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[repr(transparent)]
-#[serde(transparent)]
-struct MaybeAnchor(Option<Anchor>);
 fn _get_anchor(address: HoloHashCore) -> Result<MaybeAnchor, WasmError> {
     Ok(MaybeAnchor(hdk3::prelude::get_anchor(address)?))
 }

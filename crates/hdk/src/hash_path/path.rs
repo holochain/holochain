@@ -76,6 +76,28 @@ impl From<String> for Component {
     }
 }
 
+impl TryFrom<&Component> for String {
+    type Error = SerializedBytesError;
+    fn try_from(component: &Component) -> Result<Self, Self::Error> {
+        let (chars, build) =
+            component
+                .as_ref()
+                .iter()
+                .fold((vec![], vec![]), |(mut chars, mut build), b| {
+                    build.push(*b);
+                    if build.len() == 4 {
+                        let u = u32::from_le_bytes(build[0..4].try_into().unwrap());
+                        dbg!(&u);
+                        chars.push(std::char::from_u32(u).unwrap());
+                        build = vec![];
+                    }
+                    (chars, build)
+                });
+        assert_eq!(build.len(), 0);
+        Ok(chars.iter().collect::<String>())
+    }
+}
+
 /// a Path is a vector of components
 /// it represents a single traversal of a tree structure down to some arbitrary point
 /// the main intent is that we can recursively walk back up the tree, hashing, committing and
@@ -271,6 +293,19 @@ fn hash_path_component() {
     let component = Component::from(bytes.clone());
 
     assert_eq!(bytes, component.as_ref(),);
+
+    assert_eq!(
+        Component::from(vec![102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0]),
+        Component::from("foo"),
+    );
+
+    assert_eq!(
+        String::try_from(&Component::from(vec![
+            102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0
+        ]))
+        .unwrap(),
+        String::from("foo"),
+    );
 }
 
 #[test]

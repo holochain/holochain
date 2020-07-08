@@ -1,3 +1,4 @@
+use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
@@ -6,7 +7,7 @@ use holochain_zome_types::link::LinkTag;
 /// "hdk.path.anchor.root"
 pub const ROOT: &str = "hdk.path.anchor.root";
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, Clone)]
+#[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, SerializedBytes, Clone)]
 pub struct Anchor {
     pub anchor_type: String,
     pub anchor_text: Option<String>,
@@ -20,6 +21,35 @@ impl From<&Anchor> for Path {
             anchor.anchor_type,
             anchor.anchor_text.as_ref().unwrap_or(&String::default())
         ))
+    }
+}
+
+impl TryFrom<&Path> for Anchor {
+    type Error = SerializedBytesError;
+    fn try_from(path: &Path) -> Result<Self, Self::Error> {
+        let components: Vec<Component> = path.as_ref().to_owned();
+        if components.len() == 2 || components.len() == 3 {
+            if components[0] == Component::from(ROOT) {
+                Ok(Anchor {
+                    anchor_type: (&components[1]).try_into()?,
+                    anchor_text: {
+                        match components.get(2) {
+                            Some(component) => Some(component.try_into()?),
+                            None => None,
+                        }
+                    },
+                })
+            } else {
+                Err(SerializedBytesError::FromBytes(
+                    "Bad anchor path root".into(),
+                ))
+            }
+        } else {
+            Err(SerializedBytesError::FromBytes(format!(
+                "Bad anchor path length {}",
+                components.len()
+            )))
+        }
     }
 }
 
@@ -62,7 +92,11 @@ pub fn anchor(
 
 pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
     Ok(match get_entry!(anchor_address)? {
-        Some(Entry::App(sb)) => Some(Anchor::try_from(sb)?),
+        Some(Entry::App(sb)) => {
+            let path = Path::try_from(sb)?;
+            debug!(&path)?;
+            Some(Anchor::try_from(&path)?)
+        }
         _ => None,
     })
 }
@@ -141,7 +175,7 @@ fn hash_path_anchor_path() {
 
 #[cfg(test)]
 #[test]
-fn hash_path_classic_entry_def() {
+fn hash_path_anchor_entry_def() {
     assert_eq!(Path::entry_def_id(), Anchor::entry_def_id(),);
 
     assert_eq!(Path::crdt_type(), Anchor::crdt_type(),);
@@ -151,4 +185,27 @@ fn hash_path_classic_entry_def() {
     assert_eq!(Path::entry_visibility(), Anchor::entry_visibility(),);
 
     assert_eq!(Path::entry_def(), Anchor::entry_def(),);
+}
+
+#[cfg(test)]
+#[test]
+fn hash_path_anchor_from_path() {
+    let path = Path::from(vec![
+        Component::from(vec![
+            104, 0, 0, 0, 100, 0, 0, 0, 107, 0, 0, 0, 46, 0, 0, 0, 112, 0, 0, 0, 97, 0, 0, 0, 116,
+            0, 0, 0, 104, 0, 0, 0, 46, 0, 0, 0, 97, 0, 0, 0, 110, 0, 0, 0, 99, 0, 0, 0, 104, 0, 0,
+            0, 111, 0, 0, 0, 114, 0, 0, 0, 46, 0, 0, 0, 114, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0,
+            116, 0, 0, 0,
+        ]),
+        Component::from(vec![102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0]),
+        Component::from(vec![98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0]),
+    ]);
+
+    assert_eq!(
+        Anchor::try_from(&path).unwrap(),
+        Anchor {
+            anchor_type: "foo".into(),
+            anchor_text: Some("bar".into()),
+        },
+    );
 }

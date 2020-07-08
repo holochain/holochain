@@ -1,4 +1,4 @@
-use holochain_serialized_bytes::prelude::*;
+use hdk3::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct TestString(pub String);
@@ -26,3 +26,11 @@ impl From<bool> for TestBool {
         Self(b)
     }
 }
+
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct AnchorInput(pub String, pub String);
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct MaybeAnchor(pub Option<Anchor>);

@@ -582,6 +582,7 @@ dependencies = [
 name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
+ "hdk3",
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
