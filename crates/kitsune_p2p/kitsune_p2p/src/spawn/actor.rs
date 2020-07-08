@@ -8,6 +8,10 @@ use std::{
 mod space;
 use space::*;
 
+/// A small delay to prevent notify multi spamming
+// FIXME: Use better strategy
+const NOTIFY_DELAY_MS: u64 = 10;
+
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
 
@@ -284,7 +288,10 @@ impl KitsuneP2pActor {
                                 }
                             });
                             // Chill this loop out a little
-                            tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+                            tokio::time::delay_for(std::time::Duration::from_millis(
+                                NOTIFY_DELAY_MS,
+                            ))
+                            .await;
                         }
                     }
                 }
