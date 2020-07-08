@@ -8,7 +8,7 @@
 //! ```rust, no_run
 //! # async fn async_main () {
 //! # use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
-//! use holochain_2020::conductor::{Conductor, ConductorBuilder, ConductorHandle};
+//! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! # let env = test_conductor_env();
 //! #   let TestEnvironment {
 //! #       env: wasm_env,
