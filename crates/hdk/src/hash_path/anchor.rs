@@ -81,6 +81,31 @@ pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmEr
     })
 }
 
+pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
+    let links = Path::from(ROOT)
+        .ls()?
+        .into_inner()
+        .into_iter()
+        .map(|link| link.target)
+        .collect();
+    Ok(links)
+}
+
+pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
+    let anchor = Anchor {
+        anchor_type: anchor_type,
+        anchor_text: None,
+    };
+    anchor.touch()?;
+    let links = anchor
+        .ls()?
+        .into_inner()
+        .into_iter()
+        .map(|link| link.target)
+        .collect();
+    Ok(links)
+}
+
 #[cfg(test)]
 #[test]
 fn hash_path_root() {

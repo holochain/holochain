@@ -8,6 +8,8 @@ pub use crate::globals;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;
+pub use crate::hash_path::anchor::list_anchor_type_addresses;
+pub use crate::hash_path::anchor::list_anchor_addresses;
 pub use crate::link_entries;
 pub use crate::map_extern;
 pub use holo_hash_core::HoloHashCore;
