@@ -87,6 +87,7 @@ pub fn commit_entry<'a>(
     let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderAddress>> {
         async move {
             let source_chain = &mut workspace.source_chain;
+            dbg!(source_chain.agent_pubkey());
             // push the header and the entry into the source chain
             source_chain.put(header_builder, Some(entry)).await
         }

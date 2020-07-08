@@ -26,12 +26,13 @@ pub async fn sys_validate_element(
     )
     .await?;
 
-    // The signature was authored by the agent that owns this chain.
+    // The header was authored by the agent that owns this chain.
     if element.header().author() != author {
         tracing::error!(
-            "Author mismatch! {} != {}",
+            "Author mismatch! {} != {}, element: {:?}",
             element.header().author(),
             author,
+            element
         );
         return Err(SourceChainError::InvalidSignature);
     }
