@@ -1,5 +1,5 @@
 use hdk3::prelude::*;
-// use link::LinkTag;
+use link::LinkTag;
 use test_wasm_common::TestString;
 
 holochain_externs!();
@@ -36,18 +36,11 @@ fn _list_anchor_addresses(anchor_type: TestString) -> Result<Hashes, WasmError> 
 }
 map_extern!(list_anchor_addresses, _list_anchor_addresses);
 
-// fn _list_anchor_tags(anchor_type: TestString) -> Result<Vec<LinkTag>, WasmError> {
-//     let anchor = Anchor {
-//         anchor_type: anchor_type.0,
-//         anchor_text: None,
-//     };
-//     anchor.touch()?;
-//     let links = anchor
-//         .ls()?
-//         .into_inner()
-//         .into_iter()
-//         .map(|link| link.tag)
-//         .collect();
-//     Ok(links)
-// }
-// map_extern!(list_anchor_tags, _list_anchor_tags);
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
+struct LinkTags(Vec<LinkTag>);
+fn _list_anchor_tags(anchor_type: TestString) -> Result<LinkTags, WasmError> {
+    Ok(LinkTags(hdk3::prelude::list_anchor_tags(anchor_type.0)?))
+}
+map_extern!(list_anchor_tags, _list_anchor_tags);

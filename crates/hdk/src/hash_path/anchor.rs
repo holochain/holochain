@@ -1,6 +1,7 @@
 use crate::hash_path::path::Path;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
+use holochain_zome_types::link::LinkTag;
 
 /// "hdk.path.anchor.root"
 pub const ROOT: &str = "hdk.path.anchor.root";
@@ -91,7 +92,9 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::HoloHashCore>,
     Ok(links)
 }
 
-pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
+pub fn list_anchor_addresses(
+    anchor_type: String,
+) -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
     let anchor = Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
@@ -102,6 +105,21 @@ pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash_core::
         .into_inner()
         .into_iter()
         .map(|link| link.target)
+        .collect();
+    Ok(links)
+}
+
+pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> {
+    let anchor = Anchor {
+        anchor_type: anchor_type,
+        anchor_text: None,
+    };
+    anchor.touch()?;
+    let links = anchor
+        .ls()?
+        .into_inner()
+        .into_iter()
+        .map(|link| link.tag)
         .collect();
     Ok(links)
 }
