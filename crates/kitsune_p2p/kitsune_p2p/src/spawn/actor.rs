@@ -283,6 +283,8 @@ impl KitsuneP2pActor {
                                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 }
                             });
+                            // Chill this loop out a little
+                            tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
                         }
                     }
                 }
