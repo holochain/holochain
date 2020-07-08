@@ -15,11 +15,13 @@ fn _entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {
 }
 map_extern!(entry_defs, _entry_defs);
 
-fn _anchor(anchor_type: TestString, anchor_text: TestString) -> Result<HoloHashCore, WasmError> {
-    debug!(&anchor_type)?;
-    debug!(&anchor_text)?;
-    hash_path::anchor::anchor(anchor_type.0, anchor_text.0)
+fn _anchor(anchor: Anchor) -> Result<HoloHashCore, WasmError> {
+    debug!(&anchor.anchor_type)?;
+    debug!(&anchor.anchor_text)?;
+    anchor.touch()?;
+    Ok(anchor.pwd()?)
 }
+
 map_extern!(anchor, _anchor);
 
 fn _get_anchor(address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
