@@ -43,22 +43,6 @@ impl Anchor {
     pub fn entry_def() -> EntryDef {
         Path::entry_def()
     }
-
-    pub fn pwd(&self) -> Result<holo_hash_core::HoloHashCore, WasmError> {
-        Path::from(self).pwd()
-    }
-
-    pub fn exists(&self) -> Result<bool, WasmError> {
-        Path::from(self).exists()
-    }
-
-    pub fn touch(&self) -> Result<(), WasmError> {
-        Path::from(self).touch()
-    }
-
-    pub fn ls(&self) -> Result<holochain_zome_types::link::Links, WasmError> {
-        Path::from(self).ls()
-    }
 }
 
 /// simple string interface to simple string based paths
@@ -67,12 +51,13 @@ pub fn anchor(
     anchor_type: String,
     anchor_text: String,
 ) -> Result<holo_hash_core::HoloHashCore, WasmError> {
-    let anchor = Anchor {
+    let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
-    };
-    anchor.touch()?;
-    Ok(anchor.pwd()?)
+    })
+        .into();
+    path.touch()?;
+    Ok(path.pwd()?)
 }
 
 pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
@@ -95,12 +80,13 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::HoloHashCore>,
 pub fn list_anchor_addresses(
     anchor_type: String,
 ) -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
-    let anchor = Anchor {
+    let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
-    };
-    anchor.touch()?;
-    let links = anchor
+    })
+        .into();
+    path.touch()?;
+    let links = path
         .ls()?
         .into_inner()
         .into_iter()
@@ -110,12 +96,13 @@ pub fn list_anchor_addresses(
 }
 
 pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> {
-    let anchor = Anchor {
+    let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
-    };
-    anchor.touch()?;
-    let links = anchor
+    })
+        .into();
+    path.touch()?;
+    let links = path
         .ls()?
         .into_inner()
         .into_iter()
