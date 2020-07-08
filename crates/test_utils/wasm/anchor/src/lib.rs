@@ -1,44 +1,86 @@
+use hdk3::hash_path::path::Path;
+use hdk3::hash_path::{self, anchor::Anchor};
 use hdk3::prelude::*;
+use link::LinkTag;
+use test_wasm_common::TestString;
 
 holochain_externs!();
 
-#[no_mangle]
-pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
-    let globals: ZomeGlobals = try_result!(host_call!(__globals, ()), "failed to get globals");
-
-    let defs: EntryDefs = vec![
-        Anchor::entry_def()
-    ].into();
-
-    ret!(GuestOutput::new(try_result!(EntryDefsCallbackResult::Defs(
-        globals.zome_name,
-        defs,
-    ).try_into(), "failed to serialize entry defs")));
+fn _entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {
+    let mut defs = vec![Path::entry_def(), Anchor::entry_def()];
+    Ok(EntryDefsCallbackResult::Defs(
+        globals!()?.zome_name,
+        defs.into(),
+    ))
 }
+map_extern!(entry_defs, _entry_defs);
 
-
-#[test]
-fn anchor_namespace() {
-    assert_eq!(
-        hdk3::anchor::ROOT,
-        "holochain_anchors::root",
-    );
-
-    assert_eq!(
-        hdk3::anchor::ANCHOR,
-        "holochain_anchors::anchor",
-    );
-
-    assert_eq!(
-        hdk3::anchor::LINK,
-        "holochain_anchors::link",
-    );
+fn _anchor(anchor_type: TestString, anchor_text: TestString) -> Result<HoloHashCore, WasmError> {
+    debug!(&anchor_type)?;
+    debug!(&anchor_text)?;
+    hash_path::anchor::anchor(anchor_type.0, anchor_text.0)
 }
+map_extern!(anchor, _anchor);
 
-#[test]
-fn anchor_required_validations() {
-    assert_eq!(
-        hdk3::anchor::REQUIRED_VALIDATIONS,
-        13,
-    );
+fn _get_anchor(address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
+    let entry = get_entry!(address)?;
+    Ok(match entry {
+        Some(Entry::App(serialized_bytes)) => Some(Anchor::try_from(serialized_bytes)?),
+        _ => None,
+    })
 }
+map_extern!(get_anchor, _get_anchor);
+
+fn _list_anchor_type_address() -> Result<Vec<HoloHashCore>, WasmError> {
+    let links = Path::from(hash_path::anchor::ROOT)
+        .ls()?
+        .into_inner()
+        .into_iter()
+        .map(|link| link.target)
+        .collect();
+    Ok(links)
+}
+map_extern!(list_anchor_type_address, _list_anchor_type_address);
+
+fn _list_anchor_type_tags() -> Result<Vec<LinkTag>, WasmError> {
+    let links = Path::from(hash_path::anchor::ROOT)
+        .ls()?
+        .into_inner()
+        .into_iter()
+        .map(|link| link.tag)
+        .collect();
+    Ok(links)
+}
+map_extern!(list_anchor_type_tags, _list_anchor_type_tags);
+
+fn _list_anchor_addresses(anchor_type: TestString) -> Result<Vec<HoloHashCore>, WasmError> {
+    let anchor = Anchor {
+        anchor_type: anchor_type.0,
+        anchor_text: None,
+    };
+    anchor.touch()?;
+    let links = anchor
+        .ls()?
+        .into_inner()
+        .into_iter()
+        .map(|link| link.target)
+        .collect();
+    Ok(links)
+}
+map_extern!(list_anchor_addresses, _list_anchor_addresses);
+
+fn _list_anchor_tags(anchor_type: TestString) -> Result<Vec<LinkTag>, WasmError> {
+    let anchor = Anchor {
+        anchor_type: anchor_type.0,
+        anchor_text: None,
+    };
+    anchor.touch()?;
+    let links = anchor
+        .ls()?
+        .into_inner()
+        .into_iter()
+        .map(|link| link.tag)
+        .collect();
+    Ok(links)
+}
+map_extern!(list_anchor_tags, _list_anchor_tags);
