@@ -1,10 +1,10 @@
 use fixt::prelude::*;
-use holochain_2020::core::state::{
+use holochain::core::state::{
     cascade::Cascade,
     metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
-use holochain_2020::fixt::ZomeIdFixturator;
+use holochain::fixt::ZomeIdFixturator;
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
