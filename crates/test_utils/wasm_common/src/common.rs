@@ -1,6 +1,9 @@
+use hdk3::prelude::link::LinkTag;
 use hdk3::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
 pub struct TestString(pub String);
 
 impl From<String> for TestString {
@@ -10,6 +13,7 @@ impl From<String> for TestString {
 }
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
+#[repr(transparent)]
 pub struct TestBytes(#[serde(with = "serde_bytes")] Vec<u8>);
 
 impl From<Vec<u8>> for TestBytes {
@@ -18,7 +22,9 @@ impl From<Vec<u8>> for TestBytes {
     }
 }
 
-#[derive(Serialize, Deserialize, SerializedBytes)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
 pub struct TestBool(pub bool);
 
 impl From<bool> for TestBool {
@@ -30,7 +36,17 @@ impl From<bool> for TestBool {
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AnchorInput(pub String, pub String);
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct MaybeAnchor(pub Option<Anchor>);
+
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct Hashes(pub Vec<HoloHashCore>);
+
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct LinkTags(pub Vec<LinkTag>);

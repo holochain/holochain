@@ -75,13 +75,13 @@ pub mod wasm_test {
     use crate::core::workflow::produce_dht_ops_workflow::{
         produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
     };
+    use hdk3::prelude::link::LinkTag;
+    use hdk3::prelude::*;
     use holo_hash_core::HoloHashCore;
     use holo_hash_core::HoloHashCoreHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
-    use test_wasm_common::AnchorInput;
-    use test_wasm_common::MaybeAnchor;
-    use test_wasm_common::TestString;
+    use test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_ls() {
@@ -99,7 +99,16 @@ pub mod wasm_test {
                 .await
                 .unwrap();
 
-            // touch foo/bar
+            // touch foo/bar twice to ensure idempotency
+            let _: () = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(
+                    raw_workspace,
+                    TestWasm::HashPath,
+                    "touch",
+                    TestString::from("foo/bar".to_string())
+                )
+            };
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
@@ -155,6 +164,54 @@ pub mod wasm_test {
             }
         }
 
+        let exists_output = {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            let output: TestBool = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(
+                    raw_workspace,
+                    TestWasm::HashPath,
+                    "exists",
+                    TestString::from("foo".to_string())
+                )
+            };
+
+            output
+        };
+
+        assert_eq!(TestBool(true), exists_output,);
+
+        let (foo_bar, foo_baz) = {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            let foo_bar: holo_hash_core::HoloHashCore = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(
+                    raw_workspace,
+                    TestWasm::HashPath,
+                    "pwd",
+                    TestString::from("foo/bar".to_string())
+                )
+            };
+
+            let foo_baz: holo_hash_core::HoloHashCore = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(
+                    raw_workspace,
+                    TestWasm::HashPath,
+                    "pwd",
+                    TestString::from("foo/baz".to_string())
+                )
+            };
+
+            (foo_bar, foo_baz)
+        };
+
         let ls_output = {
             let reader = env_ref.reader().unwrap();
             let mut workspace =
@@ -173,20 +230,10 @@ pub mod wasm_test {
             output
         };
 
-        println!("{:?}", &ls_output);
-
-        // let expected_path = hdk3::hash_path::path::Path::from("foo/bar");
-        //
-        // let expected_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        //     holochain_types::entry::EntryHashed::with_data(Entry::App((&expected_path).try_into().unwrap())).await
-        // })
-        // .unwrap()
-        // .into_hash();
-        //
-        // assert_eq!(
-        //     expected_hash.into_inner(),
-        //     output.into_inner(),
-        // );
+        let links = ls_output.into_inner();
+        assert_eq!(2, links.len());
+        assert_eq!(links[0].target, foo_baz,);
+        assert_eq!(links[1].target, foo_bar,);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -195,7 +242,7 @@ pub mod wasm_test {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
-        let anchor_address = {
+        let (anchor_address_one, anchor_address_two) = {
             let reader = env_ref.reader().unwrap();
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
@@ -251,7 +298,7 @@ pub mod wasm_test {
             })
             .unwrap();
 
-            anchor_address_one
+            (anchor_address_one, anchor_address_two)
         };
 
         // Needs metadata to return get
@@ -286,34 +333,101 @@ pub mod wasm_test {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
+            let input = anchor_address_one.clone();
             let output: MaybeAnchor = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(raw_workspace, TestWasm::Anchor, "get_anchor", input)
+            };
+
+            output
+        };
+
+        assert_eq!(
+            MaybeAnchor(Some(Anchor {
+                anchor_type: "foo".into(),
+                anchor_text: Some("bar".into()),
+            })),
+            get_output,
+        );
+
+        let list_anchor_type_addresses_output = {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            let output: Hashes = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::Anchor,
-                    "get_anchor",
-                    anchor_address
+                    "list_anchor_type_addresses",
+                    ()
                 )
             };
 
             output
         };
 
-        dbg!(&get_output);
+        // should be 1 anchor type, "foo"
+        assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
+        assert_eq!(
+            (list_anchor_type_addresses_output.0)[0].get_raw().to_vec(),
+            vec![
+                46, 187, 74, 48, 90, 73, 153, 38, 193, 172, 241, 90, 224, 154, 107, 253, 214, 55,
+                229, 101, 197, 18, 128, 240, 62, 161, 32, 217, 225, 88, 33, 22, 35, 133, 149, 209
+            ],
+        );
 
-        // println!("{:?}", &ls_output);
+        let list_anchor_addresses_output = {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        // let expected_path = hdk3::hash_path::path::Path::from("foo/bar");
-        //
-        // let expected_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        //     holochain_types::entry::EntryHashed::with_data(Entry::App((&expected_path).try_into().unwrap())).await
-        // })
-        // .unwrap()
-        // .into_hash();
-        //
-        // assert_eq!(
-        //     expected_hash.into_inner(),
-        //     output.into_inner(),
-        // );
+            let output: Hashes = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(
+                    raw_workspace,
+                    TestWasm::Anchor,
+                    "list_anchor_addresses",
+                    TestString("foo".into())
+                )
+            };
+
+            output
+        };
+
+        // should be 2 anchors under "foo" sorted by hash
+        assert_eq!(list_anchor_addresses_output.0.len(), 2,);
+        assert_eq!(
+            (list_anchor_addresses_output.0)[0].get_raw().to_vec(),
+            anchor_address_two.get_raw().to_vec(),
+        );
+        assert_eq!(
+            (list_anchor_addresses_output.0)[1].get_raw().to_vec(),
+            anchor_address_one.get_raw().to_vec(),
+        );
+
+        let list_anchor_tags_output = {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            let output: LinkTags = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(
+                    raw_workspace,
+                    TestWasm::Anchor,
+                    "list_anchor_tags",
+                    TestString("foo".into())
+                )
+            };
+
+            output
+        };
+
+        assert_eq!(
+            LinkTags(vec![LinkTag(vec![104, 100, 107, 46, 112, 97, 116, 104,],),],),
+            list_anchor_tags_output,
+        );
     }
 }

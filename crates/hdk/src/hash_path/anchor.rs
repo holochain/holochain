@@ -94,7 +94,6 @@ pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmEr
     Ok(match get_entry!(anchor_address)? {
         Some(Entry::App(sb)) => {
             let path = Path::try_from(sb)?;
-            debug!(&path)?;
             Some(Anchor::try_from(&path)?)
         }
         _ => None,
@@ -129,6 +128,11 @@ pub fn list_anchor_addresses(
     Ok(links)
 }
 
+/// @TODO not sure if this is useful or done correctly??
+/// the whole idea of link tags has been removed since the old anchors implementation and even the
+/// old version only returned the same thing as the anchor text
+/// in this version we just remove the same link tag no matter what because all anchor links have
+/// the same tag
 pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,
@@ -136,13 +140,15 @@ pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> 
     })
         .into();
     path.touch()?;
-    let links = path
+    let mut tags: Vec<LinkTag> = path
         .ls()?
         .into_inner()
         .into_iter()
         .map(|link| link.tag)
         .collect();
-    Ok(links)
+    tags.sort();
+    tags.dedup();
+    Ok(tags)
 }
 
 #[cfg(test)]

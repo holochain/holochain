@@ -76,25 +76,52 @@ impl From<String> for Component {
     }
 }
 
+/// restoring a String from a Component requires Vec<u8> to u32 to utf8 handling
 impl TryFrom<&Component> for String {
     type Error = SerializedBytesError;
     fn try_from(component: &Component) -> Result<Self, Self::Error> {
-        let (chars, build) =
-            component
-                .as_ref()
-                .iter()
-                .fold((vec![], vec![]), |(mut chars, mut build), b| {
-                    build.push(*b);
-                    if build.len() == 4 {
-                        let u = u32::from_le_bytes(build[0..4].try_into().unwrap());
-                        dbg!(&u);
-                        chars.push(std::char::from_u32(u).unwrap());
-                        build = vec![];
+        if component.as_ref().len() % 4 != 0 {
+            return Err(SerializedBytesError::FromBytes(format!(
+                "attempted to create u32s from utf8 bytes of length not a factor of 4: length {}",
+                component.as_ref().len()
+            )));
+        }
+        let (chars, _, error) = component
+            .as_ref()
+            .iter()
+            // @todo this algo seems a bit inefficient but also i'm not sure how much that
+            // matters in reality, maybe a premature optimisation to do anything else
+            .fold(
+                (vec![], vec![], None),
+                |(mut chars, mut build, mut error), b| {
+                    if error.is_none() {
+                        build.push(*b);
+                        if build.len() == std::mem::size_of::<u32>() {
+                            // convert the build vector into 4 le_bytes for the u32
+                            // this is an unwrap because we already check the total length above
+                            let le_bytes = build[0..std::mem::size_of::<u32>()].try_into().unwrap();
+                            let u = u32::from_le_bytes(le_bytes);
+                            match std::char::from_u32(u) {
+                                Some(c) => {
+                                    chars.push(c);
+                                    build = vec![];
+                                }
+                                None => {
+                                    error = Some(Err(SerializedBytesError::FromBytes(format!(
+                                        "unknown char for u32: {}",
+                                        u
+                                    ))));
+                                }
+                            }
+                        }
                     }
-                    (chars, build)
-                });
-        assert_eq!(build.len(), 0);
-        Ok(chars.iter().collect::<String>())
+                    (chars, build, error)
+                },
+            );
+        match error {
+            Some(error) => error,
+            None => Ok(chars.iter().collect::<String>()),
+        }
     }
 }
 
@@ -264,10 +291,12 @@ impl Path {
     /// something like `mkdir -p $DIR && ls -d $DIR`
     pub fn ls(&self) -> Result<holochain_zome_types::link::Links, WasmError> {
         Self::touch(&self)?;
-        Ok(get_links!(
-            self.pwd()?,
-            holochain_zome_types::link::LinkTag::new(NAME)
-        )?)
+        let links = get_links!(self.pwd()?, holochain_zome_types::link::LinkTag::new(NAME))?;
+        // only need one of each hash to build the tree
+        let mut unwrapped: Vec<holochain_zome_types::link::Link> = links.into_inner();
+        unwrapped.sort();
+        unwrapped.dedup();
+        Ok(holochain_zome_types::link::Links::from(unwrapped))
     }
 }
 
@@ -305,6 +334,19 @@ fn hash_path_component() {
         ]))
         .unwrap(),
         String::from("foo"),
+    );
+
+    assert_eq!(
+        String::try_from(&Component::from(vec![1])),
+        Err(SerializedBytesError::FromBytes(
+            "attempted to create u32s from utf8 bytes of length not a factor of 4: length 1".into()
+        )),
+    );
+    assert_eq!(
+        String::try_from(&Component::from(vec![9, 9, 9, 9])),
+        Err(SerializedBytesError::FromBytes(
+            "unknown char for u32: 151587081".into()
+        )),
     );
 }
 
