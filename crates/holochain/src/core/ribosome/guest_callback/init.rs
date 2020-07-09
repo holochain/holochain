@@ -5,7 +5,7 @@ use crate::fixt::DnaDefFixturator;
 use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::DnaDef;
+use holochain_types::dna::{zome::HostFnAccess, DnaDef};
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -27,8 +27,8 @@ fixturator!(
 );
 
 impl Invocation for InitInvocation {
-    fn allow_side_effects(&self) -> bool {
-        true
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::all()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All

@@ -9,6 +9,7 @@ use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
+use holochain_types::dna::zome::HostFnAccess;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
@@ -28,8 +29,8 @@ fixturator!(
 );
 
 impl Invocation for PostCommitInvocation {
-    fn allow_side_effects(&self) -> bool {
-        true
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::all()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())

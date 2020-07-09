@@ -88,6 +88,14 @@ impl std::ops::Index<usize> for EntryDefs {
     }
 }
 
+impl IntoIterator for EntryDefs {
+    type Item = EntryDef;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl From<Vec<EntryDef>> for EntryDefs {
     fn from(v: Vec<EntryDef>) -> Self {
         Self(v)

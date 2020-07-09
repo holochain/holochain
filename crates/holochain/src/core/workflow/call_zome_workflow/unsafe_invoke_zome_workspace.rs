@@ -80,10 +80,9 @@ impl UnsafeInvokeZomeWorkspace {
         (guard, workspace)
     }
 
-    #[cfg(test)]
-    /// Useful when we need this type for tests where we don't want to use it.
+    /// Useful when we need this type where we don't want to use it.
     /// It will always return None.
-    pub fn test_dropped_guard() -> Self {
+    pub fn null() -> Self {
         let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
         let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(fake_ptr)));
         let workspace = Arc::downgrade(&guard);

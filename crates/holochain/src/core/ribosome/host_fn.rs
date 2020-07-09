@@ -1,3 +1,4 @@
+pub mod agent_info;
 pub mod call;
 pub mod capability;
 pub mod commit_entry;
@@ -9,7 +10,6 @@ pub mod entry_hash;
 pub mod entry_type_properties;
 pub mod get_entry;
 pub mod get_links;
-pub mod globals;
 pub mod keystore;
 pub mod link_entries;
 pub mod property;
@@ -23,3 +23,4 @@ pub mod sign;
 pub mod sys_time;
 pub mod unreachable;
 pub mod update_entry;
+pub mod zome_info;

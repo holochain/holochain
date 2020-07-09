@@ -11,6 +11,7 @@ use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::sync::Arc;
+use holochain_types::dna::zome::HostFnAccess;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {
@@ -37,8 +38,8 @@ fixturator!(
 );
 
 impl Invocation for ValidateInvocation {
-    fn allow_side_effects(&self) -> bool {
-        false
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::none()
     }
     fn zomes(&self) -> ZomesToInvoke {
         // entries are specific to zomes so only validate in the zome the entry is defined in

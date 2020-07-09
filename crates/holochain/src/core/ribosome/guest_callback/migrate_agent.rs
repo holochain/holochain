@@ -5,7 +5,7 @@ use crate::fixt::DnaDefFixturator;
 use crate::fixt::MigrateAgentFixturator;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::DnaDef;
+use holochain_types::dna::{zome::HostFnAccess, DnaDef};
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -32,8 +32,8 @@ fixturator!(
 );
 
 impl Invocation for MigrateAgentInvocation {
-    fn allow_side_effects(&self) -> bool {
-        false
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::none()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All

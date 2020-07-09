@@ -49,7 +49,7 @@ pub fn commit_entry<'a>(
 
     // extract the entry defs for a zome
     let (header_entry_def_id, entry_visibility) = match match ribosome
-        .run_entry_defs(host_context.workspace.clone(), EntryDefsInvocation)?
+        .run_entry_defs(EntryDefsInvocation)?
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {

@@ -8,6 +8,7 @@ use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::collections::BTreeMap;
+use holochain_types::dna::zome::HostFnAccess;
 
 #[derive(Debug, Clone)]
 pub struct EntryDefsInvocation;
@@ -24,8 +25,8 @@ fixturator!(
 );
 
 impl Invocation for EntryDefsInvocation {
-    fn allow_side_effects(&self) -> bool {
-        false
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::none()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All

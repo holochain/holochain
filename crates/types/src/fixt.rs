@@ -7,6 +7,7 @@
 use crate::composite_hash::AnyDhtHash;
 use crate::composite_hash::EntryHash;
 use crate::dna::zome::Zome;
+use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
 use crate::dna::Zomes;
 use crate::header::AgentValidationPkg;
@@ -526,4 +527,14 @@ fixturator!(
         Create(EntryCreate)
         Update(EntryUpdate)
     ];
+);
+
+fixturator!(
+    Permission;
+    unit variants [ Allow Deny ] empty Deny;
+);
+
+fixturator!(
+    HostFnAccess;
+    constructor fn new(Permission, Permission, Permission);
 );

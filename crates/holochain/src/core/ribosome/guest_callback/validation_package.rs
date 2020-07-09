@@ -6,7 +6,7 @@ use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::fixt::AppEntryTypeFixturator;
-use holochain_types::header::AppEntryType;
+use holochain_types::{dna::zome::HostFnAccess, header::AppEntryType};
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -33,8 +33,8 @@ fixturator!(
 );
 
 impl Invocation for ValidationPackageInvocation {
-    fn allow_side_effects(&self) -> bool {
-        false
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::none()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())

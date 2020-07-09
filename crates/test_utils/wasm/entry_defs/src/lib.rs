@@ -3,7 +3,7 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::crdt::CrdtType;
 use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::globals::ZomeGlobals;
+use holochain_zome_types::globals::ZomeInfo;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::*;
@@ -91,7 +91,7 @@ impl From<&Comment> for EntryDef {
 
 #[no_mangle]
 pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
-    let globals: ZomeGlobals = try_result!(host_call!(__globals, ()), "failed to get globals");
+    let zome_info: ZomeInfo = try_result!(host_call!(__zome_info, ()), "failed to get zome_info");
 
     let defs: EntryDefs = vec![
         (&Post).into(),
@@ -99,7 +99,7 @@ pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
     ].into();
 
     ret!(GuestOutput::new(try_result!(EntryDefsCallbackResult::Defs(
-        globals.zome_name,
+        zome_info.zome_name,
         defs,
     ).try_into(), "failed to serialize entry defs return value")));
 }
