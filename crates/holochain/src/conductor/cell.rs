@@ -404,7 +404,8 @@ impl Cell {
         _dht_hash: holochain_types::composite_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<SerializedBytes> {
-        unimplemented!()
+        tracing::warn!("handle get links is unimplemented");
+        Ok(CellError::Todo)
     }
 
     /// a remote agent is sending us a validation receipt.

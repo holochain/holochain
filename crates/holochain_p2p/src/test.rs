@@ -218,7 +218,7 @@ mod tests {
                     GetLinks { respond, .. } => {
                         respond.r(Ok(async move { Ok(test_1_clone) }.boxed().into()));
                     }
-                    _ => panic!("unexpected event"),
+                    _ => panic!("unexpected event in test_get_links_workflow"),
                 }
             }
         });
