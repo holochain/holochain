@@ -176,7 +176,8 @@ mod test {
             HostFnAccess {
                 side_effects: Deny,
                 agent_info: Deny,
-                read_workspace: Deny
+                read_workspace: Deny,
+                non_determinism: Deny,
             }
         );
     }

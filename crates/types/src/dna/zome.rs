@@ -13,12 +13,14 @@ pub struct Zome {
 /// Access a call has to host functions
 #[derive(Debug, Copy, Clone, Constructor)]
 pub struct HostFnAccess {
+    /// Can access agent information
+    pub agent_info: Permission,
     /// Can access the workspace
     pub read_workspace: Permission,
     /// Can write to the network and workspace
     pub side_effects: Permission,
-    /// Can access agent information
-    pub agent_info: Permission,
+    /// All other non-deterministic functions
+    pub non_determinism: Permission,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -48,6 +50,7 @@ impl HostFnAccess {
             read_workspace: Permission::Allow,
             side_effects: Permission::Allow,
             agent_info: Permission::Allow,
+            non_determinism: Permission::Allow,
         }
     }
 
@@ -57,6 +60,7 @@ impl HostFnAccess {
             read_workspace: Permission::Deny,
             side_effects: Permission::Deny,
             agent_info: Permission::Deny,
+            non_determinism: Permission::Deny,
         }
     }
 }

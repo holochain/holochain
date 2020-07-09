@@ -159,7 +159,6 @@ impl WasmRibosome {
         );
 
         // imported host functions for core
-        ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
         ns.insert("__debug", func!(invoke_host_function!(debug)));
         ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
         ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
@@ -169,14 +168,29 @@ impl WasmRibosome {
             func!(invoke_host_function!(entry_type_properties)),
         );
         ns.insert("__keystore", func!(invoke_host_function!(keystore)));
-        ns.insert("__property", func!(invoke_host_function!(property)));
-        ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
         ns.insert("__sign", func!(invoke_host_function!(sign)));
-        ns.insert("__show_env", func!(invoke_host_function!(show_env)));
-        ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
         ns.insert("__schedule", func!(invoke_host_function!(schedule)));
-        ns.insert("__capability", func!(invoke_host_function!(capability)));
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
+
+        if let HostFnAccess {
+            non_determinism: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
+            ns.insert("__property", func!(invoke_host_function!(property)));
+            ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
+            ns.insert("__show_env", func!(invoke_host_function!(show_env)));
+            ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
+            ns.insert("__capability", func!(invoke_host_function!(capability)));
+        } else {
+            ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__property", func!(invoke_host_function!(unreachable)));
+            ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
+            ns.insert("__show_env", func!(invoke_host_function!(unreachable)));
+            ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
+            ns.insert("__capability", func!(invoke_host_function!(unreachable)));
+        }
 
         if let HostFnAccess {
             read_workspace: Permission::Allow,

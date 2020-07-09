@@ -148,7 +148,8 @@ mod test {
             HostFnAccess {
                 side_effects: Allow,
                 agent_info: Allow,
-                read_workspace: Allow
+                read_workspace: Allow,
+                non_determinism: Allow,
             }
         );
     }
