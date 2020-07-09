@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
-use thiserror::Error;
 use crate::core::ribosome::error::RibosomeError;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum EntryDefStoreError {

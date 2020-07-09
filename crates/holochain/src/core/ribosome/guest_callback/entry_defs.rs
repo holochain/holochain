@@ -3,12 +3,12 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::collections::BTreeMap;
-use holochain_types::dna::zome::HostFnAccess;
 
 #[derive(Debug, Clone)]
 pub struct EntryDefsInvocation;

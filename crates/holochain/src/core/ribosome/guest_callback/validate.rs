@@ -6,12 +6,12 @@ use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::sync::Arc;
-use holochain_types::dna::zome::HostFnAccess;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {

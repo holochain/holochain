@@ -50,7 +50,7 @@ impl HostFnAccess {
             agent_info: Permission::Allow,
         }
     }
-    
+
     /// Deny all access
     pub fn none() -> Self {
         HostFnAccess {

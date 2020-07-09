@@ -1,4 +1,3 @@
-
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
@@ -13,10 +12,10 @@ pub fn agent_info(
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {
     Ok(AgentInfoOutput::new(AgentInfo {
-        agent_address: "todo".into(),                           // @TODO
-        agent_id_str: "".into(),                            // @TODO
-        agent_initial_hash: "".into(),                      // @TODO
-        agent_latest_hash: "".into(),                       // @TODO
+        agent_address: "todo".into(),  // @TODO
+        agent_id_str: "".into(),       // @TODO
+        agent_initial_hash: "".into(), // @TODO
+        agent_latest_hash: "".into(),  // @TODO
     }))
 }
 

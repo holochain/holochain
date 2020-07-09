@@ -5,11 +5,11 @@ use crate::fixt::HeaderHashesFixturator;
 use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
-use holochain_types::dna::zome::HostFnAccess;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
