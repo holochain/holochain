@@ -232,20 +232,25 @@ impl WasmRibosome {
 
 macro_rules! do_callback {
     ( $self:ident, $workspace:ident, $invocation:ident, $callback_result:ty ) => {{
-        let mut results: Vec<$callback_result> = vec![];
+        let mut results: Vec<$callback_result> = Vec::new();
+        let mut zome_names: Vec<ZomeName> = Vec::new();
         // fallible iterator syntax instead of for loop
         let mut call_iterator = $self.call_iterator($workspace, $self.clone(), $invocation);
         while let Some(output) = call_iterator.next()? {
-            let callback_result: $callback_result = output.into();
+            let (zome_name, callback_result) = output;
+            let callback_result: $callback_result = callback_result.into();
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
-                return Ok(vec![callback_result].into());
+                zome_names = vec![zome_name];
+                results = vec![callback_result];
+                break;
             }
+            zome_names.push(zome_name);
             results.push(callback_result);
         }
-        // fold all the non-definitive callbacks down into a single overall result
-        Ok(results.into())
+        // Return the zomes and results
+        (zome_names, results)
     }};
 }
 
@@ -337,7 +342,7 @@ impl RibosomeT for WasmRibosome {
             .call_iterator(workspace, self.clone(), invocation)
             .next()?
         {
-            Some(result) => result,
+            Some(result) => result.1,
             None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
         };
 
@@ -354,7 +359,11 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
-        do_callback!(self, workspace, invocation, ValidateCallbackResult)
+        Ok(
+            do_callback!(self, workspace, invocation, ValidateCallbackResult)
+                .1
+                .into(),
+        )
     }
 
     fn run_init(
@@ -362,14 +371,23 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult> {
-        do_callback!(self, workspace, invocation, InitCallbackResult)
+        Ok(
+            do_callback!(self, workspace, invocation, InitCallbackResult)
+                .1
+                .into(),
+        )
     }
 
     fn run_entry_defs(&self, invocation: EntryDefsInvocation) -> RibosomeResult<EntryDefsResult> {
         // Workspace can't be called
         // This is safe because even if there's a mistake it will only return None
         let workspace = UnsafeInvokeZomeWorkspace::null();
-        do_callback!(self, workspace, invocation, EntryDefsCallbackResult)
+        let r = do_callback!(self, workspace, invocation, EntryDefsCallbackResult);
+        Ok(r.0
+            .into_iter()
+            .zip(r.1.into_iter())
+            .collect::<Vec<_>>()
+            .into())
     }
 
     fn run_migrate_agent(
@@ -377,7 +395,11 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult> {
-        do_callback!(self, workspace, invocation, MigrateAgentCallbackResult)
+        Ok(
+            do_callback!(self, workspace, invocation, MigrateAgentCallbackResult)
+                .1
+                .into(),
+        )
     }
 
     fn run_validation_package(
@@ -385,7 +407,11 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult> {
-        do_callback!(self, workspace, invocation, ValidationPackageCallbackResult)
+        Ok(
+            do_callback!(self, workspace, invocation, ValidationPackageCallbackResult)
+                .1
+                .into(),
+        )
     }
 
     fn run_post_commit(
@@ -393,6 +419,10 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult> {
-        do_callback!(self, workspace, invocation, PostCommitCallbackResult)
+        Ok(
+            do_callback!(self, workspace, invocation, PostCommitCallbackResult)
+                .1
+                .into(),
+        )
     }
 }
