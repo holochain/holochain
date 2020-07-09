@@ -13,7 +13,6 @@ pub fn debug(
     input: DebugInput,
 ) -> RibosomeResult<DebugOutput> {
     let msg: DebugMsg = input.into_inner();
-    dbg!(&msg);
     trace!(
         "{}:{}:{} {}",
         msg.module_path(),

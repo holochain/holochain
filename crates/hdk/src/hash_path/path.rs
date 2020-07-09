@@ -263,7 +263,6 @@ impl Path {
     /// does an entry exist at the hash we expect?
     /// something like `[ -d $DIR ]`
     pub fn exists(&self) -> Result<bool, WasmError> {
-        debug!(get_entry!(self.pwd()?))?;
         Ok(get_entry!(self.pwd()?)?.is_some())
     }
 

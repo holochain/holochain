@@ -91,7 +91,6 @@ pub async fn load_conductor_from_legacy_config(
         let agent_pubkey = keystore.generate_sign_keypair_from_pure_entropy().await?;
         let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
         let cell_handle = i.id.clone();
-        dbg!(&cell_id, &cell_handle);
         app_install_payload.push((InstalledCell::new(cell_id, cell_handle), None));
     }
 

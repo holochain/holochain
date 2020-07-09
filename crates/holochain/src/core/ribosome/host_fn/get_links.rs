@@ -19,7 +19,6 @@ pub fn get_links<'a>(
     host_context: Arc<HostContext>,
     input: GetLinksInput,
 ) -> RibosomeResult<GetLinksOutput> {
-    dbg!(&input);
     let (base_address, tag) = input.into_inner();
 
     let base_address = base_address.try_into()?;

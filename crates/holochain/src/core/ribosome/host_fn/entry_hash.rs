@@ -13,7 +13,6 @@ pub fn entry_hash(
     _host_context: Arc<HostContext>,
     input: EntryHashInput,
 ) -> RibosomeResult<EntryHashOutput> {
-    dbg!(&input);
     let entry: Entry = input.into_inner();
 
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
@@ -23,13 +22,11 @@ pub fn entry_hash(
 
     let core_hash: holo_hash_core::HoloHashCore = entry_hash.into();
 
-    let r = Ok(EntryHashOutput::new(core_hash));
-    dbg!(&r);
-    r
+    Ok(EntryHashOutput::new(core_hash))
 }
 
 #[cfg(test)]
-// #[cfg(feature = "slow_tests")]
+#[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::*;
     use crate::core::ribosome::host_fn::entry_hash::entry_hash;
