@@ -308,8 +308,9 @@ mod test {
     use holochain_types::{
         app::InstallAppDnaPayload,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, write_fake_dna_file},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
     };
+    use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
     use uuid::Uuid;
 
@@ -325,7 +326,10 @@ mod test {
         let handle = Conductor::builder().test(test_env, wasm_env).await?;
         let admin_api = RealAdminInterfaceApi::new(handle);
         let uuid = Uuid::new_v4();
-        let dna = fake_dna_file(&uuid.to_string());
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
         let dna_hash = dna.dna_hash().clone();

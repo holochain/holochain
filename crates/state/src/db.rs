@@ -101,7 +101,7 @@ impl DbName {
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
-            EntryDef => Multi,
+            EntryDef => Single,
             AuthoredDhtOps => Single,
             IntegratedDhtOps => Single,
             IntegrationQueue => Single,
