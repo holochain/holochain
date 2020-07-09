@@ -31,7 +31,7 @@ use holochain_state::{
     error::DatabaseError,
     prelude::Writer,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{self, mpsc};
 
 // TODO: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -43,6 +43,7 @@ use app_validation_consumer::*;
 mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
+use crate::conductor::manager::ManagedTaskAdd;
 use holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 
@@ -54,12 +55,39 @@ use publish_dht_ops_consumer::*;
 pub async fn spawn_queue_consumer_tasks(
     env: &EnvironmentWrite,
     cell_network: HolochainP2pCell,
+    mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+    stop: sync::broadcast::Sender<()>,
 ) -> InitialQueueTriggers {
-    let (tx_publish, rx1) = spawn_publish_dht_ops_consumer(env.clone(), cell_network);
-    let (tx_integration, rx2) = spawn_integrate_dht_ops_consumer(env.clone(), tx_publish);
-    let (tx_app, rx3) = spawn_app_validation_consumer(env.clone(), tx_integration.clone());
-    let (tx_sys, rx4) = spawn_sys_validation_consumer(env.clone(), tx_app);
-    let (tx_produce, rx5) = spawn_produce_dht_ops_consumer(env.clone(), tx_integration.clone());
+    let (tx_publish, rx1, handle) =
+        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network);
+    task_sender
+        .send(ManagedTaskAdd::dont_handle(handle))
+        .await
+        .expect("Failed to manage workflow handle");
+    let (tx_integration, rx2, handle) =
+        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish);
+    task_sender
+        .send(ManagedTaskAdd::dont_handle(handle))
+        .await
+        .expect("Failed to manage workflow handle");
+    let (tx_app, rx3, handle) =
+        spawn_app_validation_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
+    task_sender
+        .send(ManagedTaskAdd::dont_handle(handle))
+        .await
+        .expect("Failed to manage workflow handle");
+    let (tx_sys, rx4, handle) =
+        spawn_sys_validation_consumer(env.clone(), stop.subscribe(), tx_app);
+    task_sender
+        .send(ManagedTaskAdd::dont_handle(handle))
+        .await
+        .expect("Failed to manage workflow handle");
+    let (tx_produce, rx5, handle) =
+        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
+    task_sender
+        .send(ManagedTaskAdd::dont_handle(handle))
+        .await
+        .expect("Failed to manage workflow handle");
 
     // Wait for initial loop to complete for each consumer
     futures::future::join_all(vec![rx1, rx2, rx3, rx4, rx5].into_iter())

@@ -28,6 +28,7 @@ pub enum DhtOp {
     ///   - Note: they do not become responsible for keeping the set of
     ///     references from that entry up-to-date.
     StoreElement(Signature, Header, Option<Box<Entry>>),
+
     /// Used to notify the authority for an entry that it has been created
     /// anew. (The same entry can be created more than once.)
     ///
@@ -43,6 +44,7 @@ pub enum DhtOp {
     /// TODO: document how those "created-by" references are stored in
     /// reality.
     StoreEntry(Signature, NewEntryHeader, Box<Entry>),
+
     /// Used to notify the authority for an agent's public key that that agent
     /// has committed a new header.
     ///
@@ -57,17 +59,23 @@ pub enum DhtOp {
     /// TODO: document how those "agent-activity" references are stored in
     /// reality.
     RegisterAgentActivity(Signature, Header),
+
     /// Op for updating an entry
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
     RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
-    /// Op for deleting an entry
-    RegisterDeletedBy(Signature, header::EntryDelete),
-    /// Op for deleting a header
-    RegisterDeletedHeaderBy(Signature, header::EntryDelete),
-    /// Op for adding a link  
+
+    /// Op for registering a Header deletion with the Header authority
+    RegisterDeletedBy(Signature, header::ElementDelete),
+
+    /// Op for registering a Header deletion with the Entry authority, so that
+    /// the Entry can be marked Dead if all of its Headers have been deleted
+    RegisterDeletedEntryHeader(Signature, header::ElementDelete),
+
+    /// Op for adding a link
     RegisterAddLink(Signature, header::LinkAdd),
+
     /// Op for removing a link
     RegisterRemoveLink(Signature, header::LinkRemove),
 }
@@ -80,7 +88,9 @@ impl DhtOp {
             Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
             Self::RegisterReplacedBy(_, header, _) => UniqueForm::RegisterReplacedBy(header),
             Self::RegisterDeletedBy(_, header) => UniqueForm::RegisterDeletedBy(header),
-            Self::RegisterDeletedHeaderBy(_, header) => UniqueForm::RegisterDeletedHeaderBy(header),
+            Self::RegisterDeletedEntryHeader(_, header) => {
+                UniqueForm::RegisterDeletedEntryHeader(header)
+            }
             Self::RegisterAddLink(_, header) => UniqueForm::RegisterAddLink(header),
             Self::RegisterRemoveLink(_, header) => UniqueForm::RegisterRemoveLink(header),
         }
@@ -95,8 +105,8 @@ enum UniqueForm<'a> {
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
     RegisterReplacedBy(&'a header::EntryUpdate),
-    RegisterDeletedBy(&'a header::EntryDelete),
-    RegisterDeletedHeaderBy(&'a header::EntryDelete),
+    RegisterDeletedBy(&'a header::ElementDelete),
+    RegisterDeletedEntryHeader(&'a header::ElementDelete),
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
@@ -153,12 +163,11 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
                 Some(Box::new(entry)),
             ));
         }
-        Header::EntryDelete(entry_delete) => {
-            ops.push(DhtOp::RegisterDeletedHeaderBy(
-                sig.clone(),
-                entry_delete.clone(),
-            ));
-            ops.push(DhtOp::RegisterDeletedBy(sig, entry_delete.clone()));
+        Header::ElementDelete(entry_delete) => {
+            // TODO: VALIDATION: This only works if entry_delete.remove_address is either EntryCreate
+            // or EntryUpdate
+            ops.push(DhtOp::RegisterDeletedBy(sig.clone(), entry_delete.clone()));
+            ops.push(DhtOp::RegisterDeletedEntryHeader(sig, entry_delete.clone()));
         }
     }
     Ok(ops)

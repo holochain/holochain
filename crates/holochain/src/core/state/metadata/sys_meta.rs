@@ -10,7 +10,7 @@ mod tests {
     use crate::core::state::metadata::{MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use header::{HeaderBuilderCommon, IntendedFor};
+    use header::{HeaderBuilderCommon, IntendedFor, NewEntryHeader};
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
@@ -97,8 +97,8 @@ mod tests {
     async fn test_delete(
         removes_address: HeaderAddress,
         fx: &mut TestFixtures,
-    ) -> (header::EntryDelete, HeaderHashed) {
-        let builder = builder::EntryDelete { removes_address };
+    ) -> (header::ElementDelete, HeaderHashed) {
+        let builder = builder::ElementDelete { removes_address };
         let delete = builder.build(fx.common());
         let header = HeaderHashed::with_data(delete.clone().into())
             .await
@@ -123,7 +123,7 @@ mod tests {
                 &mut fx,
             )
             .await;
-            buf.add_update(update.clone(), None).await?;
+            buf.register_update(update.clone(), None).await?;
             let original = update.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
@@ -163,9 +163,9 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let _ = buf.add_update(update1.clone(), None).await?;
-            let _ = buf.add_update(update2, None).await?;
-            buf.add_update(update3.clone(), None).await?;
+            let _ = buf.register_update(update1.clone(), None).await?;
+            let _ = buf.register_update(update2, None).await?;
+            buf.register_update(update3.clone(), None).await?;
 
             let original = update1.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
@@ -195,7 +195,7 @@ mod tests {
             let (update, _) =
                 test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
             let _ = buf
-                .add_update(update.clone(), Some(original_entry.clone()))
+                .register_update(update.clone(), Some(original_entry.clone()))
                 .await?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
@@ -239,13 +239,13 @@ mod tests {
             )
             .await;
             let _ = buf
-                .add_update(update1.clone(), Some(original_entry.clone()))
+                .register_update(update1.clone(), Some(original_entry.clone()))
                 .await?;
             let _ = buf
-                .add_update(update2.clone(), Some(original_entry.clone()))
+                .register_update(update2.clone(), Some(original_entry.clone()))
                 .await?;
             let _ = buf
-                .add_update(update3.clone(), Some(original_entry.clone()))
+                .register_update(update3.clone(), Some(original_entry.clone()))
                 .await?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
@@ -284,9 +284,9 @@ mod tests {
             let (update_entry, _) =
                 test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
 
-            let _ = buf.add_update(update_header.clone(), None).await?;
+            let _ = buf.register_update(update_header.clone(), None).await?;
             let _ = buf
-                .add_update(update_entry.clone(), Some(original_entry.clone()))
+                .register_update(update_entry.clone(), Some(original_entry.clone()))
                 .await?;
             let expected_entry_hash = update_entry.entry_hash;
 
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn add_entry_get_creates() {
+    async fn add_entry_get_headers() {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
@@ -321,10 +321,13 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for create in entry_creates {
-                meta_buf.add_create(create).await.unwrap();
+                meta_buf
+                    .register_header(NewEntryHeader::Create(create))
+                    .await
+                    .unwrap();
             }
             let mut headers = meta_buf
-                .get_creates(entry_hash.clone())
+                .get_headers(entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -337,7 +340,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
-                .get_creates(entry_hash.clone())
+                .get_headers(entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -378,7 +381,7 @@ mod tests {
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for update in entry_updates {
                 meta_buf
-                    .add_update(update, Some(original_entry_hash.clone()))
+                    .register_update(update, Some(original_entry_hash.clone()))
                     .await
                     .unwrap();
             }
@@ -436,7 +439,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for update in entry_updates {
-                meta_buf.add_update(update, None).await.unwrap();
+                meta_buf.register_update(update, None).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_updates(original_header_hash.clone().into())
@@ -481,10 +484,10 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf.add_delete(delete).await.unwrap();
+                meta_buf.register_delete_on_header(delete).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone())
+                .get_deletes(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -497,7 +500,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone())
+                .get_deletes(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();

@@ -2,7 +2,6 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
@@ -22,7 +21,7 @@ use std::sync::Arc;
 /// commit an entry
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn commit_entry<'a>(
-    ribosome: Arc<WasmRibosome>,
+    ribosome: Arc<impl RibosomeT>,
     host_context: Arc<HostContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
@@ -38,7 +37,7 @@ pub fn commit_entry<'a>(
 
     // extract the zome position
     let header_zome_id: holochain_types::header::ZomeId = match ribosome
-        .dna_file
+        .dna_file()
         .dna
         .zomes
         .iter()
@@ -110,7 +109,14 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::HostContextFixturator;
     use crate::core::state::source_chain::ChainInvalidReason;
-    use crate::core::state::source_chain::SourceChainError;
+    use crate::core::{
+        queue_consumer::TriggerSender,
+        state::source_chain::SourceChainError,
+        workflow::{
+            integrate_dht_ops_workflow::{integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace},
+            produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
+        },
+    };
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holo_hash::Hashable;
@@ -205,22 +211,32 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_commit_entry_test() {
+        holochain_types::observability::test_run().ok();
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let output = {
+            let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+            let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
+            // commits fail validation if we don't do genesis
+            crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+                .await
+                .unwrap();
+
+            // get the result of a commit entry
+            let output: CommitEntryOutput = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
+            };
+
+            // Write the database to file
+            holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
+                crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
+            })
             .unwrap();
-
-        // get the result of a commit entry
-        let output: CommitEntryOutput = {
-            let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
+            output
         };
 
         // this should be the hash of the newly committed entry
@@ -233,14 +249,43 @@ pub mod wasm_test {
             output.into_inner().get_raw(),
         );
 
+        // Needs metadata to return get
+        {
+            use crate::core::state::workspace::Workspace;
+            use holochain_state::env::ReadManager;
+
+            // Produce the ops
+            let (mut qt, mut rx) = TriggerSender::new();
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                // await the workflow finishing
+                rx.listen().await.unwrap();
+            }
+            // Integrate the ops
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                integrate_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                rx.listen().await.unwrap();
+            }
+        }
+
         let round: GetEntryOutput = {
+            let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+            let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
             let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
             crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "get_entry", ())
         };
 
         let sb = match round.into_inner() {
             Some(holochain_zome_types::entry::Entry::App(serialized_bytes)) => serialized_bytes,
-            _ => unreachable!(),
+            other => panic!(format!("unexpected output: {:?}", other)),
         };
         // this should be the content "foo" of the committed post
         assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)

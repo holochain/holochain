@@ -77,6 +77,15 @@ impl HostContext {
     pub fn allow_side_effects(&self) -> bool {
         self.allow_side_effects
     }
+    #[cfg(test)]
+    pub(crate) fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
+        &self.workspace
+    }
+
+    #[cfg(test)]
+    pub(crate) fn change_workspace(&mut self, workspace: UnsafeInvokeZomeWorkspace) {
+        self.workspace = workspace;
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -436,6 +445,20 @@ pub mod wasm_test {
         let expected = vec!["foo_bar_baz", "foo_bar", "foo"];
 
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn warm_wasm_tests() {
+        holochain_types::observability::test_run().ok();
+        use strum::IntoEnumIterator;
+
+        // If HC_WASM_CACHE_PATH is set warm the cache
+        if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
+            let wasms: Vec<_> = TestWasm::iter().collect();
+            crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+                .next()
+                .unwrap();
+        }
     }
 
     #[tokio::test(threaded_scheduler)]

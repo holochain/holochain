@@ -3,7 +3,6 @@ use crate::header;
 use crate::{
     composite_hash::{EntryHash, HeaderAddress},
     fixt::*,
-    link::Tag,
     Timestamp,
 };
 use derive_more::Constructor;
@@ -11,6 +10,7 @@ use fixt::prelude::*;
 use header::HeaderInner;
 use header::{IntendedFor, ZomeId};
 use holo_hash::*;
+use holochain_zome_types::link::LinkTag;
 
 #[derive(Constructor)]
 pub struct HeaderBuilderCommon {
@@ -107,7 +107,7 @@ builder_variant!(LinkAdd {
     base_address: EntryHash,
     target_address: EntryHash,
     zome_id: ZomeId,
-    tag: Tag,
+    tag: LinkTag,
 });
 
 builder_variant!(LinkRemove {
@@ -136,7 +136,7 @@ builder_variant!(EntryUpdate {
     entry_hash: EntryHash,
 });
 
-builder_variant!(EntryDelete {
+builder_variant!(ElementDelete {
     removes_address: HeaderHash,
 });
 

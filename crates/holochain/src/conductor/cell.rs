@@ -4,6 +4,7 @@
 //! ChainElements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::manager::ManagedTaskAdd;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -38,6 +39,7 @@ use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
+use tokio::sync;
 use tracing::*;
 
 #[allow(missing_docs)]
@@ -90,7 +92,9 @@ impl Cell {
         conductor_handle: ConductorHandle,
         env_path: P,
         keystore: KeystoreSender,
-        holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
@@ -110,8 +114,14 @@ impl Cell {
         };
 
         if has_genesis {
-            let queue_triggers =
-                spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
+            holochain_p2p_cell.join().await?;
+            let queue_triggers = spawn_queue_consumer_tasks(
+                &state_env,
+                holochain_p2p_cell.clone(),
+                managed_task_add_sender,
+                managed_task_stop_broadcaster,
+            )
+            .await;
 
             Ok(Self {
                 id,
@@ -307,13 +317,31 @@ impl Cell {
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        _from_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holochain_types::composite_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        // TODO - We are temporarily just integrating everything...
-        //        Really this should go to validation first!
+        if from_agent == *self.id().agent_pubkey() {
+            // Don't handle messages we published to ourselves, because that
+            // would trigger another publish, and cause an infinite loop.
+            //
+            // TODO: Perhaps we *do* want to publish to ourselves, as a way of
+            // discovering that we are the authority for something we just
+            // committed. However, at the moment there is nothing different
+            // we can do, because we already integrate everything that we've
+            // authored. If that is ever no longer the case, then we can revisit
+            // this question of how to handle things we've already published.
+            debug!("Ignoring ops that we've published to ourselves");
+            trace!("{:?}", ops);
+            return Ok(());
+        }
+
+        /////////////////////////////////////////////////////////////
+        // FIXME - We are temporarily just integrating everything...
+        //         Really this should go to validation first!
+        //         Everything below this line is throwaway code.
+        /////////////////////////////////////////////////////////////
 
         // set up our workspace
         let env_ref = self.state_env.guard().await;
@@ -330,10 +358,11 @@ impl Cell {
                 validation_status: holochain_types::validate::ValidationStatus::Valid,
                 op,
             };
-            workspace.integration_queue.put(
-                std::convert::TryInto::try_into((holochain_types::Timestamp::now(), hash))?,
-                iqv,
-            )?;
+            // NB: it is possible we may put the same op into the integration
+            // queue twice, but this shouldn't be a problem.
+            workspace
+                .integration_queue
+                .put((holochain_types::TimestampKey::now(), hash).into(), iqv)?;
         }
 
         // commit our transaction

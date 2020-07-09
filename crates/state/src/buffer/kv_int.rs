@@ -108,6 +108,13 @@ where
     pub fn is_scratch_fresh(&self) -> bool {
         self.scratch.is_empty()
     }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.scratch.clear();
+        Ok(self.db.clear(writer)?)
+    }
 }
 
 impl<'env, K, V, R> BufferedStore<'env> for IntKvBuf<'env, K, V, R>
@@ -118,8 +125,15 @@ where
 {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         use Op::*;
+        if self.is_clean() {
+            return Ok(());
+        }
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {

@@ -1,19 +1,18 @@
 use super::{error::WorkflowResult, InvokeZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOps, IntegrationQueue, IntegrationQueueValue},
+    dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue},
     workspace::{Workspace, WorkspaceResult},
 };
-use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, Timestamp};
+use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, TimestampKey};
 use tracing::*;
 
-pub mod dht_op;
+pub mod dht_op_light;
 
 // TODO: #[instrument]
 pub async fn produce_dht_ops_workflow(
@@ -51,7 +50,7 @@ async fn produce_dht_ops_workflow_inner(
             let (op, hash) = DhtOpHashed::with_data(op).await.into();
             debug!(?hash);
             workspace.integration_queue.put(
-                (Timestamp::now(), hash.clone()).try_into()?,
+                (TimestampKey::now(), hash.clone()).into(),
                 IntegrationQueueValue {
                     validation_status: ValidationStatus::Valid,
                     op,
@@ -68,8 +67,8 @@ async fn produce_dht_ops_workflow_inner(
 
 pub struct ProduceDhtOpsWorkspace<'env> {
     pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
-    pub authored_dht_ops: AuthoredDhtOps<'env>,
-    pub integration_queue: IntegrationQueue<'env>,
+    pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
+    pub integration_queue: IntegrationQueueStore<'env>,
 }
 
 impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
@@ -232,10 +231,7 @@ mod tests {
                 .map(|(k, v)| {
                     let s = debug_span!("times");
                     let _g = s.enter();
-                    let key = IntegrationQueueKey::from(SerializedBytes::from(UnsafeBytes::from(
-                        k.to_vec(),
-                    )));
-                    let t: (Timestamp, DhtOpHash) = key.try_into().unwrap();
+                    let t: (TimestampKey, DhtOpHash) = IntegrationQueueKey::from(k).into();
                     debug!(time = ?t.0);
                     debug!(hash = ?t.1);
                     times.push(t.0);

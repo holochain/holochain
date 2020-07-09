@@ -10,14 +10,13 @@ use holochain_state::{
 };
 use holochain_types::{
     entry::EntryHashed,
-    header,
-    link::Tag,
-    observability,
+    header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     Header,
 };
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::link::LinkTag;
 use mockall::*;
 
 #[allow(dead_code)]
@@ -286,7 +285,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
 
-    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
 
     let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
@@ -355,7 +354,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
 
-    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
 
     let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
@@ -429,7 +428,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();
 
-    let tag = Tag::new(BytesFixturator::new(Unpredictable).next().unwrap());
+    let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
 
     let link = LinkMetaValFixturator::new((target.clone(), tag.clone()))
