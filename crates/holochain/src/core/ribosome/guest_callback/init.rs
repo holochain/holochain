@@ -100,9 +100,11 @@ mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -166,10 +168,18 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn init_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(init_invocation.allow_side_effects());
+        assert_matches!(
+            init_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Allow,
+                agent_info: Allow,
+                read_workspace: Allow,
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

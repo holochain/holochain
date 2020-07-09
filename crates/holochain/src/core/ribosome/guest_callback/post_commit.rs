@@ -88,9 +88,11 @@ mod test {
     use fixt::prelude::*;
     use holo_hash::HeaderHashFixturator;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
     async fn post_commit_callback_result_fold() {
@@ -137,10 +139,18 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn post_commit_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(post_commit_invocation.allow_side_effects());
+        assert_matches!(
+            post_commit_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Allow,
+                agent_info: Allow,
+                read_workspace: Allow
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

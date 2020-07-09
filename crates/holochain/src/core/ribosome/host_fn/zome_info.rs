@@ -29,6 +29,7 @@ pub mod test {
     use crate::core::state::workspace::Workspace;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::{ZomeInfoInput, ZomeInfoOutput};
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_zome_info_test() {

@@ -568,8 +568,8 @@ where
 
         let mut entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
 
-        for (key, entry_defs) in zome_defs {
-            entry_def_buf.put(key, entry_defs)?;
+        for (key, entry_def) in zome_defs {
+            entry_def_buf.put(key, entry_def)?;
         }
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;

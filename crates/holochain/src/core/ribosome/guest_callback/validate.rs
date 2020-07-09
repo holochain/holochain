@@ -116,12 +116,13 @@ mod test {
     use holo_hash::AgentPubKeyFixturator;
     use holo_hash_core::HoloHashCoreHash;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::fixt::CapClaimFixturator;
+    use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -166,10 +167,18 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(!validate_invocation.allow_side_effects());
+        assert_matches!(
+            validate_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Deny,
+                agent_info: Deny,
+                read_workspace: Deny
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

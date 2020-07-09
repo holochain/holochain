@@ -26,7 +26,7 @@ pub mod test {
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::AgentInfoInput;
-    use holochain_zome_types::AgentInfoOutput;
+    use holochain_zome_types::{hash::HashString, AgentInfoOutput};
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_agent_info_test() {
@@ -44,6 +44,9 @@ pub mod test {
             "agent_info",
             AgentInfoInput::new(())
         );
-        assert_eq!(agent_info.inner_ref().agent_address, "todo",);
+        assert_eq!(
+            agent_info.inner_ref().agent_address,
+            HashString::from("todo")
+        );
     }
 }

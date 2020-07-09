@@ -104,10 +104,12 @@ mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::migrate_agent::MigrateAgent;
     use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -155,10 +157,18 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn migrate_agent_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(!migrate_agent_invocation.allow_side_effects());
+        assert_matches!(
+            migrate_agent_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Deny,
+                agent_info: Deny,
+                read_workspace: Deny
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

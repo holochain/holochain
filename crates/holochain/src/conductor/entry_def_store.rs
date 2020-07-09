@@ -25,14 +25,22 @@ use std::{collections::HashMap, convert::TryInto};
 
 pub mod error;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-struct EntryDefStoreKey(SerializedBytes);
-
+/// Key for the [EntryDef] buffer
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct EntryDefBufferKey {
     zome: Zome,
     entry_def_position: EntryDefId,
 }
+
+/// This is where entry defs live
+pub struct EntryDefBuf<'env>(EntryDefStore<'env>);
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct EntryDefStoreKey(SerializedBytes);
+
+#[derive(From, Shrinkwrap)]
+#[shrinkwrap(mutable)]
+struct EntryDefStore<'env>(KvBuf<'env, EntryDefStoreKey, EntryDef, Reader<'env>>);
 
 impl AsRef<[u8]> for EntryDefStoreKey {
     fn as_ref(&self) -> &[u8] {
@@ -49,22 +57,28 @@ impl From<EntryDefBufferKey> for EntryDefStoreKey {
     }
 }
 
-#[derive(From, Shrinkwrap)]
-#[shrinkwrap(mutable)]
-struct EntryDefStore<'env>(KvBuf<'env, EntryDefStoreKey, EntryDef, Reader<'env>>);
-
-/// This is where entry defs live
-pub struct EntryDefBuf<'env>(EntryDefStore<'env>);
+impl EntryDefBufferKey {
+    /// Create a new key
+    pub fn new(zome: Zome, entry_def_position: EntryDefId) -> Self {
+        Self {
+            zome,
+            entry_def_position,
+        }
+    }
+}
 
 impl<'env> EntryDefBuf<'env> {
+    /// Create a new buffer
     pub fn new(reader: &'env Reader<'env>, entry_def_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self(KvBuf::new(reader, entry_def_store)?.into()))
     }
 
-    // pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
-    //     self.0.get(&wasm_hash).await
-    // }
+    /// Get an entry def
+    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
+        self.0.get(&k.into())
+    }
 
+    /// Store an entry def
     pub fn put(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) -> DatabaseResult<()> {
         self.0.put(k.into(), entry_def)
     }
@@ -123,9 +137,8 @@ pub(crate) async fn get_entry_defs(
                 })
                 .collect()
         }
-        EntryDefsResult::Err(_, _) => {
-            //TODO: PR:
-            todo!()
+        EntryDefsResult::Err(zome_name, msg) => {
+            return Err(EntryDefStoreError::CallbackFailed(zome_name, msg))
         }
     }
 }

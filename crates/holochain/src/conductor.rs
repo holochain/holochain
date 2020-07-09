@@ -22,8 +22,6 @@ mod conductor;
 pub mod config;
 #[allow(missing_docs)]
 pub mod dna_store;
-// TODO: PR: remove
-#[warn(missing_docs)]
 pub mod entry_def_store;
 #[allow(missing_docs)]
 pub mod error;
