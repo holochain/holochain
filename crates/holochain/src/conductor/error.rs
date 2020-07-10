@@ -1,7 +1,4 @@
-use super::{
-    dna_store::error::DnaStoreError, entry_def_store::error::EntryDefStoreError,
-    interface::error::InterfaceError,
-};
+use super::{entry_def_store::error::EntryDefStoreError, interface::error::InterfaceError};
 use crate::{conductor::cell::error::CellError, core::workflow::error::WorkflowError};
 use holochain_state::error::DatabaseError;
 use holochain_types::{app::AppId, cell::CellId};
@@ -56,9 +53,6 @@ pub enum ConductorError {
 
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
-
-    #[error("DNA store error: {0:?}")]
-    DnaStoreError(#[from] DnaStoreError),
 
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),

@@ -240,7 +240,7 @@ mod test {
     use crate::conductor::{
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
-        dna_store::{error::DnaStoreError, MockDnaStore},
+        dna_store::MockDnaStore,
         state::ConductorState,
         Conductor, ConductorHandle,
     };
@@ -256,7 +256,7 @@ mod test {
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
@@ -404,58 +404,6 @@ mod test {
             assert_matches!(
                 response,
                 AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
-            );
-            async { Ok(()) }.boxed()
-        };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown().await;
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn cache_failure() {
-        observability::test_run().ok();
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let _tmpdir = test_env.tmpdir.clone();
-
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_file(&uuid.to_string());
-
-        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let mut dna_store = MockDnaStore::new();
-        dna_store
-            .expect_add()
-            .with(predicate::eq(dna))
-            .returning(|_| Err(DnaStoreError::WriteFail));
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(test_env, wasm_env)
-            .await
-            .unwrap();
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-        let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-        let agent_key = fake_agent_pubkey_1();
-        let payload = InstallAppPayload {
-            dnas: vec![dna_payload],
-            app_id: "test app".to_string(),
-            agent_key,
-        };
-        let msg = AdminRequest::InstallApp(Box::new(payload));
-        let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(
-                response,
-                AdminResponse::Error(ExternalApiWireError::InternalError(_))
             );
             async { Ok(()) }.boxed()
         };

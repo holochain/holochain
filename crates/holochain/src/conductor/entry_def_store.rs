@@ -7,6 +7,7 @@ use crate::core::ribosome::{
 };
 use derive_more::From;
 use error::{EntryDefStoreError, EntryDefStoreResult};
+use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
@@ -26,7 +27,7 @@ use std::{collections::HashMap, convert::TryInto};
 pub mod error;
 
 /// Key for the [EntryDef] buffer
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct EntryDefBufferKey {
     zome: Zome,
     entry_def_position: EntryDefId,
@@ -57,6 +58,19 @@ impl From<EntryDefBufferKey> for EntryDefStoreKey {
     }
 }
 
+impl From<&[u8]> for EntryDefStoreKey {
+    fn from(bytes: &[u8]) -> Self {
+        Self(UnsafeBytes::from(bytes.to_vec()).into())
+    }
+}
+
+impl From<EntryDefStoreKey> for EntryDefBufferKey {
+    fn from(a: EntryDefStoreKey) -> Self {
+        a.0.try_into()
+            .expect("Database corruption when retrieving EntryDefBufferKeys")
+    }
+}
+
 impl EntryDefBufferKey {
     /// Create a new key
     pub fn new(zome: Zome, entry_def_position: EntryDefId) -> Self {
@@ -81,6 +95,19 @@ impl<'env> EntryDefBuf<'env> {
     /// Store an entry def
     pub fn put(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) -> DatabaseResult<()> {
         self.0.put(k.into(), entry_def)
+    }
+
+    /// Get all the entry defs in the database
+    pub fn get_all(
+        &self,
+    ) -> DatabaseResult<
+        Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + '_>,
+    > {
+        Ok(Box::new(
+            self.0
+                .iter_raw()?
+                .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
+        ))
     }
 }
 
