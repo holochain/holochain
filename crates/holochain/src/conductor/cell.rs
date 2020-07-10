@@ -405,7 +405,7 @@ impl Cell {
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<SerializedBytes> {
         tracing::warn!("handle get links is unimplemented");
-        Ok(CellError::Todo)
+        Err(CellError::Todo)
     }
 
     /// a remote agent is sending us a validation receipt.
