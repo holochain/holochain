@@ -22,7 +22,6 @@ use crate::core::ribosome::host_fn::decrypt::decrypt;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
 use crate::core::ribosome::host_fn::entry_hash::entry_hash;
-use crate::core::ribosome::host_fn::entry_type_properties::entry_type_properties;
 use crate::core::ribosome::host_fn::get_entry::get_entry;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::keystore::keystore;
@@ -160,17 +159,24 @@ impl WasmRibosome {
 
         // imported host functions for core
         ns.insert("__debug", func!(invoke_host_function!(debug)));
-        ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
-        ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
         ns.insert("__entry_hash", func!(invoke_host_function!(entry_hash)));
-        ns.insert(
-            "__entry_type_properties",
-            func!(invoke_host_function!(entry_type_properties)),
-        );
-        ns.insert("__keystore", func!(invoke_host_function!(keystore)));
-        ns.insert("__sign", func!(invoke_host_function!(sign)));
-        ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
+
+        if let HostFnAccess {
+            conductor: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            ns.insert("__keystore", func!(invoke_host_function!(keystore)));
+            ns.insert("__sign", func!(invoke_host_function!(sign)));
+            ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
+            ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
+        } else {
+            ns.insert("__keystore", func!(invoke_host_function!(unreachable)));
+            ns.insert("__sign", func!(invoke_host_function!(unreachable)));
+            ns.insert("__decrypt", func!(invoke_host_function!(unreachable)));
+            ns.insert("__encrypt", func!(invoke_host_function!(unreachable)));
+        }
 
         if let HostFnAccess {
             non_determinism: Permission::Allow,
@@ -193,7 +199,7 @@ impl WasmRibosome {
         }
 
         if let HostFnAccess {
-            read_workspace: Permission::Allow,
+            agent_info: Permission::Allow,
             ..
         } = host_fn_access
         {
@@ -228,6 +234,7 @@ impl WasmRibosome {
             ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
             ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
             ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
+            ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         } else {
             ns.insert("__call", func!(invoke_host_function!(unreachable)));
             ns.insert("__commit_entry", func!(invoke_host_function!(unreachable)));
@@ -236,6 +243,7 @@ impl WasmRibosome {
             ns.insert("__remove_link", func!(invoke_host_function!(unreachable)));
             ns.insert("__update_entry", func!(invoke_host_function!(unreachable)));
             ns.insert("__remove_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__schedule", func!(invoke_host_function!(unreachable)));
         }
         imports.register("env", ns);
 
@@ -246,8 +254,7 @@ impl WasmRibosome {
 
 macro_rules! do_callback {
     ( $self:ident, $workspace:ident, $invocation:ident, $callback_result:ty ) => {{
-        let mut results: Vec<$callback_result> = Vec::new();
-        let mut zome_names: Vec<ZomeName> = Vec::new();
+        let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
         let mut call_iterator = $self.call_iterator($workspace, $self.clone(), $invocation);
         while let Some(output) = call_iterator.next()? {
@@ -256,15 +263,12 @@ macro_rules! do_callback {
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
-                zome_names = vec![zome_name];
-                results = vec![callback_result];
-                break;
+                return Ok(vec![(zome_name, callback_result)].into());
             }
-            zome_names.push(zome_name);
-            results.push(callback_result);
+            results.push((zome_name, callback_result));
         }
-        // Return the zomes and results
-        (zome_names, results)
+        // fold all the non-definitive callbacks down into a single overall result
+        Ok(results.into())
     }};
 }
 
@@ -373,11 +377,7 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
-        Ok(
-            do_callback!(self, workspace, invocation, ValidateCallbackResult)
-                .1
-                .into(),
-        )
+        do_callback!(self, workspace, invocation, ValidateCallbackResult)
     }
 
     fn run_init(
@@ -385,23 +385,14 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult> {
-        Ok(
-            do_callback!(self, workspace, invocation, InitCallbackResult)
-                .1
-                .into(),
-        )
+        do_callback!(self, workspace, invocation, InitCallbackResult)
     }
 
     fn run_entry_defs(&self, invocation: EntryDefsInvocation) -> RibosomeResult<EntryDefsResult> {
         // Workspace can't be called
         // This is safe because even if there's a mistake it will only return None
         let workspace = UnsafeInvokeZomeWorkspace::null();
-        let r = do_callback!(self, workspace, invocation, EntryDefsCallbackResult);
-        Ok(r.0
-            .into_iter()
-            .zip(r.1.into_iter())
-            .collect::<Vec<_>>()
-            .into())
+        do_callback!(self, workspace, invocation, EntryDefsCallbackResult)
     }
 
     fn run_migrate_agent(
@@ -409,11 +400,7 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult> {
-        Ok(
-            do_callback!(self, workspace, invocation, MigrateAgentCallbackResult)
-                .1
-                .into(),
-        )
+        do_callback!(self, workspace, invocation, MigrateAgentCallbackResult)
     }
 
     fn run_validation_package(
@@ -421,11 +408,7 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult> {
-        Ok(
-            do_callback!(self, workspace, invocation, ValidationPackageCallbackResult)
-                .1
-                .into(),
-        )
+        do_callback!(self, workspace, invocation, ValidationPackageCallbackResult)
     }
 
     fn run_post_commit(
@@ -433,10 +416,6 @@ impl RibosomeT for WasmRibosome {
         workspace: UnsafeInvokeZomeWorkspace,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult> {
-        Ok(
-            do_callback!(self, workspace, invocation, PostCommitCallbackResult)
-                .1
-                .into(),
-        )
+        do_callback!(self, workspace, invocation, PostCommitCallbackResult)
     }
 }

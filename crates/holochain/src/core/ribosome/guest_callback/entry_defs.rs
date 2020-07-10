@@ -189,6 +189,7 @@ mod test {
                 agent_info: Deny,
                 read_workspace: Deny,
                 non_determinism: Deny,
+                conductor: Deny,
             }
         );
     }

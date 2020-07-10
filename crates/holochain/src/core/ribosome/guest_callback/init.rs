@@ -63,17 +63,15 @@ pub enum InitResult {
     UnresolvedDependencies(ZomeName, Vec<EntryContentHash>),
 }
 
-impl From<Vec<InitCallbackResult>> for InitResult {
-    fn from(callback_results: Vec<InitCallbackResult>) -> Self {
+impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
+    fn from(callback_results: Vec<(ZomeName, InitCallbackResult)>) -> Self {
         callback_results
             .into_iter()
-            .fold(Self::Pass, |acc, x| match x {
+            .fold(Self::Pass, |acc, (zome_name, x)| match x {
                 // fail overrides everything
-                InitCallbackResult::Fail(zome_name, fail_string) => {
-                    Self::Fail(zome_name, fail_string)
-                }
+                InitCallbackResult::Fail(fail_string) => Self::Fail(zome_name, fail_string),
                 // unresolved deps overrides pass but not fail
-                InitCallbackResult::UnresolvedDependencies(zome_name, ud) => match acc {
+                InitCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Fail(_, _) => acc,
                     _ => Self::UnresolvedDependencies(
                         zome_name,
@@ -125,17 +123,22 @@ mod test {
             )
         };
 
-        let cb_pass = || InitCallbackResult::Pass;
-        let cb_ud = || {
-            InitCallbackResult::UnresolvedDependencies(
+        let cb_pass = || {
+            (
                 ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
-                vec![],
+                InitCallbackResult::Pass,
+            )
+        };
+        let cb_ud = || {
+            (
+                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                InitCallbackResult::UnresolvedDependencies(vec![]),
             )
         };
         let cb_fail = || {
-            InitCallbackResult::Fail(
+            (
                 ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
-                "".into(),
+                InitCallbackResult::Fail("".into()),
             )
         };
 
@@ -179,6 +182,7 @@ mod test {
                 agent_info: Allow,
                 read_workspace: Allow,
                 non_determinism: Allow,
+                conductor: Allow,
             }
         );
     }

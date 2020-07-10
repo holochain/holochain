@@ -81,6 +81,12 @@ pub enum ValidateResult {
     UnresolvedDependencies(Vec<EntryContentHash>),
 }
 
+impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
+    fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
+    }
+}
+
 impl From<Vec<ValidateCallbackResult>> for ValidateResult {
     fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
         callback_results.into_iter().fold(Self::Valid, |acc, x| {
@@ -178,6 +184,7 @@ mod test {
                 agent_info: Deny,
                 read_workspace: Deny,
                 non_determinism: Deny,
+                conductor: Deny,
             }
         );
     }

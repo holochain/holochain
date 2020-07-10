@@ -37,7 +37,10 @@ fixturator!(
 impl Invocation for MigrateAgentInvocation {
     fn allowed_access(&self) -> HostFnAccess {
         let mut access = HostFnAccess::none();
-        access.non_determinism = Permission::Allow;
+        // TODO: insert zome_name
+        access.non_determinism = Permission::Deny;
+        access.read_workspace = Permission::Allow;
+        access.agent_info = Permission::Allow;
         access
     }
     fn zomes(&self) -> ZomesToInvoke {
@@ -79,18 +82,20 @@ pub enum MigrateAgentResult {
     Fail(ZomeName, String),
 }
 
-impl From<Vec<MigrateAgentCallbackResult>> for MigrateAgentResult {
-    fn from(callback_results: Vec<MigrateAgentCallbackResult>) -> Self {
-        callback_results.into_iter().fold(Self::Pass, |acc, x| {
-            match x {
-                // fail always overrides the acc
-                MigrateAgentCallbackResult::Fail(zome_name, fail_string) => {
-                    Self::Fail(zome_name, fail_string)
+impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
+    fn from(callback_results: Vec<(ZomeName, MigrateAgentCallbackResult)>) -> Self {
+        callback_results
+            .into_iter()
+            .fold(Self::Pass, |acc, (zome_name, x)| {
+                match x {
+                    // fail always overrides the acc
+                    MigrateAgentCallbackResult::Fail(fail_string) => {
+                        Self::Fail(zome_name, fail_string)
+                    }
+                    // pass allows the acc to continue
+                    MigrateAgentCallbackResult::Pass => acc,
                 }
-                // pass allows the acc to continue
-                MigrateAgentCallbackResult::Pass => acc,
-            }
-        })
+            })
     }
 }
 
@@ -129,11 +134,16 @@ mod test {
             )
         };
 
-        let cb_pass = || MigrateAgentCallbackResult::Pass;
-        let cb_fail = || {
-            MigrateAgentCallbackResult::Fail(
+        let cb_pass = || {
+            (
                 ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
-                "".into(),
+                MigrateAgentCallbackResult::Pass,
+            )
+        };
+        let cb_fail = || {
+            (
+                ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
+                MigrateAgentCallbackResult::Fail("".into()),
             )
         };
 
@@ -170,9 +180,10 @@ mod test {
             migrate_agent_invocation.allowed_access(),
             HostFnAccess {
                 side_effects: Deny,
-                agent_info: Deny,
-                read_workspace: Deny,
-                non_determinism: Allow,
+                agent_info: Allow,
+                read_workspace: Allow,
+                non_determinism: Deny,
+                conductor: Deny,
             }
         );
     }

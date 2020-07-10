@@ -89,12 +89,6 @@ guest_functions!(
     [__get_links, get_links, GetLinksInput, GetLinksOutput],
     [__get_entry, get_entry, GetEntryInput, GetEntryOutput],
     [
-        __entry_type_properties,
-        entry_type_properties,
-        EntryTypePropertiesInput,
-        EntryTypePropertiesOutput
-    ],
-    [
         __entry_hash,
         entry_hash,
         EntryHashInput,

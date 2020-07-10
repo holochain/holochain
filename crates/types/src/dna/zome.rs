@@ -21,6 +21,8 @@ pub struct HostFnAccess {
     pub side_effects: Permission,
     /// All other non-deterministic functions
     pub non_determinism: Permission,
+    /// Access to functions that use the conductor
+    pub conductor: Permission,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -51,6 +53,7 @@ impl HostFnAccess {
             side_effects: Permission::Allow,
             agent_info: Permission::Allow,
             non_determinism: Permission::Allow,
+            conductor: Permission::Allow,
         }
     }
 
@@ -61,6 +64,7 @@ impl HostFnAccess {
             side_effects: Permission::Deny,
             agent_info: Permission::Deny,
             non_determinism: Permission::Deny,
+            conductor: Permission::Deny,
         }
     }
 }
