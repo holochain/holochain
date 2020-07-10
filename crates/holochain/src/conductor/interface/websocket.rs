@@ -454,6 +454,10 @@ mod test {
             .expect_add_dnas::<Vec<_>>()
             .times(1)
             .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
         let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
         let mut request = Box::new(
@@ -514,6 +518,10 @@ mod test {
             .returning(move |hash| dna_map.get(&hash).cloned());
         dna_store
             .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
             .times(1)
             .return_const(());
         let (_tmpdir, conductor_handle) =
@@ -635,6 +643,10 @@ mod test {
         dna_store.expect_get().returning(move |_| Some(dna.clone()));
         dna_store
             .expect_add_dnas::<Vec<_>>()
+            .times(1)
+            .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
             .times(1)
             .return_const(());
 
