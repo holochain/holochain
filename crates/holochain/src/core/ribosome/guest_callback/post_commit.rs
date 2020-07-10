@@ -56,6 +56,12 @@ pub enum PostCommitResult {
     Fail(HeaderHashes, String),
 }
 
+impl From<Vec<(ZomeName, PostCommitCallbackResult)>> for PostCommitResult {
+    fn from(a: Vec<(ZomeName, PostCommitCallbackResult)>) -> Self {
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
+    }
+}
+
 impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
     fn from(callback_results: Vec<PostCommitCallbackResult>) -> Self {
         // this is an optional callback so defaults to success
@@ -150,6 +156,7 @@ mod test {
                 agent_info: Allow,
                 read_workspace: Allow,
                 non_determinism: Allow,
+                conductor: Allow,
             }
         );
     }

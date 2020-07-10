@@ -6,7 +6,10 @@ use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::fixt::AppEntryTypeFixturator;
-use holochain_types::{dna::zome::HostFnAccess, header::AppEntryType};
+use holochain_types::{
+    dna::zome::{HostFnAccess, Permission},
+    header::AppEntryType,
+};
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -34,7 +37,10 @@ fixturator!(
 
 impl Invocation for ValidationPackageInvocation {
     fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::none()
+        let mut access = HostFnAccess::none();
+        access.read_workspace = Permission::Allow;
+        access.agent_info = Permission::Allow;
+        access
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())
@@ -70,6 +76,12 @@ pub enum ValidationPackageResult {
     Fail(String),
     UnresolvedDependencies(Vec<EntryContentHash>),
     NotImplemented,
+}
+
+impl From<Vec<(ZomeName, ValidationPackageCallbackResult)>> for ValidationPackageResult {
+    fn from(a: Vec<(ZomeName, ValidationPackageCallbackResult)>) -> Self {
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
+    }
 }
 
 impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
@@ -175,9 +187,10 @@ mod test {
             validation_package_invocation.allowed_access(),
             HostFnAccess {
                 side_effects: Deny,
-                agent_info: Deny,
-                read_workspace: Deny,
+                agent_info: Allow,
+                read_workspace: Allow,
                 non_determinism: Deny,
+                conductor: Deny,
             }
         );
     }
