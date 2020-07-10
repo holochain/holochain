@@ -11,7 +11,6 @@ use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::entry::GetOptions;
 
 holochain_wasmer_guest::holochain_externs!();
-holochain_wasmer_guest::host_externs!(__entry_hash);
 
 const POST_ID: &str = "post";
 const POST_VALIDATIONS: u8 = 8;

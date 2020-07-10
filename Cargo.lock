@@ -1050,6 +1050,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d36fab90f82edc3c747f9d438e06cf0a491055896f2a279638bb5beed6c40177"
 
 [[package]]
+name = "hdk3"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "holo_hash_core",
+ "holochain_wasmer_guest",
+ "holochain_zome_types",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,6 +1130,7 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor",
+ "hdk3",
  "holo_hash",
  "holo_hash_core",
  "holochain_crypto",
@@ -1334,6 +1347,17 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
+version = "0.0.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30a11d4a4100168e8d2a1aee41138b8cdc0e478fb5ad59d81e86ed1b899a50d0"
+dependencies = [
+ "holochain_serialized_bytes",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "holochain_wasmer_common"
 version = "0.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ecfe600b97cec0a7965094188e4f20a7c363c1d94d0a08ebf20ccde80c22d6"
@@ -1344,13 +1368,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_wasmer_guest"
+version = "0.0.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e17f7250904bf79209ce232c69a0f8af53dad83d183f0c16b8f776b85d926d38"
+dependencies = [
+ "holochain_serialized_bytes",
+ "holochain_wasmer_common 0.0.34",
+ "serde",
+]
+
+[[package]]
 name = "holochain_wasmer_host"
 version = "0.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "758d5291ea2c87cc50cf66c25259008b5ba460d021d7ed17dd9df996ade4721a"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.35",
  "lazy_static",
  "serde",
  "wasmer-runtime",
@@ -3322,6 +3357,7 @@ dependencies = [
 name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
+ "hdk3",
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",

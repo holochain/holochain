@@ -20,11 +20,13 @@ fn main() {
     }
 
     for &m in [
+        "anchor",
         "bench",
         "commit_entry",
         "debug",
         "entry_defs",
         "foo",
+        "hash_path",
         "imports",
         "init_pass",
         "init_fail",
