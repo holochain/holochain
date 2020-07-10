@@ -70,6 +70,9 @@ pub enum ChainInvalidReason {
     #[error("A valid chain always begins with a Dna entry, followed by an Agent entry.")]
     GenesisDataMissing,
 
+    #[error("A genesis element contains incorrect data.")]
+    MalformedGenesisData,
+
     #[error("A chain header and its corresponding entry have a discrepancy. Entry address: {0}")]
     HeaderAndEntryMismatch(EntryHash),
 
