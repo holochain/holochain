@@ -356,7 +356,9 @@ mod test {
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
         handle.shutdown().await;
-        shutdown.await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+            .await
+            .ok();
         Ok(())
     }
 
