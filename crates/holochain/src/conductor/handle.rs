@@ -49,6 +49,7 @@ use super::{
     api::error::ConductorApiResult,
     config::AdminInterfaceConfig,
     dna_store::DnaStore,
+    entry_def_store::EntryDefBufferKey,
     error::{ConductorResult, CreateAppError},
     manager::TaskManagerRunHandle,
     Cell, Conductor,
@@ -71,6 +72,7 @@ use tracing::*;
 use super::state::ConductorState;
 #[cfg(test)]
 use holochain_state::env::EnvironmentWrite;
+use holochain_zome_types::entry_def::EntryDef;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -104,6 +106,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
+
+    /// Get a [EntryDef] from the [DnaStore]
+    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Add the [DnaFile]s from the wasm and dna_def databases into memory
     async fn add_dnas(&self) -> ConductorResult<()>;
@@ -238,6 +243,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.conductor.read().await.dna_store().get(hash)
+    }
+
+    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+        self.conductor.read().await.dna_store().get_entry_def(key)
     }
 
     async fn dispatch_holochain_p2p_event(
@@ -428,6 +437,8 @@ pub mod mock {
 
             fn sync_get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
+            fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+
             fn sync_dispatch_holochain_p2p_event(&self, cell_id: &CellId, event: holochain_p2p::event::HolochainP2pEvent) -> ConductorResult<()>;
 
             fn sync_call_zome(
@@ -506,6 +517,10 @@ pub mod mock {
 
         async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile> {
             self.sync_get_dna(hash)
+        }
+
+        async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+            self.sync_get_entry_def(key)
         }
 
         async fn dispatch_holochain_p2p_event(

@@ -39,7 +39,7 @@ pub trait DnaStore: Default + Send + Sync {
     // TODO: FAST: Make this return an iterator to avoid allocating
     fn list(&self) -> Vec<DnaHash>;
     fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
-    fn get_entry_def<'a>(&'a self, k: &EntryDefBufferKey) -> Option<&'a EntryDef>;
+    fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef>;
 }
 
 impl DnaStore for RealDnaStore {
@@ -67,8 +67,8 @@ impl DnaStore for RealDnaStore {
     ) {
         self.entry_defs.extend(entry_defs);
     }
-    fn get_entry_def<'a>(&'a self, k: &EntryDefBufferKey) -> Option<&'a EntryDef> {
-        self.entry_defs.get(k)
+    fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef> {
+        self.entry_defs.get(k).cloned()
     }
 }
 
