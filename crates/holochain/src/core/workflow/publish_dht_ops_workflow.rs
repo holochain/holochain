@@ -366,8 +366,12 @@ mod tests {
             };
 
             // Shutdown
-            network.ghost_actor_shutdown().await.unwrap();
-            recv_task.await.unwrap();
+            tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
+                .await
+                .ok();
+            tokio::time::timeout(Duration::from_secs(10), recv_task)
+                .await
+                .ok();
         });
     }
 
