@@ -602,6 +602,9 @@ where
         // write the dna_def db
         env.with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
+        // write the entry_def db
+        env.with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
+
         Ok(zome_defs)
     }
 
