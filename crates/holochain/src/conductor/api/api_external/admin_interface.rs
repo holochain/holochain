@@ -324,7 +324,8 @@ mod test {
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
         let handle = Conductor::builder().test(test_env, wasm_env).await?;
-        let admin_api = RealAdminInterfaceApi::new(handle);
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -354,6 +355,8 @@ mod test {
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
+        handle.shutdown().await;
+        shutdown.await.unwrap();
         Ok(())
     }
 

@@ -169,3 +169,39 @@ pub(crate) async fn get_entry_defs(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::conductor::Conductor;
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_wasm_test_utils::TestWasm;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_store_entry_defs() {
+        holochain_types::observability::test_run().ok();
+
+        // all the stuff needed to have a WasmBuf
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+
+        let dna = fake_dna_zomes(
+            "",
+            vec![(TestWasm::EntryDefs.into(), TestWasm::EntryDefs.into())],
+        );
+
+        // TODO: Get expected entry defs
+
+        handle.install_dna(dna).await.unwrap();
+        // TODO: Check entry defs are here
+        handle.shutdown().await;
+        shutdown.await.unwrap();
+        // TODO: Restart conductor and check defs are still here
+    }
+}
