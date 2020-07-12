@@ -5,7 +5,7 @@ use holochain_zome_types::debug::DebugMsg;
 use holochain_zome_types::DebugInput;
 use holochain_zome_types::DebugOutput;
 use std::sync::Arc;
-// use tracing::*;
+use tracing::*;
 
 pub fn debug(
     _ribosome: Arc<WasmRibosome>,
@@ -13,7 +13,7 @@ pub fn debug(
     input: DebugInput,
 ) -> RibosomeResult<DebugOutput> {
     let msg: DebugMsg = input.into_inner();
-    dbg!(
+    trace!(
         "{}:{}:{} {}",
         msg.module_path(),
         msg.file(),

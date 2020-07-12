@@ -2,7 +2,6 @@ use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
-// use holochain_zome_types::link::LinkTag;
 
 /// "anchor"
 pub const ROOT: &str = "anchor";

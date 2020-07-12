@@ -74,7 +74,6 @@ pub mod wasm_test {
     use crate::core::workflow::produce_dht_ops_workflow::{
         produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
     };
-    // use hdk3::prelude::link::LinkTag;
     use hdk3::prelude::*;
     use holo_hash_core::HoloHashCore;
     use holo_hash_core::HoloHashCoreHash;
