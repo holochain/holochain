@@ -61,6 +61,8 @@ pub fn get_links<'a>(
 
     let links: Vec<Link> = links.into_iter().map(|l| l.into_link()).collect();
 
+    dbg!(&links);
+
     Ok(GetLinksOutput::new(links.into()))
 }
 

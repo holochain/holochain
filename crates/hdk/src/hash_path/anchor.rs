@@ -4,8 +4,8 @@ use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
 
-/// "hdk.path.anchor.root"
-pub const ROOT: &str = "hdk.path.anchor.root";
+/// "anchor"
+pub const ROOT: &str = "anchor";
 
 #[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, SerializedBytes, Clone)]
 pub struct Anchor {
@@ -16,7 +16,8 @@ pub struct Anchor {
 impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
         Self::from(&format!(
-            "{}/{}/{}",
+            "{1}{0}{2}{0}{3}",
+            crate::hash_path::path::DELIMITER,
             ROOT,
             anchor.anchor_type,
             anchor.anchor_text.as_ref().unwrap_or(&String::default())
@@ -29,6 +30,7 @@ impl TryFrom<&Path> for Anchor {
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         let components: Vec<Component> = path.as_ref().to_owned();
         if components.len() == 2 || components.len() == 3 {
+            dbg!(&components, Component::from(ROOT));
             if components[0] == Component::from(ROOT) {
                 Ok(Anchor {
                     anchor_type: (&components[1]).try_into()?,
@@ -40,9 +42,11 @@ impl TryFrom<&Path> for Anchor {
                     },
                 })
             } else {
-                Err(SerializedBytesError::FromBytes(
-                    "Bad anchor path root".into(),
-                ))
+                Err(SerializedBytesError::FromBytes(format!(
+                    "Bad anchor path root {:0?} should be {:1?}",
+                    components[0].as_ref(),
+                    ROOT.as_bytes(),
+                )))
             }
         } else {
             Err(SerializedBytesError::FromBytes(format!(
@@ -86,8 +90,8 @@ pub fn anchor(
         anchor_text: Some(anchor_text),
     })
         .into();
-    path.touch()?;
-    Ok(path.pwd()?)
+    path.ensure()?;
+    Ok(path.hash()?)
 }
 
 pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
@@ -102,7 +106,7 @@ pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmEr
 
 pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
     let links = Path::from(ROOT)
-        .ls()?
+        .children()?
         .into_inner()
         .into_iter()
         .map(|link| link.target)
@@ -118,9 +122,9 @@ pub fn list_anchor_addresses(
         anchor_text: None,
     })
         .into();
-    path.touch()?;
+    path.ensure()?;
     let links = path
-        .ls()?
+        .children()?
         .into_inner()
         .into_iter()
         .map(|link| link.target)
@@ -139,9 +143,9 @@ pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> 
         anchor_text: None,
     })
         .into();
-    path.touch()?;
+    path.ensure()?;
     let mut tags: Vec<LinkTag> = path
-        .ls()?
+        .children()?
         .into_inner()
         .into_iter()
         .map(|link| link.tag)
@@ -154,19 +158,15 @@ pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> 
 #[cfg(test)]
 #[test]
 fn hash_path_root() {
-    assert_eq!(ROOT, "hdk.path.anchor.root");
+    assert_eq!(ROOT, "anchor");
 }
 
 #[cfg(test)]
 #[test]
 fn hash_path_anchor_path() {
     for (atype, text, path_string) in vec![
-        ("foo", None, "hdk.path.anchor.root/foo"),
-        (
-            "foo",
-            Some("bar".to_string()),
-            "hdk.path.anchor.root/foo/bar",
-        ),
+        ("foo", None, "anchor.foo"),
+        ("foo", Some("bar".to_string()), "anchor.foo.bar"),
     ] {
         assert_eq!(
             Path::from(path_string),
@@ -198,10 +198,7 @@ fn hash_path_anchor_entry_def() {
 fn hash_path_anchor_from_path() {
     let path = Path::from(vec![
         Component::from(vec![
-            104, 0, 0, 0, 100, 0, 0, 0, 107, 0, 0, 0, 46, 0, 0, 0, 112, 0, 0, 0, 97, 0, 0, 0, 116,
-            0, 0, 0, 104, 0, 0, 0, 46, 0, 0, 0, 97, 0, 0, 0, 110, 0, 0, 0, 99, 0, 0, 0, 104, 0, 0,
-            0, 111, 0, 0, 0, 114, 0, 0, 0, 46, 0, 0, 0, 114, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0,
-            116, 0, 0, 0,
+            97, 0, 0, 0, 110, 0, 0, 0, 99, 0, 0, 0, 104, 0, 0, 0, 111, 0, 0, 0, 114, 0, 0, 0,
         ]),
         Component::from(vec![102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0]),
         Component::from(vec![98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0]),

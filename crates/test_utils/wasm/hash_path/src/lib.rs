@@ -7,23 +7,27 @@ holochain_externs!();
 
 entry_defs!(vec![Path::entry_def()]);
 
-map_extern!(pwd, _pwd);
+map_extern!(hash, _hash);
 map_extern!(exists, _exists);
-map_extern!(touch, _touch);
-map_extern!(ls, _ls);
+map_extern!(ensure, _ensure);
+map_extern!(children, _children);
 
-fn _pwd(path_string: TestString) -> Result<HoloHashCore, WasmError> {
-    Path::from(path_string.0).pwd()
+fn _hash(path_string: TestString) -> Result<HoloHashCore, WasmError> {
+    Path::from(path_string.0).hash()
 }
 
 fn _exists(path_string: TestString) -> Result<TestBool, WasmError> {
     Ok(Path::from(path_string.0).exists()?.into())
 }
 
-fn _touch(path_string: TestString) -> Result<(), WasmError> {
-    Path::from(path_string.0).touch()
+fn _ensure(path_string: TestString) -> Result<(), WasmError> {
+    Path::from(path_string.0).ensure()
 }
 
-fn _ls(path_string: TestString) -> Result<holochain_zome_types::link::Links, WasmError> {
-    Path::from(path_string.0).ls()
+fn _parent(path_string: TestString) -> Result<Option<Path>, WasmError> {
+    Ok(Path::from(path_string.0).parent())
+}
+
+fn _children(path_string: TestString) -> Result<holochain_zome_types::link::Links, WasmError> {
+    Path::from(path_string.0).children()
 }
