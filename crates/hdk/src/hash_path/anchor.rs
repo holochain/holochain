@@ -2,7 +2,7 @@ use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
-use holochain_zome_types::link::LinkTag;
+// use holochain_zome_types::link::LinkTag;
 
 /// "anchor"
 pub const ROOT: &str = "anchor";
@@ -132,27 +132,38 @@ pub fn list_anchor_addresses(
     Ok(links)
 }
 
-/// @TODO not sure if this is useful or done correctly??
-/// the whole idea of link tags has been removed since the old anchors implementation and even the
-/// old version only returned the same thing as the anchor text
-/// in this version we just remove the same link tag no matter what because all anchor links have
-/// the same tag
-pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> {
+/// the old version of holochain that anchors was designed for had two part link tags but now link
+/// tags are a single array of bytes, so to get an external interface that is somewhat backwards
+/// compatible we need to rebuild the anchors from the paths serialized into the links and then
+/// return the
+pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, WasmError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
     })
         .into();
     path.ensure()?;
-    let mut tags: Vec<LinkTag> = path
+    let hopefully_anchor_tags: Result<Vec<String>, SerializedBytesError> = path
         .children()?
         .into_inner()
         .into_iter()
-        .map(|link| link.tag)
+        .map(|link| match Path::try_from(&link.tag) {
+            Ok(path) => match Anchor::try_from(&path) {
+                Ok(anchor) => match anchor.anchor_text {
+                    Some(text) => Ok(text),
+                    None => Err(SerializedBytesError::FromBytes(
+                        "missing anchor text".into(),
+                    )),
+                },
+                Err(e) => Err(e),
+            },
+            Err(e) => Err(e),
+        })
         .collect();
-    tags.sort();
-    tags.dedup();
-    Ok(tags)
+    let mut anchor_tags = hopefully_anchor_tags?;
+    anchor_tags.sort();
+    anchor_tags.dedup();
+    Ok(anchor_tags)
 }
 
 #[cfg(test)]

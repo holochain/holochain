@@ -2,6 +2,7 @@ use crate::hash_path::shard::ShardStrategy;
 use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
+use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
 
 /// allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components
@@ -228,6 +229,31 @@ impl From<&Path> for EntryDefId {
     }
 }
 
+impl TryFrom<&Path> for LinkTag {
+    type Error = SerializedBytesError;
+    fn try_from(path: &Path) -> Result<Self, Self::Error> {
+        // link tag is:
+        //
+        // - the name of all anchor links to disambiguate against other links
+        // - the standard delimiter
+        // - the last component of the current path
+        //
+        // this allows the value of the target to be read/dereferenced straight from the
+        // link without needing to get it
+        let path_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(path)?).into();
+        let link_tag_bytes: Vec<u8> = NAME.iter().chain(path_bytes.iter()).cloned().collect();
+        Ok(LinkTag::new(link_tag_bytes))
+    }
+}
+
+impl TryFrom<&LinkTag> for Path {
+    type Error = SerializedBytesError;
+    fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
+        let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
+        Ok(Self::try_from(sb)?)
+    }
+}
+
 impl Path {
     pub fn entry_def_id() -> EntryDefId {
         core::str::from_utf8(&NAME).unwrap().into()
@@ -271,26 +297,7 @@ impl Path {
             match self.parent() {
                 Some(parent) => {
                     parent.ensure()?;
-                    // link tag is:
-                    //
-                    // - the name of all anchor links to disambiguate against other links
-                    // - the standard delimiter
-                    // - the last component of the current path
-                    //
-                    // this allows the value of the target to be read/dereferenced straight from the
-                    // link without needing to get it
-                    let link_tag: Vec<u8> = NAME
-                        .iter()
-                        .chain(DELIMITER.as_bytes().iter())
-                        .chain(self.as_ref()[self.as_ref().len() - 1].as_ref().iter())
-                        .cloned()
-                        .collect();
-                    debug!(&link_tag)?;
-                    link_entries!(
-                        parent.hash()?,
-                        self.hash()?,
-                        holochain_zome_types::link::LinkTag::new(link_tag)
-                    )?;
+                    link_entries!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
                 }
                 _ => {}
             }
@@ -330,6 +337,20 @@ fn hash_path_delimiter() {
 #[cfg(test)]
 fn hash_path_linktag() {
     assert_eq!("hdk.path".as_bytes(), NAME);
+
+    let path = Path::from("foo.bar");
+
+    let link_tag = LinkTag::try_from(&path).unwrap();
+
+    assert_eq!(
+        &vec![
+            104, 100, 107, 46, 112, 97, 116, 104, 146, 196, 12, 102, 0, 0, 0, 111, 0, 0, 0, 111, 0,
+            0, 0, 196, 12, 98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0
+        ],
+        link_tag.as_ref(),
+    );
+
+    assert_eq!(Path::try_from(&link_tag).unwrap(), path,);
 }
 
 #[test]
