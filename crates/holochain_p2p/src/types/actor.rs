@@ -60,12 +60,22 @@ impl Default for GetOptions {
 }
 
 /// Get links from the DHT.
-pub struct GetLinks {
-    /// The dna_hash / space_hash context.
-    pub dna_hash: DnaHash,
-    /// The agent_id / agent_pub_key context.
-    pub agent_pub_key: AgentPubKey,
-    // TODO - parameters
+/// Fields tagged with `[Network]` are network-level controls.
+/// Fields tagged with `[Remote]` are controls that will be forwarded to the
+/// remote agent processing this `GetLinks` request.
+pub struct GetLinksOptions {
+    /// [Network]
+    /// Timeout to await responses for aggregation.
+    /// Set to `None` for a default "best-effort".
+    /// Note - if all requests time-out you will receive an empty result,
+    /// not a timeout error.
+    pub timeout_ms: Option<u64>,
+}
+
+impl Default for GetLinksOptions {
+    fn default() -> Self {
+        Self { timeout_ms: None }
+    }
 }
 
 ghost_actor::ghost_chan! {
@@ -111,7 +121,12 @@ ghost_actor::ghost_chan! {
         ) -> Vec<SerializedBytes>;
 
         /// Get links from the DHT.
-        fn get_links(input: GetLinks) -> (); // TODO - proper return type
+        fn get_links(
+            dna_hash: DnaHash,
+            from_agent: AgentPubKey,
+            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            options: GetLinksOptions,
+        ) -> Vec<SerializedBytes>;
 
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, agent_pub_key: AgentPubKey, receipt: SerializedBytes) -> ();

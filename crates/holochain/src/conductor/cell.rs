@@ -265,10 +265,16 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            GetLinks { span, respond, .. } => {
+            GetLinks {
+                span,
+                respond,
+                dht_hash,
+                options,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_get_links()
+                    .handle_get_links(dht_hash, options)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -393,8 +399,13 @@ impl Cell {
     }
 
     /// a remote node is asking us for links
-    async fn handle_get_links(&self) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_get_links(
+        &self,
+        _dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        _options: holochain_p2p::event::GetLinksOptions,
+    ) -> CellResult<SerializedBytes> {
+        tracing::warn!("handle get links is unimplemented");
+        Err(CellError::Todo)
     }
 
     /// a remote agent is sending us a validation receipt.
