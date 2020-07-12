@@ -427,15 +427,16 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             _ => (),
         }
 
-        if input.as_race {
-            // if the user doesn't care about race_timeout_ms, apply default
-            match input.race_timeout_ms {
-                None | Some(0) => {
-                    input.race_timeout_ms = Some(DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS);
-                }
-                _ => (),
+        // if the user doesn't care about race_timeout_ms, apply default
+        match input.race_timeout_ms {
+            None | Some(0) => {
+                input.race_timeout_ms = Some(DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS);
             }
+            _ => (),
+        }
 
+        // race timeout > timeout is nonesense
+        if input.as_race {
             if input.race_timeout_ms.unwrap() > input.timeout_ms.unwrap() {
                 input.race_timeout_ms = Some(input.timeout_ms.unwrap());
             }
