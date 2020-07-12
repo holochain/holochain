@@ -29,7 +29,6 @@ impl TryFrom<&Path> for Anchor {
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         let components: Vec<Component> = path.as_ref().to_owned();
         if components.len() == 2 || components.len() == 3 {
-            dbg!(&components, Component::from(ROOT));
             if components[0] == Component::from(ROOT) {
                 Ok(Anchor {
                     anchor_type: (&components[1]).try_into()?,
