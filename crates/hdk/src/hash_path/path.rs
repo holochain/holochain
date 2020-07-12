@@ -235,11 +235,10 @@ impl TryFrom<&Path> for LinkTag {
         // link tag is:
         //
         // - the name of all anchor links to disambiguate against other links
-        // - the standard delimiter
-        // - the last component of the current path
+        // - the literal serialized bytes of the path
         //
         // this allows the value of the target to be read/dereferenced straight from the
-        // link without needing to get it
+        // link without needing additional network calls
         let path_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(path)?).into();
         let link_tag_bytes: Vec<u8> = NAME.iter().chain(path_bytes.iter()).cloned().collect();
         Ok(LinkTag::new(link_tag_bytes))
