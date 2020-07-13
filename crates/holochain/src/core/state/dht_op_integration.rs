@@ -13,8 +13,8 @@ use holochain_state::{
     prelude::{BufferedStore, GetDb, Reader},
 };
 use holochain_types::{
-    composite_hash::AnyDhtHash, dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus,
-    Timestamp, TimestampKey,
+    composite_hash::AnyDhtHash, dht_arc::DhtArc, dht_op::DhtOp, timestamp::TS_SIZE,
+    validate::ValidationStatus, Timestamp, TimestampKey,
 };
 
 /// Database type for AuthoredDhtOps
@@ -142,7 +142,7 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
         &'env self,
         from: Option<Timestamp>,
         to: Option<Timestamp>,
-        dht_loc: Option<u32>,
+        dht_loc: Option<DhtArc>,
     ) -> DatabaseResult<
         Box<dyn FallibleIterator<Item = IntegratedDhtOpsValue, Error = DatabaseError> + 'env>,
     > {
@@ -160,7 +160,7 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
                     _ => Ok(None),
                 })
                 .filter_map(move |v| match dht_loc {
-                    Some(dht_loc) if v.basis.get_loc() == dht_loc => Ok(Some(v)),
+                    Some(dht_loc) if dht_loc.contains(v.basis.get_loc()) => Ok(Some(v)),
                     None => Ok(Some(v)),
                     _ => Ok(None),
                 }),
@@ -271,7 +271,7 @@ mod tests {
                 .query(
                     Some(ages_ago.into()),
                     Some(future.into()),
-                    Some(same_basis.get_loc()),
+                    Some(DhtArc::new(same_basis.get_loc(), 0)),
                 )
                 .unwrap()
                 .collect::<Vec<_>>()
@@ -282,7 +282,7 @@ mod tests {
             assert_eq!(r.len(), 2);
             // Same basis all
             let mut r = buf
-                .query(None, None, Some(same_basis.get_loc()))
+                .query(None, None, Some(DhtArc::new(same_basis.get_loc(), 0)))
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
