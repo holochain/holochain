@@ -18,6 +18,16 @@ impl From<&actor::GetOptions> for GetOptions {
     }
 }
 
+/// GetLinks options help control how the get is processed at various levels.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetLinksOptions {}
+
+impl From<&actor::GetLinksOptions> for GetLinksOptions {
+    fn from(_a: &actor::GetLinksOptions) -> Self {
+        Self {}
+    }
+}
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
@@ -61,12 +71,11 @@ ghost_actor::ghost_chan! {
 
         /// A remote node is requesting link data from us.
         fn get_links(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            options: GetLinksOptions,
+        ) -> SerializedBytes;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(

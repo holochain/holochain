@@ -51,7 +51,7 @@ use holochain_types::{
     Entry, EntryHashed,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::link::{Link, LinkTag};
+use holochain_zome_types::link::{LinkTag, Links};
 use holochain_zome_types::{
     entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetLinksInput, HostInput,
     LinkEntriesInput,
@@ -959,7 +959,7 @@ async fn get_links<'env>(
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
-) -> Vec<Link> {
+) -> Links {
     let reader = env_ref.reader().unwrap();
     let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -1049,6 +1049,7 @@ async fn test_metadata_from_wasm_api() {
         // Call get links and get back the targets
         let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
         let links = links
+            .into_inner()
             .into_iter()
             .map(|h| h.target.try_into().unwrap())
             .collect::<Vec<EntryHash>>();

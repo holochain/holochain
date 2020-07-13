@@ -3,6 +3,8 @@ use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
+const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
 pub struct EntryDefId(String);
@@ -31,6 +33,12 @@ pub struct RequiredValidations(u8);
 impl From<u8> for RequiredValidations {
     fn from(u: u8) -> Self {
         Self(u)
+    }
+}
+
+impl Default for RequiredValidations {
+    fn default() -> Self {
+        Self(DEFAULT_REQUIRED_VALIDATIONS)
     }
 }
 
