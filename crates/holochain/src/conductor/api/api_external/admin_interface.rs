@@ -308,8 +308,9 @@ mod test {
     use holochain_types::{
         app::InstallAppDnaPayload,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, write_fake_dna_file},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
     };
+    use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
     use uuid::Uuid;
 
@@ -323,9 +324,13 @@ mod test {
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
         let handle = Conductor::builder().test(test_env, wasm_env).await?;
-        let admin_api = RealAdminInterfaceApi::new(handle);
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uuid = Uuid::new_v4();
-        let dna = fake_dna_file(&uuid.to_string());
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
         let dna_hash = dna.dna_hash().clone();
@@ -350,6 +355,10 @@ mod test {
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
+        handle.shutdown().await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+            .await
+            .ok();
         Ok(())
     }
 

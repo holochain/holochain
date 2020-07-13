@@ -1,4 +1,4 @@
-use error::DnaStoreResult;
+use super::entry_def_store::EntryDefBufferKey;
 use fallible_iterator::FallibleIterator;
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
@@ -10,13 +10,17 @@ use holochain_types::{
     dna::{DnaDef, DnaDefHashed, DnaFile},
     prelude::*,
 };
+use holochain_zome_types::entry_def::EntryDef;
 use mockall::automock;
 use std::collections::HashMap;
 use tracing::*;
 
 /// Placeholder for real dna store
 #[derive(Default, Debug)]
-pub struct RealDnaStore(HashMap<DnaHash, DnaFile>);
+pub struct RealDnaStore {
+    dnas: HashMap<DnaHash, DnaFile>,
+    entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
+}
 
 pub type DnaDefCas<'env> = CasBuf<'env, DnaDefHashed>;
 pub struct DnaDefBuf<'env> {
@@ -25,35 +29,55 @@ pub struct DnaDefBuf<'env> {
 
 #[automock]
 pub trait DnaStore: Default + Send + Sync {
-    fn add(&mut self, dna: DnaFile) -> DnaStoreResult<()>;
+    fn add(&mut self, dna: DnaFile);
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T);
+    fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef);
+    fn add_entry_defs<T: IntoIterator<Item = (EntryDefBufferKey, EntryDef)> + 'static>(
+        &mut self,
+        entry_defs: T,
+    );
     // TODO: FAST: Make this return an iterator to avoid allocating
     fn list(&self) -> Vec<DnaHash>;
     fn get(&self, hash: &DnaHash) -> Option<DnaFile>;
+    fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef>;
 }
 
 impl DnaStore for RealDnaStore {
     #[instrument]
-    fn add(&mut self, dna: DnaFile) -> DnaStoreResult<()> {
-        self.0.insert(dna.dna_hash().clone(), dna);
-        Ok(())
+    fn add(&mut self, dna: DnaFile) {
+        self.dnas.insert(dna.dna_hash().clone(), dna);
     }
     fn add_dnas<T: IntoIterator<Item = (DnaHash, DnaFile)> + 'static>(&mut self, dnas: T) {
-        self.0.extend(dnas);
+        self.dnas.extend(dnas);
     }
     #[instrument]
     fn list(&self) -> Vec<DnaHash> {
-        self.0.keys().cloned().collect()
+        self.dnas.keys().cloned().collect()
     }
     #[instrument]
     fn get(&self, hash: &DnaHash) -> Option<DnaFile> {
-        self.0.get(hash).cloned()
+        self.dnas.get(hash).cloned()
+    }
+    fn add_entry_def(&mut self, k: EntryDefBufferKey, entry_def: EntryDef) {
+        self.entry_defs.insert(k, entry_def);
+    }
+    fn add_entry_defs<T: IntoIterator<Item = (EntryDefBufferKey, EntryDef)> + 'static>(
+        &mut self,
+        entry_defs: T,
+    ) {
+        self.entry_defs.extend(entry_defs);
+    }
+    fn get_entry_def(&self, k: &EntryDefBufferKey) -> Option<EntryDef> {
+        self.entry_defs.get(k).cloned()
     }
 }
 
 impl RealDnaStore {
     pub fn new() -> Self {
-        RealDnaStore(HashMap::new())
+        RealDnaStore {
+            dnas: HashMap::new(),
+            entry_defs: HashMap::new(),
+        }
     }
 }
 
@@ -85,14 +109,4 @@ impl<'env> BufferedStore<'env> for DnaDefBuf<'env> {
         self.dna_defs.flush_to_txn(writer)?;
         Ok(())
     }
-}
-
-pub mod error {
-    use thiserror::Error;
-    #[derive(Error, Debug)]
-    pub enum DnaStoreError {
-        #[error("Store failed to write")]
-        WriteFail,
-    }
-    pub type DnaStoreResult<T> = Result<T, DnaStoreError>;
 }

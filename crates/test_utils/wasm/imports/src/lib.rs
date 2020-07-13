@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use holochain_wasmer_guest::*;
-use holochain_zome_types::globals::ZomeGlobals;
+use holochain_zome_types::globals::ZomeInfo;
 use holochain_zome_types::*;
 
 // only the host functions we require in order to pull/push data across the host/guest boundary
@@ -37,7 +37,8 @@ macro_rules! guest_functions {
 }
 
 guest_functions!(
-    [__globals, globals, GlobalsInput, GlobalsOutput],
+    [__zome_info, zome_info, ZomeInfoInput, ZomeInfoOutput],
+    [__agent_info, agent_info, AgentInfoInput, AgentInfoOutput],
     [__call, call, CallInput, CallOutput],
     [__capability, capability, CapabilityInput, CapabilityOutput],
     [
@@ -88,12 +89,6 @@ guest_functions!(
     [__get_links, get_links, GetLinksInput, GetLinksOutput],
     [__get_entry, get_entry, GetEntryInput, GetEntryOutput],
     [
-        __entry_type_properties,
-        entry_type_properties,
-        EntryTypePropertiesInput,
-        EntryTypePropertiesOutput
-    ],
-    [
         __entry_hash,
         entry_hash,
         EntryHashInput,
@@ -110,9 +105,10 @@ guest_functions!(
 );
 
 // this is the type of thing you'd expect to see in an HDK to cache the global constants
+// TODO: Does this actually work? I thought wasm lost it's memory between calls? freesig
 lazy_static! {
-    pub(crate) static ref GLOBALS: ZomeGlobals = {
-        let output: GlobalsOutput = host_call!(__globals, GlobalsInput::new(())).unwrap();
+    pub(crate) static ref ZOME_INFO: ZomeInfo = {
+        let output: ZomeInfoOutput = host_call!(__zome_info, ZomeInfoInput::new(())).unwrap();
         output.into_inner()
     };
 }

@@ -26,12 +26,14 @@ macro_rules! wasm_io_types {
 }
 
 wasm_io_types!(
-    // the globals are constants specific to the current zome and state of the source chain
+    // the zome and agent info are constants specific to the current zome and state of the source chain
     // all the information is provided by core so there is no input value
     // as these are constant it makes sense for the zome dev or HDK to cache the return of this in
     // a lazy_static! or similar
-    pub struct GlobalsInput(());
-    pub struct GlobalsOutput(crate::globals::ZomeGlobals);
+    pub struct ZomeInfoInput(());
+    pub struct ZomeInfoOutput(crate::globals::ZomeInfo);
+    pub struct AgentInfoInput(());
+    pub struct AgentInfoOutput(crate::globals::AgentInfo);
     // call is entirely arbitrary so we need to send and receive SerializedBytes
     pub struct CallInput(SerializedBytes);
     pub struct CallOutput(SerializedBytes);

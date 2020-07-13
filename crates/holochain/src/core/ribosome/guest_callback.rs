@@ -34,7 +34,7 @@ impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
 }
 
 impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R, I> {
-    type Item = GuestOutput;
+    type Item = (ZomeName, GuestOutput);
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let call_iterator_timeout = crate::start_hard_timeout!();
@@ -50,7 +50,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                             zome_name,
                             to_call,
                         )? {
-                            Some(result) => Some(result),
+                            Some(result) => Some((zome_name.clone(), result)),
                             None => self.next()?,
                         }
                     }
@@ -155,7 +155,7 @@ mod tests {
 
         let call_iterator = CallIterator::new(workspace, ribosome, invocation);
 
-        let output: Vec<GuestOutput> = call_iterator.collect().unwrap();
+        let output: Vec<(_, GuestOutput)> = call_iterator.collect().unwrap();
         assert_eq!(output.len(), zome_names.len() * fn_components.0.len());
     }
 }

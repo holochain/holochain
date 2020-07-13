@@ -5,7 +5,7 @@ use crate::fixt::DnaDefFixturator;
 use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::DnaDef;
+use holochain_types::dna::{zome::HostFnAccess, DnaDef};
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -27,8 +27,8 @@ fixturator!(
 );
 
 impl Invocation for InitInvocation {
-    fn allow_side_effects(&self) -> bool {
-        true
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::all()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All
@@ -63,17 +63,15 @@ pub enum InitResult {
     UnresolvedDependencies(ZomeName, Vec<EntryContentHash>),
 }
 
-impl From<Vec<InitCallbackResult>> for InitResult {
-    fn from(callback_results: Vec<InitCallbackResult>) -> Self {
+impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
+    fn from(callback_results: Vec<(ZomeName, InitCallbackResult)>) -> Self {
         callback_results
             .into_iter()
-            .fold(Self::Pass, |acc, x| match x {
+            .fold(Self::Pass, |acc, (zome_name, x)| match x {
                 // fail overrides everything
-                InitCallbackResult::Fail(zome_name, fail_string) => {
-                    Self::Fail(zome_name, fail_string)
-                }
+                InitCallbackResult::Fail(fail_string) => Self::Fail(zome_name, fail_string),
                 // unresolved deps overrides pass but not fail
-                InitCallbackResult::UnresolvedDependencies(zome_name, ud) => match acc {
+                InitCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Fail(_, _) => acc,
                     _ => Self::UnresolvedDependencies(
                         zome_name,
@@ -100,9 +98,11 @@ mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -123,17 +123,22 @@ mod test {
             )
         };
 
-        let cb_pass = || InitCallbackResult::Pass;
-        let cb_ud = || {
-            InitCallbackResult::UnresolvedDependencies(
+        let cb_pass = || {
+            (
                 ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
-                vec![],
+                InitCallbackResult::Pass,
+            )
+        };
+        let cb_ud = || {
+            (
+                ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
+                InitCallbackResult::UnresolvedDependencies(vec![]),
             )
         };
         let cb_fail = || {
-            InitCallbackResult::Fail(
+            (
                 ZomeNameFixturator::new(fixt::Predictable).next().unwrap(),
-                "".into(),
+                InitCallbackResult::Fail("".into()),
             )
         };
 
@@ -166,10 +171,20 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn init_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(init_invocation.allow_side_effects());
+        assert_matches!(
+            init_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Allow,
+                agent_info: Allow,
+                read_workspace: Allow,
+                non_determinism: Allow,
+                conductor: Allow,
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]
