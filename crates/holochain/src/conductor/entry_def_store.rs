@@ -126,6 +126,7 @@ pub(crate) async fn get_entry_defs(
     dna: DnaFile,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation::new();
+
     // Get the zomes hashes
     let zomes = dna
         .dna
@@ -167,5 +168,97 @@ pub(crate) async fn get_entry_defs(
         EntryDefsResult::Err(zome_name, msg) => {
             return Err(EntryDefStoreError::CallbackFailed(zome_name, msg))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EntryDefBufferKey;
+    use crate::conductor::Conductor;
+    use holo_hash::{Hashable, Hashed};
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_types::{
+        dna::{wasm::DnaWasmHashed, zome::Zome},
+        test_utils::fake_dna_zomes,
+    };
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::{
+        crdt::CrdtType,
+        entry_def::{EntryDef, EntryVisibility},
+    };
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_store_entry_defs() {
+        holochain_types::observability::test_run().ok();
+
+        // all the stuff needed to have a WasmBuf
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let test_env_2 = TestEnvironment {
+            env: test_env.env.clone(),
+            tmpdir: test_env.tmpdir.clone(),
+        };
+        let handle = Conductor::builder()
+            .test(test_env_2, wasm_env.clone())
+            .await
+            .unwrap();
+
+        let dna = fake_dna_zomes(
+            "",
+            vec![(TestWasm::EntryDefs.into(), TestWasm::EntryDefs.into())],
+        );
+
+        // Get expected entry defs
+        let post_def = EntryDef {
+            id: "post".into(),
+            visibility: EntryVisibility::Public,
+            crdt_type: CrdtType,
+            required_validations: 8.into(),
+        };
+        let comment_def = EntryDef {
+            id: "comment".into(),
+            visibility: EntryVisibility::Private,
+            crdt_type: CrdtType,
+            required_validations: 3.into(),
+        };
+        let dna_wasm = DnaWasmHashed::with_data(TestWasm::EntryDefs.into())
+            .await
+            .unwrap()
+            .into_hash();
+
+        let post_def_key = EntryDefBufferKey {
+            zome: Zome::from_hash(dna_wasm.clone()),
+            entry_def_position: 0.into(),
+        };
+        let comment_def_key = EntryDefBufferKey {
+            zome: Zome::from_hash(dna_wasm),
+            entry_def_position: 1.into(),
+        };
+
+        handle.install_dna(dna).await.unwrap();
+        // Check entry defs are here
+        assert_eq!(
+            handle.get_entry_def(&post_def_key).await,
+            Some(post_def.clone())
+        );
+        assert_eq!(
+            handle.get_entry_def(&comment_def_key).await,
+            Some(comment_def.clone())
+        );
+
+        std::mem::drop(handle);
+
+        // Restart conductor and check defs are still here
+        let handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
+
+        assert_eq!(handle.get_entry_def(&post_def_key).await, Some(post_def));
+        assert_eq!(
+            handle.get_entry_def(&comment_def_key).await,
+            Some(comment_def.clone())
+        );
     }
 }
