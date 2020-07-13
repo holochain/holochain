@@ -37,6 +37,8 @@ pub enum CellError {
     HolochainP2pError(#[from] HolochainP2pError),
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+    #[error("Todo")]
+    Todo,
 }
 
 pub type CellResult<T> = Result<T, CellError>;

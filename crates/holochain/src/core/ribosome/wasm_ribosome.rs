@@ -13,6 +13,7 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::host_fn::agent_info::agent_info;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::capability::capability;
 use crate::core::ribosome::host_fn::commit_entry::commit_entry;
@@ -21,10 +22,8 @@ use crate::core::ribosome::host_fn::decrypt::decrypt;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
 use crate::core::ribosome::host_fn::entry_hash::entry_hash;
-use crate::core::ribosome::host_fn::entry_type_properties::entry_type_properties;
 use crate::core::ribosome::host_fn::get_entry::get_entry;
 use crate::core::ribosome::host_fn::get_links::get_links;
-use crate::core::ribosome::host_fn::globals::globals;
 use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
@@ -38,6 +37,7 @@ use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update_entry::update_entry;
+use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
@@ -48,7 +48,10 @@ use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspa
 use fallible_iterator::FallibleIterator;
 use holo_hash_core::HoloHashCoreHash;
 use holochain_types::dna::DnaError;
-use holochain_types::dna::DnaFile;
+use holochain_types::dna::{
+    zome::{HostFnAccess, Permission},
+    DnaFile,
+};
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::init::InitCallbackResult;
@@ -113,7 +116,7 @@ impl WasmRibosome {
     fn imports(&self, host_context: HostContext) -> ImportObject {
         let instance_timeout = crate::start_hard_timeout!();
 
-        let allow_side_effects = host_context.allow_side_effects();
+        let host_fn_access = host_context.allowed_access();
 
         // it is important that WasmRibosome and ZomeCallInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
@@ -155,29 +158,75 @@ impl WasmRibosome {
         );
 
         // imported host functions for core
-        ns.insert("__globals", func!(invoke_host_function!(globals)));
         ns.insert("__debug", func!(invoke_host_function!(debug)));
-        ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
-        ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
         ns.insert("__entry_hash", func!(invoke_host_function!(entry_hash)));
-        ns.insert(
-            "__entry_type_properties",
-            func!(invoke_host_function!(entry_type_properties)),
-        );
-        ns.insert("__get_entry", func!(invoke_host_function!(get_entry)));
-        ns.insert("__get_links", func!(invoke_host_function!(get_links)));
-        ns.insert("__keystore", func!(invoke_host_function!(keystore)));
-        ns.insert("__property", func!(invoke_host_function!(property)));
-        ns.insert("__query", func!(invoke_host_function!(query)));
-        ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
-        ns.insert("__sign", func!(invoke_host_function!(sign)));
-        ns.insert("__show_env", func!(invoke_host_function!(show_env)));
-        ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
-        ns.insert("__schedule", func!(invoke_host_function!(schedule)));
-        ns.insert("__capability", func!(invoke_host_function!(capability)));
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
 
-        if allow_side_effects {
+        if let HostFnAccess {
+            conductor: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            ns.insert("__keystore", func!(invoke_host_function!(keystore)));
+            ns.insert("__sign", func!(invoke_host_function!(sign)));
+            ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
+            ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
+        } else {
+            ns.insert("__keystore", func!(invoke_host_function!(unreachable)));
+            ns.insert("__sign", func!(invoke_host_function!(unreachable)));
+            ns.insert("__decrypt", func!(invoke_host_function!(unreachable)));
+            ns.insert("__encrypt", func!(invoke_host_function!(unreachable)));
+        }
+
+        if let HostFnAccess {
+            non_determinism: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
+            ns.insert("__property", func!(invoke_host_function!(property)));
+            ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
+            ns.insert("__show_env", func!(invoke_host_function!(show_env)));
+            ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
+            ns.insert("__capability", func!(invoke_host_function!(capability)));
+        } else {
+            ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__property", func!(invoke_host_function!(unreachable)));
+            ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
+            ns.insert("__show_env", func!(invoke_host_function!(unreachable)));
+            ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
+            ns.insert("__capability", func!(invoke_host_function!(unreachable)));
+        }
+
+        if let HostFnAccess {
+            agent_info: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            ns.insert("__agent_info", func!(invoke_host_function!(agent_info)));
+        } else {
+            ns.insert("__agent_info", func!(invoke_host_function!(unreachable)));
+        }
+
+        if let HostFnAccess {
+            read_workspace: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            ns.insert("__get_entry", func!(invoke_host_function!(get_entry)));
+            ns.insert("__get_links", func!(invoke_host_function!(get_links)));
+            ns.insert("__query", func!(invoke_host_function!(query)));
+        } else {
+            ns.insert("__get_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__get_links", func!(invoke_host_function!(unreachable)));
+            ns.insert("__query", func!(invoke_host_function!(unreachable)));
+        }
+
+        if let HostFnAccess {
+            side_effects: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
             ns.insert("__call", func!(invoke_host_function!(call)));
             ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
             ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
@@ -185,6 +234,7 @@ impl WasmRibosome {
             ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
             ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
             ns.insert("__remove_entry", func!(invoke_host_function!(remove_entry)));
+            ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         } else {
             ns.insert("__call", func!(invoke_host_function!(unreachable)));
             ns.insert("__commit_entry", func!(invoke_host_function!(unreachable)));
@@ -193,6 +243,7 @@ impl WasmRibosome {
             ns.insert("__remove_link", func!(invoke_host_function!(unreachable)));
             ns.insert("__update_entry", func!(invoke_host_function!(unreachable)));
             ns.insert("__remove_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__schedule", func!(invoke_host_function!(unreachable)));
         }
         imports.register("env", ns);
 
@@ -203,17 +254,18 @@ impl WasmRibosome {
 
 macro_rules! do_callback {
     ( $self:ident, $workspace:ident, $invocation:ident, $callback_result:ty ) => {{
-        let mut results: Vec<$callback_result> = vec![];
+        let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
         let mut call_iterator = $self.call_iterator($workspace, $self.clone(), $invocation);
         while let Some(output) = call_iterator.next()? {
-            let callback_result: $callback_result = output.into();
+            let (zome_name, callback_result) = output;
+            let callback_result: $callback_result = callback_result.into();
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
-                return Ok(vec![callback_result].into());
+                return Ok(vec![(zome_name, callback_result)].into());
             }
-            results.push(callback_result);
+            results.push((zome_name, callback_result));
         }
         // fold all the non-definitive callbacks down into a single overall result
         Ok(results.into())
@@ -249,7 +301,7 @@ impl RibosomeT for WasmRibosome {
     ) -> Result<Option<GuestOutput>, RibosomeError> {
         let host_context = HostContext {
             zome_name: zome_name.clone(),
-            allow_side_effects: invocation.allow_side_effects(),
+            allowed_access: invocation.allowed_access(),
             workspace,
         };
         let module_timeout = crate::start_hard_timeout!();
@@ -308,7 +360,7 @@ impl RibosomeT for WasmRibosome {
             .call_iterator(workspace, self.clone(), invocation)
             .next()?
         {
-            Some(result) => result,
+            Some(result) => result.1,
             None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
         };
 
@@ -336,11 +388,10 @@ impl RibosomeT for WasmRibosome {
         do_callback!(self, workspace, invocation, InitCallbackResult)
     }
 
-    fn run_entry_defs(
-        &self,
-        workspace: UnsafeInvokeZomeWorkspace,
-        invocation: EntryDefsInvocation,
-    ) -> RibosomeResult<EntryDefsResult> {
+    fn run_entry_defs(&self, invocation: EntryDefsInvocation) -> RibosomeResult<EntryDefsResult> {
+        // Workspace can't be called
+        // This is safe because even if there's a mistake it will only return None
+        let workspace = UnsafeInvokeZomeWorkspace::null();
         do_callback!(self, workspace, invocation, EntryDefsCallbackResult)
     }
 

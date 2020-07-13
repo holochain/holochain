@@ -51,7 +51,7 @@ use holochain_types::{
     Entry, EntryHashed,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::link::{Link, LinkTag};
+use holochain_zome_types::link::{LinkTag, Links};
 use holochain_zome_types::{
     entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetLinksInput, HostInput,
     LinkEntriesInput,
@@ -859,7 +859,7 @@ async fn commit_entry<'env>(
 
     ribosome
         .expect_run_entry_defs()
-        .returning(move |_, _| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
+        .returning(move |_| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
 
     let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
         .next()
@@ -957,7 +957,7 @@ async fn get_links<'env>(
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
-) -> Vec<Link> {
+) -> Links {
     let reader = env_ref.reader().unwrap();
     let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -1047,6 +1047,7 @@ async fn test_metadata_from_wasm_api() {
         // Call get links and get back the targets
         let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
         let links = links
+            .into_inner()
             .into_iter()
             .map(|h| h.target.try_into().unwrap())
             .collect::<Vec<EntryHash>>();

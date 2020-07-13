@@ -3,7 +3,16 @@ use holochain_serialized_bytes::prelude::*;
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
-    Debug, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq, SerializedBytes,
+    Debug,
+    PartialOrd,
+    Ord,
+    Clone,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    SerializedBytes,
 )]
 pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
@@ -30,7 +39,16 @@ impl AsRef<Vec<u8>> for LinkTag {
 }
 
 #[derive(
-    Debug, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq, SerializedBytes,
+    Debug,
+    PartialOrd,
+    Ord,
+    Clone,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    SerializedBytes,
 )]
 pub struct Link {
     /// The [Entry] being linked to
@@ -39,4 +57,25 @@ pub struct Link {
     pub timestamp: std::time::SystemTime,
     /// A tag used to find this link
     pub tag: LinkTag,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+pub struct Links(Vec<Link>);
+
+impl From<Vec<Link>> for Links {
+    fn from(v: Vec<Link>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<Links> for Vec<Link> {
+    fn from(links: Links) -> Self {
+        links.0
+    }
+}
+
+impl Links {
+    pub fn into_inner(self) -> Vec<Link> {
+        self.into()
+    }
 }

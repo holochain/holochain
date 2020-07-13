@@ -5,7 +5,10 @@ use crate::fixt::DnaDefFixturator;
 use crate::fixt::MigrateAgentFixturator;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::DnaDef;
+use holochain_types::dna::{
+    zome::{HostFnAccess, Permission},
+    DnaDef,
+};
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -32,8 +35,13 @@ fixturator!(
 );
 
 impl Invocation for MigrateAgentInvocation {
-    fn allow_side_effects(&self) -> bool {
-        false
+    fn allowed_access(&self) -> HostFnAccess {
+        let mut access = HostFnAccess::none();
+        // TODO: insert zome_name
+        access.non_determinism = Permission::Deny;
+        access.read_workspace = Permission::Allow;
+        access.agent_info = Permission::Allow;
+        access
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All
@@ -74,18 +82,20 @@ pub enum MigrateAgentResult {
     Fail(ZomeName, String),
 }
 
-impl From<Vec<MigrateAgentCallbackResult>> for MigrateAgentResult {
-    fn from(callback_results: Vec<MigrateAgentCallbackResult>) -> Self {
-        callback_results.into_iter().fold(Self::Pass, |acc, x| {
-            match x {
-                // fail always overrides the acc
-                MigrateAgentCallbackResult::Fail(zome_name, fail_string) => {
-                    Self::Fail(zome_name, fail_string)
+impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
+    fn from(callback_results: Vec<(ZomeName, MigrateAgentCallbackResult)>) -> Self {
+        callback_results
+            .into_iter()
+            .fold(Self::Pass, |acc, (zome_name, x)| {
+                match x {
+                    // fail always overrides the acc
+                    MigrateAgentCallbackResult::Fail(fail_string) => {
+                        Self::Fail(zome_name, fail_string)
+                    }
+                    // pass allows the acc to continue
+                    MigrateAgentCallbackResult::Pass => acc,
                 }
-                // pass allows the acc to continue
-                MigrateAgentCallbackResult::Pass => acc,
-            }
-        })
+            })
     }
 }
 
@@ -104,10 +114,12 @@ mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::migrate_agent::MigrateAgent;
     use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -122,11 +134,16 @@ mod test {
             )
         };
 
-        let cb_pass = || MigrateAgentCallbackResult::Pass;
-        let cb_fail = || {
-            MigrateAgentCallbackResult::Fail(
+        let cb_pass = || {
+            (
                 ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
-                "".into(),
+                MigrateAgentCallbackResult::Pass,
+            )
+        };
+        let cb_fail = || {
+            (
+                ZomeNameFixturator::new(fixt::Empty).next().unwrap(),
+                MigrateAgentCallbackResult::Fail("".into()),
             )
         };
 
@@ -155,10 +172,20 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn migrate_agent_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(!migrate_agent_invocation.allow_side_effects());
+        assert_matches!(
+            migrate_agent_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Deny,
+                agent_info: Allow,
+                read_workspace: Allow,
+                non_determinism: Deny,
+                conductor: Deny,
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

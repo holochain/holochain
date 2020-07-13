@@ -1,8 +1,9 @@
 use crate::crdt::CrdtType;
-use crate::zome::ZomeName;
 use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
+
+const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
@@ -32,6 +33,12 @@ pub struct RequiredValidations(u8);
 impl From<u8> for RequiredValidations {
     fn from(u: u8) -> Self {
         Self(u)
+    }
+}
+
+impl Default for RequiredValidations {
+    fn default() -> Self {
+        Self(DEFAULT_REQUIRED_VALIDATIONS)
     }
 }
 
@@ -88,6 +95,14 @@ impl std::ops::Index<usize> for EntryDefs {
     }
 }
 
+impl IntoIterator for EntryDefs {
+    type Item = EntryDef;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl From<Vec<EntryDef>> for EntryDefs {
     fn from(v: Vec<EntryDef>) -> Self {
         Self(v)
@@ -96,15 +111,15 @@ impl From<Vec<EntryDef>> for EntryDefs {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum EntryDefsCallbackResult {
-    Defs(ZomeName, EntryDefs),
-    Err(ZomeName, String),
+    Defs(EntryDefs),
+    Err(String),
 }
 
 impl From<GuestOutput> for EntryDefsCallbackResult {
     fn from(callback_guest_output: GuestOutput) -> Self {
         match callback_guest_output.into_inner().try_into() {
             Ok(v) => v,
-            Err(e) => Self::Err(ZomeName::unknown(), format!("{:?}", e)),
+            Err(e) => Self::Err(format!("{:?}", e)),
         }
     }
 }
@@ -112,8 +127,8 @@ impl From<GuestOutput> for EntryDefsCallbackResult {
 impl CallbackResult for EntryDefsCallbackResult {
     fn is_definitive(&self) -> bool {
         match self {
-            EntryDefsCallbackResult::Defs(_, _) => false,
-            EntryDefsCallbackResult::Err(_, _) => true,
+            EntryDefsCallbackResult::Defs(_) => false,
+            EntryDefsCallbackResult::Err(_) => true,
         }
     }
 }
@@ -131,7 +146,6 @@ mod tests {
     #[test]
     fn from_guest_output_test() {
         let defs_callback_result = EntryDefsCallbackResult::Defs(
-            "foo".into(),
             vec![EntryDef {
                 id: "bar".into(),
                 visibility: EntryVisibility::Public,

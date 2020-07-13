@@ -107,12 +107,18 @@ impl HolochainP2pCell {
     }
 
     /// Get links from the DHT.
-    pub async fn get_links(&mut self) -> actor::HolochainP2pResult<()> {
+    pub async fn get_links(
+        &mut self,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        options: actor::GetLinksOptions,
+    ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
         self.sender
-            .get_links(actor::GetLinks {
-                dna_hash: (*self.dna_hash).clone(),
-                agent_pub_key: (*self.from_agent).clone(),
-            })
+            .get_links(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                dht_hash,
+                options,
+            )
             .await
     }
 

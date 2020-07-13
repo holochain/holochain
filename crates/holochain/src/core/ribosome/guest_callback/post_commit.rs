@@ -5,6 +5,7 @@ use crate::fixt::HeaderHashesFixturator;
 use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -28,8 +29,8 @@ fixturator!(
 );
 
 impl Invocation for PostCommitInvocation {
-    fn allow_side_effects(&self) -> bool {
-        true
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::all()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())
@@ -53,6 +54,12 @@ impl TryFrom<PostCommitInvocation> for HostInput {
 pub enum PostCommitResult {
     Success,
     Fail(HeaderHashes, String),
+}
+
+impl From<Vec<(ZomeName, PostCommitCallbackResult)>> for PostCommitResult {
+    fn from(a: Vec<(ZomeName, PostCommitCallbackResult)>) -> Self {
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
+    }
 }
 
 impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
@@ -87,9 +94,11 @@ mod test {
     use fixt::prelude::*;
     use holo_hash::HeaderHashFixturator;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
     async fn post_commit_callback_result_fold() {
@@ -136,10 +145,20 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn post_commit_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(post_commit_invocation.allow_side_effects());
+        assert_matches!(
+            post_commit_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Allow,
+                agent_info: Allow,
+                read_workspace: Allow,
+                non_determinism: Allow,
+                conductor: Allow,
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

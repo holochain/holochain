@@ -4,6 +4,7 @@ members = [
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
+  "crates/hdk",
   "crates/holo_hash",
   "crates/holo_hash_core",
   "crates/holochain",

@@ -156,7 +156,7 @@ pub mod tests {
             let reader = env.reader()?;
 
             let source_chain = SourceChain::new(&reader, &dbs)?;
-            assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
+            assert_eq!(source_chain.agent_pubkey().await?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
 
             let mut iter = source_chain.iter_back();
