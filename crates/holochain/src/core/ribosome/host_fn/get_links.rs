@@ -97,14 +97,14 @@ pub mod wasm_test {
                 .await
                 .unwrap();
 
-            // touch foo/bar twice to ensure idempotency
+            // ensure foo.bar twice to ensure idempotency
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "touch",
-                    TestString::from("foo/bar".to_string())
+                    "ensure",
+                    TestString::from("foo.bar".to_string())
                 )
             };
             let _: () = {
@@ -112,19 +112,19 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "touch",
-                    TestString::from("foo/bar".to_string())
+                    "ensure",
+                    TestString::from("foo.bar".to_string())
                 )
             };
 
-            // touch foo/baz
+            // ensure foo.baz
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "touch",
-                    TestString::from("foo/baz".to_string())
+                    "ensure",
+                    TestString::from("foo.baz".to_string())
                 )
             };
 
@@ -192,8 +192,8 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "pwd",
-                    TestString::from("foo/bar".to_string())
+                    "hash",
+                    TestString::from("foo.bar".to_string())
                 )
             };
 
@@ -202,8 +202,8 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "pwd",
-                    TestString::from("foo/baz".to_string())
+                    "hash",
+                    TestString::from("foo.baz".to_string())
                 )
             };
 
@@ -220,7 +220,7 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "ls",
+                    "children",
                     TestString::from("foo".to_string())
                 )
             };

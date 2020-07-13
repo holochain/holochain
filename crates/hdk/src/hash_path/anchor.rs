@@ -4,7 +4,7 @@ use crate::prelude::*;
 use holochain_wasmer_guest::*;
 
 /// "anchor"
-pub const ROOT: &str = "anchor";
+pub const ROOT: &str = "hdk3anchor";
 
 #[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, SerializedBytes, Clone)]
 pub struct Anchor {
