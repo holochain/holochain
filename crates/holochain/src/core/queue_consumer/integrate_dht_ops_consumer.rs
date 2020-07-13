@@ -2,22 +2,32 @@
 
 use super::*;
 use crate::core::state::workspace::Workspace;
-use crate::core::workflow::integrate_dht_ops_workflow::{
-    integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
+use crate::{
+    conductor::manager::ManagedTaskResult,
+    core::workflow::integrate_dht_ops_workflow::{
+        integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
+    },
 };
+use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::env::ReadManager;
+use tokio::task::JoinHandle;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
 pub fn spawn_integrate_dht_ops_consumer(
     env: EnvironmentWrite,
+    mut stop: sync::broadcast::Receiver<()>,
     mut trigger_publish: TriggerSender,
-) -> (TriggerSender, tokio::sync::oneshot::Receiver<()>) {
+) -> (
+    TriggerSender,
+    tokio::sync::oneshot::Receiver<()>,
+    JoinHandle<ManagedTaskResult>,
+) {
     let (tx, mut rx) = TriggerSender::new();
     let (tx_first, rx_first) = tokio::sync::oneshot::channel();
     let mut tx_first = Some(tx_first);
     let mut trigger_self = tx.clone();
-    let _handle = tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         loop {
             let env_ref = env.guard().await;
             let reader = env_ref.reader().expect("Could not create LMDB reader");
@@ -34,11 +44,20 @@ pub fn spawn_integrate_dht_ops_consumer(
             if let Some(tx_first) = tx_first.take() {
                 let _ = tx_first.send(());
             }
-            if let Err(_) = rx.listen().await {
+            // Check for shutdown or next job
+            let next_job = rx.listen();
+            let kill = stop.recv();
+            tokio::pin!(next_job);
+            tokio::pin!(kill);
+
+            if let Either::Left((Err(_), _)) | Either::Right((_, _)) =
+                futures::future::select(next_job, kill).await
+            {
                 tracing::warn!("Cell is shutting down: stopping queue consumer.");
                 break;
             };
         }
+        Ok(())
     });
-    (tx, rx_first)
+    (tx, rx_first, handle)
 }

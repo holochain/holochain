@@ -70,6 +70,26 @@ impl HolochainP2pActor {
         .into())
     }
 
+    /// receiving an incoming get_links request from a remote node
+    fn handle_incoming_get_links(
+        &mut self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        options: event::GetLinksOptions,
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let res = evt_sender
+                .get_links(dna_hash, to_agent, dht_hash, options)
+                .await;
+            res.map_err(kitsune_p2p::KitsuneP2pError::from)
+                .map(|res| UnsafeBytes::from(res).into())
+        }
+        .boxed()
+        .into())
+    }
+
     /// receiving an incoming publish from a remote node
     fn handle_incoming_publish(
         &mut self,
@@ -145,6 +165,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::Get { dht_hash, options } => {
                 self.handle_incoming_get(space, agent, dht_hash, options)
             }
+            crate::wire::WireMessage::GetLinks { dht_hash, options } => {
+                self.handle_incoming_get_links(space, agent, dht_hash, options)
+            }
             // holochain_p2p never publishes via request
             // these only occur on broadcasts
             crate::wire::WireMessage::Publish { .. } => {
@@ -174,6 +197,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             // error on these call type messages
             crate::wire::WireMessage::CallRemote { .. }
             | crate::wire::WireMessage::Get { .. }
+            | crate::wire::WireMessage::GetLinks { .. }
             | crate::wire::WireMessage::ValidationReceipt { .. } => {
                 return Err(HolochainP2pError::invalid_p2p_message(
                     "invalid call type message in a notify".to_string(),
@@ -366,8 +390,48 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
-    fn handle_get_links(&mut self, _input: actor::GetLinks) -> HolochainP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+    fn handle_get_links(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        options: actor::GetLinksOptions,
+    ) -> HolochainP2pHandlerResult<Vec<SerializedBytes>> {
+        let space = dna_hash.into_kitsune();
+        let from_agent = from_agent.into_kitsune();
+        let basis = dht_hash.to_kitsune();
+        let r_options: event::GetLinksOptions = (&options).into();
+
+        let payload = crate::wire::WireMessage::get_links(dht_hash, r_options).encode()?;
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            // TODO - We're just targeting a single remote node for now
+            //        without doing any pagination / etc...
+            //        Setting up RpcMulti to act like RpcSingle
+            let result = kitsune_p2p
+                .rpc_multi(kitsune_p2p::actor::RpcMulti {
+                    space,
+                    from_agent,
+                    basis,
+                    remote_agent_count: Some(1),
+                    timeout_ms: options.timeout_ms,
+                    as_race: false,
+                    race_timeout_ms: options.timeout_ms,
+                    payload,
+                })
+                .await?;
+
+            let mut out = Vec::new();
+            for item in result {
+                let kitsune_p2p::actor::RpcMultiResponse { response, .. } = item;
+                out.push(UnsafeBytes::from(response).into());
+            }
+
+            Ok(out)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_send_validation_receipt(

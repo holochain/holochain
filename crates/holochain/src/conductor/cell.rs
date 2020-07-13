@@ -4,6 +4,7 @@
 //! ChainElements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::manager::ManagedTaskAdd;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -30,7 +31,7 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId, prelude::Todo};
+use holochain_types::{autonomic::AutonomicProcess, cell::CellId};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -38,6 +39,7 @@ use std::{
     hash::{Hash, Hasher},
     path::Path,
 };
+use tokio::sync;
 use tracing::*;
 
 #[allow(missing_docs)]
@@ -91,6 +93,8 @@ impl Cell {
         env_path: P,
         keystore: KeystoreSender,
         mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
@@ -111,8 +115,13 @@ impl Cell {
 
         if has_genesis {
             holochain_p2p_cell.join().await?;
-            let queue_triggers =
-                spawn_queue_consumer_tasks(&state_env, holochain_p2p_cell.clone()).await;
+            let queue_triggers = spawn_queue_consumer_tasks(
+                &state_env,
+                holochain_p2p_cell.clone(),
+                managed_task_add_sender,
+                managed_task_stop_broadcaster,
+            )
+            .await;
 
             Ok(Self {
                 id,
@@ -256,10 +265,16 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            GetLinks { span, respond, .. } => {
+            GetLinks {
+                span,
+                respond,
+                dht_hash,
+                options,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_get_links()
+                    .handle_get_links(dht_hash, options)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -308,12 +323,64 @@ impl Cell {
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        _from_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holochain_types::composite_hash::AnyDhtHash,
-        _ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        warn!("handle publish unimplemented");
+        if from_agent == *self.id().agent_pubkey() {
+            // Don't handle messages we published to ourselves, because that
+            // would trigger another publish, and cause an infinite loop.
+            //
+            // TODO: Perhaps we *do* want to publish to ourselves, as a way of
+            // discovering that we are the authority for something we just
+            // committed. However, at the moment there is nothing different
+            // we can do, because we already integrate everything that we've
+            // authored. If that is ever no longer the case, then we can revisit
+            // this question of how to handle things we've already published.
+            debug!("Ignoring ops that we've published to ourselves");
+            trace!("{:?}", ops);
+            return Ok(());
+        }
+
+        /////////////////////////////////////////////////////////////
+        // FIXME - We are temporarily just integrating everything...
+        //         Really this should go to validation first!
+        //         Everything below this line is throwaway code.
+        /////////////////////////////////////////////////////////////
+
+        // set up our workspace
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader().expect("Could not create LMDB reader");
+        let mut workspace =
+            crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace::new(
+                &reader, &env_ref,
+            )
+            .expect("Could not create Workspace");
+
+        // add incoming ops to the integration queue transaction
+        for (hash, op) in ops {
+            let iqv = crate::core::state::dht_op_integration::IntegrationQueueValue {
+                validation_status: holochain_types::validate::ValidationStatus::Valid,
+                op,
+            };
+            // NB: it is possible we may put the same op into the integration
+            // queue twice, but this shouldn't be a problem.
+            workspace
+                .integration_queue
+                .put((holochain_types::TimestampKey::now(), hash).into(), iqv)?;
+        }
+
+        // commit our transaction
+        let writer: crate::core::queue_consumer::OneshotWriter = self.state_env.clone().into();
+
+        writer
+            .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+            .await?;
+
+        // trigger integration of queued ops
+        self.queue_triggers.integrate_dht_ops.clone().trigger();
+
         Ok(())
     }
 
@@ -332,8 +399,13 @@ impl Cell {
     }
 
     /// a remote node is asking us for links
-    async fn handle_get_links(&self) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_get_links(
+        &self,
+        _dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        _options: holochain_p2p::event::GetLinksOptions,
+    ) -> CellResult<SerializedBytes> {
+        tracing::warn!("handle get links is unimplemented");
+        Err(CellError::Todo)
     }
 
     /// a remote agent is sending us a validation receipt.
@@ -491,16 +563,5 @@ impl Cell {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-// The following is a sketch from the skunkworx phase, and can probably be removed
-
-// These are possibly composable traits that describe how to get a resource,
-// so instead of explicitly building resources, we can downcast a Cell to exactly
-// the right set of resource getter traits
-trait NetSend {
-    fn network_send(&self, msg: Todo) -> Result<(), NetError>;
-}
-
-#[allow(dead_code)]
-/// TODO - this is a shim until we need a real NetError
-enum NetError {}
+#[cfg(test)]
+mod test;

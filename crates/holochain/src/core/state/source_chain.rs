@@ -36,9 +36,10 @@ mod source_chain_buffer;
 pub struct SourceChain<'env>(pub SourceChainBuf<'env>);
 
 impl<'env> SourceChain<'env> {
-    pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
+    pub async fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
         self.0
-            .agent_pubkey()?
+            .agent_pubkey()
+            .await?
             .ok_or(SourceChainError::InvalidStructure(
                 ChainInvalidReason::GenesisDataMissing,
             ))
@@ -63,7 +64,7 @@ impl<'env> SourceChain<'env> {
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderAddress> {
         let common = HeaderBuilderCommon {
-            author: self.agent_pubkey()?,
+            author: self.agent_pubkey().await?,
             timestamp: Timestamp::now(),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),

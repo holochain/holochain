@@ -71,6 +71,8 @@ pub async fn integrate_dht_ops_workflow(
     )
     .await;
 
+    let mut total_integrated: usize = 0;
+
     // Try to process the queue over and over again, until we either exhaust
     // the queue, or we can no longer integrate anything in the queue.
     // We do this because items in the queue may depend on one another but may
@@ -84,12 +86,17 @@ pub async fn integrate_dht_ops_workflow(
         let mut num_integrated: usize = 0;
         let mut next_ops = Vec::new();
         for (op_hash, value) in ops {
-            match integrate_single_dht_op(&mut workspace, value).await? {
-                Outcome::Integrated(value) => {
-                    workspace.integrated_dht_ops.put(op_hash, value)?;
-                    num_integrated += 1;
+            // only integrate this op if it hasn't been integrated already!
+            // TODO: test for this [ B-01894 ]
+            if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
+                match integrate_single_dht_op(&mut workspace, value).await? {
+                    Outcome::Integrated(integrated) => {
+                        workspace.integrated_dht_ops.put(op_hash, integrated)?;
+                        num_integrated += 1;
+                        total_integrated += 1;
+                    }
+                    Outcome::Deferred(deferred) => next_ops.push((op_hash, deferred)),
                 }
-                Outcome::Deferred(value) => next_ops.push((op_hash, value)),
             }
         }
         ops = next_ops;
@@ -121,13 +128,20 @@ pub async fn integrate_dht_ops_workflow(
         .await?;
 
     // trigger other workflows
+
+    // Only trigger publish if we have done any work during this workflow,
+    // to prevent endless cascades of publishing. Ideally, we shouldn't trigger
+    // publish unless we have integrated something we've authored, but this is
+    // a step in that direction.
     // TODO: only trigger if we have integrated ops that we have authored
-    trigger_publish.trigger();
+    if total_integrated > 0 {
+        trigger_publish.trigger();
+    }
 
     Ok(result)
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip(workspace, value))]
 async fn integrate_single_dht_op(
     workspace: &mut IntegrateDhtOpsWorkspace<'_>,
     value: IntegrationQueueValue,
@@ -227,6 +241,7 @@ async fn integrate_single_dht_op(
                 workspace.meta.add_link(link_add.clone()).await?;
                 // Store add Header
                 let header = HeaderHashed::with_data(link_add.into()).await?;
+                debug!(link_add = ?header.as_hash());
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
             }
@@ -305,6 +320,7 @@ async fn integrate_single_dht_op(
             basis,
             op,
         };
+        debug!("integrating");
         Ok(Outcome::Integrated(value))
     }
 }

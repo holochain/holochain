@@ -3,7 +3,7 @@ use holochain_serialized_bytes::prelude::*;
 /// all wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way
 macro_rules! wasm_io_types {
-    ( $( pub struct $t:ident($t_inner:ty); )* ) => {
+    ( $( pub struct $t:ident($t_inner:ty $(,)?); )* ) => {
         $(
             #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
             pub struct $t($t_inner);
@@ -26,12 +26,14 @@ macro_rules! wasm_io_types {
 }
 
 wasm_io_types!(
-    // the globals are constants specific to the current zome and state of the source chain
+    // the zome and agent info are constants specific to the current zome and state of the source chain
     // all the information is provided by core so there is no input value
     // as these are constant it makes sense for the zome dev or HDK to cache the return of this in
     // a lazy_static! or similar
-    pub struct GlobalsInput(());
-    pub struct GlobalsOutput(crate::globals::ZomeGlobals);
+    pub struct ZomeInfoInput(());
+    pub struct ZomeInfoOutput(crate::globals::ZomeInfo);
+    pub struct AgentInfoInput(());
+    pub struct AgentInfoOutput(crate::globals::AgentInfo);
     // call is entirely arbitrary so we need to send and receive SerializedBytes
     pub struct CallInput(SerializedBytes);
     pub struct CallOutput(SerializedBytes);
@@ -80,15 +82,21 @@ wasm_io_types!(
     // @TODO
     pub struct RemoveEntryInput(());
     pub struct RemoveEntryOutput(());
-    // @TODO
-    pub struct LinkEntriesInput(());
-    pub struct LinkEntriesOutput(());
+    // create link entries
+    pub struct LinkEntriesInput(
+        (
+            holo_hash_core::HoloHashCore,
+            holo_hash_core::HoloHashCore,
+            crate::link::LinkTag,
+        ),
+    );
+    pub struct LinkEntriesOutput(holo_hash_core::HoloHashCore);
     // @TODO
     pub struct KeystoreInput(());
     pub struct KeystoreOutput(());
-    // @TODO
-    pub struct GetLinksInput(());
-    pub struct GetLinksOutput(());
+    // get links from the cascade
+    pub struct GetLinksInput((holo_hash_core::HoloHashCore, Option<crate::link::LinkTag>));
+    pub struct GetLinksOutput(crate::link::Links);
     // get an entry from the cascade
     pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
     pub struct GetEntryOutput(Option<crate::entry::Entry>);

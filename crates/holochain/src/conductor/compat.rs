@@ -5,6 +5,8 @@ use super::{
     ConductorBuilder, ConductorHandle,
 };
 use holo_hash::*;
+use holochain_keystore::keystore_actor::KeystoreApiSender;
+use holochain_keystore::{test_keystore::spawn_test_keystore, KeystoreError};
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
@@ -28,16 +30,23 @@ pub enum CompatConfigError {
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    KeystoreError(#[from] KeystoreError),
 }
 
 pub async fn load_conductor_from_legacy_config(
     legacy: legacy::Config,
     builder: ConductorBuilder,
-    agent_pubkey: AgentPubKey,
 ) -> Result<ConductorHandle, CompatConfigError> {
     let config = config_from_legacy(&legacy);
+    let keystore = spawn_test_keystore(Vec::new()).await?;
 
-    let conductor: ConductorHandle = builder.config(config).build().await?;
+    let conductor: ConductorHandle = builder
+        .config(config)
+        .with_keystore(keystore.clone())
+        .build()
+        .await?;
 
     fn dna_key(path: &Path, uuid: &Option<String>) -> String {
         format!("{:?} ; {:?}", path, uuid)
@@ -58,34 +67,32 @@ pub async fn load_conductor_from_legacy_config(
         );
         conductor.install_dna(dna_file).await?;
     }
+    let mut app_install_payload = Vec::new();
 
-    let cell_ids = legacy
-        .instances
-        .iter()
-        .map(|i| {
-            let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
-                CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
-            })?;
+    for i in &legacy.instances {
+        let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
+            CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
+        })?;
 
-            // make sure we have installed this DNA
-            let dna_hash = dna_hashes
-                .get(&dna_key(Path::new(&dna_config.file), &dna_config.uuid))
-                .ok_or_else(|| {
-                    CompatConfigError::BrokenReference(format!(
-                        "No DNA for path: {}",
-                        dna_config.file
-                    ))
-                })?
-                .clone();
+        // make sure we have installed this DNA
+        let dna_hash = dna_hashes
+            .get(&dna_key(Path::new(&dna_config.file), &dna_config.uuid))
+            .ok_or_else(|| {
+                CompatConfigError::BrokenReference(format!("No DNA for path: {}", dna_config.file))
+            })?
+            .clone();
 
-            // NB: disregarding agent config, using a hard-coded pre-made one
-            // for now. In the future we can actually pay attention to
-            // `i.agent` to get agent info
-            let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
-            let cell_handle = i.id.clone();
-            Ok((InstalledCell::new(cell_id, cell_handle), None))
-        })
-        .collect::<Result<Vec<_>, CompatConfigError>>()?;
+        // FIXME [ B-01893 ]:
+        // currently we can't specify a seed for generating a keypair
+        // via TestKeystore, so for now we are limited to generating a
+        // unique agent every time. Once we have same-agent tests, this will
+        // have to be addressed.
+        let _agent_name = i.agent.clone();
+        let agent_pubkey = keystore.generate_sign_keypair_from_pure_entropy().await?;
+        let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
+        let cell_handle = i.id.clone();
+        app_install_payload.push((InstalledCell::new(cell_id, cell_handle), None));
+    }
 
     let app_interfaces = extract_app_interfaces(legacy.interfaces);
 
@@ -94,7 +101,7 @@ pub async fn load_conductor_from_legacy_config(
     let app_id = "LEGACY".to_string();
     conductor
         .clone()
-        .install_app(app_id.clone(), cell_ids)
+        .install_app(app_id.clone(), app_install_payload)
         .await?;
     conductor.activate_app(app_id.clone()).await?;
     let errors = conductor.clone().setup_cells().await?;
@@ -173,16 +180,20 @@ pub mod tests {
     use crate::conductor::{
         handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
     };
-    use holochain_types::{
-        app::MembraneProof,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file},
-    };
+    use holochain_types::{app::MembraneProof, test_utils::fake_dna_zomes};
+    use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
     use mockall::predicate;
     use std::path::PathBuf;
     use tempdir::TempDir;
 
-    fn legacy_fixtures() -> (legacy::Config, EnvironmentRootPath, TempDir) {
+    fn legacy_parts() -> (
+        Vec<legacy::DnaConfig>,
+        Vec<legacy::InstanceConfig>,
+        Vec<legacy::InterfaceConfig>,
+        legacy::DpkiConfig,
+        TempDir,
+    ) {
         let dir = TempDir::new("").unwrap();
         let dnas = vec![
             legacy::DnaConfig {
@@ -240,6 +251,12 @@ pub mod tests {
             init_params: "bar".into(),
         };
 
+        (dnas, instances, interfaces, dpki, dir)
+    }
+
+    fn legacy_fixtures_1() -> (legacy::Config, EnvironmentRootPath, TempDir) {
+        let (dnas, instances, interfaces, dpki, dir) = legacy_parts();
+
         let persistence_dir = PathBuf::from("persistence_dir");
 
         let legacy_config = legacy::Config {
@@ -254,9 +271,30 @@ pub mod tests {
         (legacy_config, persistence_dir.into(), dir)
     }
 
+    fn legacy_fixtures_2() -> (legacy::Config, EnvironmentRootPath, TempDir) {
+        let (dnas, instances, interfaces, dpki, dir) = legacy_parts();
+        let (mut i1, mut i2) = (instances[0].clone(), instances[1].clone());
+
+        i1.dna = "a1".to_string();
+        i2.dna = "a1".to_string();
+
+        let persistence_dir: PathBuf = dir.path().clone().into();
+
+        let legacy_config = legacy::Config {
+            dnas: vec![dnas[0].clone()],
+            instances: vec![i1, i2],
+            interfaces,
+            dpki: Some(dpki),
+            persistence_dir: persistence_dir.clone(),
+            ..Default::default()
+        };
+
+        (legacy_config, persistence_dir.into(), dir)
+    }
+
     #[tokio::test]
     async fn test_config_from_legacy() {
-        let (legacy_config, persistence_dir, _) = legacy_fixtures();
+        let (legacy_config, persistence_dir, _) = legacy_fixtures_1();
         let config = config_from_legacy(&legacy_config);
         assert_eq!(config.environment_path, persistence_dir);
         assert_matches!(
@@ -270,10 +308,15 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_build_conductor_from_legacy() {
-        let (legacy_config, _, dir) = legacy_fixtures();
-        let dna1 = fake_dna_file("A8d8nifNnj");
-        let dna2 = fake_dna_file("90jmi9oINoiO");
-        let agent_pubkey = fake_agent_pubkey_1();
+        let (legacy_config, _, dir) = legacy_fixtures_1();
+        let dna1 = fake_dna_zomes(
+            "A8d8nifNnj",
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let dna2 = fake_dna_zomes(
+            "90jmi9oINoiO",
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
 
         tokio::fs::write(
             dir.path().join("a.dna.gz"),
@@ -295,44 +338,32 @@ pub mod tests {
             .await
             .unwrap();
 
-        let expected_cell_data: Vec<(InstalledCell, Option<MembraneProof>)> = vec![
-            (
-                InstalledCell::new(
-                    CellId::new(dna1.dna_hash().clone(), agent_pubkey.clone()),
-                    "i1".to_string(),
-                ),
-                None,
-            ),
-            (
-                InstalledCell::new(
-                    CellId::new(dna1a.dna_hash().clone(), agent_pubkey.clone()),
-                    "i2".to_string(),
-                ),
-                None,
-            ),
-        ];
-
         let mut handle = MockConductorHandle::new();
         handle
             .expect_sync_install_dna()
-            .with(predicate::eq(dna1))
+            .with(predicate::eq(dna1.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
             .expect_sync_install_dna()
-            .with(predicate::eq(dna1a))
+            .with(predicate::eq(dna1a.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
             .expect_sync_install_dna()
-            .with(predicate::eq(dna2))
+            .with(predicate::eq(dna2.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
             .expect_sync_install_app()
             .with(
                 predicate::eq("LEGACY".to_string()),
-                predicate::eq(expected_cell_data),
+                predicate::function(move |data: &Vec<(InstalledCell, Option<MembraneProof>)>| {
+                    data[0].0.as_id().dna_hash() == dna1.clone().dna_hash()
+                        && data[0].0.as_nick() == "i1"
+                        && data[1].0.as_id().dna_hash() == dna1a.clone().dna_hash()
+                        && data[1].0.as_nick() == "i2"
+                }),
             )
             .times(1)
             .returning(|_, _| Ok(()));
@@ -351,9 +382,33 @@ pub mod tests {
             .times(1)
             .returning(|port| Ok(port));
 
-        let builder = Conductor::builder().with_mock_handle(handle).await;
-        let _ = load_conductor_from_legacy_config(legacy_config, builder, agent_pubkey)
+        let builder = Conductor::builder().with_mock_handle(handle);
+        let _ = load_conductor_from_legacy_config(legacy_config, builder)
             .await
             .unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_build_conductor_from_legacy_regression() {
+        let (legacy_config, _, dir) = legacy_fixtures_2();
+        let dna1 = fake_dna_zomes(
+            "A8d8nifNnj",
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        tokio::fs::write(
+            dir.path().join("a.dna.gz"),
+            dna1.to_file_content().await.unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let handle = load_conductor_from_legacy_config(legacy_config, Conductor::builder())
+            .await
+            .unwrap();
+
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 }

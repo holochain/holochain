@@ -1,3 +1,4 @@
+use super::ChainInvalidReason;
 use crate::core::state::{
     chain_cas::{ChainCasBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
@@ -62,12 +63,9 @@ impl<'env> SourceChainBuf<'env> {
         self.sequence.len() >= 3
     }
 
-    pub async fn get_index(&self, i: u32) -> DatabaseResult<Option<Header>> {
+    pub async fn get_at_index(&self, i: u32) -> SourceChainResult<Option<ChainElement>> {
         if let Some(address) = self.sequence.get(i)? {
-            self.cas
-                .get_header(&address)
-                .await
-                .map(|h| h.map(|h| h.header().clone()))
+            self.get_element(&address).await
         } else {
             Ok(None)
         }
@@ -154,20 +152,19 @@ impl<'env> SourceChainBuf<'env> {
 
     /// Get the AgentPubKey from the entry committed to the chain.
     /// If this returns None, the chain was not initialized.
-    pub fn agent_pubkey(&self) -> DatabaseResult<Option<AgentPubKey>> {
-        // TODO: rewrite in terms of just getting the correct Header
-        Ok(self
-            .cas
-            .public_entries()
-            .iter_fail()?
-            .filter_map(|e| {
-                Ok(match e.into_content() {
-                    Entry::Agent(agent_pubkey) => Some(agent_pubkey),
-                    _ => None,
-                })
-            })
-            .next()?
-            .map(|h| h.into()))
+    pub async fn agent_pubkey(&self) -> SourceChainResult<Option<AgentPubKey>> {
+        if let Some(element) = self.get_at_index(2).await? {
+            match element.entry().as_option().ok_or_else(|| {
+                SourceChainError::InvalidStructure(ChainInvalidReason::GenesisDataMissing)
+            })? {
+                Entry::Agent(agent_pubkey) => Ok(Some(agent_pubkey.clone().into())),
+                _ => Err(SourceChainError::InvalidStructure(
+                    ChainInvalidReason::MalformedGenesisData,
+                )),
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env> {

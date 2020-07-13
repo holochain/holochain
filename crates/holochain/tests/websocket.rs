@@ -1,21 +1,21 @@
 use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
-use holochain_2020::conductor::{
+use holochain::conductor::{
     api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
     config::*,
     error::ConductorError,
     Conductor, ConductorHandle,
 };
-use holochain_2020::core::ribosome::NamedInvocation;
-use holochain_2020::core::ribosome::ZomeCallInvocationFixturator;
+use holochain::core::ribosome::NamedInvocation;
+use holochain::core::ribosome::ZomeCallInvocationFixturator;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
     dna::{DnaFile, JsonProperties},
     observability,
     prelude::*,
-    test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
+    test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
@@ -136,7 +136,13 @@ async fn call_admin() {
     let config = create_config(port, environment_path);
     let config_path = write_config(path, &config);
 
-    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
+    let uuid = Uuid::new_v4();
+    let dna = fake_dna_zomes(
+        &uuid.to_string(),
+        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+    );
+
+    let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("--structured")
         .arg("--config-path")
@@ -151,8 +157,6 @@ async fn call_admin() {
 
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
-    let uuid = Uuid::new_v4();
-    let dna = fake_dna_file(&uuid.to_string());
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
@@ -178,13 +182,13 @@ async fn call_admin() {
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
     assert_matches!(response, AdminResponse::AppInstalled(_));
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 1000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna().clone();
@@ -200,7 +204,7 @@ async fn call_admin() {
 }
 
 async fn start_holochain(config_path: PathBuf) -> Child {
-    let cmd = std::process::Command::cargo_bin("holochain-2020").unwrap();
+    let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("--structured")
         .arg("--config-path")
@@ -367,7 +371,11 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
+    let dna = fake_dna_zomes(
+        "".into(),
+        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+    );
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
@@ -420,7 +428,11 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 
     info!("About to make failing request");
 
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(fake_dna_file("")).await.unwrap();
+    let dna = fake_dna_zomes(
+        "".into(),
+        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+    );
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {

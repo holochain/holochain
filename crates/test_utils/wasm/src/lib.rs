@@ -6,11 +6,13 @@ use holochain_zome_types::zome::ZomeName;
 
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestWasm {
+    Anchor,
     Bench,
     CommitEntry,
     Debug,
     EntryDefs,
     Foo,
+    HashPath,
     Imports,
     InitPass,
     InitFail,
@@ -28,11 +30,13 @@ pub enum TestWasm {
 impl From<TestWasm> for ZomeName {
     fn from(test_wasm: TestWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
+            TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::CommitEntry => "commit_entry",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::Foo => "foo",
+            TestWasm::HashPath => "hash_path",
             TestWasm::Imports => "imports",
             TestWasm::InitPass => "init_pass",
             TestWasm::InitFail => "init_fail",
@@ -52,6 +56,11 @@ impl From<TestWasm> for ZomeName {
 impl From<TestWasm> for DnaWasm {
     fn from(test_wasm: TestWasm) -> DnaWasm {
         DnaWasm::from(match test_wasm {
+            TestWasm::Anchor => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_anchor.wasm"
+            ))
+            .to_vec(),
             TestWasm::Bench => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_bench.wasm"
@@ -75,6 +84,11 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Foo => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
+            ))
+            .to_vec(),
+            TestWasm::HashPath => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             ))
             .to_vec(),
             TestWasm::Imports => include_bytes!(concat!(

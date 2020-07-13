@@ -17,11 +17,11 @@ use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
 pub use holochain_types::fixt::*;
-use holochain_types::link::LinkTag;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::header::HeaderHashes;
+use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::HostInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
@@ -53,6 +53,7 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
                 .map(|t| (t.into(), t.into()))
                 .collect(),
         );
+
         let ribosome = WasmRibosome::new(dna_file);
 
         // warm the module cache for each wasm in the ribosome
@@ -88,11 +89,9 @@ fixturator!(
         for _ in (0..number_of_wasms) {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                tokio_safe_block_on::tokio_safe_block_on(
+                tokio_safe_block_on::tokio_safe_block_forever_on(
                     async { WasmHash::with_data(wasm.code().to_vec()).await },
-                    std::time::Duration::from_millis(10),
                 )
-                .unwrap()
                 .into(),
                 wasm,
             );
@@ -105,11 +104,9 @@ fixturator!(
         for _ in (0..3) {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                tokio_safe_block_on::tokio_safe_block_on(
+                tokio_safe_block_on::tokio_safe_block_forever_on(
                     async { WasmHash::with_data(wasm.code().to_vec()).await },
-                    std::time::Duration::from_millis(10),
                 )
-                .unwrap()
                 .into(),
                 wasm,
             );

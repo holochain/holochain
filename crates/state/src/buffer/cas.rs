@@ -111,6 +111,10 @@ where
 {
     type Error = DatabaseError;
 
+    fn is_clean(&self) -> bool {
+        self.0.is_clean()
+    }
+
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         self.0.flush_to_txn(writer)?;
         Ok(())

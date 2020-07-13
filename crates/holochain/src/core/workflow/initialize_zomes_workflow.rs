@@ -118,8 +118,15 @@ pub mod tests {
 
         // Check init is added to the workspace
         assert_matches!(
-            workspace.0.source_chain.get_index(3).await,
-            Ok(Some(Header::InitZomesComplete(_)))
+            *workspace
+                .0
+                .source_chain
+                .get_at_index(3)
+                .await
+                .unwrap()
+                .unwrap()
+                .header(),
+            Header::InitZomesComplete(_)
         );
     }
 }

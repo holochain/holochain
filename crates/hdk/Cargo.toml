@@ -1,0 +1,24 @@
+[package]
+name = "hdk3"
+version = "0.0.1"
+description = "third iteration of the holochain hdk"
+license = "Apache-2.0"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "hdk" ]
+categories = [ "cryptography" ]
+edition = "2018"
+
+[lib]
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+holo_hash_core = { path = "../holo_hash_core" }
+holochain_wasmer_guest = "=0.0.36"
+holochain_zome_types = { path = "../zome_types" }
+serde = "=1.0.104"
+serde_bytes = "0.11"
+
+[dev-dependencies]
+fixt = { path = "../fixt" }

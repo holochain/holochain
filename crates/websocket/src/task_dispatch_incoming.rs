@@ -99,7 +99,7 @@ async fn process_incoming_message(
             match msg {
                 WireMessage::Signal { data } => {
                     let data: SerializedBytes = UnsafeBytes::from(data).into();
-                    tracing::trace!(message = "recieved signal", ?data,);
+                    tracing::trace!(message = "received signal", ?data,);
                     send_pub
                         .send(WebsocketMessage::Signal(data))
                         .await
@@ -107,7 +107,7 @@ async fn process_incoming_message(
                 }
                 WireMessage::Request { id, data } => {
                     let data: SerializedBytes = UnsafeBytes::from(data).into();
-                    tracing::trace!(message = "recieved request", ?data,);
+                    tracing::trace!(message = "received request", ?data,);
                     let mut loc_send_sink = send_sink.clone();
                     let respond: WebsocketRespond = Box::new(move |data| {
                         //let span = tracing::debug_span!("respond");
@@ -137,7 +137,7 @@ async fn process_incoming_message(
                 }
                 WireMessage::Response { id, data } => {
                     let data: SerializedBytes = UnsafeBytes::from(data).into();
-                    tracing::trace!(message = "recieved response", ?data,);
+                    tracing::trace!(message = "received response", ?data,);
                     tracker.handle_response(id, data);
                 }
             }

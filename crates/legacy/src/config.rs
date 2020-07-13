@@ -2,7 +2,7 @@
 //!
 //! This module provides a subset of the Configuration struct present in holochain-redux,
 //! for backward compatibility purposes, mainly for interoperability with Tryorama.
-//! The holochain_2020::conductor::compat module contains a function for converting this
+//! The holochain::conductor::compat module contains a function for converting this
 //! struct into a `(Config, ConductorState)` pair.
 
 use serde::*;

@@ -13,6 +13,7 @@ use super::{
     api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
     dna_store::{DnaDefBuf, DnaStore, RealDnaStore},
+    entry_def_store::{get_entry_defs, EntryDefBuf, EntryDefBufferKey},
     error::{ConductorError, CreateAppError},
     handle::ConductorHandleImpl,
     interface::{
@@ -66,6 +67,8 @@ use holo_hash::{DnaHash, Hashed};
 
 #[cfg(test)]
 use super::handle::mock::MockConductorHandle;
+use fallible_iterator::FallibleIterator;
+use holochain_zome_types::entry_def::EntryDef;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -397,6 +400,8 @@ where
                                 root_env_dir.clone(),
                                 keystore.clone(),
                                 holochain_p2p_cell,
+                                self.managed_task_add_sender.clone(),
+                                self.managed_task_stop_broadcaster.clone(),
                             )
                         });
 
@@ -512,15 +517,20 @@ where
 
     pub(super) async fn load_wasms_into_dna_files(
         &self,
-    ) -> ConductorResult<impl IntoIterator<Item = (DnaHash, DnaFile)>> {
+    ) -> ConductorResult<(
+        impl IntoIterator<Item = (DnaHash, DnaFile)>,
+        impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
+    )> {
         let environ = &self.wasm_env;
         let env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
         let reader = env.reader()?;
 
         let wasm_buf = WasmBuf::new(&reader, wasm)?;
         let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
+        let entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
             .get_all()?
@@ -543,7 +553,9 @@ where
             // This needs to happen due to the environment not being Send
             .collect::<Vec<_>>();
         // try to join all the tasks and return the list of dna files
-        futures::future::try_join_all(wasm_tasks).await
+        futures::future::try_join_all(wasm_tasks)
+            .await
+            .and_then(|dnas| Ok((dnas, entry_def_buf.get_all()?.collect::<Vec<_>>()?)))
     }
 
     /// Remove cells from the cell map in the Conductor
@@ -553,12 +565,24 @@ where
         }
     }
 
-    pub(super) async fn put_wasm(&self, dna: DnaFile) -> ConductorResult<()> {
+    pub(super) async fn put_wasm(
+        &self,
+        dna: DnaFile,
+    ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = &self.wasm_env;
         let env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
         let reader = env.reader()?;
+
+        let zome_defs = get_entry_defs(dna.clone()).await?;
+
+        let mut entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
+
+        for (key, entry_def) in zome_defs.clone() {
+            entry_def_buf.put(key, entry_def)?;
+        }
 
         let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
         let mut dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
@@ -578,7 +602,10 @@ where
         // write the dna_def db
         env.with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
-        Ok(())
+        // write the entry_def db
+        env.with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
+
+        Ok(zome_defs)
     }
 
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
@@ -600,7 +627,6 @@ where
 
 async fn delete_me_create_test_keystore() -> KeystoreSender {
     use std::convert::TryFrom;
-    let _ = holochain_crypto::crypto_init_sodium();
     let keystore = spawn_test_keystore(vec![
         MockKeypair {
             pub_key: holo_hash::AgentPubKey::try_from(
@@ -729,6 +755,7 @@ mod builder {
     pub struct ConductorBuilder<DS = RealDnaStore> {
         config: ConductorConfig,
         dna_store: DS,
+        keystore: Option<KeystoreSender>,
         #[cfg(test)]
         state: Option<ConductorState>,
         #[cfg(test)]
@@ -774,7 +801,13 @@ mod builder {
                 }
             }
 
-            let keystore = delete_me_create_test_keystore().await;
+            let _ = holochain_crypto::crypto_init_sodium();
+
+            let keystore = if let Some(keystore) = self.keystore {
+                keystore
+            } else {
+                delete_me_create_test_keystore().await
+            };
             let env_path = self.config.environment_path.clone();
 
             let environment = EnvironmentWrite::new(
@@ -849,6 +882,13 @@ mod builder {
             Ok(handle)
         }
 
+        /// Pass a test keystore in, to ensure that generated test agents
+        /// are actually available for signing (especially for tryorama compat)
+        pub fn with_keystore(mut self, keystore: KeystoreSender) -> Self {
+            self.keystore = Some(keystore);
+            self
+        }
+
         #[cfg(test)]
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
@@ -859,7 +899,7 @@ mod builder {
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
         #[cfg(test)]
-        pub async fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
+        pub fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
             self.mock_handle = Some(handle);
             self
         }

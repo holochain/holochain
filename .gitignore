@@ -2,6 +2,7 @@ target/
 .cargo/*
 *.log
 *~
+.wasm_cache
 
 flamegraph.svg
 perf.data

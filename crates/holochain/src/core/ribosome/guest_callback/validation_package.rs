@@ -6,7 +6,10 @@ use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::fixt::AppEntryTypeFixturator;
-use holochain_types::header::AppEntryType;
+use holochain_types::{
+    dna::zome::{HostFnAccess, Permission},
+    header::AppEntryType,
+};
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -33,8 +36,11 @@ fixturator!(
 );
 
 impl Invocation for ValidationPackageInvocation {
-    fn allow_side_effects(&self) -> bool {
-        false
+    fn allowed_access(&self) -> HostFnAccess {
+        let mut access = HostFnAccess::none();
+        access.read_workspace = Permission::Allow;
+        access.agent_info = Permission::Allow;
+        access
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())
@@ -70,6 +76,12 @@ pub enum ValidationPackageResult {
     Fail(String),
     UnresolvedDependencies(Vec<EntryContentHash>),
     NotImplemented,
+}
+
+impl From<Vec<(ZomeName, ValidationPackageCallbackResult)>> for ValidationPackageResult {
+    fn from(a: Vec<(ZomeName, ValidationPackageCallbackResult)>) -> Self {
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
+    }
 }
 
 impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
@@ -116,10 +128,12 @@ mod test {
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_serialized_bytes::prelude::*;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
     use holochain_zome_types::validate::ValidationPackageCallbackResult;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -164,11 +178,21 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validation_package_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let validation_package_invocation =
             ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap();
-        assert!(!validation_package_invocation.allow_side_effects());
+        assert_matches!(
+            validation_package_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Deny,
+                agent_info: Allow,
+                read_workspace: Allow,
+                non_determinism: Deny,
+                conductor: Deny,
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

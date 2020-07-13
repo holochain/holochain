@@ -7,6 +7,7 @@
 use crate::composite_hash::AnyDhtHash;
 use crate::composite_hash::EntryHash;
 use crate::dna::zome::Zome;
+use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
 use crate::dna::Zomes;
 use crate::header::AgentValidationPkg;
@@ -22,7 +23,6 @@ use crate::header::LinkAdd;
 use crate::header::NewEntryHeader;
 use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
-use crate::link::LinkTag;
 use crate::Timestamp;
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
@@ -44,6 +44,7 @@ use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::entry_def::RequiredValidations;
+use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
@@ -526,4 +527,14 @@ fixturator!(
         Create(EntryCreate)
         Update(EntryUpdate)
     ];
+);
+
+fixturator!(
+    Permission;
+    unit variants [ Allow Deny ] empty Deny;
+);
+
+fixturator!(
+    HostFnAccess;
+    constructor fn new(Permission, Permission, Permission, Permission, Permission);
 );

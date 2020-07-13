@@ -1,4 +1,3 @@
-use crate::zome::ZomeName;
 use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
@@ -12,14 +11,14 @@ pub enum MigrateAgent {
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum MigrateAgentCallbackResult {
     Pass,
-    Fail(ZomeName, String),
+    Fail(String),
 }
 
 impl From<GuestOutput> for MigrateAgentCallbackResult {
     fn from(guest_output: GuestOutput) -> Self {
         match guest_output.into_inner().try_into() {
             Ok(v) => v,
-            Err(e) => Self::Fail(ZomeName::unknown(), format!("{:?}", e)),
+            Err(e) => Self::Fail(format!("{:?}", e)),
         }
     }
 }
@@ -27,7 +26,7 @@ impl From<GuestOutput> for MigrateAgentCallbackResult {
 impl CallbackResult for MigrateAgentCallbackResult {
     fn is_definitive(&self) -> bool {
         match self {
-            MigrateAgentCallbackResult::Fail(_, _) => true,
+            MigrateAgentCallbackResult::Fail(_) => true,
             _ => false,
         }
     }

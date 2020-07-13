@@ -37,8 +37,9 @@ use holo_hash::AgentPubKeyFixturator;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;
+use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaFile;
-use holochain_types::fixt::CapSecretFixturator;
+use holochain_types::fixt::{CapSecretFixturator, HostFnAccessFixturator};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
@@ -49,24 +50,24 @@ use std::iter::Iterator;
 #[derive(Clone)]
 pub struct HostContext {
     pub zome_name: ZomeName,
-    allow_side_effects: bool,
+    allowed_access: HostFnAccess,
     workspace: UnsafeInvokeZomeWorkspace,
 }
 
 fixturator!(
     HostContext;
-    constructor fn new(ZomeName, bool, UnsafeInvokeZomeWorkspace);
+    constructor fn new(ZomeName, HostFnAccess, UnsafeInvokeZomeWorkspace);
 );
 
 impl HostContext {
     pub fn new(
         zome_name: ZomeName,
-        allow_side_effects: bool,
+        allowed_access: HostFnAccess,
         workspace: UnsafeInvokeZomeWorkspace,
     ) -> Self {
         Self {
             zome_name,
-            allow_side_effects,
+            allowed_access,
             workspace,
         }
     }
@@ -74,8 +75,8 @@ impl HostContext {
     pub fn zome_name(&self) -> ZomeName {
         self.zome_name.clone()
     }
-    pub fn allow_side_effects(&self) -> bool {
-        self.allow_side_effects
+    pub fn allowed_access(&self) -> HostFnAccess {
+        self.allowed_access
     }
     #[cfg(test)]
     pub(crate) fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
@@ -130,12 +131,15 @@ pub trait Invocation: Clone {
     /// a callback triggered by the subconscious in order to allow the conscious to provide
     /// feedback. In some of these cases we allow side effects to be possible, such as committing a
     /// new entry, which will in turn trigger other callbacks, such as validation, that must be
-    /// pure functions on the input data. For pure callbacks, allow_side_effects must return false.
-    /// In the case that allow_side_effects is false, any call to a host function with side effects
+    /// pure functions on the input data. For pure callbacks, HostFnAccess should have side_effects
+    /// set to Deny.
+    /// In the case that side_effects is set to Deny, any call to a host function with side effects
     /// should be an unreachable!() error and halt execution. This is a panic because the happ
     /// developer must avoid use of any host function calls that produce side effects while
     /// implementing callbacks that must be pure.
-    fn allow_side_effects(&self) -> bool;
+    /// Access to the reading the workspace (databases) and accessing agent information is handled
+    /// in the same way.
+    fn allowed_access(&self) -> HostFnAccess;
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
     /// zome in order for the Dna overall to successfully init.
@@ -167,7 +171,7 @@ pub trait Invocation: Clone {
 mockall::mock! {
     Invocation {}
     trait Invocation {
-        fn allow_side_effects(&self) -> bool;
+        fn allowed_access(&self) -> HostFnAccess;
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<HostInput, SerializedBytesError>;
@@ -255,8 +259,8 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 }
 
 impl Invocation for ZomeCallInvocation {
-    fn allow_side_effects(&self) -> bool {
-        true
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::all()
     }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())
@@ -318,11 +322,7 @@ pub trait RibosomeT: Sized {
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
 
-    fn run_entry_defs(
-        &self,
-        workspace: UnsafeInvokeZomeWorkspace,
-        invocation: EntryDefsInvocation,
-    ) -> RibosomeResult<EntryDefsResult>;
+    fn run_entry_defs(&self, invocation: EntryDefsInvocation) -> RibosomeResult<EntryDefsResult>;
 
     fn run_validation_package(
         &self,
@@ -445,6 +445,20 @@ pub mod wasm_test {
         let expected = vec!["foo_bar_baz", "foo_bar", "foo"];
 
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn warm_wasm_tests() {
+        holochain_types::observability::test_run().ok();
+        use strum::IntoEnumIterator;
+
+        // If HC_WASM_CACHE_PATH is set warm the cache
+        if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
+            let wasms: Vec<_> = TestWasm::iter().collect();
+            crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+                .next()
+                .unwrap();
+        }
     }
 
     #[tokio::test(threaded_scheduler)]

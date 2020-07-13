@@ -162,10 +162,10 @@ impl TestData {
     }
 
     fn only_on_half_tag(&self, test: &'static str, meta_buf: &MetadataBuf) {
-        let tag_len = self.tag.len();
+        let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
-        let half_tag = LinkTag::new(&self.tag[..half_tag]);
+        let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert_eq!(
             &meta_buf.get_links(&key).unwrap()[..],
@@ -176,10 +176,10 @@ impl TestData {
     }
 
     fn is_on_half_tag(&self, test: &'static str, meta_buf: &MetadataBuf) {
-        let tag_len = self.tag.len();
+        let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
-        let half_tag = LinkTag::new(&self.tag[..half_tag]);
+        let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert!(
             meta_buf
@@ -277,15 +277,15 @@ impl TestData {
     }
 
     fn only_these_on_half_key(td: &[Self], test: &'static str, meta_buf: &MetadataBuf) {
-        let tag_len = td[0].tag.len();
+        let tag_len = td[0].tag.0.len();
         // Make sure there is at least some tag
         let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };
-        let half_tag = LinkTag::new(&td[0].tag[..tag_len]);
+        let half_tag = LinkTag::new(&td[0].tag.0[..tag_len]);
         // Check all base hash, zome_id, half tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
             assert_eq!(d.zome_id, td[0].zome_id, "{}", test);
-            assert_eq!(&d.tag[..tag_len], &half_tag[..], "{}", test);
+            assert_eq!(&d.tag.0[..tag_len], &half_tag.0[..], "{}", test);
         }
         let base_hash = &td[0].base_hash;
         let zome_id = td[0].zome_id;

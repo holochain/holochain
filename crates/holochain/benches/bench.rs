@@ -3,8 +3,8 @@ use criterion::Throughput;
 use criterion::{criterion_group, criterion_main, Criterion};
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
-use holochain_2020::core::ribosome::RibosomeT;
-use holochain_2020::core::ribosome::ZomeCallInvocation;
+use holochain::core::ribosome::RibosomeT;
+use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::prelude::*;
@@ -22,17 +22,18 @@ pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
 
     // let ribosome =
-    //     holochain_2020::fixt::WasmRibosomeFixturator::new(holochain_2020::fixt::curve::Zomes(vec![
+    //     holochain::fixt::WasmRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
     //         TestWasm::Bench.into(),
     //     ]))
     //     .next()
     //     .unwrap();
 
-    let mut ribosome_fixturator = holochain_2020::fixt::WasmRibosomeFixturator::new(
-        holochain_2020::fixt::curve::Zomes(vec![TestWasm::Bench.into()]),
-    );
+    let mut ribosome_fixturator =
+        holochain::fixt::WasmRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
+            TestWasm::Bench.into(),
+        ]));
     let mut cap_secret_fixturator = CapSecretFixturator::new(Unpredictable);
-    let mut workspace_fixturator = holochain_2020::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable);
+    let mut workspace_fixturator = holochain::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable);
     let mut cell_id_fixturator = holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable);
     let mut agent_key_fixturator = AgentPubKeyFixturator::new(Unpredictable);
 

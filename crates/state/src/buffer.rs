@@ -30,6 +30,12 @@ pub trait BufferedStore<'env> {
     /// Flush the scratch space to the read-write transaction, staging the changes
     /// for an actual database update
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error>;
+
+    /// Specifies whether there are actually changes to flush. If not, the
+    /// flush_to_txn method may decide to do nothing.
+    fn is_clean(&self) -> bool {
+        false
+    }
 }
 
 /// Trait alias for the combination of constraints needed for keys in [KvBuf] and [KvvBuf]

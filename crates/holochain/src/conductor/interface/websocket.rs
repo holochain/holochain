@@ -240,7 +240,7 @@ mod test {
     use crate::conductor::{
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
         conductor::ConductorBuilder,
-        dna_store::{error::DnaStoreError, MockDnaStore},
+        dna_store::MockDnaStore,
         state::ConductorState,
         Conductor, ConductorHandle,
     };
@@ -256,7 +256,7 @@ mod test {
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
         observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
@@ -273,7 +273,7 @@ mod test {
         InstallsDna(String),
     }
 
-    async fn setup_admin() -> (Arc<TempDir>, RealAdminInterfaceApi) {
+    async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
@@ -281,7 +281,7 @@ mod test {
         } = test_wasm_env();
         let tmpdir = test_env.tmpdir.clone();
         let conductor_handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
-        (tmpdir, RealAdminInterfaceApi::new(conductor_handle))
+        (tmpdir, conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
@@ -331,7 +331,7 @@ mod test {
     async fn setup_app(
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
-    ) -> (Arc<TempDir>, RealAppInterfaceApi) {
+    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
@@ -359,12 +359,15 @@ mod test {
 
         assert!(errors.is_empty());
 
-        (tmpdir, RealAppInterfaceApi::new(conductor_handle))
+        let handle = conductor_handle.clone();
+
+        (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn serialization_failure() {
-        let (_tmpdir, admin_api) = setup_admin().await;
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdmonRequest::InstallsDna("".into());
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -378,12 +381,14 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown().await;
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn invalid_request() {
         observability::test_run().ok();
-        let (_tmpdir, admin_api) = setup_admin().await;
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload =
             InstallAppDnaPayload::path_only("some$\\//weird00=-+[] \\Path".into(), "".to_string());
         let agent_key = fake_agent_pubkey_1();
@@ -404,57 +409,8 @@ mod test {
         };
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap()
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn cache_failure() {
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let _tmpdir = test_env.tmpdir.clone();
-
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_file(&uuid.to_string());
-
-        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let mut dna_store = MockDnaStore::new();
-        dna_store
-            .expect_add()
-            .with(predicate::eq(dna))
-            .returning(|_| Err(DnaStoreError::WriteFail));
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(test_env, wasm_env)
-            .await
-            .unwrap();
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
-        let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-        let agent_key = fake_agent_pubkey_1();
-        let payload = InstallAppPayload {
-            dnas: vec![dna_payload],
-            app_id: "test app".to_string(),
-            agent_key,
-        };
-        let msg = AdminRequest::InstallApp(Box::new(payload));
-        let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(
-                response,
-                AdminResponse::Error(ExternalApiWireError::InternalError(_))
-            );
-            async { Ok(()) }.boxed()
-        };
-        let respond = Box::new(respond);
-        let msg = WebsocketMessage::Request(msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap()
+        handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown().await;
     }
 
     #[ignore]
@@ -466,8 +422,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
-    #[ignore] // david.b - THIS TEST PANIC!s TODO FIXME
     async fn websocket_call_zome_function() {
         observability::test_run().ok();
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -500,8 +454,12 @@ mod test {
             .expect_add_dnas::<Vec<_>>()
             .times(1)
             .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
-        let (_tmpdir, app_api) = setup_app(vec![(installed_cell, None)], dna_store).await;
+        let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
         let mut request = Box::new(
             crate::core::ribosome::ZomeCallInvocationFixturator::new(
                 crate::core::ribosome::NamedInvocation(
@@ -530,6 +488,9 @@ mod test {
         // the time here should be almost the same (about +0.1ms) vs. the raw wasm_ribosome call
         // the overhead of a websocket request locally is small
         crate::end_hard_timeout!(websocket_timeout, crate::perf::ONE_WASM_CALL);
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -559,7 +520,13 @@ mod test {
             .expect_add_dnas::<Vec<_>>()
             .times(1)
             .return_const(());
-        let (_tmpdir, handle) = setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(1)
+            .return_const(());
+        let (_tmpdir, conductor_handle) =
+            setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Activate the app
         let msg = AdminRequest::ActivateApp {
@@ -574,12 +541,12 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
 
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
             .await
             .unwrap();
 
         // Get the state
-        let state: ConductorState = handle.get_state_from_handle().await.unwrap();
+        let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
 
         // Check it is not in inactive apps
         let r = state.inactive_apps.get("test app");
@@ -616,12 +583,12 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
 
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
             .await
             .unwrap();
 
         // Get the state
-        let state = handle.get_state_from_handle().await.unwrap();
+        let state = conductor_handle.get_state_from_handle().await.unwrap();
 
         // Check it's removed from active
         let r = state.active_apps.get("test app");
@@ -638,12 +605,16 @@ mod test {
             .collect();
 
         assert_eq!(expected, cell_ids);
+        conductor_handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn attach_app_interface() {
         observability::test_run().ok();
-        let (_tmpdir, admin_api) = setup_admin().await;
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -654,6 +625,8 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -672,10 +645,15 @@ mod test {
             .expect_add_dnas::<Vec<_>>()
             .times(1)
             .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(1)
+            .return_const(());
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
         let conductor_handle = activate(conductor_handle).await;
+        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Set some state
         let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
@@ -688,7 +666,7 @@ mod test {
             source_chain.dump_as_json().await.unwrap()
         };
 
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle);
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
             cell_id: Box::new(cell_id),
         };
@@ -701,5 +679,7 @@ mod test {
         let respond = Box::new(respond);
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 }
