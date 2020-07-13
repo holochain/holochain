@@ -7,7 +7,7 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::metadata::{MetadataBuf, MetadataBufT};
+    use crate::core::state::metadata::{EntryDhtStatus, MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use header::{HeaderBuilderCommon, IntendedFor, NewEntryHeader};
@@ -470,6 +470,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
+        let entry_hash = fx.entry_hash();
         let mut expected = Vec::new();
         let mut entry_deletes = Vec::new();
         for _ in 0..10 {
@@ -484,7 +485,10 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf.register_delete_on_header(delete).await.unwrap();
+                meta_buf
+                    .register_delete(delete, entry_hash.clone())
+                    .await
+                    .unwrap();
             }
             let mut headers = meta_buf
                 .get_deletes(header_hash.clone().into())
@@ -507,5 +511,46 @@ mod tests {
             headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
         }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_entry_dht_status() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let mut fx = TestFixtures::new();
+        let entry_hash = fx.entry_hash();
+        let mut expected = Vec::new();
+        let mut entry_creates = Vec::new();
+        let mut entry_deletes = Vec::new();
+        for _ in 0..10 {
+            let e = test_create(entry_hash.clone(), &mut fx).await;
+            entry_creates.push(e)
+        }
+        for (_, (_, header_hash)) in (0..10).zip(entry_creates.iter()) {
+            let (e, hash) = test_delete(header_hash.as_hash().clone(), &mut fx).await;
+            let (_, hash) = <(Header, HeaderHash)>::from(hash);
+            expected.push(hash);
+            entry_deletes.push(e)
+        }
+
+        let reader = env.reader().unwrap();
+        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        for (e, _) in entry_creates {
+            meta_buf
+                .register_header(NewEntryHeader::Create(e))
+                .await
+                .unwrap();
+        }
+        for delete in entry_deletes {
+            meta_buf
+                .register_delete(delete, entry_hash.clone())
+                .await
+                .unwrap();
+        }
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Dead);
+
+        // TODO: Check update bring entry back to life
+        // TODO: Check deleting update kills entry
     }
 }

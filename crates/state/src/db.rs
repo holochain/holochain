@@ -4,6 +4,7 @@ use crate::{
     env::EnvironmentKind,
     error::{DatabaseError, DatabaseResult},
 };
+use derive_more::Display;
 use holochain_keystore::KeystoreSender;
 use holochain_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
@@ -14,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 /// TODO This is incomplete
 /// Enumeration of all databases needed by Holochain
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
 pub enum DbName {
     /// Primary database: KV store of chain entries, keyed by address
     PrimaryChainPublicEntries,
@@ -26,6 +27,8 @@ pub enum DbName {
     PrimaryMetadata,
     /// Primary database: Kv store of links
     PrimaryLinksMeta,
+    /// Primary database: Kv store of entry dht status
+    PrimaryStatusMeta,
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
     ChainSequence,
@@ -37,6 +40,8 @@ pub enum DbName {
     CacheMetadata,
     /// Cachedatabase: Kv store of links
     CacheLinksMeta,
+    /// Primary database: Kv store of entry dht status
+    CacheStatusMeta,
     /// database which stores a single key-value pair, encoding the
     /// mutable state for the entire Conductor
     ConductorState,
@@ -56,31 +61,31 @@ pub enum DbName {
     ValidationReceipts,
 }
 
-impl std::fmt::Display for DbName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use DbName::*;
-        match self {
-            PrimaryChainPublicEntries => write!(f, "PrimaryChainPublicEntries"),
-            PrimaryChainPrivateEntries => write!(f, "PrimaryChainPrivateEntries"),
-            PrimaryChainHeaders => write!(f, "PrimaryChainHeaders"),
-            PrimaryMetadata => write!(f, "PrimaryMetadata"),
-            PrimaryLinksMeta => write!(f, "PrimaryLinksMeta"),
-            ChainSequence => write!(f, "ChainSequence"),
-            CacheChainEntries => write!(f, "CacheChainEntries"),
-            CacheChainHeaders => write!(f, "CacheChainHeaders"),
-            CacheMetadata => write!(f, "CacheMetadata"),
-            CacheLinksMeta => write!(f, "CacheLinksMeta"),
-            ConductorState => write!(f, "ConductorState"),
-            Wasm => write!(f, "Wasm"),
-            DnaDef => write!(f, "DnaDef"),
-            EntryDef => write!(f, "EntryDef"),
-            AuthoredDhtOps => write!(f, "AuthoredDhtOps"),
-            IntegratedDhtOps => write!(f, "IntegratedDhtOps"),
-            IntegrationQueue => write!(f, "IntegrationQueue"),
-            ValidationReceipts => write!(f, "ValidationReceipts"),
-        }
-    }
-}
+// impl std::fmt::Display for DbName {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         use DbName::*;
+//         match self {
+//             PrimaryChainPublicEntries => write!(f, "PrimaryChainPublicEntries"),
+//             PrimaryChainPrivateEntries => write!(f, "PrimaryChainPrivateEntries"),
+//             PrimaryChainHeaders => write!(f, "PrimaryChainHeaders"),
+//             PrimaryMetadata => write!(f, "PrimaryMetadata"),
+//             PrimaryLinksMeta => write!(f, "PrimaryLinksMeta"),
+//             ChainSequence => write!(f, "ChainSequence"),
+//             CacheChainEntries => write!(f, "CacheChainEntries"),
+//             CacheChainHeaders => write!(f, "CacheChainHeaders"),
+//             CacheMetadata => write!(f, "CacheMetadata"),
+//             CacheLinksMeta => write!(f, "CacheLinksMeta"),
+//             ConductorState => write!(f, "ConductorState"),
+//             Wasm => write!(f, "Wasm"),
+//             DnaDef => write!(f, "DnaDef"),
+//             EntryDef => write!(f, "EntryDef"),
+//             AuthoredDhtOps => write!(f, "AuthoredDhtOps"),
+//             IntegratedDhtOps => write!(f, "IntegratedDhtOps"),
+//             IntegrationQueue => write!(f, "IntegrationQueue"),
+//             ValidationReceipts => write!(f, "ValidationReceipts"),
+//         }
+//     }
+// }
 
 impl DbName {
     /// Associates a [DbKind] to each [DbName]
@@ -93,11 +98,13 @@ impl DbName {
             PrimaryChainHeaders => Single,
             PrimaryMetadata => Multi,
             PrimaryLinksMeta => Single,
+            PrimaryStatusMeta => Single,
             ChainSequence => SingleInt,
             CacheChainEntries => Single,
             CacheChainHeaders => Single,
             CacheMetadata => Multi,
             CacheLinksMeta => Single,
+            CacheStatusMeta => Single,
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
@@ -141,6 +148,8 @@ lazy_static! {
     pub static ref PRIMARY_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryMetadata);
     /// The key to access the links database
     pub static ref PRIMARY_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::PrimaryLinksMeta);
+    /// The key to access the entry status database
+    pub static ref PRIMARY_STATUS_META: DbKey<SingleStore> = DbKey::new(DbName::PrimaryStatusMeta);
     /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
     /// The key to access the ChainEntries database
@@ -153,6 +162,8 @@ lazy_static! {
     pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::CacheMetadata);
     /// The key to access the cache links database
     pub static ref CACHE_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::CacheLinksMeta);
+    /// The key to access the entry status database
+    pub static ref CACHE_STATUS_META: DbKey<SingleStore> = DbKey::new(DbName::CacheStatusMeta);
     /// The key to access the ConductorState database
     pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
     /// The key to access the Wasm database
@@ -215,11 +226,13 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*PRIMARY_CHAIN_HEADERS)?;
             register_db(env, um, &*PRIMARY_SYSTEM_META)?;
             register_db(env, um, &*PRIMARY_LINKS_META)?;
+            register_db(env, um, &*PRIMARY_STATUS_META)?;
             register_db(env, um, &*CHAIN_SEQUENCE)?;
             register_db(env, um, &*CACHE_CHAIN_ENTRIES)?;
             register_db(env, um, &*CACHE_CHAIN_HEADERS)?;
             register_db(env, um, &*CACHE_SYSTEM_META)?;
             register_db(env, um, &*CACHE_LINKS_META)?;
+            register_db(env, um, &*CACHE_STATUS_META)?;
             register_db(env, um, &*AUTHORED_DHT_OPS)?;
             register_db(env, um, &*INTEGRATED_DHT_OPS)?;
             register_db(env, um, &*INTEGRATION_QUEUE)?;

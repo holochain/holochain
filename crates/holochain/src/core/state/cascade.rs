@@ -175,7 +175,7 @@ where
         key: &'a LinkMetaKey<'a>,
     ) -> DatabaseResult<Vec<LinkMetaVal>> {
         // Am I an authority?
-        // TODO: Not a good check for authority as the base could be in the cas because 
+        // TODO: Not a good check for authority as the base could be in the cas because
         // you authored it.
         let authority = self.primary.contains(&key.base()).await?;
         if authority {
