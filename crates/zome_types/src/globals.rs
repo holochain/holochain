@@ -21,7 +21,6 @@ pub struct ZomeInfo {
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct AgentInfo {
-    pub agent_id_str: String,
     pub agent_address: HashString,
     pub agent_initial_hash: HashString,
     pub agent_latest_hash: HashString,

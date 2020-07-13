@@ -13,7 +13,6 @@ pub fn agent_info(
 ) -> RibosomeResult<AgentInfoOutput> {
     Ok(AgentInfoOutput::new(AgentInfo {
         agent_address: "todo".into(),  // @TODO
-        agent_id_str: "".into(),       // @TODO
         agent_initial_hash: "".into(), // @TODO
         agent_latest_hash: "".into(),  // @TODO
     }))
