@@ -167,15 +167,15 @@ pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, WasmError> {
 #[cfg(test)]
 #[test]
 fn hash_path_root() {
-    assert_eq!(ROOT, "anchor");
+    assert_eq!(ROOT, "hdk3anchor");
 }
 
 #[cfg(test)]
 #[test]
 fn hash_path_anchor_path() {
     for (atype, text, path_string) in vec![
-        ("foo", None, "anchor.foo"),
-        ("foo", Some("bar".to_string()), "anchor.foo.bar"),
+        ("foo", None, "hdk3anchor.foo"),
+        ("foo", Some("bar".to_string()), "hdk3anchor.foo.bar"),
     ] {
         assert_eq!(
             Path::from(path_string),
@@ -207,7 +207,8 @@ fn hash_path_anchor_entry_def() {
 fn hash_path_anchor_from_path() {
     let path = Path::from(vec![
         Component::from(vec![
-            97, 0, 0, 0, 110, 0, 0, 0, 99, 0, 0, 0, 104, 0, 0, 0, 111, 0, 0, 0, 114, 0, 0, 0,
+            104, 0, 0, 0, 100, 0, 0, 0, 107, 0, 0, 0, 51, 0, 0, 0, 97, 0, 0, 0, 110, 0, 0, 0, 99,
+            0, 0, 0, 104, 0, 0, 0, 111, 0, 0, 0, 114, 0, 0, 0,
         ]),
         Component::from(vec![102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0]),
         Component::from(vec![98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0]),
