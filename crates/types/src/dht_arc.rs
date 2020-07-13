@@ -19,7 +19,7 @@ pub const MAX_LENGTH: i64 = u32::MAX as i64 / 2;
 /// length -1 means nothing is held
 /// length 0 means just the hash_location is held
 /// length n where n > 0 means n locations are
-/// held on either side of hash_location 
+/// held on either side of hash_location
 pub struct DhtArc {
     hash_location: Location,
     length_either_side: i64,
