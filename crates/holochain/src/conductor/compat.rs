@@ -180,7 +180,8 @@ pub mod tests {
     use crate::conductor::{
         handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
     };
-    use holochain_types::{app::MembraneProof, test_utils::fake_dna_file};
+    use holochain_types::{app::MembraneProof, test_utils::fake_dna_zomes};
+    use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
     use mockall::predicate;
     use std::path::PathBuf;
@@ -308,8 +309,14 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_build_conductor_from_legacy() {
         let (legacy_config, _, dir) = legacy_fixtures_1();
-        let dna1 = fake_dna_file("A8d8nifNnj");
-        let dna2 = fake_dna_file("90jmi9oINoiO");
+        let dna1 = fake_dna_zomes(
+            "A8d8nifNnj",
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let dna2 = fake_dna_zomes(
+            "90jmi9oINoiO",
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
 
         tokio::fs::write(
             dir.path().join("a.dna.gz"),
@@ -384,8 +391,10 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_build_conductor_from_legacy_regression() {
         let (legacy_config, _, dir) = legacy_fixtures_2();
-        let dna1 = fake_dna_file("A8d8nifNnj");
-        // let dna2 = fake_dna_file("90jmi9oINoiO");
+        let dna1 = fake_dna_zomes(
+            "A8d8nifNnj",
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
 
         tokio::fs::write(
             dir.path().join("a.dna.gz"),

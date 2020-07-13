@@ -6,6 +6,7 @@ use crate::fixt::ZomeNameFixturator;
 use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -37,8 +38,8 @@ fixturator!(
 );
 
 impl Invocation for ValidateInvocation {
-    fn allow_side_effects(&self) -> bool {
-        false
+    fn allowed_access(&self) -> HostFnAccess {
+        HostFnAccess::none()
     }
     fn zomes(&self) -> ZomesToInvoke {
         // entries are specific to zomes so only validate in the zome the entry is defined in
@@ -80,6 +81,12 @@ pub enum ValidateResult {
     UnresolvedDependencies(Vec<EntryContentHash>),
 }
 
+impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
+    fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
+        a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
+    }
+}
+
 impl From<Vec<ValidateCallbackResult>> for ValidateResult {
     fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
         callback_results.into_iter().fold(Self::Valid, |acc, x| {
@@ -115,12 +122,13 @@ mod test {
     use holo_hash::AgentPubKeyFixturator;
     use holo_hash_core::HoloHashCoreHash;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::fixt::CapClaimFixturator;
+    use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::HostInput;
+    use matches::assert_matches;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -165,10 +173,20 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_allow_side_effects() {
+        use holochain_types::dna::zome::Permission::*;
         let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert!(!validate_invocation.allow_side_effects());
+        assert_matches!(
+            validate_invocation.allowed_access(),
+            HostFnAccess {
+                side_effects: Deny,
+                agent_info: Deny,
+                read_workspace: Deny,
+                non_determinism: Deny,
+                conductor: Deny,
+            }
+        );
     }
 
     #[tokio::test(threaded_scheduler)]
