@@ -74,7 +74,6 @@ pub mod wasm_test {
     use crate::core::workflow::produce_dht_ops_workflow::{
         produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
     };
-    use hdk3::prelude::link::LinkTag;
     use hdk3::prelude::*;
     use holo_hash_core::HoloHashCore;
     use holo_hash_core::HoloHashCoreHash;
@@ -98,14 +97,14 @@ pub mod wasm_test {
                 .await
                 .unwrap();
 
-            // touch foo/bar twice to ensure idempotency
+            // ensure foo.bar twice to ensure idempotency
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "touch",
-                    TestString::from("foo/bar".to_string())
+                    "ensure",
+                    TestString::from("foo.bar".to_string())
                 )
             };
             let _: () = {
@@ -113,19 +112,19 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "touch",
-                    TestString::from("foo/bar".to_string())
+                    "ensure",
+                    TestString::from("foo.bar".to_string())
                 )
             };
 
-            // touch foo/baz
+            // ensure foo.baz
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "touch",
-                    TestString::from("foo/baz".to_string())
+                    "ensure",
+                    TestString::from("foo.baz".to_string())
                 )
             };
 
@@ -193,8 +192,8 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "pwd",
-                    TestString::from("foo/bar".to_string())
+                    "hash",
+                    TestString::from("foo.bar".to_string())
                 )
             };
 
@@ -203,8 +202,8 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "pwd",
-                    TestString::from("foo/baz".to_string())
+                    "hash",
+                    TestString::from("foo.baz".to_string())
                 )
             };
 
@@ -221,7 +220,7 @@ pub mod wasm_test {
                 crate::call_test_ribosome!(
                     raw_workspace,
                     TestWasm::HashPath,
-                    "ls",
+                    "children",
                     TestString::from("foo".to_string())
                 )
             };
@@ -265,9 +264,9 @@ pub mod wasm_test {
             assert_eq!(
                 anchor_address_one.get_raw().to_vec(),
                 vec![
-                    251, 69, 127, 15, 3, 239, 206, 255, 170, 38, 140, 9, 220, 244, 93, 184, 84,
-                    189, 108, 142, 47, 195, 34, 218, 250, 121, 203, 196, 26, 203, 53, 50, 38, 242,
-                    236, 123,
+                    138, 240, 209, 89, 206, 160, 42, 131, 107, 63, 111, 243, 67, 8, 24, 48, 151,
+                    62, 108, 99, 102, 109, 57, 253, 219, 26, 255, 164, 83, 134, 245, 254, 186, 50,
+                    192, 174
                 ],
             );
 
@@ -285,9 +284,9 @@ pub mod wasm_test {
             assert_eq!(
                 anchor_address_two.get_raw().to_vec(),
                 vec![
-                    40, 91, 139, 255, 25, 187, 26, 6, 97, 212, 166, 244, 73, 56, 176, 96, 53, 235,
-                    174, 8, 151, 130, 108, 116, 77, 202, 115, 10, 110, 186, 187, 211, 173, 135, 76,
-                    5
+                    175, 176, 111, 101, 56, 12, 198, 140, 48, 157, 209, 87, 118, 124, 157, 94, 234,
+                    232, 82, 136, 228, 219, 237, 221, 195, 225, 98, 177, 76, 26, 126, 6, 26, 90,
+                    146, 169
                 ],
             );
 
@@ -372,8 +371,8 @@ pub mod wasm_test {
         assert_eq!(
             (list_anchor_type_addresses_output.0)[0].get_raw().to_vec(),
             vec![
-                46, 187, 74, 48, 90, 73, 153, 38, 193, 172, 241, 90, 224, 154, 107, 253, 214, 55,
-                229, 101, 197, 18, 128, 240, 62, 161, 32, 217, 225, 88, 33, 22, 35, 133, 149, 209
+                14, 28, 21, 33, 162, 54, 200, 39, 170, 131, 53, 252, 229, 108, 231, 41, 38, 79, 4,
+                232, 36, 95, 237, 120, 101, 249, 248, 91, 140, 51, 61, 124, 199, 152, 168, 188
             ],
         );
 
@@ -399,11 +398,11 @@ pub mod wasm_test {
         assert_eq!(list_anchor_addresses_output.0.len(), 2,);
         assert_eq!(
             (list_anchor_addresses_output.0)[0].get_raw().to_vec(),
-            anchor_address_two.get_raw().to_vec(),
+            anchor_address_one.get_raw().to_vec(),
         );
         assert_eq!(
             (list_anchor_addresses_output.0)[1].get_raw().to_vec(),
-            anchor_address_one.get_raw().to_vec(),
+            anchor_address_two.get_raw().to_vec(),
         );
 
         let list_anchor_tags_output = {
@@ -411,7 +410,7 @@ pub mod wasm_test {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let output: LinkTags = {
+            let output: AnchorTags = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
@@ -425,7 +424,7 @@ pub mod wasm_test {
         };
 
         assert_eq!(
-            LinkTags(vec![LinkTag(vec![104, 100, 107, 46, 112, 97, 116, 104,],),],),
+            AnchorTags(vec!["bar".to_string(), "baz".to_string()]),
             list_anchor_tags_output,
         );
     }

@@ -2,13 +2,14 @@ use crate::hash_path::shard::ShardStrategy;
 use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
+use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
 
-/// allows for "foo/bar/baz" to automatically move to/from ["foo", "bar", "baz"] components
+/// allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components
 /// technically it's moving each string component in as bytes
 /// if this is a problem for you simply built the components yourself
 /// @see `impl From<String> for Path` below
-pub const DELIMITER: &str = "/";
+pub const DELIMITER: &str = ".";
 
 /// "hdk.path" as utf8 bytes
 /// all paths use the same link tag and entry def id
@@ -167,11 +168,11 @@ impl AsRef<Vec<Component>> for Path {
 /// to a path with zero length (no components)
 ///
 /// e.g. all the following result in the same components as `vec!["foo", "bar"]` (as bytes)
-/// - foo/bar
-/// - foo/bar/
-/// - /foo/bar
-/// - /foo/bar/
-/// - foo//bar
+/// - foo.bar
+/// - foo.bar.
+/// - .foo.bar
+/// - .foo.bar.
+/// - foo..bar
 ///
 /// there is no normalisation of paths, e.g. to guarantee a specific root component exists, at this
 /// layer so there is a risk that there are hash collisions with other data on the DHT network if
@@ -181,9 +182,9 @@ impl AsRef<Vec<Component>> for Path {
 /// start each component with <width>:<depth># to get shards out of the string
 ///
 /// e.g.
-/// - foo/barbaz => normal path as above ["foo", "barbaz"]
-/// - foo/1:3#barbazii => width 1, depth 3, ["foo", "b", "a", "r", "barbazii"]
-/// - foo/2:3#barbazii => width 2, depth 3, ["foo", "ba", "rb", "az", "barbazii"]
+/// - foo.barbaz => normal path as above ["foo", "barbaz"]
+/// - foo.1:3#barbazii => width 1, depth 3, ["foo", "b", "a", "r", "barbazii"]
+/// - foo.2:3#barbazii => width 2, depth 3, ["foo", "ba", "rb", "az", "barbazii"]
 ///
 /// note that this all works because the components and sharding for strings maps to fixed-width
 /// utf32 bytes under the hood rather than variable width bytes
@@ -228,6 +229,30 @@ impl From<&Path> for EntryDefId {
     }
 }
 
+impl TryFrom<&Path> for LinkTag {
+    type Error = SerializedBytesError;
+    fn try_from(path: &Path) -> Result<Self, Self::Error> {
+        // link tag is:
+        //
+        // - the name of all anchor links to disambiguate against other links
+        // - the literal serialized bytes of the path
+        //
+        // this allows the value of the target to be read/dereferenced straight from the
+        // link without needing additional network calls
+        let path_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(path)?).into();
+        let link_tag_bytes: Vec<u8> = NAME.iter().chain(path_bytes.iter()).cloned().collect();
+        Ok(LinkTag::new(link_tag_bytes))
+    }
+}
+
+impl TryFrom<&LinkTag> for Path {
+    type Error = SerializedBytesError;
+    fn try_from(link_tag: &LinkTag) -> Result<Self, Self::Error> {
+        let sb = SerializedBytes::from(UnsafeBytes::from(link_tag.as_ref()[NAME.len()..].to_vec()));
+        Ok(Self::try_from(sb)?)
+    }
+}
+
 impl Path {
     pub fn entry_def_id() -> EntryDefId {
         core::str::from_utf8(&NAME).unwrap().into()
@@ -255,42 +280,44 @@ impl Path {
     }
 
     /// what is the hash for the current Path
-    /// something like `$PWD` for the Path, but from a DHT perspective (i.e. a hash)
-    pub fn pwd(&self) -> Result<holo_hash_core::HoloHashCore, WasmError> {
+    pub fn hash(&self) -> Result<holo_hash_core::HoloHashCore, WasmError> {
         Ok(entry_hash!(self)?)
     }
 
     /// does an entry exist at the hash we expect?
-    /// something like `[ -d $DIR ]`
     pub fn exists(&self) -> Result<bool, WasmError> {
-        Ok(get_entry!(self.pwd()?)?.is_some())
+        Ok(get_entry!(self.hash()?)?.is_some())
     }
 
     /// recursively touch this and every parent that doesn't exist yet
-    /// something like `mkdir -p $DIR`
-    pub fn touch(&self) -> Result<(), WasmError> {
+    pub fn ensure(&self) -> Result<(), WasmError> {
         if !self.exists()? {
             commit_entry!(self)?;
-            let parent_vec: Vec<Component> = self.as_ref()[0..self.as_ref().len() - 1].to_vec();
-            if parent_vec.len() > 0 {
-                let parent = Self::from(parent_vec);
-                parent.touch()?;
-                link_entries!(
-                    parent.pwd()?,
-                    self.pwd()?,
-                    holochain_zome_types::link::LinkTag::new(NAME)
-                )?;
+            match self.parent() {
+                Some(parent) => {
+                    parent.ensure()?;
+                    link_entries!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
+                }
+                _ => {}
             }
         }
         Ok(())
     }
 
+    pub fn parent(&self) -> Option<Path> {
+        if self.as_ref().len() > 1 {
+            let parent_vec: Vec<Component> = self.as_ref()[0..self.as_ref().len() - 1].to_vec();
+            Some(parent_vec.into())
+        } else {
+            None
+        }
+    }
+
     /// touch and list all the links from this anchor to anchors below it
     /// only returns links between anchors, not to other entries that might have their own links
-    /// something like `mkdir -p $DIR && ls -d $DIR`
-    pub fn ls(&self) -> Result<holochain_zome_types::link::Links, WasmError> {
-        Self::touch(&self)?;
-        let links = get_links!(self.pwd()?, holochain_zome_types::link::LinkTag::new(NAME))?;
+    pub fn children(&self) -> Result<holochain_zome_types::link::Links, WasmError> {
+        Self::ensure(&self)?;
+        let links = get_links!(self.hash()?, holochain_zome_types::link::LinkTag::new(NAME))?;
         // only need one of each hash to build the tree
         let mut unwrapped: Vec<holochain_zome_types::link::Link> = links.into_inner();
         unwrapped.sort();
@@ -302,13 +329,27 @@ impl Path {
 #[test]
 #[cfg(test)]
 fn hash_path_delimiter() {
-    assert_eq!("/", DELIMITER,);
+    assert_eq!(".", DELIMITER,);
 }
 
 #[test]
 #[cfg(test)]
 fn hash_path_linktag() {
     assert_eq!("hdk.path".as_bytes(), NAME);
+
+    let path = Path::from("foo.bar");
+
+    let link_tag = LinkTag::try_from(&path).unwrap();
+
+    assert_eq!(
+        &vec![
+            104, 100, 107, 46, 112, 97, 116, 104, 146, 196, 12, 102, 0, 0, 0, 111, 0, 0, 0, 111, 0,
+            0, 0, 196, 12, 98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0
+        ],
+        link_tag.as_ref(),
+    );
+
+    assert_eq!(Path::try_from(&link_tag).unwrap(), path,);
 }
 
 #[test]
@@ -367,33 +408,33 @@ fn hash_path_path() {
 
     for (input, output) in vec![
         ("", vec![]),
-        ("/", vec![]),
-        ("/foo", vec![Component::from("foo")]),
+        (".", vec![]),
+        (".foo", vec![Component::from("foo")]),
         ("foo", vec![Component::from("foo")]),
-        ("foo/", vec![Component::from("foo")]),
-        ("/foo/", vec![Component::from("foo")]),
+        ("foo.", vec![Component::from("foo")]),
+        (".foo.", vec![Component::from("foo")]),
         (
-            "/foo/bar",
+            ".foo.bar",
             vec![Component::from("foo"), Component::from("bar")],
         ),
         (
-            "/foo/bar/",
+            ".foo.bar.",
             vec![Component::from("foo"), Component::from("bar")],
         ),
         (
-            "foo/bar",
+            "foo.bar",
             vec![Component::from("foo"), Component::from("bar")],
         ),
         (
-            "foo/bar/",
+            "foo.bar.",
             vec![Component::from("foo"), Component::from("bar")],
         ),
         (
-            "foo//bar",
+            "foo..bar",
             vec![Component::from("foo"), Component::from("bar")],
         ),
         (
-            "foo/1:3#abcdef",
+            "foo.1:3#abcdef",
             vec![
                 Component::from("foo"),
                 Component::from("a"),
@@ -403,7 +444,7 @@ fn hash_path_path() {
             ],
         ),
         (
-            "foo/2:3#zzzzzzzzzz",
+            "foo.2:3#zzzzzzzzzz",
             vec![
                 Component::from("foo"),
                 Component::from("zz"),
@@ -413,7 +454,7 @@ fn hash_path_path() {
             ],
         ),
         (
-            "foo/1:3#abcdef/bar",
+            "foo.1:3#abcdef.bar",
             vec![
                 Component::from("foo"),
                 Component::from("a"),

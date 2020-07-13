@@ -27,6 +27,6 @@ fn _list_anchor_addresses(anchor_type: TestString) -> Result<Hashes, WasmError> 
     Ok(Hashes(hdk3::prelude::list_anchor_addresses(anchor_type.0)?))
 }
 
-fn _list_anchor_tags(anchor_type: TestString) -> Result<LinkTags, WasmError> {
-    Ok(LinkTags(hdk3::prelude::list_anchor_tags(anchor_type.0)?))
+fn _list_anchor_tags(anchor_type: TestString) -> Result<AnchorTags, WasmError> {
+    Ok(AnchorTags(hdk3::prelude::list_anchor_tags(anchor_type.0)?))
 }
