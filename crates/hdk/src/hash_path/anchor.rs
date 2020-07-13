@@ -2,10 +2,9 @@ use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
-use holochain_zome_types::link::LinkTag;
 
-/// "hdk.path.anchor.root"
-pub const ROOT: &str = "hdk.path.anchor.root";
+/// "anchor"
+pub const ROOT: &str = "hdk3anchor";
 
 #[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, SerializedBytes, Clone)]
 pub struct Anchor {
@@ -16,7 +15,8 @@ pub struct Anchor {
 impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
         Self::from(&format!(
-            "{}/{}/{}",
+            "{1}{0}{2}{0}{3}",
+            crate::hash_path::path::DELIMITER,
             ROOT,
             anchor.anchor_type,
             anchor.anchor_text.as_ref().unwrap_or(&String::default())
@@ -40,9 +40,11 @@ impl TryFrom<&Path> for Anchor {
                     },
                 })
             } else {
-                Err(SerializedBytesError::FromBytes(
-                    "Bad anchor path root".into(),
-                ))
+                Err(SerializedBytesError::FromBytes(format!(
+                    "Bad anchor path root {:0?} should be {:1?}",
+                    components[0].as_ref(),
+                    ROOT.as_bytes(),
+                )))
             }
         } else {
             Err(SerializedBytesError::FromBytes(format!(
@@ -86,8 +88,8 @@ pub fn anchor(
         anchor_text: Some(anchor_text),
     })
         .into();
-    path.touch()?;
-    Ok(path.pwd()?)
+    path.ensure()?;
+    Ok(path.hash()?)
 }
 
 pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
@@ -102,7 +104,7 @@ pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmEr
 
 pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
     let links = Path::from(ROOT)
-        .ls()?
+        .children()?
         .into_inner()
         .into_iter()
         .map(|link| link.target)
@@ -118,9 +120,9 @@ pub fn list_anchor_addresses(
         anchor_text: None,
     })
         .into();
-    path.touch()?;
+    path.ensure()?;
     let links = path
-        .ls()?
+        .children()?
         .into_inner()
         .into_iter()
         .map(|link| link.target)
@@ -128,45 +130,52 @@ pub fn list_anchor_addresses(
     Ok(links)
 }
 
-/// @TODO not sure if this is useful or done correctly??
-/// the whole idea of link tags has been removed since the old anchors implementation and even the
-/// old version only returned the same thing as the anchor text
-/// in this version we just remove the same link tag no matter what because all anchor links have
-/// the same tag
-pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<LinkTag>, WasmError> {
+/// the old version of holochain that anchors was designed for had two part link tags but now link
+/// tags are a single array of bytes, so to get an external interface that is somewhat backwards
+/// compatible we need to rebuild the anchors from the paths serialized into the links and then
+/// return the
+pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, WasmError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
     })
         .into();
-    path.touch()?;
-    let mut tags: Vec<LinkTag> = path
-        .ls()?
+    path.ensure()?;
+    let hopefully_anchor_tags: Result<Vec<String>, SerializedBytesError> = path
+        .children()?
         .into_inner()
         .into_iter()
-        .map(|link| link.tag)
+        .map(|link| match Path::try_from(&link.tag) {
+            Ok(path) => match Anchor::try_from(&path) {
+                Ok(anchor) => match anchor.anchor_text {
+                    Some(text) => Ok(text),
+                    None => Err(SerializedBytesError::FromBytes(
+                        "missing anchor text".into(),
+                    )),
+                },
+                Err(e) => Err(e),
+            },
+            Err(e) => Err(e),
+        })
         .collect();
-    tags.sort();
-    tags.dedup();
-    Ok(tags)
+    let mut anchor_tags = hopefully_anchor_tags?;
+    anchor_tags.sort();
+    anchor_tags.dedup();
+    Ok(anchor_tags)
 }
 
 #[cfg(test)]
 #[test]
 fn hash_path_root() {
-    assert_eq!(ROOT, "hdk.path.anchor.root");
+    assert_eq!(ROOT, "hdk3anchor");
 }
 
 #[cfg(test)]
 #[test]
 fn hash_path_anchor_path() {
     for (atype, text, path_string) in vec![
-        ("foo", None, "hdk.path.anchor.root/foo"),
-        (
-            "foo",
-            Some("bar".to_string()),
-            "hdk.path.anchor.root/foo/bar",
-        ),
+        ("foo", None, "hdk3anchor.foo"),
+        ("foo", Some("bar".to_string()), "hdk3anchor.foo.bar"),
     ] {
         assert_eq!(
             Path::from(path_string),
@@ -198,10 +207,8 @@ fn hash_path_anchor_entry_def() {
 fn hash_path_anchor_from_path() {
     let path = Path::from(vec![
         Component::from(vec![
-            104, 0, 0, 0, 100, 0, 0, 0, 107, 0, 0, 0, 46, 0, 0, 0, 112, 0, 0, 0, 97, 0, 0, 0, 116,
-            0, 0, 0, 104, 0, 0, 0, 46, 0, 0, 0, 97, 0, 0, 0, 110, 0, 0, 0, 99, 0, 0, 0, 104, 0, 0,
-            0, 111, 0, 0, 0, 114, 0, 0, 0, 46, 0, 0, 0, 114, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0,
-            116, 0, 0, 0,
+            104, 0, 0, 0, 100, 0, 0, 0, 107, 0, 0, 0, 51, 0, 0, 0, 97, 0, 0, 0, 110, 0, 0, 0, 99,
+            0, 0, 0, 104, 0, 0, 0, 111, 0, 0, 0, 114, 0, 0, 0,
         ]),
         Component::from(vec![102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0]),
         Component::from(vec![98, 0, 0, 0, 97, 0, 0, 0, 114, 0, 0, 0]),
