@@ -1,4 +1,18 @@
 #[macro_export]
+macro_rules! zome_info {
+    () => {{
+        $crate::api_call!(__zome_info, ZomeInfoInput::new(()), ZomeInfoOutput)
+    }};
+}
+
+#[macro_export]
+macro_rules! agent_info {
+    () => {{
+        $crate::api_call!(__agent_info, AgentInfoInput::new(()), AgentInfoOutput)
+    }};
+}
+
+#[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident ) => {
         #[no_mangle]
@@ -22,10 +36,7 @@ macro_rules! map_extern {
 macro_rules! entry_defs {
     ( $defs_vec:expr ) => {
         fn __entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {
-            Ok(EntryDefsCallbackResult::Defs(
-                globals!()?.zome_name,
-                $defs_vec.into(),
-            ))
+            Ok(EntryDefsCallbackResult::Defs($defs_vec.into()))
         }
         map_extern!(entry_defs, __entry_defs);
     };
@@ -50,13 +61,6 @@ macro_rules! debug {
             DebugInput::new(debug_msg!(format!("{:?}", $msg))),
             DebugOutput
         )
-    }};
-}
-
-#[macro_export]
-macro_rules! globals {
-    () => {{
-        $crate::api_call!(__globals, GlobalsInput::new(()), GlobalsOutput)
     }};
 }
 
