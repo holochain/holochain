@@ -185,6 +185,7 @@ enum Db {
     Integrated(DhtOp),
     IntegratedEmpty,
     IntQueue(DhtOp),
+    IntQueueEmpty,
     CasHeader(Header, Option<Signature>),
     CasEntry(Entry, Option<Header>, Option<Signature>),
     MetaEmpty,
@@ -358,6 +359,14 @@ impl Db {
                         here
                     );
                 }
+                Db::IntQueueEmpty => {
+                    assert_eq!(
+                        workspace.integration_queue.iter().unwrap().count().unwrap(),
+                        0,
+                        "{}",
+                        here
+                    );
+                }
                 Db::MetaEmpty => {
                     // TODO: Not currently possible because kvv bufs have no iterator over all keys
                 }
@@ -480,6 +489,7 @@ impl Db {
                     workspace.meta.add_link(link_add).await.unwrap();
                 }
                 Db::MetaLinkEmpty(_) => {}
+                Db::IntQueueEmpty => {}
             }
         }
         // Commit workspace
@@ -632,6 +642,7 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
     ];
     let expect = vec![
+        Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
         Db::MetaDelete(
             a.original_entry_hash.clone().into(),

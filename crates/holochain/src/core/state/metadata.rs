@@ -449,7 +449,12 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             (header::IntendedFor::Entry, None) => {
                 panic!("Can't update to entry with no entry hash")
             }
-            (header::IntendedFor::Entry, Some(entry_hash)) => entry_hash.into(),
+            (header::IntendedFor::Entry, Some(entry_hash)) => {
+                // TODO: Can an update intended for a header also change an
+                // entries dht status?
+                self.update_entry_dht_status(entry_hash.clone())?;
+                entry_hash.into()
+            }
         };
         self.register_header_to_basis(update, basis).await
     }
@@ -530,17 +535,14 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
-        let headers = self.get_headers(entry_hash)?;
-        Ok(Box::new(headers.flat_map(move |header| {
-            Ok(
-                fallible_iterator::convert(self.system_meta.get(&header.into())?).filter_map(|h| {
-                    Ok(match h {
-                        SysMetaVal::Delete(h) => Some(h),
-                        _ => None,
-                    })
-                }),
-            )
-        })))
+        Ok(Box::new(
+            fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?).filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::Delete(h) => Some(h),
+                    _ => None,
+                })
+            }),
+        ))
     }
 
     fn get_activity(
