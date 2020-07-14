@@ -212,7 +212,8 @@ async fn integrate_single_dht_op(
                     .register_update(entry_update, old_entry_hash)
                     .await?;
             }
-            DhtOp::RegisterDeletedEntryHeader(_, entry_delete) => {
+            DhtOp::RegisterDeletedEntryHeader(_, entry_delete)
+            | DhtOp::RegisterDeletedBy(_, entry_delete) => {
                 let entry_hash = match workspace
                     .cas
                     .get_header(&entry_delete.removes_address)
@@ -228,13 +229,7 @@ async fn integrate_single_dht_op(
                 };
                 workspace
                     .meta
-                    .register_delete_on_entry(entry_delete, entry_hash)
-                    .await?
-            }
-            DhtOp::RegisterDeletedBy(_, entry_delete) => {
-                workspace
-                    .meta
-                    .register_delete_on_header(entry_delete)
+                    .register_delete(entry_delete, entry_hash)
                     .await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {

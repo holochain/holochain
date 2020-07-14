@@ -78,10 +78,6 @@ impl HostContext {
     pub fn allowed_access(&self) -> HostFnAccess {
         self.allowed_access
     }
-    #[cfg(test)]
-    pub(crate) fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
-        &self.workspace
-    }
 
     #[cfg(test)]
     pub(crate) fn change_workspace(&mut self, workspace: UnsafeInvokeZomeWorkspace) {

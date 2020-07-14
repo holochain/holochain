@@ -50,3 +50,8 @@ pub struct Hashes(pub Vec<HoloHashCore>);
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct LinkTags(pub Vec<LinkTag>);
+
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct AnchorTags(pub Vec<String>);

@@ -209,17 +209,17 @@ fn hash_path_shard_string() {
         // basic sharding behaviour
         (1, 1, "foobar", Path::from("f")),
         (2, 1, "foobar", Path::from("fo")),
-        (1, 2, "foobar", Path::from("f/o")),
-        (2, 2, "foobar", Path::from("fo/ob")),
+        (1, 2, "foobar", Path::from("f.o")),
+        (2, 2, "foobar", Path::from("fo.ob")),
         // multibyte characters should be handled the way a naive understanding of strings would
         // expect, i.e. that a 2-byte utf8 character is represented as 1 4-byte utf32 character and
         // so counts as 1 "width" and 1 "depth" for the purpose of sharding
-        (2, 2, "€€€€", Path::from("€€/€€")),
+        (2, 2, "€€€€", Path::from("€€.€€")),
         // if the string is shorter than the width and depth we go as deep as we can cleanly and
         // truncate the end
         (4, 4, "foobar", Path::from("foob")),
-        (4, 4, "foobarbaz", Path::from("foob/arba")),
-        (4, 4, "€€€€€€€€€", Path::from("€€€€/€€€€")),
+        (4, 4, "foobarbaz", Path::from("foob.arba")),
+        (4, 4, "€€€€€€€€€", Path::from("€€€€.€€€€")),
     ] {
         assert_eq!(output, Path::from((&ShardStrategy(width, depth), s)));
         assert_eq!(

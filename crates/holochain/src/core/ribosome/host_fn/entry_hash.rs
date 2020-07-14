@@ -103,11 +103,11 @@ pub mod wasm_test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
-        let input = TestString::from("foo/bar".to_string());
+        let input = TestString::from("foo.bar".to_string());
         let output: holo_hash_core::HoloHashCore =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::HashPath, "pwd", input);
+            crate::call_test_ribosome!(raw_workspace, TestWasm::HashPath, "hash", input);
 
-        let expected_path = hdk3::hash_path::path::Path::from("foo/bar");
+        let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             holochain_types::entry::EntryHashed::with_data(Entry::App(

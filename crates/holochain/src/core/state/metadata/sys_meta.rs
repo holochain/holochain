@@ -7,10 +7,10 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::metadata::{MetadataBuf, MetadataBufT};
+    use crate::core::state::metadata::{EntryDhtStatus, MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use header::{HeaderBuilderCommon, IntendedFor, NewEntryHeader};
+    use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
@@ -470,6 +470,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
+        let entry_hash = fx.entry_hash();
         let mut expected = Vec::new();
         let mut entry_deletes = Vec::new();
         for _ in 0..10 {
@@ -484,10 +485,13 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf.register_delete_on_header(delete).await.unwrap();
+                meta_buf
+                    .register_delete(delete, entry_hash.clone())
+                    .await
+                    .unwrap();
             }
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone().into())
+                .get_deletes_on_header(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -500,12 +504,233 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone().into())
+                .get_deletes_on_header(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
             headers.sort_by_key(|h| h.clone());
             assert_eq!(headers, expected);
         }
+    }
+
+    async fn update_dbs(
+        new_entries: &[NewEntryHeader],
+        entry_deletes: &[ElementDelete],
+        update_entries: &[NewEntryHeader],
+        delete_updates: &[ElementDelete],
+        entry_hash: &EntryHash,
+        meta_buf: &mut MetadataBuf<'_>,
+    ) {
+        for e in new_entries.iter().chain(update_entries.iter()) {
+            meta_buf.register_header(e.clone()).await.unwrap();
+        }
+        for delete in entry_deletes.iter().chain(delete_updates.iter()) {
+            meta_buf
+                .register_delete(delete.clone(), entry_hash.clone())
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn create_data(
+        entry_creates: &mut Vec<NewEntryHeader>,
+        entry_deletes: &mut Vec<ElementDelete>,
+        entry_updates: &mut Vec<NewEntryHeader>,
+        delete_updates: &mut Vec<ElementDelete>,
+        entry_hash: &EntryHash,
+        fx: &mut TestFixtures,
+    ) {
+        for _ in 0..10 {
+            let (e, h) = test_create(entry_hash.clone(), fx).await;
+            entry_creates.push(NewEntryHeader::Create(e));
+            let (e, _) = test_delete(h.clone().into_hash(), fx).await;
+            entry_deletes.push(e);
+            let (e, h) =
+                test_update(h.into_hash(), entry_hash.clone(), IntendedFor::Entry, fx).await;
+            entry_updates.push(NewEntryHeader::Update(e));
+            let (e, _) = test_delete(h.into_hash(), fx).await;
+            delete_updates.push(e);
+        }
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_entry_dht_status() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let mut fx = TestFixtures::new();
+        let entry_hash = fx.entry_hash();
+        let mut entry_creates = Vec::new();
+        let mut entry_deletes = Vec::new();
+        let mut entry_updates = Vec::new();
+        let mut delete_updates = Vec::new();
+
+        create_data(
+            &mut entry_creates,
+            &mut entry_deletes,
+            &mut entry_updates,
+            &mut delete_updates,
+            &entry_hash,
+            &mut fx,
+        )
+        .await;
+
+        let reader = env.reader().unwrap();
+        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        update_dbs(
+            &entry_creates[..],
+            &entry_deletes[..0],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Live);
+        update_dbs(
+            &entry_creates[..0],
+            &entry_deletes[..],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Dead);
+
+        // Same headers don't reanimate entry
+        update_dbs(
+            &entry_creates[..],
+            &entry_deletes[..0],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Dead);
+
+        // Check create bring entry back to life
+        create_data(
+            &mut entry_creates,
+            &mut entry_deletes,
+            &mut entry_updates,
+            &mut delete_updates,
+            &entry_hash,
+            &mut fx,
+        )
+        .await;
+
+        // New creates should be alive now
+        update_dbs(
+            &entry_creates[10..],
+            &entry_deletes[..0],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Live);
+
+        // New deletes should be dead
+        update_dbs(
+            &entry_creates[..0],
+            &entry_deletes[10..],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Dead);
+
+        // Check update bring entry back to life
+        update_dbs(
+            &entry_creates[..0],
+            &entry_deletes[..0],
+            &entry_updates[..10],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Live);
+
+        // Check deleting update kills entry
+        update_dbs(
+            &entry_creates[..0],
+            &entry_deletes[..0],
+            &entry_updates[..0],
+            &delete_updates[..10],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Dead);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_entry_dht_status_one_less() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let mut fx = TestFixtures::new();
+        let entry_hash = fx.entry_hash();
+        let mut entry_creates = Vec::new();
+        let mut entry_deletes = Vec::new();
+        let mut entry_updates = Vec::new();
+        let mut delete_updates = Vec::new();
+
+        create_data(
+            &mut entry_creates,
+            &mut entry_deletes,
+            &mut entry_updates,
+            &mut delete_updates,
+            &entry_hash,
+            &mut fx,
+        )
+        .await;
+
+        let reader = env.reader().unwrap();
+        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        update_dbs(
+            &entry_creates[..],
+            &entry_deletes[..0],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Live);
+        update_dbs(
+            &entry_creates[..0],
+            &entry_deletes[..9],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Live);
+        update_dbs(
+            &entry_creates[..0],
+            &entry_deletes[9..10],
+            &entry_updates[..0],
+            &delete_updates[..0],
+            &entry_hash,
+            &mut meta_buf,
+        )
+        .await;
+        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        assert_eq!(status, EntryDhtStatus::Dead);
     }
 }
