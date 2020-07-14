@@ -630,6 +630,10 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             a.original_entry_hash.clone().into(),
             a.entry_delete.clone().into(),
         ),
+        Db::MetaDelete(
+            a.original_header_hash.clone().into(),
+            a.entry_delete.clone().into(),
+        ),
     ];
     (pre_state, expect, "register deleted by")
 }
@@ -647,11 +651,18 @@ fn register_deleted_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 
 fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
-    let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = vec![
+        Db::IntQueue(op.clone()),
+        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+    ];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
             a.original_header_hash.clone().into(),
+            a.entry_delete.clone().into(),
+        ),
+        Db::MetaDelete(
+            a.original_entry_hash.clone().into(),
             a.entry_delete.clone().into(),
         ),
     ];
