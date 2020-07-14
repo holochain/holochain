@@ -9,7 +9,10 @@ use holo_hash::{AgentPubKey, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{KvBuf, KvvBuf},
-    db::{CACHE_LINKS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META, PRIMARY_SYSTEM_META},
+    db::{
+        CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META,
+        PRIMARY_STATUS_META, PRIMARY_SYSTEM_META,
+    },
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
@@ -40,7 +43,7 @@ mod sys_meta;
 mod mock;
 
 /// The status of an [Entry] in the Dht
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryDhtStatus {
     /// This [Entry] has active headers
     Live,
@@ -172,17 +175,11 @@ pub trait MetadataBufT {
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::ElementDelete] on the Entry of the referenced Header
-    async fn register_delete_on_entry(
+    /// Registers a [Header::ElementDelete] on the Header of an Entry
+    async fn register_delete(
         &mut self,
         delete: header::ElementDelete,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<()>;
-
-    /// Registers a [Header::ElementDelete] on the referenced [Header]
-    async fn register_delete_on_header(
-        &mut self,
-        delete: header::ElementDelete,
     ) -> DatabaseResult<()>;
 
     /// Returns all the [HeaderHash]es of headers that created this [Entry]
@@ -204,9 +201,15 @@ pub trait MetadataBufT {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [ElementDelete] headers registered on a Header
-    fn get_deletes(
+    fn get_deletes_on_header(
         &self,
-        entry_or_new_entry_header: AnyDhtHash,
+        new_entry_header: HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Returns all the hashes of [ElementDelete] headers registered on an Entry's header
+    fn get_deletes_on_entry(
+        &self,
+        entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns the current [EntryDhtStatus] of an [Entry]
@@ -308,6 +311,7 @@ impl From<header::ElementDelete> for EntryHeader {
 pub struct MetadataBuf<'env> {
     system_meta: KvvBuf<'env, SysMetaKey, SysMetaVal, Reader<'env>>,
     links_meta: KvBuf<'env, LinkMetaKeyBytes, LinkMetaVal, Reader<'env>>,
+    status_meta: KvBuf<'env, EntryHash, EntryDhtStatus, Reader<'env>>,
 }
 
 impl<'env> MetadataBuf<'env> {
@@ -315,24 +319,28 @@ impl<'env> MetadataBuf<'env> {
         reader: &'env Reader<'env>,
         system_meta: MultiStore,
         links_meta: SingleStore,
+        status_meta: SingleStore,
     ) -> DatabaseResult<Self> {
         Ok(Self {
             system_meta: KvvBuf::new(reader, system_meta)?,
             links_meta: KvBuf::new(reader, links_meta)?,
+            status_meta: KvBuf::new(reader, status_meta)?,
         })
     }
     /// Create a [MetadataBuf] with the primary databases
     pub fn primary(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*PRIMARY_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*PRIMARY_LINKS_META)?;
-        Self::new(reader, system_meta, links_meta)
+        let status_meta = dbs.get_db(&*PRIMARY_STATUS_META)?;
+        Self::new(reader, system_meta, links_meta, status_meta)
     }
 
     /// Create a [MetadataBuf] with the cache databases
     pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
-        Self::new(reader, system_meta, links_meta)
+        let status_meta = dbs.get_db(&*CACHE_STATUS_META)?;
+        Self::new(reader, system_meta, links_meta, status_meta)
     }
 
     async fn register_header_to_basis<K, H>(&mut self, header: H, key: K) -> DatabaseResult<()>
@@ -348,6 +356,24 @@ impl<'env> MetadataBuf<'env> {
         };
         self.system_meta.insert(key.into(), sys_val);
         Ok(())
+    }
+
+    #[instrument(skip(self))]
+    fn update_entry_dht_status(&mut self, basis: EntryHash) -> DatabaseResult<()> {
+        let status = self
+            .get_headers(basis.clone())?
+            .find_map(|header| {
+                if self.get_deletes_on_header(header)?.count()? == 0 {
+                    debug!("found dead header");
+                    Ok(Some(EntryDhtStatus::Live))
+                } else {
+                    debug!("found live header");
+                    Ok(None)
+                }
+            })?
+            // No evidence of life found so entry is marked dead
+            .unwrap_or(EntryDhtStatus::Dead);
+        self.status_meta.put(basis, status)
     }
 
     #[cfg(test)]
@@ -403,7 +429,10 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         let basis = new_entry_header.entry().clone();
-        self.register_header_to_basis(new_entry_header, basis).await
+        self.register_header_to_basis(new_entry_header, basis.clone())
+            .await?;
+        self.update_entry_dht_status(basis)?;
+        Ok(())
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -420,28 +449,28 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             (header::IntendedFor::Entry, None) => {
                 panic!("Can't update to entry with no entry hash")
             }
-            (header::IntendedFor::Entry, Some(entry_hash)) => entry_hash.into(),
+            (header::IntendedFor::Entry, Some(entry_hash)) => {
+                // TODO: Can an update intended for a header also change an
+                // entries dht status?
+                self.update_entry_dht_status(entry_hash.clone())?;
+                entry_hash.into()
+            }
         };
         self.register_header_to_basis(update, basis).await
     }
 
-    // MDD: This seems like it should be replaced by register_delete_on_header
     #[allow(clippy::needless_lifetimes)]
-    async fn register_delete_on_entry(
+    async fn register_delete(
         &mut self,
         delete: header::ElementDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()> {
-        self.register_header_to_basis(delete, entry_hash).await
-    }
-
-    #[allow(clippy::needless_lifetimes)]
-    async fn register_delete_on_header(
-        &mut self,
-        delete: header::ElementDelete,
-    ) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
-        self.register_header_to_basis(delete, remove).await
+        self.register_header_to_basis(delete.clone(), remove)
+            .await?;
+        self.register_header_to_basis(delete, entry_hash.clone())
+            .await?;
+        self.update_entry_dht_status(entry_hash)
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -481,19 +510,35 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         ))
     }
 
-    fn get_deletes(
+    fn get_deletes_on_header(
         &self,
-        entry_or_new_entry_header: AnyDhtHash,
+        new_entry_header: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&entry_or_new_entry_header)?)
-                .filter_map(|h| {
+            fallible_iterator::convert(self.system_meta.get(&new_entry_header.into())?).filter_map(
+                |h| {
                     Ok(match h {
                         SysMetaVal::Delete(h) => Some(h),
                         _ => None,
                     })
-                }),
+                },
+            ),
+        ))
+    }
+
+    fn get_deletes_on_entry(
+        &self,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?).filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::Delete(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
@@ -516,8 +561,11 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     // TODO: For now this is only checking for deletes
     // Once the validation is finished this should check for that as well
-    fn get_dht_status(&self, _entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
-        Ok(EntryDhtStatus::Live)
+    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+        Ok(self
+            .status_meta
+            .get(entry_hash)?
+            .unwrap_or(EntryDhtStatus::Live))
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
@@ -535,6 +583,7 @@ impl<'env> BufferedStore<'env> for MetadataBuf<'env> {
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         self.system_meta.flush_to_txn(writer)?;
         self.links_meta.flush_to_txn(writer)?;
+        self.status_meta.flush_to_txn(writer)?;
         Ok(())
     }
 }

@@ -1,6 +1,5 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
-use crate::core::ribosome::HostContext;
+use crate::core::ribosome::{HostContext, RibosomeT};
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::future::FutureExt;
 use holo_hash::Hashed;
@@ -14,7 +13,7 @@ use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_entry<'a>(
-    _ribosome: Arc<WasmRibosome>,
+    _ribosome: Arc<impl RibosomeT>,
     host_context: Arc<HostContext>,
     input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
