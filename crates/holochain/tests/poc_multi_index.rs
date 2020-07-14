@@ -98,6 +98,8 @@ impl FakeIntegratedDhtOpStore {
         // add it to the fast_loop index
         if entry.integrated_at > recent {
             self.fast_loop_index.insert(FastLoopIndexKey(
+                // TODO - INCORRECT!!
+                //        this needs to be the loc of the basis hash
                 entry.dht_op_hash.get_loc(),
                 entry.integrated_at.clone(),
                 entry.dht_op_hash.clone(),
@@ -107,6 +109,8 @@ impl FakeIntegratedDhtOpStore {
         // always add entries to the longtail consistency loop index
         self.long_consistency_loop_index
             .insert(LongConsistencyLoopIndexKey(
+                // TODO - INCORRECT!!
+                //        this needs to be the loc of the basis hash
                 entry.dht_op_hash.get_loc(),
                 entry.integrated_at.clone(),
                 entry.dht_op_hash.clone(),
