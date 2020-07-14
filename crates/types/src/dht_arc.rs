@@ -10,7 +10,7 @@ pub struct Location(pub Wrapping<u32>);
 
 /// The maximum you can hold either side of the hash location
 /// is half te circle
-pub const MAX_LENGTH: i64 = u32::MAX as i64 / 2;
+pub const MAX_LENGTH: i32 = (u32::MAX / 2) as i32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
@@ -22,13 +22,13 @@ pub const MAX_LENGTH: i64 = u32::MAX as i64 / 2;
 /// held on either side of hash_location
 pub struct DhtArc {
     hash_location: Location,
-    length_either_side: i64,
+    length_either_side: i32,
 }
 
 impl DhtArc {
     /// Create an Arc from a hash location plus a length on either side
     /// Length is (0..u32::Max + 1)
-    pub fn new<I: Into<Location>>(hash_location: I, length_either_side: i64) -> Self {
+    pub fn new<I: Into<Location>>(hash_location: I, length_either_side: i32) -> Self {
         let length_either_side = std::cmp::max(length_either_side, -1);
         let length_either_side = std::cmp::min(length_either_side, MAX_LENGTH);
         Self {
@@ -40,8 +40,26 @@ impl DhtArc {
     /// Check if a location is contained in this arc
     pub fn contains<I: Into<Location>>(&self, location: I) -> bool {
         self.length_either_side >= 0
-            && i64::from(shortest_arc_distance(self.hash_location, location.into()))
+            && shortest_arc_distance(self.hash_location, location.into()) as i32
                 <= self.length_either_side
+    }
+
+    /// TODO
+    pub fn start(&self) -> u32 {
+        if self.length_either_side >= 0 {
+            (self.hash_location.0 - Location::from(self.length_either_side as u32).0).0
+        } else {
+            (self.hash_location.0).0
+        }
+    }
+
+    /// TODO
+    pub fn length(&self) -> u32 {
+        if self.length_either_side >= 0 {
+            self.length_either_side as u32 * 2
+        } else {
+            0
+        }
     }
 }
 
@@ -51,7 +69,7 @@ impl From<u32> for Location {
     }
 }
 
-/// Finds the shortest absolute distance between two points on a circle
+/// Finds the shortest distance between two points on a circle
 fn shortest_arc_distance<A: Into<Location>, B: Into<Location>>(a: A, b: B) -> u32 {
     // Turn into wrapped u32s
     let a = a.into().0;
@@ -62,8 +80,11 @@ fn shortest_arc_distance<A: Into<Location>, B: Into<Location>>(a: A, b: B) -> u3
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fixt::Predictable;
+    use holo_hash::AgentPubKeyFixturator;
     use rand::{distributions::Uniform, Rng};
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
+    use std::ops::Bound;
 
     // TODO: This is a really good place for prop testing
 
@@ -107,29 +128,55 @@ mod tests {
 
     #[test]
     fn test_index() {
-        // TODO: Sort arcs by dist to noon through center
+        // TODO: Sort arcs by starts and ends of range
         let mut index = BTreeMap::new();
-        let mut rng = rand::thread_rng();
-        let range = Uniform::new_inclusive(1, MAX_LENTH + 1);
+        let rng = rand::thread_rng();
+        let range = Uniform::new_inclusive(1, MAX_LENGTH);
         let mut lens = rng.sample_iter(range);
         let range = Uniform::new_inclusive(0, u32::MAX);
         let mut hash_locations = rng.sample_iter(range);
         let mut arcs = Vec::new();
-        for _ in 50 {
+        let mut expect = HashMap::new();
+        let mut agent_fixt = AgentPubKeyFixturator::new(Predictable);
+        for _ in 0..50 {
             arcs.push(DhtArc::new(0, lens.next().unwrap()));
             arcs.push(DhtArc::new(u32::MAX, lens.next().unwrap()));
         }
-        for _ in 50 {
+        for _ in 0..50 {
             arcs.push(DhtArc::new(
                 hash_locations.next().unwrap(),
                 lens.next().unwrap(),
             ));
         }
-        for arc in arcs {
-            let key = arc.index_key();
-            index.entry(key.0)_or_insert(Vec::new()).push(key.1);
+        arcs.push(DhtArc::new(125414057, 100699849));
+
+        for arc in arcs.iter() {
+            let start = arc.start();
+            let length = arc.length();
+            let agent_key = agent_fixt.next().unwrap();
+            expect.insert(agent_key.clone(), arc);
+            // store key with arc to verify
+            index
+                .entry(start)
+                .or_insert(BTreeMap::new())
+                .insert(length, agent_key);
         }
 
-        // TODO: Key is shortest dist to noon with sign
+        let basis = 0u32;
+        for (start, inner) in index.range_mut(basis..) {
+            let mut keys = Vec::new();
+            let length = Location::from(*start).0 - Location::from(basis).0;
+            for (k, agent) in inner.range((Bound::Unbounded, Bound::Included(length.0))) {
+                keys.push(k.clone());
+                assert!(expect.get(agent).unwrap().contains(basis));
+            }
+            for k in keys {
+                inner.remove(&k).unwrap();
+            }
+        }
+        for agent in index.values().flat_map(|i| i.values()) {
+            let arc = expect.get(agent).unwrap();
+            assert!(arc.contains(basis), "basis: {}, arc: {:?}", basis, arc);
+        }
     }
 }
