@@ -363,7 +363,7 @@ impl<'env> MetadataBuf<'env> {
         let status = self
             .get_headers(basis.clone())?
             .find_map(|header| {
-                if self.get_deletes_on_header(header.into())?.count()? == 0 {
+                if self.get_deletes_on_header(header)?.count()? == 0 {
                     debug!("found dead header");
                     Ok(Some(EntryDhtStatus::Live))
                 } else {
