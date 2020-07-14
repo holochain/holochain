@@ -201,9 +201,15 @@ pub trait MetadataBufT {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [ElementDelete] headers registered on a Header
-    fn get_deletes(
+    fn get_deletes_on_header(
         &self,
-        entry_or_new_entry_header: AnyDhtHash,
+        new_entry_header: HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Returns all the hashes of [ElementDelete] headers registered on an Entry's header
+    fn get_deletes_on_entry(
+        &self,
+        entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns the current [EntryDhtStatus] of an [Entry]
@@ -352,13 +358,16 @@ impl<'env> MetadataBuf<'env> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     fn update_entry_dht_status(&mut self, basis: EntryHash) -> DatabaseResult<()> {
         let status = self
             .get_headers(basis.clone())?
             .find_map(|header| {
-                if self.get_deletes(header.into())?.count()? == 0 {
+                if self.get_deletes_on_header(header.into())?.count()? == 0 {
+                    debug!("found dead header");
                     Ok(Some(EntryDhtStatus::Live))
                 } else {
+                    debug!("found live header");
                     Ok(None)
                 }
             })?
@@ -499,20 +508,39 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         ))
     }
 
-    fn get_deletes(
+    fn get_deletes_on_header(
         &self,
-        entry_or_new_entry_header: AnyDhtHash,
+        new_entry_header: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&entry_or_new_entry_header)?)
-                .filter_map(|h| {
+            fallible_iterator::convert(self.system_meta.get(&new_entry_header.into())?).filter_map(
+                |h| {
+                    Ok(match h {
+                        SysMetaVal::Delete(h) => Some(h),
+                        _ => None,
+                    })
+                },
+            ),
+        ))
+    }
+
+    fn get_deletes_on_entry(
+        &self,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        let headers = self.get_headers(entry_hash)?;
+        Ok(Box::new(headers.flat_map(move |header| {
+            Ok(
+                fallible_iterator::convert(self.system_meta.get(&header.into())?).filter_map(|h| {
                     Ok(match h {
                         SysMetaVal::Delete(h) => Some(h),
                         _ => None,
                     })
                 }),
-        ))
+            )
+        })))
     }
 
     fn get_activity(
@@ -556,6 +584,7 @@ impl<'env> BufferedStore<'env> for MetadataBuf<'env> {
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         self.system_meta.flush_to_txn(writer)?;
         self.links_meta.flush_to_txn(writer)?;
+        self.status_meta.flush_to_txn(writer)?;
         Ok(())
     }
 }

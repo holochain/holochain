@@ -491,7 +491,7 @@ mod tests {
                     .unwrap();
             }
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone().into())
+                .get_deletes_on_header(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -504,7 +504,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
             let mut headers = meta_buf
-                .get_deletes(header_hash.clone().into())
+                .get_deletes_on_header(header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
