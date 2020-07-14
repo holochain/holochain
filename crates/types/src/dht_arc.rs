@@ -62,6 +62,8 @@ fn shortest_arc_distance<A: Into<Location>, B: Into<Location>>(a: A, b: B) -> u3
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::{distributions::Uniform, Rng};
+    use std::collections::BTreeMap;
 
     // TODO: This is a really good place for prop testing
 
@@ -101,5 +103,33 @@ mod tests {
 
         assert!(DhtArc::new(0, 2).contains(2));
         assert!(DhtArc::new(0, 2).contains(u32::MAX - 1));
+    }
+
+    #[test]
+    fn test_index() {
+        // TODO: Sort arcs by dist to noon through center
+        let mut index = BTreeMap::new();
+        let mut rng = rand::thread_rng();
+        let range = Uniform::new_inclusive(1, MAX_LENTH + 1);
+        let mut lens = rng.sample_iter(range);
+        let range = Uniform::new_inclusive(0, u32::MAX);
+        let mut hash_locations = rng.sample_iter(range);
+        let mut arcs = Vec::new();
+        for _ in 50 {
+            arcs.push(DhtArc::new(0, lens.next().unwrap()));
+            arcs.push(DhtArc::new(u32::MAX, lens.next().unwrap()));
+        }
+        for _ in 50 {
+            arcs.push(DhtArc::new(
+                hash_locations.next().unwrap(),
+                lens.next().unwrap(),
+            ));
+        }
+        for arc in arcs {
+            let key = arc.index_key();
+            index.entry(key.0)_or_insert(Vec::new()).push(key.1);
+        }
+
+        // TODO: Key is shortest dist to noon with sign
     }
 }
