@@ -459,9 +459,6 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         self.register_header_to_basis(update, basis).await
     }
 
-    // MDD: This seems like it should be replaced by register_delete_on_header
-    // TODO: Headers registered on an entry really point to the headers
-    // So these should just be placed onto the headers like mdd says
     #[allow(clippy::needless_lifetimes)]
     async fn register_delete(
         &mut self,

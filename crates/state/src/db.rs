@@ -61,32 +61,6 @@ pub enum DbName {
     ValidationReceipts,
 }
 
-// impl std::fmt::Display for DbName {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         use DbName::*;
-//         match self {
-//             PrimaryChainPublicEntries => write!(f, "PrimaryChainPublicEntries"),
-//             PrimaryChainPrivateEntries => write!(f, "PrimaryChainPrivateEntries"),
-//             PrimaryChainHeaders => write!(f, "PrimaryChainHeaders"),
-//             PrimaryMetadata => write!(f, "PrimaryMetadata"),
-//             PrimaryLinksMeta => write!(f, "PrimaryLinksMeta"),
-//             ChainSequence => write!(f, "ChainSequence"),
-//             CacheChainEntries => write!(f, "CacheChainEntries"),
-//             CacheChainHeaders => write!(f, "CacheChainHeaders"),
-//             CacheMetadata => write!(f, "CacheMetadata"),
-//             CacheLinksMeta => write!(f, "CacheLinksMeta"),
-//             ConductorState => write!(f, "ConductorState"),
-//             Wasm => write!(f, "Wasm"),
-//             DnaDef => write!(f, "DnaDef"),
-//             EntryDef => write!(f, "EntryDef"),
-//             AuthoredDhtOps => write!(f, "AuthoredDhtOps"),
-//             IntegratedDhtOps => write!(f, "IntegratedDhtOps"),
-//             IntegrationQueue => write!(f, "IntegrationQueue"),
-//             ValidationReceipts => write!(f, "ValidationReceipts"),
-//         }
-//     }
-// }
-
 impl DbName {
     /// Associates a [DbKind] to each [DbName]
     pub fn kind(&self) -> DbKind {
