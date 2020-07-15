@@ -97,6 +97,7 @@ impl DhtOp {
     }
 }
 
+// FIXME: need to use this in HashableContent
 #[derive(Serialize)]
 enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant

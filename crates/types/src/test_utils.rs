@@ -68,15 +68,13 @@ pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempd
 }
 
 /// A fixture example CellId for unit testing.
-pub fn fake_cell_id() -> CellId {
-    (fake_dna_hash(), fake_agent_pubkey_1()).into()
+pub fn fake_cell_id(name: char) -> CellId {
+    (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }
 
 /// A fixture example DnaHash for unit testing.
-pub fn fake_dna_hash() -> DnaHash {
-    DnaHashFixturator::new(::fixt::prelude::Unpredictable)
-        .next()
-        .unwrap()
+pub fn fake_dna_hash(name: char) -> DnaHash {
+    DnaHash::new([name as u8; 32].to_vec())
 }
 
 /// A fixture example AgentPubKey for unit testing.
@@ -92,10 +90,8 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 }
 
 /// A fixture example HeaderHash for unit testing.
-pub fn fake_header_hash() -> HeaderHash {
-    HeaderHashFixturator::new(::fixt::prelude::Unpredictable)
-        .next()
-        .unwrap()
+pub fn fake_header_hash(name: char) -> HeaderHash {
+    HeaderHash::new([name as u8; 32].to_vec())
 }
 
 /// A fixture example CapSecret for unit testing.

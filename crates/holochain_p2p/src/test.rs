@@ -6,7 +6,7 @@ mod tests {
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash::$p::from(crate::holo_hash_core::$p::new([$c as u8; 36].to_vec()))
+            holo_hash::$p::new([$c as u8; 36].to_vec())
         };
     }
 
@@ -131,13 +131,12 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let entry_hash = holochain_types::composite_hash::AnyDhtHash::from(
-            holo_hash::EntryContentHash::from(crate::holo_hash_core::EntryContentHash::new(
-                b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            )),
+        let header_hash = holo_hash::AnyDhtHash::new_typed(
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
+            holo_hash_core::hash_type::AnyDht::Header,
         );
 
-        p2p.publish(dna, a1, true, entry_hash, vec![], Some(20))
+        p2p.publish(dna, a1, true, header_hash, vec![], Some(20))
             .await
             .unwrap();
 
@@ -179,14 +178,13 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let entry_hash = holochain_types::composite_hash::AnyDhtHash::from(
-            holo_hash::EntryContentHash::from(crate::holo_hash_core::EntryContentHash::new(
-                b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            )),
+        let hash = holo_hash::AnyDhtHash::new_typed(
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
+            holo_hash_core::hash_type::AnyDht::Header,
         );
 
         let res = p2p
-            .get(dna, a1, entry_hash, actor::GetOptions::default())
+            .get(dna, a1, hash, actor::GetOptions::default())
             .await
             .unwrap();
 
@@ -226,14 +224,13 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        let entry_hash = holochain_types::composite_hash::AnyDhtHash::from(
-            holo_hash::EntryContentHash::from(crate::holo_hash_core::EntryContentHash::new(
-                b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            )),
+        let hash = holo_hash::AnyDhtHash::new_typed(
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
+            holo_hash_core::hash_type::AnyDht::Header,
         );
 
         let res = p2p
-            .get_links(dna, a1, entry_hash, actor::GetLinksOptions::default())
+            .get_links(dna, a1, hash, actor::GetLinksOptions::default())
             .await
             .unwrap();
 

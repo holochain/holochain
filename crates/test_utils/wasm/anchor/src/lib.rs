@@ -19,12 +19,14 @@ fn _get_anchor(address: EntryHash) -> Result<MaybeAnchor, WasmError> {
     Ok(MaybeAnchor(hdk3::prelude::get_anchor(address)?))
 }
 
-fn _list_anchor_type_addresses(_: ()) -> Result<Hashes, WasmError> {
-    Ok(Hashes(hdk3::prelude::list_anchor_type_addresses()?))
+fn _list_anchor_type_addresses(_: ()) -> Result<EntryHashes, WasmError> {
+    Ok(EntryHashes(hdk3::prelude::list_anchor_type_addresses()?))
 }
 
-fn _list_anchor_addresses(anchor_type: TestString) -> Result<Hashes, WasmError> {
-    Ok(Hashes(hdk3::prelude::list_anchor_addresses(anchor_type.0)?))
+fn _list_anchor_addresses(anchor_type: TestString) -> Result<EntryHashes, WasmError> {
+    Ok(EntryHashes(hdk3::prelude::list_anchor_addresses(
+        anchor_type.0,
+    )?))
 }
 
 fn _list_anchor_tags(anchor_type: TestString) -> Result<AnchorTags, WasmError> {

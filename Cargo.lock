@@ -1219,6 +1219,7 @@ dependencies = [
  "futures",
  "ghost_actor",
  "holo_hash",
+ "holo_hash_core",
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types",

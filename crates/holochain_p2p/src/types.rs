@@ -1,5 +1,3 @@
-use crate::holo_hash_core::HoloHashCoreHash;
-
 /// Error type for Holochain P2p.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -99,7 +97,7 @@ pub mod event;
 pub(crate) mod wire;
 
 macro_rules! to_and_from_kitsune {
-    ($($i:ident<$h:ty, $hc:ty,> -> $k:ty,)*) => {
+    ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(
             pub(crate) trait $i: ::std::clone::Clone + Sized {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
@@ -115,7 +113,7 @@ macro_rules! to_and_from_kitsune {
                 }
 
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
-                    <$hc>::new((**k).clone().into()).into()
+                    <$h>::new((**k).clone().into()).into()
                 }
             }
         )*
@@ -123,18 +121,14 @@ macro_rules! to_and_from_kitsune {
 }
 
 to_and_from_kitsune! {
-    DnaHashExt<
-        holo_hash::DnaHash,
-        crate::holo_hash_core::DnaHash,
-    > -> kitsune_p2p::KitsuneSpace,
+    DnaHashExt<holo_hash::DnaHash> -> kitsune_p2p::KitsuneSpace,
     AgentPubKeyExt<
-        holo_hash::AgentPubKey,
-        crate::holo_hash_core::AgentPubKey,
+        holo_hash::AgentPubKey
     > -> kitsune_p2p::KitsuneAgent,
 }
 
 macro_rules! to_kitsune {
-    ($($i:ident<$h:ty, $hc:ty,> -> $k:ty,)*) => {
+    ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(
             pub(crate) trait $i: ::std::clone::Clone + Sized {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
@@ -154,7 +148,6 @@ macro_rules! to_kitsune {
 
 to_kitsune! {
     AnyDhtHashExt<
-        holochain_types::composite_hash::AnyDhtHash,
-        crate::holo_hash_core::EntryContentHash,
+        holo_hash::AnyDhtHash
     > -> kitsune_p2p::KitsuneBasis,
 }

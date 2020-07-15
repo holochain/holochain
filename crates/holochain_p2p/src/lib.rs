@@ -64,7 +64,7 @@ impl HolochainP2pCell {
     pub async fn publish(
         &mut self,
         request_validation_receipt: bool,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
@@ -93,7 +93,7 @@ impl HolochainP2pCell {
     /// Get an entry from the DHT.
     pub async fn get(
         &mut self,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
     ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
         self.sender
@@ -109,7 +109,7 @@ impl HolochainP2pCell {
     /// Get links from the DHT.
     pub async fn get_links(
         &mut self,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
         self.sender
