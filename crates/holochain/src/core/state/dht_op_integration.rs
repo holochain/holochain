@@ -271,7 +271,7 @@ mod tests {
                 .query(
                     Some(ages_ago.into()),
                     Some(future.into()),
-                    Some(DhtArc::new(same_basis.get_loc(), 0)),
+                    Some(DhtArc::new(same_basis.get_loc(), 1)),
                 )
                 .unwrap()
                 .collect::<Vec<_>>()
@@ -282,7 +282,7 @@ mod tests {
             assert_eq!(r.len(), 2);
             // Same basis all
             let mut r = buf
-                .query(None, None, Some(DhtArc::new(same_basis.get_loc(), 0)))
+                .query(None, None, Some(DhtArc::new(same_basis.get_loc(), 1)))
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
