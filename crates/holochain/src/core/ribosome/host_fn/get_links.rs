@@ -56,7 +56,7 @@ pub fn get_links<'a>(
         };
 
     let links = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        unsafe { host_context.workspace.apply_ref(call).await }
+        unsafe { host_context.conductor_access.workspace().apply_ref(call).await }
     })??;
 
     let links: Vec<Link> = links.into_iter().map(|l| l.into_link()).collect();

@@ -63,6 +63,9 @@ use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
 use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
+use super::ConductorAccess;
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::HolochainP2pCell;
 
 /// Path to the wasm cache path
 const WASM_CACHE_PATH_ENV: &'static str = "HC_WASM_CACHE_PATH";
@@ -294,7 +297,7 @@ impl RibosomeT for WasmRibosome {
     /// if it does not exist then return Ok(None)
     fn maybe_call<I: Invocation>(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ConductorAccess,
         invocation: &I,
         zome_name: &ZomeName,
         to_call: String,
@@ -302,7 +305,7 @@ impl RibosomeT for WasmRibosome {
         let host_context = HostContext {
             zome_name: zome_name.clone(),
             allowed_access: invocation.allowed_access(),
-            workspace,
+            conductor_access,
         };
         let module_timeout = crate::start_hard_timeout!();
         let module = self.module(host_context.clone())?;
@@ -335,11 +338,11 @@ impl RibosomeT for WasmRibosome {
 
     fn call_iterator<R: RibosomeT, I: crate::core::ribosome::Invocation>(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ConductorAccess,
         ribosome: R,
         invocation: I,
     ) -> CallIterator<R, I> {
-        CallIterator::new(workspace, ribosome, invocation)
+        CallIterator::new(conductor_access, ribosome, invocation)
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
@@ -347,17 +350,18 @@ impl RibosomeT for WasmRibosome {
     fn call_zome_function(
         &self,
         workspace: UnsafeInvokeZomeWorkspace,
+        keystore: KeystoreSender,
+        network: HolochainP2pCell,
         invocation: ZomeCallInvocation,
-        // cell_conductor_api: CellConductorApi,
-        // source_chain: SourceChain,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
+        let conductor_access = ConductorAccess::new(workspace, keystore, network);
         let timeout = crate::start_hard_timeout!();
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
         let fn_name = invocation.fn_name.clone();
 
         let guest_output: GuestOutput = match self
-            .call_iterator(workspace, self.clone(), invocation)
+            .call_iterator(conductor_access, self.clone(), invocation)
             .next()?
         {
             Some(result) => result.1,

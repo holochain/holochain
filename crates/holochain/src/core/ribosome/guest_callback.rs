@@ -12,9 +12,10 @@ use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspa
 use fallible_iterator::FallibleIterator;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
+use super::ConductorAccess;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
-    workspace: UnsafeInvokeZomeWorkspace,
+    conductor_access: ConductorAccess,
     ribosome: R,
     invocation: I,
     remaining_zomes: Vec<ZomeName>,
@@ -22,9 +23,9 @@ pub struct CallIterator<R: RibosomeT, I: Invocation> {
 }
 
 impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
-    pub fn new(workspace: UnsafeInvokeZomeWorkspace, ribosome: R, invocation: I) -> Self {
+    pub fn new(conductor_access: ConductorAccess, ribosome: R, invocation: I) -> Self {
         Self {
-            workspace,
+            conductor_access,
             remaining_zomes: ribosome.zomes_to_invoke(invocation.zomes()),
             ribosome,
             remaining_components: invocation.fn_components(),
@@ -45,7 +46,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                 match self.remaining_components.next() {
                     Some(to_call) => {
                         match self.ribosome.maybe_call(
-                            self.workspace.clone(),
+                            self.conductor_access.clone(),
                             &self.invocation,
                             zome_name,
                             to_call,

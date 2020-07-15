@@ -35,7 +35,7 @@ pub fn get_entry<'a>(
         };
     let maybe_entry: Option<Entry> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe { host_context.workspace.apply_ref(call).await }
+            unsafe { host_context.conductor_access.workspace().apply_ref(call).await }
         })??;
     Ok(GetEntryOutput::new(maybe_entry))
 }

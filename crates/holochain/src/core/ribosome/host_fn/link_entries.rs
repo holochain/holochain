@@ -47,7 +47,7 @@ pub fn link_entries<'a>(
     };
     let link_hash =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            unsafe { host_context.workspace.apply_mut(call).await }
+            unsafe { host_context.conductor_access.workspace_mut().apply_mut(call).await }
         }))???;
 
     // return the hash of the committed link
