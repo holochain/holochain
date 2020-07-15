@@ -188,18 +188,12 @@ impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
     }
 }
 
-make_hashed_base! {
-    Visibility(pub),
-    HashedName(DhtOpHashed),
-    ContentType(DhtOp),
-    HashType(DhtOpHash),
-}
+pub type DhtOpHashed = HoloHashed<DhtOp>;
 
-impl DhtOpHashed {
-    /// Create a hashed [DhtOp]
-    pub async fn with_data(op: DhtOp) -> Self {
-        let sb = SerializedBytes::try_from(&op.as_unique_form())
-            .expect("`UniqueForm` must be serializable into MessagePack");
-        DhtOpHashed::with_pre_hashed(op, DhtOpHash::with_data(UnsafeBytes::from(sb).into()).await)
+impl HashableContent for DhtOp {
+    type HashType = holo_hash_core::hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        holo_hash_core::hash_type::DhtOp
     }
 }

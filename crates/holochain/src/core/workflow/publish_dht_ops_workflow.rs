@@ -22,7 +22,7 @@ use crate::core::{
     },
 };
 use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, HoloHashBaseExt};
+use holo_hash::{DhtOpHash, HoloHashExt};
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::KvBuf,

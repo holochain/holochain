@@ -98,7 +98,7 @@ mod tests {
 
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
-    use holo_hash::{DhtOpHash, Hashable, Hashed, HoloHashBaseExt};
+    use holo_hash::{DhtOpHash, Hashable, Hashed, HoloHashExt};
 
     use holochain_state::{
         env::{ReadManager, WriteManager},

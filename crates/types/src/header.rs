@@ -145,21 +145,13 @@ impl Header {
     }
 }
 
-make_hashed_base! {
-    Visibility(pub),
-    HashedName(HeaderHashed),
-    ContentType(Header),
-    HashType(HeaderHash),
-}
+pub type HeaderHashed = HoloHashed<Header>;
 
-impl HeaderHashed {
-    /// Constructor
-    pub async fn with_data(header: Header) -> Result<Self, SerializedBytesError> {
-        let sb = SerializedBytes::try_from(&header)?;
-        Ok(HeaderHashed::with_pre_hashed(
-            header,
-            HeaderHash::with_data(UnsafeBytes::from(sb).into()).await,
-        ))
+impl HashableContent for Header {
+    type HashType = holo_hash_core::hash_type::Header;
+
+    fn hash_type(&self) -> Self::HashType {
+        holo_hash_core::hash_type::Header
     }
 }
 

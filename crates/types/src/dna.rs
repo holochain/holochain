@@ -61,11 +61,14 @@ impl DnaDef {
     }
 }
 
-make_hashed! {
-    Visibility(pub),
-    HashedName(DnaDefHashed),
-    ContentType(DnaDef),
-    HashType(holo_hash::DnaHash),
+pub type DnaDefHashed = HoloHashed<DnaDef>;
+
+impl HashableContent for DnaDef {
+    type HashType = holo_hash_core::hash_type::Dna;
+
+    fn hash_type(&self) -> Self::HashType {
+        holo_hash_core::hash_type::Dna
+    }
 }
 
 /// Wasms need to be an ordered map from WasmHash to a DnaWasm

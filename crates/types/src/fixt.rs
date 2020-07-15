@@ -4,8 +4,6 @@
 
 #![allow(missing_docs)]
 
-use crate::composite_hash::AnyDhtHash;
-use crate::composite_hash::EntryHash;
 use crate::dna::zome::Zome;
 use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
@@ -25,11 +23,13 @@ use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::Timestamp;
 use fixt::prelude::*;
-use holo_hash::AgentPubKeyFixturator;
-use holo_hash::DnaHashFixturator;
-use holo_hash::EntryContentHashFixturator;
-use holo_hash::HeaderHashFixturator;
-use holo_hash::WasmHashFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
+use holo_hash::fixt::EntryContentHashFixturator;
+use holo_hash::fixt::HeaderHashFixturator;
+use holo_hash::fixt::WasmHashFixturator;
+use holo_hash_core::AnyDhtHash;
+use holo_hash_core::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::capability::CapAccess;

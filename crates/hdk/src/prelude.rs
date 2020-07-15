@@ -14,7 +14,6 @@ pub use crate::hash_path::anchor::Anchor;
 pub use crate::link_entries;
 pub use crate::map_extern;
 pub use crate::zome_info;
-pub use holo_hash_core::HoloHashCore;
 pub use holochain_wasmer_guest::holochain_externs;
 pub use holochain_wasmer_guest::host_call;
 pub use holochain_wasmer_guest::ret;

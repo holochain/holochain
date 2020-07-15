@@ -1,8 +1,9 @@
 //! Defines a ChainElement, the basic unit of Holochain data.
 
-use crate::{composite_hash::HeaderAddress, prelude::*, Header, HeaderHashed};
+use crate::{prelude::*, Header, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
+use holo_hash::HeaderAddress;
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -128,7 +129,7 @@ impl SignedHeader {
 // HACK: In this representation, we have to clone the Header and store it twice,
 // once in the HeaderHashed, and once in the SignedHeader. The reason is that
 // the API currently requires references to both types, and it was easier to
-// to a simple clone than to refactor the entire struct and API to remove the
+// do a simple clone than to refactor the entire struct and API to remove the
 // need for one of those references. We probably SHOULD do that refactor at
 // some point.
 // FIXME: refactor so that HeaderHashed is not stored, and then remove the
@@ -144,30 +145,27 @@ pub struct SignedHeaderHashed {
     signed_header: SignedHeader,
 }
 
-impl Hashed for SignedHeaderHashed {
-    type Content = SignedHeader;
-    type HashType = HeaderHash;
-
+impl SignedHeaderHashed {
     /// Unwrap the complete contents of this "Hashed" wrapper.
-    fn into_inner(self) -> (Self::Content, Self::HashType) {
+    fn into_inner(self) -> (SignedHeader, HeaderHash) {
         let (header, hash) = self.header.into_inner();
         ((header, self.signed_header.1).into(), hash)
     }
 
     /// Access the main item stored in this wrapper type.
-    fn as_content(&self) -> &Self::Content {
+    fn as_content(&self) -> &SignedHeader {
         &self.signed_header
     }
 
     /// Access the already-calculated hash stored in this wrapper type.
-    fn as_hash(&self) -> &Self::HashType {
+    fn as_hash(&self) -> &HeaderHash {
         self.header.as_hash()
     }
 }
 
-impl Hashable for SignedHeaderHashed {
+impl SignedHeaderHashed {
     fn with_data(
-        signed_header: Self::Content,
+        signed_header: SignedHeader,
     ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
     where
         Self: Sized,

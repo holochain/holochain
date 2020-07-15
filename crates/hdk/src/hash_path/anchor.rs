@@ -82,7 +82,7 @@ impl Anchor {
 pub fn anchor(
     anchor_type: String,
     anchor_text: String,
-) -> Result<holo_hash_core::HoloHashCore, WasmError> {
+) -> Result<holo_hash_core::EntryHash, WasmError> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
@@ -92,7 +92,7 @@ pub fn anchor(
     Ok(path.hash()?)
 }
 
-pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmError> {
+pub fn get_anchor(anchor_address: holo_hash_core::EntryHash) -> Result<Option<Anchor>, WasmError> {
     Ok(match get_entry!(anchor_address)? {
         Some(Entry::App(sb)) => {
             let path = Path::try_from(sb)?;
@@ -102,7 +102,7 @@ pub fn get_anchor(anchor_address: HoloHashCore) -> Result<Option<Anchor>, WasmEr
     })
 }
 
-pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
+pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::EntryHash>, WasmError> {
     let links = Path::from(ROOT)
         .children()?
         .into_inner()
@@ -114,7 +114,7 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::HoloHashCore>,
 
 pub fn list_anchor_addresses(
     anchor_type: String,
-) -> Result<Vec<holo_hash_core::HoloHashCore>, WasmError> {
+) -> Result<Vec<holo_hash_core::EntryHash>, WasmError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
