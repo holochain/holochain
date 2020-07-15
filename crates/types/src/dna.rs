@@ -10,6 +10,7 @@ use crate::prelude::*;
 use derive_more::From;
 pub use error::DnaError;
 pub use holo_hash::*;
+use holo_hash_core::impl_hashable_content;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
@@ -48,7 +49,7 @@ impl DnaDef {
     /// Calculate DnaHash for DnaDef
     pub async fn dna_hash(&self) -> DnaHash {
         let sb: SerializedBytes = self.try_into().expect("failed to hash DnaDef");
-        DnaHash::with_data(UnsafeBytes::from(sb).into()).await
+        DnaHash::with_data(self).await
     }
 
     /// Return a Zome
@@ -61,15 +62,10 @@ impl DnaDef {
     }
 }
 
+/// A DnaDef paired with its DnaHash
 pub type DnaDefHashed = HoloHashed<DnaDef>;
 
-impl HashableContent for DnaDef {
-    type HashType = holo_hash_core::hash_type::Dna;
-
-    fn hash_type(&self) -> Self::HashType {
-        holo_hash_core::hash_type::Dna
-    }
-}
+impl_hashable_content!(DnaDef, Dna);
 
 /// Wasms need to be an ordered map from WasmHash to a DnaWasm
 pub type Wasms = BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>;
@@ -105,12 +101,11 @@ impl DnaFile {
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            let wasm_hash = holo_hash::WasmHash::with_data(wasm.code().to_vec()).await;
-            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
+            // FIXME: WasmHash needs to be based on wasm.code().to_vec(), not the struct!
+            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
-        let dna_sb: SerializedBytes = (&dna).try_into()?;
-        let dna_hash = holo_hash::DnaHash::with_data(UnsafeBytes::from(dna_sb).into()).await;
+        let dna_hash = holo_hash::DnaHash::with_data(&dna).await;
         Ok(Self {
             dna,
             dna_hash,

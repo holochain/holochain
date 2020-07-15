@@ -117,7 +117,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
 
     let (signed_header, maybe_entry) = element.clone().into_inner();
     let (header, sig) = signed_header.into_header_and_signature();
-    let (header, _): (Header, _) = header.into();
+    let header: Header = header.into_content();
 
     // TODO: avoid allocation, we have a static maximum of four items and
     // callers simply want to iterate over the ops.
@@ -188,6 +188,7 @@ impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
     }
 }
 
+/// A DhtOp paired with its DhtOpHash
 pub type DhtOpHashed = HoloHashed<DhtOp>;
 
 impl HashableContent for DhtOp {

@@ -3,6 +3,7 @@
 //!  - and serialized to json
 use backtrace::Backtrace;
 use holo_hash::prelude::*;
+use holo_hash_core::impl_hashable_content;
 use holochain_serialized_bytes::prelude::*;
 use serde::{self, Deserialize, Serialize};
 use std::{
@@ -19,15 +20,13 @@ pub struct DnaWasm {
     pub code: Arc<Vec<u8>>,
 }
 
+/// A DnaWasm paired with its WasmHash
 pub type DnaWasmHashed = HoloHashed<DnaWasm>;
 
-impl HashableContent for DnaWasm {
-    type HashType = holo_hash_core::hash_type::Wasm;
+// FIXME: WasmHash needs to be based on wasm.code().to_vec(), not the struct!
+// Make sure this is the case.
 
-    fn hash_type(&self) -> Self::HashType {
-        holo_hash_core::hash_type::Wasm
-    }
-}
+impl_hashable_content!(DnaWasm, Wasm);
 
 impl TryFrom<&DnaWasm> for SerializedBytes {
     type Error = SerializedBytesError;

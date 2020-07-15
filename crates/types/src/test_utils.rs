@@ -6,7 +6,7 @@ use crate::{
     dna::{DnaDef, DnaFile},
     prelude::*,
 };
-use holo_hash::AgentPubKey;
+use holo_hash::{fixt::*, AgentPubKey};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -47,9 +47,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut wasm_code = Vec::new();
         for (zome_name, wasm) in zomes {
-            let wasm = crate::dna::wasm::DnaWasmHashed::with_data(wasm)
-                .await
-                .unwrap();
+            let wasm = crate::dna::wasm::DnaWasmHashed::with_data(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
             let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             dna.zomes.push((zome_name, Zome { wasm_hash }));
@@ -70,17 +68,15 @@ pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempd
 }
 
 /// A fixture example CellId for unit testing.
-pub fn fake_cell_id(name: &str) -> CellId {
-    (fake_dna_hash(name), fake_agent_pubkey_1()).into()
+pub fn fake_cell_id() -> CellId {
+    (fake_dna_hash(), fake_agent_pubkey_1()).into()
 }
 
 /// A fixture example DnaHash for unit testing.
-pub fn fake_dna_hash(name: &str) -> DnaHash {
-    tokio_safe_block_on::tokio_safe_block_on(
-        DnaHash::with_data(name.as_bytes().to_vec()),
-        std::time::Duration::from_secs(1),
-    )
-    .unwrap()
+pub fn fake_dna_hash() -> DnaHash {
+    DnaHashFixturator::new(::fixt::prelude::Unpredictable)
+        .next()
+        .unwrap()
 }
 
 /// A fixture example AgentPubKey for unit testing.
@@ -96,12 +92,10 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 }
 
 /// A fixture example HeaderHash for unit testing.
-pub fn fake_header_hash(name: &str) -> HeaderHash {
-    tokio_safe_block_on::tokio_safe_block_on(
-        HeaderHash::with_data(name.as_bytes().to_vec()),
-        std::time::Duration::from_secs(1),
-    )
-    .unwrap()
+pub fn fake_header_hash() -> HeaderHash {
+    HeaderHashFixturator::new(::fixt::prelude::Unpredictable)
+        .next()
+        .unwrap()
 }
 
 /// A fixture example CapSecret for unit testing.

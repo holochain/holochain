@@ -145,26 +145,28 @@ pub struct SignedHeaderHashed {
     signed_header: SignedHeader,
 }
 
+#[allow(missing_docs)]
 impl SignedHeaderHashed {
     /// Unwrap the complete contents of this "Hashed" wrapper.
-    fn into_inner(self) -> (SignedHeader, HeaderHash) {
+    pub fn into_inner(self) -> (SignedHeader, HeaderHash) {
         let (header, hash) = self.header.into_inner();
         ((header, self.signed_header.1).into(), hash)
     }
 
     /// Access the main item stored in this wrapper type.
-    fn as_content(&self) -> &SignedHeader {
+    pub fn as_content(&self) -> &SignedHeader {
         &self.signed_header
     }
 
     /// Access the already-calculated hash stored in this wrapper type.
-    fn as_hash(&self) -> &HeaderHash {
+    pub fn as_hash(&self) -> &HeaderHash {
         self.header.as_hash()
     }
 }
 
+#[allow(missing_docs)]
 impl SignedHeaderHashed {
-    fn with_data(
+    pub fn with_data(
         signed_header: SignedHeader,
     ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
     where
@@ -173,7 +175,7 @@ impl SignedHeaderHashed {
         async move {
             let (header, signature) = signed_header.into();
             Ok(Self {
-                header: HeaderHashed::with_data(header.clone()).await?,
+                header: HeaderHashed::with_data(header.clone()).await,
                 signed_header: SignedHeader(header, signature),
             })
         }

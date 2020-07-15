@@ -26,6 +26,7 @@ use fixt::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryContentHashFixturator;
+use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::fixt::WasmHashFixturator;
 use holo_hash_core::AnyDhtHash;
@@ -116,14 +117,6 @@ newtype_fixturator!(Signature<Bytes>);
 fixturator!(
     IntendedFor;
     unit variants [ Entry Header ] empty Entry;
-);
-
-fixturator!(
-    EntryHash;
-    variants [
-        Entry(EntryContentHash)
-        Agent(AgentPubKey)
-    ];
 );
 
 fixturator!(
@@ -484,15 +477,6 @@ fixturator!(
 fixturator!(
     EntryCreate;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
-);
-
-fixturator!(
-    AnyDhtHash;
-    variants [
-        EntryContent(EntryContentHash)
-        Agent(AgentPubKey)
-        Header(HeaderHash)
-    ];
 );
 
 fixturator!(

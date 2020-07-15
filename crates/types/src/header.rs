@@ -6,8 +6,8 @@
 
 #![allow(missing_docs)]
 
-use crate::composite_hash::{EntryHash, HeaderAddress};
 use crate::prelude::*;
+use holo_hash::{EntryHash, HeaderAddress};
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::link::LinkTag;
 
@@ -148,6 +148,14 @@ impl Header {
 pub type HeaderHashed = HoloHashed<Header>;
 
 impl HashableContent for Header {
+    type HashType = holo_hash_core::hash_type::Header;
+
+    fn hash_type(&self) -> Self::HashType {
+        holo_hash_core::hash_type::Header
+    }
+}
+
+impl HashableContent for &Header {
     type HashType = holo_hash_core::hash_type::Header;
 
     fn hash_type(&self) -> Self::HashType {
