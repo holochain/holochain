@@ -1,64 +1,108 @@
 //! A type for indicating ranges on the dht arc
 
-use derive_more::From;
-use std::num::Wrapping;
+use derive_more::{From, Into};
+#[cfg(test)]
+use std::ops::RangeInclusive;
+use std::{
+    num::Wrapping,
+    ops::{Bound, RangeBounds},
+};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
 pub struct Location(pub Wrapping<u32>);
 
 /// The maximum you can hold either side of the hash location
-/// is half te circle
-pub const MAX_LENGTH: i32 = (u32::MAX / 2) as i32;
+/// is half te circle.
+/// This is half of the furthest index you can hold
+/// 1 is added for rounding
+/// 1 more is added to represent the middle point of an odd length array
+pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
 /// hash_location is where the hash is.
 /// The hash_location is the center of the arc
-/// length -1 means nothing is held
-/// length 0 means just the hash_location is held
-/// length n where n > 0 means n locations are
-/// held on either side of hash_location
+/// The half length is the length of items held
+/// from the center in both directions
+/// half_length 0 means nothing is held
+/// half_length 1 means just the hash_location is held
+/// half_length n where n > 1 will hold those positions out
+/// half_length u32::MAX / 2 + 1 covers all positions
+/// on either side of hash_location.
+/// Imagine an bidirectional array:
+/// ```text
+/// [4][3][2][1][0][1][2][3][4]
+// half length of 3 will give you
+/// [2][1][0][1][2]
+/// ```
 pub struct DhtArc {
     hash_location: Location,
-    length_either_side: i32,
+    half_length: u32,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+/// This represents the range of values covered by an arc
+pub struct ArcRange {
+    start: Bound<u32>,
+    end: Bound<u32>,
 }
 
 impl DhtArc {
     /// Create an Arc from a hash location plus a length on either side
-    /// Length is (0..u32::Max + 1)
-    pub fn new<I: Into<Location>>(hash_location: I, length_either_side: i32) -> Self {
-        let length_either_side = std::cmp::max(length_either_side, -1);
-        let length_either_side = std::cmp::min(length_either_side, MAX_LENGTH);
+    /// half length is (0..(u32::Max / 2 + 1))
+    pub fn new<I: Into<Location>>(hash_location: I, half_length: u32) -> Self {
+        let half_length = std::cmp::min(half_length, MAX_HALF_LENGTH);
         Self {
             hash_location: hash_location.into(),
-            length_either_side,
+            half_length,
         }
     }
 
     /// Check if a location is contained in this arc
     pub fn contains<I: Into<Location>>(&self, location: I) -> bool {
-        self.length_either_side >= 0
-            && shortest_arc_distance(self.hash_location, location.into()) as i32
-                <= self.length_either_side
+        let location = location.into();
+        let do_hold_something = self.half_length != 0;
+        let only_hold_self = self.half_length == 1 && self.hash_location == location;
+        // Add one to convert to "array length" from math distance
+        let dist_as_array_len = shortest_arc_distance(self.hash_location, location.0) + 1;
+        // Check for any other dist and the special case of the maximum array len
+        let within_range = self.half_length > 1 && dist_as_array_len <= self.half_length;
+        // Have to hold something and hold ourself or something within range
+        do_hold_something && (only_hold_self || within_range)
     }
 
-    /// TODO
-    pub fn start(&self) -> u32 {
-        if self.length_either_side >= 0 {
-            (self.hash_location.0 - Location::from(self.length_either_side as u32).0).0
+    /// Get the range of the arc
+    pub fn range(&self) -> ArcRange {
+        if self.half_length == 0 {
+            ArcRange {
+                start: Bound::Excluded(self.hash_location.into()),
+                end: Bound::Excluded(self.hash_location.into()),
+            }
+        } else if self.half_length == 1 {
+            ArcRange {
+                start: Bound::Included(self.hash_location.into()),
+                end: Bound::Included(self.hash_location.into()),
+            }
+        } else if self.half_length == MAX_HALF_LENGTH {
+            ArcRange {
+                start: Bound::Included(
+                    (self.hash_location.0 - Location::from(MAX_HALF_LENGTH - 1).0).0,
+                ),
+                end: Bound::Included(
+                    (self.hash_location.0 + Location::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
+                ),
+            }
         } else {
-            (self.hash_location.0).0
-        }
-    }
-
-    /// TODO
-    pub fn length(&self) -> u32 {
-        if self.length_either_side >= 0 {
-            self.length_either_side as u32 * 2
-        } else {
-            0
+            ArcRange {
+                start: Bound::Included(
+                    (self.hash_location.0 - Location::from(self.half_length - 1).0).0,
+                ),
+                end: Bound::Included(
+                    (self.hash_location.0 + Location::from(self.half_length).0 - Wrapping(1)).0,
+                ),
+            }
         }
     }
 }
@@ -66,6 +110,54 @@ impl DhtArc {
 impl From<u32> for Location {
     fn from(a: u32) -> Self {
         Self(Wrapping(a))
+    }
+}
+
+impl From<Location> for u32 {
+    fn from(l: Location) -> Self {
+        (l.0).0
+    }
+}
+
+impl ArcRange {
+    /// Show if the bound is empty
+    /// Useful before using as an index
+    pub fn is_empty(&self) -> bool {
+        match (self.start_bound(), self.end_bound()) {
+            (Bound::Excluded(a), Bound::Excluded(b)) if a == b => true,
+            _ => false,
+        }
+    }
+    #[cfg(test)]
+    fn to_inc(self: ArcRange) -> RangeInclusive<usize> {
+        match self {
+            ArcRange {
+                start: Bound::Included(a),
+                end: Bound::Included(b),
+            } if a <= b => RangeInclusive::new(a as usize, b as usize),
+            arc @ _ => panic!(
+                "This range goes all the way around the arc from {:?} to {:?}",
+                arc.start_bound(),
+                arc.end_bound()
+            ),
+        }
+    }
+}
+
+impl RangeBounds<u32> for ArcRange {
+    fn start_bound(&self) -> Bound<&u32> {
+        match &self.start {
+            Bound::Included(i) => Bound::Included(i),
+            Bound::Excluded(i) => Bound::Excluded(i),
+            Bound::Unbounded => unreachable!("No unbounded ranges for arcs"),
+        }
+    }
+    fn end_bound(&self) -> Bound<&u32> {
+        match &self.end {
+            Bound::Included(i) => Bound::Included(i),
+            Bound::Excluded(i) => Bound::Excluded(i),
+            Bound::Unbounded => unreachable!("No unbounded ranges for arcs"),
+        }
     }
 }
 
@@ -80,11 +172,6 @@ fn shortest_arc_distance<A: Into<Location>, B: Into<Location>>(a: A, b: B) -> u3
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fixt::Predictable;
-    use holo_hash::AgentPubKeyFixturator;
-    use rand::{distributions::Uniform, Rng};
-    use std::collections::{BTreeMap, HashMap};
-    use std::ops::Bound;
 
     // TODO: This is a really good place for prop testing
 
@@ -100,83 +187,127 @@ mod tests {
             5
         );
         assert_eq!(shortest_arc_distance(0, u32::MAX), 1);
+        assert_eq!(
+            shortest_arc_distance(0, MAX_HALF_LENGTH),
+            MAX_HALF_LENGTH - 2
+        );
     }
 
     #[test]
     fn test_dht_arc() {
-        assert!(!DhtArc::new(0, -1).contains(0));
+        assert!(!DhtArc::new(0, 0).contains(0));
 
-        assert!(DhtArc::new(0, 0).contains(0));
-
-        assert!(!DhtArc::new(0, 0).contains(1));
-        assert!(!DhtArc::new(1, -1).contains(0));
-        assert!(!DhtArc::new(1, -1).contains(1));
-
-        assert!(DhtArc::new(1, 0).contains(1));
         assert!(DhtArc::new(0, 1).contains(0));
-        assert!(DhtArc::new(0, 1).contains(1));
-        assert!(DhtArc::new(0, 1).contains(u32::MAX));
 
-        assert!(!DhtArc::new(0, 1).contains(2));
-        assert!(!DhtArc::new(0, 1).contains(3));
-        assert!(!DhtArc::new(0, 1).contains(u32::MAX - 1));
-        assert!(!DhtArc::new(0, 1).contains(u32::MAX - 2));
+        assert!(!DhtArc::new(0, 1).contains(1));
+        assert!(!DhtArc::new(1, 0).contains(0));
+        assert!(!DhtArc::new(1, 0).contains(1));
 
-        assert!(DhtArc::new(0, 2).contains(2));
-        assert!(DhtArc::new(0, 2).contains(u32::MAX - 1));
+        assert!(DhtArc::new(1, 1).contains(1));
+        assert!(DhtArc::new(0, 2).contains(0));
+        assert!(DhtArc::new(0, 2).contains(1));
+        assert!(DhtArc::new(0, 2).contains(u32::MAX));
+
+        assert!(!DhtArc::new(0, 2).contains(2));
+        assert!(!DhtArc::new(0, 2).contains(3));
+        assert!(!DhtArc::new(0, 2).contains(u32::MAX - 1));
+        assert!(!DhtArc::new(0, 2).contains(u32::MAX - 2));
+
+        assert!(DhtArc::new(0, 3).contains(2));
+        assert!(DhtArc::new(0, 3).contains(u32::MAX - 1));
+        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX / 2));
+        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(u32::MAX));
+        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(0));
+        assert!(DhtArc::new(0, MAX_HALF_LENGTH).contains(MAX_HALF_LENGTH));
     }
 
     #[test]
-    fn test_index() {
-        // TODO: Sort arcs by starts and ends of range
-        let mut index = BTreeMap::new();
-        let rng = rand::thread_rng();
-        let range = Uniform::new_inclusive(1, MAX_LENGTH);
-        let mut lens = rng.sample_iter(range);
-        let range = Uniform::new_inclusive(0, u32::MAX);
-        let mut hash_locations = rng.sample_iter(range);
-        let mut arcs = Vec::new();
-        let mut expect = HashMap::new();
-        let mut agent_fixt = AgentPubKeyFixturator::new(Predictable);
-        for _ in 0..50 {
-            arcs.push(DhtArc::new(0, lens.next().unwrap()));
-            arcs.push(DhtArc::new(u32::MAX, lens.next().unwrap()));
-        }
-        for _ in 0..50 {
-            arcs.push(DhtArc::new(
-                hash_locations.next().unwrap(),
-                lens.next().unwrap(),
-            ));
-        }
-        arcs.push(DhtArc::new(125414057, 100699849));
+    fn test_arc_start_end() {
+        use std::ops::Bound::*;
 
-        for arc in arcs.iter() {
-            let start = arc.start();
-            let length = arc.length();
-            let agent_key = agent_fixt.next().unwrap();
-            expect.insert(agent_key.clone(), arc);
-            // store key with arc to verify
-            index
-                .entry(start)
-                .or_insert(BTreeMap::new())
-                .insert(length, agent_key);
-        }
+        let quarter = (u32::MAX as f64 / 4.0).round() as u32;
+        let half = (u32::MAX as f64 / 2.0).round() as u32;
 
-        let basis = 0u32;
-        for (start, inner) in index.range_mut(basis..) {
-            let mut keys = Vec::new();
-            let length = Location::from(*start).0 - Location::from(basis).0;
-            for (k, agent) in inner.range((Bound::Unbounded, Bound::Included(length.0))) {
-                keys.push(k.clone());
-                assert!(expect.get(agent).unwrap().contains(basis));
+        // Checks that the range is contained and the outside of the range isn't contained
+        let check_bounds = |mid, hl, start, end| {
+            let out_l = (Wrapping(start) - Wrapping(1u32)).0;
+            let out_r = (Wrapping(end) + Wrapping(1u32)).0;
+            let opp = (Wrapping(mid) + Wrapping(half)).0;
+
+            assert!(!DhtArc::new(mid, hl).contains(out_l));
+            assert!(DhtArc::new(mid, hl).contains(start));
+            assert!(DhtArc::new(mid, hl).contains(mid));
+            assert!(DhtArc::new(mid, hl).contains(end));
+            assert!(!DhtArc::new(mid, hl).contains(out_r));
+            assert!(!DhtArc::new(mid, hl + 1).contains(opp));
+        };
+
+        // Checks that everything is contained because this is a full range
+        let check_bounds_full = |mid, hl, start, end| {
+            let out_l = (Wrapping(start) - Wrapping(1u32)).0;
+            let out_r = (Wrapping(end) + Wrapping(1u32)).0;
+            let opp = (Wrapping(mid) + Wrapping(half)).0;
+
+            assert!(DhtArc::new(mid, hl).contains(out_l));
+            assert!(DhtArc::new(mid, hl).contains(start));
+            assert!(DhtArc::new(mid, hl).contains(mid));
+            assert!(DhtArc::new(mid, hl).contains(end));
+            assert!(DhtArc::new(mid, hl).contains(out_r));
+            assert!(DhtArc::new(mid, hl + 1).contains(opp));
+        };
+
+        assert!(DhtArc::new(0, 0).range().is_empty());
+        assert_eq!(DhtArc::new(0, 1).range().to_inc(), 0..=0);
+        assert_eq!(DhtArc::new(1, 2).range().to_inc(), 0..=2);
+        assert_eq!(
+            DhtArc::new(quarter, quarter + 1).range().to_inc(),
+            0..=(half as usize)
+        );
+        check_bounds(quarter, quarter + 1, 0, half);
+
+        assert_eq!(
+            DhtArc::new(half, quarter + 1).range().to_inc(),
+            (quarter as usize)..=((quarter * 3) as usize)
+        );
+        check_bounds(half, quarter + 1, quarter, quarter * 3);
+
+        assert_eq!(
+            DhtArc::new(half, MAX_HALF_LENGTH).range().to_inc(),
+            0..=(u32::MAX as usize)
+        );
+        check_bounds_full(half, MAX_HALF_LENGTH, 0, u32::MAX);
+
+        assert_eq!(
+            DhtArc::new(half, MAX_HALF_LENGTH - 2).range().to_inc(),
+            2..=((u32::MAX - 1) as usize)
+        );
+        check_bounds(half, MAX_HALF_LENGTH - 2, 2, u32::MAX - 1);
+
+        assert_eq!(
+            DhtArc::new(0, 2).range(),
+            ArcRange {
+                start: Included(u32::MAX),
+                end: Included(1)
             }
-            for k in keys {
-                inner.remove(&k).unwrap();
+        );
+        check_bounds(0, 2, u32::MAX, 1);
+
+        assert_eq!(
+            DhtArc::new(u32::MAX, 2).range(),
+            ArcRange {
+                start: Included(u32::MAX - 1),
+                end: Included(0)
             }
-        }
-        for agent in index.values().flat_map(|i| i.values()) {
-            let arc = expect.get(agent).unwrap();
-            assert!(arc.contains(basis), "basis: {}, arc: {:?}", basis, arc);
-        }
+        );
+        check_bounds(u32::MAX, 2, u32::MAX - 1, 0);
+
+        assert_eq!(
+            DhtArc::new(0, MAX_HALF_LENGTH).range(),
+            ArcRange {
+                start: Included(half),
+                end: Included(half - 1)
+            }
+        );
+        check_bounds_full(0, MAX_HALF_LENGTH, half, half - 1);
     }
 }
