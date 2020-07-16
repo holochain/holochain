@@ -101,12 +101,12 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 #[cfg(feature = "slow_tests")]
 mod test {
 
+    use super::PostCommitConductorAccessFixturator;
     use super::PostCommitInvocationFixturator;
     use super::PostCommitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::HeaderHashesFixturator;
     use crate::fixt::WasmRibosomeFixturator;
@@ -224,7 +224,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_unimplemented() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let conductor_access = PostCommitConductorAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
@@ -236,7 +236,7 @@ mod test {
         post_commit_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_post_commit(workspace, post_commit_invocation)
+            .run_post_commit(conductor_access, post_commit_invocation)
             .unwrap();
         assert_eq!(result, PostCommitResult::Success,);
     }
@@ -244,7 +244,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_implemented_success() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let conductor_access = PostCommitConductorAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
@@ -256,7 +256,7 @@ mod test {
         post_commit_invocation.zome_name = TestWasm::PostCommitSuccess.into();
 
         let result = ribosome
-            .run_post_commit(workspace, post_commit_invocation)
+            .run_post_commit(conductor_access, post_commit_invocation)
             .unwrap();
         assert_eq!(result, PostCommitResult::Success,);
     }
@@ -264,7 +264,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_implemented_fail() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let conductor_access = PostCommitConductorAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
@@ -276,7 +276,7 @@ mod test {
         post_commit_invocation.zome_name = TestWasm::PostCommitFail.into();
 
         let result = ribosome
-            .run_post_commit(workspace, post_commit_invocation)
+            .run_post_commit(conductor_access, post_commit_invocation)
             .unwrap();
         assert_eq!(
             result,

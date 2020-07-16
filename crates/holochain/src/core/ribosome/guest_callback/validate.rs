@@ -118,12 +118,13 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 #[cfg(feature = "slow_tests")]
 mod test {
 
+    use super::ValidateConductorAccess;
     use super::ValidateInvocationFixturator;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
@@ -279,9 +280,6 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validate_unimplemented() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
@@ -291,7 +289,7 @@ mod test {
         validate_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateConductorAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -299,9 +297,6 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validate_implemented_valid() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
@@ -311,7 +306,7 @@ mod test {
         validate_invocation.zome_name = TestWasm::ValidateValid.into();
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateConductorAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -319,9 +314,6 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validate_implemented_invalid() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
@@ -331,7 +323,7 @@ mod test {
         validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateConductorAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
@@ -339,9 +331,6 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_validate_implemented_multi() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
@@ -359,7 +348,7 @@ mod test {
         validate_invocation.entry = Arc::new(entry);
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateConductorAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }
@@ -379,9 +368,15 @@ mod test {
             .unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
 
-        let output: CommitEntryOutput =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::Validate, "always_validates", ());
+        let output: CommitEntryOutput = crate::call_test_ribosome!(
+            conductor_access,
+            TestWasm::Validate,
+            "always_validates",
+            ()
+        );
 
         assert_eq!(
             vec![
@@ -409,8 +404,11 @@ mod test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
+
         let output: CommitEntryOutput =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::Validate, "never_validates", ());
+            crate::call_test_ribosome!(conductor_access, TestWasm::Validate, "never_validates", ());
 
         assert_eq!(
             vec![

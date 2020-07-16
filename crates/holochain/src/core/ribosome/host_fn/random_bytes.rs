@@ -33,8 +33,10 @@ pub fn random_bytes(
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
     use crate::core::ribosome::HostContextFixturator;
+    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
     use crate::core::state::workspace::Workspace;
     use crate::fixt::WasmRibosomeFixturator;
+    use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::RandomBytesInput;
@@ -74,8 +76,10 @@ pub mod wasm_test {
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
         const LEN: usize = 5;
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
         let output: RandomBytesOutput = crate::call_test_ribosome!(
-            raw_workspace,
+            conductor_access,
             TestWasm::Imports,
             "random_bytes",
             RandomBytesInput::new(5 as _)

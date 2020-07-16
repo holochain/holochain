@@ -96,7 +96,7 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
 mod test {
 
     use super::EntryDefsInvocationFixturator;
-    use super::EntryDefsResult;
+    use super::{EntryDefsConductorAccess, EntryDefsResult};
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
@@ -253,7 +253,9 @@ mod test {
             .next()
             .unwrap();
 
-        let result = ribosome.run_entry_defs(entry_defs_invocation).unwrap();
+        let result = ribosome
+            .run_entry_defs(EntryDefsConductorAccess, entry_defs_invocation)
+            .unwrap();
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
     }
 
@@ -267,7 +269,9 @@ mod test {
             .next()
             .unwrap();
 
-        let result = ribosome.run_entry_defs(entry_defs_invocation).unwrap();
+        let result = ribosome
+            .run_entry_defs(EntryDefsConductorAccess, entry_defs_invocation)
+            .unwrap();
         assert_eq!(
             result,
             EntryDefsResult::Defs({

@@ -107,22 +107,22 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 #[cfg(feature = "slow_tests")]
 mod test {
 
+    use super::InitConductorAccessFixturator;
     use super::InitInvocationFixturator;
     use super::InitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeNameFixturator;
+    use fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::HostInput;
     use matches::assert_matches;
-    use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn init_callback_result_fold() {
@@ -243,48 +243,48 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_init_unimplemented() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let conductor_access = fixt!(InitConductorAccess);
+        let result = ribosome
+            .run_init(conductor_access, init_invocation)
+            .unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_init_implemented_pass() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let conductor_access = fixt!(InitConductorAccess);
+        let result = ribosome
+            .run_init(conductor_access, init_invocation)
+            .unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_init_implemented_fail() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let conductor_access = fixt!(InitConductorAccess);
+        let result = ribosome
+            .run_init(conductor_access, init_invocation)
+            .unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
@@ -294,9 +294,6 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_init_multi_implemented_fail() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome =
             WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))
                 .next()
@@ -304,7 +301,10 @@ mod test {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let conductor_access = fixt!(InitConductorAccess);
+        let result = ribosome
+            .run_init(conductor_access, init_invocation)
+            .unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),

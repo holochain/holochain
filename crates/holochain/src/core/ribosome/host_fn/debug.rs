@@ -28,8 +28,10 @@ pub fn debug(
 pub mod wasm_test {
     use super::debug;
     use crate::core::ribosome::HostContextFixturator;
+    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
     use crate::core::state::workspace::Workspace;
     use crate::fixt::WasmRibosomeFixturator;
+    use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::debug_msg;
@@ -62,11 +64,13 @@ pub mod wasm_test {
         let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
 
         // this shows that debug is called but our line numbers will be messed up
         // the line numbers will show as coming from this test because we made the input here
         let output: DebugOutput = crate::call_test_ribosome!(
-            raw_workspace,
+            conductor_access,
             TestWasm::Imports,
             "debug",
             DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
@@ -83,10 +87,12 @@ pub mod wasm_test {
         let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
 
         // this shows that we can get line numbers out of wasm
         let output: DebugOutput =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::Debug, "debug", ());
+            crate::call_test_ribosome!(conductor_access, TestWasm::Debug, "debug", ());
         assert_eq!(output, DebugOutput::new(()));
     }
 }

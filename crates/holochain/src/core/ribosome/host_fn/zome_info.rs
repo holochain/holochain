@@ -26,7 +26,9 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
+    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
     use crate::core::state::workspace::Workspace;
+    use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::{ZomeInfoInput, ZomeInfoOutput};
@@ -41,8 +43,10 @@ pub mod test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
         let zome_info: ZomeInfoOutput = crate::call_test_ribosome!(
-            raw_workspace,
+            conductor_access,
             TestWasm::Imports,
             "zome_info",
             ZomeInfoInput::new(())

@@ -75,11 +75,12 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
 mod tests {
 
     use super::CallIterator;
+    use crate::core::ribosome::ConductorAccess;
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::MockRibosomeT;
+    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::FnComponentsFixturator;
     use crate::fixt::ZomeNameFixturator;
     use fallible_iterator::FallibleIterator;
@@ -99,9 +100,10 @@ mod tests {
 
         let mut invocation = MockInvocation::new();
 
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Empty)
+        let conductor_access = ZomeCallConductorAccessFixturator::new(fixt::Empty)
             .next()
             .unwrap();
+        let conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let zome_name_fixturator = ZomeNameFixturator::new(fixt::Unpredictable);
         let mut fn_components_fixturator = FnComponentsFixturator::new(fixt::Unpredictable);
 
@@ -153,7 +155,7 @@ mod tests {
                 .return_const(fn_components.clone());
         }
 
-        let call_iterator = CallIterator::new(workspace, ribosome, invocation);
+        let call_iterator = CallIterator::new(conductor_access, ribosome, invocation);
 
         let output: Vec<(_, GuestOutput)> = call_iterator.collect().unwrap();
         assert_eq!(output.len(), zome_names.len() * fn_components.0.len());

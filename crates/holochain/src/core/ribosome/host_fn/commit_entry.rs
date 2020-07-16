@@ -114,6 +114,7 @@ pub mod wasm_test {
     use super::commit_entry;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::HostContextFixturator;
+    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::{
         queue_consumer::TriggerSender,
@@ -125,6 +126,7 @@ pub mod wasm_test {
     };
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use fixt::prelude::*;
     use holo_hash::Hashable;
     use holo_hash::Hashed;
     use holo_hash_core::HoloHashCoreHash;
@@ -156,7 +158,7 @@ pub mod wasm_test {
             .next()
             .unwrap();
         host_context.zome_name = TestWasm::CommitEntry.into();
-        host_context.workspace = raw_workspace;
+        host_context.change_workspace(raw_workspace);
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
@@ -199,7 +201,7 @@ pub mod wasm_test {
             .next()
             .unwrap();
         host_context.zome_name = TestWasm::CommitEntry.into();
-        host_context.workspace = raw_workspace;
+        host_context.change_workspace(raw_workspace);
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
@@ -234,7 +236,14 @@ pub mod wasm_test {
             // get the result of a commit entry
             let output: CommitEntryOutput = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
+                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                conductor_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(
+                    conductor_access,
+                    TestWasm::CommitEntry,
+                    "commit_entry",
+                    ()
+                )
             };
 
             // Write the database to file
@@ -286,7 +295,9 @@ pub mod wasm_test {
             let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
             let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
             let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "get_entry", ())
+            let mut conductor_access = fixt!(ZomeCallConductorAccess);
+            conductor_access.workspace = raw_workspace;
+            crate::call_test_ribosome!(conductor_access, TestWasm::CommitEntry, "get_entry", ())
         };
 
         let sb = match round.into_inner() {
