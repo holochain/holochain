@@ -42,10 +42,11 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
+use holo_hash::Hashed;
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    composite_hash::{EntryHash, HeaderAddress},
-    element::SignedHeaderHashed,
+    composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
+    element::{ChainElement, ChainElementEntry, SignedHeaderHashed},
     EntryHashed,
 };
 use tracing::*;
@@ -68,7 +69,7 @@ where
 /// The state of the cascade search
 enum Search {
     /// The entry is found and we can stop
-    Found(EntryHashed),
+    Found(ChainElement),
     /// We haven't found the entry yet and should
     /// continue searching down the cascade
     Continue,
@@ -123,46 +124,77 @@ where
         }
     }
 
+    // TODO: Currently treating "found in cas" as proof authority
+    // But this could also be authored data or stale authority data.
+    // I was an authority but my arc has changed
+    async fn default_dht_get_entry(
+        &self,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Option<ChainElement>> {
+        // Cas
+        let search = match self.primary.get_entry(&entry_hash).await? {
+            Some(entry) => {
+                let crud = self.primary_meta.get_dht_status(&entry_hash)?;
+                if let EntryDhtStatus::Live = crud {
+                    // TODO: PERF: Store header timestamp so this we
+                    // can sort these headers by time without lookup
+                    // self.primary_meta.get_headers(entry_hash)
+                    let mut headers = self.primary_meta.get_headers(entry_hash)?;
+                    let mut oldest = None;
+                    let mut result = None;
+                    while let Some(header) = headers.next()? {
+                        // TODO: Handle error
+                        self.primary.get_element(&header).await.unwrap().map(|element| {
+                            let t = element.header().timestamp();
+                            let o = oldest.get_or_insert(t);
+                            if t < *o {
+                                *o = t;
+                                result = Some(element);
+                            }
+                        });
+                    }
+                    if let Some(element) = result {
+                        Search::Found(element)
+                    } else {
+                        Search::NotInCascade
+                    }
+                } else {
+                    Search::NotInCascade
+                }
+            }
+            None => Search::Continue,
+        };
+
+        // Cache
+        match search {
+            // Search::Continue => Ok(self.cache.get_entry(&entry_hash).await?.and_then(|entry| {
+            //     self.cache_meta
+            //         .get_dht_status(entry.as_hash())
+            //         .ok()
+            //         .and_then(|crud| match crud {
+            //             EntryDhtStatus::Live => Some(entry),
+            //             _ => None,
+            //         })
+            // })),
+            Search::Continue => todo!(),
+            Search::Found(entry) => Ok(Some(entry)),
+            Search::NotInCascade => Ok(None),
+        }
+    }
+
     // TODO: dht_get_header -> Header
 
     #[instrument(skip(self))]
     /// Gets an entry from the cas or cache depending on it's metadata
-    // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
-        // Cas
-        let search = self
-            .primary
-            .get_entry(entry_hash)
-            .await?
-            .and_then(|entry| {
-                self.primary_meta
-                    .get_dht_status(entry_hash)
-                    .ok()
-                    .map(|crud| {
-                        if let EntryDhtStatus::Live = crud {
-                            Search::Found(entry)
-                        } else {
-                            Search::NotInCascade
-                        }
-                    })
-            })
-            .unwrap_or_else(|| Search::Continue);
-
-        // Cache
-        match search {
-            Search::Continue => Ok(self.cache.get_entry(entry_hash).await?.and_then(|entry| {
-                self.cache_meta
-                    .get_dht_status(entry_hash)
-                    .ok()
-                    .and_then(|crud| match crud {
-                        EntryDhtStatus::Live => Some(entry),
-                        _ => None,
-                    })
-            })),
-            Search::Found(entry) => Ok(Some(entry)),
-            Search::NotInCascade => Ok(None),
+    pub async fn dht_get(&self, hash: &AnyDhtHash) -> DatabaseResult<Option<ChainElement>> {
+        match hash.clone() {
+            AnyDhtHash::EntryContent(ec) => self.default_dht_get_entry(ec.into()).await,
+            AnyDhtHash::Agent(a) => self.default_dht_get_entry(a.into()).await,
+            AnyDhtHash::Header(_) => {
+                todo!();
+            }
         }
     }
 
