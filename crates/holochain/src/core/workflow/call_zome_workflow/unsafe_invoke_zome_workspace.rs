@@ -1,6 +1,6 @@
 #![allow(clippy::mutex_atomic)]
 use super::*;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use futures::Future;
 use std::{
     marker::PhantomData,

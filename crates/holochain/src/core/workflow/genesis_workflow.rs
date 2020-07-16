@@ -111,7 +111,7 @@ pub mod tests {
         core::{state::source_chain::SourceChain, SourceChainResult},
     };
     use fallible_iterator::FallibleIterator;
-    use holo_hash::Hashed;
+    use holo_hash::HoloHashExt;
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::{
         observability,

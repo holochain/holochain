@@ -30,10 +30,10 @@ use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspa
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
 use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
+use ::fixt::prelude::*;
 use error::RibosomeResult;
-use fixt::prelude::*;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::AgentPubKey;
-use holo_hash::AgentPubKeyFixturator;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;

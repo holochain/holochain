@@ -3,9 +3,9 @@ use crate::{
     core::state::{dht_op_integration::IntegrationQueueValue, workspace::Workspace},
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
+use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use fixt::prelude::*;
-use holo_hash::{DhtOpHashFixturator, HeaderHashFixturator};
+use holo_hash::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_state::{
     env::ReadManager,

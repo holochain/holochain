@@ -22,7 +22,7 @@ use crate::header::NewEntryHeader;
 use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::Timestamp;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryContentHashFixturator;

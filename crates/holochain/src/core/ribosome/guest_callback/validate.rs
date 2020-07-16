@@ -3,7 +3,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::EntryFixturator;
 use crate::fixt::ZomeNameFixturator;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
@@ -118,7 +118,7 @@ mod test {
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::AgentPubKeyFixturator;
     use holo_hash_core::HoloHashCoreHash;
     use holochain_serialized_bytes::prelude::*;

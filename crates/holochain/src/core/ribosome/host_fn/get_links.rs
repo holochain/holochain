@@ -75,8 +75,6 @@ pub mod wasm_test {
         produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
     };
     use hdk3::prelude::*;
-    use holo_hash_core::HoloHashCore;
-    use holo_hash_core::HoloHashCoreHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::*;
@@ -187,7 +185,7 @@ pub mod wasm_test {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let foo_bar: holo_hash_core::HoloHashCore = {
+            let foo_bar: holo_hash_core::EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
@@ -197,7 +195,7 @@ pub mod wasm_test {
                 )
             };
 
-            let foo_baz: holo_hash_core::HoloHashCore = {
+            let foo_baz: holo_hash_core::EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
@@ -251,7 +249,7 @@ pub mod wasm_test {
                 .unwrap();
 
             // anchor foo bar
-            let anchor_address_one: HoloHashCore = {
+            let anchor_address_one: EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
@@ -271,7 +269,7 @@ pub mod wasm_test {
             );
 
             // anchor foo baz
-            let anchor_address_two: HoloHashCore = {
+            let anchor_address_two: EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
@@ -353,7 +351,7 @@ pub mod wasm_test {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let output: Hashes = {
+            let output: EntryHashes = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,
@@ -381,7 +379,7 @@ pub mod wasm_test {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let output: Hashes = {
+            let output: EntryHashes = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 crate::call_test_ribosome!(
                     raw_workspace,

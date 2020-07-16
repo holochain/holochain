@@ -38,7 +38,6 @@ use crate::{
     },
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
-use holo_hash::Hashable;
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
     KeystoreApiSender, KeystoreSender,
@@ -63,7 +62,7 @@ use tracing::*;
 
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
-use holo_hash::{DnaHash, Hashed};
+use holo_hash::DnaHash;
 
 #[cfg(test)]
 use super::handle::mock::MockConductorHandle;

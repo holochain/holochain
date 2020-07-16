@@ -1,7 +1,7 @@
 //! A "Cell" represents a DNA/AgentId pair - a space where one dna/agent
 //! can track its source chain and service network requests / responses.
 
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holo_hash::{
     fixt::{AgentPubKeyFixturator, DnaHashFixturator},
     AgentPubKey, DnaHash,

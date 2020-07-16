@@ -2,7 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::ZomeNameFixturator;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::fixt::AppEntryTypeFixturator;

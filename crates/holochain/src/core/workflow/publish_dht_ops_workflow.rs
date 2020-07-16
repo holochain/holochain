@@ -163,7 +163,7 @@ mod tests {
         },
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
     use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashable, Hashed};

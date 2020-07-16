@@ -8,7 +8,7 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
-use holo_hash::{Hashed, HeaderHash};
+use holo_hash::{EntryHash, HeaderAddress, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -20,7 +20,6 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    composite_hash::{EntryHash, HeaderAddress},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
     Header,
@@ -30,7 +29,7 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use tracing::*;
 
 /// A CasBuf with Entries for values
-pub type EntryCas<'env> = CasBuf<'env, EntryHashed>;
+pub type EntryCas<'env> = CasBuf<'env, Entry>;
 /// A CasBuf with SignedHeaders for values
 pub type HeaderCas<'env> = CasBuf<'env, SignedHeaderHashed>;
 

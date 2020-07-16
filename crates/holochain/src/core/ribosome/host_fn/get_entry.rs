@@ -2,7 +2,7 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::{HostContext, RibosomeT};
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::future::FutureExt;
-use holo_hash::Hashed;
+use holo_hash::HoloHashExt;
 use holochain_state::error::DatabaseResult;
 use holochain_zome_types::Entry;
 use holochain_zome_types::GetEntryInput;

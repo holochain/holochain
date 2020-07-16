@@ -27,7 +27,7 @@ use crate::{
     },
     fixt::*,
 };
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holo_hash::{Hashable, Hashed, HeaderHash};
 use holo_hash_core::HoloHashCore;
 use holochain_keystore::Signature;

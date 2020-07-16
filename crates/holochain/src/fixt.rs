@@ -4,7 +4,7 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
 use crate::core::state::metadata::LinkMetaVal;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holo_hash::DnaHashFixturator;
 use holo_hash::HeaderHashFixturator;
 use holo_hash::HoloHashExt;

@@ -4,7 +4,7 @@ use crate::core::state::{
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use crate::fixt::{LinkMetaValFixturator, ZomeIdFixturator};
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };

@@ -9,7 +9,7 @@ pub enum MetaGetStatus<T> {
 mod tests {
     use crate::core::state::metadata::{EntryDhtStatus, MetadataBuf, MetadataBufT};
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};

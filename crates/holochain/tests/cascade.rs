@@ -1,4 +1,4 @@
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holochain::core::state::{
     cascade::Cascade,
     metadata::{LinkMetaKey, MetadataBuf},

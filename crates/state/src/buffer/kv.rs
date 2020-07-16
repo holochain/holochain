@@ -611,7 +611,7 @@ pub mod tests {
         test_utils::test_cell_env,
     };
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
     use std::collections::BTreeMap;
