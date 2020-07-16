@@ -65,7 +65,7 @@ use std::iter::Iterator;
 pub struct HostContext {
     pub zome_name: ZomeName,
     allowed_access: HostFnAccess,
-    conductor_access: ConductorAccess,
+    pub conductor_access: ConductorAccess,
 }
 
 fixturator!(
@@ -110,11 +110,6 @@ impl HostContext {
     pub fn allowed_access(&self) -> HostFnAccess {
         self.allowed_access
     }
-
-    #[cfg(test)]
-    pub(crate) fn change_workspace(&mut self, workspace: UnsafeInvokeZomeWorkspace) {
-        self.conductor_access.change_workspace(workspace);
-    }
 }
 
 #[derive(Clone)]
@@ -132,7 +127,11 @@ impl ConductorAccess {
     /// Get the workspace, panics if none was provided
     pub fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
         match self {
-            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{workspace, .. }) => {
+            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{workspace, .. }) |
+            ConductorAccess::InitConductorAccess(InitConductorAccess{workspace, .. }) |
+            ConductorAccess::MigrateAgentConductorAccess(MigrateAgentConductorAccess{workspace, .. }) |
+            ConductorAccess::ValidationPackageConductorAccess(ValidationPackageConductorAccess{workspace, .. }) |
+            ConductorAccess::PostCommitConductorAccess(PostCommitConductorAccess{workspace, .. }) => {
                 workspace
             }
             _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
@@ -142,7 +141,9 @@ impl ConductorAccess {
     /// Get the keystore, panics if none was provided
     pub fn keystore(&self) -> &KeystoreSender {
         match self {
-            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{keystore, .. }) => {
+            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{keystore, .. }) |
+            ConductorAccess::InitConductorAccess(InitConductorAccess{keystore, .. }) |
+            ConductorAccess::PostCommitConductorAccess(PostCommitConductorAccess{keystore, .. }) => {
                 keystore
             }
             _ => panic!("Gave access to a host function that uses the keystore without providing a keystore"),
@@ -154,22 +155,15 @@ impl ConductorAccess {
         match self {
             ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess {
                 network, ..
+            })
+            | ConductorAccess::InitConductorAccess(InitConductorAccess { network, .. })
+            | ConductorAccess::PostCommitConductorAccess(PostCommitConductorAccess {
+                network,
+                ..
             }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn change_workspace(&mut self, new_workspace: UnsafeInvokeZomeWorkspace) {
-        match self {
-            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess {
-                workspace, ..
-            }) => {
-                *workspace = new_workspace;
-            }
-            _ => panic!("No workspace on this call"),
         }
     }
 }
@@ -367,7 +361,7 @@ pub enum ZomeCallInvocationResponse {
 
 #[derive(Clone, Constructor)]
 pub struct ZomeCallConductorAccess {
-    workspace: UnsafeInvokeZomeWorkspace,
+    pub workspace: UnsafeInvokeZomeWorkspace,
     keystore: KeystoreSender,
     network: HolochainP2pCell,
 }

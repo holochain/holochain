@@ -2,6 +2,7 @@
 
 use super::*;
 
+use crate::core::ribosome::ZomeCallConductorAccessFixturator;
 use crate::here;
 use crate::{
     conductor::{
@@ -13,8 +14,8 @@ use crate::{
     },
     core::{
         ribosome::{
-            guest_callback::entry_defs::EntryDefsResult, host_fn, HostContextFixturator,
-            MockRibosomeT, NamedInvocation, ZomeCallInvocationFixturator,
+            guest_callback::entry_defs::EntryDefsResult, host_fn, ConductorAccess,
+            HostContextFixturator, MockRibosomeT, NamedInvocation, ZomeCallInvocationFixturator,
         },
         state::{
             cascade::{test_dbs_and_mocks, Cascade},
@@ -886,7 +887,9 @@ async fn commit_entry<'env>(
 
     let output = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-        host_context.change_workspace(raw_workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
+        host_context.conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let ribosome = Arc::new(ribosome);
         let host_context = Arc::new(host_context);
         host_fn::commit_entry::commit_entry(ribosome.clone(), host_context.clone(), input).unwrap()
@@ -920,7 +923,9 @@ async fn get_entry<'env>(
 
     let output = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-        host_context.change_workspace(raw_workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
+        host_context.conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let ribosome = Arc::new(ribosome);
         let host_context = Arc::new(host_context);
         host_fn::get_entry::get_entry(ribosome.clone(), host_context.clone(), input).unwrap()
@@ -963,7 +968,9 @@ async fn link_entries<'env>(
     let output = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
-        host_context.change_workspace(raw_workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
+        host_context.conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let ribosome = Arc::new(ribosome);
         let host_context = Arc::new(host_context);
         // Call the real link_entries host fn
@@ -1015,7 +1022,9 @@ async fn get_links<'env>(
     let output = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
-        host_context.change_workspace(raw_workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
+        host_context.conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let ribosome = Arc::new(ribosome);
         let host_context = Arc::new(host_context);
         host_fn::get_links::get_links(ribosome.clone(), host_context.clone(), input)

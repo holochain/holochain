@@ -113,6 +113,7 @@ pub fn commit_entry<'a>(
 pub mod wasm_test {
     use super::commit_entry;
     use crate::core::ribosome::error::RibosomeError;
+    use crate::core::ribosome::ConductorAccess;
     use crate::core::ribosome::HostContextFixturator;
     use crate::core::ribosome::ZomeCallConductorAccessFixturator;
     use crate::core::state::source_chain::ChainInvalidReason;
@@ -158,7 +159,9 @@ pub mod wasm_test {
             .next()
             .unwrap();
         host_context.zome_name = TestWasm::CommitEntry.into();
-        host_context.change_workspace(raw_workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
+        host_context.conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
@@ -201,7 +204,9 @@ pub mod wasm_test {
             .next()
             .unwrap();
         host_context.zome_name = TestWasm::CommitEntry.into();
-        host_context.change_workspace(raw_workspace);
+        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        conductor_access.workspace = raw_workspace;
+        host_context.conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
