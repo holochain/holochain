@@ -40,7 +40,7 @@ fixturator!(
 
 #[derive(Clone, Constructor)]
 pub struct MigrateAgentConductorAccess {
-    workspace: UnsafeInvokeZomeWorkspace,
+    pub workspace: UnsafeInvokeZomeWorkspace,
 }
 
 fixturator!(

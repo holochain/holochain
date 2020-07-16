@@ -35,9 +35,9 @@ fixturator!(
 
 #[derive(Clone, Constructor)]
 pub struct InitConductorAccess {
-    workspace: UnsafeInvokeZomeWorkspace,
-    keystore: KeystoreSender,
-    network: HolochainP2pCell,
+    pub workspace: UnsafeInvokeZomeWorkspace,
+    pub keystore: KeystoreSender,
+    pub network: HolochainP2pCell,
 }
 
 fixturator!(

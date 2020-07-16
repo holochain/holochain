@@ -41,7 +41,7 @@ fixturator!(
 
 #[derive(Clone, Constructor)]
 pub struct ValidationPackageConductorAccess {
-    workspace: UnsafeInvokeZomeWorkspace,
+    pub workspace: UnsafeInvokeZomeWorkspace,
 }
 
 fixturator!(
