@@ -11,10 +11,10 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
-pub struct Location(pub Wrapping<u32>);
+pub struct DhtLocation(pub Wrapping<u32>);
 
 /// The maximum you can hold either side of the hash location
-/// is half te circle.
+/// is half the circle.
 /// This is half of the furthest index you can hold
 /// 1 is added for rounding
 /// 1 more is added to represent the middle point of an odd length array
@@ -22,15 +22,15 @@ pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
-/// hash_location is where the hash is.
-/// The hash_location is the center of the arc
+/// dht_arc is where the hash is.
+/// The dht_arc is the center of the arc
 /// The half length is the length of items held
 /// from the center in both directions
 /// half_length 0 means nothing is held
-/// half_length 1 means just the hash_location is held
+/// half_length 1 means just the dht_arc is held
 /// half_length n where n > 1 will hold those positions out
 /// half_length u32::MAX / 2 + 1 covers all positions
-/// on either side of hash_location.
+/// on either side of dht_arc.
 /// Imagine an bidirectional array:
 /// ```text
 /// [4][3][2][1][0][1][2][3][4]
@@ -38,7 +38,7 @@ pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 /// [2][1][0][1][2]
 /// ```
 pub struct DhtArc {
-    hash_location: Location,
+    dht_arc: DhtLocation,
     half_length: u32,
 }
 
@@ -52,21 +52,21 @@ pub struct ArcRange {
 impl DhtArc {
     /// Create an Arc from a hash location plus a length on either side
     /// half length is (0..(u32::Max / 2 + 1))
-    pub fn new<I: Into<Location>>(hash_location: I, half_length: u32) -> Self {
+    pub fn new<I: Into<DhtLocation>>(dht_arc: I, half_length: u32) -> Self {
         let half_length = std::cmp::min(half_length, MAX_HALF_LENGTH);
         Self {
-            hash_location: hash_location.into(),
+            dht_arc: dht_arc.into(),
             half_length,
         }
     }
 
     /// Check if a location is contained in this arc
-    pub fn contains<I: Into<Location>>(&self, location: I) -> bool {
-        let location = location.into();
+    pub fn contains<I: Into<DhtLocation>>(&self, other_location: I) -> bool {
+        let other_location = other_location.into();
         let do_hold_something = self.half_length != 0;
-        let only_hold_self = self.half_length == 1 && self.hash_location == location;
+        let only_hold_self = self.half_length == 1 && self.dht_arc == other_location;
         // Add one to convert to "array length" from math distance
-        let dist_as_array_len = shortest_arc_distance(self.hash_location, location.0) + 1;
+        let dist_as_array_len = shortest_arc_distance(self.dht_arc, other_location.0) + 1;
         // Check for any other dist and the special case of the maximum array len
         let within_range = self.half_length > 1 && dist_as_array_len <= self.half_length;
         // Have to hold something and hold ourself or something within range
@@ -77,44 +77,44 @@ impl DhtArc {
     pub fn range(&self) -> ArcRange {
         if self.half_length == 0 {
             ArcRange {
-                start: Bound::Excluded(self.hash_location.into()),
-                end: Bound::Excluded(self.hash_location.into()),
+                start: Bound::Excluded(self.dht_arc.into()),
+                end: Bound::Excluded(self.dht_arc.into()),
             }
         } else if self.half_length == 1 {
             ArcRange {
-                start: Bound::Included(self.hash_location.into()),
-                end: Bound::Included(self.hash_location.into()),
+                start: Bound::Included(self.dht_arc.into()),
+                end: Bound::Included(self.dht_arc.into()),
             }
         } else if self.half_length == MAX_HALF_LENGTH {
             ArcRange {
                 start: Bound::Included(
-                    (self.hash_location.0 - Location::from(MAX_HALF_LENGTH - 1).0).0,
+                    (self.dht_arc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
                 ),
                 end: Bound::Included(
-                    (self.hash_location.0 + Location::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
+                    (self.dht_arc.0 + DhtLocation::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
                 ),
             }
         } else {
             ArcRange {
                 start: Bound::Included(
-                    (self.hash_location.0 - Location::from(self.half_length - 1).0).0,
+                    (self.dht_arc.0 - DhtLocation::from(self.half_length - 1).0).0,
                 ),
                 end: Bound::Included(
-                    (self.hash_location.0 + Location::from(self.half_length).0 - Wrapping(1)).0,
+                    (self.dht_arc.0 + DhtLocation::from(self.half_length).0 - Wrapping(1)).0,
                 ),
             }
         }
     }
 }
 
-impl From<u32> for Location {
+impl From<u32> for DhtLocation {
     fn from(a: u32) -> Self {
         Self(Wrapping(a))
     }
 }
 
-impl From<Location> for u32 {
-    fn from(l: Location) -> Self {
+impl From<DhtLocation> for u32 {
+    fn from(l: DhtLocation) -> Self {
         (l.0).0
     }
 }
@@ -162,7 +162,7 @@ impl RangeBounds<u32> for ArcRange {
 }
 
 /// Finds the shortest distance between two points on a circle
-fn shortest_arc_distance<A: Into<Location>, B: Into<Location>>(a: A, b: B) -> u32 {
+fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
     // Turn into wrapped u32s
     let a = a.into().0;
     let b = b.into().0;

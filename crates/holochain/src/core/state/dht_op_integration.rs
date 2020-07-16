@@ -142,7 +142,7 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
         &'env self,
         from: Option<Timestamp>,
         to: Option<Timestamp>,
-        dht_loc: Option<DhtArc>,
+        dht_arc: Option<DhtArc>,
     ) -> DatabaseResult<
         Box<dyn FallibleIterator<Item = IntegratedDhtOpsValue, Error = DatabaseError> + 'env>,
     > {
@@ -159,8 +159,8 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
                     None => Ok(Some(v)),
                     _ => Ok(None),
                 })
-                .filter_map(move |v| match dht_loc {
-                    Some(dht_loc) if dht_loc.contains(v.basis.get_loc()) => Ok(Some(v)),
+                .filter_map(move |v| match dht_arc {
+                    Some(dht_arc) if dht_arc.contains(v.basis.get_loc()) => Ok(Some(v)),
                     None => Ok(Some(v)),
                     _ => Ok(None),
                 }),
@@ -189,7 +189,7 @@ mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
-        // Create some integration valuesA
+        // Create some integration values
         let mut expected = Vec::new();
         let mut basis = AnyDhtHashFixturator::new(Predictable);
         let now = Utc::now();
