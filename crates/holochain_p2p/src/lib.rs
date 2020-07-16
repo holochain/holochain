@@ -13,6 +13,7 @@ pub use types::*;
 
 mod spawn;
 pub use spawn::*;
+pub use test::HolochainP2pCellFixturator;
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.

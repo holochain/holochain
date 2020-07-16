@@ -4,15 +4,14 @@ pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
 pub mod validation_package;
+use super::ConductorAccess;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use fallible_iterator::FallibleIterator;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
-use super::ConductorAccess;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
     conductor_access: ConductorAccess,

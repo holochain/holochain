@@ -4,7 +4,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
-use holochain::core::ribosome::ZomeCallInvocation;
+use holochain::core::ribosome::{ConductorAccess, ZomeCallInvocation};
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::prelude::*;
@@ -33,7 +33,8 @@ pub fn wasm_call_n(c: &mut Criterion) {
             TestWasm::Bench.into(),
         ]));
     let mut cap_secret_fixturator = CapSecretFixturator::new(Unpredictable);
-    let mut workspace_fixturator = holochain::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable);
+    let mut conductor_access_fixturator =
+        holochain::core::ribosome::ZomeCallConductorAccessFixturator::new(fixt::Unpredictable);
     let mut cell_id_fixturator = holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable);
     let mut agent_key_fixturator = AgentPubKeyFixturator::new(Unpredictable);
 
@@ -63,7 +64,8 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     // .build()
                     // .unwrap()
                     // .spawn(async {
-                    let w = workspace_fixturator.next().unwrap();
+                    let ca = conductor_access_fixturator.next().unwrap();
+                    let ca = ConductorAccess::ZomeCallConductorAccess(ca);
                     let r = ribosome_fixturator.next().unwrap();
                     let i = ZomeCallInvocation {
                         cell_id: cell_id_fixturator.next().unwrap(),
@@ -74,7 +76,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         provenance: agent_key_fixturator.next().unwrap(),
                     };
                     println!("{}", n);
-                    r.maybe_call(w, &i, &TestWasm::Bench.into(), "echo_bytes".into())
+                    r.maybe_call(ca, &i, &TestWasm::Bench.into(), "echo_bytes".into())
                         .unwrap();
                 });
                 // });

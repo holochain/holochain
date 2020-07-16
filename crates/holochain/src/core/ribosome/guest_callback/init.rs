@@ -1,9 +1,16 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::unsafe_invoke_zome_workspace::{
+    UnsafeInvokeZomeWorkspace, UnsafeInvokeZomeWorkspaceFixturator,
+};
 use crate::fixt::DnaDefFixturator;
+use crate::fixt::KeystoreSenderFixturator;
+use derive_more::Constructor;
 use fixt::prelude::*;
 use holo_hash::EntryContentHash;
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::{HolochainP2pCell, HolochainP2pCellFixturator};
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{zome::HostFnAccess, DnaDef};
 use holochain_zome_types::init::InitCallbackResult;
@@ -24,6 +31,18 @@ impl InitInvocation {
 fixturator!(
     InitInvocation;
     constructor fn new(DnaDef);
+);
+
+#[derive(Clone, Constructor)]
+pub struct InitConductorAccess {
+    workspace: UnsafeInvokeZomeWorkspace,
+    keystore: KeystoreSender,
+    network: HolochainP2pCell,
+}
+
+fixturator!(
+    InitConductorAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
 );
 
 impl Invocation for InitInvocation {

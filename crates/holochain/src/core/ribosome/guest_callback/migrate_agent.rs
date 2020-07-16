@@ -1,8 +1,12 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::unsafe_invoke_zome_workspace::{
+    UnsafeInvokeZomeWorkspace, UnsafeInvokeZomeWorkspaceFixturator,
+};
 use crate::fixt::DnaDefFixturator;
 use crate::fixt::MigrateAgentFixturator;
+use derive_more::Constructor;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{
@@ -32,6 +36,16 @@ impl MigrateAgentInvocation {
 fixturator!(
     MigrateAgentInvocation;
     constructor fn new(DnaDef, MigrateAgent);
+);
+
+#[derive(Clone, Constructor)]
+pub struct MigrateAgentConductorAccess {
+    workspace: UnsafeInvokeZomeWorkspace,
+}
+
+fixturator!(
+    MigrateAgentConductorAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace);
 );
 
 impl Invocation for MigrateAgentInvocation {

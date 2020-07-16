@@ -861,7 +861,7 @@ async fn commit_entry<'env>(
 
     ribosome
         .expect_run_entry_defs()
-        .returning(move |_| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
+        .returning(move |_, _| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
 
     let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
         .next()

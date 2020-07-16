@@ -1211,6 +1211,7 @@ dependencies = [
 name = "holochain_p2p"
 version = "0.0.1"
 dependencies = [
+ "fixt",
  "futures",
  "ghost_actor",
  "holo_hash",
@@ -1223,6 +1224,7 @@ dependencies = [
  "serde_bytes",
  "thiserror",
  "tokio",
+ "tokio_safe_block_on",
 ]
 
 [[package]]

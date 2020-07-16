@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
+use crate::core::ribosome::{ConductorAccess, ZomesToInvoke};
+use derive_more::Constructor;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
@@ -23,6 +24,20 @@ fixturator!(
     EntryDefsInvocation;
     constructor fn new();
 );
+
+#[derive(Clone, Constructor)]
+pub struct EntryDefsConductorAccess;
+
+fixturator!(
+    EntryDefsConductorAccess;
+    constructor fn new();
+);
+
+impl From<&ConductorAccess> for EntryDefsConductorAccess {
+    fn from(_: &ConductorAccess) -> Self {
+        Self
+    }
+}
 
 impl Invocation for EntryDefsInvocation {
     fn allowed_access(&self) -> HostFnAccess {

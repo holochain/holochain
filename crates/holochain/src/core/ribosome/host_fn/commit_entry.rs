@@ -49,7 +49,7 @@ pub fn commit_entry<'a>(
 
     // extract the entry defs for a zome
     let (header_entry_def_id, entry_visibility) = match match ribosome
-        .run_entry_defs(EntryDefsInvocation)?
+        .run_entry_defs((&host_context.conductor_access).into(), EntryDefsInvocation)?
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
@@ -92,7 +92,13 @@ pub fn commit_entry<'a>(
         .boxed()
     };
     tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-        unsafe { host_context.conductor_access.workspace_mut().apply_mut(call).await }
+        unsafe {
+            host_context
+                .conductor_access
+                .workspace()
+                .apply_mut(call)
+                .await
+        }
     }))???;
 
     // return the hash of the committed entry

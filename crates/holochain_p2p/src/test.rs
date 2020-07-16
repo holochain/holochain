@@ -1,3 +1,40 @@
+use crate::actor::HolochainP2pRefToCell;
+use crate::HolochainP2pCell;
+use fixt::prelude::*;
+use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator};
+
+fixturator!(
+    HolochainP2pCell;
+    curve Empty {
+        // TODO: Make this empty
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            holochain_p2p.to_cell(
+                DnaHashFixturator::new(Empty).next().unwrap(),
+                AgentPubKeyFixturator::new(Empty).next().unwrap(),
+            )
+        })
+    };
+    curve Unpredictable {
+        // TODO: Make this unpredictable
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            holochain_p2p.to_cell(
+                DnaHashFixturator::new(Unpredictable).next().unwrap(),
+                AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+            )
+        })
+    };
+    curve Predictable {
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            holochain_p2p.to_cell(
+                DnaHashFixturator::new(Predictable).next().unwrap(),
+                AgentPubKeyFixturator::new(Predictable).next().unwrap(),
+            )
+        })
+    };
+);
 #[cfg(test)]
 mod tests {
     use crate::*;

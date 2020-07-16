@@ -1,7 +1,11 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::unsafe_invoke_zome_workspace::{
+    UnsafeInvokeZomeWorkspace, UnsafeInvokeZomeWorkspaceFixturator,
+};
 use crate::fixt::ZomeNameFixturator;
+use derive_more::Constructor;
 use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
@@ -33,6 +37,16 @@ impl ValidationPackageInvocation {
 fixturator!(
     ValidationPackageInvocation;
     constructor fn new(ZomeName, AppEntryType);
+);
+
+#[derive(Clone, Constructor)]
+pub struct ValidationPackageConductorAccess {
+    workspace: UnsafeInvokeZomeWorkspace,
+}
+
+fixturator!(
+    ValidationPackageConductorAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace);
 );
 
 impl Invocation for ValidationPackageInvocation {

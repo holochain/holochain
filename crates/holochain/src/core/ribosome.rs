@@ -29,11 +29,25 @@ use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
 use crate::fixt::HostInputFixturator;
+use crate::fixt::KeystoreSenderFixturator;
 use crate::fixt::ZomeNameFixturator;
+use derive_more::Constructor;
 use error::RibosomeResult;
 use fixt::prelude::*;
+use guest_callback::{
+    entry_defs::{EntryDefsConductorAccess, EntryDefsConductorAccessFixturator},
+    init::{InitConductorAccess, InitConductorAccessFixturator},
+    migrate_agent::{MigrateAgentConductorAccess, MigrateAgentConductorAccessFixturator},
+    post_commit::{PostCommitConductorAccess, PostCommitConductorAccessFixturator},
+    validate::{ValidateConductorAccess, ValidateConductorAccessFixturator},
+    validation_package::{
+        ValidationPackageConductorAccess, ValidationPackageConductorAccessFixturator,
+    },
+};
 use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::{HolochainP2pCell, HolochainP2pCellFixturator};
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;
@@ -51,24 +65,42 @@ use std::iter::Iterator;
 pub struct HostContext {
     pub zome_name: ZomeName,
     allowed_access: HostFnAccess,
-    workspace: UnsafeInvokeZomeWorkspace,
+    conductor_access: ConductorAccess,
 }
 
 fixturator!(
+    ZomeCallConductorAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
+);
+
+fixturator!(
+    ConductorAccess;
+    variants [
+        ZomeCallConductorAccess(ZomeCallConductorAccess)
+        ValidateConductorAccess(ValidateConductorAccess)
+        InitConductorAccess(InitConductorAccess)
+        EntryDefsConductorAccess(EntryDefsConductorAccess)
+        MigrateAgentConductorAccess(MigrateAgentConductorAccess)
+        ValidationPackageConductorAccess(ValidationPackageConductorAccess)
+        PostCommitConductorAccess(PostCommitConductorAccess)
+    ];
+);
+
+fixturator!(
     HostContext;
-    constructor fn new(ZomeName, HostFnAccess, UnsafeInvokeZomeWorkspace);
+    constructor fn new(ZomeName, HostFnAccess, ConductorAccess);
 );
 
 impl HostContext {
     pub fn new(
         zome_name: ZomeName,
         allowed_access: HostFnAccess,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ConductorAccess,
     ) -> Self {
         Self {
             zome_name,
             allowed_access,
-            workspace,
+            conductor_access,
         }
     }
 
@@ -81,7 +113,64 @@ impl HostContext {
 
     #[cfg(test)]
     pub(crate) fn change_workspace(&mut self, workspace: UnsafeInvokeZomeWorkspace) {
-        self.workspace = workspace;
+        self.conductor_access.change_workspace(workspace);
+    }
+}
+
+#[derive(Clone)]
+pub enum ConductorAccess {
+    ZomeCallConductorAccess(ZomeCallConductorAccess),
+    ValidateConductorAccess(ValidateConductorAccess),
+    InitConductorAccess(InitConductorAccess),
+    EntryDefsConductorAccess(EntryDefsConductorAccess),
+    MigrateAgentConductorAccess(MigrateAgentConductorAccess),
+    ValidationPackageConductorAccess(ValidationPackageConductorAccess),
+    PostCommitConductorAccess(PostCommitConductorAccess),
+}
+
+impl ConductorAccess {
+    /// Get the workspace, panics if none was provided
+    pub fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
+        match self {
+            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{workspace, .. }) => {
+                workspace
+            }
+            _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
+        }
+    }
+
+    /// Get the keystore, panics if none was provided
+    pub fn keystore(&self) -> &KeystoreSender {
+        match self {
+            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{keystore, .. }) => {
+                keystore
+            }
+            _ => panic!("Gave access to a host function that uses the keystore without providing a keystore"),
+        }
+    }
+
+    /// Get the network, panics if none was provided
+    pub fn network(&self) -> &HolochainP2pCell {
+        match self {
+            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess {
+                network, ..
+            }) => network,
+            _ => panic!(
+                "Gave access to a host function that uses the network without providing a network"
+            ),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn change_workspace(&mut self, new_workspace: UnsafeInvokeZomeWorkspace) {
+        match self {
+            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess {
+                workspace, ..
+            }) => {
+                *workspace = new_workspace;
+            }
+            _ => panic!("No workspace on this call"),
+        }
     }
 }
 
@@ -276,6 +365,13 @@ pub enum ZomeCallInvocationResponse {
     ZomeApiFn(GuestOutput),
 }
 
+#[derive(Clone, Constructor)]
+pub struct ZomeCallConductorAccess {
+    workspace: UnsafeInvokeZomeWorkspace,
+    keystore: KeystoreSender,
+    network: HolochainP2pCell,
+}
+
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
 #[automock]
@@ -286,7 +382,7 @@ pub trait RibosomeT: Sized {
 
     fn maybe_call<I: Invocation + 'static>(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ConductorAccess,
         invocation: &I,
         zome_name: &ZomeName,
         to_call: String,
@@ -308,27 +404,31 @@ pub trait RibosomeT: Sized {
 
     fn run_init(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: InitConductorAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult>;
 
     fn run_migrate_agent(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: MigrateAgentConductorAccess,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
 
-    fn run_entry_defs(&self, invocation: EntryDefsInvocation) -> RibosomeResult<EntryDefsResult>;
+    fn run_entry_defs(
+        &self,
+        conductor_access: EntryDefsConductorAccess,
+        invocation: EntryDefsInvocation,
+    ) -> RibosomeResult<EntryDefsResult>;
 
     fn run_validation_package(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ValidationPackageConductorAccess,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult>;
 
     fn run_post_commit(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: PostCommitConductorAccess,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult>;
 
@@ -337,13 +437,13 @@ pub trait RibosomeT: Sized {
     /// [`run_callback`]: #method.run_callback
     fn run_validate(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ValidateConductorAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ConductorAccess,
         ribosome: R,
         invocation: I,
     ) -> CallIterator<R, I>;
@@ -352,18 +452,17 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
-        // TODO: ConductorHandle
+        conductor_access: ZomeCallConductorAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse>;
 }
 
 #[cfg(test)]
 pub mod wasm_test {
+    use super::ZomeCallConductorAccessFixturator;
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomeCallInvocationResponse;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
     use holochain_serialized_bytes::prelude::*;
@@ -379,7 +478,7 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $unsafe_workspace:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
+        ( $conductor_access:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
@@ -407,7 +506,7 @@ pub mod wasm_test {
                 .next()
                 .unwrap();
                 let zome_invocation_response =
-                    match ribosome.call_zome_function($unsafe_workspace, invocation.clone()) {
+                    match ribosome.call_zome_function($conductor_access, invocation.clone()) {
                         Ok(v) => v,
                         Err(e) => {
                             dbg!("call_zome_function error", &invocation, &e);
@@ -460,7 +559,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn invoke_foo_test() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let conductor_access = ZomeCallConductorAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -485,7 +584,9 @@ pub mod wasm_test {
             ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
-            ribosome.call_zome_function(workspace, invocation).unwrap()
+            ribosome
+                .call_zome_function(conductor_access, invocation)
+                .unwrap()
         );
     }
 }

@@ -1,3 +1,11 @@
+use super::{
+    guest_callback::{
+        entry_defs::EntryDefsConductorAccess, init::InitConductorAccess,
+        migrate_agent::MigrateAgentConductorAccess, post_commit::PostCommitConductorAccess,
+        validate::ValidateConductorAccess, validation_package::ValidationPackageConductorAccess,
+    },
+    ConductorAccess, ZomeCallConductorAccess,
+};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -44,7 +52,6 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use fallible_iterator::FallibleIterator;
 use holo_hash_core::HoloHashCoreHash;
 use holochain_types::dna::DnaError;
@@ -63,9 +70,6 @@ use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
 use holochain_zome_types::GuestOutput;
 use std::sync::Arc;
-use super::ConductorAccess;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
 
 /// Path to the wasm cache path
 const WASM_CACHE_PATH_ENV: &'static str = "HC_WASM_CACHE_PATH";
@@ -256,10 +260,10 @@ impl WasmRibosome {
 }
 
 macro_rules! do_callback {
-    ( $self:ident, $workspace:ident, $invocation:ident, $callback_result:ty ) => {{
+    ( $self:ident, $conductor_access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
-        let mut call_iterator = $self.call_iterator($workspace, $self.clone(), $invocation);
+        let mut call_iterator = $self.call_iterator($conductor_access, $self.clone(), $invocation);
         while let Some(output) = call_iterator.next()? {
             let (zome_name, callback_result) = output;
             let callback_result: $callback_result = callback_result.into();
@@ -349,12 +353,10 @@ impl RibosomeT for WasmRibosome {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
-        keystore: KeystoreSender,
-        network: HolochainP2pCell,
+        conductor_access: ZomeCallConductorAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
-        let conductor_access = ConductorAccess::new(workspace, keystore, network);
+        let conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let timeout = crate::start_hard_timeout!();
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
@@ -378,48 +380,65 @@ impl RibosomeT for WasmRibosome {
 
     fn run_validate(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ValidateConductorAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
-        do_callback!(self, workspace, invocation, ValidateCallbackResult)
+        let conductor_access = ConductorAccess::ValidateConductorAccess(conductor_access);
+        do_callback!(self, conductor_access, invocation, ValidateCallbackResult)
     }
 
     fn run_init(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: InitConductorAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult> {
-        do_callback!(self, workspace, invocation, InitCallbackResult)
+        let conductor_access = ConductorAccess::InitConductorAccess(conductor_access);
+        do_callback!(self, conductor_access, invocation, InitCallbackResult)
     }
 
-    fn run_entry_defs(&self, invocation: EntryDefsInvocation) -> RibosomeResult<EntryDefsResult> {
-        // Workspace can't be called
-        // This is safe because even if there's a mistake it will only return None
-        let workspace = UnsafeInvokeZomeWorkspace::null();
-        do_callback!(self, workspace, invocation, EntryDefsCallbackResult)
+    fn run_entry_defs(
+        &self,
+        conductor_access: EntryDefsConductorAccess,
+        invocation: EntryDefsInvocation,
+    ) -> RibosomeResult<EntryDefsResult> {
+        let conductor_access = ConductorAccess::EntryDefsConductorAccess(conductor_access);
+        do_callback!(self, conductor_access, invocation, EntryDefsCallbackResult)
     }
 
     fn run_migrate_agent(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: MigrateAgentConductorAccess,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult> {
-        do_callback!(self, workspace, invocation, MigrateAgentCallbackResult)
+        let conductor_access = ConductorAccess::MigrateAgentConductorAccess(conductor_access);
+        do_callback!(
+            self,
+            conductor_access,
+            invocation,
+            MigrateAgentCallbackResult
+        )
     }
 
     fn run_validation_package(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: ValidationPackageConductorAccess,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult> {
-        do_callback!(self, workspace, invocation, ValidationPackageCallbackResult)
+        let conductor_access = ConductorAccess::ValidationPackageConductorAccess(conductor_access);
+        do_callback!(
+            self,
+            conductor_access,
+            invocation,
+            ValidationPackageCallbackResult
+        )
     }
 
     fn run_post_commit(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        conductor_access: PostCommitConductorAccess,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult> {
-        do_callback!(self, workspace, invocation, PostCommitCallbackResult)
+        let conductor_access = ConductorAccess::PostCommitConductorAccess(conductor_access);
+        do_callback!(self, conductor_access, invocation, PostCommitCallbackResult)
     }
 }

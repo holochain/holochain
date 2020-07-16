@@ -1,5 +1,6 @@
 pub mod curve;
 
+use crate::conductor::delete_me_create_test_keystore;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContextFixturator;
@@ -10,6 +11,7 @@ use holo_hash::HeaderHashFixturator;
 use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
+use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_types::composite_hash::EntryHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
@@ -216,4 +218,24 @@ fixturator!(
         }
         hashes.into()
     }
+);
+
+fixturator!(
+    KeystoreSender;
+    curve Empty {
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            delete_me_create_test_keystore().await
+        })
+    };
+    curve Unpredictable {
+        // TODO: Make this unpredictable
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            delete_me_create_test_keystore().await
+        })
+    };
+    curve Predictable {
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            delete_me_create_test_keystore().await
+        })
+    };
 );

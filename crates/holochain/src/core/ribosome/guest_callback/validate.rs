@@ -3,6 +3,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::EntryFixturator;
 use crate::fixt::ZomeNameFixturator;
+use derive_more::Constructor;
 use fixt::prelude::*;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
@@ -35,6 +36,14 @@ impl ValidateInvocation {
 fixturator!(
     ValidateInvocation;
     constructor fn new(ZomeName, Entry);
+);
+
+#[derive(Clone, Constructor)]
+pub struct ValidateConductorAccess;
+
+fixturator!(
+    ValidateConductorAccess;
+    constructor fn new();
 );
 
 impl Invocation for ValidateInvocation {
