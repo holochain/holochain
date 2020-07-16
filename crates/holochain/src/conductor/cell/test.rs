@@ -25,7 +25,7 @@ async fn test_cell_handle_publish() {
     let TestEnvironment { env, tmpdir } = test_conductor_env();
     let keystore = env.keystore().clone();
     let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
-    let cell_id = fake_cell_id("dr. cell");
+    let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 

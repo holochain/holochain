@@ -18,16 +18,12 @@ pub fn get_entry<'a>(
     input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
     let (hash, _options) = input.into_inner();
-    let cascade_hash = hash.try_into()?;
     let call =
         |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
                 let cascade = workspace.cascade();
                 // safe block on
-                let maybe_entry = cascade
-                    .dht_get(&cascade_hash)
-                    .await?
-                    .map(|e| e.into_content());
+                let maybe_entry = cascade.dht_get(&hash).await?.map(|e| e.into_content());
                 Ok(maybe_entry)
             }
             .boxed()

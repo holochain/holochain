@@ -28,8 +28,7 @@ use crate::{
     fixt::*,
 };
 use ::fixt::prelude::*;
-use holo_hash::{Hashable, Hashed, HeaderHash};
-use holo_hash_core::HoloHashCore;
+use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
@@ -39,7 +38,6 @@ use holochain_state::{
 };
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
-    composite_hash::{AnyDhtHash, EntryHash},
     dht_op::{DhtOp, DhtOpHashed},
     fixt::*,
     header::{builder, ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader},

@@ -6,7 +6,8 @@ use crate::{
     dna::{DnaDef, DnaFile},
     prelude::*,
 };
-use holo_hash::{fixt::*, AgentPubKey};
+use holo_hash::{fixt::*, *};
+use holo_hash_core::hash_type;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -47,7 +48,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut wasm_code = Vec::new();
         for (zome_name, wasm) in zomes {
-            let wasm = crate::dna::wasm::DnaWasmHashed::with_data(wasm).await;
+            let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
             let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             dna.zomes.push((zome_name, Zome { wasm_hash }));
@@ -68,38 +69,52 @@ pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempd
 }
 
 /// A fixture example CellId for unit testing.
-pub fn fake_cell_id(name: char) -> CellId {
+pub fn fake_cell_id(name: u8) -> CellId {
     (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }
 
-/// A fixture example DnaHash for unit testing.
-pub fn fake_dna_hash(name: char) -> DnaHash {
-    DnaHash::new([name as u8; 32].to_vec())
+fn fake_holo_hash<T: holo_hash_core::HashType>(name: u8, hash_type: T) -> HoloHashImpl<T> {
+    HoloHashImpl::new_typed([name; 32].to_vec(), hash_type)
 }
 
-/// A fixture example AgentPubKey for unit testing.
+/// A fixture DnaHash for unit testing.
+pub fn fake_dna_hash(name: u8) -> DnaHash {
+    fake_holo_hash(name, hash_type::Dna)
+}
+
+/// A fixture HeaderHash for unit testing.
+pub fn fake_header_hash(name: u8) -> HeaderHash {
+    fake_holo_hash(name, hash_type::Header)
+}
+
+/// A fixture DhtOpHash for unit testing.
+pub fn fake_dht_op_hash(name: u8) -> DhtOpHash {
+    fake_holo_hash(name, hash_type::DhtOp)
+}
+
+/// A fixture AgentPubKey for unit testing.
+pub fn fake_agent_pub_key(name: u8) -> AgentPubKey {
+    fake_holo_hash(name, hash_type::Agent)
+}
+
+/// A fixture AgentPubKey for unit testing.
 pub fn fake_agent_pubkey_1() -> AgentPubKey {
     holo_hash::AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4")
         .unwrap()
 }
 
-/// Another fixture example AgentPubKey for unit testing.
+/// Another fixture AgentPubKey for unit testing.
 pub fn fake_agent_pubkey_2() -> AgentPubKey {
     holo_hash::AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK")
         .unwrap()
 }
 
-/// A fixture example HeaderHash for unit testing.
-pub fn fake_header_hash(name: char) -> HeaderHash {
-    HeaderHash::new([name as u8; 32].to_vec())
-}
-
-/// A fixture example CapSecret for unit testing.
+/// A fixture CapSecret for unit testing.
 pub fn fake_cap_secret() -> CapSecret {
     CapSecret::random()
 }
 
-/// A fixture example ZomeCallInvocationPayload for unit testing.
+/// A fixture ZomeCallInvocationPayload for unit testing.
 pub fn fake_zome_invocation_payload() -> HostInput {
     HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }

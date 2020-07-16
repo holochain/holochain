@@ -5,7 +5,7 @@
 //! [Entry]: holochain_types::Entry
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AgentPubKey, HeaderHash};
+use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{KvBuf, KvvBuf},
@@ -18,7 +18,6 @@ use holochain_state::{
 };
 use holochain_types::header;
 use holochain_types::{
-    composite_hash::{AnyDhtHash, EntryHash},
     header::{LinkAdd, LinkRemove, ZomeId},
     Header, HeaderHashed, Timestamp,
 };

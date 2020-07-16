@@ -4,6 +4,7 @@ use crate::{prelude::*, Header, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
 use holo_hash::HeaderAddress;
+use holo_hash_core::impl_hashable_content;
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -126,6 +127,20 @@ impl SignedHeader {
     }
 }
 
+impl_hashable_content!(SignedHeader, Header);
+
+impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
+    fn from(hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
+        todo!()
+    }
+}
+
+impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
+    fn from(hashed: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
+        todo!()
+    }
+}
+
 // HACK: In this representation, we have to clone the Header and store it twice,
 // once in the HeaderHashed, and once in the SignedHeader. The reason is that
 // the API currently requires references to both types, and it was easier to
@@ -175,7 +190,7 @@ impl SignedHeaderHashed {
         async move {
             let (header, signature) = signed_header.into();
             Ok(Self {
-                header: HeaderHashed::with_data(header.clone()).await,
+                header: HeaderHashed::with_data(header.clone()).await?,
                 signed_header: SignedHeader(header, signature),
             })
         }

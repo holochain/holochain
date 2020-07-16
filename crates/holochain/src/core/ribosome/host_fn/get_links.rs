@@ -21,8 +21,6 @@ pub fn get_links<'a>(
 ) -> RibosomeResult<GetLinksOutput> {
     let (base_address, tag) = input.into_inner();
 
-    let base_address = base_address.try_into()?;
-
     // Get zome id
     let zome_id: holochain_types::header::ZomeId = match ribosome
         .dna_file()

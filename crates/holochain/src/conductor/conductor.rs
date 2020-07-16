@@ -995,7 +995,7 @@ pub mod tests {
         let state = conductor.get_state().await.unwrap();
         assert_eq!(state, ConductorState::default());
 
-        let cell_id = fake_cell_id("dr. cell");
+        let cell_id = fake_cell_id(1);
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
 
         conductor

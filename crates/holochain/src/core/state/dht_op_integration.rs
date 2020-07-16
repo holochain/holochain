@@ -1,13 +1,11 @@
 //! Various types for the databases involved in the DhtOp integration workflow
 
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
-use holo_hash::DhtOpHash;
-use holo_hash::HoloHashExt;
+use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{buffer::KvBuf, prelude::Reader};
 use holochain_types::{
-    composite_hash::AnyDhtHash, dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus,
-    TimestampKey,
+    dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus, TimestampKey,
 };
 
 /// Database type for AuthoredDhtOps
@@ -92,7 +90,7 @@ pub struct IntegrationQueueValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::{DhtOpHash, HoloHashExt};
+    use holo_hash::*;
     use holochain_types::Timestamp;
 
     #[test]

@@ -51,10 +51,9 @@ pub enum RibosomeError {
     #[error(transparent)]
     UnsafeInvokeZomeWorkspaceError(#[from] UnsafeInvokeZomeWorkspaceError),
 
-    /// ident
-    #[error(transparent)]
-    HoloHashError(#[from] holo_hash_core::error::HoloHashError),
-
+    // /// ident
+    // #[error(transparent)]
+    // HoloHashError(#[from] holo_hash_core::error::HoloHashError),
     /// ident
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),

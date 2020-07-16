@@ -90,7 +90,7 @@ wasm_io_types!(
             crate::link::LinkTag,
         ),
     );
-    pub struct LinkEntriesOutput(holo_hash_core::EntryHash);
+    pub struct LinkEntriesOutput(holo_hash_core::HeaderHash);
     // @TODO
     pub struct KeystoreInput(());
     pub struct KeystoreOutput(());

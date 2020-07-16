@@ -12,7 +12,6 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    composite_hash::HeaderAddress,
     dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,

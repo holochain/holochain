@@ -64,7 +64,7 @@ impl TestKeystore {
         Self {
             internal_sender,
             fixture_keypairs,
-            active_keypairs: HashMap::new(),
+            active_keypairs: HashMap::<holo_hash::AgentPubKey, _>::new(),
         }
     }
 }

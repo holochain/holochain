@@ -1,5 +1,5 @@
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-pub use holo_hash::{AgentPubKey, Hashed};
+pub use holo_hash_core::*;
 pub use holochain_types::{element::ChainElement, HeaderHashed};
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
@@ -116,14 +116,12 @@ mod tests {
     use super::*;
     use holo_hash::{HeaderHash, HoloHashExt};
     use holochain_types::{
-        composite_hash::HeaderAddress, element::SignedHeaderHashed, header::InitZomesComplete,
-        test_utils::fake_agent_pubkey_1, Timestamp,
+        element::SignedHeaderHashed,
+        header::InitZomesComplete,
+        test_utils::{fake_agent_pubkey_1, fake_header_hash},
+        Timestamp,
     };
     use std::convert::TryInto;
-
-    async fn fake_addr(n: &str) -> HeaderAddress {
-        HeaderHash::with_data(n.as_bytes().to_vec()).await.into()
-    }
 
     async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderAddress) -> ChainElement {
         let keystore = holochain_state::test_utils::test_keystore();
@@ -145,7 +143,7 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_addr("no-prev").await,
+            fake_header_hash(1).await,
         )
         .await;
         let second = test_gen(
@@ -165,13 +163,13 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_addr("no-prev").await,
+            fake_header_hash(1).await,
         )
         .await;
         let second = test_gen(
             "2020-05-05T19:16:04.366431045Z".try_into().unwrap(),
             13,
-            fake_addr("no-prev2").await,
+            fake_header_hash(2).await,
         )
         .await;
 
@@ -186,7 +184,7 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_addr("no-prev").await,
+            fake_header_hash(1).await,
         )
         .await;
         let second = test_gen(
@@ -207,7 +205,7 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_addr("no-prev").await,
+            fake_header_hash(1).await,
         )
         .await;
         let second = test_gen(

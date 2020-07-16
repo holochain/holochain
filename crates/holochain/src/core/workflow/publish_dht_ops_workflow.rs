@@ -22,7 +22,7 @@ use crate::core::{
     },
 };
 use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, HoloHashExt};
+use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::KvBuf,
@@ -30,7 +30,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{GetDb, Reader},
 };
-use holochain_types::{composite_hash::AnyDhtHash, dht_op::DhtOp};
+use holochain_types::dht_op::DhtOp;
 use std::collections::HashMap;
 use tracing::*;
 
