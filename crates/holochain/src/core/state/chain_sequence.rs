@@ -180,7 +180,7 @@ pub mod tests {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             assert_eq!(buf.chain_head(), None);
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
@@ -189,7 +189,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::new(vec![
+                    &HeaderHash::from_raw_bytes(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                     ])
@@ -197,7 +197,7 @@ pub mod tests {
                 )
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
@@ -206,7 +206,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::new(vec![
+                    &HeaderHash::from_raw_bytes(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
                     ])
@@ -214,7 +214,7 @@ pub mod tests {
                 )
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
@@ -223,7 +223,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::new(vec![
+                    &HeaderHash::from_raw_bytes(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2
                     ])
@@ -243,14 +243,14 @@ pub mod tests {
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
@@ -259,7 +259,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::new(vec![
+                    &HeaderHash::from_raw_bytes(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
                     ])
@@ -267,7 +267,7 @@ pub mod tests {
                 )
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
@@ -282,7 +282,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::new(vec![
+                    &HeaderHash::from_raw_bytes(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2
                     ])
@@ -297,21 +297,21 @@ pub mod tests {
         env.with_reader::<SourceChainError, _, _>(|reader| {
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
@@ -326,7 +326,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::new(vec![
+                    &HeaderHash::from_raw_bytes(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5
                     ])
@@ -354,21 +354,21 @@ pub mod tests {
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
@@ -390,21 +390,21 @@ pub mod tests {
             let reader = env.reader()?;
             let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
             );
             buf.put_header(
-                HeaderHash::new(vec![
+                HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
@@ -418,7 +418,7 @@ pub mod tests {
 
         let (result1, result2) = tokio::join!(task1, task2);
 
-        let expected_hash = HeaderHash::new(vec![
+        let expected_hash = HeaderHash::from_raw_bytes(vec![
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 5,
         ])

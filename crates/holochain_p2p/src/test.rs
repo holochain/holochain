@@ -6,7 +6,7 @@ mod tests {
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash::$p::new([$c as u8; 36].to_vec())
+            holo_hash::$p::from_raw_bytes([$c as u8; 36].to_vec())
         };
     }
 
@@ -131,7 +131,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let header_hash = holo_hash::AnyDhtHash::new_typed(
+        let header_hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash_core::hash_type::AnyDht::Header,
         );
@@ -178,7 +178,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let hash = holo_hash::AnyDhtHash::new_typed(
+        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash_core::hash_type::AnyDht::Header,
         );
@@ -224,7 +224,7 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        let hash = holo_hash::AnyDhtHash::new_typed(
+        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash_core::hash_type::AnyDht::Header,
         );

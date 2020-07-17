@@ -141,7 +141,9 @@ impl_hashable_content!(SignedHeader, Header);
 // - Having a lazily instantiable SignedHeader, so we only have to clone if needed
 // - Having HeaderHashed take AsRefs for its arguments, so you can have a
 //    HeaderHashed of references instead of values
-/// the header and the signature that signed it
+// FIXME: OR, even better yet, do away with this struct and just use
+// HoloHashed<SignedHeader> instead, if possible and expedient
+/// The header and the signature that signed it
 #[derive(Clone, Debug, PartialEq)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,

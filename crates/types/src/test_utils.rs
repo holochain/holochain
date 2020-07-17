@@ -26,7 +26,7 @@ pub fn fake_dna_wasm() -> DnaWasm {
 /// simple Zome fixture
 pub fn fake_zome() -> Zome {
     Zome {
-        wasm_hash: holo_hash_core::WasmHash::new(vec![0; 36]),
+        wasm_hash: holo_hash_core::WasmHash::from_raw_bytes(vec![0; 36]),
     }
 }
 
@@ -74,7 +74,7 @@ pub fn fake_cell_id(name: u8) -> CellId {
 }
 
 fn fake_holo_hash<T: holo_hash_core::HashType>(name: u8, hash_type: T) -> HoloHashImpl<T> {
-    HoloHashImpl::new_typed([name; 32].to_vec(), hash_type)
+    HoloHashImpl::from_raw_bytes_and_type([name; 32].to_vec(), hash_type)
 }
 
 /// A fixture DnaHash for unit testing.

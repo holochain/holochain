@@ -96,8 +96,8 @@ mod tests {
     use super::*;
     use crate::core::state::{dht_op_integration::IntegrationQueueKey, source_chain::SourceChain};
 
-    use fallible_iterator::FallibleIterator;
     use ::fixt::prelude::*;
+    use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
     use holochain_state::{
