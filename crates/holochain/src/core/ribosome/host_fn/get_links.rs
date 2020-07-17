@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::{
-    ribosome::{HostContext, RibosomeT},
+    ribosome::{CallContext, RibosomeT},
     state::metadata::{LinkMetaKey, LinkMetaVal},
     workflow::InvokeZomeWorkspace,
 };
@@ -16,7 +16,7 @@ use std::sync::Arc;
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_links<'a>(
     ribosome: Arc<impl RibosomeT>,
-    host_context: Arc<HostContext>,
+    call_context: Arc<CallContext>,
     input: GetLinksInput,
 ) -> RibosomeResult<GetLinksOutput> {
     let (base_address, tag) = input.into_inner();
@@ -29,10 +29,10 @@ pub fn get_links<'a>(
         .dna
         .zomes
         .iter()
-        .position(|(name, _)| name == &host_context.zome_name)
+        .position(|(name, _)| name == &call_context.zome_name)
     {
         Some(index) => holochain_types::header::ZomeId::from(index as u8),
-        None => Err(RibosomeError::ZomeNotExists(host_context.zome_name.clone()))?,
+        None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
     };
 
     let call =
@@ -56,13 +56,7 @@ pub fn get_links<'a>(
         };
 
     let links = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        unsafe {
-            host_context
-                .conductor_access
-                .workspace()
-                .apply_ref(call)
-                .await
-        }
+        unsafe { call_context.host_access.workspace().apply_ref(call).await }
     })??;
 
     let links: Vec<Link> = links.into_iter().map(|l| l.into_link()).collect();
@@ -73,7 +67,7 @@ pub fn get_links<'a>(
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::queue_consumer::TriggerSender;
-    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
+    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::workspace::Workspace;
     use crate::core::workflow::integrate_dht_ops_workflow::{
         integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
@@ -108,7 +102,7 @@ pub mod wasm_test {
             // ensure foo.bar twice to ensure idempotency
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -119,7 +113,7 @@ pub mod wasm_test {
             };
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -132,7 +126,7 @@ pub mod wasm_test {
             // ensure foo.baz
             let _: () = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -183,7 +177,7 @@ pub mod wasm_test {
 
             let output: TestBool = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -205,7 +199,7 @@ pub mod wasm_test {
 
             let foo_bar: holo_hash_core::HoloHashCore = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -217,7 +211,7 @@ pub mod wasm_test {
 
             let foo_baz: holo_hash_core::HoloHashCore = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -237,7 +231,7 @@ pub mod wasm_test {
 
             let output: holochain_zome_types::link::Links = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -275,7 +269,7 @@ pub mod wasm_test {
             // anchor foo bar
             let anchor_address_one: HoloHashCore = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -297,7 +291,7 @@ pub mod wasm_test {
             // anchor foo baz
             let anchor_address_two: HoloHashCore = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -360,7 +354,7 @@ pub mod wasm_test {
             let input = anchor_address_one.clone();
             let output: MaybeAnchor = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(conductor_access, TestWasm::Anchor, "get_anchor", input)
             };
@@ -383,7 +377,7 @@ pub mod wasm_test {
 
             let output: Hashes = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -413,7 +407,7 @@ pub mod wasm_test {
 
             let output: Hashes = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,
@@ -444,7 +438,7 @@ pub mod wasm_test {
 
             let output: AnchorTags = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut conductor_access = fixt!(ZomeCallConductorAccess);
+                let mut conductor_access = fixt!(ZomeCallHostAccess);
                 conductor_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(
                     conductor_access,

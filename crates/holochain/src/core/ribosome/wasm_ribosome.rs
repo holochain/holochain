@@ -1,10 +1,10 @@
 use super::{
     guest_callback::{
-        entry_defs::EntryDefsConductorAccess, init::InitConductorAccess,
-        migrate_agent::MigrateAgentConductorAccess, post_commit::PostCommitConductorAccess,
-        validate::ValidateConductorAccess, validation_package::ValidationPackageConductorAccess,
+        entry_defs::EntryDefsHostAccess, init::InitHostAccess,
+        migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
+        validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
     },
-    ConductorAccess, ZomeCallConductorAccess,
+    HostAccess, ZomeCallHostAccess,
 };
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
@@ -37,6 +37,7 @@ use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
+use crate::core::ribosome::host_fn::remote_call::remote_call;
 use crate::core::ribosome::host_fn::remove_entry::remove_entry;
 use crate::core::ribosome::host_fn::remove_link::remove_link;
 use crate::core::ribosome::host_fn::schedule::schedule;
@@ -46,7 +47,7 @@ use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update_entry::update_entry;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
-use crate::core::ribosome::HostContext;
+use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -91,7 +92,7 @@ impl WasmRibosome {
         Self { dna_file }
     }
 
-    pub fn module(&self, host_context: HostContext) -> RibosomeResult<Module> {
+    pub fn module(&self, host_context: CallContext) -> RibosomeResult<Module> {
         let zome_name: ZomeName = host_context.zome_name();
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         Ok(holochain_wasmer_host::instantiate::module(
@@ -108,7 +109,7 @@ impl WasmRibosome {
         Ok(self.dna_file.dna().get_zome(zome_name)?.wasm_hash.get_raw())
     }
 
-    pub fn instance(&self, host_context: HostContext) -> RibosomeResult<Instance> {
+    pub fn instance(&self, host_context: CallContext) -> RibosomeResult<Instance> {
         let zome_name: ZomeName = host_context.zome_name();
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = Self::imports(self, host_context);
@@ -120,14 +121,14 @@ impl WasmRibosome {
         )?)
     }
 
-    fn imports(&self, host_context: HostContext) -> ImportObject {
+    fn imports(&self, call_context: CallContext) -> ImportObject {
         let instance_timeout = crate::start_hard_timeout!();
 
-        let host_fn_access = host_context.allowed_access();
+        let host_fn_access = (&call_context.host_access()).into();
 
         // it is important that WasmRibosome and ZomeCallInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
-        let host_context_arc = std::sync::Arc::new(host_context);
+        let host_context_arc = std::sync::Arc::new(call_context);
 
         macro_rules! invoke_host_function {
             ( $host_function:ident ) => {{
@@ -170,7 +171,7 @@ impl WasmRibosome {
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
 
         if let HostFnAccess {
-            conductor: Permission::Allow,
+            keystore: Permission::Allow,
             ..
         } = host_fn_access
         {
@@ -186,19 +187,27 @@ impl WasmRibosome {
         }
 
         if let HostFnAccess {
-            non_determinism: Permission::Allow,
+            dna_bindings: Permission::Allow,
             ..
         } = host_fn_access
         {
             ns.insert("__zome_info", func!(invoke_host_function!(zome_info)));
             ns.insert("__property", func!(invoke_host_function!(property)));
+        } else {
+            ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
+            ns.insert("__property", func!(invoke_host_function!(unreachable)));
+        }
+
+        if let HostFnAccess {
+            non_determinism: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
             ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
             ns.insert("__show_env", func!(invoke_host_function!(show_env)));
             ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
             ns.insert("__capability", func!(invoke_host_function!(capability)));
         } else {
-            ns.insert("__zome_info", func!(invoke_host_function!(unreachable)));
-            ns.insert("__property", func!(invoke_host_function!(unreachable)));
             ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
             ns.insert("__show_env", func!(invoke_host_function!(unreachable)));
             ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
@@ -230,7 +239,15 @@ impl WasmRibosome {
         }
 
         if let HostFnAccess {
-            side_effects: Permission::Allow,
+            write_network: Permission::Allow,
+            ..
+        } = host_fn_access
+        {
+            ns.insert("__remote_call", func!(invoke_host_function!(remote_call)));
+        }
+
+        if let HostFnAccess {
+            write_workspace: Permission::Allow,
             ..
         } = host_fn_access
         {
@@ -260,10 +277,10 @@ impl WasmRibosome {
 }
 
 macro_rules! do_callback {
-    ( $self:ident, $conductor_access:ident, $invocation:ident, $callback_result:ty ) => {{
+    ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
-        let mut call_iterator = $self.call_iterator($conductor_access, $self.clone(), $invocation);
+        let mut call_iterator = $self.call_iterator($access.into(), $self.clone(), $invocation);
         while let Some(output) = call_iterator.next()? {
             let (zome_name, callback_result) = output;
             let callback_result: $callback_result = callback_result.into();
@@ -301,15 +318,14 @@ impl RibosomeT for WasmRibosome {
     /// if it does not exist then return Ok(None)
     fn maybe_call<I: Invocation>(
         &self,
-        conductor_access: ConductorAccess,
+        host_access: HostAccess,
         invocation: &I,
         zome_name: &ZomeName,
         to_call: String,
     ) -> Result<Option<GuestOutput>, RibosomeError> {
-        let host_context = HostContext {
+        let host_context = CallContext {
             zome_name: zome_name.clone(),
-            allowed_access: invocation.allowed_access(),
-            conductor_access,
+            host_access,
         };
         let module_timeout = crate::start_hard_timeout!();
         let module = self.module(host_context.clone())?;
@@ -342,28 +358,27 @@ impl RibosomeT for WasmRibosome {
 
     fn call_iterator<R: RibosomeT, I: crate::core::ribosome::Invocation>(
         &self,
-        conductor_access: ConductorAccess,
+        access: HostAccess,
         ribosome: R,
         invocation: I,
     ) -> CallIterator<R, I> {
-        CallIterator::new(conductor_access, ribosome, invocation)
+        CallIterator::new(access, ribosome, invocation)
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         &self,
-        conductor_access: ZomeCallConductorAccess,
+        host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
-        let conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
         let timeout = crate::start_hard_timeout!();
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
         let fn_name = invocation.fn_name.clone();
 
         let guest_output: GuestOutput = match self
-            .call_iterator(conductor_access, self.clone(), invocation)
+            .call_iterator(host_access.into(), self.clone(), invocation)
             .next()?
         {
             Some(result) => result.1,
@@ -380,65 +395,49 @@ impl RibosomeT for WasmRibosome {
 
     fn run_validate(
         &self,
-        conductor_access: ValidateConductorAccess,
+        access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
-        let conductor_access = ConductorAccess::ValidateConductorAccess(conductor_access);
-        do_callback!(self, conductor_access, invocation, ValidateCallbackResult)
+        do_callback!(self, access, invocation, ValidateCallbackResult)
     }
 
     fn run_init(
         &self,
-        conductor_access: InitConductorAccess,
+        access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult> {
-        let conductor_access = ConductorAccess::InitConductorAccess(conductor_access);
-        do_callback!(self, conductor_access, invocation, InitCallbackResult)
+        do_callback!(self, access, invocation, InitCallbackResult)
     }
 
     fn run_entry_defs(
         &self,
-        conductor_access: EntryDefsConductorAccess,
+        access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult> {
-        let conductor_access = ConductorAccess::EntryDefsConductorAccess(conductor_access);
-        do_callback!(self, conductor_access, invocation, EntryDefsCallbackResult)
+        do_callback!(self, access, invocation, EntryDefsCallbackResult)
     }
 
     fn run_migrate_agent(
         &self,
-        conductor_access: MigrateAgentConductorAccess,
+        access: MigrateAgentHostAccess,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult> {
-        let conductor_access = ConductorAccess::MigrateAgentConductorAccess(conductor_access);
-        do_callback!(
-            self,
-            conductor_access,
-            invocation,
-            MigrateAgentCallbackResult
-        )
+        do_callback!(self, access, invocation, MigrateAgentCallbackResult)
     }
 
     fn run_validation_package(
         &self,
-        conductor_access: ValidationPackageConductorAccess,
+        access: ValidationPackageHostAccess,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult> {
-        let conductor_access = ConductorAccess::ValidationPackageConductorAccess(conductor_access);
-        do_callback!(
-            self,
-            conductor_access,
-            invocation,
-            ValidationPackageCallbackResult
-        )
+        do_callback!(self, access, invocation, ValidationPackageCallbackResult)
     }
 
     fn run_post_commit(
         &self,
-        conductor_access: PostCommitConductorAccess,
+        access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult> {
-        let conductor_access = ConductorAccess::PostCommitConductorAccess(conductor_access);
-        do_callback!(self, conductor_access, invocation, PostCommitCallbackResult)
+        do_callback!(self, access, invocation, PostCommitCallbackResult)
     }
 }

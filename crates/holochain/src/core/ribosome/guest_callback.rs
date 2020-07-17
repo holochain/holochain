@@ -4,7 +4,7 @@ pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
 pub mod validation_package;
-use super::ConductorAccess;
+use super::HostAccess;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
@@ -14,7 +14,7 @@ use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
-    conductor_access: ConductorAccess,
+    host_access: HostAccess,
     ribosome: R,
     invocation: I,
     remaining_zomes: Vec<ZomeName>,
@@ -22,9 +22,9 @@ pub struct CallIterator<R: RibosomeT, I: Invocation> {
 }
 
 impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
-    pub fn new(conductor_access: ConductorAccess, ribosome: R, invocation: I) -> Self {
+    pub fn new(host_access: HostAccess, ribosome: R, invocation: I) -> Self {
         Self {
-            conductor_access,
+            host_access,
             remaining_zomes: ribosome.zomes_to_invoke(invocation.zomes()),
             ribosome,
             remaining_components: invocation.fn_components(),
@@ -45,7 +45,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                 match self.remaining_components.next() {
                     Some(to_call) => {
                         match self.ribosome.maybe_call(
-                            self.conductor_access.clone(),
+                            self.host_access.clone(),
                             &self.invocation,
                             zome_name,
                             to_call,
@@ -75,11 +75,11 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
 mod tests {
 
     use super::CallIterator;
-    use crate::core::ribosome::ConductorAccess;
     use crate::core::ribosome::FnComponents;
+    use crate::core::ribosome::HostAccess;
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::MockRibosomeT;
-    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
+    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::FnComponentsFixturator;
     use crate::fixt::ZomeNameFixturator;
@@ -92,7 +92,6 @@ mod tests {
     use std::convert::TryInto;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn call_iterator_iterates() {
         // stuff we need to test with
         let mut sequence = Sequence::new();
@@ -100,10 +99,10 @@ mod tests {
 
         let mut invocation = MockInvocation::new();
 
-        let conductor_access = ZomeCallConductorAccessFixturator::new(fixt::Empty)
+        let host_access = ZomeCallHostAccessFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        let conductor_access = ConductorAccess::ZomeCallConductorAccess(conductor_access);
+        let host_access = HostAccess::from(host_access);
         let zome_name_fixturator = ZomeNameFixturator::new(fixt::Unpredictable);
         let mut fn_components_fixturator = FnComponentsFixturator::new(fixt::Unpredictable);
 
@@ -155,7 +154,7 @@ mod tests {
                 .return_const(fn_components.clone());
         }
 
-        let call_iterator = CallIterator::new(conductor_access, ribosome, invocation);
+        let call_iterator = CallIterator::new(host_access, ribosome, invocation);
 
         let output: Vec<(_, GuestOutput)> = call_iterator.collect().unwrap();
         assert_eq!(output.len(), zome_names.len() * fn_components.0.len());

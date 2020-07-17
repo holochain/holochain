@@ -35,14 +35,12 @@ use derive_more::Constructor;
 use error::RibosomeResult;
 use fixt::prelude::*;
 use guest_callback::{
-    entry_defs::{EntryDefsConductorAccess, EntryDefsConductorAccessFixturator},
-    init::{InitConductorAccess, InitConductorAccessFixturator},
-    migrate_agent::{MigrateAgentConductorAccess, MigrateAgentConductorAccessFixturator},
-    post_commit::{PostCommitConductorAccess, PostCommitConductorAccessFixturator},
-    validate::{ValidateConductorAccess, ValidateConductorAccessFixturator},
-    validation_package::{
-        ValidationPackageConductorAccess, ValidationPackageConductorAccessFixturator,
-    },
+    entry_defs::{EntryDefsHostAccess, EntryDefsHostAccessFixturator},
+    init::{InitHostAccess, InitHostAccessFixturator},
+    migrate_agent::{MigrateAgentHostAccess, MigrateAgentHostAccessFixturator},
+    post_commit::{PostCommitHostAccess, PostCommitHostAccessFixturator},
+    validate::{ValidateHostAccess, ValidateHostAccessFixturator},
+    validation_package::{ValidationPackageHostAccess, ValidationPackageHostAccessFixturator},
 };
 use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
@@ -53,7 +51,7 @@ use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaFile;
-use holochain_types::fixt::{CapSecretFixturator, HostFnAccessFixturator};
+use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
@@ -62,76 +60,86 @@ use mockall::automock;
 use std::iter::Iterator;
 
 #[derive(Clone)]
-pub struct HostContext {
+pub struct CallContext {
     pub zome_name: ZomeName,
-    allowed_access: HostFnAccess,
-    pub conductor_access: ConductorAccess,
+    pub host_access: HostAccess,
 }
 
 fixturator!(
-    ZomeCallConductorAccess;
+    ZomeCallHostAccess;
     constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
 );
 
 fixturator!(
-    ConductorAccess;
+    HostAccess;
     variants [
-        ZomeCallConductorAccess(ZomeCallConductorAccess)
-        ValidateConductorAccess(ValidateConductorAccess)
-        InitConductorAccess(InitConductorAccess)
-        EntryDefsConductorAccess(EntryDefsConductorAccess)
-        MigrateAgentConductorAccess(MigrateAgentConductorAccess)
-        ValidationPackageConductorAccess(ValidationPackageConductorAccess)
-        PostCommitConductorAccess(PostCommitConductorAccess)
+        ZomeCall(ZomeCallHostAccess)
+        Validate(ValidateHostAccess)
+        Init(InitHostAccess)
+        EntryDefs(EntryDefsHostAccess)
+        MigrateAgent(MigrateAgentHostAccess)
+        ValidationPackage(ValidationPackageHostAccess)
+        PostCommit(PostCommitHostAccess)
     ];
 );
 
 fixturator!(
-    HostContext;
-    constructor fn new(ZomeName, HostFnAccess, ConductorAccess);
+    CallContext;
+    constructor fn new(ZomeName, HostAccess);
 );
 
-impl HostContext {
-    pub fn new(
-        zome_name: ZomeName,
-        allowed_access: HostFnAccess,
-        conductor_access: ConductorAccess,
-    ) -> Self {
+impl CallContext {
+    pub fn new(zome_name: ZomeName, host_access: HostAccess) -> Self {
         Self {
             zome_name,
-            allowed_access,
-            conductor_access,
+            host_access,
         }
     }
 
     pub fn zome_name(&self) -> ZomeName {
         self.zome_name.clone()
     }
-    pub fn allowed_access(&self) -> HostFnAccess {
-        self.allowed_access
+    pub fn host_access(&self) -> HostAccess {
+        self.host_access.clone()
     }
 }
 
 #[derive(Clone)]
-pub enum ConductorAccess {
-    ZomeCallConductorAccess(ZomeCallConductorAccess),
-    ValidateConductorAccess(ValidateConductorAccess),
-    InitConductorAccess(InitConductorAccess),
-    EntryDefsConductorAccess(EntryDefsConductorAccess),
-    MigrateAgentConductorAccess(MigrateAgentConductorAccess),
-    ValidationPackageConductorAccess(ValidationPackageConductorAccess),
-    PostCommitConductorAccess(PostCommitConductorAccess),
+pub enum HostAccess {
+    ZomeCall(ZomeCallHostAccess),
+    Validate(ValidateHostAccess),
+    Init(InitHostAccess),
+    EntryDefs(EntryDefsHostAccess),
+    MigrateAgent(MigrateAgentHostAccess),
+    ValidationPackage(ValidationPackageHostAccess),
+    PostCommit(PostCommitHostAccess),
 }
 
-impl ConductorAccess {
+impl From<&HostAccess> for HostFnAccess {
+    fn from(host_access: &HostAccess) -> Self {
+        match host_access {
+            HostAccess::ZomeCall(zome_call_host_access) => zome_call_host_access.into(),
+            HostAccess::Validate(validate_host_access) => validate_host_access.into(),
+            HostAccess::Init(init_host_access) => init_host_access.into(),
+            HostAccess::EntryDefs(entry_defs_host_access) => entry_defs_host_access.into(),
+            HostAccess::MigrateAgent(migrate_agent_host_access) => migrate_agent_host_access.into(),
+            HostAccess::ValidationPackage(validation_package_host_access) => {
+                validation_package_host_access.into()
+            }
+            HostAccess::PostCommit(post_commit_host_access) => post_commit_host_access.into(),
+        }
+    }
+}
+
+impl HostAccess {
     /// Get the workspace, panics if none was provided
     pub fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
         match self {
-            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{workspace, .. }) |
-            ConductorAccess::InitConductorAccess(InitConductorAccess{workspace, .. }) |
-            ConductorAccess::MigrateAgentConductorAccess(MigrateAgentConductorAccess{workspace, .. }) |
-            ConductorAccess::ValidationPackageConductorAccess(ValidationPackageConductorAccess{workspace, .. }) |
-            ConductorAccess::PostCommitConductorAccess(PostCommitConductorAccess{workspace, .. }) => {
+            Self::ZomeCall(ZomeCallHostAccess{workspace, .. }) |
+            Self::Init(InitHostAccess{workspace, .. }) |
+            Self::MigrateAgent(MigrateAgentHostAccess{workspace, .. }) |
+            Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
+            Self::PostCommit(PostCommitHostAccess{workspace, .. }) => {
                 workspace
             }
             _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
@@ -141,9 +149,9 @@ impl ConductorAccess {
     /// Get the keystore, panics if none was provided
     pub fn keystore(&self) -> &KeystoreSender {
         match self {
-            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess{keystore, .. }) |
-            ConductorAccess::InitConductorAccess(InitConductorAccess{keystore, .. }) |
-            ConductorAccess::PostCommitConductorAccess(PostCommitConductorAccess{keystore, .. }) => {
+            Self::ZomeCall(ZomeCallHostAccess{keystore, .. }) |
+            Self::Init(InitHostAccess{keystore, .. }) |
+            Self::PostCommit(PostCommitHostAccess{keystore, .. }) => {
                 keystore
             }
             _ => panic!("Gave access to a host function that uses the keystore without providing a keystore"),
@@ -153,14 +161,9 @@ impl ConductorAccess {
     /// Get the network, panics if none was provided
     pub fn network(&self) -> &HolochainP2pCell {
         match self {
-            ConductorAccess::ZomeCallConductorAccess(ZomeCallConductorAccess {
-                network, ..
-            })
-            | ConductorAccess::InitConductorAccess(InitConductorAccess { network, .. })
-            | ConductorAccess::PostCommitConductorAccess(PostCommitConductorAccess {
-                network,
-                ..
-            }) => network,
+            Self::ZomeCall(ZomeCallHostAccess { network, .. })
+            | Self::Init(InitHostAccess { network, .. })
+            | Self::PostCommit(PostCommitHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
@@ -206,19 +209,6 @@ pub enum ZomesToInvoke {
 }
 
 pub trait Invocation: Clone {
-    /// Invocations can be externally driven (e.g. by a websockets client) or internally (e.g. from
-    /// a callback triggered by the subconscious in order to allow the conscious to provide
-    /// feedback. In some of these cases we allow side effects to be possible, such as committing a
-    /// new entry, which will in turn trigger other callbacks, such as validation, that must be
-    /// pure functions on the input data. For pure callbacks, HostFnAccess should have side_effects
-    /// set to Deny.
-    /// In the case that side_effects is set to Deny, any call to a host function with side effects
-    /// should be an unreachable!() error and halt execution. This is a panic because the happ
-    /// developer must avoid use of any host function calls that produce side effects while
-    /// implementing callbacks that must be pure.
-    /// Access to the reading the workspace (databases) and accessing agent information is handled
-    /// in the same way.
-    fn allowed_access(&self) -> HostFnAccess;
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
     /// zome in order for the Dna overall to successfully init.
@@ -250,7 +240,6 @@ pub trait Invocation: Clone {
 mockall::mock! {
     Invocation {}
     trait Invocation {
-        fn allowed_access(&self) -> HostFnAccess;
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<HostInput, SerializedBytesError>;
@@ -338,9 +327,6 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 }
 
 impl Invocation for ZomeCallInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::all()
-    }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())
     }
@@ -360,10 +346,22 @@ pub enum ZomeCallInvocationResponse {
 }
 
 #[derive(Clone, Constructor)]
-pub struct ZomeCallConductorAccess {
+pub struct ZomeCallHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
     keystore: KeystoreSender,
     network: HolochainP2pCell,
+}
+
+impl From<ZomeCallHostAccess> for HostAccess {
+    fn from(zome_call_host_access: ZomeCallHostAccess) -> Self {
+        Self::ZomeCall(zome_call_host_access)
+    }
+}
+
+impl From<&ZomeCallHostAccess> for HostFnAccess {
+    fn from(_: &ZomeCallHostAccess) -> Self {
+        Self::all()
+    }
 }
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
@@ -376,7 +374,7 @@ pub trait RibosomeT: Sized {
 
     fn maybe_call<I: Invocation + 'static>(
         &self,
-        conductor_access: ConductorAccess,
+        access: HostAccess,
         invocation: &I,
         zome_name: &ZomeName,
         to_call: String,
@@ -398,31 +396,31 @@ pub trait RibosomeT: Sized {
 
     fn run_init(
         &self,
-        conductor_access: InitConductorAccess,
+        access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult>;
 
     fn run_migrate_agent(
         &self,
-        conductor_access: MigrateAgentConductorAccess,
+        access: MigrateAgentHostAccess,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
 
     fn run_entry_defs(
         &self,
-        conductor_access: EntryDefsConductorAccess,
+        access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult>;
 
     fn run_validation_package(
         &self,
-        conductor_access: ValidationPackageConductorAccess,
+        access: ValidationPackageHostAccess,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult>;
 
     fn run_post_commit(
         &self,
-        conductor_access: PostCommitConductorAccess,
+        access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult>;
 
@@ -431,13 +429,13 @@ pub trait RibosomeT: Sized {
     /// [`run_callback`]: #method.run_callback
     fn run_validate(
         &self,
-        conductor_access: ValidateConductorAccess,
+        access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
-        conductor_access: ConductorAccess,
+        access: HostAccess,
         ribosome: R,
         invocation: I,
     ) -> CallIterator<R, I>;
@@ -446,14 +444,14 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         &self,
-        conductor_access: ZomeCallConductorAccess,
+        access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse>;
 }
 
 #[cfg(test)]
 pub mod wasm_test {
-    use super::ZomeCallConductorAccessFixturator;
+    use super::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomeCallInvocationResponse;
@@ -553,7 +551,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn invoke_foo_test() {
-        let conductor_access = ZomeCallConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = ZomeCallHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
 

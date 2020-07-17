@@ -1,7 +1,7 @@
 //! # Entry Defs Store
 //! Stores all the entry definitions across zomes
 use crate::core::ribosome::{
-    guest_callback::entry_defs::{EntryDefsConductorAccess, EntryDefsInvocation, EntryDefsResult},
+    guest_callback::entry_defs::{EntryDefsHostAccess, EntryDefsInvocation, EntryDefsResult},
     wasm_ribosome::WasmRibosome,
     RibosomeT,
 };
@@ -137,7 +137,7 @@ pub(crate) async fn get_entry_defs(
         .collect::<HashMap<_, _>>();
 
     let ribosome = WasmRibosome::new(dna);
-    match ribosome.run_entry_defs(EntryDefsConductorAccess, invocation)? {
+    match ribosome.run_entry_defs(EntryDefsHostAccess, invocation)? {
         EntryDefsResult::Defs(map) => {
             // Turn the defs map into a vec of keys and entry defs
             map.into_iter()

@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
-use crate::core::ribosome::HostContext;
+use crate::core::ribosome::CallContext;
 use holochain_zome_types::debug::DebugMsg;
 use holochain_zome_types::DebugInput;
 use holochain_zome_types::DebugOutput;
@@ -9,7 +9,7 @@ use tracing::*;
 
 pub fn debug(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<CallContext>,
     input: DebugInput,
 ) -> RibosomeResult<DebugOutput> {
     let msg: DebugMsg = input.into_inner();
@@ -27,8 +27,8 @@ pub fn debug(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::debug;
-    use crate::core::ribosome::HostContextFixturator;
-    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
+    use crate::core::ribosome::CallContextFixturator;
+    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::workspace::Workspace;
     use crate::fixt::WasmRibosomeFixturator;
     use fixt::prelude::*;
@@ -45,7 +45,7 @@ pub mod wasm_test {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let host_context = HostContextFixturator::new(fixt::Unpredictable)
+        let host_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let input = DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")));
@@ -64,7 +64,7 @@ pub mod wasm_test {
         let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        let mut conductor_access = fixt!(ZomeCallHostAccess);
         conductor_access.workspace = raw_workspace;
 
         // this shows that debug is called but our line numbers will be messed up
@@ -87,7 +87,7 @@ pub mod wasm_test {
         let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        let mut conductor_access = fixt!(ZomeCallHostAccess);
         conductor_access.workspace = raw_workspace;
 
         // this shows that we can get line numbers out of wasm

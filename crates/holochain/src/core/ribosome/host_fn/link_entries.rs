@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::{
-    ribosome::{HostContext, RibosomeT},
+    ribosome::{CallContext, RibosomeT},
     workflow::InvokeZomeWorkspace,
     SourceChainResult,
 };
@@ -15,7 +15,7 @@ use std::sync::Arc;
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn link_entries<'a>(
     ribosome: Arc<impl RibosomeT>,
-    host_context: Arc<HostContext>,
+    call_context: Arc<CallContext>,
     input: LinkEntriesInput,
 ) -> RibosomeResult<LinkEntriesOutput> {
     let (base_address, target_address, tag) = input.into_inner();
@@ -28,10 +28,10 @@ pub fn link_entries<'a>(
         .dna
         .zomes
         .iter()
-        .position(|(name, _)| name == &host_context.zome_name)
+        .position(|(name, _)| name == &call_context.zome_name)
     {
         Some(index) => holochain_types::header::ZomeId::from(index as u8),
-        None => Err(RibosomeError::ZomeNotExists(host_context.zome_name.clone()))?,
+        None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
     };
 
     // Construct the link add
@@ -47,13 +47,7 @@ pub fn link_entries<'a>(
     };
     let link_hash =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            unsafe {
-                host_context
-                    .conductor_access
-                    .workspace()
-                    .apply_mut(call)
-                    .await
-            }
+            unsafe { call_context.host_access.workspace().apply_mut(call).await }
         }))???;
 
     // return the hash of the committed link

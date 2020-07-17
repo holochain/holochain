@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
-use crate::core::ribosome::HostContext;
+use crate::core::ribosome::CallContext;
 use holochain_zome_types::globals::AgentInfo;
 use holochain_zome_types::AgentInfoInput;
 use holochain_zome_types::AgentInfoOutput;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 pub fn agent_info(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<CallContext>,
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {
     Ok(AgentInfoOutput::new(AgentInfo {
@@ -21,7 +21,7 @@ pub fn agent_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
+    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::workspace::Workspace;
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;
@@ -39,7 +39,7 @@ pub mod test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
-        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        let mut conductor_access = fixt!(ZomeCallHostAccess);
         conductor_access.workspace = raw_workspace;
 
         let agent_info: AgentInfoOutput = crate::call_test_ribosome!(

@@ -1,6 +1,6 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
-use crate::core::ribosome::{ConductorAccess, ZomesToInvoke};
+use crate::core::ribosome::{HostAccess, ZomesToInvoke};
 use derive_more::Constructor;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
@@ -26,23 +26,32 @@ fixturator!(
 );
 
 #[derive(Clone, Constructor)]
-pub struct EntryDefsConductorAccess;
+pub struct EntryDefsHostAccess;
 
 fixturator!(
-    EntryDefsConductorAccess;
+    EntryDefsHostAccess;
     constructor fn new();
 );
 
-impl From<&ConductorAccess> for EntryDefsConductorAccess {
-    fn from(_: &ConductorAccess) -> Self {
+impl From<&HostAccess> for EntryDefsHostAccess {
+    fn from(_: &HostAccess) -> Self {
         Self
     }
 }
 
-impl Invocation for EntryDefsInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::none()
+impl From<EntryDefsHostAccess> for HostAccess {
+    fn from(entry_defs_host_access: EntryDefsHostAccess) -> Self {
+        Self::EntryDefs(entry_defs_host_access)
     }
+}
+
+impl From<&EntryDefsHostAccess> for HostFnAccess {
+    fn from(_: &EntryDefsHostAccess) -> Self {
+        Self::none()
+    }
+}
+
+impl Invocation for EntryDefsInvocation {
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All
     }
@@ -96,7 +105,7 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
 mod test {
 
     use super::EntryDefsInvocationFixturator;
-    use super::{EntryDefsConductorAccess, EntryDefsResult};
+    use super::{EntryDefsHostAccess, EntryDefsResult};
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
@@ -198,7 +207,7 @@ mod test {
             .next()
             .unwrap();
         assert_matches!(
-            entry_defs_invocation.allowed_access(),
+            entry_defs_invocation.into(),
             HostFnAccess {
                 side_effects: Deny,
                 agent_info: Deny,
@@ -254,7 +263,7 @@ mod test {
             .unwrap();
 
         let result = ribosome
-            .run_entry_defs(EntryDefsConductorAccess, entry_defs_invocation)
+            .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
             .unwrap();
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
     }
@@ -270,7 +279,7 @@ mod test {
             .unwrap();
 
         let result = ribosome
-            .run_entry_defs(EntryDefsConductorAccess, entry_defs_invocation)
+            .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
             .unwrap();
         assert_eq!(
             result,

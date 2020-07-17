@@ -1,4 +1,5 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_invoke_zome_workspace::{
@@ -36,21 +37,30 @@ fixturator!(
 );
 
 #[derive(Clone, Constructor)]
-pub struct PostCommitConductorAccess {
+pub struct PostCommitHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }
 
+impl From<PostCommitHostAccess> for HostAccess {
+    fn from(post_commit_host_access: PostCommitHostAccess) -> Self {
+        Self::PostCommit(post_commit_host_access)
+    }
+}
+
+impl From<&PostCommitHostAccess> for HostFnAccess {
+    fn from(_: &PostCommitHostAccess) -> Self {
+        Self::all()
+    }
+}
+
 fixturator!(
-    PostCommitConductorAccess;
+    PostCommitHostAccess;
     constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
 );
 
 impl Invocation for PostCommitInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::all()
-    }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())
     }
@@ -101,7 +111,7 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 #[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::PostCommitConductorAccessFixturator;
+    use super::PostCommitHostAccessFixturator;
     use super::PostCommitInvocationFixturator;
     use super::PostCommitResult;
     use crate::core::ribosome::Invocation;
@@ -224,7 +234,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_unimplemented() {
-        let conductor_access = PostCommitConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
@@ -244,7 +254,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_implemented_success() {
-        let conductor_access = PostCommitConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
@@ -264,7 +274,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_post_commit_implemented_fail() {
-        let conductor_access = PostCommitConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))

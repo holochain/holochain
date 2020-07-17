@@ -1,4 +1,5 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::fixt::EntryFixturator;
@@ -39,17 +40,26 @@ fixturator!(
 );
 
 #[derive(Clone, Constructor)]
-pub struct ValidateConductorAccess;
+pub struct ValidateHostAccess;
+
+impl From<ValidateHostAccess> for HostAccess {
+    fn from(validate_host_access: ValidateHostAccess) -> Self {
+        Self::Validate(validate_host_access)
+    }
+}
+
+impl From<&ValidateHostAccess> for HostFnAccess {
+    fn from(_: &ValidateHostAccess) -> Self {
+        Self::none()
+    }
+}
 
 fixturator!(
-    ValidateConductorAccess;
+    ValidateHostAccess;
     constructor fn new();
 );
 
 impl Invocation for ValidateInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::none()
-    }
     fn zomes(&self) -> ZomesToInvoke {
         // entries are specific to zomes so only validate in the zome the entry is defined in
         // note that here it is possible there is a zome/entry mismatch
@@ -118,12 +128,12 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 #[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::ValidateConductorAccess;
+    use super::ValidateHostAccess;
     use super::ValidateInvocationFixturator;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeCallConductorAccessFixturator;
+    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::curve::Zomes;
     use crate::fixt::WasmRibosomeFixturator;
@@ -289,7 +299,7 @@ mod test {
         validate_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_validate(ValidateConductorAccess, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -306,7 +316,7 @@ mod test {
         validate_invocation.zome_name = TestWasm::ValidateValid.into();
 
         let result = ribosome
-            .run_validate(ValidateConductorAccess, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -323,7 +333,7 @@ mod test {
         validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
 
         let result = ribosome
-            .run_validate(ValidateConductorAccess, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
@@ -348,7 +358,7 @@ mod test {
         validate_invocation.entry = Arc::new(entry);
 
         let result = ribosome
-            .run_validate(ValidateConductorAccess, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }
@@ -368,7 +378,7 @@ mod test {
             .unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        let mut conductor_access = fixt!(ZomeCallHostAccess);
         conductor_access.workspace = raw_workspace;
 
         let output: CommitEntryOutput = crate::call_test_ribosome!(
@@ -404,7 +414,7 @@ mod test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
-        let mut conductor_access = fixt!(ZomeCallConductorAccess);
+        let mut conductor_access = fixt!(ZomeCallHostAccess);
         conductor_access.workspace = raw_workspace;
 
         let output: CommitEntryOutput =

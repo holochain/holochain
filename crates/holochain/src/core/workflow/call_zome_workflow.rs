@@ -1,9 +1,9 @@
 use super::error::{WorkflowError, WorkflowResult};
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate::{ValidateConductorAccess, ValidateResult};
+use crate::core::ribosome::guest_callback::validate::{ValidateHostAccess, ValidateResult};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
-use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallConductorAccess};
+use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
 use crate::core::{
@@ -78,7 +78,7 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(workspace);
-        let conductor_access = ZomeCallConductorAccess::new(raw_workspace, keystore, network);
+        let conductor_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
         ribosome.call_zome_function(conductor_access, invocation)
     };
     tracing::trace!(line = line!());
@@ -130,7 +130,7 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
         match chain_element.entry() {
             holochain_types::element::ChainElementEntry::Present(entry) => {
                 let validate: ValidateResult = ribosome.run_validate(
-                    ValidateConductorAccess,
+                    ValidateHostAccess,
                     ValidateInvocation {
                         zome_name: zome_name.clone(),
                         entry: Arc::new(entry.clone()),

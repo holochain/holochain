@@ -4,7 +4,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
-use holochain::core::ribosome::{ConductorAccess, ZomeCallInvocation};
+use holochain::core::ribosome::{HostAccess, ZomeCallInvocation};
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::prelude::*;
@@ -34,7 +34,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
         ]));
     let mut cap_secret_fixturator = CapSecretFixturator::new(Unpredictable);
     let mut conductor_access_fixturator =
-        holochain::core::ribosome::ZomeCallConductorAccessFixturator::new(fixt::Unpredictable);
+        holochain::core::ribosome::ZomeCallHostAccessFixturator::new(fixt::Unpredictable);
     let mut cell_id_fixturator = holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable);
     let mut agent_key_fixturator = AgentPubKeyFixturator::new(Unpredictable);
 
@@ -65,7 +65,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     // .unwrap()
                     // .spawn(async {
                     let ca = conductor_access_fixturator.next().unwrap();
-                    let ca = ConductorAccess::ZomeCallConductorAccess(ca);
+                    let ca = HostAccess::ZomeCallHostAccess(ca);
                     let r = ribosome_fixturator.next().unwrap();
                     let i = ZomeCallInvocation {
                         cell_id: cell_id_fixturator.next().unwrap(),

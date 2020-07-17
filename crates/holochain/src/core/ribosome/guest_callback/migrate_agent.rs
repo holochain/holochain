@@ -1,4 +1,5 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_invoke_zome_workspace::{
@@ -39,24 +40,33 @@ fixturator!(
 );
 
 #[derive(Clone, Constructor)]
-pub struct MigrateAgentConductorAccess {
+pub struct MigrateAgentHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
 }
 
-fixturator!(
-    MigrateAgentConductorAccess;
-    constructor fn new(UnsafeInvokeZomeWorkspace);
-);
+impl From<MigrateAgentHostAccess> for HostAccess {
+    fn from(migrate_agent_host_access: MigrateAgentHostAccess) -> Self {
+        Self::MigrateAgent(migrate_agent_host_access)
+    }
+}
 
-impl Invocation for MigrateAgentInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        let mut access = HostFnAccess::none();
+impl From<&MigrateAgentHostAccess> for HostFnAccess {
+    fn from(_: &MigrateAgentHostAccess) -> Self {
+        let mut access = Self::none();
         // TODO: insert zome_name
         access.non_determinism = Permission::Deny;
         access.read_workspace = Permission::Allow;
         access.agent_info = Permission::Allow;
         access
     }
+}
+
+fixturator!(
+    MigrateAgentHostAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace);
+);
+
+impl Invocation for MigrateAgentInvocation {
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All
     }
@@ -117,7 +127,7 @@ impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
 #[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::MigrateAgentConductorAccessFixturator;
+    use super::MigrateAgentHostAccessFixturator;
     use super::MigrateAgentInvocationFixturator;
     use super::MigrateAgentResult;
     use crate::core::ribosome::Invocation;
@@ -245,7 +255,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_unimplemented() {
-        let conductor_access = MigrateAgentConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
@@ -265,7 +275,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_implemented_pass() {
-        let conductor_access = MigrateAgentConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
@@ -285,7 +295,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_implemented_fail() {
-        let conductor_access = MigrateAgentConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
@@ -308,7 +318,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     #[serial_test::serial]
     async fn test_migrate_agent_multi_implemented_fail() {
-        let conductor_access = MigrateAgentConductorAccessFixturator::new(fixt::Unpredictable)
+        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![

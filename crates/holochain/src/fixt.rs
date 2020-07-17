@@ -2,8 +2,8 @@ pub mod curve;
 
 use crate::conductor::delete_me_create_test_keystore;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::CallContextFixturator;
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostContextFixturator;
 use crate::core::state::metadata::LinkMetaVal;
 use fixt::prelude::*;
 use holo_hash::DnaHashFixturator;
@@ -60,7 +60,7 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
-            let mut host_context = HostContextFixturator::new(Empty).next().unwrap();
+            let mut host_context = CallContextFixturator::new(Empty).next().unwrap();
             host_context.zome_name = zome.into();
             ribosome.module(host_context).unwrap();
         }

@@ -1,4 +1,5 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_invoke_zome_workspace::{
@@ -12,7 +13,8 @@ use holo_hash::EntryContentHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{HolochainP2pCell, HolochainP2pCellFixturator};
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{zome::HostFnAccess, DnaDef};
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::DnaDef;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -34,21 +36,30 @@ fixturator!(
 );
 
 #[derive(Clone, Constructor)]
-pub struct InitConductorAccess {
+pub struct InitHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }
 
 fixturator!(
-    InitConductorAccess;
+    InitHostAccess;
     constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
 );
 
-impl Invocation for InitInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::all()
+impl From<InitHostAccess> for HostAccess {
+    fn from(init_host_access: InitHostAccess) -> Self {
+        Self::Init(init_host_access)
     }
+}
+
+impl From<&InitHostAccess> for HostFnAccess {
+    fn from(_: &InitHostAccess) -> Self {
+        Self::all()
+    }
+}
+
+impl Invocation for InitInvocation {
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All
     }
@@ -107,7 +118,7 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 #[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::InitConductorAccessFixturator;
+    use super::InitHostAccessFixturator;
     use super::InitInvocationFixturator;
     use super::InitResult;
     use crate::core::ribosome::Invocation;
@@ -249,7 +260,7 @@ mod test {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitConductorAccess);
+        let conductor_access = fixt!(InitHostAccess);
         let result = ribosome
             .run_init(conductor_access, init_invocation)
             .unwrap();
@@ -265,7 +276,7 @@ mod test {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitConductorAccess);
+        let conductor_access = fixt!(InitHostAccess);
         let result = ribosome
             .run_init(conductor_access, init_invocation)
             .unwrap();
@@ -281,7 +292,7 @@ mod test {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitConductorAccess);
+        let conductor_access = fixt!(InitHostAccess);
         let result = ribosome
             .run_init(conductor_access, init_invocation)
             .unwrap();
@@ -301,7 +312,7 @@ mod test {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitConductorAccess);
+        let conductor_access = fixt!(InitHostAccess);
         let result = ribosome
             .run_init(conductor_access, init_invocation)
             .unwrap();
