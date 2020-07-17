@@ -5,7 +5,7 @@ mock! {
     {
         fn get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<LinkMetaVal>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
-        fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: LinkTag) -> DatabaseResult<()>;
+        fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn sync_register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
         fn sync_register_activity(
@@ -40,6 +40,14 @@ mock! {
         fn get_deletes_on_entry(
             &self,
             entry_hash: EntryHash,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        fn get_link_add_on_base(
+            &self,
+            link_base: EntryHash,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        fn get_link_remove_on_link_add(
+            &self,
+            link_add: HeaderHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
     }
 }
@@ -102,18 +110,29 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_deletes_on_entry(entry_hash)
     }
 
+    fn get_link_add_on_base(
+        &self,
+        link_base: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        self.get_link_add_on_base(link_base)
+    }
+
+    /// Get link removes on link adds
+    fn get_link_remove_on_link_add(
+        &self,
+        link_add: HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        self.get_link_remove_on_link_add(link_add)
+    }
+
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         self.add_link(link_add)
     }
 
-    fn remove_link(
-        &mut self,
-        link_remove: LinkRemove,
-        base: &EntryHash,
-        zome_id: ZomeId,
-        tag: LinkTag,
-    ) -> DatabaseResult<()> {
-        self.remove_link(link_remove, base, zome_id, tag)
+    async fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+        self.remove_link(link_remove)
     }
 
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
