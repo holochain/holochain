@@ -1,0 +1,75 @@
+use crate::HoloHash;
+use futures::FutureExt;
+use holo_hash_core::{encode, HashableContent, HoloHashImpl, PrimitiveHashType};
+use holochain_serialized_bytes::prelude::*;
+use must_future::MustBoxFuture;
+
+pub trait HoloHashExt<C: HashableContent>
+where
+    for<'a> &'a C: HashableContent,
+{
+    fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
+
+    // TODO: deprecate
+    // #[deprecated = "alias for with_content"]
+    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
+
+    fn with_pre_hashed_typed(hash: Vec<u8>, hash_type: C::HashType) -> Self;
+
+    // TODO: add this to the general extension trait so that non-primitive
+    // hash types can implement it
+    // fn to_string(&self) -> String;
+}
+
+impl<C: HashableContent> HoloHashExt<C> for HoloHash<C>
+where
+    for<'a> &'a C: HashableContent,
+{
+    fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
+        async move {
+            let sb: SerializedBytes = content
+                .try_into()
+                // TODO: this expect seems right, but is perhaps questionable.
+                // the idea is: you should only ever use a type for HashableContent
+                // which is infallibly serializable.
+                .expect("Could not serialize HashableContent");
+            let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
+            let hash =
+                Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type());
+            hash
+        }
+        .boxed()
+        .into()
+    }
+
+    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
+        Self::with_content(content)
+    }
+
+    fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: C::HashType) -> Self {
+        // Assert the data size is relatively small so we are
+        // comfortable executing this synchronously / blocking
+        // tokio thread.
+        assert_eq!(32, hash.len(), "only 32 byte hashes supported");
+
+        hash.append(&mut encode::holo_dht_location_bytes(&hash));
+        HoloHashImpl::from_raw_bytes_and_type(hash, hash_type)
+    }
+}
+
+pub trait HoloHashPrimitiveExt<P: PrimitiveHashType> {
+    fn with_pre_hashed(hash: Vec<u8>) -> Self;
+}
+
+impl<P: PrimitiveHashType> HoloHashPrimitiveExt<P> for HoloHashImpl<P> {
+    fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
+        // Assert the data size is relatively small so we are
+        // comfortable executing this synchronously / blocking
+        // tokio thread.
+        // TODO: DRY, write in terms of with_pre_hashed_typed
+        assert_eq!(32, hash.len(), "only 32 byte hashes supported");
+
+        hash.append(&mut encode::holo_dht_location_bytes(&hash));
+        HoloHashImpl::from_raw_bytes(hash)
+    }
+}
