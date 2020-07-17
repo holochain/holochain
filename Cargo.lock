@@ -1109,6 +1109,7 @@ dependencies = [
  "must_future",
  "rmp-serde",
  "serde",
+ "serde_bytes",
 ]
 
 [[package]]

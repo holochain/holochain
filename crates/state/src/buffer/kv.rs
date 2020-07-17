@@ -3,11 +3,9 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Reader, Writer},
 };
-use rkv::{SingleStore, StoreError};
-
-use std::{collections::BTreeMap, marker::PhantomData};
-
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
+use rkv::{SingleStore, StoreError};
+use std::{collections::BTreeMap, marker::PhantomData};
 use tracing::*;
 
 #[cfg(test)]
@@ -89,7 +87,14 @@ where
     fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
         Self::empty_key(&k)?;
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(
+                rmp_serde::from_read_ref(buf)
+                    .map_err(|e| {
+                        println!("RMP-ERR: {:?}", buf);
+                        e
+                    })
+                    .expect("TODO: IS IT HERE?"),
+            )),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }
@@ -610,8 +615,8 @@ pub mod tests {
         error::{DatabaseError, DatabaseResult},
         test_utils::test_cell_env,
     };
-    use fallible_iterator::FallibleIterator;
     use ::fixt::prelude::*;
+    use fallible_iterator::FallibleIterator;
     use rkv::StoreOptions;
     use serde_derive::{Deserialize, Serialize};
     use std::collections::BTreeMap;
