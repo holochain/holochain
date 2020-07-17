@@ -435,3 +435,66 @@ impl Dna {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        fixt::HeaderBuilderCommonFixturator,
+        test_utils::{fake_dna_hash, fake_entry_content_hash},
+    };
+    use ::fixt::prelude::*;
+
+    #[test]
+    fn test_header_msgpack_roundtrip() {
+        let orig: Header = Dna::from_builder(
+            fake_dna_hash(1),
+            HeaderBuilderCommonFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+        )
+        .into();
+        let bytes = rmp_serde::to_vec_named(&orig).unwrap();
+        let res: Header = rmp_serde::from_read_ref(&bytes).unwrap();
+        assert_eq!(orig, res);
+    }
+
+    #[test]
+    fn test_entrycreate_msgpack_roundtrip() {
+        let orig: Header = EntryCreate::from_builder(
+            HeaderBuilderCommonFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            fake_entry_content_hash(1).into(),
+        )
+        .into();
+        let bytes = rmp_serde::to_vec_named(&orig).unwrap();
+        println!("{:?}", bytes);
+        let res: Header = rmp_serde::from_read_ref(&bytes).unwrap();
+        assert_eq!(orig, res);
+    }
+
+    #[test]
+    fn test_entrycreate_serializedbytes_roundtrip() {
+        let orig: Header = EntryCreate::from_builder(
+            HeaderBuilderCommonFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+            EntryType::App(AppEntryType::new(
+                0.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            fake_entry_content_hash(1).into(),
+        )
+        .into();
+        let bytes: SerializedBytes = orig.clone().try_into().unwrap();
+        let res: Header = bytes.try_into().unwrap();
+        assert_eq!(orig, res);
+    }
+}

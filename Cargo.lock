@@ -1314,6 +1314,7 @@ dependencies = [
  "nanoid",
  "rand 0.7.3",
  "regex",
+ "rmp-serde",
  "rust-base58",
  "serde",
  "serde_bytes",
