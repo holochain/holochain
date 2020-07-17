@@ -7,7 +7,7 @@ use crate::{
     prelude::*,
 };
 
-use holo_hash_core::hash_type;
+use holo_hash_core::{hash_type, PrimitiveHashType};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -79,22 +79,22 @@ fn fake_holo_hash<T: holo_hash_core::HashType>(name: u8, hash_type: T) -> HoloHa
 
 /// A fixture DnaHash for unit testing.
 pub fn fake_dna_hash(name: u8) -> DnaHash {
-    fake_holo_hash(name, hash_type::Dna)
+    fake_holo_hash(name, hash_type::Dna::new())
 }
 
 /// A fixture HeaderHash for unit testing.
 pub fn fake_header_hash(name: u8) -> HeaderHash {
-    fake_holo_hash(name, hash_type::Header)
+    fake_holo_hash(name, hash_type::Header::new())
 }
 
 /// A fixture DhtOpHash for unit testing.
 pub fn fake_dht_op_hash(name: u8) -> DhtOpHash {
-    fake_holo_hash(name, hash_type::DhtOp)
+    fake_holo_hash(name, hash_type::DhtOp::new())
 }
 
 /// A fixture AgentPubKey for unit testing.
 pub fn fake_agent_pub_key(name: u8) -> AgentPubKey {
-    fake_holo_hash(name, hash_type::Agent)
+    fake_holo_hash(name, hash_type::Agent::new())
 }
 
 /// A fixture AgentPubKey for unit testing.

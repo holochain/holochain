@@ -13,6 +13,7 @@ use holochain_zome_types::link::LinkTag;
 
 pub mod builder;
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
+use holo_hash_core::impl_hashable_content;
 
 /// Header contains variants for each type of header.
 ///
@@ -147,21 +148,7 @@ impl Header {
 
 pub type HeaderHashed = HoloHashed<Header>;
 
-impl HashableContent for Header {
-    type HashType = holo_hash_core::hash_type::Header;
-
-    fn hash_type(&self) -> Self::HashType {
-        holo_hash_core::hash_type::Header
-    }
-}
-
-impl HashableContent for &Header {
-    type HashType = holo_hash_core::hash_type::Header;
-
-    fn hash_type(&self) -> Self::HashType {
-        holo_hash_core::hash_type::Header
-    }
-}
+impl_hashable_content!(Header, Header);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 /// A header of one of the two types that create a new entry.

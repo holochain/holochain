@@ -219,10 +219,19 @@ where
         if self.is_clean() {
             return Ok(());
         }
+
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
+                    // TODO: consider using a more explicit msgpack encoding,
+                    // with more data and less chance of "slippage"
+                    // let mut buf = Vec::with_capacity(128);
+                    // let mut se = rmp_serde::encode::Serializer::new(buf)
+                    //     .with_struct_map()
+                    //     .with_string_variants();
+                    // v.serialize(&mut se)?;
                     let buf = rmp_serde::to_vec_named(v)?;
+
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
