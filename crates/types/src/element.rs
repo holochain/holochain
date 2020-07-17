@@ -129,18 +129,6 @@ impl SignedHeader {
 
 impl_hashable_content!(SignedHeader, Header);
 
-impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
-    fn from(_hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
-        todo!()
-    }
-}
-
-impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
-    fn from(_hashed: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
-        todo!()
-    }
-}
-
 // HACK: In this representation, we have to clone the Header and store it twice,
 // once in the HeaderHashed, and once in the SignedHeader. The reason is that
 // the API currently requires references to both types, and it was easier to
@@ -177,10 +165,7 @@ impl SignedHeaderHashed {
     pub fn as_hash(&self) -> &HeaderHash {
         self.header.as_hash()
     }
-}
 
-#[allow(missing_docs)]
-impl SignedHeaderHashed {
     pub fn with_data(
         signed_header: SignedHeader,
     ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
@@ -257,5 +242,22 @@ impl SignedHeaderHashed {
             ));
         }
         Ok(())
+    }
+}
+
+impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
+    fn from(hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
+        let (signed_header, hash) = hashed.into_inner();
+        SignedHeaderHashed {
+            header: HeaderHashed::with_pre_hashed(signed_header.header().clone(), hash),
+            signed_header,
+        }
+    }
+}
+
+impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
+    fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
+        let hash = shh.header.into_hash();
+        HoloHashed::with_pre_hashed(shh.signed_header, hash)
     }
 }
