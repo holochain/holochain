@@ -130,13 +130,13 @@ impl SignedHeader {
 impl_hashable_content!(SignedHeader, Header);
 
 impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
-    fn from(hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
+    fn from(_hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
         todo!()
     }
 }
 
 impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
-    fn from(hashed: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
+    fn from(_hashed: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
         todo!()
     }
 }

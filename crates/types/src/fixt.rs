@@ -25,11 +25,11 @@ use crate::Timestamp;
 use ::fixt::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
-use holo_hash::fixt::EntryContentHashFixturator;
+
 use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::fixt::WasmHashFixturator;
-use holo_hash_core::AnyDhtHash;
+
 use holo_hash_core::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;

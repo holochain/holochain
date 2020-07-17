@@ -143,7 +143,7 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_header_hash(1).await,
+            fake_header_hash(1),
         )
         .await;
         let second = test_gen(
@@ -163,13 +163,13 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_header_hash(1).await,
+            fake_header_hash(1),
         )
         .await;
         let second = test_gen(
             "2020-05-05T19:16:04.366431045Z".try_into().unwrap(),
             13,
-            fake_header_hash(2).await,
+            fake_header_hash(2),
         )
         .await;
 
@@ -184,7 +184,7 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_header_hash(1).await,
+            fake_header_hash(1),
         )
         .await;
         let second = test_gen(
@@ -205,7 +205,7 @@ mod tests {
         let first = test_gen(
             "2020-05-05T19:16:04.266431045Z".try_into().unwrap(),
             12,
-            fake_header_hash(1).await,
+            fake_header_hash(1),
         )
         .await;
         let second = test_gen(

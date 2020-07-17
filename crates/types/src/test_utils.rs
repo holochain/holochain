@@ -6,7 +6,7 @@ use crate::{
     dna::{DnaDef, DnaFile},
     prelude::*,
 };
-use holo_hash::{fixt::*, *};
+
 use holo_hash_core::hash_type;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
