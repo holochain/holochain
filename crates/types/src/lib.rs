@@ -9,6 +9,7 @@ pub mod autonomic;
 pub mod cell;
 pub mod composite_hash;
 pub mod db;
+pub mod dht_arc;
 pub mod dht_op;
 pub mod dna;
 pub mod element;
