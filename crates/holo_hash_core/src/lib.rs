@@ -3,6 +3,7 @@ pub mod error;
 mod has_hash;
 mod hash;
 pub mod hash_type;
+mod hash_type_enum;
 mod hashable_content;
 mod ser;
 // mod serialize_hash_type;
