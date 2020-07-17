@@ -1396,11 +1396,19 @@ async fn commit_entry_add_link() {
         let link = links[0].clone();
         assert_eq!(link.target, target_entry_hash);
 
-        let e = cascade.dht_get(&target_entry_hash).await.unwrap().unwrap();
-        assert_eq!(e.into_content(), target_entry);
+        let e = cascade
+            .dht_get(&target_entry_hash.into())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(e.into_inner().1, Some(target_entry));
 
-        let e = cascade.dht_get(&base_entry_hash).await.unwrap().unwrap();
-        assert_eq!(e.into_content(), base_entry);
+        let e = cascade
+            .dht_get(&base_entry_hash.into())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(e.into_inner().1, Some(base_entry));
     }
     conductor.shutdown().await;
     shutdown.await.unwrap();

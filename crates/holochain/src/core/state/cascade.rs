@@ -42,11 +42,11 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
-use holo_hash::Hashed;
+use fallible_iterator::FallibleIterator;
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
-    element::{ChainElement, ChainElementEntry, SignedHeaderHashed},
+    element::{ChainElement, SignedHeaderHashed},
     EntryHashed,
 };
 use tracing::*;
@@ -124,60 +124,61 @@ where
         }
     }
 
-    // TODO: Currently treating "found in cas" as proof authority
-    // But this could also be authored data or stale authority data.
-    // I was an authority but my arc has changed
-    async fn default_dht_get_entry(
-        &self,
-        entry_hash: EntryHash,
-    ) -> DatabaseResult<Option<ChainElement>> {
-        // Cas
-        let search = match self.primary.get_entry(&entry_hash).await? {
-            Some(entry) => {
-                let crud = self.primary_meta.get_dht_status(&entry_hash)?;
-                if let EntryDhtStatus::Live = crud {
-                    // TODO: PERF: Store header timestamp so this we
-                    // can sort these headers by time without lookup
-                    // self.primary_meta.get_headers(entry_hash)
-                    let mut headers = self.primary_meta.get_headers(entry_hash)?;
-                    let mut oldest = None;
-                    let mut result = None;
-                    while let Some(header) = headers.next()? {
+    async fn dht_get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<ChainElement>> {
+        // TODO: Update the cache from the network
+        // TODO: Fetch the EntryDhtStatus
+        // TODO: Fetch the headers on this entry
+        // TODO: Fetch the deletes on this entry
+        // TODO: Update the meta cache
+        // Meta Cache
+        let oldest_live_element = match self.cache_meta.get_dht_status(&entry_hash)? {
+            EntryDhtStatus::Live => {
+                // TODO: PERF: Firstly probably do this on writes not reads to meta cache
+                // Secondly figure out how to allow these iterators to cross awaits to avoid collecting
+                let headers = self
+                    .cache_meta
+                    .get_headers(entry_hash)?
+                    .collect::<Vec<_>>()?;
+                let mut oldest = None;
+                let mut result = None;
+                for hash in headers {
+                    // Element Vault
+                    // TODO: Handle error
+                    let element = match self.primary.get_element(&hash).await.unwrap() {
+                        // Element Cache
                         // TODO: Handle error
-                        self.primary.get_element(&header).await.unwrap().map(|element| {
-                            let t = element.header().timestamp();
-                            let o = oldest.get_or_insert(t);
-                            if t < *o {
-                                *o = t;
-                                result = Some(element);
-                            }
-                        });
+                        None => self.cache.get_element(&hash).await.unwrap(),
+                        e => e,
+                    };
+                    if let Some(element) = element {
+                        let t = element.header().timestamp();
+                        let o = oldest.get_or_insert(t);
+                        if t < *o {
+                            *o = t;
+                            result = Some(element);
+                        }
                     }
-                    if let Some(element) = result {
-                        Search::Found(element)
-                    } else {
-                        Search::NotInCascade
-                    }
-                } else {
-                    Search::NotInCascade
                 }
+                result.map(Search::Found).unwrap_or(Search::Continue)
             }
-            None => Search::Continue,
+            EntryDhtStatus::Dead
+            | EntryDhtStatus::Pending
+            | EntryDhtStatus::Rejected
+            | EntryDhtStatus::Abandoned
+            | EntryDhtStatus::Conflict
+            | EntryDhtStatus::Withdrawn
+            | EntryDhtStatus::Purged => Search::NotInCascade,
         };
 
-        // Cache
-        match search {
-            // Search::Continue => Ok(self.cache.get_entry(&entry_hash).await?.and_then(|entry| {
-            //     self.cache_meta
-            //         .get_dht_status(entry.as_hash())
-            //         .ok()
-            //         .and_then(|crud| match crud {
-            //             EntryDhtStatus::Live => Some(entry),
-            //             _ => None,
-            //         })
-            // })),
-            Search::Continue => todo!(),
-            Search::Found(entry) => Ok(Some(entry)),
+        // Network
+        match oldest_live_element {
+            Search::Found(element) => Ok(Some(element)),
+            Search::Continue => {
+                // TODO: Fetch the element from the network
+                // TODO: Update the element cache
+                // TODO: Return the element
+                todo!("Fetch from network")
+            }
             Search::NotInCascade => Ok(None),
         }
     }
@@ -185,13 +186,14 @@ where
     // TODO: dht_get_header -> Header
 
     #[instrument(skip(self))]
-    /// Gets an entry from the cas or cache depending on it's metadata
-    // The default behavior is to skip deleted or replaced entries.
-    // TODO: Implement customization of this behavior with an options/builder struct
+    // Updates the cache with the latest network authority data
+    // and returns what is in the cache.
+    // This gives you the latest possible picture of the current dht state.
+    // Data from your zome call is also added to the cache.
     pub async fn dht_get(&self, hash: &AnyDhtHash) -> DatabaseResult<Option<ChainElement>> {
         match hash.clone() {
-            AnyDhtHash::EntryContent(ec) => self.default_dht_get_entry(ec.into()).await,
-            AnyDhtHash::Agent(a) => self.default_dht_get_entry(a.into()).await,
+            AnyDhtHash::EntryContent(ec) => self.dht_get_entry(ec.into()).await,
+            AnyDhtHash::Agent(a) => self.dht_get_entry(a.into()).await,
             AnyDhtHash::Header(_) => {
                 todo!();
             }

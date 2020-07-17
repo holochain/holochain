@@ -2,15 +2,14 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::{HostContext, RibosomeT};
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::future::FutureExt;
-use holo_hash::Hashed;
 use holochain_state::error::DatabaseResult;
+use holochain_types::composite_hash::EntryHash;
 use holochain_zome_types::Entry;
 use holochain_zome_types::GetEntryInput;
 use holochain_zome_types::GetEntryOutput;
 use must_future::MustBoxFuture;
 use std::convert::TryInto;
 use std::sync::Arc;
-use holochain_types::composite_hash::EntryHash;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_entry<'a>(
