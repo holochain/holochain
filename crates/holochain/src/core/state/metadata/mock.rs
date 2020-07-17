@@ -3,7 +3,10 @@ use super::*;
 mock! {
     pub MetadataBuf
     {
-        fn get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<LinkMetaVal>>;
+        fn get_links<'a>(
+            &self,
+            key: &'a LinkMetaKey<'a>,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove, base: &EntryHash, zome_id: ZomeId, tag: LinkTag) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
@@ -46,7 +49,11 @@ mock! {
 
 #[async_trait::async_trait]
 impl MetadataBufT for MockMetadataBuf {
-    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
+    fn get_links<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    {
         self.get_links(key)
     }
 

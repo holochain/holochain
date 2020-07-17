@@ -77,7 +77,15 @@ async fn fixtures(n: usize) -> Vec<TestData> {
 impl TestData {
     fn empty(&self, test: &'static str, meta_buf: &MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
-        assert!(meta_buf.get_links(&key).unwrap().is_empty(), test);
+        assert!(
+            meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()
+                .is_empty(),
+            test
+        );
     }
 
     fn is_on_full_key(&self, test: &'static str, meta_buf: &MetadataBuf) {
@@ -85,6 +93,8 @@ impl TestData {
         assert!(
             meta_buf
                 .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
                 .unwrap()
                 .contains(&self.expected_link),
             "{}",
@@ -95,7 +105,11 @@ impl TestData {
     fn only_on_full_key(&self, test: &'static str, meta_buf: &MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -107,6 +121,8 @@ impl TestData {
         assert!(
             !meta_buf
                 .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
                 .unwrap()
                 .contains(&self.expected_link),
             "LinkMetaVal: {:?} should not be present {}",
@@ -121,6 +137,8 @@ impl TestData {
             meta_buf
                 .get_links(&key)
                 .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()
                 .contains(&self.expected_link),
             "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
@@ -131,7 +149,11 @@ impl TestData {
     fn only_on_base(&self, test: &'static str, meta_buf: &MetadataBuf) {
         let key = LinkMetaKey::Base(&self.base_hash);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -144,6 +166,8 @@ impl TestData {
             meta_buf
                 .get_links(&key)
                 .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()
                 .contains(&self.expected_link),
             "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
@@ -154,7 +178,11 @@ impl TestData {
     fn only_on_zome_id(&self, test: &'static str, meta_buf: &MetadataBuf) {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -168,7 +196,11 @@ impl TestData {
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
@@ -184,6 +216,8 @@ impl TestData {
         assert!(
             meta_buf
                 .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
                 .unwrap()
                 .contains(&self.expected_link),
             "Results should contain LinkMetaVal: {:?} in test: {}",
@@ -221,7 +255,11 @@ impl TestData {
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::Base(&base_hash);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &expected[..],
             "{}",
             test
@@ -244,7 +282,11 @@ impl TestData {
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZome(&base_hash, zome_id);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &expected[..],
             "{}",
             test
@@ -269,7 +311,11 @@ impl TestData {
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &tag);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &expected[..],
             "{}",
             test
@@ -297,7 +343,11 @@ impl TestData {
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &half_tag);
         assert_eq!(
-            &meta_buf.get_links(&key).unwrap()[..],
+            &meta_buf
+                .get_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap()[..],
             &expected[..],
             "{}",
             test

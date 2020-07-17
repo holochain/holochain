@@ -295,6 +295,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
     // Return a link between entries
+    let link_return = vec![link.clone()];
     mock_primary_meta
         .expect_get_links()
         .withf({
@@ -306,8 +307,11 @@ async fn links_local_return() -> SourceChainResult<()> {
             }
         })
         .returning({
-            let link = link.clone();
-            move |_| Ok(vec![link.clone()])
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
         });
 
     // call dht_get_links with above base
@@ -319,7 +323,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
-    assert_eq!(links, vec![link]);
+    assert_eq!(links, vec![link.into_link()]);
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -363,6 +367,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
 
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
+    let link_return = vec![];
     // Return empty links
     mock_primary_meta
         .expect_get_links()
@@ -374,7 +379,15 @@ async fn links_cache_return() -> SourceChainResult<()> {
                 k == &key
             }
         })
-        .returning(move |_| Ok(Vec::new()));
+        .returning({
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
+        });
+
+    let link_return = vec![link.clone()];
     // Return a link between entries
     mock_cache_meta
         .expect_get_links()
@@ -387,8 +400,11 @@ async fn links_cache_return() -> SourceChainResult<()> {
             }
         })
         .returning({
-            let link = link.clone();
-            move |_| Ok(vec![link.clone()])
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
         });
 
     // call dht_get_links with above base
@@ -400,7 +416,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
-    assert_eq!(links, vec![link.clone()]);
+    assert_eq!(links, vec![link.into_link()]);
     Ok(())
 }
 
@@ -437,6 +453,8 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
 
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
+    let link_return = vec![link.clone()];
+
     // Return empty links
     mock_cache_meta
         .expect_get_links()
@@ -449,8 +467,11 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
             }
         })
         .returning({
-            let link = link.clone();
-            move |_| Ok(vec![link.clone()])
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
         });
 
     // call dht_get_links with above base
@@ -462,7 +483,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
-    assert_eq!(links, vec![link]);
+    assert_eq!(links, vec![link.into_link()]);
     // check it doesn't hit the primary
     // this is implied by the mock not expecting calls
     Ok(())

@@ -56,6 +56,7 @@ use holochain_zome_types::{
 };
 use matches::assert_matches;
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
+use std::convert::TryFrom;
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
 use unwrap_to::unwrap_to;
 use uuid::Uuid;
@@ -396,7 +397,12 @@ impl Db {
                     link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
 
                     for link_meta_key in link_meta_keys {
-                        let res = workspace.meta.get_links(&link_meta_key).unwrap();
+                        let res = workspace
+                            .meta
+                            .get_links(&link_meta_key)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
 
                         assert_eq!(res.len(), 1, "{}", here);
                         assert_eq!(res[0].link_add_hash, link_add_hash, "{}", here);
@@ -431,7 +437,12 @@ impl Db {
                     link_meta_keys.push(LinkMetaKey::Base(&link_add.base_address));
 
                     for link_meta_key in link_meta_keys {
-                        let res = workspace.meta.get_links(&link_meta_key).unwrap();
+                        let res = workspace
+                            .meta
+                            .get_links(&link_meta_key)
+                            .unwrap()
+                            .collect::<Vec<_>>()
+                            .unwrap();
 
                         assert_eq!(res.len(), 0, "{}", here);
                     }
@@ -1385,7 +1396,7 @@ async fn commit_entry_add_link() {
 
         let meta = MetadataBuf::primary(&reader, &dbs).unwrap();
         let key = LinkMetaKey::Base(&base_entry_hash);
-        let links = meta.get_links(&key).unwrap();
+        let links = meta.get_links(&key).unwrap().collect::<Vec<_>>().unwrap();
         let link = links[0].clone();
         assert_eq!(link.target, target_entry_hash);
 
@@ -1394,7 +1405,7 @@ async fn commit_entry_add_link() {
 
         let links = cascade.dht_get_links(&key).await.unwrap();
         let link = links[0].clone();
-        assert_eq!(link.target, target_entry_hash);
+        assert_eq!(EntryHash::try_from(link.target).unwrap(), target_entry_hash);
 
         let e = cascade
             .dht_get(&target_entry_hash.into())

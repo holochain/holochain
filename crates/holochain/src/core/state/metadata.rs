@@ -148,7 +148,10 @@ impl LinkMetaVal {
 pub trait MetadataBufT {
     // Links
     /// Get all the links on this base that match the tag
-    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>>;
+    fn get_links<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>;
 
     /// Add a link
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
@@ -385,11 +388,16 @@ impl<'env> MetadataBuf<'env> {
 
 #[async_trait::async_trait]
 impl<'env> MetadataBufT for MetadataBuf<'env> {
-    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
-        self.links_meta
-            .iter_all_key_matches(key.to_key())?
-            .map(|(_, v)| Ok(v))
-            .collect()
+    fn get_links<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            self.links_meta
+                .iter_all_key_matches(key.to_key())?
+                .map(|(_, v)| Ok(v)),
+        ))
     }
 
     #[allow(clippy::needless_lifetimes)]

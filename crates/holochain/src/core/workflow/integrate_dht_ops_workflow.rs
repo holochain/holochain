@@ -271,7 +271,13 @@ async fn integrate_single_dht_op(
 
                         // Create a full link key and check if the link add exists
                         let key = LinkMetaKey::from((&link_add, &hash));
-                        if workspace.meta.get_links(&key)?.is_empty() {
+                        if workspace
+                            .meta
+                            .get_links(&key)?
+                            .collect::<Vec<_>>()
+                            .unwrap()
+                            .is_empty()
+                        {
                             None
                         } else {
                             Some(link_add)

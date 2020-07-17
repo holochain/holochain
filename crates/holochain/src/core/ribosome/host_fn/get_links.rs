@@ -1,7 +1,7 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::{
     ribosome::{HostContext, RibosomeT},
-    state::metadata::{LinkMetaKey, LinkMetaVal},
+    state::metadata::LinkMetaKey,
     workflow::InvokeZomeWorkspace,
 };
 use futures::future::FutureExt;
@@ -36,7 +36,7 @@ pub fn get_links<'a>(
     };
 
     let call =
-        |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
+        |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<Link>>> {
             async move {
                 let cascade = workspace.cascade();
 
@@ -47,9 +47,7 @@ pub fn get_links<'a>(
                 };
 
                 // Get te links from the dht
-                cascade
-                    .dht_get_links(&key)
-                    .await
+                cascade.dht_get_links(&key).await
             }
             .boxed()
             .into()
@@ -58,8 +56,6 @@ pub fn get_links<'a>(
     let links = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         unsafe { host_context.workspace.apply_ref(call).await }
     })??;
-
-    let links: Vec<Link> = links.into_iter().map(|l| l.into_link()).collect();
 
     Ok(GetLinksOutput::new(links.into()))
 }

@@ -40,15 +40,17 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
+    metadata::{EntryDhtStatus, LinkMetaKey, MetadataBuf, MetadataBufT},
 };
 use fallible_iterator::FallibleIterator;
+use holo_hash::HeaderHash;
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
     composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
     element::{ChainElement, SignedHeaderHashed},
     EntryHashed,
 };
+use holochain_zome_types::link::Link;
 use tracing::*;
 
 #[cfg(test)]
@@ -124,12 +126,18 @@ where
         }
     }
 
-    async fn dht_get_entry(&self, entry_hash: EntryHash) -> DatabaseResult<Option<ChainElement>> {
+    /// Returns the oldest live [ChainElement] for this [EntryHash] by getting the
+    /// latest available metadata from authorities combined with this agents authored data.
+    pub async fn dht_get_entry(
+        &self,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Option<ChainElement>> {
         // TODO: Update the cache from the network
         // TODO: Fetch the EntryDhtStatus
         // TODO: Fetch the headers on this entry
         // TODO: Fetch the deletes on this entry
         // TODO: Update the meta cache
+
         // Meta Cache
         let oldest_live_element = match self.cache_meta.get_dht_status(&entry_hash)? {
             EntryDhtStatus::Live => {
@@ -183,7 +191,56 @@ where
         }
     }
 
-    // TODO: dht_get_header -> Header
+    /// Returns the [ChainElement] for this [HeaderHash] if it is live
+    /// by getting the latest available metadata from authorities
+    /// combined with this agents authored data.
+    /// _Note: Deleted headers are a tombstone set_
+    pub async fn dht_get_header(
+        &self,
+        header_hash: HeaderHash,
+    ) -> DatabaseResult<Option<ChainElement>> {
+        // Meta Cache
+        if let Some(_) = self
+            .cache_meta
+            .get_deletes_on_header(header_hash.clone())?
+            .next()?
+        {
+            // Final tombstone found
+            return Ok(None);
+        // Meta Vault
+        } else if let Some(_) = self
+            .primary_meta
+            .get_deletes_on_header(header_hash.clone())?
+            .next()?
+        {
+            // Final tombstone found
+            return Ok(None);
+        }
+        // TODO: Network
+        // TODO: Fetches any deletes on this header.
+        // TODO: If found updates the meta cache and returns none.
+
+        // Element Vault
+        // Checks the element vault for this header element.
+        // TODO: Handle error
+        let element = match self.primary.get_element(&header_hash).await.unwrap() {
+            // Element Cache
+            // If not found checks the element cache
+            // TODO: Handle error
+            None => self.cache.get_element(&header_hash).await.unwrap(),
+            e => e,
+        };
+
+        // Network
+        match element {
+            None => {
+                // TODO: If not found fetches this element from the network.
+                // TODO: Update the element cache.
+                todo!("Fetch element from the network")
+            }
+            e => Ok(e),
+        }
+    }
 
     #[instrument(skip(self))]
     // Updates the cache with the latest network authority data
@@ -194,40 +251,20 @@ where
         match hash.clone() {
             AnyDhtHash::EntryContent(ec) => self.dht_get_entry(ec.into()).await,
             AnyDhtHash::Agent(a) => self.dht_get_entry(a.into()).await,
-            AnyDhtHash::Header(_) => {
-                todo!();
-            }
+            AnyDhtHash::Header(header) => self.dht_get_header(header).await,
         }
     }
 
     /// Gets an links from the cas or cache depending on it's metadata
-    // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get_links<'a>(
-        &self,
-        key: &'a LinkMetaKey<'a>,
-    ) -> DatabaseResult<Vec<LinkMetaVal>> {
-        // Am I an authority?
-        // TODO: Not a good check for authority as the base could be in the cas because
-        // you authored it.
-        let authority = self.primary.contains(&key.base()).await?;
-        if authority {
-            // Cas
-            let links = self.primary_meta.get_links(key)?;
-
-            // TODO: Why check cache if you are the authority?
-            // Cache
-            if links.is_empty() {
-                self.cache_meta.get_links(key)
-            } else {
-                Ok(links)
-            }
-        } else {
-            // TODO: Why check cache if you need to go to the authority?
-            // Cache
-            self.cache_meta.get_links(key)
-        }
+    pub async fn dht_get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<Link>> {
+        // Meta Cache
+        // Return any links from the meta cache that don't have removes.
+        self.cache_meta
+            .get_links(key)?
+            .map(|l| Ok(l.into_link()))
+            .collect()
     }
 }
 
