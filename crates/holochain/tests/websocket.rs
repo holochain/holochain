@@ -12,10 +12,7 @@ use holochain::core::ribosome::ZomeCallInvocationFixturator;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
-    dna::{
-        // DnaFile,
-        JsonProperties,
-    },
+    dna::JsonProperties,
     observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
