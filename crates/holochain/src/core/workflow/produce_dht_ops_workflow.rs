@@ -98,7 +98,7 @@ mod tests {
 
     use fallible_iterator::FallibleIterator;
     use ::fixt::prelude::*;
-    use holo_hash::{DhtOpHash, Hashable, Hashed, HoloHashExt};
+    use holo_hash::*;
 
     use holochain_state::{
         env::{ReadManager, WriteManager},
@@ -269,7 +269,7 @@ mod tests {
             // Hash the results
             let mut results_hashed = Vec::new();
             for op in results {
-                let (_, hash) = DhtOpHashed::with_data(op).await.into();
+                let (_, hash) = DhtOpHashed::from_content(op).await.into();
                 results_hashed.push(hash);
             }
 

@@ -159,7 +159,7 @@ mod tests {
         let env_ref = env.guard().await;
         let keystore = holochain_state::test_utils::test_keystore();
 
-        let test_op_hash = fake_dht_op_hash(1).await;
+        let test_op_hash = fake_dht_op_hash(1);
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 

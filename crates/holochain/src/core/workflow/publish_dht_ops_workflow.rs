@@ -166,7 +166,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashable, Hashed};
+    use holo_hash::*;
     use holochain_p2p::{
         actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
         spawn_holochain_p2p,
@@ -549,14 +549,14 @@ mod tests {
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
                 let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
-                let op_hash = DhtOpHashed::with_data(op.clone()).await?.into_hash();
+                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let store_element = (op_hash, light, basis, expected_op);
 
                 // Create StoreEntry
                 let header = NewEntryHeader::Create(entry_create.clone());
                 let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
                 let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
-                let op_hash = DhtOpHashed::with_data(op.clone()).await?.into_hash();
+                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let store_entry = (op_hash, light, basis);
 
                 // Create RegisterReplacedBy
@@ -569,7 +569,7 @@ mod tests {
                 let expected_op =
                     DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
                 let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
-                let op_hash = DhtOpHashed::with_data(op.clone()).await?.into_hash();
+                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let register_replaced_by = (op_hash, light, basis, expected_op);
 
                 (store_element, store_entry, register_replaced_by)

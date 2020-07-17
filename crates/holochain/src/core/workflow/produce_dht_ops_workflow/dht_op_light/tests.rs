@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use ::fixt::prelude::*;
-use holo_hash::{fixt::HeaderHashFixturator, AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::{fixt::HeaderHashFixturator, *};
 use holochain_keystore::Signature;
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{

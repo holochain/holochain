@@ -87,13 +87,13 @@ impl TestData {
     #[instrument()]
     async fn new_inner(original_entry: Entry, new_entry: Entry) -> Self {
         // original entry
-        let original_entry_hash = EntryHashed::with_data(original_entry.clone())
+        let original_entry_hash = EntryHashed::from_content(original_entry.clone())
             .await
             .unwrap()
             .into_hash();
 
         // New entry
-        let new_entry_hash = EntryHashed::with_data(new_entry.clone())
+        let new_entry_hash = EntryHashed::from_content(new_entry.clone())
             .await
             .unwrap()
             .into_hash();
@@ -106,7 +106,7 @@ impl TestData {
             NewEntryHeader::Update(u) => u.entry_hash = original_entry_hash.clone(),
         }
 
-        let original_header_hash = HeaderHashed::with_data(original_header.clone().into())
+        let original_header_hash = HeaderHashed::from_content(original_header.clone().into())
             .await
             .unwrap()
             .into_hash();
@@ -143,7 +143,7 @@ impl TestData {
         link_add.zome_id = fixt!(ZomeId);
         link_add.tag = fixt!(LinkTag);
 
-        let link_add_hash = HeaderHashed::with_data(link_add.clone().into())
+        let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
             .await
             .unwrap()
             .into_hash();
@@ -209,7 +209,7 @@ impl Db {
         for expect in expects {
             match expect {
                 Db::Integrated(op) => {
-                    let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                    let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                     let (op, basis) =
                         dht_op_to_light_basis(op, &workspace.cas)
                             .await
@@ -245,7 +245,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::CasHeader(header, _) => {
-                    let hash = HeaderHashed::with_data(header.clone()).await.unwrap();
+                    let hash = HeaderHashed::from_content(header.clone()).await.unwrap();
                     assert_eq!(
                         workspace
                             .cas
@@ -260,7 +260,7 @@ impl Db {
                     );
                 }
                 Db::CasEntry(entry, _, _) => {
-                    let hash = EntryHashed::with_data(entry.clone())
+                    let hash = EntryHashed::from_content(entry.clone())
                         .await
                         .unwrap()
                         .into_hash();
@@ -278,11 +278,11 @@ impl Db {
                     );
                 }
                 Db::MetaHeader(entry, header) => {
-                    let header_hash = HeaderHashed::with_data(header.clone())
+                    let header_hash = HeaderHashed::from_content(header.clone())
                         .await
                         .unwrap()
                         .into_hash();
-                    let entry_hash = EntryHashed::with_data(entry.clone())
+                    let entry_hash = EntryHashed::from_content(entry.clone())
                         .await
                         .unwrap()
                         .into_hash();
@@ -296,7 +296,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaActivity(header) => {
-                    let header_hash = HeaderHashed::with_data(header.clone())
+                    let header_hash = HeaderHashed::from_content(header.clone())
                         .await
                         .unwrap()
                         .into_hash();
@@ -310,7 +310,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaUpdate(base, header) => {
-                    let header_hash = HeaderHashed::with_data(header.clone())
+                    let header_hash = HeaderHashed::from_content(header.clone())
                         .await
                         .unwrap()
                         .into_hash();
@@ -324,7 +324,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaDelete(base, deleted_header_hash, header) => {
-                    let header_hash = HeaderHashed::with_data(header.clone())
+                    let header_hash = HeaderHashed::from_content(header.clone())
                         .await
                         .unwrap()
                         .into_hash();
@@ -369,7 +369,7 @@ impl Db {
                     // TODO: Not currently possible because kvv bufs have no iterator over all keys
                 }
                 Db::MetaLink(link_add, target_hash) => {
-                    let link_add_hash = HeaderHashed::with_data(link_add.clone().into())
+                    let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
                         .await
                         .unwrap()
                         .into_hash();
@@ -404,7 +404,7 @@ impl Db {
                     }
                 }
                 Db::MetaLinkEmpty(link_add) => {
-                    let link_add_hash = HeaderHashed::with_data(link_add.clone().into())
+                    let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
                         .await
                         .unwrap()
                         .into_hash();
@@ -451,7 +451,7 @@ impl Db {
             match state {
                 Db::Integrated(_) => {}
                 Db::IntQueue(op) => {
-                    let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                    let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                     let val = IntegrationQueueValue {
                         validation_status: ValidationStatus::Valid,
                         op,
@@ -462,17 +462,17 @@ impl Db {
                         .unwrap();
                 }
                 Db::CasHeader(header, signature) => {
-                    let header_hash = HeaderHashed::with_data(header.clone()).await.unwrap();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await.unwrap();
                     debug!(header_hash = %header_hash.as_hash());
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
                     workspace.cas.put(signed_header, None).unwrap();
                 }
                 Db::CasEntry(entry, header, signature) => {
-                    let header_hash = HeaderHashed::with_data(header.unwrap().clone())
+                    let header_hash = HeaderHashed::from_content(header.unwrap().clone())
                         .await
                         .unwrap();
-                    let entry_hash = EntryHashed::with_data(entry.clone()).await.unwrap();
+                    let entry_hash = EntryHashed::from_content(entry.clone()).await.unwrap();
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
                     workspace.cas.put(signed_header, Some(entry_hash)).unwrap();
@@ -1302,12 +1302,12 @@ async fn commit_entry_add_link() {
     let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
 
     let base_entry = entry_fixt.next().unwrap();
-    let base_entry_hash = EntryHashed::with_data(base_entry.clone())
+    let base_entry_hash = EntryHashed::from_content(base_entry.clone())
         .await
         .unwrap()
         .into_hash();
     let target_entry = entry_fixt.next().unwrap();
-    let target_entry_hash = EntryHashed::with_data(target_entry.clone())
+    let target_entry_hash = EntryHashed::from_content(target_entry.clone())
         .await
         .unwrap()
         .into_hash();
