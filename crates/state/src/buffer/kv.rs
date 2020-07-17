@@ -231,7 +231,7 @@ where
                     //     .with_string_variants();
                     // v.serialize(&mut se)?;
                     let buf = rmp_serde::to_vec_named(v)?;
-
+                    println!("PUT:\n{:?} ->\n{:?}", k, buf);
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }

@@ -16,8 +16,8 @@ pub trait HashType:
     + Eq
     + PartialOrd
     + Ord
-    + serde::Serialize
     + serde::de::DeserializeOwned
+    + serde::Serialize
 {
     fn get_prefix(self) -> &'static [u8];
     fn hash_name(self) -> &'static str;
@@ -39,19 +39,8 @@ impl<P: PrimitiveHashType> HashType for P {
 }
 
 macro_rules! primitive_hash_type {
-    ($name: ident, $display: ident, $prefix: ident) => {
-        #[derive(
-            Debug,
-            Copy,
-            Clone,
-            Hash,
-            PartialEq,
-            Eq,
-            PartialOrd,
-            Ord,
-            serde::Serialize,
-            serde::Deserialize,
-        )]
+    ($name: ident, $display: ident, $visitor: ident, $prefix: ident) => {
+        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $name;
 
         impl PrimitiveHashType for $name {
@@ -65,19 +54,57 @@ macro_rules! primitive_hash_type {
                 stringify!($display)
             }
         }
+
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_bytes(self.get_prefix())
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_bytes($visitor)
+            }
+        }
+
+        struct $visitor;
+
+        impl<'de> serde::de::Visitor<'de> for $visitor {
+            type Value = $name;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a HoloHash of primitive hash_type")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v {
+                    $prefix => Ok($name),
+                    _ => panic!("noo"),
+                }
+            }
+        }
     };
 }
 
-primitive_hash_type!(Agent, AgentPubKey, AGENT_PREFIX);
-primitive_hash_type!(Content, EntryContentHash, CONTENT_PREFIX);
-primitive_hash_type!(Dna, DnaHash, DNA_PREFIX);
-primitive_hash_type!(DhtOp, DhtOpHash, DHTOP_PREFIX);
-primitive_hash_type!(Header, HeaderHash, HEADER_PREFIX);
-primitive_hash_type!(NetId, NetIdHash, NET_ID_PREFIX);
-primitive_hash_type!(Wasm, WasmHash, WASM_PREFIX);
+primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
+primitive_hash_type!(Content, EntryContentHash, ContentVisitor, CONTENT_PREFIX);
+primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
+primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
+primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
+primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
+primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
 
 #[derive(
-    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize,
 )]
 pub enum Entry {
     Agent,
@@ -97,7 +124,7 @@ impl HashType for Entry {
 }
 
 #[derive(
-    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize,
 )]
 pub enum AnyDht {
     Entry(Entry),

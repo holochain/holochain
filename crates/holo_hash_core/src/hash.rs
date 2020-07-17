@@ -7,7 +7,6 @@ pub struct HoloHashImpl<T> {
     #[serde(with = "serde_bytes")]
     hash: Vec<u8>,
 
-    // #[serde(bound = "T: HashType")]
     hash_type: T,
 }
 
