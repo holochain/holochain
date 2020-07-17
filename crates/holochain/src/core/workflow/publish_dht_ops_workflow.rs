@@ -166,7 +166,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holo_hash::*;
+    use holo_hash::fixt::*;
     use holochain_p2p::{
         actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
         spawn_holochain_p2p,
@@ -225,11 +225,9 @@ mod tests {
             // Create DhtOp
             let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
             // Get the hash from the op
-            let op_hashed = DhtOpHashed::with_data(op.clone()).await?;
+            let op_hashed = DhtOpHashed::from_content(op.clone()).await;
             // Convert op to DhtOpLight
-            let header_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
-                .await
-                .unwrap();
+            let header_hash = HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).await;
             let light = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),

@@ -89,13 +89,11 @@ impl TestData {
         // original entry
         let original_entry_hash = EntryHashed::from_content(original_entry.clone())
             .await
-            .unwrap()
             .into_hash();
 
         // New entry
         let new_entry_hash = EntryHashed::from_content(new_entry.clone())
             .await
-            .unwrap()
             .into_hash();
 
         // Original entry and header for updates
@@ -108,7 +106,6 @@ impl TestData {
 
         let original_header_hash = HeaderHashed::from_content(original_header.clone().into())
             .await
-            .unwrap()
             .into_hash();
 
         // Header for the new entry
@@ -145,7 +142,6 @@ impl TestData {
 
         let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
             .await
-            .unwrap()
             .into_hash();
 
         // Link remove
@@ -245,7 +241,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::CasHeader(header, _) => {
-                    let hash = HeaderHashed::from_content(header.clone()).await.unwrap();
+                    let hash = HeaderHashed::from_content(header.clone()).await;
                     assert_eq!(
                         workspace
                             .cas
@@ -260,10 +256,7 @@ impl Db {
                     );
                 }
                 Db::CasEntry(entry, _, _) => {
-                    let hash = EntryHashed::from_content(entry.clone())
-                        .await
-                        .unwrap()
-                        .into_hash();
+                    let hash = EntryHashed::from_content(entry.clone()).await.into_hash();
                     assert_eq!(
                         workspace
                             .cas
@@ -278,14 +271,8 @@ impl Db {
                     );
                 }
                 Db::MetaHeader(entry, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone())
-                        .await
-                        .unwrap()
-                        .into_hash();
-                    let entry_hash = EntryHashed::from_content(entry.clone())
-                        .await
-                        .unwrap()
-                        .into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
+                    let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
                     let res = workspace
                         .meta
                         .get_headers(entry_hash)
@@ -296,10 +283,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaActivity(header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone())
-                        .await
-                        .unwrap()
-                        .into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
                     let res = workspace
                         .meta
                         .get_activity(header.author().clone())
@@ -310,10 +294,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaUpdate(base, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone())
-                        .await
-                        .unwrap()
-                        .into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
                     let res = workspace
                         .meta
                         .get_updates(base)
@@ -324,10 +305,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaDelete(base, deleted_header_hash, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone())
-                        .await
-                        .unwrap()
-                        .into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
                     let res = workspace
                         .meta
                         .get_deletes_on_entry(base)
@@ -371,7 +349,6 @@ impl Db {
                 Db::MetaLink(link_add, target_hash) => {
                     let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
                         .await
-                        .unwrap()
                         .into_hash();
 
                     // LinkMetaKey
@@ -406,7 +383,6 @@ impl Db {
                 Db::MetaLinkEmpty(link_add) => {
                     let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
                         .await
-                        .unwrap()
                         .into_hash();
 
                     // LinkMetaKey
@@ -462,17 +438,15 @@ impl Db {
                         .unwrap();
                 }
                 Db::CasHeader(header, signature) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await.unwrap();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await;
                     debug!(header_hash = %header_hash.as_hash());
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
                     workspace.cas.put(signed_header, None).unwrap();
                 }
                 Db::CasEntry(entry, header, signature) => {
-                    let header_hash = HeaderHashed::from_content(header.unwrap().clone())
-                        .await
-                        .unwrap();
-                    let entry_hash = EntryHashed::from_content(entry.clone()).await.unwrap();
+                    let header_hash = HeaderHashed::from_content(header.unwrap().clone()).await;
+                    let entry_hash = EntryHashed::from_content(entry.clone()).await;
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
                     workspace.cas.put(signed_header, Some(entry_hash)).unwrap();
@@ -861,9 +835,7 @@ async fn commit_entry<'env>(
         .expect_run_entry_defs()
         .returning(move |_| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
 
-    let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut host_context = HostContextFixturator::new(Unpredictable).next().unwrap();
     host_context.zome_name = zome_name.clone();
 
     // Collect the entry from the pre-state to commit
@@ -910,9 +882,7 @@ async fn get_entry<'env>(
     // This is a lot faster then compiling a zome
     let ribosome = MockRibosomeT::new();
 
-    let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut host_context = HostContextFixturator::new(Unpredictable).next().unwrap();
 
     let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));
 
@@ -950,9 +920,7 @@ async fn link_entries<'env>(
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_file().return_const(dna_file);
 
-    let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut host_context = HostContextFixturator::new(Unpredictable).next().unwrap();
     host_context.zome_name = zome_name.clone();
 
     // Call link_entries
@@ -974,9 +942,7 @@ async fn link_entries<'env>(
         .unwrap();
 
     // Get the LinkAdd HeaderHash back
-    unwrap_to!(output.into_inner() => HoloHashCore::HeaderHash)
-        .clone()
-        .into()
+    output.into_inner()
 }
 
 async fn get_links<'env>(
@@ -1002,9 +968,7 @@ async fn get_links<'env>(
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_file().return_const(dna_file);
 
-    let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut host_context = HostContextFixturator::new(Unpredictable).next().unwrap();
     host_context.zome_name = zome_name.clone();
 
     // Call get links
@@ -1304,12 +1268,10 @@ async fn commit_entry_add_link() {
     let base_entry = entry_fixt.next().unwrap();
     let base_entry_hash = EntryHashed::from_content(base_entry.clone())
         .await
-        .unwrap()
         .into_hash();
     let target_entry = entry_fixt.next().unwrap();
     let target_entry_hash = EntryHashed::from_content(target_entry.clone())
         .await
-        .unwrap()
         .into_hash();
     // Put commit entry into source chain
     {

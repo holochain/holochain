@@ -48,7 +48,7 @@ pub mod tests {
         prelude::*,
         test_utils::test_cell_env,
     };
-    use holochain_types::prelude::*;
+    use holochain_types::{prelude::*, test_utils::fake_header_hash};
 
     pub struct TestWorkspace<'env> {
         one: KvBuf<'env, HeaderHash, u32, Reader<'env>>,
