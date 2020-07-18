@@ -7,7 +7,7 @@ impl<P: PrimitiveHashType> TryFrom<&str> for HoloHashImpl<P> {
         let hash_type = P::new();
         Ok(HoloHashImpl::from_raw_bytes(holo_hash_decode(
             hash_type.get_prefix(),
-            s.as_ref(),
+            s,
         )?))
     }
 }

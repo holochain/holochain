@@ -26,7 +26,7 @@ where
     C: HashableContent,
 {
     pub async fn from_content(content: C) -> Self {
-        let hash: HoloHash<C> = HoloHashImpl::with_content(&content).await.into();
+        let hash: HoloHash<C> = HoloHashImpl::with_data(&content).await.into();
         Self { content, hash }
     }
 

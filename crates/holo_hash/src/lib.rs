@@ -5,9 +5,6 @@ pub use ext::*;
 pub use hashed::*;
 mod tests;
 
-// mod hashable_content;
-// pub use hashable_content::*;
-
 pub mod prelude {
     pub use super::*;
     pub use holo_hash_core::HasHash;

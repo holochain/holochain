@@ -5,22 +5,16 @@ use holo_hash_core::{
 };
 use must_future::MustBoxFuture;
 
-pub trait HoloHashExt<C: HashableContent> // for<'a> &'a C: HashableContent,
-{
-    fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
-
-    // TODO: deprecate
-    // #[deprecated = "alias for with_content"]
+/// Extension trait for HoloHashImpl, which allows instantiation with
+/// HashableContent rather than raw bytes
+pub trait HoloHashExt<C: HashableContent> {
     fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
 
     fn with_pre_hashed_typed(hash: Vec<u8>, hash_type: C::HashType) -> Self;
 }
 
-impl<C: HashableContent> HoloHashExt<C> for HoloHash<C>
-where
-// for<'a> &'a C: HashableContent,
-{
-    fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
+impl<C: HashableContent> HoloHashExt<C> for HoloHash<C> {
+    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
         async move {
             match content.hashable_content() {
                 HashableContentBytes::Content(sb) => {
@@ -37,10 +31,6 @@ where
         }
         .boxed()
         .into()
-    }
-
-    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
-        Self::with_content(content)
     }
 
     fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: C::HashType) -> Self {
