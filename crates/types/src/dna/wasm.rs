@@ -3,7 +3,7 @@
 //!  - and serialized to json
 use backtrace::Backtrace;
 use holo_hash::prelude::*;
-use holo_hash_core::hash_type;
+use holo_hash_core::{hash_type, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 use serde::{self, Deserialize, Serialize};
 use std::{
@@ -30,9 +30,11 @@ impl HashableContent for DnaWasm {
         hash_type::Wasm
     }
 
-    fn hashable_content(&self) -> SerializedBytes {
-        self.try_into()
-            .expect("Could not serialize HashableContent")
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            self.try_into()
+                .expect("Could not serialize HashableContent"),
+        )
     }
 }
 

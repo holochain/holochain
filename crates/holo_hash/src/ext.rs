@@ -1,6 +1,8 @@
 use crate::HoloHash;
 use futures::FutureExt;
-use holo_hash_core::{encode, HashableContent, HoloHashImpl, PrimitiveHashType};
+use holo_hash_core::{
+    encode, HashableContent, HashableContentBytes, HoloHashImpl, PrimitiveHashType,
+};
 use holochain_serialized_bytes::prelude::*;
 use must_future::MustBoxFuture;
 
@@ -13,10 +15,6 @@ pub trait HoloHashExt<C: HashableContent> // for<'a> &'a C: HashableContent,
     fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
 
     fn with_pre_hashed_typed(hash: Vec<u8>, hash_type: C::HashType) -> Self;
-
-    // TODO: add this to the general extension trait so that non-primitive
-    // hash types can implement it
-    // fn to_string(&self) -> String;
 }
 
 impl<C: HashableContent> HoloHashExt<C> for HoloHash<C>
@@ -25,13 +23,18 @@ where
 {
     fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
         async move {
-            let sb: SerializedBytes = content.hashable_content();
-            let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
-            let hash = HoloHashExt::<C>::with_pre_hashed_typed(
-                encode::blake2b_256(&bytes),
-                content.hash_type(),
-            );
-            hash
+            match content.hashable_content() {
+                HashableContentBytes::Content(sb) => {
+                    let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
+                    HoloHashExt::<C>::with_pre_hashed_typed(
+                        encode::blake2b_256(&bytes),
+                        content.hash_type(),
+                    )
+                }
+                HashableContentBytes::Prehashed36(bytes) => {
+                    HoloHashImpl::from_raw_bytes_and_type(bytes, content.hash_type())
+                }
+            }
         }
         .boxed()
         .into()
