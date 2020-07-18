@@ -87,9 +87,7 @@ where
     fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
         Self::empty_key(&k)?;
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(
-                rmp_serde::from_read_ref(buf)?,
-            )),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }

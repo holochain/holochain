@@ -1,7 +1,5 @@
 use crate::HashType;
-use futures::FutureExt;
 use holochain_serialized_bytes::prelude::*;
-use must_future::MustBoxFuture;
 
 pub trait HashableContent: Sized + Send + Sync {
     type HashType: HashType;

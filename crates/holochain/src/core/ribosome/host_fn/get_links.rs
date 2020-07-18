@@ -10,7 +10,6 @@ use holochain_zome_types::link::Link;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::GetLinksOutput;
 use must_future::MustBoxFuture;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

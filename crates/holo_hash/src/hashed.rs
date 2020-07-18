@@ -6,21 +6,12 @@ use holochain_serialized_bytes::SerializedBytesError;
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
 // TODO: consider making lazy with OnceCell
-pub struct HoloHashed<C: HashableContent>
-where
-    // TODO: can remove this constraint?
-    C: HashableContent,
-    // for<'a> &'a C: HashableContent,
-{
+pub struct HoloHashed<C: HashableContent> {
     content: C,
     hash: HoloHash<C>,
 }
 
-impl<C> HasHash<C::HashType> for HoloHashed<C>
-where
-    C: HashableContent,
-    // for<'a> &'a C: HashableContent,
-{
+impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
     fn hash(&self) -> &HoloHash<C> {
         &self.hash
     }
@@ -33,7 +24,6 @@ where
 impl<C> HoloHashed<C>
 where
     C: HashableContent,
-    // for<'a> &'a C: HashableContent,
 {
     pub async fn from_content(content: C) -> Self {
         let hash: HoloHash<C> = HoloHashImpl::with_content(&content).await.into();
@@ -78,7 +68,6 @@ where
 impl<C> Clone for HoloHashed<C>
 where
     C: HashableContent + Clone,
-    // for<'a> &'a C: HashableContent,
 {
     fn clone(&self) -> Self {
         Self {
@@ -91,7 +80,6 @@ where
 impl<C> std::fmt::Debug for HoloHashed<C>
 where
     C: HashableContent + std::fmt::Debug,
-    // for<'a> &'a C: HashableContent,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("HoloHashed({:?})", self.content))?;
@@ -102,7 +90,6 @@ where
 impl<C> std::convert::From<HoloHashed<C>> for (C, HoloHash<C>)
 where
     C: HashableContent,
-    // for<'a> &'a C: HashableContent,
 {
     fn from(g: HoloHashed<C>) -> (C, HoloHash<C>) {
         g.into_inner()
@@ -112,7 +99,6 @@ where
 impl<C> std::ops::Deref for HoloHashed<C>
 where
     C: HashableContent,
-    // for<'a> &'a C: HashableContent,
 {
     type Target = C;
 
@@ -124,7 +110,6 @@ where
 impl<C> std::convert::AsRef<C> for HoloHashed<C>
 where
     C: HashableContent,
-    // for<'a> &'a C: HashableContent,
 {
     fn as_ref(&self) -> &C {
         self.content()
@@ -134,7 +119,6 @@ where
 impl<C> std::borrow::Borrow<C> for HoloHashed<C>
 where
     C: HashableContent,
-    // for<'a> &'a C: HashableContent,
 {
     fn borrow(&self) -> &C {
         self.content()
@@ -144,23 +128,17 @@ where
 impl<C> std::cmp::PartialEq for HoloHashed<C>
 where
     C: HashableContent,
-    // for<'a> &'a C: HashableContent,
 {
     fn eq(&self, other: &Self) -> bool {
         self.hash == other.hash
     }
 }
 
-impl<C> std::cmp::Eq for HoloHashed<C> where
-    C: HashableContent
-    // for<'a> &'a C: HashableContent,
-{
-}
+impl<C> std::cmp::Eq for HoloHashed<C> where C: HashableContent {}
 
 impl<C> std::hash::Hash for HoloHashed<C>
 where
     C: HashableContent,
-    // for<'a> &'a C: HashableContent,
 {
     fn hash<StdH: std::hash::Hasher>(&self, state: &mut StdH) {
         std::hash::Hash::hash(&self.hash, state)

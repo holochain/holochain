@@ -2,13 +2,11 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::{HostContext, RibosomeT};
 use crate::core::workflow::InvokeZomeWorkspace;
 use futures::future::FutureExt;
-use holo_hash::HoloHashExt;
 use holochain_state::error::DatabaseResult;
 use holochain_zome_types::Entry;
 use holochain_zome_types::GetEntryInput;
 use holochain_zome_types::GetEntryOutput;
 use must_future::MustBoxFuture;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

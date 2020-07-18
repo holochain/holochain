@@ -3,7 +3,6 @@ use futures::FutureExt;
 use holo_hash_core::{
     encode, HashableContent, HashableContentBytes, HoloHashImpl, PrimitiveHashType,
 };
-use holochain_serialized_bytes::prelude::*;
 use must_future::MustBoxFuture;
 
 pub trait HoloHashExt<C: HashableContent> // for<'a> &'a C: HashableContent,

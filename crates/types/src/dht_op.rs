@@ -8,7 +8,7 @@ use crate::element::ChainElement;
 use crate::{header, prelude::*, Header};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
-use holo_hash_core::impl_hashable_content;
+use holo_hash_core::{hash_type, HashableContentBytes};
 use holochain_zome_types::Entry;
 use serde::{Deserialize, Serialize};
 
@@ -193,4 +193,18 @@ impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
 /// A DhtOp paired with its DhtOpHash
 pub type DhtOpHashed = HoloHashed<DhtOp>;
 
-impl_hashable_content!(DhtOp, DhtOp);
+impl HashableContent for DhtOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            (&self.as_unique_form())
+                .try_into()
+                .expect("Could not serialize HashableContent"),
+        )
+    }
+}

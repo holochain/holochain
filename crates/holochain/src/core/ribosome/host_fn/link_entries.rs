@@ -10,7 +10,6 @@ use holo_hash_core::HeaderAddress;
 use holochain_types::header::builder;
 use holochain_zome_types::LinkEntriesInput;
 use holochain_zome_types::LinkEntriesOutput;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

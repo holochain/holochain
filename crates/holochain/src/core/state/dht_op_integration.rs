@@ -90,7 +90,6 @@ pub struct IntegrationQueueValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::*;
     use holochain_types::Timestamp;
 
     #[test]

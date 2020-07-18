@@ -13,7 +13,6 @@ mod tests {
     use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use holo_hash_core::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
         fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},

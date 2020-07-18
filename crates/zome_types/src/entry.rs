@@ -8,7 +8,7 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
-use holo_hash_core::{hash_type, AgentPubKey, HashableContent, HashableContentBytes, HoloHashImpl};
+use holo_hash_core::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 
 /// The data type written to the source chain when explicitly granting a capability.

@@ -114,7 +114,6 @@ pub async fn sys_validate_header(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::{HeaderHash, HoloHashExt};
     use holochain_types::{
         element::SignedHeaderHashed,
         header::InitZomesComplete,
