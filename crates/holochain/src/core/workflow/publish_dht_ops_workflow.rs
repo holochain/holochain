@@ -184,7 +184,7 @@ mod tests {
         header::{EntryType, IntendedFor, NewEntryHeader},
         observability,
         validate::ValidationStatus,
-        EntryHashed, Header, HeaderHashed,
+        EntryHashed, Header, HeaderHashed, Timestamp,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use std::{
@@ -232,6 +232,7 @@ mod tests {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
                 op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
+                when_integrated: Timestamp::now(),
             };
             data.push((sig, op_hashed, light, header_hash));
         }
@@ -601,6 +602,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
+                    when_integrated: Timestamp::now(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
@@ -614,6 +616,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
+                    when_integrated: Timestamp::now(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
@@ -627,6 +630,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
+                    when_integrated: Timestamp::now(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db

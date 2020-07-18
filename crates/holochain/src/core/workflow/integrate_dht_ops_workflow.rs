@@ -26,7 +26,7 @@ use holochain_types::{
     element::SignedHeaderHashed,
     header::IntendedFor,
     validate::ValidationStatus,
-    EntryHashed, Header, HeaderHashed, TimestampKey,
+    EntryHashed, Header, HeaderHashed, Timestamp, TimestampKey,
 };
 use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use tracing::*;
@@ -313,6 +313,7 @@ async fn integrate_single_dht_op(
             validation_status,
             basis,
             op,
+            when_integrated: Timestamp::now(),
         };
         debug!("integrating");
         Ok(Outcome::Integrated(value))

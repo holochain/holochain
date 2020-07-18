@@ -217,13 +217,11 @@ impl Db {
                         validation_status: ValidationStatus::Valid,
                         basis,
                         op,
+                        when_integrated: Timestamp::now(),
                     };
-                    assert_eq!(
-                        workspace.integrated_dht_ops.get(&op_hash).unwrap(),
-                        Some(value),
-                        "{}",
-                        here
-                    );
+                    let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
+                    r.when_integrated = value.when_integrated;
+                    assert_eq!(r, value, "{}", here);
                 }
                 Db::IntQueue(op) => {
                     let value = IntegrationQueueValue {
