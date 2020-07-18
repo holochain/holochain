@@ -71,6 +71,14 @@ impl HashableContent for Entry {
             _ => hash_type::Entry::Content,
         }
     }
+
+    fn hashable_content(self) -> SerializedBytes {
+        match self {
+            Entry::Agent(agent_pubkey) => todo!(),
+            _ => self.try_into(),
+        }
+        .expect("Could not serialize HashableContent")
+    }
 }
 
 impl HashableContent for &Entry {
@@ -81,5 +89,12 @@ impl HashableContent for &Entry {
             Entry::Agent(_) => hash_type::Entry::Agent,
             _ => hash_type::Entry::Content,
         }
+    }
+    fn hashable_content(self) -> SerializedBytes {
+        match self {
+            Entry::Agent(agent_pubkey) => todo!(),
+            _ => self.try_into(),
+        }
+        .expect("Could not serialize HashableContent")
     }
 }

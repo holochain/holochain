@@ -3,7 +3,7 @@
 //!  - and serialized to json
 use backtrace::Backtrace;
 use holo_hash::prelude::*;
-use holo_hash_core::impl_hashable_content;
+use holo_hash_core::hash_type;
 use holochain_serialized_bytes::prelude::*;
 use serde::{self, Deserialize, Serialize};
 use std::{
@@ -23,10 +23,30 @@ pub struct DnaWasm {
 /// A DnaWasm paired with its WasmHash
 pub type DnaWasmHashed = HoloHashed<DnaWasm>;
 
-// FIXME: WasmHash needs to be based on wasm.code().to_vec(), not the struct!
-// Make sure this is the case.
+impl HashableContent for DnaWasm {
+    type HashType = hash_type::Wasm;
 
-impl_hashable_content!(DnaWasm, Wasm);
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::Wasm
+    }
+
+    fn hashable_content(self) -> SerializedBytes {
+        self.try_into()
+            .expect("Could not serialize HashableContent")
+    }
+}
+
+impl HashableContent for &DnaWasm {
+    type HashType = hash_type::Wasm;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::Wasm
+    }
+    fn hashable_content(self) -> SerializedBytes {
+        self.try_into()
+            .expect("Could not serialize HashableContent")
+    }
+}
 
 impl TryFrom<&DnaWasm> for SerializedBytes {
     type Error = SerializedBytesError;

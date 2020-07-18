@@ -46,10 +46,10 @@ We are shutting down as a precaution to prevent further corruption."#,
 /// Macro for standard handling of db hash integrity check failures
 #[macro_export]
 macro_rules! fatal_db_hash_integrity_check {
-    ($hint:expr, $expected_hash:expr, $actual_hash:expr,) => {
-        fatal_db_hash_integrity_check!($hint, $expected_hash, $actual_hash);
-    };
-    ($hint:expr, $expected_hash:expr, $actual_hash:expr) => {
+    // ($hint:expr, $expected_hash:expr, $actual_hash:expr, $content,) => {
+    //     fatal_db_hash_integrity_check!($hint, $expected_hash, $actual_hash, $content);
+    // };
+    ($hint:expr, $expected_hash:expr, $actual_hash:expr, $content:expr $(,)?) => {
         if *$expected_hash != *$actual_hash {
             $crate::fatal!(
                 r#"Holochain detected database corruption.
@@ -57,11 +57,13 @@ macro_rules! fatal_db_hash_integrity_check {
 Corrupt module: {}
 Expected hash: {:?}
 Actual hash: {:?}
+Content: {:?}
 
 We are shutting down as a precaution to prevent further corruption."#,
                 $hint,
                 $expected_hash,
                 $actual_hash,
+                $content,
             );
         }
     };

@@ -96,7 +96,12 @@ where
             hash_bytes,
             HoloHashed::<C>::with_data(content).await
         );
-        fatal_db_hash_integrity_check!("CasBuf::get", hash_bytes, data.as_hash().get_bytes());
+        fatal_db_hash_integrity_check!(
+            "CasBuf::get",
+            hash_bytes,
+            data.as_hash().get_bytes(),
+            data.as_content(),
+        );
         data
     }
 

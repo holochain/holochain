@@ -128,6 +128,15 @@ impl<'env> ChainCasBuf<'env> {
                     // if the header references an entry and the database is
                     // available, it better have been stored!
                     EntryVisibility::Public => {
+                        use fallible_iterator::FallibleIterator;
+                        self.public_entries
+                            .iter_fail()
+                            .unwrap()
+                            .for_each(|i| {
+                                println!("PUBLIC ENTRY ITEM: {:?}", i);
+                                Ok(())
+                            })
+                            .unwrap();
                         Some(self.public_entries.get(entry_hash).await?.ok_or_else(|| {
                             SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
                                 entry_hash.clone(),

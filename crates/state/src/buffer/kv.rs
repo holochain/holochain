@@ -59,6 +59,7 @@ where
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         Self::empty_key(&k)?;
         use Op::*;
+        println!("KV-GET: {:?}", k.as_ref());
         let val = match self.scratch.get(k.as_ref()) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Delete) => None,
@@ -71,6 +72,7 @@ where
     pub fn put(&mut self, k: K, v: V) -> DatabaseResult<()> {
         Self::empty_key(&k)?;
         let k = k.as_ref().to_vec();
+        println!("KV-PUT: {:?}", k);
         self.scratch.insert(k, Op::Put(Box::new(v)));
         Ok(())
     }

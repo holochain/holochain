@@ -14,43 +14,14 @@ struct TestDhtOp {
     pub i: i64,
 }
 
-impl HashableContent for TestDhtOp {
-    type HashType = hash_type::DhtOp;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::DhtOp::new()
-    }
-}
-
-impl HashableContent for &TestDhtOp {
-    type HashType = hash_type::DhtOp;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::DhtOp::new()
-    }
-}
-
 type TestDhtOpHashed = HoloHashed<TestDhtOp>;
 
 /// test struct
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 struct TestHeader(String);
 
-impl HashableContent for TestHeader {
-    type HashType = hash_type::Header;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::Header::new()
-    }
-}
-
-impl HashableContent for &TestHeader {
-    type HashType = hash_type::Header;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::Header::new()
-    }
-}
+impl_hashable_content!(TestDhtOp, DhtOp);
+impl_hashable_content!(TestHeader, Header);
 
 #[tokio::test(threaded_scheduler)]
 async fn check_hashed_type() {

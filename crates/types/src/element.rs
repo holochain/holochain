@@ -4,7 +4,7 @@ use crate::{prelude::*, Header, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
 use holo_hash::HeaderAddress;
-use holo_hash_core::impl_hashable_content;
+use holo_hash_core::{hash_type, impl_hashable_content};
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -127,7 +127,32 @@ impl SignedHeader {
     }
 }
 
-impl_hashable_content!(SignedHeader, Header);
+impl HashableContent for SignedHeader {
+    type HashType = hash_type::Header;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::Header
+    }
+
+    fn hashable_content(self) -> SerializedBytes {
+        self.0
+            .try_into()
+            .expect("Could not serialize HashableContent")
+    }
+}
+
+impl HashableContent for &SignedHeader {
+    type HashType = hash_type::Header;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::Header
+    }
+    fn hashable_content(self) -> SerializedBytes {
+        (&self.0)
+            .try_into()
+            .expect("Could not serialize HashableContent")
+    }
+}
 
 // HACK: In this representation, we have to clone the Header and store it twice,
 // once in the HeaderHashed, and once in the SignedHeader. The reason is that
@@ -261,5 +286,28 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
     fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
         let hash = shh.header.into_hash();
         HoloHashed::with_pre_hashed(shh.signed_header, hash)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SignedHeader, SignedHeaderHashed};
+    use crate::fixt::*;
+    use ::fixt::prelude::*;
+    use holo_hash::HoloHashed;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_signed_header_roundtrip() {
+        let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
+        let header = HeaderFixturator::new(Unpredictable).next().unwrap();
+        let signed_header = SignedHeader(header, signature);
+        let hashed: HoloHashed<SignedHeader> = HoloHashed::from_content(signed_header).await;
+        let shh: SignedHeaderHashed = hashed.clone().into();
+
+        assert_eq!(shh.header_address(), hashed.as_hash());
+        
+        let round: HoloHashed<SignedHeader> = shh.into();
+
+        assert_eq!(hashed, round);
     }
 }

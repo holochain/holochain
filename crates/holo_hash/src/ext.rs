@@ -27,12 +27,7 @@ where
 {
     fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
         async move {
-            let sb: SerializedBytes = content
-                .try_into()
-                // TODO: this expect seems right, but is perhaps questionable.
-                // the idea is: you should only ever use a type for HashableContent
-                // which is infallibly serializable.
-                .expect("Could not serialize HashableContent");
+            let sb: SerializedBytes = content.hashable_content();
             let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
             let hash =
                 Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type());

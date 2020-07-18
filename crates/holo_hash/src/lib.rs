@@ -3,8 +3,10 @@ pub mod fixt;
 mod hashed;
 pub use ext::*;
 pub use hashed::*;
-
 mod tests;
+
+// mod hashable_content;
+// pub use hashable_content::*;
 
 pub mod prelude {
     pub use super::*;
