@@ -527,7 +527,7 @@ where
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
         let reader = env.reader()?;
 
-        let wasm_buf = WasmBuf::new(&reader, wasm)?;
+        let wasm_buf = Arc::new(WasmBuf::new(&reader, wasm)?);
         let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         let entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
         // Load out all dna defs
@@ -536,12 +536,15 @@ where
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| async {
-                    wasm_buf
-                        .get(&zome.wasm_hash.into())
-                        .await?
-                        .map(|hashed| hashed.into_content())
-                        .ok_or(ConductorError::WasmMissing)
+                let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| {
+                    let wasm_buf = wasm_buf.clone();
+                    async move {
+                        wasm_buf
+                            .get(&zome.wasm_hash)
+                            .await?
+                            .map(|hashed| hashed.into_content())
+                            .ok_or(ConductorError::WasmMissing)
+                    }
                 });
                 async move {
                     let wasms = futures::future::try_join_all(wasms).await?;
@@ -587,7 +590,7 @@ where
         let mut dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
-            if let None = wasm_buf.get(&wasm_hash.into()).await? {
+            if let None = wasm_buf.get(&wasm_hash).await? {
                 wasm_buf.put(DnaWasmHashed::with_data(dna_wasm).await?);
             }
         }

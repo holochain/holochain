@@ -96,7 +96,7 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
                 // return unresolved dependencies if it's otherwise valid
                 ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Invalid(_) => acc,
-                    _ => Self::UnresolvedDependencies(ud.into_iter().map(|h| h.into()).collect()),
+                    _ => Self::UnresolvedDependencies(ud),
                 },
                 // valid x allows validation to continue
                 ValidateCallbackResult::Valid => acc,

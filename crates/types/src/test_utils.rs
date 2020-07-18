@@ -50,7 +50,6 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         for (zome_name, wasm) in zomes {
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
-            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             dna.zomes.push((zome_name, Zome { wasm_hash }));
             wasm_code.push(wasm);
         }

@@ -156,7 +156,7 @@ impl<'env> SourceChainBuf<'env> {
             match element.entry().as_option().ok_or_else(|| {
                 SourceChainError::InvalidStructure(ChainInvalidReason::GenesisDataMissing)
             })? {
-                Entry::Agent(agent_pubkey) => Ok(Some(agent_pubkey.clone().into())),
+                Entry::Agent(agent_pubkey) => Ok(Some(agent_pubkey.clone())),
                 _ => Err(SourceChainError::InvalidStructure(
                     ChainInvalidReason::MalformedGenesisData,
                 )),
@@ -249,7 +249,7 @@ impl<'env> SourceChainBuf<'env> {
             entry_type: header::EntryType::AgentPubKey,
             entry_hash: agent_pubkey.clone().into(),
         });
-        self.put_raw(agent_header, Some(Entry::Agent(agent_pubkey.into())))
+        self.put_raw(agent_header, Some(Entry::Agent(agent_pubkey)))
             .await?;
 
         Ok(())

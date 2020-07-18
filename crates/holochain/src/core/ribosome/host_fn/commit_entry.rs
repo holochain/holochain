@@ -97,7 +97,7 @@ pub fn commit_entry<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(CommitEntryOutput::new(entry_hash.into()))
+    Ok(CommitEntryOutput::new(entry_hash))
 }
 
 #[cfg(test)]

@@ -237,7 +237,6 @@ impl DnaDefJson {
 
             let wasm: DnaWasm = zome_content.into();
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
-            let wasm_hash: holo_hash_core::WasmHash = wasm_hash.into();
             zomes.push((zome_name.clone(), Zome { wasm_hash }));
             wasm_list.push(wasm);
         }

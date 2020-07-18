@@ -134,7 +134,7 @@ impl LinkMetaVal {
     pub fn into_link(self) -> holochain_zome_types::link::Link {
         let timestamp: chrono::DateTime<chrono::Utc> = self.timestamp.into();
         holochain_zome_types::link::Link {
-            target: self.target.into(),
+            target: self.target,
             timestamp: timestamp.into(),
             tag: self.tag,
         }

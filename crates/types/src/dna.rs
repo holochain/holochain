@@ -101,7 +101,6 @@ impl DnaFile {
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            // FIXME: WasmHash needs to be based on wasm.code().to_vec(), not the struct!
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
