@@ -134,20 +134,7 @@ impl HashableContent for SignedHeader {
         hash_type::Header
     }
 
-    fn hashable_content(self) -> SerializedBytes {
-        self.0
-            .try_into()
-            .expect("Could not serialize HashableContent")
-    }
-}
-
-impl HashableContent for &SignedHeader {
-    type HashType = hash_type::Header;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::Header
-    }
-    fn hashable_content(self) -> SerializedBytes {
+    fn hashable_content(&self) -> SerializedBytes {
         (&self.0)
             .try_into()
             .expect("Could not serialize HashableContent")
@@ -305,7 +292,7 @@ mod tests {
         let shh: SignedHeaderHashed = hashed.clone().into();
 
         assert_eq!(shh.header_address(), hashed.as_hash());
-        
+
         let round: HoloHashed<SignedHeader> = shh.into();
 
         assert_eq!(hashed, round);

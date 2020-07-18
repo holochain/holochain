@@ -4,9 +4,7 @@ use holo_hash_core::{encode, HashableContent, HoloHashImpl, PrimitiveHashType};
 use holochain_serialized_bytes::prelude::*;
 use must_future::MustBoxFuture;
 
-pub trait HoloHashExt<C: HashableContent>
-where
-    for<'a> &'a C: HashableContent,
+pub trait HoloHashExt<C: HashableContent> // for<'a> &'a C: HashableContent,
 {
     fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
 
@@ -23,14 +21,16 @@ where
 
 impl<C: HashableContent> HoloHashExt<C> for HoloHash<C>
 where
-    for<'a> &'a C: HashableContent,
+// for<'a> &'a C: HashableContent,
 {
     fn with_content<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
         async move {
             let sb: SerializedBytes = content.hashable_content();
             let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
-            let hash =
-                Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type());
+            let hash = HoloHashExt::<C>::with_pre_hashed_typed(
+                encode::blake2b_256(&bytes),
+                content.hash_type(),
+            );
             hash
         }
         .boxed()

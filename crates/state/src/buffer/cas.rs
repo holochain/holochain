@@ -14,14 +14,14 @@ use must_future::MustBoxFuture;
 pub struct CasBuf<'env, C>(KvBuf<'env, HoloHash<C>, C, Reader<'env>>)
 where
     C: HashableContent + BufVal + Send + Sync,
-    for<'a> &'a C: HashableContent,
+    // for<'a> &'a C: HashableContent,
     HoloHash<C>: BufKey,
     C::HashType: Send + Sync;
 
 impl<'env, C> CasBuf<'env, C>
 where
     C: HashableContent + BufVal + Send + Sync,
-    for<'a> &'a C: HashableContent,
+    // for<'a> &'a C: HashableContent,
     HoloHash<C>: BufKey,
     C::HashType: Send + Sync,
 {
@@ -115,7 +115,7 @@ where
 impl<'env, C> BufferedStore<'env> for CasBuf<'env, C>
 where
     C: HashableContent + BufVal + Send + Sync,
-    for<'a> &'a C: HashableContent,
+    // for<'a> &'a C: HashableContent,
     C::HashType: Send + Sync,
 {
     type Error = DatabaseError;

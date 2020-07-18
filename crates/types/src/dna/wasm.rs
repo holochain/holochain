@@ -30,19 +30,7 @@ impl HashableContent for DnaWasm {
         hash_type::Wasm
     }
 
-    fn hashable_content(self) -> SerializedBytes {
-        self.try_into()
-            .expect("Could not serialize HashableContent")
-    }
-}
-
-impl HashableContent for &DnaWasm {
-    type HashType = hash_type::Wasm;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::Wasm
-    }
-    fn hashable_content(self) -> SerializedBytes {
+    fn hashable_content(&self) -> SerializedBytes {
         self.try_into()
             .expect("Could not serialize HashableContent")
     }
