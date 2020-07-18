@@ -108,29 +108,22 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::PostCommitHostAccessFixturator;
     use super::PostCommitInvocationFixturator;
     use super::PostCommitResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::curve::Zomes;
     use crate::fixt::HeaderHashesFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
     use fixt::prelude::*;
-    use holo_hash::HeaderHashFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
     use holochain_zome_types::HostInput;
-    use matches::assert_matches;
 
-    #[tokio::test(threaded_scheduler)]
-    async fn post_commit_callback_result_fold() {
+    #[test]
+    fn post_commit_callback_result_fold() {
         let mut rng = thread_rng();
 
         let result_success = || PostCommitResult::Success;
@@ -173,25 +166,18 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn post_commit_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
-        let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
+    async fn post_commit_invocation_access() {
+        let post_commit_host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_matches!(
-            post_commit_invocation.allowed_access(),
-            HostFnAccess {
-                side_effects: Allow,
-                agent_info: Allow,
-                read_workspace: Allow,
-                non_determinism: Allow,
-                conductor: Allow,
-            }
+        assert_eq!(
+            HostFnAccess::from(&post_commit_host_access),
+            HostFnAccess::all()
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn post_commit_invocation_zomes() {
+    #[test]
+    fn post_commit_invocation_zomes() {
         let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
@@ -202,8 +188,8 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn post_commit_invocation_fn_components() {
+    #[test]
+    fn post_commit_invocation_fn_components() {
         let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
@@ -214,8 +200,8 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn post_commit_invocation_host_input() {
+    #[test]
+    fn post_commit_invocation_host_input() {
         let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
@@ -230,9 +216,22 @@ mod test {
             ),
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::PostCommitHostAccessFixturator;
+    use super::PostCommitInvocationFixturator;
+    use super::PostCommitResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::WasmRibosomeFixturator;
+    use holo_hash::HeaderHashFixturator;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_post_commit_unimplemented() {
         let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -252,7 +251,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_post_commit_implemented_success() {
         let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -272,7 +270,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_post_commit_implemented_fail() {
         let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()

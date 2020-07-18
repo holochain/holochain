@@ -65,7 +65,8 @@ pub fn get_links<'a>(
 }
 
 #[cfg(test)]
-pub mod wasm_test {
+#[cfg(feature = "slow_tests")]
+pub mod slow_tests {
     use crate::core::queue_consumer::TriggerSender;
     use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::workspace::Workspace;

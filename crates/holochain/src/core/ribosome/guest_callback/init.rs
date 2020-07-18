@@ -115,28 +115,22 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::InitHostAccessFixturator;
     use super::InitInvocationFixturator;
     use super::InitResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeNameFixturator;
     use fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::HostInput;
-    use matches::assert_matches;
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_callback_result_fold() {
+    #[test]
+    fn init_callback_result_fold() {
         let mut rng = thread_rng();
 
         let result_pass = || InitResult::Pass;
@@ -200,33 +194,23 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
-        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+    async fn init_access() {
+        let init_host_access = InitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_matches!(
-            init_invocation.allowed_access(),
-            HostFnAccess {
-                side_effects: Allow,
-                agent_info: Allow,
-                read_workspace: Allow,
-                non_determinism: Allow,
-                conductor: Allow,
-            }
-        );
+        assert_eq!(HostFnAccess::from(&init_host_access), HostFnAccess::all(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_zomes() {
+    #[test]
+    fn init_invocation_zomes() {
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_fn_components() {
+    #[test]
+    fn init_invocation_fn_components() {
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
@@ -237,8 +221,8 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_host_input() {
+    #[test]
+    fn init_invocation_host_input() {
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
@@ -250,9 +234,22 @@ mod test {
             HostInput::new(SerializedBytes::try_from(()).unwrap()),
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::InitHostAccessFixturator;
+    use super::InitInvocationFixturator;
+    use super::InitResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::WasmRibosomeFixturator;
+    use fixt::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -268,7 +265,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_implemented_pass() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
@@ -284,7 +280,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_implemented_fail() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
@@ -303,7 +298,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_multi_implemented_fail() {
         let ribosome =
             WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))

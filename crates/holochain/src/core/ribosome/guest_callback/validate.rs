@@ -125,30 +125,21 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::ValidateHostAccess;
+    use super::ValidateHostAccessFixturator;
     use super::ValidateInvocationFixturator;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
     use fixt::prelude::*;
     use holo_hash::AgentPubKeyFixturator;
-    use holo_hash_core::HoloHashCoreHash;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
-    use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::HostInput;
-    use matches::assert_matches;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -193,19 +184,12 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_matches!(
-            validate_invocation.allowed_access(),
-            HostFnAccess {
-                side_effects: Deny,
-                agent_info: Deny,
-                read_workspace: Deny,
-                non_determinism: Deny,
-                conductor: Deny,
-            }
+        assert_eq!(
+            HostFnAccess::from(&validate_host_access),
+            HostFnAccess::none(),
         );
     }
 
@@ -286,9 +270,28 @@ mod test {
             HostInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::ValidateInvocationFixturator;
+    use super::ValidateResult;
+    use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
+    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomeCallHostAccessFixturator;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::WasmRibosomeFixturator;
+    use fixt::prelude::*;
+    use holo_hash::AgentPubKeyFixturator;
+    use holo_hash_core::HoloHashCoreHash;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::CommitEntryOutput;
+    use holochain_zome_types::Entry;
+    use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -305,7 +308,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_implemented_valid() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
@@ -322,7 +324,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_implemented_invalid() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
@@ -339,7 +340,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_implemented_multi() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()

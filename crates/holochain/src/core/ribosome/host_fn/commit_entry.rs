@@ -108,7 +108,6 @@ pub mod wasm_test {
     use super::commit_entry;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::CallContextFixturator;
-    use crate::core::ribosome::HostAccess;
     use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::{
@@ -149,18 +148,18 @@ pub mod wasm_test {
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
                 .next()
                 .unwrap();
-        let mut host_context = CallContextFixturator::new(fixt::Unpredictable)
+        let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        host_context.zome_name = TestWasm::CommitEntry.into();
-        let mut conductor_access = fixt!(ZomeCallHostAccess);
-        conductor_access.workspace = raw_workspace;
-        host_context.conductor_access = HostAccess::ZomeCallHostAccess(conductor_access);
+        call_context.zome_name = TestWasm::CommitEntry.into();
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
+        call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
-        let output = commit_entry(Arc::new(ribosome), Arc::new(host_context), input);
+        let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input);
 
         assert_eq!(
             format!("{:?}", output.unwrap_err()),
@@ -194,18 +193,18 @@ pub mod wasm_test {
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
                 .next()
                 .unwrap();
-        let mut host_context = CallContextFixturator::new(fixt::Unpredictable)
+        let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        host_context.zome_name = TestWasm::CommitEntry.into();
-        let mut conductor_access = fixt!(ZomeCallHostAccess);
-        conductor_access.workspace = raw_workspace;
-        host_context.conductor_access = HostAccess::ZomeCallHostAccess(conductor_access);
+        call_context.zome_name = TestWasm::CommitEntry.into();
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
+        call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
-        let output = commit_entry(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
+        let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         let app_entry_hash = holochain_types::entry::EntryHashed::with_data(app_entry.clone())
             .await

@@ -11,7 +11,7 @@ pub struct Zome {
 }
 
 /// Access a call has to host functions
-#[derive(Debug, Copy, Clone, Constructor)]
+#[derive(Debug, Copy, Clone, Constructor, PartialEq)]
 pub struct HostFnAccess {
     /// Can access agent information
     pub agent_info: Permission,
@@ -29,7 +29,7 @@ pub struct HostFnAccess {
     pub keystore: Permission,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 /// Permission granted to a call
 pub enum Permission {
     /// Host functions with this access will be included

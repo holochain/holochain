@@ -140,24 +140,18 @@ impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
 mod test {
 
     use super::ValidationPackageHostAccessFixturator;
     use super::ValidationPackageInvocationFixturator;
     use super::ValidationPackageResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::WasmRibosomeFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
     use holochain_zome_types::validate::ValidationPackageCallbackResult;
     use holochain_zome_types::HostInput;
-    use matches::assert_matches;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -203,18 +197,20 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validation_package_invocation_allow_side_effects() {
         use holochain_types::dna::zome::Permission::*;
-        let validation_package_invocation =
-            ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
+        let validation_package_host_access =
+            ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap();
-        assert_matches!(
-            validation_package_invocation.allowed_access(),
+        assert_eq!(
+            HostFnAccess::from(&validation_package_host_access),
             HostFnAccess {
-                side_effects: Deny,
                 agent_info: Allow,
                 read_workspace: Allow,
+                write_workspace: Deny,
+                write_network: Deny,
+                dna_bindings: Deny,
                 non_determinism: Deny,
-                conductor: Deny,
+                keystore: Deny,
             }
         );
     }
@@ -267,9 +263,22 @@ mod test {
             ),
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::ValidationPackageHostAccessFixturator;
+    use super::ValidationPackageInvocationFixturator;
+    use super::ValidationPackageResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::WasmRibosomeFixturator;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::validate::ValidationPackage;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validation_package_unimplemented() {
         let conductor_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -290,7 +299,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validation_package_implemented_success() {
         let conductor_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -311,7 +319,6 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validation_package_implemented_fail() {
         let conductor_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()

@@ -142,6 +142,11 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    // @TODO flakey test
+    // ---- test::tests::test_publish_workflow stdout ----
+    // thread 'test::tests::test_publish_workflow' panicked at 'assertion failed: `(left == right)`
+    //   left: `3`,
+    //  right: `0`', crates/holochain_p2p/src/test.rs:181:9
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
