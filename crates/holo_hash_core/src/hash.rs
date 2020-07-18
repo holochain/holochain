@@ -162,9 +162,7 @@ mod tests {
             let h_orig =
                 EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Content);
             let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            println!("RMPBUF {:?}", buf);
             let h: EntryHash = rmp_serde::from_read_ref(&buf).unwrap();
-            println!("HT {:?}", h.hash_type());
 
             assert_eq!(h_orig, h);
             assert_eq!(h.hash_type, hash_type::Entry::Content);
@@ -173,9 +171,7 @@ mod tests {
             let h_orig =
                 EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Agent);
             let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            println!("RMPBUF {:?}", buf);
             let h: EntryHash = rmp_serde::from_read_ref(&buf).unwrap();
-            println!("HT {:?}", h.hash_type());
 
             assert_eq!(h_orig, h);
             assert_eq!(h.hash_type, hash_type::Entry::Agent);
@@ -196,7 +192,6 @@ mod tests {
         };
 
         let buf = rmp_serde::to_vec_named(&orig).unwrap();
-        println!("RMPBUF {:?}", buf);
         let res: Data = rmp_serde::from_read_ref(&buf).unwrap();
 
         assert_eq!(orig, res);

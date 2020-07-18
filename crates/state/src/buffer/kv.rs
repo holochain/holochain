@@ -59,7 +59,6 @@ where
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         Self::empty_key(&k)?;
         use Op::*;
-        println!("KV-GET: {:?}", k.as_ref());
         let val = match self.scratch.get(k.as_ref()) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Delete) => None,
@@ -72,7 +71,6 @@ where
     pub fn put(&mut self, k: K, v: V) -> DatabaseResult<()> {
         Self::empty_key(&k)?;
         let k = k.as_ref().to_vec();
-        println!("KV-PUT: {:?}", k);
         self.scratch.insert(k, Op::Put(Box::new(v)));
         Ok(())
     }
@@ -90,12 +88,7 @@ where
         Self::empty_key(&k)?;
         match self.db.get(self.reader, k)? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(
-                rmp_serde::from_read_ref(buf)
-                    .map_err(|e| {
-                        println!("RMP-ERR: {:?}", buf);
-                        e
-                    })
-                    .expect("TODO: IS IT HERE?"),
+                rmp_serde::from_read_ref(buf)?,
             )),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
@@ -233,7 +226,6 @@ where
                     //     .with_string_variants();
                     // v.serialize(&mut se)?;
                     let buf = rmp_serde::to_vec_named(v)?;
-                    println!("PUT:\n{:?} ->\n{:?}", k, buf);
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
