@@ -280,7 +280,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_unimplemented() {
-        let conductor_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
@@ -293,14 +293,14 @@ mod slow_tests {
         validation_package_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_validation_package(conductor_access, validation_package_invocation)
+            .run_validation_package(host_access, validation_package_invocation)
             .unwrap();
         assert_eq!(result, ValidationPackageResult::NotImplemented,);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_implemented_success() {
-        let conductor_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
@@ -313,14 +313,14 @@ mod slow_tests {
         validation_package_invocation.zome_name = TestWasm::ValidationPackageSuccess.into();
 
         let result = ribosome
-            .run_validation_package(conductor_access, validation_package_invocation)
+            .run_validation_package(host_access, validation_package_invocation)
             .unwrap();
         assert_eq!(result, ValidationPackageResult::Success(ValidationPackage),);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_implemented_fail() {
-        let conductor_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
@@ -333,7 +333,7 @@ mod slow_tests {
         validation_package_invocation.zome_name = TestWasm::ValidationPackageFail.into();
 
         let result = ribosome
-            .run_validation_package(conductor_access, validation_package_invocation)
+            .run_validation_package(host_access, validation_package_invocation)
             .unwrap();
         assert_eq!(result, ValidationPackageResult::Fail("bad package".into()),);
     }
