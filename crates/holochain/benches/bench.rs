@@ -33,7 +33,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
             TestWasm::Bench.into(),
         ]));
     let mut cap_secret_fixturator = CapSecretFixturator::new(Unpredictable);
-    let mut conductor_access_fixturator =
+    let mut host_access_fixturator =
         holochain::core::ribosome::ZomeCallHostAccessFixturator::new(fixt::Unpredictable);
     let mut cell_id_fixturator = holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable);
     let mut agent_key_fixturator = AgentPubKeyFixturator::new(Unpredictable);
@@ -64,7 +64,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     // .build()
                     // .unwrap()
                     // .spawn(async {
-                    let ca = conductor_access_fixturator.next().unwrap();
+                    let ca = host_access_fixturator.next().unwrap();
                     let ca = HostAccess::ZomeCallHostAccess(ca);
                     let r = ribosome_fixturator.next().unwrap();
                     let i = ZomeCallInvocation {
