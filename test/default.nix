@@ -23,7 +23,7 @@ let
   cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
 
   # stop our background ticker
-  if [ ! -z ''${CIRCLECI+x} ]]; then
+  if [ ! -z ''${CIRCLECI+x} ]; then
    kill $_jid
   fi
   '';

@@ -76,7 +76,6 @@ mod tests {
 
     use super::CallIterator;
     use crate::core::ribosome::FnComponents;
-    use crate::core::ribosome::HostAccess;
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::MockRibosomeT;
     use crate::core::ribosome::ZomeCallHostAccessFixturator;
@@ -102,7 +101,6 @@ mod tests {
         let host_access = ZomeCallHostAccessFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        let host_access = HostAccess::from(host_access);
         let zome_name_fixturator = ZomeNameFixturator::new(fixt::Unpredictable);
         let mut fn_components_fixturator = FnComponentsFixturator::new(fixt::Unpredictable);
 
@@ -154,7 +152,7 @@ mod tests {
                 .return_const(fn_components.clone());
         }
 
-        let call_iterator = CallIterator::new(host_access, ribosome, invocation);
+        let call_iterator = CallIterator::new(host_access.into(), ribosome, invocation);
 
         let output: Vec<(_, GuestOutput)> = call_iterator.collect().unwrap();
         assert_eq!(output.len(), zome_names.len() * fn_components.0.len());
