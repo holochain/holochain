@@ -556,7 +556,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_foo_test() {
-        let conductor_access = ZomeCallHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ZomeCallHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -582,7 +582,7 @@ mod slow_tests {
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
             ribosome
-                .call_zome_function(conductor_access, invocation)
+                .call_zome_function(host_access, invocation)
                 .unwrap()
         );
     }
