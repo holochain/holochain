@@ -1,7 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::HostContext;
-use holo_hash_core::HasHash;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryHashInput;
 use holochain_zome_types::EntryHashOutput;
@@ -31,8 +30,6 @@ pub mod wasm_test {
     use crate::core::state::workspace::Workspace;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use holo_hash::HoloHashExt;
-    use holo_hash_core::HoloHashCoreHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;
@@ -101,8 +98,7 @@ pub mod wasm_test {
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
         let input = TestString::from("foo.bar".to_string());
-        let output: holo_hash_core::HoloHashCore =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::HashPath, "hash", input);
+        let output = crate::call_test_ribosome!(raw_workspace, TestWasm::HashPath, "hash", input);
 
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 

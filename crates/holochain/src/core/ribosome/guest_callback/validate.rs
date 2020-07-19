@@ -119,8 +119,7 @@ mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
-    use holo_hash::AgentPubKeyFixturator;
-    use holo_hash_core::HoloHashCoreHash;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
     use holochain_wasm_test_utils::TestWasm;

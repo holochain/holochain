@@ -8,7 +8,7 @@ use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash_core::{HasHash, HeaderAddress};
+use holo_hash_core::HeaderAddress;
 use holochain_types::header::builder;
 use holochain_types::header::AppEntryType;
 use holochain_types::header::EntryType;
@@ -117,9 +117,6 @@ pub mod wasm_test {
     };
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use holo_hash::HoloHashExt;
-    use holo_hash::HoloHashExt;
-    use holo_hash_core::HoloHashCoreHash;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;

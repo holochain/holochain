@@ -38,6 +38,10 @@ where
         &self.content
     }
 
+    pub fn into_hash(self) -> HoloHash<C> {
+        self.hash
+    }
+
     pub fn into_content(self) -> C {
         self.content
     }

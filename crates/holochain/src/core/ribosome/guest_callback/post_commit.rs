@@ -92,7 +92,7 @@ mod test {
     use crate::fixt::HeaderHashesFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use ::fixt::prelude::*;
-    use holo_hash::HeaderHashFixturator;
+    use holo_hash::fixt::HeaderHashFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_wasm_test_utils::TestWasm;
