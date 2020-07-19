@@ -233,7 +233,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_post_commit_unimplemented() {
-        let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
@@ -245,14 +245,14 @@ mod slow_tests {
         post_commit_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_post_commit(conductor_access, post_commit_invocation)
+            .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
         assert_eq!(result, PostCommitResult::Success,);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_post_commit_implemented_success() {
-        let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
@@ -264,14 +264,14 @@ mod slow_tests {
         post_commit_invocation.zome_name = TestWasm::PostCommitSuccess.into();
 
         let result = ribosome
-            .run_post_commit(conductor_access, post_commit_invocation)
+            .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
         assert_eq!(result, PostCommitResult::Success,);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_post_commit_implemented_fail() {
-        let conductor_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
@@ -283,7 +283,7 @@ mod slow_tests {
         post_commit_invocation.zome_name = TestWasm::PostCommitFail.into();
 
         let result = ribosome
-            .run_post_commit(conductor_access, post_commit_invocation)
+            .run_post_commit(host_access, post_commit_invocation)
             .unwrap();
         assert_eq!(
             result,
