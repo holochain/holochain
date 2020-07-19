@@ -257,10 +257,8 @@ mod slow_tests {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitHostAccess);
-        let result = ribosome
-            .run_init(conductor_access, init_invocation)
-            .unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
@@ -272,10 +270,8 @@ mod slow_tests {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitHostAccess);
-        let result = ribosome
-            .run_init(conductor_access, init_invocation)
-            .unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
@@ -287,10 +283,8 @@ mod slow_tests {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitHostAccess);
-        let result = ribosome
-            .run_init(conductor_access, init_invocation)
-            .unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
@@ -306,10 +300,8 @@ mod slow_tests {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let conductor_access = fixt!(InitHostAccess);
-        let result = ribosome
-            .run_init(conductor_access, init_invocation)
-            .unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
