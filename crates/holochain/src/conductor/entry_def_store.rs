@@ -175,7 +175,6 @@ pub(crate) async fn get_entry_defs(
 mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
-    use holo_hash_core::HasHash;
     use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
     use holochain_types::{
         dna::{wasm::DnaWasmHashed, zome::Zome},
