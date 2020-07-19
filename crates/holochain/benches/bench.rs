@@ -65,7 +65,6 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     // .unwrap()
                     // .spawn(async {
                     let ca = host_access_fixturator.next().unwrap();
-                    let ca = HostAccess::ZomeCallHostAccess(ca);
                     let r = ribosome_fixturator.next().unwrap();
                     let i = ZomeCallInvocation {
                         cell_id: cell_id_fixturator.next().unwrap(),
@@ -76,7 +75,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         provenance: agent_key_fixturator.next().unwrap(),
                     };
                     println!("{}", n);
-                    r.maybe_call(ca, &i, &TestWasm::Bench.into(), "echo_bytes".into())
+                    r.maybe_call(ca.into(), &i, &TestWasm::Bench.into(), "echo_bytes".into())
                         .unwrap();
                 });
                 // });
