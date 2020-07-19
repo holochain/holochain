@@ -263,7 +263,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_migrate_agent_unimplemented() {
-        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
@@ -275,14 +275,14 @@ mod slow_tests {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(conductor_access, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_migrate_agent_implemented_pass() {
-        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
@@ -294,14 +294,14 @@ mod slow_tests {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(conductor_access, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_migrate_agent_implemented_fail() {
-        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
@@ -313,7 +313,7 @@ mod slow_tests {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(conductor_access, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(
             result,
@@ -323,7 +323,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_migrate_agent_multi_implemented_fail() {
-        let conductor_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![
@@ -338,7 +338,7 @@ mod slow_tests {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(conductor_access, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(
             result,
