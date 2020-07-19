@@ -78,8 +78,8 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(workspace);
-        let conductor_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
-        ribosome.call_zome_function(conductor_access, invocation)
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        ribosome.call_zome_function(host_access, invocation)
     };
     tracing::trace!(line = line!());
 

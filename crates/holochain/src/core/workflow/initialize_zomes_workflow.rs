@@ -54,9 +54,9 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     let result = {
         // TODO: We need a better solution then re-using the InvokeZomeWorkspace (i.e. ghost actor)
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace.0);
-        let conductor_access = InitHostAccess::new(raw_workspace, keystore, network);
+        let host_access = InitHostAccess::new(raw_workspace, keystore, network);
         let invocation = InitInvocation { dna_def };
-        ribosome.run_init(conductor_access, invocation)?
+        ribosome.run_init(host_access, invocation)?
     };
 
     // Insert the init marker

@@ -37,10 +37,10 @@ pub mod wasm_test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
-        let mut conductor_access = fixt!(ZomeCallHostAccess);
-        conductor_access.workspace = raw_workspace;
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
         let _: SysTimeOutput = crate::call_test_ribosome!(
-            conductor_access,
+            host_access,
             TestWasm::Imports,
             "sys_time",
             SysTimeInput::new(())
