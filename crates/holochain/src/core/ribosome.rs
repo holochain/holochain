@@ -451,16 +451,8 @@ pub trait RibosomeT: Sized {
 
 #[cfg(test)]
 pub mod wasm_test {
-    use super::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::FnComponents;
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeCallInvocationResponse;
-    use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::*;
-    use test_wasm_common::TestString;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -470,7 +462,7 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $conductor_access:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
+        ( $host_access:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
@@ -498,7 +490,7 @@ pub mod wasm_test {
                 .next()
                 .unwrap();
                 let zome_invocation_response =
-                    match ribosome.call_zome_function($conductor_access, invocation.clone()) {
+                    match ribosome.call_zome_function($host_access, invocation.clone()) {
                         Ok(v) => v,
                         Err(e) => {
                             dbg!("call_zome_function error", &invocation, &e);
@@ -534,22 +526,35 @@ pub mod wasm_test {
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn warm_wasm_tests() {
-        holochain_types::observability::test_run().ok();
-        use strum::IntoEnumIterator;
+    // #[tokio::test(threaded_scheduler)]
+    // async fn warm_wasm_tests() {
+    //     holochain_types::observability::test_run().ok();
+    //     use strum::IntoEnumIterator;
+    //
+    //     // If HC_WASM_CACHE_PATH is set warm the cache
+    //     if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
+    //         let wasms: Vec<_> = TestWasm::iter().collect();
+    //         crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+    //             .next()
+    //             .unwrap();
+    //     }
+    // }
+}
 
-        // If HC_WASM_CACHE_PATH is set warm the cache
-        if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
-            let wasms: Vec<_> = TestWasm::iter().collect();
-            crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
-                .next()
-                .unwrap();
-        }
-    }
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::ZomeCallHostAccessFixturator;
+    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomeCallInvocationResponse;
+    use crate::fixt::WasmRibosomeFixturator;
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::*;
+    use test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn invoke_foo_test() {
         let conductor_access = ZomeCallHostAccessFixturator::new(fixt::Unpredictable)
             .next()
