@@ -6,14 +6,14 @@ use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 // TODO: make holochain_serial! / the derive able to deal with a type param
 // or if not, implement the TryFroms manually...
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
-pub struct HoloHashImpl<T> {
+pub struct HoloHash<T> {
     #[serde(with = "serde_bytes")]
     hash: Vec<u8>,
 
     hash_type: T,
 }
 
-impl<T: HashType> HoloHashImpl<T> {
+impl<T: HashType> HoloHash<T> {
     /// Raw constructor: use a precomputed hash + location byte array in vec
     /// form, along with a type, to construct a hash.
     pub fn from_raw_bytes_and_type(hash: Vec<u8>, hash_type: T) -> Self {
@@ -28,8 +28,8 @@ impl<T: HashType> HoloHashImpl<T> {
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub fn retype<TT: HashType>(self, hash_type: TT) -> HoloHashImpl<TT> {
-        HoloHashImpl {
+    pub fn retype<TT: HashType>(self, hash_type: TT) -> HoloHash<TT> {
+        HoloHash {
             hash: self.hash,
             hash_type,
         }
@@ -61,30 +61,30 @@ impl<T: HashType> HoloHashImpl<T> {
     }
 }
 
-impl<P: PrimitiveHashType> HoloHashImpl<P> {
+impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct from 36 raw bytes, using the known PrimitiveHashType
     pub fn from_raw_bytes(hash: Vec<u8>) -> Self {
         Self::from_raw_bytes_and_type(hash, P::new())
     }
 }
 
-impl<T: HashType> AsRef<[u8]> for HoloHashImpl<T> {
+impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     fn as_ref(&self) -> &[u8] {
         &self.hash[0..32]
     }
 }
 
-impl<T: HashType> HasHash<T> for HoloHashImpl<T> {
-    fn hash(&self) -> &HoloHashImpl<T> {
+impl<T: HashType> HasHash<T> for HoloHash<T> {
+    fn hash(&self) -> &HoloHash<T> {
         &self
     }
-    fn into_hash(self) -> HoloHashImpl<T> {
+    fn into_hash(self) -> HoloHash<T> {
         self
     }
 }
 
 // NB: See encode/encode_raw module for Display impl
-impl<T: HashType> std::fmt::Debug for HoloHashImpl<T> {
+impl<T: HashType> std::fmt::Debug for HoloHash<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{}({})", self.hash_type().hash_name(), self))?;
         Ok(())
@@ -104,7 +104,7 @@ mod tests {
     use crate::*;
 
     #[cfg(not(feature = "string-encoding"))]
-    fn assert_type<T: HashType>(t: &str, h: HoloHashImpl<T>) {
+    fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc());
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",

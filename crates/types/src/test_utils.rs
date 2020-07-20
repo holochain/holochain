@@ -72,8 +72,8 @@ pub fn fake_cell_id(name: u8) -> CellId {
     (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }
 
-fn fake_holo_hash<T: holo_hash_core::HashType>(name: u8, hash_type: T) -> HoloHashImpl<T> {
-    HoloHashImpl::from_raw_bytes_and_type([name; 36].to_vec(), hash_type)
+fn fake_holo_hash<T: holo_hash_core::HashType>(name: u8, hash_type: T) -> HoloHash<T> {
+    HoloHash::from_raw_bytes_and_type([name; 36].to_vec(), hash_type)
 }
 
 /// A fixture DnaHash for unit testing.

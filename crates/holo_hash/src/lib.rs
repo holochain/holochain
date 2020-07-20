@@ -17,11 +17,11 @@ pub mod prelude {
     pub use holo_hash_core::HasHash;
 }
 
-pub use holo_hash_core::HoloHashImpl;
+pub use holo_hash_core::HoloHash;
 
 /// A convenience type, for specifying a hash by HashableContent rather than
 /// by its HashType
-pub type HoloHashOf<C> = HoloHashImpl<<C as HashableContent>::HashType>;
+pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
 
 // re-export hash types
 pub use holo_hash_core::{

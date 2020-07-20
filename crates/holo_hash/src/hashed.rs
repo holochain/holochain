@@ -1,5 +1,5 @@
 use crate::{HoloHashExt, HoloHashOf};
-use holo_hash_core::{HasHash, HashableContent, HoloHashImpl};
+use holo_hash_core::{HasHash, HashableContent, HoloHash};
 use holochain_serialized_bytes::SerializedBytesError;
 
 /// Represents some piece of content along with its hash representation, so that
@@ -27,7 +27,7 @@ where
 {
     /// Compute the hash of this content and store it alongside
     pub async fn from_content(content: C) -> Self {
-        let hash: HoloHashOf<C> = HoloHashImpl::with_data(&content).await;
+        let hash: HoloHashOf<C> = HoloHash::with_data(&content).await;
         Self { content, hash }
     }
 

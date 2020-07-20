@@ -1,11 +1,9 @@
 use crate::HoloHashOf;
 use futures::FutureExt;
-use holo_hash_core::{
-    encode, HashableContent, HashableContentBytes, HoloHashImpl, PrimitiveHashType,
-};
+use holo_hash_core::{encode, HashableContent, HashableContentBytes, HoloHash, PrimitiveHashType};
 use must_future::MustBoxFuture;
 
-/// Extension trait for HoloHashImpl, which allows instantiation with
+/// Extension trait for HoloHash, which allows instantiation with
 /// HashableContent rather than raw bytes
 pub trait HoloHashExt<C: HashableContent> {
     /// Hash the given content to produce a HoloHash
@@ -28,7 +26,7 @@ impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
                     )
                 }
                 HashableContentBytes::Prehashed36(bytes) => {
-                    HoloHashImpl::from_raw_bytes_and_type(bytes, content.hash_type())
+                    HoloHash::from_raw_bytes_and_type(bytes, content.hash_type())
                 }
             }
         }
@@ -43,7 +41,7 @@ impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
         assert_eq!(32, hash.len(), "only 32 byte hashes supported");
 
         hash.append(&mut encode::holo_dht_location_bytes(&hash));
-        HoloHashImpl::from_raw_bytes_and_type(hash, hash_type)
+        HoloHash::from_raw_bytes_and_type(hash, hash_type)
     }
 }
 
@@ -55,7 +53,7 @@ pub trait HoloHashPrimitiveExt<P: PrimitiveHashType> {
     fn with_pre_hashed(hash: Vec<u8>) -> Self;
 }
 
-impl<P: PrimitiveHashType> HoloHashPrimitiveExt<P> for HoloHashImpl<P> {
+impl<P: PrimitiveHashType> HoloHashPrimitiveExt<P> for HoloHash<P> {
     fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
         // Assert the data size is relatively small so we are
         // comfortable executing this synchronously / blocking
@@ -64,6 +62,6 @@ impl<P: PrimitiveHashType> HoloHashPrimitiveExt<P> for HoloHashImpl<P> {
         assert_eq!(32, hash.len(), "only 32 byte hashes supported");
 
         hash.append(&mut encode::holo_dht_location_bytes(&hash));
-        HoloHashImpl::from_raw_bytes(hash)
+        HoloHash::from_raw_bytes(hash)
     }
 }

@@ -1,32 +1,32 @@
-use crate::{error::HoloHashError, HashType, HoloHashImpl, PrimitiveHashType};
+use crate::{error::HoloHashError, HashType, HoloHash, PrimitiveHashType};
 use std::convert::TryFrom;
 
-impl<P: PrimitiveHashType> TryFrom<&str> for HoloHashImpl<P> {
+impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;
     fn try_from(s: &str) -> Result<Self, HoloHashError> {
         let hash_type = P::new();
-        Ok(HoloHashImpl::from_raw_bytes(holo_hash_decode(
+        Ok(HoloHash::from_raw_bytes(holo_hash_decode(
             hash_type.get_prefix(),
             s,
         )?))
     }
 }
 
-impl<P: PrimitiveHashType> TryFrom<&String> for HoloHashImpl<P> {
+impl<P: PrimitiveHashType> TryFrom<&String> for HoloHash<P> {
     type Error = HoloHashError;
     fn try_from(s: &String) -> Result<Self, HoloHashError> {
         Self::try_from(s as &str)
     }
 }
 
-impl<P: PrimitiveHashType> TryFrom<String> for HoloHashImpl<P> {
+impl<P: PrimitiveHashType> TryFrom<String> for HoloHash<P> {
     type Error = HoloHashError;
     fn try_from(s: String) -> Result<Self, HoloHashError> {
         Self::try_from(&s)
     }
 }
 
-impl<T: HashType> std::fmt::Display for HoloHashImpl<T> {
+impl<T: HashType> std::fmt::Display for HoloHash<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         let prefix = self.hash_type().get_prefix();
         write!(f, "{}", holo_hash_encode(prefix, self.get_raw()))
