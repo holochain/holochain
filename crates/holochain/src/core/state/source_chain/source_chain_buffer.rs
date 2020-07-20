@@ -106,7 +106,7 @@ impl<'env> SourceChainBuf<'env> {
         self.sequence.complete_dht_op(i)
     }
 
-    pub fn cas(&self) -> &ChainCasBuf {
+    pub fn cas<'a>(&'a self) -> &'a ChainCasBuf<'env> {
         &self.cas
     }
 

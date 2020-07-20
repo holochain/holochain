@@ -1,5 +1,6 @@
 use super::Cascade;
 use crate::core::state::{
+    chain_cas::ChainCasBuf,
     metadata::{EntryDhtStatus, LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
@@ -12,11 +13,13 @@ use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
 };
 use holochain_types::{
+    element::SignedHeaderHashed,
     entry::EntryHashed,
+    fixt::SignatureFixturator,
     header, observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
-    Header,
+    Header, HeaderHashed,
 };
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::link::LinkTag;
@@ -25,7 +28,7 @@ use mockall::*;
 #[allow(dead_code)]
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env>,
-    cache: SourceChainBuf<'env>,
+    cache: ChainCasBuf<'env>,
     jimbo_id: AgentPubKey,
     jimbo_header: Header,
     jimbo_entry: EntryHashed,
@@ -75,7 +78,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     });
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
-    let cache = SourceChainBuf::cache(reader, dbs)?;
+    let cache = ChainCasBuf::cache(reader, dbs)?;
     let mock_primary_meta = MockMetadataBuf::new();
     let mock_cache_meta = MockMetadataBuf::new();
     Ok(Chains {
@@ -101,7 +104,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
-        cache,
+        mut cache,
         jimbo_header,
         jimbo_entry,
         mut mock_primary_meta,
@@ -125,7 +128,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &mut cache.cas(),
+        &mut cache,
         &mock_cache_meta,
         cell_network,
     );
@@ -148,7 +151,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
-        cache,
+        mut cache,
         jimbo_id: _,
         jimbo_header,
         jimbo_entry,
@@ -172,7 +175,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &mut cache.cas(),
+        &mut cache,
         &mock_cache_meta,
         cell_network,
     );
@@ -202,9 +205,9 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    cache
-        .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
-        .await?;
+    let h = HeaderHashed::with_data(jimbo_header.clone()).await.unwrap();
+    let h = SignedHeaderHashed::with_presigned(h, fixt!(Signature));
+    cache.put(h, Some(jimbo_entry.clone()))?;
     let address = jimbo_entry.as_hash();
 
     // set it's metadata to Live
@@ -218,7 +221,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &mut cache.cas(),
+        &mut cache,
         &mock_cache_meta,
         cell_network,
     );
@@ -242,7 +245,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     let reader = env_ref.reader()?;
     let Chains {
         source_chain,
-        cache,
+        mut cache,
         jimbo_header: _,
         jimbo_entry,
         mock_primary_meta,
@@ -256,7 +259,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &mut cache.cas(),
+        &mut cache,
         &mock_cache_meta,
         cell_network,
     );
@@ -279,7 +282,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
-        cache,
+        mut cache,
         jimbo_id: _,
         jimbo_header,
         jimbo_entry,
@@ -328,7 +331,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &mut cache.cas(),
+        &mut cache,
         &mock_cache_meta,
         cell_network,
     );
@@ -350,7 +353,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
-        cache,
+        mut cache,
         jimbo_id: _,
         jimbo_header,
         jimbo_entry,
@@ -411,7 +414,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &mut cache.cas(),
+        &mut cache,
         &mock_cache_meta,
         cell_network,
     );
@@ -431,7 +434,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let reader = env_ref.reader()?;
     let Chains {
         source_chain,
-        cache,
+        mut cache,
         jimbo_header: _,
         jimbo_entry,
         jessy_id: _,
@@ -476,7 +479,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &mut cache.cas(),
+        &mut cache,
         &mock_cache_meta,
         cell_network,
     );

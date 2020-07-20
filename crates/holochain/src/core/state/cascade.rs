@@ -65,16 +65,16 @@ struct PlaceholderGetReturn {
     entry: Option<Entry>,
 }
 
-pub struct Cascade<'env, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
+pub struct Cascade<'env: 'a, 'a, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
 where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    primary: &'env ChainCasBuf<'env>,
-    primary_meta: &'env M,
+    primary: &'a ChainCasBuf<'env>,
+    primary_meta: &'a M,
 
-    cache: &'env mut ChainCasBuf<'env>,
-    cache_meta: &'env C,
+    cache: &'a mut ChainCasBuf<'env>,
+    cache_meta: &'a C,
 
     network: HolochainP2pCell,
 }
@@ -95,17 +95,17 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'env, M, C> Cascade<'env, M, C>
+impl<'env: 'a, 'a, M, C> Cascade<'env, 'a, M, C>
 where
     C: MetadataBufT,
     M: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
-        primary: &'env ChainCasBuf<'env>,
-        primary_meta: &'env M,
-        cache: &'env mut ChainCasBuf<'env>,
-        cache_meta: &'env C,
+        primary: &'a ChainCasBuf<'env>,
+        primary_meta: &'a M,
+        cache: &'a mut ChainCasBuf<'env>,
+        cache_meta: &'a C,
         network: HolochainP2pCell,
     ) -> Self {
         Cascade {

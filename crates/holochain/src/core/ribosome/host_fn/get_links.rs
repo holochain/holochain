@@ -36,7 +36,7 @@ pub fn get_links<'a>(
     };
 
     let call =
-        |workspace: &'a mut InvokeZomeWorkspace<'a>| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
+        |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
                 // TODO: Get the network from the context
                 let network = todo!("Get the nework");

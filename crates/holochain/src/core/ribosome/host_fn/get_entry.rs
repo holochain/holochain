@@ -20,7 +20,7 @@ pub fn get_entry<'a>(
     let (hash, _options) = input.into_inner();
     let cascade_hash = hash.try_into()?;
     let call =
-        |workspace: &'a mut InvokeZomeWorkspace<'a>| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
+        |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
                 // TODO: Get the network from the context
                 let network = todo!("Get the nework");
