@@ -25,43 +25,52 @@ impl<C> HoloHashed<C>
 where
     C: HashableContent,
 {
+    /// Compute the hash of this content and store it alongside
     pub async fn from_content(content: C) -> Self {
         let hash: HoloHash<C> = HoloHashImpl::with_data(&content).await;
         Self { content, hash }
     }
 
+    /// Combine content with its precalculated hash
     pub fn with_pre_hashed(content: C, hash: HoloHash<C>) -> Self {
         Self { content, hash }
     }
 
+    /// Accessor for content
     pub fn content(&self) -> &C {
         &self.content
     }
 
+    /// Convert to hash
     pub fn into_hash(self) -> HoloHash<C> {
         self.hash
     }
 
+    /// Convert to content
     pub fn into_content(self) -> C {
         self.content
     }
 
+    /// Deconstruct as a tuple
     pub fn into_inner(self) -> (C, HoloHash<C>) {
         (self.content, self.hash)
     }
 
+    /// Alias for with_content
     // TODO: deprecate
     // #[deprecated = "alias for `from_content`"]
     pub async fn with_data(content: C) -> Result<Self, SerializedBytesError> {
         Ok(Self::from_content(content).await)
     }
 
+    /// alias for `HasHash::hash
     // TODO: deprecate
     // #[deprecated = "alias for `HasHash::hash`"]
     pub fn as_hash(&self) -> &HoloHash<C> {
         &self.hash
     }
 
+    /// Alias for `content`
     // TODO: deprecate
     // #[deprecated = "alias for `content`"]
     pub fn as_content(&self) -> &C {

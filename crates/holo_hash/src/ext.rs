@@ -8,8 +8,11 @@ use must_future::MustBoxFuture;
 /// Extension trait for HoloHashImpl, which allows instantiation with
 /// HashableContent rather than raw bytes
 pub trait HoloHashExt<C: HashableContent> {
+    /// Hash the given content to produce a HoloHash
     fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
 
+    /// Construct a HoloHash from a prehashed raw 32-byte slice, with given type.
+    /// The location bytes will be calculated.
     fn with_pre_hashed_typed(hash: Vec<u8>, hash_type: C::HashType) -> Self;
 }
 
@@ -44,7 +47,11 @@ impl<C: HashableContent> HoloHashExt<C> for HoloHash<C> {
     }
 }
 
+/// Allows the HashType to be inferred when constructing a hash from raw bytes,
+/// if the HashType is primitive
 pub trait HoloHashPrimitiveExt<P: PrimitiveHashType> {
+    /// Construct a HoloHash from a prehashed raw 32-byte slice.
+    /// The location bytes will be calculated.
     fn with_pre_hashed(hash: Vec<u8>) -> Self;
 }
 

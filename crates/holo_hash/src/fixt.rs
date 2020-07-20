@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use ::fixt::prelude::*;
 use holo_hash_core::{
     encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
