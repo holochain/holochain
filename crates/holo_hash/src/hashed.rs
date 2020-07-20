@@ -1,4 +1,4 @@
-use crate::{HoloHash, HoloHashExt};
+use crate::{HoloHashExt, HoloHashOf};
 use holo_hash_core::{HasHash, HashableContent, HoloHashImpl};
 use holochain_serialized_bytes::SerializedBytesError;
 
@@ -8,15 +8,15 @@ use holochain_serialized_bytes::SerializedBytesError;
 // TODO: consider making lazy with OnceCell
 pub struct HoloHashed<C: HashableContent> {
     content: C,
-    hash: HoloHash<C>,
+    hash: HoloHashOf<C>,
 }
 
 impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
-    fn hash(&self) -> &HoloHash<C> {
+    fn hash(&self) -> &HoloHashOf<C> {
         &self.hash
     }
 
-    fn into_hash(self) -> HoloHash<C> {
+    fn into_hash(self) -> HoloHashOf<C> {
         self.hash
     }
 }
@@ -27,12 +27,12 @@ where
 {
     /// Compute the hash of this content and store it alongside
     pub async fn from_content(content: C) -> Self {
-        let hash: HoloHash<C> = HoloHashImpl::with_data(&content).await;
+        let hash: HoloHashOf<C> = HoloHashImpl::with_data(&content).await;
         Self { content, hash }
     }
 
     /// Combine content with its precalculated hash
-    pub fn with_pre_hashed(content: C, hash: HoloHash<C>) -> Self {
+    pub fn with_pre_hashed(content: C, hash: HoloHashOf<C>) -> Self {
         Self { content, hash }
     }
 
@@ -42,7 +42,7 @@ where
     }
 
     /// Convert to hash
-    pub fn into_hash(self) -> HoloHash<C> {
+    pub fn into_hash(self) -> HoloHashOf<C> {
         self.hash
     }
 
@@ -52,7 +52,7 @@ where
     }
 
     /// Deconstruct as a tuple
-    pub fn into_inner(self) -> (C, HoloHash<C>) {
+    pub fn into_inner(self) -> (C, HoloHashOf<C>) {
         (self.content, self.hash)
     }
 
@@ -66,7 +66,7 @@ where
     /// alias for `HasHash::hash
     // TODO: deprecate
     // #[deprecated = "alias for `HasHash::hash`"]
-    pub fn as_hash(&self) -> &HoloHash<C> {
+    pub fn as_hash(&self) -> &HoloHashOf<C> {
         &self.hash
     }
 
@@ -100,11 +100,11 @@ where
     }
 }
 
-impl<C> std::convert::From<HoloHashed<C>> for (C, HoloHash<C>)
+impl<C> std::convert::From<HoloHashed<C>> for (C, HoloHashOf<C>)
 where
     C: HashableContent,
 {
-    fn from(g: HoloHashed<C>) -> (C, HoloHash<C>) {
+    fn from(g: HoloHashed<C>) -> (C, HoloHashOf<C>) {
         g.into_inner()
     }
 }

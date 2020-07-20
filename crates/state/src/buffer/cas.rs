@@ -6,23 +6,23 @@ use crate::{
 };
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
-use holo_hash::{HashableContent, HoloHash, HoloHashed};
+use holo_hash::{HashableContent, HoloHashOf, HoloHashed};
 use must_future::MustBoxFuture;
 
 /// A wrapper around a KvBuf where keys are always Addresses,
 /// and values are always AddressableContent.
-pub struct CasBuf<'env, C>(KvBuf<'env, HoloHash<C>, C, Reader<'env>>)
+pub struct CasBuf<'env, C>(KvBuf<'env, HoloHashOf<C>, C, Reader<'env>>)
 where
     C: HashableContent + BufVal + Send + Sync,
     // for<'a> &'a C: HashableContent,
-    HoloHash<C>: BufKey,
+    HoloHashOf<C>: BufKey,
     C::HashType: Send + Sync;
 
 impl<'env, C> CasBuf<'env, C>
 where
     C: HashableContent + BufVal + Send + Sync,
     // for<'a> &'a C: HashableContent,
-    HoloHash<C>: BufKey,
+    HoloHashOf<C>: BufKey,
     C::HashType: Send + Sync,
 {
     /// Create a new CasBuf from a read-only transaction and a database reference
@@ -33,7 +33,7 @@ where
     /// Get a value from the underlying [KvBuf]
     pub fn get(
         &'env self,
-        hash: &'env HoloHash<C>,
+        hash: &'env HoloHashOf<C>,
     ) -> MustBoxFuture<'env, DatabaseResult<Option<HoloHashed<C>>>> {
         async move {
             Ok(if let Some(content) = self.0.get(hash)? {
@@ -54,7 +54,7 @@ where
     }
 
     /// Delete a value from the underlying [KvBuf]
-    pub fn delete(&mut self, k: HoloHash<C>) {
+    pub fn delete(&mut self, k: HoloHashOf<C>) {
         // These expects seem valid as it means the hashing is broken
         self.0.delete(k).expect("Hash key is empty");
     }

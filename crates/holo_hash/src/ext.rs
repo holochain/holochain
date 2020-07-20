@@ -1,4 +1,4 @@
-use crate::HoloHash;
+use crate::HoloHashOf;
 use futures::FutureExt;
 use holo_hash_core::{
     encode, HashableContent, HashableContentBytes, HoloHashImpl, PrimitiveHashType,
@@ -9,15 +9,15 @@ use must_future::MustBoxFuture;
 /// HashableContent rather than raw bytes
 pub trait HoloHashExt<C: HashableContent> {
     /// Hash the given content to produce a HoloHash
-    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>>;
+    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHashOf<C>>;
 
     /// Construct a HoloHash from a prehashed raw 32-byte slice, with given type.
     /// The location bytes will be calculated.
     fn with_pre_hashed_typed(hash: Vec<u8>, hash_type: C::HashType) -> Self;
 }
 
-impl<C: HashableContent> HoloHashExt<C> for HoloHash<C> {
-    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHash<C>> {
+impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
+    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHashOf<C>> {
         async move {
             match content.hashable_content() {
                 HashableContentBytes::Content(sb) => {

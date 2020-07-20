@@ -1,4 +1,4 @@
-//! Defines HoloHash and its various HashTypes
+//! Defines HoloHashOf and its various HashTypes
 
 #![deny(missing_docs)]
 

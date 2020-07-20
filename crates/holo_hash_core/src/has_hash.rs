@@ -2,7 +2,7 @@
 
 use crate::{HashType, HoloHashImpl};
 
-/// Anything which has an owned HoloHash.
+/// Anything which has an owned HoloHashOf.
 pub trait HasHash<T: HashType> {
     /// Get the hash by reference
     // TODO: maybe rename to as_hash

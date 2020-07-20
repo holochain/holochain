@@ -21,7 +21,7 @@ pub use holo_hash_core::HoloHashImpl;
 
 /// A convenience type, for specifying a hash by HashableContent rather than
 /// by its HashType
-pub type HoloHash<C> = HoloHashImpl<<C as HashableContent>::HashType>;
+pub type HoloHashOf<C> = HoloHashImpl<<C as HashableContent>::HashType>;
 
 // re-export hash types
 pub use holo_hash_core::{
