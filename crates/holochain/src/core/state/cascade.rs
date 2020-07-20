@@ -218,9 +218,9 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get_links<'a>(
+    pub async fn dht_get_links<'link>(
         &self,
-        key: &'a LinkMetaKey<'a>,
+        key: &'link LinkMetaKey<'link>,
     ) -> DatabaseResult<Vec<LinkMetaVal>> {
         // Am I an authority?
         // TODO: Not a good check for authority as the base could be in the cas because

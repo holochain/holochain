@@ -123,7 +123,7 @@ impl UnsafeInvokeZomeWorkspace {
         'a,
         R,
         Fut: Future<Output = R> + 'a,
-        F: FnOnce(&'a mut InvokeZomeWorkspace) -> Fut,
+        F: FnOnce(&'a mut InvokeZomeWorkspace<'a>) -> Fut,
     >(
         &self,
         f: F,

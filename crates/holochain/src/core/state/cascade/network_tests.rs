@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_utils::test_network;
 use fixt::prelude::*;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
@@ -34,23 +35,27 @@ async fn get_updates_cache() {
         .unwrap();
 
     // Create the cascade
-    let (element_vault, meta_vault, element_cache, meta_cache) = test_dbs_and_mocks(&reader, &dbs);
+    let (element_vault, meta_vault, mut element_cache, meta_cache) =
+        test_dbs_and_mocks(&reader, &dbs);
     let (network, shutdown) = run_fixt_network(fixt_store).await;
-    // Construct the cascade with a network
-    let cascade = Cascade::new(
-        &element_vault,
-        &meta_vault,
-        &mut element_cache,
-        &meta_cache,
-        network,
-    );
 
-    // Call fetch element
-    let returned_element = cascade
-        .fetch_element(expected.0.clone().into(), Default::default())
-        .await
-        .unwrap()
-        .unwrap();
+    let returned_element = {
+        // Construct the cascade with a network
+        let mut cascade = Cascade::new(
+            &element_vault,
+            &meta_vault,
+            &mut element_cache,
+            &meta_cache,
+            network,
+        );
+
+        // Call fetch element
+        cascade
+            .fetch_element(expected.0.clone().into(), Default::default())
+            .await
+            .unwrap()
+            .unwrap()
+    };
 
     // Check the returned element is correct
     assert_eq!(returned_element.header(), expected.1.header());
@@ -99,12 +104,8 @@ async fn run_fixt_network(
     fixt_store: BTreeMap<HeaderHash, ChainElement>,
 ) -> (HolochainP2pCell, Shutdown) {
     // Create the network
-    let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+    let (network, mut recv, cell_network) = test_network().await;
     let (kill, killed) = tokio::sync::oneshot::channel();
-    let dna = fixt!(DnaHash);
-    let agent_key = fixt!(AgentPubKey);
-    let cell_network = network.to_cell(dna.clone(), agent_key.clone());
-    network.join(dna, agent_key).await.unwrap();
 
     // Return fixt store data to gets
     let handle = tokio::task::spawn({

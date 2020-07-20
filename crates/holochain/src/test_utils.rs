@@ -3,7 +3,7 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
     actor::HolochainP2pRefToCell, event::HolochainP2pEventReceiver, spawn_holochain_p2p,
-    HolochainP2pCell, HolochainP2pRef,
+    HolochainP2pCell, HolochainP2pRef, HolochainP2pSender,
 };
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
@@ -55,5 +55,6 @@ pub async fn test_network() -> (HolochainP2pRef, HolochainP2pEventReceiver, Holo
     let dna = fixt!(DnaHash);
     let agent_key = fixt!(AgentPubKey);
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
+    network.join(dna, agent_key).await.unwrap();
     (network, recv, cell_network)
 }

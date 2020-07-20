@@ -15,11 +15,11 @@ use crate::core::{
     sys_validate_element,
 };
 use fallible_iterator::FallibleIterator;
+use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
 use holochain_types::element::ChainElement;
 use std::sync::Arc;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use holochain_p2p::HolochainP2pCell;
 
 pub mod unsafe_invoke_zome_workspace;
 

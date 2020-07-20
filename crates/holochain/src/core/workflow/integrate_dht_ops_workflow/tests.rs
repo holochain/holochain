@@ -25,7 +25,8 @@ use crate::{
         workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
         SourceChainError,
     },
-    fixt::*, test_utils::test_network,
+    fixt::*,
+    test_utils::test_network,
 };
 use fixt::prelude::*;
 use holo_hash::{Hashable, Hashed, HeaderHash};
