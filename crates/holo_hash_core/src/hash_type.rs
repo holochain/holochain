@@ -1,3 +1,6 @@
+//! Defines the prefixes for the various HashTypes, as well as the traits
+//! which unify them
+
 const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
 const CONTENT_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
 const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk
@@ -6,6 +9,9 @@ const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
 const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk
 const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok
 
+/// Every HoloHash is generic over HashType.
+/// Additionally, every HashableContent has an associated HashType.
+/// The HashType is the glue that binds together HashableContent with its hash.
 pub trait HashType:
     Copy
     + Clone
@@ -19,13 +25,24 @@ pub trait HashType:
     + serde::de::DeserializeOwned
     + serde::Serialize
 {
+    /// Get the 3 byte prefix for the underlying primitive hash type
     fn get_prefix(self) -> &'static [u8];
+
+    /// Get a Display-worthy name for this hash type
     fn hash_name(self) -> &'static str;
 }
 
+/// A PrimitiveHashType is one with a multihash prefix.
+/// In contrast, a non-primitive hash type could be one of several primitive
+/// types, e.g. an `AnyDhtHash` can represent one of three primitive types.
 pub trait PrimitiveHashType: HashType {
+    /// Constructor
     fn new() -> Self;
+
+    /// Get the 3 byte prefix, which is statically known for primitive hash types
     fn static_prefix() -> &'static [u8];
+
+    /// Get a Display-worthy name for this hash type
     fn hash_name(self) -> &'static str;
 }
 
@@ -40,6 +57,7 @@ impl<P: PrimitiveHashType> HashType for P {
 
 macro_rules! primitive_hash_type {
     ($name: ident, $display: ident, $visitor: ident, $prefix: ident) => {
+        /// The $name PrimitiveHashType
         #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $name;
 
@@ -103,11 +121,14 @@ primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
 
+/// The Entry (composite) HashType
 #[derive(
     Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize,
 )]
 pub enum Entry {
+    /// The hash of an Entry of EntryType::Agent
     Agent,
+    /// The hash of any other EntryType
     Content,
 }
 
@@ -123,11 +144,14 @@ impl HashType for Entry {
     }
 }
 
+/// The AnyDht (composite) HashType
 #[derive(
     Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize,
 )]
 pub enum AnyDht {
+    /// The hash of an Entry
     Entry(Entry),
+    /// The hash of a Header
     Header,
 }
 

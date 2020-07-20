@@ -1,23 +1,46 @@
+//! Type aliases for the various concrete HoloHash types
+
 use crate::{hash_type, HoloHashImpl};
 use holochain_serialized_bytes::prelude::*;
 
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support
+
+/// An Agent public signing key. Not really a hash, more of an "identity hash".
 pub type AgentPubKey = HoloHashImpl<hash_type::Agent>;
+
+/// The hash of an Entry, if that Entry is not an AgentPubKey
 pub type EntryContentHash = HoloHashImpl<hash_type::Content>;
+
+/// The hash of a DnaDef
 pub type DnaHash = HoloHashImpl<hash_type::Dna>;
+
+/// The hash of a DhtOp's "unique form" representation
 pub type DhtOpHash = HoloHashImpl<hash_type::DhtOp>;
+
+/// The hash of a Header
 pub type HeaderHash = HoloHashImpl<hash_type::Header>;
+
+/// The hash of a network ID
 pub type NetIdHash = HoloHashImpl<hash_type::NetId>;
+
+/// The hash of some wasm bytecode
 pub type WasmHash = HoloHashImpl<hash_type::Wasm>;
 
+/// The hash of an entry.
+/// This is a composite of AgentPubKey and EntryContentHash.
 pub type EntryHash = HoloHashImpl<hash_type::Entry>;
+
+/// The hash of anything referrable in the DHT.
+/// This is a composite of AgentPubKey, EntryContentHash, and HeaderHash
 pub type AnyDhtHash = HoloHashImpl<hash_type::AnyDht>;
 
 // TODO: deprecate
 // #[deprecated = "alias for HeaderHash"]
+#[allow(missing_docs)]
 pub type HeaderAddress = HeaderHash;
 
+/// A newtype for a collection of EntryHashes, needed for some wasm return types.
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[repr(transparent)]
 #[serde(transparent)]

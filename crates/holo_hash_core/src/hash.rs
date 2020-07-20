@@ -1,5 +1,8 @@
 use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 
+/// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
+/// plus 4 bytes representing a DHT location. It also contains a zero-sized
+/// type which specifies what it is a hash of.
 // TODO: make holochain_serial! / the derive able to deal with a type param
 // or if not, implement the TryFroms manually...
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
@@ -32,6 +35,7 @@ impl<T: HashType> HoloHashImpl<T> {
         }
     }
 
+    /// The HashType of this hash
     pub fn hash_type(&self) -> &T {
         &self.hash_type
     }
@@ -58,6 +62,7 @@ impl<T: HashType> HoloHashImpl<T> {
 }
 
 impl<P: PrimitiveHashType> HoloHashImpl<P> {
+    /// Construct from 36 raw bytes, using the known PrimitiveHashType
     pub fn from_raw_bytes(hash: Vec<u8>) -> Self {
         Self::from_raw_bytes_and_type(hash, P::new())
     }

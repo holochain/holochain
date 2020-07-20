@@ -4,6 +4,7 @@ use holochain_serialized_bytes::prelude::*;
 /// Any implementor of HashableContent may be used in a HoloHashed to pair
 /// data with its HoloHash representation. It also has an associated HashType.
 pub trait HashableContent: Sized + Send + Sync {
+    /// The HashType which this content will be hashed to
     type HashType: HashType;
 
     /// The HashType which this content will be hashed to
@@ -15,14 +16,17 @@ pub trait HashableContent: Sized + Send + Sync {
     fn hashable_content(&self) -> HashableContentBytes;
 }
 
-/// HashableContent can be expressed as "content", or "prehashed".
-/// If "content", the hash will be calculated from this data
-/// If "prehashed", the bytes of the hash will be used directly for the hash representation.
+/// HashableContent can be expressed as "content", or "prehashed", which affects
+/// how a HoloHashed type will be constructed from it.
 pub enum HashableContentBytes {
+    /// Denotes that the hash should be computed for the given data
     Content(SerializedBytes),
+    /// Denotes that the given bytes already constitute a valid HoloHash
     Prehashed36(Vec<u8>),
 }
 
+/// A default HashableContent implementation, suitable for content which
+/// is already TryInto<SerializedBytes>, and uses a PrimitiveHashType
 #[macro_export]
 macro_rules! impl_hashable_content {
     ($n: ident, $t: ident) => {

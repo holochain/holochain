@@ -1,3 +1,7 @@
+//! Defines HoloHash and its various HashTypes
+
+#![deny(missing_docs)]
+
 mod aliases;
 pub mod error;
 mod has_hash;

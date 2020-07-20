@@ -1,4 +1,6 @@
-/// Holo Hash Error Type.
+//! HoloHash Error Type.
+
+/// HoloHash Error Type.
 #[derive(Debug)]
 pub enum HoloHashError {
     /// holo hashes begin with a lower case u (base64url_no_pad)
