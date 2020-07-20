@@ -183,7 +183,7 @@ async fn call_admin() {
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 10000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
     assert_matches!(response, AdminResponse::AppInstalled(_));
 
     // List Dnas
@@ -242,7 +242,7 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
     );
     let request = AppRequest::ZomeCallInvocation(request);
     let response = app_interface.request(request);
-    let call_response = check_timeout(holochain, response, 10000).await;
+    let call_response = check_timeout(holochain, response, 3000).await;
     let foo = TestString::from(String::from("foo"));
     let expected = Box::new(GuestOutput::new(foo.try_into().unwrap()));
     trace!(?call_response);
