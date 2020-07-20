@@ -323,7 +323,7 @@ async fn call_zome() {
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
-    let response = check_timeout(&mut holochain, response, 10000).await;
+    let response = check_timeout(&mut holochain, response, 3000).await;
     assert_matches!(response, AdminResponse::AppInstalled(_));
 
     // List Dnas
