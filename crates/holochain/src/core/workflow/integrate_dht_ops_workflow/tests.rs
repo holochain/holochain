@@ -25,7 +25,7 @@ use crate::{
         workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
         SourceChainError,
     },
-    fixt::*,
+    fixt::*, test_utils::test_network,
 };
 use fixt::prelude::*;
 use holo_hash::{Hashable, Hashed, HeaderHash};
@@ -1388,7 +1388,8 @@ async fn commit_entry_add_link() {
         assert_eq!(link.target, target_entry_hash);
 
         let (cas, _metadata, cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
-        let cascade = Cascade::new(&cas, &meta, &cache, &metadata_cache);
+        let (_n, _r, cell_network) = test_network().await;
+        let cascade = Cascade::new(&cas, &meta, &mut cache, &metadata_cache, cell_network);
 
         let links = cascade.dht_get_links(&key).await.unwrap();
         let link = links[0].clone();

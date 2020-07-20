@@ -3,7 +3,10 @@ use crate::core::state::{
     metadata::{EntryDhtStatus, LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
-use crate::fixt::{LinkMetaValFixturator, ZomeIdFixturator};
+use crate::{
+    fixt::{LinkMetaValFixturator, ZomeIdFixturator},
+    test_utils::test_network,
+};
 use fixt::prelude::*;
 use holochain_state::{
     env::ReadManager, error::DatabaseResult, prelude::*, test_utils::test_cell_env,
@@ -116,13 +119,17 @@ async fn live_local_return() -> SourceChainResult<()> {
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
 
+    let (_n, _r, cell_network) = test_network().await;
+
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &cache.cas(),
+        &mut cache.cas(),
         &mock_cache_meta,
+        cell_network,
     );
+
     let entry = cascade.dht_get(address).await?;
     // check it returns
     assert_eq!(entry.unwrap(), jimbo_entry);
@@ -160,12 +167,14 @@ async fn dead_local_none() -> SourceChainResult<()> {
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Dead));
 
+    let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &cache.cas(),
+        &mut cache.cas(),
         &mock_cache_meta,
+        cell_network,
     );
     let entry = cascade.dht_get(address).await?;
     // check it returns none
@@ -204,12 +213,14 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
 
+    let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &cache.cas(),
+        &mut cache.cas(),
         &mock_cache_meta,
+        cell_network,
     );
     let _entry = cascade.dht_get(&address).await?;
     // check it returns
@@ -240,12 +251,14 @@ async fn notfound_cache() -> DatabaseResult<()> {
     } = setup_env(&reader, &dbs)?;
     let address = jimbo_entry.as_hash();
 
+    let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &cache.cas(),
+        &mut cache.cas(),
         &mock_cache_meta,
+        cell_network,
     );
     let entry = cascade.dht_get(&address).await?;
     // check it returns
@@ -310,12 +323,14 @@ async fn links_local_return() -> SourceChainResult<()> {
             move |_| Ok(vec![link.clone()])
         });
 
+    let (_n, _r, cell_network) = test_network().await;
     // call dht_get_links with above base
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &cache.cas(),
+        &mut cache.cas(),
         &mock_cache_meta,
+        cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
@@ -391,12 +406,14 @@ async fn links_cache_return() -> SourceChainResult<()> {
             move |_| Ok(vec![link.clone()])
         });
 
+    let (_n, _r, cell_network) = test_network().await;
     // call dht_get_links with above base
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &cache.cas(),
+        &mut cache.cas(),
         &mock_cache_meta,
+        cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
@@ -453,12 +470,15 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
             move |_| Ok(vec![link.clone()])
         });
 
+    let (_n, _r, cell_network) = test_network().await;
+
     // call dht_get_links with above base
     let cascade = Cascade::new(
         &source_chain.cas(),
         &mock_primary_meta,
-        &cache.cas(),
+        &mut cache.cas(),
         &mock_cache_meta,
+        cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns

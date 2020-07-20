@@ -42,16 +42,28 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
+use holo_hash::Hashable;
+use holochain_p2p::{actor::GetOptions, HolochainP2pCell};
+use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    composite_hash::{EntryHash, HeaderAddress},
-    element::SignedHeaderHashed,
-    EntryHashed,
+    composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
+    element::{ChainElement, SignedHeader, SignedHeaderHashed},
+    Entry, EntryHashed, HeaderHashed,
 };
 use tracing::*;
 
 #[cfg(test)]
+mod network_tests;
+#[cfg(test)]
 mod test;
+
+// TODO: Remove this when holohash refactor PR lands
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
+struct PlaceholderGetReturn {
+    signed_header: SignedHeader,
+    entry: Option<Entry>,
+}
 
 pub struct Cascade<'env, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
 where
@@ -61,8 +73,10 @@ where
     primary: &'env ChainCasBuf<'env>,
     primary_meta: &'env M,
 
-    cache: &'env ChainCasBuf<'env>,
+    cache: &'env mut ChainCasBuf<'env>,
     cache_meta: &'env C,
+
+    network: HolochainP2pCell,
 }
 
 /// The state of the cascade search
@@ -90,15 +104,49 @@ where
     pub fn new(
         primary: &'env ChainCasBuf<'env>,
         primary_meta: &'env M,
-        cache: &'env ChainCasBuf<'env>,
+        cache: &'env mut ChainCasBuf<'env>,
         cache_meta: &'env C,
+        network: HolochainP2pCell,
     ) -> Self {
         Cascade {
             primary,
             primary_meta,
             cache,
             cache_meta,
+            network,
         }
+    }
+
+    async fn fetch_element(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> DatabaseResult<Option<ChainElement>> {
+        // TODO: Handle error
+        let elements = self.network.get(hash, options).await.unwrap();
+        // TODO: handle case of multiple elements returned
+        let element = match elements.into_iter().next() {
+            Some(bytes) => {
+                // TODO: Handle error
+                let element = PlaceholderGetReturn::try_from(bytes).unwrap();
+                let (header, signature) = element.signed_header.into();
+                // TODO: Handle error
+                let header = HeaderHashed::with_data(header).await?;
+
+                // TODO: Does this verify the signature?
+                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                let element = ChainElement::new(signed_header, element.entry);
+                let (signed_header, maybe_entry) = element.clone().into_inner();
+                let entry = match maybe_entry {
+                    Some(entry) => Some(EntryHashed::with_data(entry).await?),
+                    None => None,
+                };
+                self.cache.put(signed_header, entry)?;
+                Some(element)
+            }
+            None => None,
+        };
+        Ok(element)
     }
 
     /// Get a header without checking its metadata

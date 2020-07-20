@@ -36,9 +36,11 @@ pub fn get_links<'a>(
     };
 
     let call =
-        |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
+        |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
-                let cascade = workspace.cascade();
+                // TODO: Get the network from the context
+                let network = todo!("Get the nework");
+                let cascade = workspace.cascade(network);
 
                 // Create the key
                 let key = match tag.as_ref() {
@@ -56,7 +58,7 @@ pub fn get_links<'a>(
         };
 
     let links = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        unsafe { host_context.workspace.apply_ref(call).await }
+        unsafe { host_context.workspace.apply_mut(call).await }
     })??;
 
     let links: Vec<Link> = links.into_iter().map(|l| l.into_link()).collect();

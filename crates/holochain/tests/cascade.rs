@@ -4,7 +4,7 @@ use holochain::core::state::{
     metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
-use holochain::fixt::ZomeIdFixturator;
+use holochain::{test_utils::test_network, fixt::ZomeIdFixturator};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
@@ -95,12 +95,15 @@ async fn get_links() -> SourceChainResult<()> {
         .put_raw(jessy_header, Some(jessy_entry.as_content().clone()))
         .await?;
 
+    let (_n, _r, cell_network) = test_network().await;
+
     // Pass in stores as references
     let cascade = Cascade::new(
         &source_chain.cas(),
         &primary_meta,
         &cache.cas(),
         &cache_meta,
+        cell_network,
     );
     let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();

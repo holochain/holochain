@@ -19,6 +19,7 @@ use holochain_state::prelude::*;
 use holochain_types::element::ChainElement;
 use std::sync::Arc;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use holochain_p2p::HolochainP2pCell;
 
 pub mod unsafe_invoke_zome_workspace;
 
@@ -163,12 +164,13 @@ pub struct InvokeZomeWorkspace<'env> {
 }
 
 impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn cascade(&self) -> Cascade {
+    pub fn cascade(&'env mut self, network: HolochainP2pCell) -> Cascade<'env> {
         Cascade::new(
             &self.source_chain.cas(),
             &self.meta,
-            &self.cache_cas,
+            &mut self.cache_cas,
             &self.cache_meta,
+            network,
         )
     }
 }

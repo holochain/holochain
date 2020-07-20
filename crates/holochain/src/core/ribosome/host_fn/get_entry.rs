@@ -20,9 +20,11 @@ pub fn get_entry<'a>(
     let (hash, _options) = input.into_inner();
     let cascade_hash = hash.try_into()?;
     let call =
-        |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
+        |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
-                let cascade = workspace.cascade();
+                // TODO: Get the network from the context
+                let network = todo!("Get the nework");
+                let cascade = workspace.cascade(network);
                 // safe block on
                 let maybe_entry = cascade
                     .dht_get(&cascade_hash)
@@ -35,7 +37,7 @@ pub fn get_entry<'a>(
         };
     let maybe_entry: Option<Entry> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe { host_context.workspace.apply_ref(call).await }
+            unsafe { host_context.workspace.apply_mut(call).await }
         })??;
     Ok(GetEntryOutput::new(maybe_entry))
 }
