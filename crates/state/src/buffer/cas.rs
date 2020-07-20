@@ -6,7 +6,7 @@ use crate::{
 };
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
-use holo_hash::{HashableContent, HoloHashOf, HoloHashed};
+use holo_hash::{HasHash, HashableContent, HoloHashOf, HoloHashed};
 use must_future::MustBoxFuture;
 
 /// A wrapper around a KvBuf where keys are always Addresses,
@@ -14,14 +14,12 @@ use must_future::MustBoxFuture;
 pub struct CasBuf<'env, C>(KvBuf<'env, HoloHashOf<C>, C, Reader<'env>>)
 where
     C: HashableContent + BufVal + Send + Sync,
-    // for<'a> &'a C: HashableContent,
     HoloHashOf<C>: BufKey,
     C::HashType: Send + Sync;
 
 impl<'env, C> CasBuf<'env, C>
 where
     C: HashableContent + BufVal + Send + Sync,
-    // for<'a> &'a C: HashableContent,
     HoloHashOf<C>: BufKey,
     C::HashType: Send + Sync,
 {
@@ -115,7 +113,6 @@ where
 impl<'env, C> BufferedStore<'env> for CasBuf<'env, C>
 where
     C: HashableContent + BufVal + Send + Sync,
-    // for<'a> &'a C: HashableContent,
     C::HashType: Send + Sync,
 {
     type Error = DatabaseError;

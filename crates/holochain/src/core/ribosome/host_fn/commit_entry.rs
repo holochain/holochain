@@ -8,7 +8,7 @@ use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash_core::HeaderAddress;
+use holo_hash_core::{HasHash, HeaderAddress};
 use holochain_types::header::builder;
 use holochain_types::header::AppEntryType;
 use holochain_types::header::EntryType;

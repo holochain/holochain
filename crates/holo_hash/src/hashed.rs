@@ -12,7 +12,7 @@ pub struct HoloHashed<C: HashableContent> {
 }
 
 impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
-    fn hash(&self) -> &HoloHashOf<C> {
+    fn as_hash(&self) -> &HoloHashOf<C> {
         &self.hash
     }
 
@@ -36,14 +36,11 @@ where
         Self { content, hash }
     }
 
-    /// Accessor for content
-    pub fn content(&self) -> &C {
-        &self.content
-    }
+    // NB: as_hash and into_hash are provided by the HasHash impl
 
-    /// Convert to hash
-    pub fn into_hash(self) -> HoloHashOf<C> {
-        self.hash
+    /// Accessor for content
+    pub fn as_content(&self) -> &C {
+        &self.content
     }
 
     /// Convert to content
@@ -61,20 +58,6 @@ where
     // #[deprecated = "alias for `from_content`"]
     pub async fn with_data(content: C) -> Result<Self, SerializedBytesError> {
         Ok(Self::from_content(content).await)
-    }
-
-    /// alias for `HasHash::hash
-    // TODO: deprecate
-    // #[deprecated = "alias for `HasHash::hash`"]
-    pub fn as_hash(&self) -> &HoloHashOf<C> {
-        &self.hash
-    }
-
-    /// Alias for `content`
-    // TODO: deprecate
-    // #[deprecated = "alias for `content`"]
-    pub fn as_content(&self) -> &C {
-        &self.content
     }
 }
 
@@ -116,7 +99,7 @@ where
     type Target = C;
 
     fn deref(&self) -> &Self::Target {
-        self.content()
+        self.as_content()
     }
 }
 
@@ -125,7 +108,7 @@ where
     C: HashableContent,
 {
     fn as_ref(&self) -> &C {
-        self.content()
+        self.as_content()
     }
 }
 
@@ -134,7 +117,7 @@ where
     C: HashableContent,
 {
     fn borrow(&self) -> &C {
-        self.content()
+        self.as_content()
     }
 }
 

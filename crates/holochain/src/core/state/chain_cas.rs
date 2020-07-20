@@ -8,7 +8,7 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
-use holo_hash::{EntryHash, HeaderAddress, HeaderHash};
+use holo_hash::{EntryHash, HasHash, HeaderAddress, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{

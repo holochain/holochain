@@ -127,7 +127,7 @@ mod tests {
             let original = update.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
-            assert_eq!(&canonical, expected.hash());
+            assert_eq!(&canonical, expected.as_hash());
         }
         Ok(())
     }
@@ -170,7 +170,7 @@ mod tests {
             let original = update1.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
-            assert_eq!(&canonical, expected.hash());
+            assert_eq!(&canonical, expected.as_hash());
         }
         Ok(())
     }
@@ -295,7 +295,7 @@ mod tests {
                 buf.get_canonical_header_hash(original_header_hash.clone())?;
             let canonical_entry_hash = buf.get_canonical_entry_hash(original_entry_1)?;
 
-            assert_eq!(&canonical_header_hash, expected_header.hash());
+            assert_eq!(&canonical_header_hash, expected_header.as_hash());
             assert_eq!(canonical_entry_hash, expected_entry_hash);
         }
         Ok(())

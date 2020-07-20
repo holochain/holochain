@@ -75,7 +75,7 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
 }
 
 impl<T: HashType> HasHash<T> for HoloHash<T> {
-    fn hash(&self) -> &HoloHash<T> {
+    fn as_hash(&self) -> &HoloHash<T> {
         &self
     }
     fn into_hash(self) -> HoloHash<T> {

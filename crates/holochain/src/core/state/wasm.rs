@@ -36,6 +36,7 @@ impl<'env> BufferedStore<'env> for WasmBuf<'env> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holo_hash::HasHash;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(threaded_scheduler)]

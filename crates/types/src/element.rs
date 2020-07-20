@@ -283,7 +283,7 @@ mod tests {
     use super::{SignedHeader, SignedHeaderHashed};
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holo_hash::HoloHashed;
+    use holo_hash::{HasHash, HoloHashed};
 
     #[tokio::test(threaded_scheduler)]
     async fn test_signed_header_roundtrip() {
