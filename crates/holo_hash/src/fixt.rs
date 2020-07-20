@@ -1,7 +1,7 @@
 use ::fixt::prelude::*;
 use holo_hash_core::{
-    hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash, EntryContentHash, EntryHash,
-    HeaderHash, NetIdHash, WasmHash,
+    encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
+    EntryContentHash, EntryHash, HeaderHash, NetIdHash, WasmHash,
 };
 
 pub type HashTypeEntry = hash_type::Entry;
@@ -81,23 +81,29 @@ pub type ThirtySixBytes = Vec<u8>;
 // Simply generate "bytes" which is a Vec<u8> of 36 bytes
 fixturator!(
     ThirtySixBytes,
-    [0; 36].to_vec(),
+    append_location([0; 32].to_vec()),
     {
         let mut rng = rand::thread_rng();
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
-        for _ in 0..36 {
+        for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());
         }
-        bytes
+        append_location(bytes)
     },
     {
         let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, self.0.index);
         let mut bytes = vec![];
-        for _ in 0..36 {
+        for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());
         }
         self.0.index += 1;
-        bytes
+        append_location(bytes)
     }
 );
+
+fn append_location(mut base: Vec<u8>) -> Vec<u8> {
+    let mut loc_bytes = holo_dht_location_bytes(&base);
+    base.append(&mut loc_bytes);
+    base
+}
