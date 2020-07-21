@@ -12,7 +12,7 @@ map_extern!(exists, _exists);
 map_extern!(ensure, _ensure);
 map_extern!(children, _children);
 
-fn _hash(path_string: TestString) -> Result<HoloHashCore, WasmError> {
+fn _hash(path_string: TestString) -> Result<EntryHash, WasmError> {
     Path::from(path_string.0).hash()
 }
 

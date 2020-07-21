@@ -48,7 +48,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
-            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            dht_hash: holo_hash::AnyDhtHash,
             ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         ) -> ();
 
@@ -65,7 +65,7 @@ ghost_actor::ghost_chan! {
         fn get(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
         ) -> SerializedBytes;
 
@@ -73,7 +73,7 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            dht_hash: holo_hash::AnyDhtHash,
             options: GetLinksOptions,
         ) -> SerializedBytes;
 

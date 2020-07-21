@@ -10,7 +10,6 @@ use holochain_zome_types::link::Link;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::GetLinksOutput;
 use must_future::MustBoxFuture;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -20,8 +19,6 @@ pub fn get_links<'a>(
     input: GetLinksInput,
 ) -> RibosomeResult<GetLinksOutput> {
     let (base_address, tag) = input.into_inner();
-
-    let base_address = base_address.try_into()?;
 
     // Get zome id
     let zome_id: holochain_types::header::ZomeId = match ribosome
@@ -78,8 +75,6 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
-    use holo_hash_core::HoloHashCore;
-    use holo_hash_core::HoloHashCoreHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::*;
@@ -198,7 +193,7 @@ pub mod slow_tests {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let foo_bar: holo_hash_core::HoloHashCore = {
+            let foo_bar: holo_hash_core::EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;
@@ -210,7 +205,7 @@ pub mod slow_tests {
                 )
             };
 
-            let foo_baz: holo_hash_core::HoloHashCore = {
+            let foo_baz: holo_hash_core::EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;
@@ -268,7 +263,7 @@ pub mod slow_tests {
                 .unwrap();
 
             // anchor foo bar
-            let anchor_address_one: HoloHashCore = {
+            let anchor_address_one: EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;
@@ -290,7 +285,7 @@ pub mod slow_tests {
             );
 
             // anchor foo baz
-            let anchor_address_two: HoloHashCore = {
+            let anchor_address_two: EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;
@@ -376,7 +371,7 @@ pub mod slow_tests {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let output: Hashes = {
+            let output: EntryHashes = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;
@@ -406,7 +401,7 @@ pub mod slow_tests {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let output: Hashes = {
+            let output: EntryHashes = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;

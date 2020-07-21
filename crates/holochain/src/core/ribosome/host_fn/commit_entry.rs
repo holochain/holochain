@@ -8,9 +8,7 @@ use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash::Hashable;
-use holo_hash::Hashed;
-use holochain_types::composite_hash::HeaderAddress;
+use holo_hash_core::{HasHash, HeaderAddress};
 use holochain_types::header::builder;
 use holochain_types::header::AppEntryType;
 use holochain_types::header::EntryType;
@@ -99,7 +97,7 @@ pub fn commit_entry<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(CommitEntryOutput::new(entry_hash.into()))
+    Ok(CommitEntryOutput::new(entry_hash))
 }
 
 #[cfg(test)]
@@ -121,9 +119,7 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holo_hash::Hashable;
-    use holo_hash::Hashed;
-    use holo_hash_core::HoloHashCoreHash;
+    use holo_hash::HasHash;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;

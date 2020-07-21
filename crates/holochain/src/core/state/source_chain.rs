@@ -12,7 +12,6 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    composite_hash::HeaderAddress,
     header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
     prelude::*,
     EntryHashed,
@@ -225,7 +224,7 @@ pub mod tests {
             let reader = env.reader()?;
             let mut store = SourceChainBuf::new(&reader, &env)?;
             store
-                .genesis(fake_dna_hash(""), fake_agent_pubkey_1(), None)
+                .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
@@ -270,7 +269,7 @@ pub mod tests {
             let reader = env.reader()?;
             let mut store = SourceChainBuf::new(&reader, &env)?;
             store
-                .genesis(fake_dna_hash(""), fake_agent_pubkey_1(), None)
+                .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }

@@ -98,7 +98,7 @@ mod test {
     use crate::fixt::EntryDefsFixturator;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::entry_def::EntryDefsCallbackResult;

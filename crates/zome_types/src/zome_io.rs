@@ -42,7 +42,7 @@ wasm_io_types!(
     pub struct CapabilityOutput(());
     // the SerializedBytes will be stuffed into an Entry::App(SB) host side
     pub struct CommitEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry));
-    pub struct CommitEntryOutput(holo_hash_core::HoloHashCore);
+    pub struct CommitEntryOutput(holo_hash_core::EntryHash);
     // @TODO
     pub struct DecryptInput(());
     pub struct DecryptOutput(());
@@ -88,27 +88,27 @@ wasm_io_types!(
     // create link entries
     pub struct LinkEntriesInput(
         (
-            holo_hash_core::HoloHashCore,
-            holo_hash_core::HoloHashCore,
+            holo_hash_core::EntryHash,
+            holo_hash_core::EntryHash,
             crate::link::LinkTag,
         ),
     );
-    pub struct LinkEntriesOutput(holo_hash_core::HoloHashCore);
+    pub struct LinkEntriesOutput(holo_hash_core::HeaderHash);
     // @TODO
     pub struct KeystoreInput(());
     pub struct KeystoreOutput(());
     // get links from the cascade
-    pub struct GetLinksInput((holo_hash_core::HoloHashCore, Option<crate::link::LinkTag>));
+    pub struct GetLinksInput((holo_hash_core::EntryHash, Option<crate::link::LinkTag>));
     pub struct GetLinksOutput(crate::link::Links);
     // get an entry from the cascade
-    pub struct GetEntryInput((holo_hash_core::HoloHashCore, crate::entry::GetOptions));
+    pub struct GetEntryInput((holo_hash_core::EntryHash, crate::entry::GetOptions));
     pub struct GetEntryOutput(Option<crate::entry::Entry>);
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
     // hash an entry on the host and get a core hash back
     pub struct EntryHashInput(crate::entry::Entry);
-    pub struct EntryHashOutput(holo_hash_core::HoloHashCore);
+    pub struct EntryHashOutput(holo_hash_core::EntryHash);
     // the current system time, in the opinion of the host, as a Duration
     pub struct SysTimeInput(());
     pub struct SysTimeOutput(core::time::Duration);

@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
-use holo_hash::Hashable;
-use holo_hash::Hashed;
+use holo_hash::HasHash;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryHashInput;
 use holochain_zome_types::EntryHashOutput;
@@ -20,9 +19,7 @@ pub fn entry_hash(
     })?
     .into_hash();
 
-    let core_hash: holo_hash_core::HoloHashCore = entry_hash.into();
-
-    Ok(EntryHashOutput::new(core_hash))
+    Ok(EntryHashOutput::new(entry_hash))
 }
 
 #[cfg(test)]
@@ -36,8 +33,7 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holo_hash::Hashable;
-    use holo_hash_core::HoloHashCoreHash;
+    use holo_hash::EntryHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;
@@ -61,13 +57,7 @@ pub mod wasm_test {
         let output: EntryHashOutput =
             entry_hash(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
 
-        assert_eq!(
-            vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 153, 246, 31, 194
-            ],
-            output.into_inner().get_raw().to_vec()
-        );
+        assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -87,13 +77,7 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace;
         let output: EntryHashOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Imports, "entry_hash", input);
-        assert_eq!(
-            vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 153, 246, 31, 194
-            ],
-            output.into_inner().get_raw().to_vec()
-        );
+        assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -110,7 +94,7 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
         let input = TestString::from("foo.bar".to_string());
-        let output: holo_hash_core::HoloHashCore =
+        let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
 
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");

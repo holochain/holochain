@@ -22,7 +22,7 @@ pub struct RealDnaStore {
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
 }
 
-pub type DnaDefCas<'env> = CasBuf<'env, DnaDefHashed>;
+pub type DnaDefCas<'env> = CasBuf<'env, DnaDef>;
 pub struct DnaDefBuf<'env> {
     dna_defs: DnaDefCas<'env>,
 }

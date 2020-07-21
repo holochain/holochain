@@ -4,7 +4,7 @@ use crate::fixt::{
     ZomeIdFixturator,
 };
 use crate::here;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
 use holochain_types::observability;
 

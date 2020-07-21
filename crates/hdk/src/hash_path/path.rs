@@ -280,7 +280,7 @@ impl Path {
     }
 
     /// what is the hash for the current Path
-    pub fn hash(&self) -> Result<holo_hash_core::HoloHashCore, WasmError> {
+    pub fn hash(&self) -> Result<holo_hash_core::EntryHash, WasmError> {
         Ok(entry_hash!(self)?)
     }
 
@@ -355,7 +355,7 @@ fn hash_path_linktag() {
 #[test]
 #[cfg(test)]
 fn hash_path_component() {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
 
     let bytes: Vec<u8> = U8Fixturator::new(fixt::Unpredictable).take(5).collect();
 
@@ -393,7 +393,7 @@ fn hash_path_component() {
 #[test]
 #[cfg(test)]
 fn hash_path_path() {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
 
     let components: Vec<Component> = {
         let mut vec = vec![];

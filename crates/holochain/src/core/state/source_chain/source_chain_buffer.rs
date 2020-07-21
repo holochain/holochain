@@ -12,7 +12,6 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    composite_hash::HeaderAddress,
     dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
@@ -157,7 +156,7 @@ impl<'env> SourceChainBuf<'env> {
             match element.entry().as_option().ok_or_else(|| {
                 SourceChainError::InvalidStructure(ChainInvalidReason::GenesisDataMissing)
             })? {
-                Entry::Agent(agent_pubkey) => Ok(Some(agent_pubkey.clone().into())),
+                Entry::Agent(agent_pubkey) => Ok(Some(agent_pubkey.clone())),
                 _ => Err(SourceChainError::InvalidStructure(
                     ChainInvalidReason::MalformedGenesisData,
                 )),
@@ -250,7 +249,7 @@ impl<'env> SourceChainBuf<'env> {
             entry_type: header::EntryType::AgentPubKey,
             entry_hash: agent_pubkey.clone().into(),
         });
-        self.put_raw(agent_header, Some(Entry::Agent(agent_pubkey.into())))
+        self.put_raw(agent_header, Some(Entry::Agent(agent_pubkey)))
             .await?;
 
         Ok(())
@@ -340,7 +339,7 @@ pub mod tests {
             async {
                 let dna_header = Header::Dna(header::Dna {
                     author: agent_pubkey.clone(),
-                    timestamp: Timestamp::now(),
+                    timestamp: Timestamp(0, 0),
                     header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
@@ -348,8 +347,8 @@ pub mod tests {
 
                 let agent_header = Header::EntryCreate(header::EntryCreate {
                     author: agent_pubkey.clone(),
-                    timestamp: Timestamp::now(),
-                    header_seq: 0,
+                    timestamp: Timestamp(1, 0),
+                    header_seq: 1,
                     prev_header: dna_header.as_hash().to_owned().into(),
                     entry_type: header::EntryType::AgentPubKey,
                     entry_hash: agent_pubkey.clone().into(),
@@ -486,5 +485,25 @@ pub mod tests {
         }
 
         Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_header_cas_roundtrip() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let reader = env.reader().unwrap();
+        let mut store = SourceChainBuf::new(&reader, &env).unwrap();
+
+        let (_, hashed, _, _, _) = fixtures();
+        let header = hashed.into_content();
+        let hash = HeaderHash::with_data(&header).await;
+        let hashed = HeaderHashed::with_data(header.clone()).await.unwrap();
+        assert_eq!(hash, *hashed.as_hash());
+
+        store.put_raw(header, None).await.unwrap();
+        let signed_header = store.get_header(&hash).await.unwrap().unwrap();
+
+        assert_eq!(signed_header.as_hash(), hashed.as_hash());
+        assert_eq!(signed_header.as_hash(), signed_header.header_address());
     }
 }

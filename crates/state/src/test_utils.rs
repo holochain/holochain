@@ -8,7 +8,7 @@ use tempdir::TempDir;
 
 /// Create an [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory
 pub fn test_cell_env() -> TestEnvironment {
-    let cell_id = fake_cell_id(&nanoid::nanoid!());
+    let cell_id = fake_cell_id(1);
     test_env(EnvironmentKind::Cell(cell_id))
 }
 

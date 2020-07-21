@@ -100,7 +100,7 @@ mod test {
     use crate::fixt::HeaderHashesFixturator;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
@@ -212,7 +212,7 @@ mod slow_tests {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use holo_hash::HeaderHashFixturator;
+    use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
