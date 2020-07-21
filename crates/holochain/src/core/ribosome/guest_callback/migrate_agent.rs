@@ -2,11 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_invoke_zome_workspace::{
-    UnsafeInvokeZomeWorkspace, UnsafeInvokeZomeWorkspaceFixturator,
-};
-use crate::fixt::DnaDefFixturator;
-use crate::fixt::MigrateAgentFixturator;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use derive_more::Constructor;
 use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
@@ -34,11 +30,6 @@ impl MigrateAgentInvocation {
     }
 }
 
-fixturator!(
-    MigrateAgentInvocation;
-    constructor fn new(DnaDef, MigrateAgent);
-);
-
 #[derive(Clone, Constructor)]
 pub struct MigrateAgentHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
@@ -60,11 +51,6 @@ impl From<&MigrateAgentHostAccess> for HostFnAccess {
         access
     }
 }
-
-fixturator!(
-    MigrateAgentHostAccess;
-    constructor fn new(UnsafeInvokeZomeWorkspace);
-);
 
 impl Invocation for MigrateAgentInvocation {
     fn zomes(&self) -> ZomesToInvoke {
@@ -126,12 +112,12 @@ impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
 #[cfg(test)]
 mod test {
 
-    use super::MigrateAgentHostAccessFixturator;
-    use super::MigrateAgentInvocationFixturator;
     use super::MigrateAgentResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::MigrateAgentFixturator;
+    use crate::fixt::MigrateAgentHostAccessFixturator;
+    use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
@@ -253,11 +239,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::MigrateAgentHostAccessFixturator;
-    use super::MigrateAgentInvocationFixturator;
     use super::MigrateAgentResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::MigrateAgentHostAccessFixturator;
+    use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
 

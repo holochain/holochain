@@ -2,9 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_invoke_zome_workspace::{
-    UnsafeInvokeZomeWorkspace, UnsafeInvokeZomeWorkspaceFixturator,
-};
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::fixt::ZomeNameFixturator;
 use derive_more::Constructor;
 use fixt::prelude::*;
@@ -35,11 +33,6 @@ impl ValidationPackageInvocation {
     }
 }
 
-fixturator!(
-    ValidationPackageInvocation;
-    constructor fn new(ZomeName, AppEntryType);
-);
-
 #[derive(Clone, Constructor)]
 pub struct ValidationPackageHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
@@ -59,11 +52,6 @@ impl From<&ValidationPackageHostAccess> for HostFnAccess {
         access
     }
 }
-
-fixturator!(
-    ValidationPackageHostAccess;
-    constructor fn new(UnsafeInvokeZomeWorkspace);
-);
 
 impl Invocation for ValidationPackageInvocation {
     fn zomes(&self) -> ZomesToInvoke {
@@ -142,11 +130,11 @@ impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
 #[cfg(test)]
 mod test {
 
-    use super::ValidationPackageHostAccessFixturator;
-    use super::ValidationPackageInvocationFixturator;
     use super::ValidationPackageResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::ValidationPackageHostAccessFixturator;
+    use crate::fixt::ValidationPackageInvocationFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::validate::ValidationPackage;
@@ -269,11 +257,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::ValidationPackageHostAccessFixturator;
-    use super::ValidationPackageInvocationFixturator;
     use super::ValidationPackageResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::ValidationPackageHostAccessFixturator;
+    use crate::fixt::ValidationPackageInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;

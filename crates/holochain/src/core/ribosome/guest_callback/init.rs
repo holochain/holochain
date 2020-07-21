@@ -2,9 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_invoke_zome_workspace::{
-    UnsafeInvokeZomeWorkspace, UnsafeInvokeZomeWorkspaceFixturator,
-};
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::fixt::DnaDefFixturator;
 use crate::fixt::KeystoreSenderFixturator;
 use derive_more::Constructor;
@@ -30,22 +28,12 @@ impl InitInvocation {
     }
 }
 
-fixturator!(
-    InitInvocation;
-    constructor fn new(DnaDef);
-);
-
 #[derive(Clone, Constructor)]
 pub struct InitHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }
-
-fixturator!(
-    InitHostAccess;
-    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
-);
 
 impl From<InitHostAccess> for HostAccess {
     fn from(init_host_access: InitHostAccess) -> Self {
@@ -117,11 +105,11 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 #[cfg(test)]
 mod test {
 
-    use super::InitHostAccessFixturator;
-    use super::InitInvocationFixturator;
     use super::InitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::InitHostAccessFixturator;
+    use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
@@ -240,11 +228,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::InitHostAccessFixturator;
-    use super::InitInvocationFixturator;
     use super::InitResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::InitHostAccessFixturator;
+    use crate::fixt::InitInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

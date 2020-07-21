@@ -68,7 +68,6 @@ pub fn get_links<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
     use crate::core::queue_consumer::TriggerSender;
-    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::workspace::Workspace;
     use crate::core::workflow::integrate_dht_ops_workflow::{
         integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
@@ -76,6 +75,7 @@ pub mod slow_tests {
     use crate::core::workflow::produce_dht_ops_workflow::{
         produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
     };
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
     use holo_hash_core::HoloHashCore;

@@ -27,20 +27,23 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::fixt::EntryDefsHostAccessFixturator;
 use crate::fixt::HostInputFixturator;
+use crate::fixt::InitHostAccessFixturator;
 use crate::fixt::KeystoreSenderFixturator;
+use crate::fixt::MigrateAgentHostAccessFixturator;
+use crate::fixt::PostCommitHostAccessFixturator;
+use crate::fixt::UnsafeInvokeZomeWorkspaceFixturator;
+use crate::fixt::ValidateHostAccessFixturator;
+use crate::fixt::ValidationPackageHostAccessFixturator;
 use crate::fixt::ZomeNameFixturator;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use fixt::prelude::*;
 use guest_callback::{
-    entry_defs::{EntryDefsHostAccess, EntryDefsHostAccessFixturator},
-    init::{InitHostAccess, InitHostAccessFixturator},
-    migrate_agent::{MigrateAgentHostAccess, MigrateAgentHostAccessFixturator},
-    post_commit::{PostCommitHostAccess, PostCommitHostAccessFixturator},
-    validate::{ValidateHostAccess, ValidateHostAccessFixturator},
-    validation_package::{ValidationPackageHostAccess, ValidationPackageHostAccessFixturator},
+    entry_defs::EntryDefsHostAccess, init::InitHostAccess, migrate_agent::MigrateAgentHostAccess,
+    post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
+    validation_package::ValidationPackageHostAccess,
 };
 use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
@@ -64,29 +67,6 @@ pub struct CallContext {
     pub zome_name: ZomeName,
     pub host_access: HostAccess,
 }
-
-fixturator!(
-    ZomeCallHostAccess;
-    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
-);
-
-fixturator!(
-    HostAccess;
-    variants [
-        ZomeCall(ZomeCallHostAccess)
-        Validate(ValidateHostAccess)
-        Init(InitHostAccess)
-        EntryDefs(EntryDefsHostAccess)
-        MigrateAgent(MigrateAgentHostAccess)
-        ValidationPackage(ValidationPackageHostAccess)
-        PostCommit(PostCommitHostAccess)
-    ];
-);
-
-fixturator!(
-    CallContext;
-    constructor fn new(ZomeName, HostAccess);
-);
 
 impl CallContext {
     pub fn new(zome_name: ZomeName, host_access: HostAccess) -> Self {
@@ -531,10 +511,10 @@ pub mod wasm_test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomeCallInvocationResponse;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::*;

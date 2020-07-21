@@ -32,10 +32,10 @@ pub fn random_bytes(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-    use crate::core::ribosome::CallContextFixturator;
-    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::workspace::Workspace;
+    use crate::fixt::CallContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;

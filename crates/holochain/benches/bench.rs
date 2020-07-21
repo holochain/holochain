@@ -34,7 +34,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
         ]));
     let mut cap_secret_fixturator = CapSecretFixturator::new(Unpredictable);
     let mut host_access_fixturator =
-        holochain::core::ribosome::ZomeCallHostAccessFixturator::new(fixt::Unpredictable);
+        holochain::fixt::ZomeCallHostAccessFixturator::new(fixt::Unpredictable);
     let mut cell_id_fixturator = holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable);
     let mut agent_key_fixturator = AgentPubKeyFixturator::new(Unpredictable);
 

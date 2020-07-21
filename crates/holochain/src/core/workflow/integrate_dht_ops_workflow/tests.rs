@@ -2,14 +2,12 @@
 
 use super::*;
 
-use crate::core::ribosome::ZomeCallHostAccessFixturator;
+use crate::fixt::CallContextFixturator;
+use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::here;
 use crate::{
     core::{
-        ribosome::{
-            guest_callback::entry_defs::EntryDefsResult, host_fn, CallContextFixturator,
-            MockRibosomeT,
-        },
+        ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
         state::{metadata::LinkMetaKey, workspace::WorkspaceError},
         workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
     },

@@ -78,9 +78,9 @@ mod tests {
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::MockRibosomeT;
-    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::FnComponentsFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::ZomeNameFixturator;
     use fallible_iterator::FallibleIterator;
     use holochain_zome_types::init::InitCallbackResult;

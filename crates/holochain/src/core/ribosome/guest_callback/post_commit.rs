@@ -2,9 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_invoke_zome_workspace::{
-    UnsafeInvokeZomeWorkspace, UnsafeInvokeZomeWorkspaceFixturator,
-};
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::fixt::HeaderHashesFixturator;
 use crate::fixt::KeystoreSenderFixturator;
 use crate::fixt::ZomeNameFixturator;
@@ -31,11 +29,6 @@ impl PostCommitInvocation {
     }
 }
 
-fixturator!(
-    PostCommitInvocation;
-    constructor fn new(ZomeName, HeaderHashes);
-);
-
 #[derive(Clone, Constructor)]
 pub struct PostCommitHostAccess {
     pub workspace: UnsafeInvokeZomeWorkspace,
@@ -54,11 +47,6 @@ impl From<&PostCommitHostAccess> for HostFnAccess {
         Self::all()
     }
 }
-
-fixturator!(
-    PostCommitHostAccess;
-    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
-);
 
 impl Invocation for PostCommitInvocation {
     fn zomes(&self) -> ZomesToInvoke {
@@ -110,12 +98,12 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 #[cfg(test)]
 mod test {
 
-    use super::PostCommitHostAccessFixturator;
-    use super::PostCommitInvocationFixturator;
     use super::PostCommitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::HeaderHashesFixturator;
+    use crate::fixt::PostCommitHostAccessFixturator;
+    use crate::fixt::PostCommitInvocationFixturator;
     use fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
@@ -222,11 +210,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::PostCommitHostAccessFixturator;
-    use super::PostCommitInvocationFixturator;
     use super::PostCommitResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::PostCommitHostAccessFixturator;
+    use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holo_hash::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;

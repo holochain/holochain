@@ -20,18 +20,8 @@ impl EntryDefsInvocation {
     }
 }
 
-fixturator!(
-    EntryDefsInvocation;
-    constructor fn new();
-);
-
 #[derive(Clone, Constructor)]
 pub struct EntryDefsHostAccess;
-
-fixturator!(
-    EntryDefsHostAccess;
-    constructor fn new();
-);
 
 impl From<&HostAccess> for EntryDefsHostAccess {
     fn from(_: &HostAccess) -> Self {
@@ -103,11 +93,11 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
 #[cfg(test)]
 mod test {
 
-    use super::EntryDefsInvocationFixturator;
     use super::{EntryDefsHostAccess, EntryDefsResult};
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::EntryDefsFixturator;
+    use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
@@ -235,11 +225,11 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use super::EntryDefsInvocationFixturator;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::crdt::CrdtType;

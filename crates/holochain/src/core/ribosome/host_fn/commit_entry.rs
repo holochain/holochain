@@ -107,8 +107,6 @@ pub fn commit_entry<'a>(
 pub mod wasm_test {
     use super::commit_entry;
     use crate::core::ribosome::error::RibosomeError;
-    use crate::core::ribosome::CallContextFixturator;
-    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::{
         queue_consumer::TriggerSender,
@@ -118,8 +116,10 @@ pub mod wasm_test {
             produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
         },
     };
+    use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::Hashable;
     use holo_hash::Hashed;

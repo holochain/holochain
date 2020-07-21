@@ -34,11 +34,6 @@ impl ValidateInvocation {
     }
 }
 
-fixturator!(
-    ValidateInvocation;
-    constructor fn new(ZomeName, Entry);
-);
-
 #[derive(Clone, Constructor)]
 pub struct ValidateHostAccess;
 
@@ -53,11 +48,6 @@ impl From<&ValidateHostAccess> for HostFnAccess {
         Self::none()
     }
 }
-
-fixturator!(
-    ValidateHostAccess;
-    constructor fn new();
-);
 
 impl Invocation for ValidateInvocation {
     fn zomes(&self) -> ZomesToInvoke {
@@ -127,11 +117,11 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 #[cfg(test)]
 mod test {
 
-    use super::ValidateHostAccessFixturator;
-    use super::ValidateInvocationFixturator;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::ValidateHostAccessFixturator;
+    use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
     use fixt::prelude::*;
     use holo_hash::AgentPubKeyFixturator;
@@ -276,13 +266,13 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::ValidateInvocationFixturator;
+    use super::ValidateHostAccess;
     use super::ValidateResult;
-    use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
     use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeCallHostAccessFixturator;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::AgentPubKeyFixturator;
     use holo_hash_core::HoloHashCoreHash;
