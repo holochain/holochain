@@ -82,6 +82,20 @@ pub enum DhtOp {
 }
 
 impl DhtOp {
+    /// Specifies into which store this DhtOp will be integrated
+    pub fn integration_destination(&self) -> DhtOpIntegrationDestination {
+        match self {
+            Self::StoreElement(_, _, _) => DhtOpIntegrationDestination::Element,
+            Self::StoreEntry(_, _, _) => DhtOpIntegrationDestination::Element,
+            Self::RegisterAgentActivity(_, _) => DhtOpIntegrationDestination::Meta,
+            Self::RegisterReplacedBy(_, _, _) => DhtOpIntegrationDestination::Meta,
+            Self::RegisterDeletedBy(_, _) => DhtOpIntegrationDestination::Meta,
+            Self::RegisterDeletedEntryHeader(_, _) => DhtOpIntegrationDestination::Meta,
+            Self::RegisterAddLink(_, _) => DhtOpIntegrationDestination::Meta,
+            Self::RegisterRemoveLink(_, _) => DhtOpIntegrationDestination::Meta,
+        }
+    }
+
     fn as_unique_form(&self) -> UniqueForm<'_> {
         match self {
             Self::StoreElement(_, header, _) => UniqueForm::StoreElement(header),
@@ -96,6 +110,15 @@ impl DhtOp {
             Self::RegisterRemoveLink(_, header) => UniqueForm::RegisterRemoveLink(header),
         }
     }
+}
+
+#[derive(PartialEq)]
+/// Specifies into which store a DhtOp will be integrated
+pub enum DhtOpIntegrationDestination {
+    /// The DhtOp will be integrated into the ElementVault (or Cache)
+    Element,
+    /// The DhtOp will be integrated into the MetaVault (or Cache)
+    Meta,
 }
 
 // FIXME: need to use this in HashableContent
