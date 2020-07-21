@@ -30,6 +30,8 @@ pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod post_commit;
 #[allow(missing_docs)]
+pub mod remote_call;
+#[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]
 pub mod zome;
