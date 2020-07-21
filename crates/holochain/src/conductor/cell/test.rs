@@ -98,6 +98,7 @@ async fn test_cell_handle_publish() {
         .unwrap()
         .collect::<Vec<_>>()
         .unwrap();
+
     let (_, last) = &res[res.len() - 1];
 
     matches::assert_matches!(

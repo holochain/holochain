@@ -1104,9 +1104,7 @@ version = "0.0.1"
 dependencies = [
  "base64 0.12.3",
  "blake2b_simd",
- "futures",
  "holochain_serialized_bytes",
- "must_future",
  "rmp-serde",
  "serde",
  "serde_bytes",

@@ -1,17 +1,19 @@
 [package]
 name = "holo_hash_core"
 version = "0.0.1"
-authors = ["Michael Dougherty <maackle.d@gmail.com>"]
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
+categories = [ "cryptography" ]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "hashing helpers supporting dht sharding"
+license = "CAL-1.0"
+homepage = "https://github.com/Holo-host/holochain"
+documentation = "https://github.com/Holo-host/holochain"
 
 [dependencies]
 base64 = {version = "0.12.0", optional = true}
 blake2b_simd = {version = "0.5.10", optional = true}
-futures = "0.3.1"
 holochain_serialized_bytes = "0.0.40"
-must_future = "0.1.1"
 serde = "1"
 serde_bytes = "0.11"
 
