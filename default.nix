@@ -30,6 +30,9 @@ with holonix.pkgs;
     export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
     export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
     export CARGO_CACHE_RUSTC_INFO=1
+
+    mkdir -p .wasm_cache
+    export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
    ''
   ];
 

@@ -27,19 +27,26 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
 use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
+use derive_more::Constructor;
 use error::RibosomeResult;
 use fixt::prelude::*;
+use guest_callback::{
+    entry_defs::EntryDefsHostAccess, init::InitHostAccess, migrate_agent::MigrateAgentHostAccess,
+    post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
+    validation_package::ValidationPackageHostAccess,
+};
 use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaFile;
-use holochain_types::fixt::{CapSecretFixturator, HostFnAccessFixturator};
+use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
@@ -48,40 +55,91 @@ use mockall::automock;
 use std::iter::Iterator;
 
 #[derive(Clone)]
-pub struct HostContext {
+pub struct CallContext {
     pub zome_name: ZomeName,
-    allowed_access: HostFnAccess,
-    workspace: UnsafeInvokeZomeWorkspace,
+    pub host_access: HostAccess,
 }
 
-fixturator!(
-    HostContext;
-    constructor fn new(ZomeName, HostFnAccess, UnsafeInvokeZomeWorkspace);
-);
-
-impl HostContext {
-    pub fn new(
-        zome_name: ZomeName,
-        allowed_access: HostFnAccess,
-        workspace: UnsafeInvokeZomeWorkspace,
-    ) -> Self {
+impl CallContext {
+    pub fn new(zome_name: ZomeName, host_access: HostAccess) -> Self {
         Self {
             zome_name,
-            allowed_access,
-            workspace,
+            host_access,
         }
     }
 
     pub fn zome_name(&self) -> ZomeName {
         self.zome_name.clone()
     }
-    pub fn allowed_access(&self) -> HostFnAccess {
-        self.allowed_access
+    pub fn host_access(&self) -> HostAccess {
+        self.host_access.clone()
+    }
+}
+
+#[derive(Clone)]
+pub enum HostAccess {
+    ZomeCall(ZomeCallHostAccess),
+    Validate(ValidateHostAccess),
+    Init(InitHostAccess),
+    EntryDefs(EntryDefsHostAccess),
+    MigrateAgent(MigrateAgentHostAccess),
+    ValidationPackage(ValidationPackageHostAccess),
+    PostCommit(PostCommitHostAccess),
+}
+
+impl From<&HostAccess> for HostFnAccess {
+    fn from(host_access: &HostAccess) -> Self {
+        match host_access {
+            HostAccess::ZomeCall(zome_call_host_access) => zome_call_host_access.into(),
+            HostAccess::Validate(validate_host_access) => validate_host_access.into(),
+            HostAccess::Init(init_host_access) => init_host_access.into(),
+            HostAccess::EntryDefs(entry_defs_host_access) => entry_defs_host_access.into(),
+            HostAccess::MigrateAgent(migrate_agent_host_access) => migrate_agent_host_access.into(),
+            HostAccess::ValidationPackage(validation_package_host_access) => {
+                validation_package_host_access.into()
+            }
+            HostAccess::PostCommit(post_commit_host_access) => post_commit_host_access.into(),
+        }
+    }
+}
+
+impl HostAccess {
+    /// Get the workspace, panics if none was provided
+    pub fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess{workspace, .. }) |
+            Self::Init(InitHostAccess{workspace, .. }) |
+            Self::MigrateAgent(MigrateAgentHostAccess{workspace, .. }) |
+            Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
+            Self::PostCommit(PostCommitHostAccess{workspace, .. }) => {
+                workspace
+            }
+            _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
+        }
     }
 
-    #[cfg(test)]
-    pub(crate) fn change_workspace(&mut self, workspace: UnsafeInvokeZomeWorkspace) {
-        self.workspace = workspace;
+    /// Get the keystore, panics if none was provided
+    pub fn keystore(&self) -> &KeystoreSender {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess{keystore, .. }) |
+            Self::Init(InitHostAccess{keystore, .. }) |
+            Self::PostCommit(PostCommitHostAccess{keystore, .. }) => {
+                keystore
+            }
+            _ => panic!("Gave access to a host function that uses the keystore without providing a keystore"),
+        }
+    }
+
+    /// Get the network, panics if none was provided
+    pub fn network(&self) -> &HolochainP2pCell {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess { network, .. })
+            | Self::Init(InitHostAccess { network, .. })
+            | Self::PostCommit(PostCommitHostAccess { network, .. }) => network,
+            _ => panic!(
+                "Gave access to a host function that uses the network without providing a network"
+            ),
+        }
     }
 }
 
@@ -123,19 +181,6 @@ pub enum ZomesToInvoke {
 }
 
 pub trait Invocation: Clone {
-    /// Invocations can be externally driven (e.g. by a websockets client) or internally (e.g. from
-    /// a callback triggered by the subconscious in order to allow the conscious to provide
-    /// feedback. In some of these cases we allow side effects to be possible, such as committing a
-    /// new entry, which will in turn trigger other callbacks, such as validation, that must be
-    /// pure functions on the input data. For pure callbacks, HostFnAccess should have side_effects
-    /// set to Deny.
-    /// In the case that side_effects is set to Deny, any call to a host function with side effects
-    /// should be an unreachable!() error and halt execution. This is a panic because the happ
-    /// developer must avoid use of any host function calls that produce side effects while
-    /// implementing callbacks that must be pure.
-    /// Access to the reading the workspace (databases) and accessing agent information is handled
-    /// in the same way.
-    fn allowed_access(&self) -> HostFnAccess;
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
     /// zome in order for the Dna overall to successfully init.
@@ -167,7 +212,6 @@ pub trait Invocation: Clone {
 mockall::mock! {
     Invocation {}
     trait Invocation {
-        fn allowed_access(&self) -> HostFnAccess;
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<HostInput, SerializedBytesError>;
@@ -255,9 +299,6 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 }
 
 impl Invocation for ZomeCallInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::all()
-    }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome_name.to_owned())
     }
@@ -276,6 +317,25 @@ pub enum ZomeCallInvocationResponse {
     ZomeApiFn(GuestOutput),
 }
 
+#[derive(Clone, Constructor)]
+pub struct ZomeCallHostAccess {
+    pub workspace: UnsafeInvokeZomeWorkspace,
+    keystore: KeystoreSender,
+    network: HolochainP2pCell,
+}
+
+impl From<ZomeCallHostAccess> for HostAccess {
+    fn from(zome_call_host_access: ZomeCallHostAccess) -> Self {
+        Self::ZomeCall(zome_call_host_access)
+    }
+}
+
+impl From<&ZomeCallHostAccess> for HostFnAccess {
+    fn from(_: &ZomeCallHostAccess) -> Self {
+        Self::all()
+    }
+}
+
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
 #[automock]
@@ -286,7 +346,7 @@ pub trait RibosomeT: Sized {
 
     fn maybe_call<I: Invocation + 'static>(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        access: HostAccess,
         invocation: &I,
         zome_name: &ZomeName,
         to_call: String,
@@ -308,27 +368,31 @@ pub trait RibosomeT: Sized {
 
     fn run_init(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult>;
 
     fn run_migrate_agent(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        access: MigrateAgentHostAccess,
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult>;
 
-    fn run_entry_defs(&self, invocation: EntryDefsInvocation) -> RibosomeResult<EntryDefsResult>;
+    fn run_entry_defs(
+        &self,
+        access: EntryDefsHostAccess,
+        invocation: EntryDefsInvocation,
+    ) -> RibosomeResult<EntryDefsResult>;
 
     fn run_validation_package(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        access: ValidationPackageHostAccess,
         invocation: ValidationPackageInvocation,
     ) -> RibosomeResult<ValidationPackageResult>;
 
     fn run_post_commit(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult>;
 
@@ -337,13 +401,13 @@ pub trait RibosomeT: Sized {
     /// [`run_callback`]: #method.run_callback
     fn run_validate(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
+        access: HostAccess,
         ribosome: R,
         invocation: I,
     ) -> CallIterator<R, I>;
@@ -352,8 +416,7 @@ pub trait RibosomeT: Sized {
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
         &self,
-        workspace: UnsafeInvokeZomeWorkspace,
-        // TODO: ConductorHandle
+        access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse>;
 }
@@ -361,15 +424,7 @@ pub trait RibosomeT: Sized {
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeCallInvocationResponse;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
     use core::time::Duration;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::*;
-    use test_wasm_common::TestString;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -379,7 +434,7 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $unsafe_workspace:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
+        ( $host_access:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
@@ -407,7 +462,7 @@ pub mod wasm_test {
                 .next()
                 .unwrap();
                 let zome_invocation_response =
-                    match ribosome.call_zome_function($unsafe_workspace, invocation.clone()) {
+                    match ribosome.call_zome_function($host_access, invocation.clone()) {
                         Ok(v) => v,
                         Err(e) => {
                             dbg!("call_zome_function error", &invocation, &e);
@@ -442,6 +497,20 @@ pub mod wasm_test {
 
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::ZomeCallInvocationResponse;
+    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use holochain_serialized_bytes::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::*;
+    use test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     async fn warm_wasm_tests() {
@@ -458,9 +527,8 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn invoke_foo_test() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let host_access = ZomeCallHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -485,7 +553,9 @@ pub mod wasm_test {
             ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(
                 TestString::from(String::from("foo")).try_into().unwrap()
             )),
-            ribosome.call_zome_function(workspace, invocation).unwrap()
+            ribosome
+                .call_zome_function(host_access, invocation)
+                .unwrap()
         );
     }
 }

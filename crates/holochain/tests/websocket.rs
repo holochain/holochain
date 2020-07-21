@@ -9,10 +9,11 @@ use holochain::conductor::{
 };
 use holochain::core::ribosome::NamedInvocation;
 use holochain::core::ribosome::ZomeCallInvocationFixturator;
+use holochain_types::dna::DnaFile;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
-    dna::{DnaFile, JsonProperties},
+    dna::JsonProperties,
     observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
@@ -32,7 +33,7 @@ use tracing::*;
 use url2::prelude::*;
 use uuid::Uuid;
 
-fn spawn_output(holochain: &mut Child) {
+pub fn spawn_output(holochain: &mut Child) {
     let stdout = holochain.stdout.take();
     let stderr = holochain.stderr.take();
     tokio::task::spawn(async move {
@@ -53,7 +54,7 @@ fn spawn_output(holochain: &mut Child) {
     });
 }
 
-async fn check_started(holochain: &mut Child) {
+pub async fn check_started(holochain: &mut Child) {
     let started = tokio::time::timeout(std::time::Duration::from_secs(1), holochain).await;
     if let Ok(status) = started {
         panic!("Holochain failed to start. status: {:?}", status);
@@ -77,7 +78,7 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
     }
 }
 
-fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
+pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
     path.push("conductor_config.toml");
     std::fs::write(path.clone(), toml::to_string(&config).unwrap()).unwrap();
     path
@@ -94,7 +95,7 @@ async fn check_timeout<T>(
         Err(_) => {
             holochain.kill().unwrap();
             error!("Timeout");
-            panic!("Timed out on request");
+            panic!("Timed out on request after {}", timeout_millis);
         }
     }
 }
@@ -203,7 +204,7 @@ async fn call_admin() {
     holochain.kill().expect("Failed to kill holochain");
 }
 
-async fn start_holochain(config_path: PathBuf) -> Child {
+pub async fn start_holochain(config_path: PathBuf) -> Child {
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("--structured")
@@ -219,7 +220,7 @@ async fn start_holochain(config_path: PathBuf) -> Child {
     holochain
 }
 
-async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut Child) {
+pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut Child) {
     // Connect to App Interface
     let (mut app_interface, _) = websocket_client_by_port(app_port).await.unwrap();
 
@@ -241,7 +242,7 @@ async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut 
     );
     let request = AppRequest::ZomeCallInvocation(request);
     let response = app_interface.request(request);
-    let call_response = check_timeout(holochain, response, 10000).await;
+    let call_response = check_timeout(holochain, response, 3000).await;
     let foo = TestString::from(String::from("foo"));
     let expected = Box::new(GuestOutput::new(foo.try_into().unwrap()));
     trace!(?call_response);
@@ -252,7 +253,7 @@ async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut 
         .unwrap();
 }
 
-async fn attach_app_interface(client: &mut WebsocketSender, holochain: &mut Child) -> u16 {
+pub async fn attach_app_interface(client: &mut WebsocketSender, holochain: &mut Child) -> u16 {
     let request = AdminRequest::AttachAppInterface { port: None };
     let response = client.request(request);
     let response = check_timeout(holochain, response, 1000).await;
@@ -262,7 +263,11 @@ async fn attach_app_interface(client: &mut WebsocketSender, holochain: &mut Chil
     }
 }
 
-async fn retry_admin_interface(port: u16, mut attempts: usize, delay: Duration) -> WebsocketSender {
+pub async fn retry_admin_interface(
+    port: u16,
+    mut attempts: usize,
+    delay: Duration,
+) -> WebsocketSender {
     loop {
         match websocket_client_by_port(port).await {
             Ok(c) => return c.0,

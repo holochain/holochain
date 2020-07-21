@@ -1,9 +1,9 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::fixt::DnaDefFixturator;
-use crate::fixt::MigrateAgentFixturator;
-use fixt::prelude::*;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
@@ -29,20 +29,29 @@ impl MigrateAgentInvocation {
     }
 }
 
-fixturator!(
-    MigrateAgentInvocation;
-    constructor fn new(DnaDef, MigrateAgent);
-);
+#[derive(Clone, Constructor)]
+pub struct MigrateAgentHostAccess {
+    pub workspace: UnsafeInvokeZomeWorkspace,
+}
 
-impl Invocation for MigrateAgentInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        let mut access = HostFnAccess::none();
+impl From<MigrateAgentHostAccess> for HostAccess {
+    fn from(migrate_agent_host_access: MigrateAgentHostAccess) -> Self {
+        Self::MigrateAgent(migrate_agent_host_access)
+    }
+}
+
+impl From<&MigrateAgentHostAccess> for HostFnAccess {
+    fn from(_: &MigrateAgentHostAccess) -> Self {
+        let mut access = Self::none();
         // TODO: insert zome_name
-        access.non_determinism = Permission::Deny;
         access.read_workspace = Permission::Allow;
         access.agent_info = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         access
     }
+}
+
+impl Invocation for MigrateAgentInvocation {
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All
     }
@@ -100,30 +109,24 @@ impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::MigrateAgentInvocationFixturator;
     use super::MigrateAgentResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
-    use crate::fixt::curve::Zomes;
     use crate::fixt::MigrateAgentFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::MigrateAgentHostAccessFixturator;
+    use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::migrate_agent::MigrateAgent;
     use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
     use holochain_zome_types::HostInput;
-    use matches::assert_matches;
     use rand::prelude::*;
 
-    #[tokio::test(threaded_scheduler)]
-    async fn migrate_agent_callback_result_fold() {
+    #[test]
+    fn migrate_agent_callback_result_fold() {
         let mut rng = thread_rng();
 
         let result_pass = || MigrateAgentResult::Pass;
@@ -170,34 +173,36 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn migrate_agent_invocation_allow_side_effects() {
+    #[test]
+    fn migrate_agent_invocation_allow_side_effects() {
         use holochain_types::dna::zome::Permission::*;
-        let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
+        let migrate_agent_host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_matches!(
-            migrate_agent_invocation.allowed_access(),
+        assert_eq!(
+            HostFnAccess::from(&migrate_agent_host_access),
             HostFnAccess {
-                side_effects: Deny,
                 agent_info: Allow,
                 read_workspace: Allow,
+                write_workspace: Deny,
                 non_determinism: Deny,
-                conductor: Deny,
+                write_network: Deny,
+                dna_bindings: Allow,
+                keystore: Deny,
             }
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn migrate_agent_invocation_zomes() {
+    #[test]
+    fn migrate_agent_invocation_zomes() {
         let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(ZomesToInvoke::All, migrate_agent_invocation.zomes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn migrate_agent_invocation_fn_components() {
+    #[test]
+    fn migrate_agent_invocation_fn_components() {
         let mut migrate_agent_invocation =
             MigrateAgentInvocationFixturator::new(fixt::Unpredictable)
                 .next()
@@ -211,8 +216,8 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn migrate_agent_invocation_host_input() {
+    #[test]
+    fn migrate_agent_invocation_host_input() {
         let migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
@@ -227,11 +232,23 @@ mod test {
             ),
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::MigrateAgentResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::MigrateAgentHostAccessFixturator;
+    use crate::fixt::MigrateAgentInvocationFixturator;
+    use crate::fixt::WasmRibosomeFixturator;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_migrate_agent_unimplemented() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
@@ -243,15 +260,14 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(workspace, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_migrate_agent_implemented_pass() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
@@ -263,15 +279,14 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(workspace, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_migrate_agent_implemented_fail() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
@@ -283,7 +298,7 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(workspace, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(
             result,
@@ -292,9 +307,8 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_migrate_agent_multi_implemented_fail() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
+        let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![
@@ -309,7 +323,7 @@ mod test {
         migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
 
         let result = ribosome
-            .run_migrate_agent(workspace, migrate_agent_invocation)
+            .run_migrate_agent(host_access, migrate_agent_invocation)
             .unwrap();
         assert_eq!(
             result,
