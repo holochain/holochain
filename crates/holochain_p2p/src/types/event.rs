@@ -18,6 +18,16 @@ impl From<&actor::GetOptions> for GetOptions {
     }
 }
 
+/// GetMeta options help control how the get is processed at various levels.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetMetaOptions {}
+
+impl From<&actor::GetMetaOptions> for GetMetaOptions {
+    fn from(_a: &actor::GetMetaOptions) -> Self {
+        Self {}
+    }
+}
+
 /// GetLinks options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetLinksOptions {}
@@ -68,6 +78,14 @@ ghost_actor::ghost_chan! {
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
         ) -> WireElement;
+
+        /// A remote node is requesting metadata from us.
+        fn get_meta(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            dht_hash: holo_hash::AnyDhtHash,
+            options: GetMetaOptions,
+        ) -> MetadataSet;
 
         /// A remote node is requesting link data from us.
         fn get_links(
@@ -122,6 +140,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::Publish { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetValidationPackage { $i, .. } => { $($t)* }
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
+            HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::ListDhtOpHashes { $i, .. } => { $($t)* }

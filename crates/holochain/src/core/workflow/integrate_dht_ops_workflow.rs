@@ -301,13 +301,13 @@ impl Outcome {
 
 pub struct IntegrateDhtOpsWorkspace<'env> {
     // integration queue
-    integration_queue: IntegrationQueueStore<'env>,
+    pub integration_queue: IntegrationQueueStore<'env>,
     // integrated ops
-    integrated_dht_ops: IntegratedDhtOpsStore<'env>,
+    pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing
-    cas: ChainCasBuf<'env>,
+    pub cas: ChainCasBuf<'env>,
     // metadata store
-    meta: MetadataBuf<'env>,
+    pub meta: MetadataBuf<'env>,
 }
 
 impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {

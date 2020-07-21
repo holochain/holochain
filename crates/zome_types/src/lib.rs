@@ -36,6 +36,8 @@ pub mod zome;
 #[allow(missing_docs)]
 mod zome_io;
 
+pub mod request;
+
 pub use entry::Entry;
 use holochain_serialized_bytes::prelude::*;
 pub use zome_io::*;

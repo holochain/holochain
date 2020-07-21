@@ -24,6 +24,10 @@ pub(crate) enum WireMessage {
         dht_hash: holo_hash::AnyDhtHash,
         options: event::GetOptions,
     },
+    GetMeta {
+        dht_hash: holo_hash::AnyDhtHash,
+        options: event::GetMetaOptions,
+    },
     GetLinks {
         dht_hash: holo_hash::AnyDhtHash,
         options: event::GetLinksOptions,
@@ -76,6 +80,13 @@ impl WireMessage {
 
     pub fn get(dht_hash: holo_hash::AnyDhtHash, options: event::GetOptions) -> WireMessage {
         Self::Get { dht_hash, options }
+    }
+
+    pub fn get_meta(
+        dht_hash: holo_hash::AnyDhtHash,
+        options: event::GetMetaOptions,
+    ) -> WireMessage {
+        Self::GetMeta { dht_hash, options }
     }
 
     pub fn get_links(
