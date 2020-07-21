@@ -36,7 +36,6 @@ use holochain_zome_types::{
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
-use unwrap_to::unwrap_to;
 
 #[derive(Clone)]
 struct TestData {
@@ -1226,6 +1225,7 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::HostInput;
     use matches::assert_matches;
+    use unwrap_to::unwrap_to;
     use uuid::Uuid;
 
     // TODO: Document this test
