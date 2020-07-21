@@ -27,15 +27,7 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::fixt::EntryDefsHostAccessFixturator;
 use crate::fixt::HostInputFixturator;
-use crate::fixt::InitHostAccessFixturator;
-use crate::fixt::KeystoreSenderFixturator;
-use crate::fixt::MigrateAgentHostAccessFixturator;
-use crate::fixt::PostCommitHostAccessFixturator;
-use crate::fixt::UnsafeInvokeZomeWorkspaceFixturator;
-use crate::fixt::ValidateHostAccessFixturator;
-use crate::fixt::ValidationPackageHostAccessFixturator;
 use crate::fixt::ZomeNameFixturator;
 use derive_more::Constructor;
 use error::RibosomeResult;
@@ -48,7 +40,7 @@ use guest_callback::{
 use holo_hash::AgentPubKey;
 use holo_hash::AgentPubKeyFixturator;
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::{HolochainP2pCell, HolochainP2pCellFixturator};
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
 use holochain_types::cell::CellIdFixturator;

@@ -4,7 +4,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use fixt::prelude::*;
 use holo_hash::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
-use holochain::core::ribosome::{HostAccess, ZomeCallInvocation};
+use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::prelude::*;

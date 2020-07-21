@@ -2,7 +2,6 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::{HostAccess, ZomesToInvoke};
 use derive_more::Constructor;
-use fixt::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry_def::EntryDefs;

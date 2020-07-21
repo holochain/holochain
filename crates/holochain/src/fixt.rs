@@ -45,7 +45,6 @@ use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
-use std::sync::atomic::AtomicPtr;
 use std::sync::Arc;
 
 wasm_io_fixturator!(HostInput<SerializedBytes>);
