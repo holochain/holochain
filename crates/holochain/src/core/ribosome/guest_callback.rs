@@ -4,17 +4,17 @@ pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
 pub mod validation_package;
+use super::HostAccess;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use fallible_iterator::FallibleIterator;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
-    workspace: UnsafeInvokeZomeWorkspace,
+    host_access: HostAccess,
     ribosome: R,
     invocation: I,
     remaining_zomes: Vec<ZomeName>,
@@ -22,9 +22,9 @@ pub struct CallIterator<R: RibosomeT, I: Invocation> {
 }
 
 impl<R: RibosomeT, I: Invocation> CallIterator<R, I> {
-    pub fn new(workspace: UnsafeInvokeZomeWorkspace, ribosome: R, invocation: I) -> Self {
+    pub fn new(host_access: HostAccess, ribosome: R, invocation: I) -> Self {
         Self {
-            workspace,
+            host_access,
             remaining_zomes: ribosome.zomes_to_invoke(invocation.zomes()),
             ribosome,
             remaining_components: invocation.fn_components(),
@@ -45,7 +45,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                 match self.remaining_components.next() {
                     Some(to_call) => {
                         match self.ribosome.maybe_call(
-                            self.workspace.clone(),
+                            self.host_access.clone(),
                             &self.invocation,
                             zome_name,
                             to_call,
@@ -79,8 +79,8 @@ mod tests {
     use crate::core::ribosome::MockInvocation;
     use crate::core::ribosome::MockRibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
     use crate::fixt::FnComponentsFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::ZomeNameFixturator;
     use fallible_iterator::FallibleIterator;
     use holochain_zome_types::init::InitCallbackResult;
@@ -91,7 +91,6 @@ mod tests {
     use std::convert::TryInto;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn call_iterator_iterates() {
         // stuff we need to test with
         let mut sequence = Sequence::new();
@@ -99,7 +98,7 @@ mod tests {
 
         let mut invocation = MockInvocation::new();
 
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Empty)
+        let host_access = ZomeCallHostAccessFixturator::new(fixt::Empty)
             .next()
             .unwrap();
         let zome_name_fixturator = ZomeNameFixturator::new(fixt::Unpredictable);
@@ -153,7 +152,7 @@ mod tests {
                 .return_const(fn_components.clone());
         }
 
-        let call_iterator = CallIterator::new(workspace, ribosome, invocation);
+        let call_iterator = CallIterator::new(host_access.into(), ribosome, invocation);
 
         let output: Vec<(_, GuestOutput)> = call_iterator.collect().unwrap();
         assert_eq!(output.len(), zome_names.len() * fn_components.0.len());

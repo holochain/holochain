@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
-use crate::core::ribosome::HostContext;
+use crate::core::ribosome::CallContext;
 use holochain_crypto::crypto_init_sodium;
 use holochain_crypto::crypto_randombytes_buf;
 use holochain_crypto::crypto_secure_buffer;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<CallContext>,
     input: RandomBytesInput,
 ) -> RibosomeResult<RandomBytesOutput> {
     let _ = crypto_init_sodium();
@@ -32,9 +32,11 @@ pub fn random_bytes(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-    use crate::core::ribosome::HostContextFixturator;
     use crate::core::state::workspace::Workspace;
+    use crate::fixt::CallContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::RandomBytesInput;
@@ -48,7 +50,7 @@ pub mod wasm_test {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let host_context = HostContextFixturator::new(fixt::Unpredictable)
+        let host_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         const LEN: usize = 10;
@@ -74,8 +76,10 @@ pub mod wasm_test {
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
         const LEN: usize = 5;
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
         let output: RandomBytesOutput = crate::call_test_ribosome!(
-            raw_workspace,
+            host_access,
             TestWasm::Imports,
             "random_bytes",
             RandomBytesInput::new(5 as _)
