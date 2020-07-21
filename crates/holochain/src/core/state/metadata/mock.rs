@@ -41,10 +41,6 @@ mock! {
             &self,
             entry_hash: EntryHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
-        fn get_link_add_on_base(
-            &self,
-            link_base: EntryHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
         fn get_link_remove_on_link_add(
             &self,
             link_add: HeaderHash,
@@ -110,15 +106,6 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_deletes_on_entry(entry_hash)
     }
 
-    fn get_link_add_on_base(
-        &self,
-        link_base: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
-    {
-        self.get_link_add_on_base(link_base)
-    }
-
-    /// Get link removes on link adds
     fn get_link_remove_on_link_add(
         &self,
         link_add: HeaderHash,

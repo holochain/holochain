@@ -215,12 +215,6 @@ pub trait MetadataBufT {
     /// Finds the redirect path and returns the final [Header]
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
 
-    /// Get link add on base
-    fn get_link_add_on_base(
-        &self,
-        link_base: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
-
     /// Get link removes on link adds
     fn get_link_remove_on_link_add(
         &self,
@@ -240,8 +234,6 @@ pub enum SysMetaVal {
     Delete(HeaderHash),
     /// Activity on an agent's public key
     Activity(HeaderHash),
-    /// Link add on link base
-    LinkAdd(HeaderHash),
     /// Link remove on link add
     LinkRemove(HeaderHash),
 }
@@ -281,7 +273,6 @@ impl From<SysMetaVal> for HeaderHash {
             SysMetaVal::NewEntry(h)
             | SysMetaVal::Update(h)
             | SysMetaVal::Delete(h)
-            | SysMetaVal::LinkAdd(h)
             | SysMetaVal::LinkRemove(h)
             | SysMetaVal::Activity(h) => h,
         }
@@ -418,10 +409,6 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         let link_add_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
             .await?
             .into_hash();
-
-        let sys_val = SysMetaVal::LinkAdd(link_add_hash.clone());
-        self.system_meta
-            .insert(link_add.base_address.clone().into(), sys_val);
 
         // Put the link add to the links table
         let key = LinkMetaKey::from((&link_add, &link_add_hash));
@@ -596,22 +583,6 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     fn get_canonical_header_hash(&self, _header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {
         todo!()
-    }
-
-    /// Get link add on base
-    fn get_link_add_on_base(
-        &self,
-        link_base: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
-    {
-        Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(&link_base.into())?).filter_map(|h| {
-                Ok(match h {
-                    SysMetaVal::LinkAdd(h) => Some(h),
-                    _ => None,
-                })
-            }),
-        ))
     }
 
     /// Get link removes on link adds
