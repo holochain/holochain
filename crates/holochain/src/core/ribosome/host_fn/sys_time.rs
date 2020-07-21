@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub fn sys_time(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     _input: SysTimeInput,
 ) -> RibosomeResult<SysTimeOutput> {
     let start = std::time::SystemTime::now();

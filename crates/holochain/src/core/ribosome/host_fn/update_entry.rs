@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub fn update_entry(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     _input: UpdateEntryInput,
 ) -> RibosomeResult<UpdateEntryOutput> {
     unimplemented!();

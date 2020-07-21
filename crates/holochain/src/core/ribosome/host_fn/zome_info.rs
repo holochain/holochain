@@ -11,12 +11,12 @@ use std::sync::Arc;
 
 pub fn zome_info(
     ribosome: Arc<WasmRibosome>,
-    host_context: Arc<CallContext>,
+    call_context: Arc<CallContext>,
     _input: ZomeInfoInput,
 ) -> RibosomeResult<ZomeInfoOutput> {
     Ok(ZomeInfoOutput::new(ZomeInfo {
         dna_name: ribosome.dna_file().dna().name.clone(),
-        zome_name: host_context.zome_name.clone(),
+        zome_name: call_context.zome_name.clone(),
         dna_address: "".into(),                             // @TODO
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
         public_token: "".into(),                            // @TODO

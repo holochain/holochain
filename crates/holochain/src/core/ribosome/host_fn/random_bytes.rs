@@ -13,7 +13,7 @@ use std::sync::Arc;
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     input: RandomBytesInput,
 ) -> RibosomeResult<RandomBytesOutput> {
     let _ = crypto_init_sodium();
@@ -50,14 +50,14 @@ pub mod wasm_test {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let host_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         const LEN: usize = 10;
         let input = RandomBytesInput::new(LEN.try_into().unwrap());
 
         let output: RandomBytesOutput =
-            random_bytes(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
+            random_bytes(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         println!("{:?}", output);
 

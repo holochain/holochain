@@ -91,8 +91,8 @@ impl WasmRibosome {
         Self { dna_file }
     }
 
-    pub fn module(&self, host_context: CallContext) -> RibosomeResult<Module> {
-        let zome_name: ZomeName = host_context.zome_name();
+    pub fn module(&self, call_context: CallContext) -> RibosomeResult<Module> {
+        let zome_name: ZomeName = call_context.zome_name();
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         Ok(holochain_wasmer_host::instantiate::module(
             &self.wasm_cache_key(&zome_name)?,
@@ -108,10 +108,10 @@ impl WasmRibosome {
         Ok(self.dna_file.dna().get_zome(zome_name)?.wasm_hash.get_raw())
     }
 
-    pub fn instance(&self, host_context: CallContext) -> RibosomeResult<Instance> {
-        let zome_name: ZomeName = host_context.zome_name();
+    pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
+        let zome_name: ZomeName = call_context.zome_name();
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
-        let imports: ImportObject = Self::imports(self, host_context);
+        let imports: ImportObject = Self::imports(self, call_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
             self.wasm_cache_key(&zome_name)?,
             &wasm,
@@ -127,12 +127,12 @@ impl WasmRibosome {
 
         // it is important that WasmRibosome and ZomeCallInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
-        let host_context_arc = std::sync::Arc::new(call_context);
+        let call_context_arc = std::sync::Arc::new(call_context);
 
         macro_rules! invoke_host_function {
             ( $host_function:ident ) => {{
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
-                let closure_host_context_arc = std::sync::Arc::clone(&host_context_arc);
+                let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
                 move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
                     let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
@@ -143,7 +143,7 @@ impl WasmRibosome {
                     let output_sb: holochain_wasmer_host::prelude::SerializedBytes =
                         $host_function(
                             std::sync::Arc::clone(&closure_self_arc),
-                            std::sync::Arc::clone(&closure_host_context_arc),
+                            std::sync::Arc::clone(&closure_call_context_arc),
                             input,
                         )
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
@@ -322,19 +322,19 @@ impl RibosomeT for WasmRibosome {
         zome_name: &ZomeName,
         to_call: String,
     ) -> Result<Option<GuestOutput>, RibosomeError> {
-        let host_context = CallContext {
+        let call_context = CallContext {
             zome_name: zome_name.clone(),
             host_access,
         };
         let module_timeout = crate::start_hard_timeout!();
-        let module = self.module(host_context.clone())?;
+        let module = self.module(call_context.clone())?;
         crate::end_hard_timeout!(module_timeout, crate::perf::WASM_MODULE_CACHE_HIT);
 
         if module.info().exports.contains_key(&to_call) {
             // there is a callback to_call and it is implemented in the wasm
             // it is important to fully instantiate this (e.g. don't try to use the module above)
             // because it builds guards against memory leaks and handles imports correctly
-            let mut instance = self.instance(host_context)?;
+            let mut instance = self.instance(call_context)?;
 
             let call_timeout = crate::start_hard_timeout!();
             let result: GuestOutput = holochain_wasmer_host::guest::call(
