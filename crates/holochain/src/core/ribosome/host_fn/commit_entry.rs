@@ -117,6 +117,7 @@ pub mod wasm_test {
     };
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use holo_hash::HasHash;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;
