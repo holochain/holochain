@@ -37,7 +37,7 @@
 //!     (`dna_util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
 //! ```
 
-use holo_hash::HoloHashExt;
+use holo_hash_ext::HoloHashExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
 use holochain_zome_types::zome::ZomeName;
@@ -236,7 +236,7 @@ impl DnaDefJson {
             let zome_content = tokio::fs::read(zome_file_path).await?;
 
             let wasm: DnaWasm = zome_content.into();
-            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            let wasm_hash = holo_hash_ext::WasmHash::with_data(&wasm).await;
             zomes.push((zome_name.clone(), Zome { wasm_hash }));
             wasm_list.push(wasm);
         }

@@ -5,7 +5,7 @@ use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
-use holo_hash::DnaHash;
+use holo_hash_ext::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId, dna::DnaFile};
 use tracing::*;

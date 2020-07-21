@@ -1,5 +1,5 @@
 use crate::{HoloHashExt, HoloHashOf};
-use holo_hash_core::{HasHash, HashableContent, HoloHash};
+use holo_hash::{HasHash, HashableContent, HoloHash};
 use holochain_serialized_bytes::SerializedBytesError;
 
 /// Represents some piece of content along with its hash representation, so that

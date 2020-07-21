@@ -1,4 +1,4 @@
-use holo_hash::WasmHash;
+use holo_hash_ext::WasmHash;
 use holochain_state::buffer::{BufferedStore, CasBuf};
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
@@ -36,7 +36,7 @@ impl<'env> BufferedStore<'env> for WasmBuf<'env> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::HasHash;
+    use holo_hash_ext::HasHash;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(threaded_scheduler)]

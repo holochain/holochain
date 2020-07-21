@@ -1,6 +1,6 @@
 use crate::HoloHashOf;
 use futures::FutureExt;
-use holo_hash_core::{encode, HashableContent, HashableContentBytes, HoloHash, PrimitiveHashType};
+use holo_hash::{encode, HashableContent, HashableContentBytes, HoloHash, PrimitiveHashType};
 use must_future::MustBoxFuture;
 
 /// Extension trait for HoloHash, which allows instantiation with

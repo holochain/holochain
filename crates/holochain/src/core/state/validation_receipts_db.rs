@@ -1,7 +1,7 @@
 //! Module for items related to aggregating validation_receipts
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AgentPubKey, DhtOpHash};
+use holo_hash_ext::{AgentPubKey, DhtOpHash};
 use holochain_keystore::{AgentPubKeyExt, KeystoreSender, Signature};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{

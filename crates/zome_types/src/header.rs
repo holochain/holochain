@@ -1,4 +1,4 @@
-use holo_hash_core::HeaderHash;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]

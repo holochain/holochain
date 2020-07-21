@@ -7,13 +7,13 @@
 #![allow(missing_docs)]
 
 use crate::prelude::*;
-use holo_hash::{EntryHash, HeaderAddress};
+use holo_hash_ext::{EntryHash, HeaderAddress};
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::link::LinkTag;
 
 pub mod builder;
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
-use holo_hash_core::impl_hashable_content;
+use holo_hash::impl_hashable_content;
 
 /// Header contains variants for each type of header.
 ///

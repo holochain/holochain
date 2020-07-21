@@ -48,8 +48,8 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
-            dht_hash: holo_hash::AnyDhtHash,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            dht_hash: holo_hash_ext::AnyDhtHash,
+            ops: Vec<(holo_hash_ext::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         ) -> ();
 
         /// A remote node is requesting a validation package.
@@ -65,7 +65,7 @@ ghost_actor::ghost_chan! {
         fn get(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            dht_hash: holo_hash::AnyDhtHash,
+            dht_hash: holo_hash_ext::AnyDhtHash,
             options: GetOptions,
         ) -> SerializedBytes;
 
@@ -73,7 +73,7 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            dht_hash: holo_hash::AnyDhtHash,
+            dht_hash: holo_hash_ext::AnyDhtHash,
             options: GetLinksOptions,
         ) -> SerializedBytes;
 

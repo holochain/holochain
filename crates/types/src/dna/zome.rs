@@ -7,7 +7,7 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, SerializedBytes)]
 pub struct Zome {
     /// The WasmHash representing the WASM byte code for this zome.
-    pub wasm_hash: holo_hash_core::WasmHash,
+    pub wasm_hash: holo_hash::WasmHash,
 }
 
 /// Access a call has to host functions
@@ -39,8 +39,8 @@ pub enum Permission {
 }
 
 impl Zome {
-    /// create a Zome from a holo_hash WasmHash instead of a holo_hash_core one
-    pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
+    /// create a Zome from a holo_hash_ext WasmHash instead of a holo_hash one
+    pub fn from_hash(wasm_hash: holo_hash_ext::WasmHash) -> Self {
         Self { wasm_hash }
     }
 }

@@ -4,7 +4,7 @@
 //! cannot fail, so the function return types reflect that.
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::*;
+use holo_hash_ext::*;
 use holochain_state::{
     buffer::BufferedStore,
     db::GetDb,

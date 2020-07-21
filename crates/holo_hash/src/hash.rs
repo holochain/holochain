@@ -19,7 +19,7 @@ impl<T: HashType> HoloHash<T> {
     pub fn from_raw_bytes_and_type(hash: Vec<u8>, hash_type: T) -> Self {
         if hash.len() != 36 {
             panic!(
-                "invalid holo_hash byte count, expected: 36, found: {}. {:?}",
+                "invalid holo_hash_ext byte count, expected: 36, found: {}. {:?}",
                 hash.len(),
                 &hash
             );

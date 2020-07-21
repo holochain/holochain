@@ -193,7 +193,7 @@ pub mod slow_tests {
             let mut workspace =
                 crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            let foo_bar: holo_hash_core::EntryHash = {
+            let foo_bar: holo_hash::EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;
@@ -205,7 +205,7 @@ pub mod slow_tests {
                 )
             };
 
-            let foo_baz: holo_hash_core::EntryHash = {
+            let foo_baz: holo_hash::EntryHash = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;

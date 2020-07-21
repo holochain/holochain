@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use ::fixt::prelude::*;
-use holo_hash_core::{
+use holo_hash::{
     encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
     EntryContentHash, EntryHash, HeaderHash, NetIdHash, WasmHash,
 };

@@ -6,7 +6,7 @@ use crate::{
 };
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
-use holo_hash::{HasHash, HashableContent, HoloHashOf, HoloHashed};
+use holo_hash_ext::{HasHash, HashableContent, HoloHashOf, HoloHashed};
 use must_future::MustBoxFuture;
 
 /// A wrapper around a KvBuf where keys are always Addresses,

@@ -3,8 +3,8 @@
 use crate::{prelude::*, Header, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
-use holo_hash::HeaderAddress;
-use holo_hash_core::{hash_type, HashableContentBytes};
+use holo_hash::{hash_type, HashableContentBytes};
+use holo_hash_ext::HeaderAddress;
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -283,7 +283,7 @@ mod tests {
     use super::{SignedHeader, SignedHeaderHashed};
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holo_hash::{HasHash, HoloHashed};
+    use holo_hash_ext::{HasHash, HoloHashed};
 
     #[tokio::test(threaded_scheduler)]
     async fn test_signed_header_roundtrip() {

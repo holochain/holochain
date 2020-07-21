@@ -2,7 +2,7 @@
 //! can track its source chain and service network requests / responses.
 
 use ::fixt::prelude::*;
-use holo_hash::{
+use holo_hash_ext::{
     fixt::{AgentPubKeyFixturator, DnaHashFixturator},
     AgentPubKey, DnaHash,
 };

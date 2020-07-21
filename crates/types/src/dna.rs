@@ -9,8 +9,8 @@ pub mod zome;
 use crate::prelude::*;
 use derive_more::From;
 pub use error::DnaError;
-pub use holo_hash::*;
-use holo_hash_core::impl_hashable_content;
+use holo_hash::impl_hashable_content;
+pub use holo_hash_ext::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
@@ -67,7 +67,7 @@ pub type DnaDefHashed = HoloHashed<DnaDef>;
 impl_hashable_content!(DnaDef, Dna);
 
 /// Wasms need to be an ordered map from WasmHash to a DnaWasm
-pub type Wasms = BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm>;
+pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
 
 /// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
@@ -76,8 +76,8 @@ pub struct DnaFile {
     pub dna: DnaDef,
 
     /// The hash of `self.dna` converted through `SerializedBytes`.
-    /// (This can be a full holo_hash because we never send a `DnaFile` to Wasm.)
-    pub dna_hash: holo_hash::DnaHash,
+    /// (This can be a full holo_hash_ext because we never send a `DnaFile` to Wasm.)
+    pub dna_hash: holo_hash_ext::DnaHash,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
     pub code: Wasms,
@@ -100,10 +100,10 @@ impl DnaFile {
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            let wasm_hash = holo_hash_ext::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
-        let dna_hash = holo_hash::DnaHash::with_data(&dna).await;
+        let dna_hash = holo_hash_ext::DnaHash::with_data(&dna).await;
         Ok(Self {
             dna,
             dna_hash,
@@ -150,13 +150,13 @@ impl DnaFile {
     }
 
     /// The hash of the dna def
-    /// (this can be a full holo_hash because we never send a DnaFile to WASM)
-    pub fn dna_hash(&self) -> &holo_hash::DnaHash {
+    /// (this can be a full holo_hash_ext because we never send a DnaFile to WASM)
+    pub fn dna_hash(&self) -> &holo_hash_ext::DnaHash {
         &self.dna_hash
     }
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
-    pub fn code(&self) -> &BTreeMap<holo_hash_core::WasmHash, wasm::DnaWasm> {
+    pub fn code(&self) -> &BTreeMap<holo_hash::WasmHash, wasm::DnaWasm> {
         &self.code
     }
 

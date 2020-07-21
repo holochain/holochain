@@ -663,7 +663,7 @@ name = "dna_util"
 version = "0.0.1"
 dependencies = [
  "holo_hash",
- "holo_hash_core",
+ "holo_hash_ext",
  "holochain_serialized_bytes",
  "holochain_types",
  "holochain_zome_types",
@@ -1048,7 +1048,7 @@ name = "hdk3"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "holo_hash_core",
+ "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
  "serde",
@@ -1085,10 +1085,22 @@ version = "0.0.1"
 dependencies = [
  "base64 0.12.3",
  "blake2b_simd",
+ "holochain_serialized_bytes",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "holo_hash_ext"
+version = "0.0.1"
+dependencies = [
+ "base64 0.12.3",
+ "blake2b_simd",
  "derive_more",
  "fixt",
  "futures",
- "holo_hash_core",
+ "holo_hash",
  "holochain_serialized_bytes",
  "must_future",
  "rand 0.7.3",
@@ -1096,18 +1108,6 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "holo_hash_core"
-version = "0.0.1"
-dependencies = [
- "base64 0.12.3",
- "blake2b_simd",
- "holochain_serialized_bytes",
- "rmp-serde",
- "serde",
- "serde_bytes",
 ]
 
 [[package]]
@@ -1130,7 +1130,7 @@ dependencies = [
  "ghost_actor",
  "hdk3",
  "holo_hash",
- "holo_hash_core",
+ "holo_hash_ext",
  "holochain_crypto",
  "holochain_keystore",
  "holochain_legacy",
@@ -1194,7 +1194,7 @@ name = "holochain_keystore"
 version = "0.0.1"
 dependencies = [
  "ghost_actor",
- "holo_hash",
+ "holo_hash_ext",
  "holochain_crypto",
  "holochain_serialized_bytes",
  "serde",
@@ -1219,7 +1219,7 @@ dependencies = [
  "futures",
  "ghost_actor",
  "holo_hash",
- "holo_hash_core",
+ "holo_hash_ext",
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types",
@@ -1269,7 +1269,7 @@ dependencies = [
  "fixt",
  "futures",
  "holo_hash",
- "holo_hash_core",
+ "holo_hash_ext",
  "holochain_crypto",
  "holochain_keystore",
  "holochain_types",
@@ -1303,7 +1303,7 @@ dependencies = [
  "flate2",
  "futures",
  "holo_hash",
- "holo_hash_core",
+ "holo_hash_ext",
  "holochain_crypto",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -1337,7 +1337,7 @@ name = "holochain_wasm_test_utils"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "holo_hash",
+ "holo_hash_ext",
  "holochain_types",
  "holochain_zome_types",
  "rand 0.7.3",
@@ -1407,7 +1407,7 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.1"
 dependencies = [
- "holo_hash_core",
+ "holo_hash",
  "holochain_serialized_bytes",
  "multihash",
  "nanoid",

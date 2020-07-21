@@ -10,7 +10,7 @@ pub struct CapClaim;
 pub struct CapGrant;
 pub struct ZomePosition;
 
-mod holo_hash {
+mod holo_hash_ext {
     pub struct Hash;
 }
 
@@ -121,7 +121,7 @@ impl Header {
     pub fn timestamp() -> Timestamp {
         unimplemented!()
     }
-    pub fn hash() -> holo_hash::Hash {
+    pub fn hash() -> holo_hash_ext::Hash {
         unimplemented!() // hash of header!!
     }
     pub fn prev_header(&self) -> Option<&HeaderHash> {

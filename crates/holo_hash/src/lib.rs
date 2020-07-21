@@ -1,30 +1,25 @@
-//! Everything associated with constructing hashes from content:
-//! - The HoloHashed type which pairs content with hash
-//! - Extension traits for actually constructing HoloHashes from content
+//! Defines HoloHashOf and its various HashTypes
 
 #![deny(missing_docs)]
 
-mod ext;
-pub mod fixt;
-mod hashed;
-pub use ext::*;
-pub use hashed::*;
-mod tests;
+mod aliases;
+pub mod error;
+mod has_hash;
+mod hash;
+pub mod hash_type;
+mod hashable_content;
+mod ser;
+// mod serialize_hash_type;
+pub use aliases::*;
+pub use has_hash::HasHash;
+pub use hash::*;
+pub use hash_type::{HashType, PrimitiveHashType};
+pub use hashable_content::*;
 
-/// Common exports
-pub mod prelude {
-    pub use super::*;
-    pub use holo_hash_core::HasHash;
-}
+/// By default, disable string encoding and just display raw bytes
+#[cfg(not(feature = "string-encoding"))]
+pub mod encode_raw;
 
-pub use holo_hash_core::HoloHash;
-
-/// A convenience type, for specifying a hash by HashableContent rather than
-/// by its HashType
-pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
-
-// re-export hash types
-pub use holo_hash_core::{
-    AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash, EntryContentHash, EntryHash, HasHash,
-    HashableContent, HeaderAddress, HeaderHash, NetIdHash, WasmHash,
-};
+/// Include nice string encoding methods and From impls
+#[cfg(feature = "string-encoding")]
+pub mod encode;

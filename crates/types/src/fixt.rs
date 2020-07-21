@@ -23,14 +23,14 @@ use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::Timestamp;
 use ::fixt::prelude::*;
-use holo_hash::fixt::AgentPubKeyFixturator;
-use holo_hash::fixt::DnaHashFixturator;
+use holo_hash_ext::fixt::AgentPubKeyFixturator;
+use holo_hash_ext::fixt::DnaHashFixturator;
 
-use holo_hash::fixt::EntryHashFixturator;
-use holo_hash::fixt::HeaderHashFixturator;
-use holo_hash::fixt::WasmHashFixturator;
+use holo_hash_ext::fixt::EntryHashFixturator;
+use holo_hash_ext::fixt::HeaderHashFixturator;
+use holo_hash_ext::fixt::WasmHashFixturator;
 
-use holo_hash_core::EntryHash;
+use holo_hash::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::capability::CapAccess;
@@ -396,7 +396,7 @@ pub struct KnownLinkAdd {
 }
 
 pub struct KnownLinkRemove {
-    pub link_add_address: holo_hash::HeaderHash,
+    pub link_add_address: holo_hash_ext::HeaderHash,
 }
 
 impl Iterator for LinkAddFixturator<KnownLinkAdd> {

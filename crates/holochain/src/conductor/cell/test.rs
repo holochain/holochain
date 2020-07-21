@@ -5,7 +5,7 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
+use holo_hash_ext::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_state::{
     env::ReadManager,

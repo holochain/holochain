@@ -42,7 +42,7 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
-use holo_hash_core::{EntryHash, HeaderAddress};
+use holo_hash::{EntryHash, HeaderAddress};
 use holochain_state::error::DatabaseResult;
 use holochain_types::{element::SignedHeaderHashed, EntryHashed};
 use tracing::*;

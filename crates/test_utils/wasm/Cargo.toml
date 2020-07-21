@@ -11,7 +11,7 @@ path = "./src/lib.rs"
 
 [dependencies]
 fixt = { path = "../../fixt" }
-holo_hash = { path = "../../holo_hash" }
+holo_hash_ext = { path = "../../holo_hash_ext" }
 holochain_types = { path = "../../types" }
 holochain_zome_types = { path = "../../zome_types" }
 rand = "0.7"

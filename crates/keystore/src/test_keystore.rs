@@ -2,7 +2,7 @@
 
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
-use holo_hash::prelude::*;
+use holo_hash_ext::prelude::*;
 use holochain_crypto::*;
 use std::collections::HashMap;
 
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// The private keys have not been handled securely!
 pub struct MockKeypair {
     /// The agent public key.
-    pub pub_key: holo_hash::AgentPubKey,
+    pub pub_key: holo_hash_ext::AgentPubKey,
 
     /// The private secret key DANGER - this is not handled securely!!
     pub sec_key: Vec<u8>,
@@ -43,7 +43,7 @@ ghost_actor::ghost_chan! {
     chan TestKeystoreInternal<KeystoreError> {
         /// we have generated a keypair, now track it
         fn finalize_new_keypair(
-            pub_key: holo_hash::AgentPubKey,
+            pub_key: holo_hash_ext::AgentPubKey,
             priv_key: PrivateKey,
         ) -> ();
     }
@@ -53,7 +53,7 @@ ghost_actor::ghost_chan! {
 struct TestKeystore {
     internal_sender: ghost_actor::GhostSender<TestKeystoreInternal>,
     fixture_keypairs: Vec<MockKeypair>,
-    active_keypairs: HashMap<holo_hash::AgentPubKey, PrivateKey>,
+    active_keypairs: HashMap<holo_hash_ext::AgentPubKey, PrivateKey>,
 }
 
 impl TestKeystore {
@@ -64,7 +64,7 @@ impl TestKeystore {
         Self {
             internal_sender,
             fixture_keypairs,
-            active_keypairs: HashMap::<holo_hash::AgentPubKey, _>::new(),
+            active_keypairs: HashMap::<holo_hash_ext::AgentPubKey, _>::new(),
         }
     }
 }
@@ -76,7 +76,7 @@ impl ghost_actor::GhostHandler<TestKeystoreInternal> for TestKeystore {}
 impl TestKeystoreInternalHandler for TestKeystore {
     fn handle_finalize_new_keypair(
         &mut self,
-        pub_key: holo_hash::AgentPubKey,
+        pub_key: holo_hash_ext::AgentPubKey,
         priv_key: PrivateKey,
     ) -> TestKeystoreInternalHandlerResult<()> {
         self.active_keypairs.insert(pub_key, priv_key);
@@ -89,7 +89,7 @@ impl ghost_actor::GhostHandler<KeystoreApi> for TestKeystore {}
 impl KeystoreApiHandler for TestKeystore {
     fn handle_generate_sign_keypair_from_pure_entropy(
         &mut self,
-    ) -> KeystoreApiHandlerResult<holo_hash::AgentPubKey> {
+    ) -> KeystoreApiHandlerResult<holo_hash_ext::AgentPubKey> {
         if !self.fixture_keypairs.is_empty() {
             let MockKeypair { pub_key, sec_key } = self.fixture_keypairs.remove(0);
             // we're loading this out of insecure memory - but this is just a mock
@@ -101,7 +101,7 @@ impl KeystoreApiHandler for TestKeystore {
         Ok(async move {
             let (pub_key, sec_key) = crypto_sign_keypair(None).await?;
             let pub_key = pub_key.read().to_vec();
-            let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key);
+            let agent_pubkey = holo_hash_ext::AgentPubKey::with_pre_hashed(pub_key);
             let sec_key = PrivateKey(sec_key);
             i_s.finalize_new_keypair(agent_pubkey.clone(), sec_key)
                 .await?;
@@ -111,7 +111,9 @@ impl KeystoreApiHandler for TestKeystore {
         .into())
     }
 
-    fn handle_list_sign_keys(&mut self) -> KeystoreApiHandlerResult<Vec<holo_hash::AgentPubKey>> {
+    fn handle_list_sign_keys(
+        &mut self,
+    ) -> KeystoreApiHandlerResult<Vec<holo_hash_ext::AgentPubKey>> {
         let keys = self.active_keypairs.keys().cloned().collect();
         Ok(async move { Ok(keys) }.boxed().into())
     }
@@ -140,7 +142,7 @@ mod tests {
     fn fixture_keypairs() -> Vec<MockKeypair> {
         vec![
             MockKeypair {
-                pub_key: holo_hash::AgentPubKey::try_from(
+                pub_key: holo_hash_ext::AgentPubKey::try_from(
                     "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
                 )
                 .unwrap(),
@@ -152,7 +154,7 @@ mod tests {
                 ],
             },
             MockKeypair {
-                pub_key: holo_hash::AgentPubKey::try_from(
+                pub_key: holo_hash_ext::AgentPubKey::try_from(
                     "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
                 )
                 .unwrap(),
@@ -169,7 +171,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_test_keystore_can_supply_fixture_keys() {
         let _ = crypto_init_sodium();
-        use holo_hash::AgentPubKey;
+        use holo_hash_ext::AgentPubKey;
         tokio::task::spawn(async move {
             let keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
 
@@ -208,7 +210,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_test_keystore_can_sign_and_validate_data() {
         let _ = crypto_init_sodium();
-        use holo_hash::AgentPubKey;
+        use holo_hash_ext::AgentPubKey;
         tokio::task::spawn(async move {
             let keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
 

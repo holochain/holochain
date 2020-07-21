@@ -1,7 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
-use holo_hash::HasHash;
+use holo_hash_ext::HasHash;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryHashInput;
 use holochain_zome_types::EntryHashOutput;
@@ -33,7 +33,7 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holo_hash::EntryHash;
+    use holo_hash_ext::EntryHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;

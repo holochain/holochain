@@ -5,7 +5,7 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use holo_hash::*;
+use holo_hash_ext::*;
 pub use holochain_zome_types::entry::Entry;
 
 /// An Entry paired with its EntryHash

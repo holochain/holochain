@@ -22,7 +22,7 @@ use crate::core::{
     },
 };
 use fallible_iterator::FallibleIterator;
-use holo_hash::*;
+use holo_hash_ext::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::KvBuf,
@@ -166,7 +166,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holo_hash::fixt::*;
+    use holo_hash_ext::fixt::*;
     use holochain_p2p::{
         actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
         spawn_holochain_p2p,

@@ -6,7 +6,7 @@ use crate::conductor::api::error::ConductorApiResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
-use holo_hash::DnaHash;
+use holo_hash_ext::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::dna::DnaFile;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId};

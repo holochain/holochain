@@ -1,7 +1,7 @@
 use crate::core::state::chain_cas::ChainCasBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use header::{IntendedFor, NewEntryHeader};
-use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash_ext::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::Signature;
 use holochain_types::{dht_op::DhtOp, header, Header};
 use holochain_zome_types::entry_def::EntryVisibility;

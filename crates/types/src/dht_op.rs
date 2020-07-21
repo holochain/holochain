@@ -8,7 +8,7 @@ use crate::element::ChainElement;
 use crate::{header, prelude::*, Header};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
-use holo_hash_core::{hash_type, HashableContentBytes};
+use holo_hash::{hash_type, HashableContentBytes};
 use holochain_zome_types::Entry;
 use serde::{Deserialize, Serialize};
 

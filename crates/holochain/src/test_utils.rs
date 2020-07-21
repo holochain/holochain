@@ -1,4 +1,4 @@
-use holo_hash::*;
+use holo_hash_ext::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{

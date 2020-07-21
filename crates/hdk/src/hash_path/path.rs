@@ -280,7 +280,7 @@ impl Path {
     }
 
     /// what is the hash for the current Path
-    pub fn hash(&self) -> Result<holo_hash_core::EntryHash, WasmError> {
+    pub fn hash(&self) -> Result<holo_hash::EntryHash, WasmError> {
         Ok(entry_hash!(self)?)
     }
 
