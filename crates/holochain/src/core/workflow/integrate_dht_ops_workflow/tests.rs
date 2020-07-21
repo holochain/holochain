@@ -12,7 +12,6 @@ use crate::{
         workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
     },
     fixt::*,
-    test_utils::test_network,
 };
 use fixt::prelude::*;
 use holo_hash::{Hashable, Hashed, HeaderHash};
@@ -1242,6 +1241,10 @@ async fn test_integrate_single_register_remove_link() {
 mod slow_tests {
 
     use super::*;
+    use crate::{
+        core::state::cascade::{test_dbs_and_mocks, Cascade},
+        test_utils::test_network,
+    };
 
     // TODO: Document this test
     // TODO: Use the wasm calls directly instead of setting the databases to
@@ -1409,7 +1412,7 @@ mod slow_tests {
 
             let (cas, _metadata, mut cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
             let (_n, _r, cell_network) = test_network().await;
-            let cascade = Cascade::new(&cas, &mut meta, &cache, &metadata_cache);
+            let cascade = Cascade::new(&cas, &meta, &mut cache, &metadata_cache, cell_network);
 
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();

@@ -35,11 +35,12 @@ pub fn get_links<'a>(
         None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
     };
 
+    // Get the network from the context
+    let network = call_context.host_access.network().clone();
+
     let call =
         |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<LinkMetaVal>>> {
             async move {
-                // TODO: Get the network from the context
-                let network = todo!("Get the nework");
                 let cascade = workspace.cascade(network);
 
                 // Create the key

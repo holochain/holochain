@@ -19,11 +19,13 @@ pub fn get_entry<'a>(
 ) -> RibosomeResult<GetEntryOutput> {
     let (hash, _options) = input.into_inner();
     let cascade_hash = hash.try_into()?;
+
+    // Get the network from the context
+    let network = call_context.host_access.network().clone();
+
     let call =
         |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
-                // TODO: Get the network from the context
-                let network = todo!("Get the nework");
                 let cascade = workspace.cascade(network);
                 // safe block on
                 let maybe_entry = cascade

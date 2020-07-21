@@ -42,6 +42,7 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
+use error::CascadeResult;
 use holo_hash::Hashable;
 use holochain_p2p::{actor::GetOptions, HolochainP2pCell};
 use holochain_serialized_bytes::prelude::*;
@@ -57,6 +58,8 @@ use tracing::*;
 mod network_tests;
 #[cfg(test)]
 mod test;
+
+mod error;
 
 // TODO: Remove this when holohash refactor PR lands
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
@@ -117,30 +120,36 @@ where
         }
     }
 
+    // TODO: Remove when used
+    #[allow(dead_code)]
     async fn fetch_element(
         &mut self,
         hash: AnyDhtHash,
         options: GetOptions,
-    ) -> DatabaseResult<Option<ChainElement>> {
-        // TODO: Handle error
-        let elements = self.network.get(hash, options).await.unwrap();
+    ) -> CascadeResult<Option<ChainElement>> {
+        let elements = self.network.get(hash, options).await?;
+
         // TODO: handle case of multiple elements returned
+        // Get the first returned element
         let element = match elements.into_iter().next() {
             Some(bytes) => {
-                // TODO: Handle error
-                let element = PlaceholderGetReturn::try_from(bytes).unwrap();
+                // Deserialize to type and hash
+                let element = PlaceholderGetReturn::try_from(bytes)?;
                 let (header, signature) = element.signed_header.into();
-                // TODO: Handle error
                 let header = HeaderHashed::with_data(header).await?;
-
-                // TODO: Does this verify the signature?
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+
+                // Create element
                 let element = ChainElement::new(signed_header, element.entry);
                 let (signed_header, maybe_entry) = element.clone().into_inner();
+
+                // Hash entry
                 let entry = match maybe_entry {
                     Some(entry) => Some(EntryHashed::with_data(entry).await?),
                     None => None,
                 };
+
+                // Put in element cache
                 self.cache.put(signed_header, entry)?;
                 Some(element)
             }

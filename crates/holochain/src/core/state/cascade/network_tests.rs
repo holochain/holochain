@@ -3,17 +3,13 @@ use crate::test_utils::test_network;
 use fixt::prelude::*;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
-use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashed, HeaderHash};
-use holochain_p2p::{
-    actor::{HolochainP2pRefToCell, HolochainP2pSender},
-    spawn_holochain_p2p, HolochainP2pCell, HolochainP2pRef,
-};
-use holochain_serialized_bytes::prelude::*;
+use hdk3::prelude::EntryVisibility;
+use holo_hash::*;
+use holochain_p2p::{HolochainP2pCell, HolochainP2pRef};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    composite_hash::AnyDhtHash,
-    element::{ChainElement, SignedHeader},
-    Entry,
+    composite_hash::AnyDhtHash, element::ChainElement, fixt::*, header::EntryType, observability,
+    Header,
 };
 use std::collections::BTreeMap;
 use tokio::{sync::oneshot, task::JoinHandle};
@@ -21,13 +17,14 @@ use unwrap_to::unwrap_to;
 
 #[tokio::test(threaded_scheduler)]
 async fn get_updates_cache() {
+    observability::test_run().ok();
     // Database setup
     let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     let reader = env_ref.reader().unwrap();
 
-    let fixt_store = generate_fixt_store();
+    let fixt_store = generate_fixt_store().await;
     let expected = fixt_store
         .iter()
         .next()
@@ -116,6 +113,7 @@ async fn run_fixt_network(
                 futures::future::select(killed.next(), recv.next()).await
             {
                 use holochain_p2p::event::HolochainP2pEvent::*;
+                debug!(?evt);
                 match evt {
                     Get {
                         dht_hash, respond, ..
@@ -150,6 +148,25 @@ async fn run_fixt_network(
     )
 }
 
-fn generate_fixt_store() -> BTreeMap<HeaderHash, ChainElement> {
-    todo!()
+async fn generate_fixt_store() -> BTreeMap<HeaderHash, ChainElement> {
+    let mut store = BTreeMap::new();
+    let entry = fixt!(Entry);
+    let entry_hash = EntryHashed::with_data(entry.clone())
+        .await
+        .unwrap()
+        .into_hash();
+    let mut element_create = fixt!(EntryCreate);
+    let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
+        .map(EntryType::App)
+        .next()
+        .unwrap();
+    element_create.entry_type = entry_type;
+    element_create.entry_hash = entry_hash;
+    let header = HeaderHashed::with_data(Header::EntryCreate(element_create))
+        .await
+        .unwrap();
+    let hash = header.as_hash().clone();
+    let signed_header = SignedHeaderHashed::with_presigned(header, fixt!(Signature));
+    store.insert(hash, ChainElement::new(signed_header, Some(entry)));
+    store
 }

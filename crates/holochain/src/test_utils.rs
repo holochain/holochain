@@ -53,8 +53,11 @@ pub async fn fake_unique_element(
 pub async fn test_network() -> (HolochainP2pRef, HolochainP2pEventReceiver, HolochainP2pCell) {
     let (network, recv) = spawn_holochain_p2p().await.unwrap();
     let dna = fixt!(DnaHash);
-    let agent_key = fixt!(AgentPubKey);
+    let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
+    let agent_key = key_fixt.next().unwrap();
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
-    network.join(dna, agent_key).await.unwrap();
+    network.join(dna.clone(), agent_key).await.unwrap();
+    // TODO: Network seems to require a minimum of two agents to function
+    network.join(dna, key_fixt.next().unwrap()).await.unwrap();
     (network, recv, cell_network)
 }
