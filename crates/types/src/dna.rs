@@ -48,7 +48,6 @@ pub struct DnaDef {
 impl DnaDef {
     /// Calculate DnaHash for DnaDef
     pub async fn dna_hash(&self) -> DnaHash {
-        let _sb: SerializedBytes = self.try_into().expect("failed to hash DnaDef");
         DnaHash::with_data(self).await
     }
 

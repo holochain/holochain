@@ -106,7 +106,7 @@ macro_rules! primitive_hash_type {
             {
                 match v {
                     $prefix => Ok($name),
-                    _ => panic!("noo"),
+                    _ => panic!("unknown hash prefix during hash deserialization {:?}", v),
                 }
             }
         }

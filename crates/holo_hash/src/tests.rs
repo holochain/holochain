@@ -165,33 +165,3 @@ async fn agent_id_loc() {
     .await
     .unwrap();
 }
-
-// #[test]
-// fn test_generic_content_roundtrip() {
-//     use std::collections::HashMap;
-
-//     #[derive(Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-//     struct Generic<K, V>(HashMap<K, V>)
-//     where
-//         K: Hash + Eq;
-
-//     impl<K, V> Generic<K, V>
-//     where
-//         K: Hash + Eq,
-//         V: Serialize + DeserializeOwned + std::fmt::Debug,
-//     {
-//         fn new() -> Self {
-//             Self(Default::default())
-//         }
-
-//         fn get(&self, k: &K) -> Option<V> {
-//             self.0.get(k)
-//         }
-
-//         fn put(&mut self, k: K, v: V) {
-//             self.0.insert(k, v)
-//         }
-//     }
-
-//     let g: Generic<HeaderHash, TestHeader> = Generic::new();
-// }
