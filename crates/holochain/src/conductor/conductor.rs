@@ -625,7 +625,7 @@ where
 
 // -- TODO - delete this helper when we have a real keystore -- //
 
-async fn delete_me_create_test_keystore() -> KeystoreSender {
+pub(crate) async fn delete_me_create_test_keystore() -> KeystoreSender {
     use std::convert::TryFrom;
     let keystore = spawn_test_keystore(vec![
         MockKeypair {

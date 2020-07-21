@@ -1,9 +1,9 @@
 use super::error::{WorkflowError, WorkflowResult};
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::core::ribosome::guest_callback::validate::{ValidateHostAccess, ValidateResult};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
-use crate::core::ribosome::{error::RibosomeResult, RibosomeT};
+use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
 use crate::core::{
@@ -15,6 +15,8 @@ use crate::core::{
     sys_validate_element,
 };
 use fallible_iterator::FallibleIterator;
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
 use holochain_types::element::ChainElement;
 use std::sync::Arc;
@@ -34,11 +36,13 @@ pub struct InvokeZomeWorkflowArgs<Ribosome: RibosomeT> {
 // TODO: #[instrument]
 pub async fn invoke_zome_workflow<'env, Ribosome: RibosomeT>(
     mut workspace: InvokeZomeWorkspace<'env>,
+    network: HolochainP2pCell,
+    keystore: KeystoreSender,
     writer: OneshotWriter,
     args: InvokeZomeWorkflowArgs<Ribosome>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
-    let result = invoke_zome_workflow_inner(&mut workspace, args).await?;
+    let result = invoke_zome_workflow_inner(&mut workspace, network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -54,6 +58,8 @@ pub async fn invoke_zome_workflow<'env, Ribosome: RibosomeT>(
 
 async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     workspace: &mut InvokeZomeWorkspace<'env>,
+    network: HolochainP2pCell,
+    keystore: KeystoreSender,
     args: InvokeZomeWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let InvokeZomeWorkflowArgs {
@@ -72,7 +78,8 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(workspace);
-        ribosome.call_zome_function(raw_workspace, invocation)
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        ribosome.call_zome_function(host_access, invocation)
     };
     tracing::trace!(line = line!());
 
@@ -122,9 +129,8 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     for chain_element in to_app_validate {
         match chain_element.entry() {
             holochain_types::element::ChainElementEntry::Present(entry) => {
-                let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(workspace);
                 let validate: ValidateResult = ribosome.run_validate(
-                    raw_workspace,
+                    ValidateHostAccess,
                     ValidateInvocation {
                         zome_name: zome_name.clone(),
                         entry: Arc::new(entry.clone()),
@@ -205,6 +211,9 @@ pub mod tests {
         ribosome::MockRibosomeT,
         workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
+    use crate::fixt::KeystoreSenderFixturator;
+    use fixt::prelude::*;
+    use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
@@ -224,11 +233,13 @@ pub mod tests {
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
     ) -> WorkflowResult<ZomeCallInvocationResult> {
+        let keystore = fixt!(KeystoreSender);
+        let network = fixt!(HolochainP2pCell);
         let args = InvokeZomeWorkflowArgs {
             invocation,
             ribosome,
         };
-        invoke_zome_workflow_inner(workspace, args).await
+        invoke_zome_workflow_inner(workspace, network, keystore, args).await
     }
 
     // 1.  Check if there is a Capability token secret in the parameters.

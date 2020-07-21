@@ -1,13 +1,13 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
-use crate::core::ribosome::HostContext;
+use crate::core::ribosome::CallContext;
 use holochain_zome_types::SysTimeInput;
 use holochain_zome_types::SysTimeOutput;
 use std::sync::Arc;
 
 pub fn sys_time(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<CallContext>,
     _input: SysTimeInput,
 ) -> RibosomeResult<SysTimeOutput> {
     let start = std::time::SystemTime::now();
@@ -21,6 +21,8 @@ pub fn sys_time(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::core::state::workspace::Workspace;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::{SysTimeInput, SysTimeOutput};
@@ -35,8 +37,10 @@ pub mod wasm_test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
         let _: SysTimeOutput = crate::call_test_ribosome!(
-            raw_workspace,
+            host_access,
             TestWasm::Imports,
             "sys_time",
             SysTimeInput::new(())
