@@ -3,9 +3,6 @@ use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::fixt::HeaderHashesFixturator;
-use crate::fixt::ZomeNameFixturator;
-use ::fixt::prelude::*;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
@@ -103,9 +100,7 @@ mod test {
     use crate::fixt::HeaderHashesFixturator;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::HeaderHashFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::post_commit::PostCommitCallbackResult;
@@ -217,7 +212,7 @@ mod slow_tests {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use holo_hash::HeaderHashFixturator;
+    use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

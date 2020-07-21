@@ -3,8 +3,6 @@ use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use crate::fixt::DnaDefFixturator;
-use ::fixt::prelude::*;
 use derive_more::Constructor;
 use holo_hash::EntryContentHash;
 use holochain_keystore::KeystoreSender;

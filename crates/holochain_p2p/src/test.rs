@@ -1,7 +1,7 @@
 use crate::actor::HolochainP2pRefToCell;
 use crate::HolochainP2pCell;
 use fixt::prelude::*;
-use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator};
+use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 
 fixturator!(
     HolochainP2pCell;

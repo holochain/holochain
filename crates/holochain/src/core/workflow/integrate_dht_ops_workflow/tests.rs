@@ -22,7 +22,6 @@ use holochain_state::{
     test_utils::test_cell_env,
 };
 use holochain_types::{
-    app::{InstallAppDnaPayload, InstallAppPayload},
     dht_op::{DhtOp, DhtOpHashed},
     fixt::*,
     header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader},
@@ -814,9 +813,7 @@ async fn commit_entry<'env>(
         .expect_run_entry_defs()
         .returning(move |_, _| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
 
-    let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
     call_context.zome_name = zome_name.clone();
 
     // Collect the entry from the pre-state to commit
@@ -865,9 +862,7 @@ async fn get_entry<'env>(
     // This is a lot faster then compiling a zome
     let ribosome = MockRibosomeT::new();
 
-    let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
     let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));
 
@@ -907,9 +902,7 @@ async fn link_entries<'env>(
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_file().return_const(dna_file);
 
-    let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
     call_context.zome_name = zome_name.clone();
 
     // Call link_entries
@@ -959,9 +952,7 @@ async fn get_links<'env>(
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_file().return_const(dna_file);
 
-    let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
-        .next()
-        .unwrap();
+    let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
     call_context.zome_name = zome_name.clone();
 
     // Call get links
@@ -1212,6 +1203,13 @@ async fn test_integrate_single_register_remove_link() {
 mod slow_tests {
 
     use super::*;
+    use crate::conductor::{
+        api::{
+            AdminInterfaceApi, AdminRequest, AdminResponse, AppInterfaceApi, AppRequest,
+            RealAdminInterfaceApi, RealAppInterfaceApi,
+        },
+        ConductorBuilder,
+    };
     use crate::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
     use holochain_state::{
         buffer::BufferedStore,
@@ -1220,7 +1218,6 @@ mod slow_tests {
     };
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload},
-        fixt::*,
         header::{builder, EntryType},
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
@@ -1231,83 +1228,15 @@ mod slow_tests {
     use matches::assert_matches;
     use uuid::Uuid;
 
+    // TODO: Document this test
+    // TODO: Use the wasm calls directly instead of setting the databases to
+    // a state
+    // Integration
+    #[tokio::test(threaded_scheduler)]
+    async fn commit_entry_add_link() {
+        observability::test_run().ok();
 
-// TODO: Document this test
-// TODO: Use the wasm calls directly instead of setting the databases to
-// a state
-// Integration
-#[tokio::test(threaded_scheduler)]
-async fn commit_entry_add_link() {
-
-    observability::test_run().ok();
-
-    observability::test_run().ok();
-    let test_env = test_conductor_env();
-    let _tmpdir = test_env.tmpdir.clone();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-    let conductor = ConductorBuilder::new()
-        .test(test_env, wasm_env)
-        .await
-        .unwrap();
-    let shutdown = conductor.take_shutdown_handle().await.unwrap();
-    let interface = RealAdminInterfaceApi::new(conductor.clone());
-    let app_interface = RealAppInterfaceApi::new(conductor.clone());
-
-    // Create dna
-    let uuid = Uuid::new_v4();
-    let dna = fake_dna_zomes(
-        &uuid.to_string(),
-        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-    );
-
-    // Install Dna
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
-    let agent_key = fake_agent_pubkey_1();
-    let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        app_id: "test".to_string(),
-        agent_key: agent_key.clone(),
-    };
-    let request = AdminRequest::InstallApp(Box::new(payload));
-    let r = interface.handle_admin_request(request).await;
-    debug!(?r);
-    let installed_app = unwrap_to!(r => AdminResponse::AppInstalled).clone();
-
-    let cell_id = installed_app.cell_data[0].as_id().clone();
-    // Activate app
-    let request = AdminRequest::ActivateApp {
-        app_id: installed_app.app_id,
-    };
-    let r = interface.handle_admin_request(request).await;
-    assert_matches!(r, AdminResponse::AppActivated);
-
-    let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
-
-    let base_entry = entry_fixt.next().unwrap();
-    let base_entry_hash = EntryHashed::from_content(base_entry.clone())
-        .await
-        .into_hash();
-    let target_entry = entry_fixt.next().unwrap();
-    let target_entry_hash = EntryHashed::from_content(target_entry.clone())
-        .await
-        .into_hash();
-    // Put commit entry into source chain
-    {
-        let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-        let dbs = cell_env.dbs().await;
-        let env_ref = cell_env.guard().await;
-
-        let reader = env_ref.reader().unwrap();
-        let mut sc = SourceChain::new(&reader, &dbs).unwrap();
-
-        let header_builder = builder::EntryCreate {
-            entry_type: EntryType::App(fixt!(AppEntryType)),
-            entry_hash: base_entry_hash.clone(),
-        };
+        observability::test_run().ok();
         let test_env = test_conductor_env();
         let _tmpdir = test_env.tmpdir.clone();
         let TestEnvironment {
@@ -1354,14 +1283,12 @@ async fn commit_entry_add_link() {
         let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
 
         let base_entry = entry_fixt.next().unwrap();
-        let base_entry_hash = EntryHashed::with_data(base_entry.clone())
+        let base_entry_hash = EntryHashed::from_content(base_entry.clone())
             .await
-            .unwrap()
             .into_hash();
         let target_entry = entry_fixt.next().unwrap();
-        let target_entry_hash = EntryHashed::with_data(target_entry.clone())
+        let target_entry_hash = EntryHashed::from_content(target_entry.clone())
             .await
-            .unwrap()
             .into_hash();
         // Put commit entry into source chain
         {

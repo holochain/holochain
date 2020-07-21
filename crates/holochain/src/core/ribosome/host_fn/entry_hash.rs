@@ -1,7 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
-use crate::core::ribosome::HostContext;
 use holo_hash::HasHash;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryHashInput;

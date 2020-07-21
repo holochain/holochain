@@ -28,7 +28,6 @@ use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
-use holochain_types::composite_hash::EntryHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
