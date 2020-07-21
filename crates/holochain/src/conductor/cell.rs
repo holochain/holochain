@@ -473,6 +473,7 @@ impl Cell {
         self.check_or_run_zome_init().await?;
 
         let arc = self.state_env();
+        let keystore = arc.keystore().clone();
         let env = arc.guard().await;
         let reader = env.reader()?;
         let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
@@ -483,6 +484,8 @@ impl Cell {
         };
         Ok(invoke_zome_workflow(
             workspace,
+            self.holochain_p2p_cell.clone(),
+            keystore,
             self.state_env().clone().into(),
             args,
             self.queue_triggers.produce_dht_ops.clone(),
@@ -495,6 +498,7 @@ impl Cell {
     async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // If not run it
         let state_env = self.state_env.clone();
+        let keystore = state_env.keystore().clone();
         let id = self.id.clone();
         let conductor_api = self.conductor_api.clone();
         let env_ref = state_env.guard().await;
@@ -523,9 +527,15 @@ impl Cell {
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
-        let init_result = initialize_zomes_workflow(workspace, state_env.clone().into(), args)
-            .await
-            .map_err(Box::new)?;
+        let init_result = initialize_zomes_workflow(
+            workspace,
+            self.holochain_p2p_cell.clone(),
+            keystore,
+            state_env.clone().into(),
+            args,
+        )
+        .await
+        .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
             InitResult::Pass => (),

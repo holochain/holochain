@@ -1,5 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use holo_hash::HasHash;
 use holochain_zome_types::Entry;
@@ -9,7 +10,7 @@ use std::sync::Arc;
 
 pub fn entry_hash(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<HostContext>,
+    _host_context: Arc<CallContext>,
     input: EntryHashInput,
 ) -> RibosomeResult<EntryHashOutput> {
     let entry: Entry = input.into_inner();
@@ -27,10 +28,12 @@ pub fn entry_hash(
 pub mod wasm_test {
     use super::*;
     use crate::core::ribosome::host_fn::entry_hash::entry_hash;
-    use crate::core::ribosome::HostContextFixturator;
     use crate::core::state::workspace::Workspace;
+    use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
     use holo_hash::EntryHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
@@ -46,7 +49,7 @@ pub mod wasm_test {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let host_context = HostContextFixturator::new(fixt::Unpredictable)
+        let host_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
@@ -71,8 +74,10 @@ pub mod wasm_test {
 
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = EntryHashInput::new(entry);
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
         let output: EntryHashOutput =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::Imports, "entry_hash", input);
+            crate::call_test_ribosome!(host_access, TestWasm::Imports, "entry_hash", input);
         assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
     }
 
@@ -87,9 +92,11 @@ pub mod wasm_test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
         let input = TestString::from("foo.bar".to_string());
         let output: EntryHash =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::HashPath, "hash", input);
+            crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
 
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 

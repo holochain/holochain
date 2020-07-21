@@ -32,28 +32,6 @@ pub struct UnsafeInvokeZomeWorkspace {
     workspace: std::sync::Weak<tokio::sync::RwLock<AtomicPtr<std::ffi::c_void>>>,
 }
 
-fixturator!(
-    UnsafeInvokeZomeWorkspace;
-    curve Empty {
-        let fake_ptr = std::ptr::NonNull::<std::ffi::c_void>::dangling().as_ptr();
-        let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(fake_ptr)));
-        let workspace = Arc::downgrade(&guard);
-        // Make sure the weak Arc cannot be upgraded
-        std::mem::drop(guard);
-        UnsafeInvokeZomeWorkspace { workspace }
-    };
-    curve Unpredictable {
-        UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
-            .next()
-            .unwrap()
-    };
-    curve Predictable {
-        UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
-            .next()
-            .unwrap()
-    };
-);
-
 // TODO: SAFETY: Tie the guard to the lmdb `'env` lifetime.
 /// If this guard is dropped the underlying
 /// ptr cannot be used.
