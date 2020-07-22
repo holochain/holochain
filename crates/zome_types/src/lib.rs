@@ -10,6 +10,8 @@
 #![deny(missing_docs)]
 
 pub mod bytes;
+#[allow(missing_docs)]
+pub mod call_remote;
 pub mod capability;
 #[allow(missing_docs)]
 pub mod crdt;
@@ -29,8 +31,6 @@ pub mod link;
 pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod post_commit;
-#[allow(missing_docs)]
-pub mod remote_call;
 #[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]

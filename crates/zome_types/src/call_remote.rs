@@ -5,7 +5,7 @@ use holo_hash_core::DnaHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct RemoteCall {
+pub struct CallRemote {
     dna_hash: DnaHash,
     to_agent: AgentPubKey,
     zome_name: ZomeName,
@@ -14,7 +14,7 @@ pub struct RemoteCall {
     request: SerializedBytes,
 }
 
-impl RemoteCall {
+impl CallRemote {
     pub fn dna_hash(&self) -> DnaHash {
         self.dna_hash.clone()
     }

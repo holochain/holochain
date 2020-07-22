@@ -23,6 +23,7 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
 use crate::core::ribosome::host_fn::call::call;
+use crate::core::ribosome::host_fn::call_remote::call_remote;
 use crate::core::ribosome::host_fn::capability::capability;
 use crate::core::ribosome::host_fn::commit_entry::commit_entry;
 use crate::core::ribosome::host_fn::debug::debug;
@@ -37,7 +38,6 @@ use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::remote_call::remote_call;
 use crate::core::ribosome::host_fn::remove_entry::remove_entry;
 use crate::core::ribosome::host_fn::remove_link::remove_link;
 use crate::core::ribosome::host_fn::schedule::schedule;
@@ -242,7 +242,9 @@ impl WasmRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__remote_call", func!(invoke_host_function!(remote_call)));
+            ns.insert("__call_remote", func!(invoke_host_function!(call_remote)));
+        } else {
+            ns.insert("__call_remote", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {

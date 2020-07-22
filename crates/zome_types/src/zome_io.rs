@@ -62,8 +62,8 @@ wasm_io_types!(
     pub struct RandomBytesInput(u32);
     pub struct RandomBytesOutput(crate::bytes::Bytes);
     // @TODO
-    pub struct RemoteCallInput(crate::remote_call::RemoteCall);
-    pub struct RemoteCallOutput(SerializedBytes);
+    pub struct CallRemoteInput(crate::call_remote::CallRemote);
+    pub struct CallRemoteOutput(SerializedBytes);
     // @TODO
     pub struct RemoveLinkInput(());
     pub struct RemoveLinkOutput(());
