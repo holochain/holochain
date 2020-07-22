@@ -48,10 +48,10 @@ pub mod tests {
         prelude::*,
         test_utils::test_cell_env,
     };
-    use holochain_types::prelude::*;
+    use holochain_types::{prelude::*, test_utils::fake_header_hash};
 
     pub struct TestWorkspace<'env> {
-        one: KvBuf<'env, EntryContentHash, u32, Reader<'env>>,
+        one: KvBuf<'env, HeaderHash, u32, Reader<'env>>,
         two: KvBuf<'env, String, bool, Reader<'env>>,
     }
 
@@ -74,7 +74,7 @@ pub mod tests {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
-        let addr1 = EntryContentHash::with_data("hello".as_bytes().to_vec()).await;
+        let addr1 = fake_header_hash(1);
         let addr2 = "hi".to_string();
         {
             let reader = env.reader()?;

@@ -6,10 +6,10 @@ use crate::core::{
 };
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holochain_types::{composite_hash::HeaderAddress, header::builder};
+use holo_hash_core::HeaderAddress;
+use holochain_types::header::builder;
 use holochain_zome_types::LinkEntriesInput;
 use holochain_zome_types::LinkEntriesOutput;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -19,8 +19,6 @@ pub fn link_entries<'a>(
     input: LinkEntriesInput,
 ) -> RibosomeResult<LinkEntriesOutput> {
     let (base_address, target_address, tag) = input.into_inner();
-    let base_address = base_address.try_into()?;
-    let target_address = target_address.try_into()?;
 
     // extract the zome position
     let zome_id: holochain_types::header::ZomeId = match ribosome
@@ -45,7 +43,7 @@ pub fn link_entries<'a>(
         }
         .boxed()
     };
-    let link_hash =
+    let header_hash =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
             unsafe { call_context.host_access.workspace().apply_mut(call).await }
         }))???;
@@ -54,5 +52,5 @@ pub fn link_entries<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(LinkEntriesOutput::new(link_hash.into()))
+    Ok(LinkEntriesOutput::new(header_hash))
 }

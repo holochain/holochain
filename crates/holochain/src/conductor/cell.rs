@@ -325,7 +325,7 @@ impl Cell {
         &self,
         from_agent: AgentPubKey,
         _request_validation_receipt: bool,
-        _dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        _dht_hash: holo_hash_core::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         if from_agent == *self.id().agent_pubkey() {
@@ -392,7 +392,7 @@ impl Cell {
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
-        _dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        _dht_hash: holo_hash_core::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
     ) -> CellResult<SerializedBytes> {
         unimplemented!()
@@ -401,7 +401,7 @@ impl Cell {
     /// a remote node is asking us for links
     async fn handle_get_links(
         &self,
-        _dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        _dht_hash: holo_hash_core::AnyDhtHash,
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<SerializedBytes> {
         tracing::warn!("handle get links is unimplemented");

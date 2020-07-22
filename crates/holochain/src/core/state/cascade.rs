@@ -43,15 +43,14 @@ use super::{
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
 use error::CascadeResult;
-use holo_hash::Hashable;
 use holochain_p2p::{actor::GetOptions, HolochainP2pCell};
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
     element::{ChainElement, SignedHeader, SignedHeaderHashed},
     Entry, EntryHashed, HeaderHashed,
 };
+use holo_hash_core::{EntryHash, HeaderAddress, AnyDhtHash};
+use holochain_state::error::DatabaseResult;
 use tracing::*;
 
 #[cfg(test)]

@@ -54,7 +54,6 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
-use holo_hash_core::HoloHashCoreHash;
 use holochain_types::dna::DnaError;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},

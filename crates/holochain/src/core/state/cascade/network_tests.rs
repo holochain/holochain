@@ -1,19 +1,16 @@
 use super::*;
 use crate::test_utils::test_network;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
 use holo_hash::*;
+use holo_hash_core::hash_type::{self, AnyDht};
 use holochain_p2p::{HolochainP2pCell, HolochainP2pRef};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-use holochain_types::{
-    composite_hash::AnyDhtHash, element::ChainElement, fixt::*, header::EntryType, observability,
-    Header,
-};
+use holochain_types::{element::ChainElement, fixt::*, header::EntryType, observability, Header};
 use std::collections::BTreeMap;
 use tokio::{sync::oneshot, task::JoinHandle};
-use unwrap_to::unwrap_to;
 
 #[tokio::test(threaded_scheduler)]
 async fn get_updates_cache() {
@@ -118,14 +115,18 @@ async fn run_fixt_network(
                     Get {
                         dht_hash, respond, ..
                     } => {
-                        let dht_hash = unwrap_to!(dht_hash => AnyDhtHash::Header);
+                        let dht_hash = match dht_hash.hash_type() {
+                            AnyDht::Header => dht_hash.retype(hash_type::Header),
+                            _ => unreachable!(),
+                        };
+
                         let chain_element = fixt_store
-                            .get(dht_hash)
+                            .get(&dht_hash)
                             .cloned()
                             .map(|element| {
                                 let (header, entry) = element.into_inner();
                                 let val = PlaceholderGetReturn {
-                                    signed_header: header.into_content(),
+                                    signed_header: header.as_content().clone(),
                                     entry,
                                 };
                                 val.try_into().unwrap()

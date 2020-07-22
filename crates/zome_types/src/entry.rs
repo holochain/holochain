@@ -8,7 +8,7 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
-use holo_hash_core::AgentPubKey;
+use holo_hash_core::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 
 /// The data type written to the source chain when explicitly granting a capability.
@@ -58,6 +58,30 @@ impl Entry {
         match self {
             Entry::CapClaim(claim) => Some(claim),
             _ => None,
+        }
+    }
+}
+
+impl HashableContent for Entry {
+    type HashType = hash_type::Entry;
+
+    fn hash_type(&self) -> Self::HashType {
+        match self {
+            Entry::Agent(_) => hash_type::Entry::Agent,
+            _ => hash_type::Entry::Content,
+        }
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        match self {
+            Entry::Agent(agent_pubkey) => {
+                HashableContentBytes::Prehashed36(agent_pubkey.clone().into_inner())
+            }
+            entry => HashableContentBytes::Content(
+                entry
+                    .try_into()
+                    .expect("Could not serialize HashableContent"),
+            ),
         }
     }
 }

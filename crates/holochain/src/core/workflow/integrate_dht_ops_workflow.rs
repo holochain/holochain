@@ -15,7 +15,7 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{Hashable, Hashed};
+use holo_hash::HasHash;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
@@ -57,7 +57,7 @@ pub async fn integrate_dht_ops_workflow(
                         op,
                         validation_status,
                     } = val;
-                    let (op, op_hash) = DhtOpHashed::with_data(op).await.into_inner();
+                    let (op, op_hash) = DhtOpHashed::from_content(op).await.into_inner();
                     (
                         op_hash,
                         IntegrationQueueValue {

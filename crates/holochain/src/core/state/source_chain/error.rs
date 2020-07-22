@@ -1,9 +1,7 @@
+use holo_hash_core::{EntryHash, HeaderAddress};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
-use holochain_types::{
-    composite_hash::{EntryHash, HeaderAddress},
-    dht_op::error::DhtOpError,
-};
+use holochain_types::dht_op::error::DhtOpError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

@@ -107,9 +107,7 @@ impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
                             // failure anywhere overrides unresolved deps
                             Self::Fail(_) => acc,
                             // unresolved deps overrides anything other than failure
-                            _ => Self::UnresolvedDependencies(
-                                ud.into_iter().map(|h| h.into()).collect(),
-                            ),
+                            _ => Self::UnresolvedDependencies(ud.into_iter().collect()),
                         }
                     }
                     ValidationPackageCallbackResult::Success(package) => match acc {

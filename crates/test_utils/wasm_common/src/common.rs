@@ -44,11 +44,6 @@ pub struct MaybeAnchor(pub Option<Anchor>);
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[repr(transparent)]
 #[serde(transparent)]
-pub struct Hashes(pub Vec<HoloHashCore>);
-
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[repr(transparent)]
-#[serde(transparent)]
 pub struct LinkTags(pub Vec<LinkTag>);
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]

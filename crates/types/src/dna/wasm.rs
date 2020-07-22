@@ -2,7 +2,8 @@
 //!  - within the in-memory dna struct
 //!  - and serialized to json
 use backtrace::Backtrace;
-use holo_hash::HoloHashExt;
+use holo_hash::prelude::*;
+use holo_hash_core::{hash_type, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 use serde::{self, Deserialize, Serialize};
 use std::{
@@ -19,11 +20,22 @@ pub struct DnaWasm {
     pub code: Arc<Vec<u8>>,
 }
 
-holo_hash::make_hashed! {
-    Visibility(pub),
-    HashedName(DnaWasmHashed),
-    ContentType(DnaWasm),
-    HashType(holo_hash::WasmHash),
+/// A DnaWasm paired with its WasmHash
+pub type DnaWasmHashed = HoloHashed<DnaWasm>;
+
+impl HashableContent for DnaWasm {
+    type HashType = hash_type::Wasm;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::Wasm
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            self.try_into()
+                .expect("Could not serialize HashableContent"),
+        )
+    }
 }
 
 impl TryFrom<&DnaWasm> for SerializedBytes {

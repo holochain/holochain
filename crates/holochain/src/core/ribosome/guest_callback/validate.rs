@@ -102,7 +102,7 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
                 // return unresolved dependencies if it's otherwise valid
                 ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Invalid(_) => acc,
-                    _ => Self::UnresolvedDependencies(ud.into_iter().map(|h| h.into()).collect()),
+                    _ => Self::UnresolvedDependencies(ud),
                 },
                 // valid x allows validation to continue
                 ValidateCallbackResult::Valid => acc,
@@ -120,8 +120,8 @@ mod test {
     use crate::fixt::ValidateHostAccessFixturator;
     use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
-    use fixt::prelude::*;
-    use holo_hash::AgentPubKeyFixturator;
+    use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
     use holochain_zome_types::entry::Entry;
@@ -271,8 +271,7 @@ mod slow_tests {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holo_hash::AgentPubKeyFixturator;
-    use holo_hash_core::HoloHashCoreHash;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::Entry;

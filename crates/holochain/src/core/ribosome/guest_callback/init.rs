@@ -88,10 +88,7 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
                 // unresolved deps overrides pass but not fail
                 InitCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Fail(_, _) => acc,
-                    _ => Self::UnresolvedDependencies(
-                        zome_name,
-                        ud.into_iter().map(|h| h.into()).collect(),
-                    ),
+                    _ => Self::UnresolvedDependencies(zome_name, ud.into_iter().collect()),
                 },
                 // passing callback allows the acc to carry forward
                 InitCallbackResult::Pass => acc,

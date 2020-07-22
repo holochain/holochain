@@ -1,4 +1,4 @@
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holochain::core::state::{
     cascade::Cascade,
     chain_cas::ChainCasBuf,
@@ -25,7 +25,7 @@ fn fixtures() -> (
     Header,
     EntryHashed,
 ) {
-    let previous_header = fake_header_hash("previous");
+    let previous_header = fake_header_hash(1);
 
     let jimbo_id = fake_agent_pubkey_1();
     let jessy_id = fake_agent_pubkey_2();

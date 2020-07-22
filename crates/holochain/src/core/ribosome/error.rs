@@ -53,10 +53,6 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    HoloHashError(#[from] holo_hash::HoloHashError),
-
-    /// ident
-    #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
 
     /// ident

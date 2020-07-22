@@ -1,6 +1,6 @@
 /// this is in a separate crate from the fixt crate to show that we've addressed the orphan rule
 /// and other issues e.g. pub/private data
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct MyNewType(bool);

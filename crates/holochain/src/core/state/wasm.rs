@@ -3,9 +3,9 @@ use holochain_state::buffer::{BufferedStore, CasBuf};
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
 use holochain_state::transaction::{Reader, Writer};
-use holochain_types::dna::wasm::DnaWasmHashed;
+use holochain_types::dna::wasm::{DnaWasm, DnaWasmHashed};
 
-pub type WasmCas<'env> = CasBuf<'env, DnaWasmHashed>;
+pub type WasmCas<'env> = CasBuf<'env, DnaWasm>;
 
 /// This is where wasm lives
 pub struct WasmBuf<'env>(WasmCas<'env>);
@@ -36,7 +36,7 @@ impl<'env> BufferedStore<'env> for WasmBuf<'env> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::{Hashable, Hashed};
+    use holo_hash::HasHash;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(threaded_scheduler)]
