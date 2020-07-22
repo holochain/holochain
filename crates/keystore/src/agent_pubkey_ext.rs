@@ -64,7 +64,6 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
         use ghost_actor::dependencies::futures::future::FutureExt;
-        use holo_hash::HoloHashCoreHash;
 
         let result: KeystoreApiResult<(
             holochain_crypto::DynCryptoBytes,
@@ -91,7 +90,6 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
 
     fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool> {
         use ghost_actor::dependencies::futures::future::FutureExt;
-        use holo_hash::HoloHashCoreHash;
 
         let result: KeystoreApiResult<(
             holochain_crypto::DynCryptoBytes,

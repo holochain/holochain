@@ -5,8 +5,8 @@ use crate::{
     error::DatabaseError,
     test_utils::test_cell_env,
 };
+use ::fixt::prelude::*;
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
-use fixt::prelude::*;
 use rkv::StoreOptions;
 use std::collections::BTreeMap;
 use tracing::*;

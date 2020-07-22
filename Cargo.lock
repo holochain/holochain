@@ -1085,14 +1085,15 @@ version = "0.0.1"
 dependencies = [
  "base64 0.12.3",
  "blake2b_simd",
+ "derive_more",
  "fixt",
  "futures",
  "holo_hash_core",
  "holochain_serialized_bytes",
  "must_future",
  "rand 0.7.3",
+ "rmp-serde",
  "serde",
- "serde_bytes",
  "thiserror",
  "tokio",
 ]
@@ -1101,7 +1102,10 @@ dependencies = [
 name = "holo_hash_core"
 version = "0.0.1"
 dependencies = [
+ "base64 0.12.3",
+ "blake2b_simd",
  "holochain_serialized_bytes",
+ "rmp-serde",
  "serde",
  "serde_bytes",
 ]
@@ -1215,6 +1219,7 @@ dependencies = [
  "futures",
  "ghost_actor",
  "holo_hash",
+ "holo_hash_core",
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_types",
@@ -1309,6 +1314,7 @@ dependencies = [
  "nanoid",
  "rand 0.7.3",
  "regex",
+ "rmp-serde",
  "rust-base58",
  "serde",
  "serde_bytes",

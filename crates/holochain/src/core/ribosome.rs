@@ -29,16 +29,16 @@ use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
+use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
-use fixt::prelude::*;
 use guest_callback::{
     entry_defs::EntryDefsHostAccess, init::InitHostAccess, migrate_agent::MigrateAgentHostAccess,
     post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
     validation_package::ValidationPackageHostAccess,
 };
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::AgentPubKey;
-use holo_hash::AgentPubKeyFixturator;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;

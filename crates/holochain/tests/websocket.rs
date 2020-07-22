@@ -9,11 +9,9 @@ use holochain::conductor::{
 };
 use holochain::core::ribosome::NamedInvocation;
 use holochain::core::ribosome::ZomeCallInvocationFixturator;
-use holochain_types::dna::DnaFile;
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
-    dna::JsonProperties,
     observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
@@ -31,7 +29,6 @@ use tokio::process::{Child, Command};
 use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
-use uuid::Uuid;
 
 pub fn spawn_output(holochain: &mut Child) {
     let stdout = holochain.stdout.take();
@@ -137,7 +134,7 @@ async fn call_admin() {
     let config = create_config(port, environment_path);
     let config_path = write_config(path, &config);
 
-    let uuid = Uuid::new_v4();
+    let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
         &uuid.to_string(),
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
@@ -161,7 +158,7 @@ async fn call_admin() {
     let original_dna_hash = dna.dna_hash().clone();
 
     // Make properties
-    let properties: JsonProperties = serde_json::json!({
+    let properties: holochain_types::dna::JsonProperties = serde_json::json!({
         "test": "example",
         "how_many": 42,
     })
@@ -194,7 +191,9 @@ async fn call_admin() {
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna().clone();
     tmp_dna.properties = properties.try_into().unwrap();
-    let dna = DnaFile::new(tmp_dna, tmp_wasm).await.unwrap();
+    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
+        .await
+        .unwrap();
 
     assert_ne!(&original_dna_hash, dna.dna_hash());
 
@@ -305,7 +304,7 @@ async fn call_zome() {
 
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
 
-    let uuid = Uuid::new_v4();
+    let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
         &uuid.to_string(),
         vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],

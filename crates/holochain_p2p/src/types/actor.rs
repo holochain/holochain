@@ -104,7 +104,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
-            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            dht_hash: holo_hash::AnyDhtHash,
             ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
             timeout_ms: Option<u64>,
         ) -> ();
@@ -116,7 +116,7 @@ ghost_actor::ghost_chan! {
         fn get(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
         ) -> Vec<SerializedBytes>;
 
@@ -124,7 +124,7 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            dht_hash: holochain_types::composite_hash::AnyDhtHash,
+            dht_hash: holo_hash::AnyDhtHash,
             options: GetLinksOptions,
         ) -> Vec<SerializedBytes>;
 

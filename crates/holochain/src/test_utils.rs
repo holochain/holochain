@@ -32,7 +32,7 @@ pub async fn fake_unique_element(
         author: agent_key,
         timestamp: Timestamp::now(),
         header_seq: 0,
-        prev_header: fake_header_hash("1"),
+        prev_header: fake_header_hash(1),
 
         entry_type: EntryType::App(app_entry_type),
         entry_hash: entry.as_hash().to_owned(),

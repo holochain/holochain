@@ -8,6 +8,7 @@ use crate::element::ChainElement;
 use crate::{header, prelude::*, Header};
 use error::{DhtOpError, DhtOpResult};
 use header::NewEntryHeader;
+use holo_hash_core::{hash_type, HashableContentBytes};
 use holochain_zome_types::Entry;
 use serde::{Deserialize, Serialize};
 
@@ -97,6 +98,7 @@ impl DhtOp {
     }
 }
 
+// FIXME: need to use this in HashableContent
 #[derive(Serialize)]
 enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
@@ -117,7 +119,7 @@ pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
 
     let (signed_header, maybe_entry) = element.clone().into_inner();
     let (header, sig) = signed_header.into_header_and_signature();
-    let (header, _): (Header, _) = header.into();
+    let header: Header = header.into_content();
 
     // TODO: avoid allocation, we have a static maximum of four items and
     // callers simply want to iterate over the ops.
@@ -188,18 +190,21 @@ impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
     }
 }
 
-make_hashed_base! {
-    Visibility(pub),
-    HashedName(DhtOpHashed),
-    ContentType(DhtOp),
-    HashType(DhtOpHash),
-}
+/// A DhtOp paired with its DhtOpHash
+pub type DhtOpHashed = HoloHashed<DhtOp>;
 
-impl DhtOpHashed {
-    /// Create a hashed [DhtOp]
-    pub async fn with_data(op: DhtOp) -> Self {
-        let sb = SerializedBytes::try_from(&op.as_unique_form())
-            .expect("`UniqueForm` must be serializable into MessagePack");
-        DhtOpHashed::with_pre_hashed(op, DhtOpHash::with_data(UnsafeBytes::from(sb).into()).await)
+impl HashableContent for DhtOp {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            (&self.as_unique_form())
+                .try_into()
+                .expect("Could not serialize HashableContent"),
+        )
     }
 }

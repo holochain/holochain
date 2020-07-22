@@ -20,15 +20,14 @@ use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::state::metadata::LinkMetaVal;
 use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
-use fixt::prelude::*;
-use holo_hash::DnaHashFixturator;
-use holo_hash::HeaderHashFixturator;
+use ::fixt::prelude::*;
+pub use holo_hash::fixt::*;
+use holo_hash::EntryHash;
 use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
-use holochain_types::composite_hash::EntryHash;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
@@ -108,7 +107,7 @@ fixturator!(
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
-                    async { WasmHash::with_data(wasm.code().to_vec()).await },
+                    async { WasmHash::with_data(&wasm).await },
                 )
                 .into(),
                 wasm,
@@ -123,7 +122,7 @@ fixturator!(
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
-                    async { WasmHash::with_data(wasm.code().to_vec()).await },
+                    async { WasmHash::with_data(&wasm).await },
                 )
                 .into(),
                 wasm,

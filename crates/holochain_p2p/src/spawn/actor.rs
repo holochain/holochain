@@ -57,7 +57,7 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: event::GetOptions,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
@@ -75,7 +75,7 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: event::GetLinksOptions,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
@@ -97,7 +97,7 @@ impl HolochainP2pActor {
         to_agent: AgentPubKey,
         from_agent: AgentPubKey,
         request_validation_receipt: bool,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
         let evt_sender = self.evt_sender.clone();
@@ -310,7 +310,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
         request_validation_receipt: bool,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
@@ -353,7 +353,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
     ) -> HolochainP2pHandlerResult<Vec<SerializedBytes>> {
         let space = dna_hash.into_kitsune();
@@ -394,7 +394,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetLinksOptions,
     ) -> HolochainP2pHandlerResult<Vec<SerializedBytes>> {
         let space = dna_hash.into_kitsune();

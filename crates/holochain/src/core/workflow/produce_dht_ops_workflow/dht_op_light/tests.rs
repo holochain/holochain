@@ -8,12 +8,11 @@ use crate::{
         LinkRemoveFixturator,
     },
 };
-use fixt::prelude::*;
-use holo_hash::{Hashed, HeaderHash, HeaderHashFixturator};
+use ::fixt::prelude::*;
+use holo_hash::{fixt::HeaderHashFixturator, *};
 use holochain_keystore::Signature;
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    composite_hash::{AnyDhtHash, EntryHash},
     dht_op::{ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},

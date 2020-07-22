@@ -1,15 +1,11 @@
 use super::EntryType;
 use crate::header;
-use crate::{
-    composite_hash::{EntryHash, HeaderAddress},
-    fixt::*,
-    Timestamp,
-};
+use crate::{fixt::*, Timestamp};
+use ::fixt::prelude::*;
 use derive_more::Constructor;
-use fixt::prelude::*;
 use header::HeaderInner;
 use header::{IntendedFor, ZomeId};
-use holo_hash::*;
+use holo_hash::{fixt::*, *};
 use holochain_zome_types::link::LinkTag;
 
 #[derive(Constructor)]
