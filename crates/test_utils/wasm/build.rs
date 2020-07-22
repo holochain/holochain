@@ -4,7 +4,7 @@ fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
 
     println!("cargo:rerun-if-changed=Cargo.toml");
-    // println!("cargo:rerun-if-changed=*");
+    println!("cargo:rerun-if-changed=*");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
@@ -39,6 +39,7 @@ fn main() {
         "validate_valid",
         "validation_package_fail",
         "validation_package_success",
+        "whoami",
     ]
     .iter()
     {

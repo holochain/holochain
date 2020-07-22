@@ -1343,6 +1343,7 @@ dependencies = [
  "rand 0.7.3",
  "strum",
  "strum_macros",
+ "tokio_safe_block_on",
  "toml",
  "walkdir",
 ]

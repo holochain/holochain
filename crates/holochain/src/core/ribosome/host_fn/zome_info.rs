@@ -3,7 +3,7 @@ use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_zome_types::globals::ZomeInfo;
+use holochain_zome_types::zome_info::ZomeInfo;
 use holochain_zome_types::ZomeInfoInput;
 use holochain_zome_types::ZomeInfoOutput;
 use std::convert::TryFrom;
@@ -17,9 +17,10 @@ pub fn zome_info(
     Ok(ZomeInfoOutput::new(ZomeInfo {
         dna_name: ribosome.dna_file().dna().name.clone(),
         zome_name: call_context.zome_name.clone(),
-        dna_address: "".into(),                             // @TODO
+        dna_hash: ribosome.dna_file().dna_hash().clone(), // @TODO
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
-        public_token: "".into(),                            // @TODO
+                                                          // @todo
+                                                          // public_token: "".into(),                            // @TODO
     }))
 }
 
