@@ -215,8 +215,8 @@ pub trait MetadataBufT {
     /// Finds the redirect path and returns the final [Header]
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
 
-    /// Get link removes on link adds
-    fn get_link_remove_on_link_add(
+    /// Returns all the link remove headers attached to a link add header
+    fn get_link_removes_on_link_add(
         &self,
         link_add: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
@@ -393,7 +393,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             .filter_map(|(_, link)| {
                 // Check if link has been removed
                 match self
-                    .get_link_remove_on_link_add(link.link_add_hash.clone())?
+                    .get_link_removes_on_link_add(link.link_add_hash.clone())?
                     .next()?
                 {
                     Some(_) => Ok(None),
@@ -586,7 +586,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     }
 
     /// Get link removes on link adds
-    fn get_link_remove_on_link_add(
+    fn get_link_removes_on_link_add(
         &self,
         link_add: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
