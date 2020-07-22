@@ -39,8 +39,6 @@ lazy_static! {
             eprintln!("FATAL PANIC {:#?}", panic_info);
             // invoke the original handler
             orig_handler(panic_info);
-            // Abort the process
-            std::process::abort();
         }));
 
         RwLockSync::new(HashMap::new())
