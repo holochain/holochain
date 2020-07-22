@@ -1202,10 +1202,6 @@ async fn test_integrate_single_register_remove_link() {
 mod slow_tests {
 
     use super::*;
-    use crate::{
-        core::state::cascade::{test_dbs_and_mocks, Cascade},
-        test_utils::test_network,
-    };
     use crate::conductor::{
         api::{
             AdminInterfaceApi, AdminRequest, AdminResponse, AppInterfaceApi, AppRequest,
@@ -1214,6 +1210,10 @@ mod slow_tests {
         ConductorBuilder,
     };
     use crate::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
+    use crate::{
+        core::state::cascade::{test_dbs_and_mocks, Cascade},
+        test_utils::test_network,
+    };
     use holochain_state::{
         buffer::BufferedStore,
         env::{ReadManager, WriteManager},
