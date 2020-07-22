@@ -1,14 +1,9 @@
-use super::EntryType;
-use crate::header;
-use crate::{fixt::*, Timestamp};
-use ::fixt::prelude::*;
-use derive_more::Constructor;
-use header::HeaderInner;
-use header::{IntendedFor, ZomeId};
-use holo_hash::{fixt::*, *};
-use holochain_zome_types::link::LinkTag;
+use super::{EntryType, Timestamp};
+use crate::header::{self, HeaderInner, IntendedFor, ZomeId};
+use crate::link::LinkTag;
+use holo_hash_core::{AgentPubKey, DnaHash, EntryHash, HeaderAddress, HeaderHash};
+use holochain_serialized_bytes::SerializedBytes;
 
-#[derive(Constructor)]
 pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -47,10 +42,10 @@ macro_rules! builder_variant {
             }
         }
 
-        fixturator!(
-            $name;
-            constructor fn new($($t),*);
-        );
+        // fixturator!(
+        //     $name;
+        //     constructor fn new($($t),*);
+        // );
 
         impl HeaderBuilder<header::$name> for $name {
             fn build(self, common: HeaderBuilderCommon) -> header::$name {
@@ -71,6 +66,11 @@ macro_rules! builder_variant {
             }
         }
 
+        impl From<($name, HeaderBuilderCommon)> for header::$name {
+            fn from((n, h): ($name, HeaderBuilderCommon)) -> header::$name {
+                n.build(h)
+            }
+        }
         impl header::$name {
             pub fn from_builder(common: HeaderBuilderCommon, $($field : $t),*) -> Self {
                 let HeaderBuilderCommon {
@@ -132,18 +132,5 @@ builder_variant!(ElementDelete {
 });
 
 builder_variant!(AgentValidationPkg {
-    membrane_proof: MaybeSerializedBytes, // needed for fixturator
+    membrane_proof: Option<SerializedBytes>,
 });
-
-impl Dna {
-    /// The Dna header can't implement HeaderBuilder because it lacks a
-    /// `prev_header` field, so this helper is provided as a special case
-    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
-        Self {
-            author: builder.author,
-            timestamp: builder.timestamp,
-            header_seq: builder.header_seq,
-            hash,
-        }
-    }
-}

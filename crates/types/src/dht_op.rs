@@ -5,11 +5,10 @@
 //! [DhtOp]: enum.DhtOp.html
 
 use crate::element::ChainElement;
-use crate::{header, prelude::*, Header};
+use crate::{prelude::*, header::NewEntryHeader};
 use error::{DhtOpError, DhtOpResult};
-use header::NewEntryHeader;
 use holo_hash_core::{hash_type, HashableContentBytes};
-use holochain_zome_types::Entry;
+use holochain_zome_types::{Entry, Header, header};
 use serde::{Deserialize, Serialize};
 
 #[allow(missing_docs)]

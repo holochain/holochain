@@ -9,12 +9,13 @@
 use crate::prelude::*;
 use holo_hash::{EntryHash, HeaderAddress};
 use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::{header::*, link::LinkTag};
 
-pub mod builder;
-pub use builder::{HeaderBuilder, HeaderBuilderCommon};
-use holo_hash_core::impl_hashable_content;
+// pub mod builder;
+// pub use builder::{HeaderBuilder, HeaderBuilderCommon};
+use holo_hash_core::{hash_type, impl_hashable_content};
 
+/*
 /// Header contains variants for each type of header.
 ///
 /// This struct really defines a local source chain, in the sense that it
@@ -145,10 +146,8 @@ impl Header {
         })
     }
 }
-
-pub type HeaderHashed = HoloHashed<Header>;
-
-impl_hashable_content!(Header, Header);
+*/
+pub type HeaderHashed = HoloHashed<hash_type::Header>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 /// A header of one of the two types that create a new entry.
@@ -186,7 +185,7 @@ impl From<NewEntryHeader> for Header {
         }
     }
 }
-
+/*
 /// this id is an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 // TODO: Check this can never be written to > 255
@@ -423,18 +422,7 @@ impl AppEntryType {
     }
 }
 
-impl Dna {
-    /// The Dna header can't implement HeaderBuilder because it lacks a
-    /// `prev_header` field, so this helper is provided as a special case
-    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
-        Self {
-            author: builder.author,
-            timestamp: builder.timestamp,
-            header_seq: builder.header_seq,
-            hash,
-        }
-    }
-}
+*/
 
 #[cfg(test)]
 mod tests {

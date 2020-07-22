@@ -1,13 +1,12 @@
 //! Defines a ChainElement, the basic unit of Holochain data.
 
-use crate::{prelude::*, Header, HeaderHashed};
+use crate::{prelude::*, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
 use holo_hash::HeaderAddress;
 use holo_hash_core::{hash_type, HashableContentBytes};
 use holochain_keystore::{KeystoreError, Signature};
-use holochain_zome_types::entry::Entry;
-use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::{Entry, Header, entry_def::EntryVisibility};
 use must_future::MustBoxFuture;
 
 /// a chain element which is a triple containing the signature of the header along with the

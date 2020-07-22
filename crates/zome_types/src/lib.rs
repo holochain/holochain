@@ -37,6 +37,7 @@ pub mod zome;
 mod zome_io;
 
 pub use entry::Entry;
+pub use header::Header;
 use holochain_serialized_bytes::prelude::*;
 pub use zome_io::*;
 
