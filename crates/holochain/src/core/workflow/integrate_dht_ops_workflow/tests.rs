@@ -1206,31 +1206,31 @@ mod slow_tests {
         core::state::cascade::{test_dbs_and_mocks, Cascade},
         test_utils::test_network,
     };
-    // use crate::conductor::{
-    //     api::{
-    //         AdminInterfaceApi, AdminRequest, AdminResponse, AppInterfaceApi, AppRequest,
-    //         RealAdminInterfaceApi, RealAppInterfaceApi,
-    //     },
-    //     ConductorBuilder,
-    // };
-    // use crate::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
-    // use holochain_state::{
-    //     buffer::BufferedStore,
-    //     env::{ReadManager, WriteManager},
-    //     test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
-    // };
-    // use holochain_types::{
-    //     app::{InstallAppDnaPayload, InstallAppPayload},
-    //     header::{builder, EntryType},
-    //     observability,
-    //     test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
-    //     Entry, EntryHashed,
-    // };
-    // use holochain_wasm_test_utils::TestWasm;
-    // use holochain_zome_types::HostInput;
-    // use matches::assert_matches;
-    // use unwrap_to::unwrap_to;
-    // use uuid::Uuid;
+    use crate::conductor::{
+        api::{
+            AdminInterfaceApi, AdminRequest, AdminResponse, AppInterfaceApi, AppRequest,
+            RealAdminInterfaceApi, RealAppInterfaceApi,
+        },
+        ConductorBuilder,
+    };
+    use crate::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
+    use holochain_state::{
+        buffer::BufferedStore,
+        env::{ReadManager, WriteManager},
+        test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
+    };
+    use holochain_types::{
+        app::{InstallAppDnaPayload, InstallAppPayload},
+        header::{builder, EntryType},
+        observability,
+        test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
+        Entry, EntryHashed,
+    };
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::HostInput;
+    use matches::assert_matches;
+    use unwrap_to::unwrap_to;
+    use uuid::Uuid;
 
     // TODO: Document this test
     // TODO: Use the wasm calls directly instead of setting the databases to

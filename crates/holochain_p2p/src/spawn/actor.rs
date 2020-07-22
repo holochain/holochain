@@ -4,6 +4,7 @@ use futures::future::FutureExt;
 
 use crate::types::AgentPubKeyExt;
 
+use holochain_types::element::ChainElementData;
 use kitsune_p2p::actor::KitsuneP2pSender;
 
 pub(crate) struct HolochainP2pActor {
@@ -63,7 +64,8 @@ impl HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender.get(dna_hash, to_agent, dht_hash, options).await;
-            res.map_err(kitsune_p2p::KitsuneP2pError::from)
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
+                .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
         .boxed()
@@ -355,7 +357,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<SerializedBytes>> {
+    ) -> HolochainP2pHandlerResult<Vec<ChainElementData>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
         let basis = dht_hash.to_kitsune();
@@ -381,7 +383,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
             let mut out = Vec::new();
             for item in result {
                 let kitsune_p2p::actor::RpcMultiResponse { response, .. } = item;
-                out.push(UnsafeBytes::from(response).into());
+                out.push(SerializedBytes::from(UnsafeBytes::from(response)).try_into()?);
             }
 
             Ok(out)

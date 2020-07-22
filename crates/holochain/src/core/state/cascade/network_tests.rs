@@ -8,8 +8,14 @@ use holo_hash::*;
 use holo_hash_core::hash_type::{self, AnyDht};
 use holochain_p2p::{HolochainP2pCell, HolochainP2pRef};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-use holochain_types::{element::ChainElement, fixt::*, header::EntryType, observability, Header};
+use holochain_types::{
+    element::{ChainElement, ChainElementData},
+    fixt::*,
+    header::EntryType,
+    observability, Header, HeaderHashed,
+};
 use std::collections::BTreeMap;
+use std::convert::TryInto;
 use tokio::{sync::oneshot, task::JoinHandle};
 
 #[tokio::test(threaded_scheduler)]
@@ -124,12 +130,7 @@ async fn run_fixt_network(
                             .get(&dht_hash)
                             .cloned()
                             .map(|element| {
-                                let (header, entry) = element.into_inner();
-                                let val = PlaceholderGetReturn {
-                                    signed_header: header.as_content().clone(),
-                                    entry,
-                                };
-                                val.try_into().unwrap()
+                                ChainElementData::from_element(element).try_into().unwrap()
                             })
                             .unwrap();
                         respond.respond(Ok(async move { Ok(chain_element) }.boxed().into()));

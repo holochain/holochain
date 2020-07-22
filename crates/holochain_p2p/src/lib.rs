@@ -12,6 +12,7 @@ pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
 pub use types::*;
 
 mod spawn;
+use holochain_types::element::ChainElementData;
 pub use spawn::*;
 pub use test::HolochainP2pCellFixturator;
 
@@ -96,7 +97,7 @@ impl HolochainP2pCell {
         &mut self,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
+    ) -> actor::HolochainP2pResult<Vec<ChainElementData>> {
         self.sender
             .get(
                 (*self.dna_hash).clone(),

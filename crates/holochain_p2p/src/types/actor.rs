@@ -118,7 +118,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> Vec<SerializedBytes>;
+        ) -> Vec<ChainElementData>;
 
         /// Get links from the DHT.
         fn get_links(

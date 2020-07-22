@@ -43,14 +43,13 @@ use super::{
     metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
 };
 use error::CascadeResult;
+use holo_hash_core::{AnyDhtHash, EntryHash, HeaderAddress};
 use holochain_p2p::{actor::GetOptions, HolochainP2pCell};
-use holochain_serialized_bytes::prelude::*;
-use holochain_types::{
-    element::{ChainElement, SignedHeader, SignedHeaderHashed},
-    Entry, EntryHashed, HeaderHashed,
-};
-use holo_hash_core::{EntryHash, HeaderAddress, AnyDhtHash};
 use holochain_state::error::DatabaseResult;
+use holochain_types::{
+    element::{ChainElement, SignedHeaderHashed},
+    EntryHashed,
+};
 use tracing::*;
 
 #[cfg(test)]
@@ -59,13 +58,6 @@ mod network_tests;
 mod test;
 
 mod error;
-
-// TODO: Remove this when holohash refactor PR lands
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-struct PlaceholderGetReturn {
-    signed_header: SignedHeader,
-    entry: Option<Entry>,
-}
 
 pub struct Cascade<'env: 'a, 'a, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
 where
@@ -131,15 +123,9 @@ where
         // TODO: handle case of multiple elements returned
         // Get the first returned element
         let element = match elements.into_iter().next() {
-            Some(bytes) => {
+            Some(chain_element_data) => {
                 // Deserialize to type and hash
-                let element = PlaceholderGetReturn::try_from(bytes)?;
-                let (header, signature) = element.signed_header.into();
-                let header = HeaderHashed::with_data(header).await?;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-
-                // Create element
-                let element = ChainElement::new(signed_header, element.entry);
+                let element = chain_element_data.into_element().await?;
                 let (signed_header, maybe_entry) = element.clone().into_inner();
 
                 // Hash entry
