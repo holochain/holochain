@@ -67,7 +67,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> ChainElementData;
+        ) -> WireElement;
 
         /// A remote node is requesting link data from us.
         fn get_links(

@@ -4,7 +4,7 @@ use futures::future::FutureExt;
 
 use crate::types::AgentPubKeyExt;
 
-use holochain_types::element::ChainElementData;
+use holochain_types::element::WireElement;
 use kitsune_p2p::actor::KitsuneP2pSender;
 
 pub(crate) struct HolochainP2pActor {
@@ -357,7 +357,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<ChainElementData>> {
+    ) -> HolochainP2pHandlerResult<Vec<WireElement>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
         let basis = dht_hash.to_kitsune();

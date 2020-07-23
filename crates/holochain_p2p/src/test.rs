@@ -197,14 +197,14 @@ mod tests {
 
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        let test_1 = ChainElementData::from_element(ChainElement::new(
+        let test_1 = WireElement::from_element(ChainElement::new(
             SignedHeaderHashed::with_presigned(
                 HoloHashed::from_content(fixt!(Header)).await,
                 fixt!(Signature),
             ),
             None,
         ));
-        let test_2 = ChainElementData::from_element(ChainElement::new(
+        let test_2 = WireElement::from_element(ChainElement::new(
             SignedHeaderHashed::with_presigned(
                 HoloHashed::from_content(fixt!(Header)).await,
                 fixt!(Signature),

@@ -9,7 +9,7 @@ use holo_hash_core::hash_type::{self, AnyDht};
 use holochain_p2p::{HolochainP2pCell, HolochainP2pRef};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    element::{ChainElement, ChainElementData},
+    element::{ChainElement, WireElement},
     fixt::*,
     header::EntryType,
     observability, Header, HeaderHashed,
@@ -129,9 +129,7 @@ async fn run_fixt_network(
                         let chain_element = fixt_store
                             .get(&dht_hash)
                             .cloned()
-                            .map(|element| {
-                                ChainElementData::from_element(element).try_into().unwrap()
-                            })
+                            .map(|element| WireElement::from_element(element).try_into().unwrap())
                             .unwrap();
                         respond.respond(Ok(async move { Ok(chain_element) }.boxed().into()));
                     }

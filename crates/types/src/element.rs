@@ -23,7 +23,7 @@ pub struct ChainElement {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// ChainElement without the hashes for sending across the network
-pub struct ChainElementData {
+pub struct WireElement {
     /// The signed header for this element
     signed_header: SignedHeader,
     /// If there is an entry associated with this header it will be here
@@ -288,7 +288,7 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
     }
 }
 
-impl ChainElementData {
+impl WireElement {
     /// Convert into a [ChainElement] when receiving from the network
     pub async fn into_element(self) -> Result<ChainElement, SerializedBytesError> {
         Ok(ChainElement::new(
