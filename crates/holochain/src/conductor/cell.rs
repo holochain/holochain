@@ -454,7 +454,6 @@ impl Cell {
             provenance,
             fn_name,
         };
-        dbg!(&invocation);
         // double ? because
         // - ConductorApiResult
         // - ZomeCallInvocationResult

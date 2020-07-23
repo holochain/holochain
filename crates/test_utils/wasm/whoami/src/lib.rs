@@ -3,12 +3,10 @@ use hdk3::prelude::*;
 holochain_wasmer_guest::host_externs!(__call_remote);
 
 fn _whoami(_: ()) -> Result<AgentInfo, WasmError> {
-    debug!("foo")?;
     Ok(agent_info!()?)
 }
 
 fn _whoarethey(agent_pubkey: AgentPubKey) -> Result<AgentInfo, WasmError> {
-    debug!(&agent_pubkey)?;
     let result: SerializedBytes = call_remote!(
         agent_pubkey,
         zome_info!()?.zome_name,
@@ -16,8 +14,6 @@ fn _whoarethey(agent_pubkey: AgentPubKey) -> Result<AgentInfo, WasmError> {
         CapSecret::default(),
         ().try_into()?
     )?;
-
-    debug!(&result)?;
 
     Ok(result.try_into()?)
 }
