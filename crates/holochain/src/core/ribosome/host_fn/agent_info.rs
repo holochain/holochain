@@ -71,5 +71,13 @@ pub mod test {
             agent_info.inner_ref().agent_pubkey,
             AgentPubKey::from_raw_bytes(vec![0xdb; 36]),
         );
+        assert_eq!(
+            agent_info.inner_ref().agent_initial_pubkey,
+            AgentPubKey::from_raw_bytes(vec![0xdb; 36]),
+        );
+        assert_eq!(
+            agent_info.inner_ref().agent_latest_pubkey,
+            AgentPubKey::from_raw_bytes(vec![0xdb; 36]),
+        );
     }
 }
