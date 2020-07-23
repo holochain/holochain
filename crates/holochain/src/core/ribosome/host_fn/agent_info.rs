@@ -27,7 +27,6 @@ pub fn agent_info<'a>(
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             unsafe { call_context.host_access.workspace().apply_ref(call).await }
         })??;
-
     Ok(AgentInfoOutput::new(AgentInfo {
         agent_pubkey: agent_pubkey.clone(),
         // @todo these were in redux, what to do here?
@@ -42,8 +41,8 @@ pub mod test {
     use crate::core::state::workspace::Workspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holo_hash_core::AgentPubKey;
     use holochain_state::env::ReadManager;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::AgentInfoInput;
     use holochain_zome_types::AgentInfoOutput;
@@ -56,6 +55,10 @@ pub mod test {
         let reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
 
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -67,17 +70,14 @@ pub mod test {
             "agent_info",
             AgentInfoInput::new(())
         );
-        assert_eq!(
-            agent_info.inner_ref().agent_pubkey,
-            AgentPubKey::from_raw_bytes(vec![0xdb; 36]),
-        );
+        assert_eq!(agent_info.inner_ref().agent_pubkey, fake_agent_pubkey_1(),);
         assert_eq!(
             agent_info.inner_ref().agent_initial_pubkey,
-            AgentPubKey::from_raw_bytes(vec![0xdb; 36]),
+            fake_agent_pubkey_1(),
         );
         assert_eq!(
             agent_info.inner_ref().agent_latest_pubkey,
-            AgentPubKey::from_raw_bytes(vec![0xdb; 36]),
+            fake_agent_pubkey_1(),
         );
     }
 }
