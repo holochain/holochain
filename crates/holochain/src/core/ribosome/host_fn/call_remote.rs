@@ -6,34 +6,25 @@ use holochain_zome_types::CallRemoteInput;
 use holochain_zome_types::CallRemoteOutput;
 use std::sync::Arc;
 
-// const CALL_REMOTE_TIMEOUT: u64 = 10_000;
-
 pub fn call_remote(
     _ribosome: Arc<WasmRibosome>,
     call_context: Arc<CallContext>,
     input: CallRemoteInput,
 ) -> RibosomeResult<CallRemoteOutput> {
-    dbg!(&input);
-    let result: SerializedBytes = tokio_safe_block_on::tokio_safe_block_forever_on(
-        async move {
-            let mut network = call_context.host_access().network().clone();
-            let call_remote = input.into_inner();
-            let response = network
-                .call_remote(
-                    call_remote.to_agent(),
-                    call_remote.zome_name(),
-                    call_remote.fn_name(),
-                    call_remote.cap(),
-                    call_remote.request(),
-                )
-                .await;
-            dbg!(&response);
-            response
-        },
-        // std::time::Duration::from_millis(CALL_REMOTE_TIMEOUT),
-    )?;
-
-    dbg!(&result);
+    // it is the network's responsibility to handle timeouts and return an Err result in that case
+    let result: SerializedBytes = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let mut network = call_context.host_access().network().clone();
+        let call_remote = input.into_inner();
+        network
+            .call_remote(
+                call_remote.to_agent(),
+                call_remote.zome_name(),
+                call_remote.fn_name(),
+                call_remote.cap(),
+                call_remote.request(),
+            )
+            .await
+    })?;
 
     Ok(CallRemoteOutput::new(result))
 }
@@ -42,31 +33,25 @@ pub fn call_remote(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
-    use crate::conductor::manager::spawn_task_manager;
-    use crate::conductor::Cell;
+    use crate::conductor::dna_store::MockDnaStore;
+    use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
-    use holochain_p2p::actor::HolochainP2pRefToCell;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_state::test_utils::test_conductor_env;
-    use holochain_state::test_utils::TestEnvironment;
+    use crate::core::ribosome::ZomeCallInvocationResponse;
+    use hdk3::prelude::*;
+    use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::capability::CapSecret;
     use holochain_zome_types::HostInput;
-    use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
     /// we can call a fn on a remote
     async fn call_remote_test() {
         // ////////////
-        // START SHARED
+        // START DNA
         // ////////////
-
-        let TestEnvironment { env, tmpdir } = test_conductor_env();
-        let keystore = env.keystore().clone();
-        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
 
         let dna_file = DnaFile::new(
             DnaDef {
@@ -79,23 +64,9 @@ pub mod wasm_test {
         )
         .await
         .unwrap();
-        // let mut agent_id_fixturator = holo_hash::fixt::AgentPubKeyFixturator::new(fixt::Unpredictable);
-
-        let path = tmpdir.path().to_path_buf();
-
-        let mut mock_handler = crate::conductor::handle::mock::MockConductorHandle::new();
-        // let mock_dna = dna_file.clone();
-        let _ = mock_handler
-            .expect_sync_get_dna()
-            .return_const(Some(dna_file.clone()));
-
-        let mock_handler: crate::conductor::handle::ConductorHandle = Arc::new(mock_handler);
-
-        let (add_task_sender, shutdown) = spawn_task_manager();
-        let (stop_tx, _) = tokio::sync::broadcast::channel(1);
 
         // //////////
-        // END SHARED
+        // END DNA
         // //////////
 
         // ///////////
@@ -107,30 +78,7 @@ pub mod wasm_test {
         )
         .unwrap();
         let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-        let alice_holochain_p2p_cell =
-            holochain_p2p.to_cell(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-
-        Cell::genesis(
-            alice_cell_id.clone(),
-            mock_handler.clone(),
-            path.clone(),
-            keystore.clone(),
-            None,
-        )
-        .await
-        .unwrap();
-
-        let alice_cell = Cell::create(
-            alice_cell_id.clone(),
-            mock_handler.clone(),
-            path.clone(),
-            keystore.clone(),
-            alice_holochain_p2p_cell.clone(),
-            add_task_sender.clone(),
-            stop_tx.clone(),
-        )
-        .await
-        .unwrap();
+        let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
         // /////////
         // END ALICE
@@ -145,59 +93,70 @@ pub mod wasm_test {
         )
         .unwrap();
         let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-        let bob_holochain_p2p_cell =
-            holochain_p2p.to_cell(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-
-        Cell::genesis(
-            bob_cell_id.clone(),
-            mock_handler.clone(),
-            path.clone(),
-            keystore.clone(),
-            None,
-        )
-        .await
-        .unwrap();
-
-        let _bob_cell = Cell::create(
-            bob_cell_id,
-            mock_handler.clone(),
-            path.clone(),
-            keystore.clone(),
-            bob_holochain_p2p_cell.clone(),
-            add_task_sender.clone(),
-            stop_tx.clone(),
-        )
-        .await
-        .unwrap();
+        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
         // ///////
         // END BOB
         // ///////
 
+        // ///////////////
+        // START CONDUCTOR
+        // ///////////////
+
+        let mut dna_store = MockDnaStore::new();
+
+        dna_store.expect_get().return_const(Some(dna_file.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(2)
+            .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(2)
+            .return_const(());
+
+        let (_tmpdir, _app_api, handle) = setup_app(
+            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+            dna_store,
+        )
+        .await;
+
+        // /////////////
+        // END CONDUCTOR
+        // /////////////
+
         // ALICE DOING A CALL
 
-        let output = alice_cell
+        let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: CapSecret::default(),
                 fn_name: "whoarethey".to_string(),
-                payload: HostInput::new(bob_agent_id.try_into().unwrap()),
+                payload: HostInput::new(bob_agent_id.clone().try_into().unwrap()),
                 provenance: alice_agent_id,
             })
             .await
             .unwrap()
             .unwrap();
 
-        // should output bob's agent info
-        dbg!(&output);
+        match output {
+            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+                let response: SerializedBytes = guest_output.into_inner();
+                let agent_info: AgentInfo = response.try_into().unwrap();
+                assert_eq!(
+                    agent_info,
+                    AgentInfo {
+                        agent_pubkey: bob_agent_id.clone(),
+                        agent_initial_pubkey: bob_agent_id.clone(),
+                        agent_latest_pubkey: bob_agent_id,
+                    },
+                );
+            }
+        }
 
-        // assert_eq!(
-        //     output.into_inner(),
-        //     bob_agent_id,
-        // );
-
-        stop_tx.send(()).unwrap();
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        handle.shutdown().await;
         shutdown.await.unwrap();
     }
 }

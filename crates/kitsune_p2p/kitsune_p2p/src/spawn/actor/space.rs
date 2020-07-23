@@ -93,6 +93,8 @@ impl Space {
         // into two variants, one for short-circuit, and one for real networking.
         let data = wire::Wire::decode((*data).clone())?;
 
+        dbg!(&data);
+
         match data {
             wire::Wire::Call(payload) => {
                 Ok(async move { evt_sender.call(space, agent, payload).await }
@@ -119,6 +121,9 @@ impl Space {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let internal_sender = self.internal_sender.clone();
+
+        dbg!(&self.list_agents());
+
         Ok(async move {
             let start = std::time::Instant::now();
 

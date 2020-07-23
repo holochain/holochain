@@ -392,6 +392,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
+        dbg!(&agent);
         let space = match self.spaces.get_mut(&space) {
             None => {
                 return Err(KitsuneP2pError::RoutingSpaceError(space));
@@ -399,8 +400,12 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             Some(space) => space,
         };
 
+        dbg!(&space.list_agents());
+
         // encode the data to send
         let payload = wire::Wire::call(payload).encode();
+
+        dbg!(&payload);
 
         let space_request_fut = space.handle_rpc_single(agent, Arc::new(payload))?;
 
