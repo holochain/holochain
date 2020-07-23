@@ -90,6 +90,19 @@ impl std::convert::TryFrom<&str> for Timestamp {
         Ok(t.into())
     }
 }
+
+impl From<Timestamp> for holochain_zome_types::timestamp::Timestamp {
+    fn from(ts: Timestamp) -> Self {
+        Self(ts.0, ts.1)
+    }
+}
+
+impl From<holochain_zome_types::timestamp::Timestamp> for Timestamp {
+    fn from(ts: holochain_zome_types::timestamp::Timestamp) -> Self {
+        Self(ts.0, ts.1)
+    }
+}
+
 const SEC: usize = std::mem::size_of::<i64>();
 const NSEC: usize = std::mem::size_of::<u32>();
 

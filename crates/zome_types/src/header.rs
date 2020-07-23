@@ -1,4 +1,5 @@
-use crate::{entry_def::EntryVisibility, link::LinkTag};
+use crate::{entry_def::EntryVisibility, link::LinkTag, timestamp::Timestamp};
+pub use builder::{HeaderBuilder, HeaderBuilderCommon};
 use holo_hash_core::{
     impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderAddress,
     HeaderHash,
@@ -6,7 +7,7 @@ use holo_hash_core::{
 use holochain_serialized_bytes::prelude::*;
 
 pub mod builder;
-pub use builder::{HeaderBuilder, HeaderBuilderCommon};
+pub mod conversions;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct HeaderHashes(Vec<HeaderHash>);
@@ -16,15 +17,6 @@ impl From<Vec<HeaderHash>> for HeaderHashes {
         Self(vs)
     }
 }
-
-// TODO: Move into module and figure out format
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Timestamp(
-    // sec
-    pub i64,
-    // nsec
-    pub u32,
-);
 
 /// Header contains variants for each type of header.
 ///
@@ -368,79 +360,3 @@ impl AppEntryType {
         &self.visibility
     }
 }
-
-// impl Dna {
-//     /// The Dna header can't implement HeaderBuilder because it lacks a
-//     /// `prev_header` field, so this helper is provided as a special case
-//     pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
-//         Self {
-//             author: builder.author,
-//             timestamp: builder.timestamp,
-//             header_seq: builder.header_seq,
-//             hash,
-//         }
-//     }
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::{
-//         fixt::HeaderBuilderCommonFixturator,
-//         test_utils::{fake_dna_hash, fake_entry_content_hash},
-//     };
-//     use ::fixt::prelude::*;
-
-//     #[test]
-//     fn test_header_msgpack_roundtrip() {
-//         let orig: Header = Dna::from_builder(
-//             fake_dna_hash(1),
-//             HeaderBuilderCommonFixturator::new(Unpredictable)
-//                 .next()
-//                 .unwrap(),
-//         )
-//         .into();
-//         let bytes = rmp_serde::to_vec_named(&orig).unwrap();
-//         let res: Header = rmp_serde::from_read_ref(&bytes).unwrap();
-//         assert_eq!(orig, res);
-//     }
-
-//     #[test]
-//     fn test_entrycreate_msgpack_roundtrip() {
-//         let orig: Header = EntryCreate::from_builder(
-//             HeaderBuilderCommonFixturator::new(Unpredictable)
-//                 .next()
-//                 .unwrap(),
-//             EntryType::App(AppEntryType::new(
-//                 0.into(),
-//                 0.into(),
-//                 EntryVisibility::Public,
-//             )),
-//             fake_entry_content_hash(1).into(),
-//         )
-//         .into();
-//         let bytes = rmp_serde::to_vec_named(&orig).unwrap();
-//         println!("{:?}", bytes);
-//         let res: Header = rmp_serde::from_read_ref(&bytes).unwrap();
-//         assert_eq!(orig, res);
-//     }
-
-//     #[test]
-//     fn test_entrycreate_serializedbytes_roundtrip() {
-//         let orig: Header = EntryCreate::from_builder(
-//             HeaderBuilderCommonFixturator::new(Unpredictable)
-//                 .next()
-//                 .unwrap(),
-//             EntryType::App(AppEntryType::new(
-//                 0.into(),
-//                 0.into(),
-//                 EntryVisibility::Public,
-//             )),
-//             fake_entry_content_hash(1).into(),
-//         )
-//         .into();
-//         let bytes: SerializedBytes = orig.clone().try_into().unwrap();
-//         let res: Header = bytes.try_into().unwrap();
-//         assert_eq!(orig, res);
-//     }
-// }

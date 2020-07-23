@@ -8,13 +8,11 @@ use holochain::fixt::ZomeIdFixturator;
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
-    header,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
-    Header,
 };
-use holochain_zome_types::entry::Entry;
 use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::{header, Entry, Header};
 
 fn fixtures() -> (
     AgentPubKey,
@@ -46,7 +44,7 @@ fn fixtures() -> (
 
     let jimbo_header = Header::EntryCreate(header::EntryCreate {
         author: jimbo_id.clone(),
-        timestamp: Timestamp::now(),
+        timestamp: Timestamp::now().into(),
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
@@ -55,7 +53,7 @@ fn fixtures() -> (
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
         author: jessy_id.clone(),
-        timestamp: Timestamp::now(),
+        timestamp: Timestamp::now().into(),
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,

@@ -22,10 +22,9 @@ use holochain_state::{
 use holochain_types::{
     element::{ChainElement, SignedHeader, SignedHeaderHashed},
     entry::EntryHashed,
-    Header,
 };
-use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
 /// A CasBuf with Entries for values

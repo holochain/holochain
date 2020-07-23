@@ -8,12 +8,12 @@ use crate::dna::zome::Zome;
 use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
 use crate::dna::Zomes;
-use holochain_zome_types::header::builder::HeaderBuilderCommon;
 use crate::header::NewEntryHeader;
 use crate::Timestamp;
 use ::fixt::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
+use holochain_zome_types::header::builder::HeaderBuilderCommon;
 use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::ChainClose;
@@ -29,6 +29,7 @@ use holochain_zome_types::header::IntendedFor;
 use holochain_zome_types::header::LinkAdd;
 use holochain_zome_types::header::LinkRemove;
 use holochain_zome_types::header::ZomeId;
+use holochain_zome_types::timestamp::Timestamp as ZomeTimestamp;
 
 use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::fixt::HeaderHashFixturator;
@@ -111,9 +112,18 @@ fixturator!(
     constructor fn now();
 );
 
+fn from_timestamp(ts: Timestamp) -> ZomeTimestamp {
+    ts.into()
+}
+
+fixturator!(
+    ZomeTimestamp;
+    vanilla fn from_timestamp(Timestamp);
+);
+
 fixturator!(
     HeaderBuilderCommon;
-    constructor fn new(AgentPubKey, Timestamp, u32, HeaderHash);
+    constructor fn new(AgentPubKey, ZomeTimestamp, u32, HeaderHash);
 );
 
 newtype_fixturator!(Signature<Bytes>);

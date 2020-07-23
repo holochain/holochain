@@ -2,12 +2,11 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
-    element::SignedHeaderHashed,
-    header::{EntryCreate, EntryType},
-    test_utils::fake_header_hash,
-    Entry, EntryHashed, Header, HeaderHashed, Timestamp,
+    element::SignedHeaderHashed, test_utils::fake_header_hash, Entry, EntryHashed, HeaderHashed,
+    Timestamp,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::header::{EntryCreate, EntryType, Header};
 use std::convert::TryInto;
 
 #[macro_export]
@@ -30,7 +29,7 @@ pub async fn fake_unique_element(
         .unwrap();
     let header_1 = Header::EntryCreate(EntryCreate {
         author: agent_key,
-        timestamp: Timestamp::now(),
+        timestamp: Timestamp::now().into(),
         header_seq: 0,
         prev_header: fake_header_hash(1),
 

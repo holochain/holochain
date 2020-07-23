@@ -10,13 +10,12 @@ use holochain_state::{
 };
 use holochain_types::{
     entry::EntryHashed,
-    header, observability,
+    observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
-    Header,
 };
-use holochain_zome_types::entry::Entry;
 use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::{header, Entry, Header};
 use mockall::*;
 
 #[allow(dead_code)]
@@ -55,7 +54,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
 
     let jimbo_header = Header::EntryCreate(header::EntryCreate {
         author: jimbo_id.clone(),
-        timestamp: Timestamp::now(),
+        timestamp: Timestamp::now().into(),
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,
@@ -64,7 +63,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
 
     let jessy_header = Header::EntryCreate(header::EntryCreate {
         author: jessy_id.clone(),
-        timestamp: Timestamp::now(),
+        timestamp: Timestamp::now().into(),
         header_seq: 0,
         prev_header: previous_header.clone().into(),
         entry_type: header::EntryType::AgentPubKey,

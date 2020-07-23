@@ -51,7 +51,7 @@ async fn fixtures(n: usize) -> Vec<TestData> {
         let expected_link = LinkMetaVal {
             link_add_hash: link_add_hash.clone(),
             target: target_address.clone(),
-            timestamp: link_add.timestamp.clone(),
+            timestamp: link_add.timestamp.clone().into(),
             zome_id,
             tag: tag.clone(),
         };
