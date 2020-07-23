@@ -42,6 +42,8 @@ pub mod wasm_test {
     use holochain_types::cell::CellId;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::capability::CapSecret;
     use holochain_zome_types::HostInput;
@@ -73,10 +75,7 @@ pub mod wasm_test {
         // START ALICE
         // ///////////
 
-        let alice_agent_id = holo_hash::AgentPubKey::try_from(
-            "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
-        )
-        .unwrap();
+        let alice_agent_id = fake_agent_pubkey_1();
         let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
         let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
@@ -88,10 +87,7 @@ pub mod wasm_test {
         // START BOB
         // /////////
 
-        let bob_agent_id = holo_hash::AgentPubKey::try_from(
-            "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
-        )
-        .unwrap();
+        let bob_agent_id = fake_agent_pubkey_2();
         let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
         let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
