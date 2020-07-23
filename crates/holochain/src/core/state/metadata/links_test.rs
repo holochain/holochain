@@ -77,13 +77,13 @@ async fn fixtures(n: usize) -> Vec<TestData> {
 impl TestData {
     /// Create the same test data with a new timestamp
     async fn with_same_keys(mut td: Self) -> Self {
-        td.link_add.timestamp = Timestamp::now();
+        td.link_add.timestamp = Timestamp::now().into();
         let link_add_hash = HeaderHashed::with_data(Header::LinkAdd(td.link_add.clone()))
             .await
             .unwrap()
             .into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();
-        td.expected_link.timestamp = td.link_add.timestamp.clone();
+        td.expected_link.timestamp = td.link_add.timestamp.clone().into();
         td.expected_link.link_add_hash = link_add_hash;
         td
     }

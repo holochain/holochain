@@ -27,7 +27,7 @@ use holochain_types::{
     header::NewEntryHeader,
     observability,
     validate::ValidationStatus,
-    Entry, EntryHashed, Header,
+    Entry, EntryHashed,
 };
 use holochain_zome_types::{
     entry::GetOptions,
@@ -35,7 +35,7 @@ use holochain_zome_types::{
     header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
     link::{LinkTag, Links},
     zome::ZomeName,
-    CommitEntryInput, GetEntryInput, GetLinksInput, LinkEntriesInput,
+    CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
