@@ -9,7 +9,7 @@ use crate::core::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
             IntegrationQueueValue,
         },
-        metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
+        metadata::{MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
     },
 };
@@ -255,50 +255,13 @@ async fn integrate_single_dht_op(
                     return Outcome::deferred(op, validation_status);
                 }
 
-                // Get the link add header
-                let maybe_link_add = match workspace
-                    .cas
-                    .get_header(&link_remove.link_add_address)
-                    .await?
-                {
-                    Some(link_add) => {
-                        let header = link_add.into_header_and_signature().0;
-                        let (header, hash) = header.into_inner();
-                        let link_add = match header {
-                            Header::LinkAdd(la) => la,
-                            _ => return Err(DhtOpConvertError::LinkRemoveRequiresLinkAdd.into()),
-                        };
-
-                        // Create a full link key and check if the link add exists
-                        let key = LinkMetaKey::from((&link_add, &hash));
-                        if workspace.meta.get_links(&key)?.is_empty() {
-                            None
-                        } else {
-                            Some(link_add)
-                        }
-                    }
-                    None => None,
-                };
-                let link_add = match maybe_link_add {
-                    Some(link_add) => link_add,
-                    // Handle link add missing
-                    // Probably just waiting on StoreElement or RegisterAddLink
-                    // to arrive so put back in queue with a log message
-                    None => return Outcome::deferred(op, validation_status),
-                };
-
                 // Store link delete Header
                 let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 workspace.cas.put(signed_header, None)?;
 
                 // Remove the link
-                workspace.meta.remove_link(
-                    link_remove,
-                    &link_add.base_address,
-                    link_add.zome_id,
-                    link_add.tag,
-                )?;
+                workspace.meta.remove_link(link_remove).await?;
             }
         }
 
