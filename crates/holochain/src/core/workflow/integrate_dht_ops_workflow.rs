@@ -28,7 +28,7 @@ use holochain_types::{
     validate::ValidationStatus,
     EntryHashed, HeaderHashed, Timestamp, TimestampKey,
 };
-use holochain_zome_types::header::{Header, IntendedFor};
+use holochain_zome_types::{header::IntendedFor, Header};
 use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use tracing::*;
 
