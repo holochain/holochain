@@ -75,6 +75,19 @@ async fn fixtures(n: usize) -> Vec<TestData> {
 
 #[allow(dead_code)]
 impl TestData {
+    /// Create the same test data with a new timestamp
+    async fn with_same_keys(mut td: Self) -> Self {
+        td.link_add.timestamp = Timestamp::now();
+        let link_add_hash = HeaderHashed::with_data(Header::LinkAdd(td.link_add.clone()))
+            .await
+            .unwrap()
+            .into_hash();
+        td.link_remove.link_add_address = link_add_hash.clone();
+        td.expected_link.timestamp = td.link_add.timestamp.clone();
+        td.expected_link.link_add_hash = link_add_hash;
+        td
+    }
+
     fn empty(&self, test: &'static str, meta_buf: &MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(meta_buf.get_links(&key).unwrap().is_empty(), test);
@@ -197,12 +210,8 @@ impl TestData {
     }
     async fn remove_link(&self, meta_buf: &mut MetadataBuf<'_>) {
         meta_buf
-            .remove_link(
-                self.link_remove.clone(),
-                &self.base_hash,
-                self.zome_id,
-                self.tag.clone(),
-            )
+            .remove_link(self.link_remove.clone())
+            .await
             .unwrap();
     }
 
@@ -310,7 +319,7 @@ async fn can_add_and_remove_link() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let td = fixtures(1).await.into_iter().next().unwrap();
+    let mut td = fixtures(1).await.into_iter().next().unwrap();
 
     // Check it's empty
     env.with_reader(|reader| {
@@ -334,6 +343,9 @@ async fn can_add_and_remove_link() {
 
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf);
+
+        let new_td = TestData::with_same_keys(td.clone()).await;
+        td = new_td;
 
         // Add again
         td.add_link(&mut meta_buf).await;
@@ -377,6 +389,8 @@ async fn can_add_and_remove_link() {
     {
         let reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let new_td = TestData::with_same_keys(td.clone()).await;
+        td = new_td;
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
@@ -411,7 +425,7 @@ async fn multiple_links() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let td = fixtures(10).await;
+    let mut td = fixtures(10).await;
 
     // Add links
     {
@@ -434,6 +448,10 @@ async fn multiple_links() {
         for d in td[0..5].iter().chain(&td[6..]) {
             d.only_on_full_key(here!("all except 5 scratch"), &meta_buf);
         }
+        // Can't add back the same header because removes are tombstones
+        // so add one with the same key
+        let new_td = TestData::with_same_keys(td[5].clone()).await;
+        td[5] = new_td;
         // Add again
         td[5].add_link(&mut meta_buf).await;
 
