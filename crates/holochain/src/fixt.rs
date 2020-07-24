@@ -23,9 +23,8 @@ use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspa
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::EntryHash;
-use holo_hash::HoloHashExt;
+use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
-use holo_hash_core::HeaderHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_types::dna::wasm::DnaWasm;

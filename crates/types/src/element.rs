@@ -4,7 +4,7 @@ use crate::{prelude::*, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
 use holo_hash::HeaderAddress;
-use holo_hash_core::{hash_type, HashableContentBytes};
+use holo_hash::{hash_type, HashableContentBytes};
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::Entry;

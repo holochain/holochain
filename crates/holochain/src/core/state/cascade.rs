@@ -43,7 +43,7 @@ use super::{
     metadata::{LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use error::CascadeResult;
-use holo_hash_core::{hash_type, AnyDhtHash, EntryHash, HeaderAddress};
+use holo_hash::{hash_type, AnyDhtHash, EntryHash, HeaderAddress};
 use holochain_p2p::{
     actor::{GetMetaOptions, GetOptions},
     HolochainP2pCell,

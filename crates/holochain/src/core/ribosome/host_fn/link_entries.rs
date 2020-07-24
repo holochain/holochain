@@ -6,7 +6,7 @@ use crate::core::{
 };
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash_core::HeaderAddress;
+use holo_hash::HeaderAddress;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::LinkEntriesInput;
 use holochain_zome_types::LinkEntriesOutput;

@@ -20,7 +20,7 @@ name = "test_wasm_post_commit_fail"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-holo_hash_core = { path = "../../../holo_hash_core" }
+holo_hash = { path = "../../../holo_hash" }
 holochain_serialized_bytes = "=0.0.40"
 holochain_wasmer_guest = "=0.0.36"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }

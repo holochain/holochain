@@ -1,7 +1,6 @@
 #![cfg(test)]
 
-use crate::{HashableContent, HoloHashExt, HoloHashPrimitiveExt, HoloHashed};
-use holo_hash_core::*;
+use crate::{HashableContent, HoloHashed};
 use holochain_serialized_bytes::prelude::*;
 use std::convert::TryInto;
 
