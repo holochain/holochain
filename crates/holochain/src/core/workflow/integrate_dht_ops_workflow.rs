@@ -92,7 +92,7 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(&mut workspace.cas, &mut workspace.meta, value, true)
+                match integrate_single_dht_op(value, &mut workspace.cas, &mut workspace.meta, true)
                     .await?
                 {
                     Outcome::Integrated(integrated) => {
@@ -147,16 +147,17 @@ pub async fn integrate_dht_ops_workflow(
 }
 
 /// Integrate a single DhtOp to the specified stores.
-/// The stores are intended to be either the pair of Vaults, or the pair of Caches,
-/// never a mixture of the two.
 ///
-/// NB: When integrating ops we have authored, we are repeating the storage of
-/// Element and Entry data.
+/// The two stores are intended to be either the pair of Vaults,
+/// or the pair of Caches, but never a mixture of the two.
+///
+/// We can skip integrating element data, specified by the last parameter,
+/// when doing inline integration into the cache after authoring an element.
 #[instrument(skip(element_store, meta_store, value))]
 async fn integrate_single_dht_op(
+    value: IntegrationQueueValue,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
-    value: IntegrationQueueValue,
     integrate_element_data: bool,
 ) -> DhtOpConvertResult<Outcome> {
     debug!("Starting integrate dht ops workflow");
@@ -286,7 +287,7 @@ async fn integrate_single_dht_op(
             Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
                 return Outcome::deferred(op, validation_status)
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(e),
         };
         let value = IntegratedDhtOpsValue {
             validation_status,
@@ -314,7 +315,7 @@ pub async fn integrate_to_cache(
             validation_status: ValidationStatus::Valid,
         };
         // we don't integrate element data, because it is already in our vault.
-        match integrate_single_dht_op(element_store, meta_store, value, false).await? {
+        match integrate_single_dht_op(value, element_store, meta_store, false).await? {
             Outcome::Integrated(_) => {}
             Outcome::Deferred(v) => {
                 unreachable!("An inline-integrated DhtOp cannot be deferred: {:?}", v)

@@ -45,10 +45,6 @@ async fn produce_dht_ops_workflow_inner(
         .get_incomplete_dht_ops()
         .await?;
 
-    // FIXME:
-    // we technically don't need to integrate StoreElement or StoreEntry
-    // DhtOps, because we already added that data to our ElementVault
-    // during authorship. However, we must publish them.
     for (index, ops) in all_ops {
         for op in ops {
             let (op, hash) = DhtOpHashed::with_data(op).await?.into_inner();
