@@ -25,7 +25,6 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
 pub use holo_hash::fixt::*;
-use holo_hash::HoloHashExt;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_types::dna::wasm::DnaWasm;

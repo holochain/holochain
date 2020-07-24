@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 
-use ::fixt::prelude::*;
-use holo_hash::{
+use crate::{
     encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
     EntryContentHash, EntryHash, HeaderHash, NetIdHash, WasmHash,
 };
+use fixt::prelude::*;
 
 pub type HashTypeEntry = hash_type::Entry;
 pub type HashTypeAnyDht = hash_type::AnyDht;

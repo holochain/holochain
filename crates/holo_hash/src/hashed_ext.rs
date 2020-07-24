@@ -1,4 +1,4 @@
-use crate::{HasHash, HashableContent, HoloHash, HoloHashOf};
+use crate::{HashableContent, HoloHash, HoloHashOf, HoloHashed};
 use holochain_serialized_bytes::SerializedBytesError;
 
 impl<C> HoloHashed<C>

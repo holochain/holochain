@@ -11,18 +11,24 @@ homepage = "https://github.com/Holo-host/holochain"
 documentation = "https://github.com/Holo-host/holochain"
 
 [dependencies]
-base64 = {version = "0.12.0", optional = true}
-blake2b_simd = {version = "0.5.10", optional = true}
 holochain_serialized_bytes = "0.0.40"
 serde = "1"
 serde_bytes = "0.11"
+
+base64 = {version = "0.12.0", optional = true}
+blake2b_simd = {version = "0.5.10", optional = true}
+fixt = { version = "0.0.1", path = "../fixt", optional = true }
+futures = {version = "0.3", optional = true}
+must_future = {version = "0.1.1", optional = true}
+rand = {version = "0.7", optional = true}
 
 # may be able to remove with custom SerializedBytes impl
 rmp-serde = "0.14.3"
 
 [features]
 default = []
-full = ["hashing", "string-encoding"]
+full = ["fixturators", "hashing", "string-encoding"]
 
+fixturators = ["fixt", "rand"]
 string-encoding = ["base64", "blake2b_simd"]
-hashing = ["blake2b_simd"]
+hashing = ["blake2b_simd", "futures", "must_future"]

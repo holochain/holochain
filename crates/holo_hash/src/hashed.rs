@@ -5,8 +5,8 @@ use crate::{HasHash, HashableContent, HoloHashOf};
 /// Provides an easy constructor which consumes the content.
 // TODO: consider making lazy with OnceCell
 pub struct HoloHashed<C: HashableContent> {
-    content: C,
-    hash: HoloHashOf<C>,
+    pub(crate) content: C,
+    pub(crate) hash: HoloHashOf<C>,
 }
 
 impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {

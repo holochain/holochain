@@ -22,6 +22,8 @@ pub use hashed::*;
 mod hash_ext;
 #[cfg(feature = "hashing")]
 mod hashed_ext;
+#[cfg(feature = "fixturators")]
+pub mod fixt;
 
 /// By default, disable string encoding and just display raw bytes
 #[cfg(not(feature = "string-encoding"))]
