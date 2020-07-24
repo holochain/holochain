@@ -3,7 +3,7 @@
 //!  - and serialized to json
 use backtrace::Backtrace;
 use holo_hash::{hash_type, HashableContentBytes};
-use holo_hash_ext::prelude::*;
+use holo_hash::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use serde::{self, Deserialize, Serialize};
 use std::{

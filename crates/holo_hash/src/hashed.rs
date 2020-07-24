@@ -1,6 +1,4 @@
-use crate::{HoloHashExt, HoloHashOf};
-use holo_hash::{HasHash, HashableContent, HoloHash};
-use holochain_serialized_bytes::SerializedBytesError;
+use crate::{HasHash, HashableContent, HoloHashOf};
 
 /// Represents some piece of content along with its hash representation, so that
 /// hashes need not be calculated multiple times.
@@ -25,12 +23,6 @@ impl<C> HoloHashed<C>
 where
     C: HashableContent,
 {
-    /// Compute the hash of this content and store it alongside
-    pub async fn from_content(content: C) -> Self {
-        let hash: HoloHashOf<C> = HoloHash::with_data(&content).await;
-        Self { content, hash }
-    }
-
     /// Combine content with its precalculated hash
     pub fn with_pre_hashed(content: C, hash: HoloHashOf<C>) -> Self {
         Self { content, hash }
@@ -51,13 +43,6 @@ where
     /// Deconstruct as a tuple
     pub fn into_inner(self) -> (C, HoloHashOf<C>) {
         (self.content, self.hash)
-    }
-
-    /// Alias for with_content
-    // TODO: deprecate
-    // #[deprecated = "alias for `from_content`"]
-    pub async fn with_data(content: C) -> Result<Self, SerializedBytesError> {
-        Ok(Self::from_content(content).await)
     }
 }
 

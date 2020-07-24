@@ -62,7 +62,7 @@ use tracing::*;
 
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
-use holo_hash_ext::DnaHash;
+use holo_hash::DnaHash;
 
 #[cfg(test)]
 use super::handle::mock::MockConductorHandle;
@@ -631,7 +631,7 @@ pub(crate) async fn delete_me_create_test_keystore() -> KeystoreSender {
     use std::convert::TryFrom;
     let keystore = spawn_test_keystore(vec![
         MockKeypair {
-            pub_key: holo_hash_ext::AgentPubKey::try_from(
+            pub_key: holo_hash::AgentPubKey::try_from(
                 "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
             )
             .unwrap(),
@@ -643,7 +643,7 @@ pub(crate) async fn delete_me_create_test_keystore() -> KeystoreSender {
             ],
         },
         MockKeypair {
-            pub_key: holo_hash_ext::AgentPubKey::try_from(
+            pub_key: holo_hash::AgentPubKey::try_from(
                 "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
             )
             .unwrap(),

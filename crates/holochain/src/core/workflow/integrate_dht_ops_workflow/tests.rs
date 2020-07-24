@@ -14,7 +14,7 @@ use crate::{
     fixt::*,
 };
 use ::fixt::prelude::*;
-use holo_hash_ext::*;
+use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{
     env::{EnvironmentReadRef, EnvironmentWrite, EnvironmentWriteRef, ReadManager, WriteManager},

@@ -2,7 +2,7 @@ use ::fixt::prelude::*;
 use criterion::BenchmarkId;
 use criterion::Throughput;
 use criterion::{criterion_group, criterion_main, Criterion};
-use holo_hash_ext::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::fixt::CapSecretFixturator;

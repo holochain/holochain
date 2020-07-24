@@ -37,8 +37,8 @@ use guest_callback::{
     post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
     validation_package::ValidationPackageHostAccess,
 };
-use holo_hash_ext::fixt::AgentPubKeyFixturator;
-use holo_hash_ext::AgentPubKey;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;

@@ -20,7 +20,6 @@ derive_more = "0.99.3"
 fixt = { path = "../fixt" }
 flate2 = "1.0.14"
 futures = "0.3"
-holo_hash_ext = { version = "0.0.1", path = "../holo_hash_ext" }
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }

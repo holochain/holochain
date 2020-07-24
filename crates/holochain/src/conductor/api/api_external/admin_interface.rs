@@ -8,7 +8,7 @@ use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
     ConductorHandle,
 };
-use holo_hash_ext::*;
+use holo_hash::*;
 use holochain_keystore::KeystoreApiSender;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{

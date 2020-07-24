@@ -11,8 +11,8 @@ mod tests {
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
-    use holo_hash_ext::fixt::*;
-    use holo_hash_ext::*;
+    use holo_hash::fixt::*;
+    use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
         fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},

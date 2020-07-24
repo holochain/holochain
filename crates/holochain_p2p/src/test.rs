@@ -1,7 +1,7 @@
 use crate::actor::HolochainP2pRefToCell;
 use crate::HolochainP2pCell;
 use fixt::prelude::*;
-use holo_hash_ext::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
+use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 
 fixturator!(
     HolochainP2pCell;
@@ -43,15 +43,15 @@ mod tests {
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash_ext::$p::from_raw_bytes([$c as u8; 36].to_vec())
+            holo_hash::$p::from_raw_bytes([$c as u8; 36].to_vec())
         };
     }
 
     fn test_setup() -> (
-        holo_hash_ext::DnaHash,
-        holo_hash_ext::AgentPubKey,
-        holo_hash_ext::AgentPubKey,
-        holo_hash_ext::AgentPubKey,
+        holo_hash::DnaHash,
+        holo_hash::AgentPubKey,
+        holo_hash::AgentPubKey,
+        holo_hash::AgentPubKey,
     ) {
         (
             newhash!(DnaHash, 's'),
@@ -173,7 +173,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let header_hash = holo_hash_ext::AnyDhtHash::from_raw_bytes_and_type(
+        let header_hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::AnyDht::Header,
         );
@@ -220,7 +220,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let hash = holo_hash_ext::AnyDhtHash::from_raw_bytes_and_type(
+        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::AnyDht::Header,
         );
@@ -266,7 +266,7 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        let hash = holo_hash_ext::AnyDhtHash::from_raw_bytes_and_type(
+        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::AnyDht::Header,
         );

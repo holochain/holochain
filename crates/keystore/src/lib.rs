@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```
-//! use holo_hash_ext::AgentPubKey;
+//! use holo_hash::AgentPubKey;
 //! use holochain_keystore::*;
 //! use holochain_serialized_bytes::prelude::*;
 //!

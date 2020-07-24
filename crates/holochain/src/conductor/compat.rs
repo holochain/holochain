@@ -4,7 +4,7 @@ use super::{
     state::AppInterfaceConfig,
     ConductorBuilder, ConductorHandle,
 };
-use holo_hash_ext::*;
+use holo_hash::*;
 use holochain_keystore::keystore_actor::KeystoreApiSender;
 use holochain_keystore::{test_keystore::spawn_test_keystore, KeystoreError};
 use holochain_types::{

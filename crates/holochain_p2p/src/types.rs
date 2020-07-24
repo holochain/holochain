@@ -8,11 +8,11 @@ pub enum HolochainP2pError {
 
     /// RoutingDnaError
     #[error("Routing Dna Error: {0}")]
-    RoutingDnaError(holo_hash_ext::DnaHash),
+    RoutingDnaError(holo_hash::DnaHash),
 
     /// RoutingAgentError
     #[error("Routing Agent Error: {0}")]
-    RoutingAgentError(holo_hash_ext::AgentPubKey),
+    RoutingAgentError(holo_hash::AgentPubKey),
 
     /// OtherKitsuneP2pError
     #[error(transparent)]
@@ -49,10 +49,10 @@ impl From<kitsune_p2p::KitsuneP2pError> for HolochainP2pError {
         use kitsune_p2p::KitsuneP2pError::*;
         match e {
             RoutingSpaceError(space) => {
-                Self::RoutingDnaError(holo_hash_ext::DnaHash::from_kitsune(&space))
+                Self::RoutingDnaError(holo_hash::DnaHash::from_kitsune(&space))
             }
             RoutingAgentError(agent) => {
-                Self::RoutingAgentError(holo_hash_ext::AgentPubKey::from_kitsune(&agent))
+                Self::RoutingAgentError(holo_hash::AgentPubKey::from_kitsune(&agent))
             }
             _ => Self::OtherKitsuneP2pError(e),
         }
@@ -121,9 +121,9 @@ macro_rules! to_and_from_kitsune {
 }
 
 to_and_from_kitsune! {
-    DnaHashExt<holo_hash_ext::DnaHash> -> kitsune_p2p::KitsuneSpace,
+    DnaHashExt<holo_hash::DnaHash> -> kitsune_p2p::KitsuneSpace,
     AgentPubKeyExt<
-        holo_hash_ext::AgentPubKey
+        holo_hash::AgentPubKey
     > -> kitsune_p2p::KitsuneAgent,
 }
 
@@ -148,6 +148,6 @@ macro_rules! to_kitsune {
 
 to_kitsune! {
     AnyDhtHashExt<
-        holo_hash_ext::AnyDhtHash
+        holo_hash::AnyDhtHash
     > -> kitsune_p2p::KitsuneBasis,
 }

@@ -27,7 +27,7 @@ use crate::{
 };
 use error::CellError;
 use futures::future::FutureExt;
-use holo_hash_ext::*;
+use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
@@ -326,7 +326,7 @@ impl Cell {
         from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash_ext::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         if from_agent == *self.id().agent_pubkey() {
             // Don't handle messages we published to ourselves, because that

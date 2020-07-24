@@ -5,7 +5,6 @@ members = [
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk",
-  "crates/holo_hash_ext",
   "crates/holo_hash",
   "crates/holochain",
   "crates/holochain_p2p",

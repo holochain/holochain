@@ -5,7 +5,7 @@ use ::fixt::prelude::*;
 use derive_more::Constructor;
 use header::HeaderInner;
 use header::{IntendedFor, ZomeId};
-use holo_hash_ext::{fixt::*, *};
+use holo_hash::{fixt::*, *};
 use holochain_zome_types::link::LinkTag;
 
 #[derive(Constructor)]

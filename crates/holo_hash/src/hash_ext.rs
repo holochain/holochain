@@ -14,8 +14,8 @@ pub trait HoloHashExt<C: HashableContent> {
     fn with_pre_hashed_typed(hash: Vec<u8>, hash_type: C::HashType) -> Self;
 }
 
-impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
-    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHashOf<C>> {
+impl<C: HashableContent> HoloHashOf<C> {
+    pub fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHashOf<C>> {
         async move {
             match content.hashable_content() {
                 HashableContentBytes::Content(sb) => {
@@ -34,7 +34,7 @@ impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
         .into()
     }
 
-    fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: C::HashType) -> Self {
+    pub fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: C::HashType) -> Self {
         // Assert the data size is relatively small so we are
         // comfortable executing this synchronously / blocking
         // tokio thread.
@@ -53,8 +53,8 @@ pub trait HoloHashPrimitiveExt<P: PrimitiveHashType> {
     fn with_pre_hashed(hash: Vec<u8>) -> Self;
 }
 
-impl<P: PrimitiveHashType> HoloHashPrimitiveExt<P> for HoloHash<P> {
-    fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
+impl<P: PrimitiveHashType> HoloHash<P> {
+    pub fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
         // Assert the data size is relatively small so we are
         // comfortable executing this synchronously / blocking
         // tokio thread.

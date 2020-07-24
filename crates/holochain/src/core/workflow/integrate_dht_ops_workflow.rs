@@ -15,7 +15,7 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash_ext::HasHash;
+use holo_hash::HasHash;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,

@@ -8,10 +8,10 @@ ghost_actor::ghost_chan! {
     /// used for signing, encryption, etc.
     pub chan KeystoreApi<KeystoreError> {
         /// Generates a new pure entropy keypair in the keystore, returning the public key.
-        fn generate_sign_keypair_from_pure_entropy() -> holo_hash_ext::AgentPubKey;
+        fn generate_sign_keypair_from_pure_entropy() -> holo_hash::AgentPubKey;
 
         /// List all the signature public keys this keystore is tracking.
-        fn list_sign_keys() -> Vec<holo_hash_ext::AgentPubKey>;
+        fn list_sign_keys() -> Vec<holo_hash::AgentPubKey>;
 
         /// Generate a signature for a given blob of binary data.
         fn sign(input: SignInput) -> Signature;

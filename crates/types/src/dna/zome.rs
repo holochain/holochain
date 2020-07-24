@@ -39,8 +39,8 @@ pub enum Permission {
 }
 
 impl Zome {
-    /// create a Zome from a holo_hash_ext WasmHash instead of a holo_hash one
-    pub fn from_hash(wasm_hash: holo_hash_ext::WasmHash) -> Self {
+    /// create a Zome from a holo_hash WasmHash instead of a holo_hash one
+    pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
         Self { wasm_hash }
     }
 }

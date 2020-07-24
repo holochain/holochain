@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! holochain specific wrapper around more generic p2p module
 
-use holo_hash_ext::*;
+use holo_hash::*;
 use holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
@@ -65,8 +65,8 @@ impl HolochainP2pCell {
     pub async fn publish(
         &mut self,
         request_validation_receipt: bool,
-        dht_hash: holo_hash_ext::AnyDhtHash,
-        ops: Vec<(holo_hash_ext::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        dht_hash: holo_hash::AnyDhtHash,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
@@ -94,7 +94,7 @@ impl HolochainP2pCell {
     /// Get an entry from the DHT.
     pub async fn get(
         &mut self,
-        dht_hash: holo_hash_ext::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
     ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
         self.sender
@@ -110,7 +110,7 @@ impl HolochainP2pCell {
     /// Get links from the DHT.
     pub async fn get_links(
         &mut self,
-        dht_hash: holo_hash_ext::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
         self.sender

@@ -1,7 +1,7 @@
 //! Collection of cells to form a holochain application
 use crate::{cell::CellId, dna::JsonProperties};
 use derive_more::Into;
-use holo_hash_ext::AgentPubKey;
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::SerializedBytes;
 use std::path::PathBuf;
 

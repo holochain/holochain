@@ -7,7 +7,7 @@
 #![allow(missing_docs)]
 
 use crate::prelude::*;
-use holo_hash_ext::{EntryHash, HeaderAddress};
+use holo_hash::{EntryHash, HeaderAddress};
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::link::LinkTag;
 

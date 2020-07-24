@@ -212,7 +212,7 @@ mod slow_tests {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use holo_hash_ext::fixt::HeaderHashFixturator;
+    use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

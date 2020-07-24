@@ -2,7 +2,7 @@
 
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use fallible_iterator::FallibleIterator;
-use holo_hash_ext::*;
+use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
@@ -171,7 +171,7 @@ mod tests {
     use crate::fixt::AnyDhtHashFixturator;
     use ::fixt::prelude::*;
     use chrono::{Duration, Utc};
-    use holo_hash_ext::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
+    use holo_hash::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
     use holochain_state::test_utils::test_cell_env;
     use holochain_state::{
         buffer::BufferedStore,

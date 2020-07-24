@@ -103,13 +103,13 @@ pub fn fake_agent_pub_key(name: u8) -> AgentPubKey {
 
 /// A fixture AgentPubKey for unit testing.
 pub fn fake_agent_pubkey_1() -> AgentPubKey {
-    holo_hash_ext::AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4")
+    holo_hash::AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4")
         .unwrap()
 }
 
 /// Another fixture AgentPubKey for unit testing.
 pub fn fake_agent_pubkey_2() -> AgentPubKey {
-    holo_hash_ext::AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK")
+    holo_hash::AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK")
         .unwrap()
 }
 

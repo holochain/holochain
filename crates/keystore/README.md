@@ -16,7 +16,7 @@ and usage of those keypairs, reference by the public AgentPubKey.
 ## Example
 
 ```rust
-use holo_hash_ext::AgentPubKey;
+use holo_hash::AgentPubKey;
 use holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
 
