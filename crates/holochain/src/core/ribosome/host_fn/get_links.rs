@@ -21,14 +21,14 @@ pub fn get_links<'a>(
     let (base_address, tag) = input.into_inner();
 
     // Get zome id
-    let zome_id: holochain_types::header::ZomeId = match ribosome
+    let zome_id: holochain_zome_types::header::ZomeId = match ribosome
         .dna_file()
         .dna
         .zomes
         .iter()
         .position(|(name, _)| name == &call_context.zome_name)
     {
-        Some(index) => holochain_types::header::ZomeId::from(index as u8),
+        Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
         None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
     };
 
