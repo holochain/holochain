@@ -1,5 +1,4 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_serialized_bytes::SerializedBytes;
@@ -10,7 +9,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 pub fn zome_info(
-    ribosome: Arc<WasmRibosome>,
+    ribosome: Arc<impl RibosomeT>,
     host_context: Arc<CallContext>,
     _input: ZomeInfoInput,
 ) -> RibosomeResult<ZomeInfoOutput> {

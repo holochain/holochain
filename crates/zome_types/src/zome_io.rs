@@ -42,7 +42,8 @@ wasm_io_types!(
     pub struct CapabilityOutput(());
     // the SerializedBytes will be stuffed into an Entry::App(SB) host side
     pub struct CommitEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry));
-    pub struct CommitEntryOutput(holo_hash_core::EntryHash);
+    // the header hash of the newly committed entry
+    pub struct CommitEntryOutput(holo_hash_core::HeaderHash);
     // @TODO
     pub struct DecryptInput(());
     pub struct DecryptOutput(());
@@ -64,9 +65,10 @@ wasm_io_types!(
     // @TODO
     pub struct RemoteCallInput(());
     pub struct RemoteCallOutput(());
-    // @TODO
-    pub struct RemoveLinkInput(());
-    pub struct RemoveLinkOutput(());
+    // the header hash of the LinkAdd element
+    pub struct RemoveLinkInput(holo_hash_core::HeaderHash);
+    // the header hash of the LinkRemove element
+    pub struct RemoveLinkOutput(holo_hash_core::HeaderHash);
     // @TODO
     pub struct SendInput(());
     pub struct SendOutput(());

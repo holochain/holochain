@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
 use holochain_crypto::crypto_init_sodium;
 use holochain_crypto::crypto_randombytes_buf;
 use holochain_crypto::crypto_secure_buffer;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
-    _ribosome: Arc<WasmRibosome>,
+    _ribosome: Arc<impl RibosomeT>,
     _host_context: Arc<CallContext>,
     input: RandomBytesInput,
 ) -> RibosomeResult<RandomBytesOutput> {

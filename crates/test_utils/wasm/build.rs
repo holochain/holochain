@@ -4,7 +4,7 @@ fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
 
     println!("cargo:rerun-if-changed=Cargo.toml");
-    // println!("cargo:rerun-if-changed=*");
+    println!("cargo:rerun-if-changed=*");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
@@ -28,12 +28,13 @@ fn main() {
         "foo",
         "hash_path",
         "imports",
-        "init_pass",
         "init_fail",
-        "migrate_agent_pass",
+        "init_pass",
+        "link",
         "migrate_agent_fail",
-        "post_commit_success",
+        "migrate_agent_pass",
         "post_commit_fail",
+        "post_commit_success",
         "validate",
         "validate_invalid",
         "validate_valid",

@@ -743,7 +743,7 @@ async fn commit_entry<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
     zome_name: ZomeName,
-) -> EntryHash {
+) -> (EntryHash, HeaderHash) {
     let reader = env_ref.reader().unwrap();
     let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -808,7 +808,13 @@ async fn commit_entry<'env>(
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
-    output.into_inner().try_into().unwrap()
+    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        holochain_types::entry::EntryHashed::with_data(entry).await
+    })
+    .unwrap()
+    .into_hash();
+
+    (entry_hash, output.into_inner().try_into().unwrap())
 }
 
 async fn get_entry<'env>(
@@ -962,7 +968,9 @@ async fn test_metadata_from_wasm_api() {
     genesis(&env_ref, &dbs).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
@@ -1029,7 +1037,9 @@ async fn test_wasm_api_without_integration_links() {
     genesis(&env_ref, &dbs).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
@@ -1081,7 +1091,9 @@ async fn test_wasm_api_without_integration_delete() {
     genesis(&env_ref, &dbs).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state.clone(), &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state.clone(), &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
 
     // Trigger the produce workflow
     produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
@@ -1113,7 +1125,9 @@ async fn test_wasm_api_without_integration_delete() {
     // Call integrate
     call_workflow(&env_ref, &dbs, env.clone()).await;
     assert_eq!(get_entry(&env_ref, &dbs, base_address.clone()).await, None);
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
     assert_eq!(
         get_entry(&env_ref, &dbs, base_address.clone()).await,
         Some(original_entry)

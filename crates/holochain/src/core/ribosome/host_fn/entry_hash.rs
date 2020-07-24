@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryHashInput;
@@ -8,7 +8,7 @@ use holochain_zome_types::EntryHashOutput;
 use std::sync::Arc;
 
 pub fn entry_hash(
-    _ribosome: Arc<WasmRibosome>,
+    _ribosome: Arc<impl RibosomeT>,
     _host_context: Arc<CallContext>,
     input: EntryHashInput,
 ) -> RibosomeResult<EntryHashOutput> {
