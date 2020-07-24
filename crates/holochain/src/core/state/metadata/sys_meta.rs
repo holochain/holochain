@@ -7,7 +7,7 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::metadata::{EntryDhtStatus, MetadataBuf, MetadataBufT, TimeHeaderHash};
+    use crate::core::state::metadata::{EntryDhtStatus, MetadataBuf, MetadataBufT, TimedHeaderHash};
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
@@ -307,7 +307,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
-        let mut expected: Vec<TimeHeaderHash> = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_creates = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_create(entry_hash.clone(), &mut fx).await;
@@ -359,7 +359,7 @@ mod tests {
             .1
             .into_inner()
             .1;
-        let mut expected: Vec<TimeHeaderHash> = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_updates = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_update(
@@ -417,7 +417,7 @@ mod tests {
             .1
             .into_inner()
             .1;
-        let mut expected: Vec<TimeHeaderHash> = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_updates = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_update(
@@ -468,7 +468,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
         let entry_hash = fx.entry_hash();
-        let mut expected: Vec<TimeHeaderHash> = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_deletes = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_delete(header_hash.clone(), &mut fx).await;

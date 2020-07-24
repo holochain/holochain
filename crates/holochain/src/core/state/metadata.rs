@@ -20,7 +20,7 @@ use holochain_state::{
 use holochain_types::header;
 use holochain_types::{
     header::{LinkAdd, LinkRemove, ZomeId},
-    metadata::{EntryDhtStatus, TimeHeaderHash},
+    metadata::{EntryDhtStatus, TimedHeaderHash},
     Header, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::link::LinkTag;
@@ -173,31 +173,31 @@ pub trait MetadataBufT {
     fn get_headers(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all headers registered on an agent's public key
     fn get_activity(
         &self,
         agent_pubkey: AgentPubKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [EntryUpdate] headers registered on an [Entry]
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [ElementDelete] headers registered on a Header
     fn get_deletes_on_header(
         &self,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [ElementDelete] headers registered on an Entry's header
     fn get_deletes_on_entry(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns the current [EntryDhtStatus] of an [Entry]
     fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -212,7 +212,7 @@ pub trait MetadataBufT {
     fn get_link_removes_on_link_add(
         &self,
         link_add: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 }
 
 /// Values of [Header]s stored by the sys meta db
@@ -220,15 +220,15 @@ pub trait MetadataBufT {
 pub enum SysMetaVal {
     /// A header that results in a new entry
     /// Either a [EntryCreate] or [EntryUpdate]
-    NewEntry(TimeHeaderHash),
+    NewEntry(TimedHeaderHash),
     /// An [EntryUpdate] [Header]
-    Update(TimeHeaderHash),
+    Update(TimedHeaderHash),
     /// An [Header::ElementDelete]
-    Delete(TimeHeaderHash),
+    Delete(TimedHeaderHash),
     /// Activity on an agent's public key
-    Activity(TimeHeaderHash),
+    Activity(TimedHeaderHash),
     /// Link remove on link add
-    LinkRemove(TimeHeaderHash),
+    LinkRemove(TimedHeaderHash),
 }
 
 /// Subset of headers for the sys meta db
@@ -273,7 +273,7 @@ impl From<SysMetaVal> for HeaderHash {
 }
 
 impl EntryHeader {
-    async fn into_hash(self) -> Result<TimeHeaderHash, SerializedBytesError> {
+    async fn into_hash(self) -> Result<TimedHeaderHash, SerializedBytesError> {
         let header = match self {
             EntryHeader::NewEntry(h)
             | EntryHeader::Update(h)
@@ -282,7 +282,7 @@ impl EntryHeader {
         };
         let (header, header_hash): (Header, HeaderHash) =
             HeaderHashed::with_data(header).await?.into();
-        Ok(TimeHeaderHash {
+        Ok(TimedHeaderHash {
             timestamp: header.timestamp(),
             header_hash,
         })
@@ -506,7 +506,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_headers(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?).filter_map(|h| {
@@ -521,7 +521,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&hash)?).filter_map(|h| {
@@ -536,7 +536,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_deletes_on_header(
         &self,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&new_entry_header.into())?).filter_map(
@@ -553,7 +553,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_deletes_on_entry(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?).filter_map(|h| {
@@ -568,7 +568,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_activity(
         &self,
         agent_pubkey: AgentPubKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&agent_pubkey.into())?).filter_map(
@@ -602,7 +602,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_link_removes_on_link_add(
         &self,
         link_add: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&link_add.into())?).filter_map(|h| {

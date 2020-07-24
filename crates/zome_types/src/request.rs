@@ -11,7 +11,7 @@ pub struct MetadataRequest {
     // TODO: Implement after validation
     /// Placeholder
     pub all_invalid_headers: bool,
-    /// Get all the deletes on an entry or header
+    /// Get all the deletes on a header
     pub all_deletes: bool,
     /// Get all the updates on an entry or header
     pub all_updates: bool,

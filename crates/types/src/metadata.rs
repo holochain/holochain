@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 /// Timestamp of when the header was created with the headers hash.
 #[derive(Debug, Hash, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct TimeHeaderHash {
+pub struct TimedHeaderHash {
     /// Time when this header was created
     pub timestamp: Timestamp,
     /// Hash of the header
@@ -16,19 +16,19 @@ pub struct TimeHeaderHash {
 }
 
 /// Metadata returned from a GetMeta request.
-/// The Ord derive on TimeHeaderHash means each set is ordered by time.
+/// The Ord derive on TimedHeaderHash means each set is ordered by time.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 pub struct MetadataSet {
     /// Headers that created or updated an entry.
     /// These are the headers that show the entry exists.
-    pub headers: BTreeSet<TimeHeaderHash>,
+    pub headers: BTreeSet<TimedHeaderHash>,
     // TODO: Implement after validation
     /// Placeholder
-    pub invalid_headers: BTreeSet<TimeHeaderHash>,
+    pub invalid_headers: BTreeSet<TimedHeaderHash>,
     /// Deletes on a header
-    pub deletes: BTreeSet<TimeHeaderHash>,
+    pub deletes: BTreeSet<TimedHeaderHash>,
     /// Updates on a header or entry
-    pub updates: BTreeSet<TimeHeaderHash>,
+    pub updates: BTreeSet<TimedHeaderHash>,
     /// The status of an entry from an authority.
     /// This is simply a faster way of determining if
     /// there are any live headers on an entry.
@@ -56,10 +56,10 @@ pub enum EntryDhtStatus {
     Purged,
 }
 
-impl From<HeaderHashed> for TimeHeaderHash {
+impl From<HeaderHashed> for TimedHeaderHash {
     fn from(h: HeaderHashed) -> Self {
         let (header, hash) = h.into_inner();
-        TimeHeaderHash {
+        TimedHeaderHash {
             timestamp: header.timestamp(),
             header_hash: hash,
         }

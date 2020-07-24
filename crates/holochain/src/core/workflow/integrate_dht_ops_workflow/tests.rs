@@ -25,7 +25,7 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     fixt::*,
     header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader},
-    metadata::TimeHeaderHash,
+    metadata::TimedHeaderHash,
     observability,
     validate::ValidationStatus,
     Entry, EntryHashed, Header,
@@ -250,7 +250,7 @@ impl Db {
                 }
                 Db::MetaHeader(entry, header) => {
                     let header_hash = HeaderHashed::from_content(header.clone()).await;
-                    let header_hash = TimeHeaderHash::from(header_hash);
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
                     let res = workspace
                         .meta
@@ -263,7 +263,7 @@ impl Db {
                 }
                 Db::MetaActivity(header) => {
                     let header_hash = HeaderHashed::from_content(header.clone()).await;
-                    let header_hash = TimeHeaderHash::from(header_hash);
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
                         .get_activity(header.author().clone())
@@ -275,7 +275,7 @@ impl Db {
                 }
                 Db::MetaUpdate(base, header) => {
                     let header_hash = HeaderHashed::from_content(header.clone()).await;
-                    let header_hash = TimeHeaderHash::from(header_hash);
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
                         .get_updates(base)
@@ -287,7 +287,7 @@ impl Db {
                 }
                 Db::MetaDelete(base, deleted_header_hash, header) => {
                     let header_hash = HeaderHashed::from_content(header.clone()).await;
-                    let header_hash = TimeHeaderHash::from(header_hash);
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
                         .get_deletes_on_entry(base)

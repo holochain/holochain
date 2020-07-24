@@ -26,27 +26,27 @@ mock! {
         fn get_headers(
             &self,
             entry_hash: EntryHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_activity(
             &self,
             header_hash: AgentPubKey,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_updates(
             &self,
             hash: AnyDhtHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_deletes_on_header(
             &self,
             new_entry_header: HeaderHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_deletes_on_entry(
             &self,
             entry_hash: EntryHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_link_removes_on_link_add(
             &self,
             link_add: HeaderHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
     }
 }
 
@@ -71,7 +71,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_headers(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_headers(entry_hash)
     }
@@ -79,7 +79,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_activity(
         &self,
         agent_pubkey: AgentPubKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_activity(agent_pubkey)
     }
@@ -87,7 +87,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_updates(hash)
     }
@@ -95,7 +95,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_deletes_on_header(
         &self,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_deletes_on_header(new_entry_header)
     }
@@ -103,7 +103,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_deletes_on_entry(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_deletes_on_entry(entry_hash)
     }
@@ -111,7 +111,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_link_removes_on_link_add(
         &self,
         link_add: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimeHeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_link_removes_on_link_add(link_add)
     }
