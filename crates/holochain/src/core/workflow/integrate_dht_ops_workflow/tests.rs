@@ -24,15 +24,18 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     fixt::*,
-    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader},
+    header::NewEntryHeader,
     observability,
     validate::ValidationStatus,
     Entry, EntryHashed,
 };
-use holochain_zome_types::link::{LinkTag, Links};
 use holochain_zome_types::{
-    entry::GetOptions, entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetEntryInput,
-    GetLinksInput, LinkEntriesInput,
+    entry::GetOptions,
+    entry_def::EntryDefs,
+    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
+    link::{LinkTag, Links},
+    zome::ZomeName,
+    CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
@@ -196,7 +199,7 @@ impl Db {
                         validation_status: ValidationStatus::Valid,
                         basis,
                         op,
-                        when_integrated: Timestamp::now(),
+                        when_integrated: Timestamp::now().into(),
                     };
                     let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
                     r.when_integrated = value.when_integrated;
@@ -666,45 +669,6 @@ fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register link remove")
 }
 
-// The header isn't stored yet
-fn register_remove_link_missing_add_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasEntry(
-            a.original_entry.clone().into(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-    ];
-    let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
-    (
-        pre_state,
-        expect,
-        "register remove link remove missing add header",
-    )
-}
-
-// Link add is there but metadata is missing
-fn register_remove_link_missing_add_metadata(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasHeader(a.link_add.clone().into(), Some(a.signature.clone())),
-        Db::CasEntry(
-            a.original_entry.clone().into(),
-            Some(a.original_header.clone().into()),
-            Some(a.signature.clone()),
-        ),
-    ];
-    let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
-    (
-        pre_state,
-        expect,
-        "register remove link remove missing add metadata",
-    )
-}
-
 // Link remove when not an author
 fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
@@ -737,8 +701,6 @@ async fn test_ops_state() {
         register_deleted_header_by,
         register_add_link,
         register_remove_link,
-        register_remove_link_missing_add_header,
-        register_remove_link_missing_add_metadata,
         register_remove_link_missing_base,
     ];
 
@@ -1210,6 +1172,10 @@ mod slow_tests {
         ConductorBuilder,
     };
     use crate::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
+    use crate::{
+        core::state::cascade::{test_dbs_and_mocks, Cascade},
+        test_utils::test_network,
+    };
     use holochain_state::{
         buffer::BufferedStore,
         env::{ReadManager, WriteManager},
@@ -1217,12 +1183,12 @@ mod slow_tests {
     };
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload},
-        header::{builder, EntryType},
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         Entry, EntryHashed,
     };
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::header::{builder, EntryType};
     use holochain_zome_types::HostInput;
     use matches::assert_matches;
     use unwrap_to::unwrap_to;
@@ -1366,10 +1332,9 @@ mod slow_tests {
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
-            let (cas, _metadata, cache, metadata_cache) =
-                crate::core::state::cascade::test_dbs_and_mocks(&reader, &dbs);
-            let cascade =
-                crate::core::state::cascade::Cascade::new(&cas, &meta, &cache, &metadata_cache);
+            let (cas, _metadata, mut cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+            let (_n, _r, cell_network) = test_network().await;
+            let cascade = Cascade::new(&cas, &meta, &mut cache, &metadata_cache, cell_network);
 
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();

@@ -339,6 +339,49 @@ macro_rules! fixturator {
         );
     };
 
+    // for any Foo that has a vanilla function like fn make_foo( ... ) -> Foo
+    //
+    // fixturator!(Foo; vanilla fn make_foo(String, String, bool););
+    //
+    // implements all curves by building all the arguments to the named vanilla function from
+    // the fixturators of the types specified to the macro
+    ( $type:ident; vanilla fn $fn:tt( $( $newtype:ty ),* ); $($munch:tt)* ) => {
+        fixturator!(
+            $type;
+
+            curve Empty {
+                $fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Empty, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+
+            curve Unpredictable {
+                $fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Unpredictable, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+            curve Predictable {
+                $fn(
+                    $(
+                        expr! {
+                            [< $newtype:camel Fixturator >]::new_indexed(Predictable, self.0.index).next().unwrap().into()
+                        }
+                    ),*
+                )
+            };
+
+            $($munch)*
+        );
+    };
+
     // implement a single curve for Foo
     //
     // fixturator!(Foo; curve MyCurve { ... };);

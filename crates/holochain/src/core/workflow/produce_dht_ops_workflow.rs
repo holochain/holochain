@@ -106,10 +106,12 @@ mod tests {
     };
     use holochain_types::{
         dht_op::{ops_from_element, DhtOp, DhtOpHashed},
-        header::{builder, EntryType},
         observability, Entry, EntryHashed,
     };
-    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::{
+        entry_def::EntryVisibility,
+        header::{builder, EntryType},
+    };
     use matches::assert_matches;
 
     struct TestData {

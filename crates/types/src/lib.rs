@@ -34,6 +34,6 @@ pub mod test_utils;
 pub use entry::{Entry, EntryHashed};
 
 #[doc(inline)]
-pub use header::{Header, HeaderHashed};
+pub use header::HeaderHashed;
 
 pub use timestamp::{Timestamp, TimestampKey};

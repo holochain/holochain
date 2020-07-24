@@ -181,12 +181,13 @@ mod tests {
         dht_op::{DhtOp, DhtOpHashed},
         element::SignedHeaderHashed,
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        header::{EntryType, IntendedFor, NewEntryHeader},
+        header::NewEntryHeader,
         observability,
         validate::ValidationStatus,
-        EntryHashed, Header, HeaderHashed, Timestamp,
+        EntryHashed, HeaderHashed, Timestamp,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::header::{EntryType, Header, IntendedFor};
     use std::{
         collections::HashMap,
         sync::{
@@ -232,7 +233,7 @@ mod tests {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
                 op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
-                when_integrated: Timestamp::now(),
+                when_integrated: Timestamp::now().into(),
             };
             data.push((sig, op_hashed, light, header_hash));
         }
@@ -602,7 +603,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
-                    when_integrated: Timestamp::now(),
+                    when_integrated: Timestamp::now().into(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
@@ -616,7 +617,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
-                    when_integrated: Timestamp::now(),
+                    when_integrated: Timestamp::now().into(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
@@ -630,7 +631,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
-                    when_integrated: Timestamp::now(),
+                    when_integrated: Timestamp::now().into(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
