@@ -89,7 +89,7 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(&mut workspace.cas, &mut workspace.meta, value)
+                match integrate_single_dht_op(&mut workspace.cas, &mut workspace.meta, value, true)
                     .await?
                 {
                     Outcome::Integrated(integrated) => {
@@ -149,15 +149,12 @@ pub async fn integrate_dht_ops_workflow(
 ///
 /// NB: When integrating ops we have authored, we are repeating the storage of
 /// Element and Entry data.
-/// In particular, when integrating inline, we are writing data to the
-/// ElementCache that we already have in our ElementVault. Then later, when we
-/// do "real" integration, we are writing it again to our ElementVault!
-/// thus, FIXME.
 #[instrument(skip(element_store, meta_store, value))]
 async fn integrate_single_dht_op(
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
     value: IntegrationQueueValue,
+    integrate_element_data: bool,
 ) -> WorkflowResult<Outcome> {
     debug!("Starting integrate dht ops workflow");
     {
@@ -171,30 +168,37 @@ async fn integrate_single_dht_op(
         // return the full op as it's not consumed when making hashes
         match op.clone() {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
-                let header = HeaderHashed::with_data(header).await?;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let maybe_entry_hashed = match maybe_entry {
-                    Some(entry) => Some(EntryHashed::with_data(*entry).await?),
-                    None => None,
-                };
-                // Store the entry
-                element_store.put(signed_header, maybe_entry_hashed)?;
+                if integrate_element_data {
+                    let header = HeaderHashed::with_data(header).await?;
+                    let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                    let maybe_entry_hashed = match maybe_entry {
+                        Some(entry) => Some(EntryHashed::with_data(*entry).await?),
+                        None => None,
+                    };
+                    // Store the entry
+                    element_store.put(signed_header, maybe_entry_hashed)?;
+                }
             }
             DhtOp::StoreEntry(signature, new_entry_header, entry) => {
                 // Reference to headers
                 meta_store.register_header(new_entry_header.clone()).await?;
 
-                let header = HeaderHashed::with_data(new_entry_header.into()).await?;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let entry = EntryHashed::with_data(*entry).await?;
-                // Store Header and Entry
-                element_store.put(signed_header, Some(entry))?;
+                if integrate_element_data {
+                    let header = HeaderHashed::with_data(new_entry_header.into()).await?;
+                    let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                    let entry = EntryHashed::with_data(*entry).await?;
+                    // Store Header and Entry
+                    element_store.put(signed_header, Some(entry))?;
+                }
             }
             DhtOp::RegisterAgentActivity(signature, header) => {
-                // Store header
-                let header_hashed = HeaderHashed::with_data(header.clone()).await?;
-                let signed_header = SignedHeaderHashed::with_presigned(header_hashed, signature);
-                element_store.put(signed_header, None)?;
+                if integrate_element_data {
+                    // Store header
+                    let header_hashed = HeaderHashed::with_data(header.clone()).await?;
+                    let signed_header =
+                        SignedHeaderHashed::with_presigned(header_hashed, signature);
+                    element_store.put(signed_header, None)?;
+                }
 
                 // register agent activity on this agents pub key
                 meta_store.register_activity(header).await?;
@@ -241,8 +245,10 @@ async fn integrate_single_dht_op(
                 // Store add Header
                 let header = HeaderHashed::with_data(link_add.into()).await?;
                 debug!(link_add = ?header.as_hash());
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                element_store.put(signed_header, None)?;
+                if integrate_element_data {
+                    let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                    element_store.put(signed_header, None)?;
+                }
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
                 // Check whether they have the base address in the cas.
@@ -259,10 +265,12 @@ async fn integrate_single_dht_op(
                     return Outcome::deferred(op, validation_status);
                 }
 
-                // Store link delete Header
-                let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                element_store.put(signed_header, None)?;
+                if integrate_element_data {
+                    // Store link delete Header
+                    let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
+                    let signed_header = SignedHeaderHashed::with_presigned(header, signature);
+                    element_store.put(signed_header, None)?;
+                }
 
                 // Remove the link
                 meta_store.remove_link(link_remove).await?;
@@ -288,9 +296,11 @@ async fn integrate_single_dht_op(
     }
 }
 
-/// When writing an Element to our chain, we want to integrate the meta ops
-/// inline, so that they are immediately available in the meta cache
-pub async fn inline_integrate_meta(
+/// After writing an Element to our chain, we want to integrate the meta ops
+/// inline, so that they are immediately available in the meta cache.
+/// NB: We skip integrating the element data, since it is already available in
+/// our vault.
+pub async fn integrate_to_cache(
     element: ChainElement,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
@@ -300,7 +310,8 @@ pub async fn inline_integrate_meta(
             op,
             validation_status: ValidationStatus::Valid,
         };
-        match integrate_single_dht_op(element_store, meta_store, value).await? {
+        // we don't integrate element data, because it is already in our vault.
+        match integrate_single_dht_op(element_store, meta_store, value, false).await? {
             Outcome::Integrated(_) => {}
             Outcome::Deferred(v) => {
                 unreachable!("An inline-integrated DhtOp cannot be deferred: {:?}", v)
