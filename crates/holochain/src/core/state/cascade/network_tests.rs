@@ -6,7 +6,6 @@ use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
 use holo_hash::hash_type::{self, AnyDht};
-use holo_hash::hash_type::{self, AnyDht};
 use holo_hash::*;
 use holochain_p2p::{actor::GetMetaOptions, HolochainP2pCell, HolochainP2pRef};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
