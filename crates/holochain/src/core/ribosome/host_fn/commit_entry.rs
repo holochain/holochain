@@ -5,7 +5,9 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
-use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
+use crate::core::workflow::{
+    call_zome_workflow::InvokeZomeWorkspace, integrate_dht_ops_workflow::integrate_to_cache,
+};
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use holo_hash::{HasHash, HeaderAddress};
@@ -85,7 +87,11 @@ pub fn commit_entry<'a>(
         async move {
             let source_chain = &mut workspace.source_chain;
             // push the header and the entry into the source chain
-            source_chain.put(header_builder, Some(entry)).await
+            let header_hash = source_chain.put(header_builder, Some(entry)).await?;
+            // fetch the element we just added so we can integrate its DhtOps
+            let element = source_chain.get_element(&header_hash).await?.expect("Element we just put in SourceChain must be gettable");
+            integrate_to_cache(&element, &mut workspace.cache_cas, &mut workspace.cache_meta).await.map_err(Box::new)?;
+            Ok(header_hash)
         }
         .boxed()
     };

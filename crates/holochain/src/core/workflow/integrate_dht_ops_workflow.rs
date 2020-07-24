@@ -29,7 +29,10 @@ use holochain_types::{
     EntryHashed, HeaderHashed, Timestamp, TimestampKey,
 };
 use holochain_zome_types::header::IntendedFor;
-use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
+use produce_dht_ops_workflow::dht_op_light::{
+    dht_op_to_light_basis,
+    error::{DhtOpConvertError, DhtOpConvertResult},
+};
 use tracing::*;
 
 mod tests;
@@ -155,7 +158,7 @@ async fn integrate_single_dht_op(
     meta_store: &mut MetadataBuf<'_>,
     value: IntegrationQueueValue,
     integrate_element_data: bool,
-) -> WorkflowResult<Outcome> {
+) -> DhtOpConvertResult<Outcome> {
     debug!("Starting integrate dht ops workflow");
     {
         // Process each op
@@ -301,11 +304,11 @@ async fn integrate_single_dht_op(
 /// NB: We skip integrating the element data, since it is already available in
 /// our vault.
 pub async fn integrate_to_cache(
-    element: ChainElement,
+    element: &ChainElement,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
-) -> WorkflowResult<()> {
-    for op in produce_ops_from_element(&element)? {
+) -> DhtOpConvertResult<()> {
+    for op in produce_ops_from_element(element)? {
         let value = IntegrationQueueValue {
             op,
             validation_status: ValidationStatus::Valid,
@@ -328,7 +331,7 @@ enum Outcome {
 }
 
 impl Outcome {
-    fn deferred(op: DhtOp, validation_status: ValidationStatus) -> WorkflowResult<Self> {
+    fn deferred(op: DhtOp, validation_status: ValidationStatus) -> DhtOpConvertResult<Self> {
         Ok(Outcome::Deferred(IntegrationQueueValue {
             op,
             validation_status,
