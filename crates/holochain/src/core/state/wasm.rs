@@ -55,8 +55,8 @@ mod tests {
 
         // a wasm
         let wasm =
-            DnaWasmHashed::with_data(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo))
-                .await?;
+            DnaWasmHashed::from_content(DnaWasm::from(holochain_wasm_test_utils::TestWasm::Foo))
+                .await;
 
         // a wasm in the WasmBuf
         wasm_buf.put(wasm.clone());

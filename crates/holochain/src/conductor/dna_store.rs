@@ -93,7 +93,7 @@ impl<'env> DnaDefBuf<'env> {
     }
 
     pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        self.dna_defs.put(DnaDefHashed::with_data(dna_def).await?);
+        self.dna_defs.put(DnaDefHashed::from_content(dna_def).await);
         Ok(())
     }
 

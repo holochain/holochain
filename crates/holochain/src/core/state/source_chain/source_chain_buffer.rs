@@ -74,10 +74,7 @@ impl<'env> SourceChainBuf<'env> {
         self.cas.get_element(k).await
     }
 
-    pub async fn get_header(
-        &self,
-        k: &HeaderHash,
-    ) -> DatabaseResult<Option<SignedHeaderHashed>> {
+    pub async fn get_header(&self, k: &HeaderHash) -> DatabaseResult<Option<SignedHeaderHashed>> {
         self.cas.get_header(k).await
     }
 
@@ -118,12 +115,12 @@ impl<'env> SourceChainBuf<'env> {
         header: Header,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
-        let header = HeaderHashed::with_data(header).await?;
+        let header = HeaderHashed::from_content(header).await;
         let header_address = header.as_hash().to_owned();
         let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
         let maybe_entry = match maybe_entry {
             None => None,
-            Some(entry) => Some(EntryHashed::with_data(entry).await?),
+            Some(entry) => Some(EntryHashed::from_content(entry).await),
         };
 
         /*
@@ -341,7 +338,7 @@ pub mod tests {
                     header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
-                let dna_header = HeaderHashed::with_data(dna_header).await.unwrap();
+                let dna_header = HeaderHashed::from_content(dna_header).await;
 
                 let agent_header = Header::EntryCreate(header::EntryCreate {
                     author: agent_pubkey.clone(),
@@ -351,7 +348,7 @@ pub mod tests {
                     entry_type: header::EntryType::AgentPubKey,
                     entry_hash: agent_pubkey.clone().into(),
                 });
-                let agent_header = HeaderHashed::with_data(agent_header).await.unwrap();
+                let agent_header = HeaderHashed::from_content(agent_header).await;
 
                 (dna_header, agent_header)
             },
@@ -495,7 +492,7 @@ pub mod tests {
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();
         let hash = HeaderHash::with_data(&header).await;
-        let hashed = HeaderHashed::with_data(header.clone()).await.unwrap();
+        let hashed = HeaderHashed::from_content(header.clone()).await;
         assert_eq!(hash, *hashed.as_hash());
 
         store.put_raw(header, None).await.unwrap();

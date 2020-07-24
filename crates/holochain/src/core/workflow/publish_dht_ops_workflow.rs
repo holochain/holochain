@@ -482,10 +482,8 @@ mod tests {
             let sig = sig_fixt.next().unwrap();
             let original_entry = fixt!(Entry);
             let new_entry = fixt!(Entry);
-            let original_entry_hashed = EntryHashed::with_data(original_entry.clone())
-                .await
-                .unwrap();
-            let new_entry_hashed = EntryHashed::with_data(new_entry.clone()).await.unwrap();
+            let original_entry_hashed = EntryHashed::from_content(original_entry.clone()).await;
+            let new_entry_hashed = EntryHashed::from_content(new_entry.clone()).await;
 
             // Create StoreElement
             // Create the headers
@@ -514,9 +512,7 @@ mod tests {
 
                 let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
 
-                let header_hash = HeaderHashed::with_data(entry_create_header.clone())
-                    .await
-                    .unwrap();
+                let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
 
                 // Update the replaces to the header of the original
                 entry_update.replaces_address = header_hash.as_hash().clone();
@@ -526,7 +522,7 @@ mod tests {
                 cas.put(signed_header, Some(original_entry_hashed)).unwrap();
 
                 let entry_update_header = Header::EntryUpdate(entry_update.clone());
-                let header_hash = HeaderHashed::with_data(entry_update_header).await.unwrap();
+                let header_hash = HeaderHashed::from_content(entry_update_header).await;
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
                 cas.put(signed_header, Some(new_entry_hashed)).unwrap();
                 env_ref

@@ -279,7 +279,7 @@ impl EntryHeader {
             | EntryHeader::Activity(h) => h,
         };
         let (header, header_hash): (Header, HeaderHash) =
-            HeaderHashed::with_data(header).await?.into();
+            HeaderHashed::from_content(header).await.into();
         Ok(TimedHeaderHash {
             timestamp: header.timestamp().into(),
             header_hash,
@@ -402,8 +402,8 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     #[allow(clippy::needless_lifetimes)]
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         // Register the add link onto the base
-        let link_add_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
-            .await?
+        let link_add_hash = HeaderHashed::from_content(Header::LinkAdd(link_add.clone()))
+            .await
             .into_hash();
 
         // Put the link add to the links table
@@ -424,7 +424,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     async fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
         let link_add_address = link_remove.link_add_address.clone();
         // Register the link remove address to the link add address
-        let link_remove = HeaderHashed::with_data(Header::LinkRemove(link_remove)).await?;
+        let link_remove = HeaderHashed::from_content(Header::LinkRemove(link_remove)).await;
         let sys_val = SysMetaVal::LinkRemove(link_remove.into());
         self.system_meta.insert(link_add_address.into(), sys_val);
         Ok(())

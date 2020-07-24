@@ -193,18 +193,16 @@ impl SignedHeaderHashed {
         self.header.as_hash()
     }
 
-    pub fn with_data(
-        signed_header: SignedHeader,
-    ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
+    pub fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, Self>
     where
         Self: Sized,
     {
         async move {
             let (header, signature) = signed_header.into();
-            Ok(Self {
-                header: HeaderHashed::with_data(header.clone()).await?,
+            Self {
+                header: HeaderHashed::from_content(header.clone()).await,
                 signed_header: SignedHeader(header, signature),
-            })
+            }
         }
         .boxed()
         .into()
@@ -293,7 +291,7 @@ impl WireElement {
     /// Convert into a [ChainElement] when receiving from the network
     pub async fn into_element(self) -> Result<ChainElement, SerializedBytesError> {
         Ok(ChainElement::new(
-            SignedHeaderHashed::with_data(self.signed_header).await?,
+            SignedHeaderHashed::from_content(self.signed_header).await,
             self.maybe_entry,
         ))
     }

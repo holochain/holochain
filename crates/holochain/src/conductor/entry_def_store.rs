@@ -223,9 +223,8 @@ mod tests {
             crdt_type: CrdtType,
             required_validations: 3.into(),
         };
-        let dna_wasm = DnaWasmHashed::with_data(TestWasm::EntryDefs.into())
+        let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await
-            .unwrap()
             .into_hash();
 
         let post_def_key = EntryDefBufferKey {

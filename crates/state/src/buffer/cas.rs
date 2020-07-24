@@ -1,7 +1,7 @@
 use super::{kv::KvBuf, BufKey, BufVal, BufferedStore};
 use crate::{
     error::{DatabaseError, DatabaseResult},
-    fatal_db_hash_construction_check, fatal_db_hash_integrity_check,
+    fatal_db_hash_integrity_check,
     prelude::{Reader, Writer},
 };
 use fallible_iterator::FallibleIterator;
@@ -88,11 +88,7 @@ where
     }
 
     async fn deserialize_and_hash(hash_bytes: &[u8], content: C) -> HoloHashed<C> {
-        let data = fatal_db_hash_construction_check!(
-            "CasBuf::get",
-            hash_bytes,
-            HoloHashed::<C>::with_data(content).await
-        );
+        let data = HoloHashed::from_content(content).await;
         fatal_db_hash_integrity_check!(
             "CasBuf::get",
             hash_bytes,

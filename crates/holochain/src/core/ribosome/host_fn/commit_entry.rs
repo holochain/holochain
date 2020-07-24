@@ -29,8 +29,8 @@ pub fn commit_entry<'a>(
     // build the entry hash
     let async_entry = entry.clone();
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::with_data(async_entry).await
-    })?
+        holochain_types::entry::EntryHashed::from_content(async_entry).await
+    })
     .into_hash();
 
     // extract the zome position
@@ -81,14 +81,15 @@ pub fn commit_entry<'a>(
         entry_type: EntryType::App(app_entry_type),
         entry_hash: entry_hash.clone(),
     };
-    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-        async move {
-            let source_chain = &mut workspace.source_chain;
-            // push the header and the entry into the source chain
-            source_chain.put(header_builder, Some(entry)).await
-        }
-        .boxed()
-    };
+    let call =
+        |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+            async move {
+                let source_chain = &mut workspace.source_chain;
+                // push the header and the entry into the source chain
+                source_chain.put(header_builder, Some(entry)).await
+            }
+            .boxed()
+        };
     tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
         unsafe { call_context.host_access.workspace().apply_mut(call).await }
     }))???;
@@ -202,9 +203,8 @@ pub mod wasm_test {
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        let app_entry_hash = holochain_types::entry::EntryHashed::with_data(app_entry.clone())
+        let app_entry_hash = holochain_types::entry::EntryHashed::from_content(app_entry.clone())
             .await
-            .unwrap()
             .into_hash();
 
         // this should be the hash of the newly committed entry

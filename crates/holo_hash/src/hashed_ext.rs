@@ -12,8 +12,7 @@ where
     }
 
     /// Alias for with_content
-    // TODO: deprecate
-    // #[deprecated = "alias for `from_content`"]
+    #[deprecated = "alias for `from_content`"]
     pub async fn with_data(content: C) -> Result<Self, SerializedBytesError> {
         Ok(Self::from_content(content).await)
     }

@@ -31,12 +31,8 @@ fn fixtures() -> (
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::with_data(Entry::Agent(jimbo_id.clone().into()))
-                    .await
-                    .unwrap(),
-                EntryHashed::with_data(Entry::Agent(jessy_id.clone().into()))
-                    .await
-                    .unwrap(),
+                EntryHashed::from_content(Entry::Agent(jimbo_id.clone().into())).await,
+                EntryHashed::from_content(Entry::Agent(jessy_id.clone().into())).await,
             )
         },
         std::time::Duration::from_secs(1),

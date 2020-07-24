@@ -48,12 +48,8 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::with_data(Entry::Agent(jimbo_id.clone().into()))
-                    .await
-                    .unwrap(),
-                EntryHashed::with_data(Entry::Agent(jessy_id.clone().into()))
-                    .await
-                    .unwrap(),
+                EntryHashed::from_content(Entry::Agent(jimbo_id.clone().into())).await,
+                EntryHashed::from_content(Entry::Agent(jessy_id.clone().into())).await,
             )
         },
         std::time::Duration::from_secs(1),
@@ -206,7 +202,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
-    let h = HeaderHashed::with_data(jimbo_header.clone()).await.unwrap();
+    let h = HeaderHashed::from_content(jimbo_header.clone()).await;
     let h = SignedHeaderHashed::with_presigned(h, fixt!(Signature));
     cache.put(h, Some(jimbo_entry.clone()))?;
     let address = jimbo_entry.as_hash();

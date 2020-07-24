@@ -132,7 +132,7 @@ mod tests {
             prev_header: prev,
         };
 
-        let hashed = HeaderHashed::with_data(header.into()).await.unwrap();
+        let hashed = HeaderHashed::from_content(header.into()).await;
         let signed = SignedHeaderHashed::new(&keystore, hashed).await.unwrap();
         ChainElement::new(signed, None)
     }

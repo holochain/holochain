@@ -134,7 +134,7 @@ where
 
                 // Hash entry
                 let entry = match maybe_entry {
-                    Some(entry) => Some(EntryHashed::with_data(entry).await?),
+                    Some(entry) => Some(EntryHashed::from_content(entry).await),
                     None => None,
                 };
 

@@ -76,9 +76,7 @@ mod tests {
             entry_type: fx.entry_type(),
         };
         let update = builder.build(fx.common());
-        let header = HeaderHashed::with_data(update.clone().into())
-            .await
-            .unwrap();
+        let header = HeaderHashed::from_content(update.clone().into()).await;
         (update, header)
     }
 
@@ -91,9 +89,7 @@ mod tests {
             entry_type: fx.entry_type(),
         };
         let create = builder.build(fx.common());
-        let header = HeaderHashed::with_data(create.clone().into())
-            .await
-            .unwrap();
+        let header = HeaderHashed::from_content(create.clone().into()).await;
         (create, header)
     }
 
@@ -103,9 +99,7 @@ mod tests {
     ) -> (header::ElementDelete, HeaderHashed) {
         let builder = builder::ElementDelete { removes_address };
         let delete = builder.build(fx.common());
-        let header = HeaderHashed::with_data(delete.clone().into())
-            .await
-            .unwrap();
+        let header = HeaderHashed::from_content(delete.clone().into()).await;
         (delete, header)
     }
 

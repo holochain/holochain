@@ -47,7 +47,7 @@ async fn produce_dht_ops_workflow_inner(
 
     for (index, ops) in all_ops {
         for op in ops {
-            let (op, hash) = DhtOpHashed::with_data(op).await?.into_inner();
+            let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
             debug!(?hash);
             workspace.integration_queue.put(
                 (TimestampKey::now(), hash.clone()).into(),
@@ -131,7 +131,7 @@ mod tests {
             visibility: EntryVisibility,
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
-            let (app_entry, entry_hash) = EntryHashed::with_data(app_entry).await.unwrap().into();
+            let (app_entry, entry_hash) = EntryHashed::from_content(app_entry).await.into();
             let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
                 .next()
                 .unwrap();
