@@ -2,7 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
@@ -27,7 +27,7 @@ impl PostCommitInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct PostCommitHostAccess {
-    pub workspace: UnsafeInvokeZomeWorkspace,
+    pub workspace: UnsafeCallZomeWorkspace,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }

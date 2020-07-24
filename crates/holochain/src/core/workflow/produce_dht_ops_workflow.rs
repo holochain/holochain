@@ -1,4 +1,4 @@
-use super::{error::WorkflowResult, InvokeZomeWorkspace};
+use super::{error::WorkflowResult, CallZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
     dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue},
@@ -39,8 +39,8 @@ async fn produce_dht_ops_workflow_inner(
     workspace: &mut ProduceDhtOpsWorkspace<'_>,
 ) -> WorkflowResult<WorkComplete> {
     debug!("Starting dht op workflow");
-    let invoke_zome_workspace = &mut workspace.invoke_zome_workspace;
-    let all_ops = invoke_zome_workspace
+    let call_zome_workspace = &mut workspace.call_zome_workspace;
+    let all_ops = call_zome_workspace
         .source_chain
         .get_incomplete_dht_ops()
         .await?;
@@ -59,14 +59,14 @@ async fn produce_dht_ops_workflow_inner(
             workspace.authored_dht_ops.put(hash, 0)?;
         }
         // Mark the dht op as complete
-        invoke_zome_workspace.source_chain.complete_dht_op(index)?;
+        call_zome_workspace.source_chain.complete_dht_op(index)?;
     }
 
     Ok(WorkComplete::Complete)
 }
 
 pub struct ProduceDhtOpsWorkspace<'env> {
-    pub invoke_zome_workspace: InvokeZomeWorkspace<'env>,
+    pub call_zome_workspace: CallZomeWorkspace<'env>,
     pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
     pub integration_queue: IntegrationQueueStore<'env>,
 }
@@ -76,14 +76,14 @@ impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         let integration_queue = db.get_db(&*INTEGRATION_QUEUE)?;
         Ok(Self {
-            invoke_zome_workspace: InvokeZomeWorkspace::new(reader, db)?,
+            call_zome_workspace: CallZomeWorkspace::new(reader, db)?,
             authored_dht_ops: KvBuf::new(reader, authored_dht_ops)?,
             integration_queue: KvBuf::new(reader, integration_queue)?,
         })
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.invoke_zome_workspace.flush_to_txn(writer)?;
+        self.call_zome_workspace.flush_to_txn(writer)?;
         self.authored_dht_ops.flush_to_txn(writer)?;
         self.integration_queue.flush_to_txn(writer)?;
         Ok(())
@@ -167,7 +167,7 @@ mod tests {
             let mut td = TestData::new();
             let mut source_chain = ProduceDhtOpsWorkspace::new(&reader, &dbs)
                 .unwrap()
-                .invoke_zome_workspace
+                .call_zome_workspace
                 .source_chain;
 
             // Add genesis so we can use the source chain
