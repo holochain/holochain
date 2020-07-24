@@ -29,7 +29,7 @@ pub async fn fake_unique_element(
     visibility: EntryVisibility,
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
     let content = UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned());
-    let entry = EntryHashed::with_data(Entry::App(content.try_into().unwrap())).await?;
+    let entry = EntryHashed::from_content(Entry::App(content.try_into().unwrap())).await;
     let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
         .next()
         .unwrap();
@@ -44,7 +44,7 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::with_data(header_1).await?).await?,
+        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content(header_1).await).await?,
         entry,
     ))
 }

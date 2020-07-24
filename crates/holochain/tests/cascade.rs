@@ -31,12 +31,8 @@ fn fixtures() -> (
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::with_data(Entry::Agent(jimbo_id.clone().into()))
-                    .await
-                    .unwrap(),
-                EntryHashed::with_data(Entry::Agent(jessy_id.clone().into()))
-                    .await
-                    .unwrap(),
+                EntryHashed::from_content(Entry::Agent(jimbo_id.clone().into())).await,
+                EntryHashed::from_content(Entry::Agent(jessy_id.clone().into())).await,
             )
         },
         std::time::Duration::from_secs(1),
@@ -81,7 +77,7 @@ async fn get_links() -> SourceChainResult<()> {
     let mut cache = ChainCasBuf::cache(&reader, &dbs)?;
 
     // create a cache and a cas for store and meta
-    let primary_meta = MetadataBuf::primary(&reader, &dbs)?;
+    let primary_meta = MetadataBuf::vault(&reader, &dbs)?;
     let mut cache_meta = MetadataBuf::cache(&reader, &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();

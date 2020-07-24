@@ -6,11 +6,11 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::{
-    call_zome_workflow::InvokeZomeWorkspace, integrate_dht_ops_workflow::integrate_to_cache,
+    call_zome_workflow::CallZomeWorkspace, integrate_dht_ops_workflow::integrate_to_cache,
 };
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash::{HasHash, HeaderAddress};
+use holo_hash::{HasHash, HeaderHash};
 use holochain_zome_types::header::builder;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryType;
@@ -31,8 +31,8 @@ pub fn commit_entry<'a>(
     // build the entry hash
     let async_entry = entry.clone();
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::with_data(async_entry).await
-    })?
+        holochain_types::entry::EntryHashed::from_content(async_entry).await
+    })
     .into_hash();
 
     // extract the zome position
@@ -83,18 +83,28 @@ pub fn commit_entry<'a>(
         entry_type: EntryType::App(app_entry_type),
         entry_hash: entry_hash.clone(),
     };
-    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderAddress>> {
-        async move {
-            let source_chain = &mut workspace.source_chain;
-            // push the header and the entry into the source chain
-            let header_hash = source_chain.put(header_builder, Some(entry)).await?;
-            // fetch the element we just added so we can integrate its DhtOps
-            let element = source_chain.get_element(&header_hash).await?.expect("Element we just put in SourceChain must be gettable");
-            integrate_to_cache(&element, &mut workspace.cache_cas, &mut workspace.cache_meta).await.map_err(Box::new)?;
-            Ok(header_hash)
-        }
-        .boxed()
-    };
+    let call =
+        |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+            async move {
+                let source_chain = &mut workspace.source_chain;
+                // push the header and the entry into the source chain
+                let header_hash = source_chain.put(header_builder, Some(entry)).await?;
+                // fetch the element we just added so we can integrate its DhtOps
+                let element = source_chain
+                    .get_element(&header_hash)
+                    .await?
+                    .expect("Element we just put in SourceChain must be gettable");
+                integrate_to_cache(
+                    &element,
+                    &mut workspace.cache_cas,
+                    &mut workspace.cache_meta,
+                )
+                .await
+                .map_err(Box::new)?;
+                Ok(header_hash)
+            }
+            .boxed()
+        };
     tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
         unsafe { call_context.host_access.workspace().apply_mut(call).await }
     }))???;
@@ -142,9 +152,12 @@ pub mod wasm_test {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
 
         let ribosome =
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
@@ -182,14 +195,17 @@ pub mod wasm_test {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
 
         let ribosome =
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
@@ -208,9 +224,8 @@ pub mod wasm_test {
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        let app_entry_hash = holochain_types::entry::EntryHashed::with_data(app_entry.clone())
+        let app_entry_hash = holochain_types::entry::EntryHashed::from_content(app_entry.clone())
             .await
-            .unwrap()
             .into_hash();
 
         // this should be the hash of the newly committed entry
@@ -226,7 +241,7 @@ pub mod wasm_test {
         let env_ref = env.guard().await;
         let output = {
             let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-            let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+            let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
             // commits fail validation if we don't do genesis
             crate::core::workflow::fake_genesis(&mut workspace.source_chain)
@@ -235,7 +250,7 @@ pub mod wasm_test {
 
             // get the result of a commit entry
             let output: CommitEntryOutput = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
                 host_access.workspace = raw_workspace;
                 crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "commit_entry", ())
@@ -288,8 +303,8 @@ pub mod wasm_test {
 
         let round: GetEntryOutput = {
             let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-            let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
-            let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+            let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+            let (_g, raw_workspace) = crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(&mut workspace);
             let mut host_access = fixt!(ZomeCallHostAccess);
             host_access.workspace = raw_workspace;
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "get_entry", ())

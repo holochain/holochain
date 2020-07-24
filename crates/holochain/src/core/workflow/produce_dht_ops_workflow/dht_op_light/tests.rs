@@ -257,9 +257,8 @@ async fn test_dht_basis() {
         let original_header = fixt!(EntryCreate);
         let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
 
-        let original_header_hash = HeaderHashed::with_data(Header::EntryCreate(original_header))
-            .await
-            .unwrap();
+        let original_header_hash =
+            HeaderHashed::from_content(Header::EntryCreate(original_header)).await;
         let signed_header =
             SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
         let original_header_hash = original_header_hash.into_inner().1;
@@ -268,7 +267,7 @@ async fn test_dht_basis() {
 
         // Setup a cascade
         let reader = env_ref.reader().unwrap();
-        let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
+        let mut cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
 
         // Put the header into the db
         cas.put(signed_header, Some(entry_hashed)).unwrap();

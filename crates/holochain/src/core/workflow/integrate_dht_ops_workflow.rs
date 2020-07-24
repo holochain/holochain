@@ -173,10 +173,10 @@ async fn integrate_single_dht_op(
         match op.clone() {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
                 if integrate_element_data {
-                    let header = HeaderHashed::with_data(header).await?;
+                    let header = HeaderHashed::from_content(header).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     let maybe_entry_hashed = match maybe_entry {
-                        Some(entry) => Some(EntryHashed::with_data(*entry).await?),
+                        Some(entry) => Some(EntryHashed::from_content(*entry).await),
                         None => None,
                     };
                     // Store the entry
@@ -188,9 +188,9 @@ async fn integrate_single_dht_op(
                 meta_store.register_header(new_entry_header.clone()).await?;
 
                 if integrate_element_data {
-                    let header = HeaderHashed::with_data(new_entry_header.into()).await?;
+                    let header = HeaderHashed::from_content(new_entry_header.into()).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                    let entry = EntryHashed::with_data(*entry).await?;
+                    let entry = EntryHashed::from_content(*entry).await;
                     // Store Header and Entry
                     element_store.put(signed_header, Some(entry))?;
                 }
@@ -198,7 +198,7 @@ async fn integrate_single_dht_op(
             DhtOp::RegisterAgentActivity(signature, header) => {
                 if integrate_element_data {
                     // Store header
-                    let header_hashed = HeaderHashed::with_data(header.clone()).await?;
+                    let header_hashed = HeaderHashed::from_content(header.clone()).await;
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hashed, signature);
                     element_store.put(signed_header, None)?;
@@ -247,7 +247,7 @@ async fn integrate_single_dht_op(
             DhtOp::RegisterAddLink(signature, link_add) => {
                 meta_store.add_link(link_add.clone()).await?;
                 // Store add Header
-                let header = HeaderHashed::with_data(link_add.into()).await?;
+                let header = HeaderHashed::from_content(link_add.into()).await;
                 debug!(link_add = ?header.as_hash());
                 if integrate_element_data {
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
@@ -271,7 +271,7 @@ async fn integrate_single_dht_op(
 
                 if integrate_element_data {
                     // Store link delete Header
-                    let header = HeaderHashed::with_data(link_remove.clone().into()).await?;
+                    let header = HeaderHashed::from_content(link_remove.clone().into()).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     element_store.put(signed_header, None)?;
                 }
@@ -360,8 +360,8 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATION_QUEUE)?;
         let integration_queue = KvBuf::new(reader, db)?;
 
-        let cas = ChainCasBuf::primary(reader, dbs, true)?;
-        let meta = MetadataBuf::primary(reader, dbs)?;
+        let cas = ChainCasBuf::vault(reader, dbs, true)?;
+        let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {
             integration_queue,

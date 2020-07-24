@@ -1,5 +1,5 @@
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
-use holo_hash::{EntryHash, HeaderAddress};
+use holo_hash::{EntryHash, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
 use holochain_types::dht_op::error::DhtOpError;
@@ -11,7 +11,7 @@ pub enum SourceChainError {
     ChainEmpty,
 
     #[error("Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}")]
-    HeadMoved(Option<HeaderAddress>, Option<HeaderAddress>),
+    HeadMoved(Option<HeaderHash>, Option<HeaderHash>),
 
     #[error(
         "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
