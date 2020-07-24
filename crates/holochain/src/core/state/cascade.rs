@@ -43,7 +43,7 @@ use super::{
     metadata::{LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use error::CascadeResult;
-use holo_hash::{hash_type, AnyDhtHash, EntryHash, HeaderAddress};
+use holo_hash::{hash_type, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_p2p::{
     actor::{GetMetaOptions, GetOptions},
     HolochainP2pCell,
@@ -187,7 +187,7 @@ where
     /// Get a header without checking its metadata
     pub async fn dht_get_header_raw(
         &self,
-        header_address: &HeaderAddress,
+        header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         match self.primary.get_header(header_address).await? {
             None => self.cache.get_header(header_address).await,

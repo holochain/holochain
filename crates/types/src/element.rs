@@ -3,7 +3,7 @@
 use crate::{prelude::*, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
-use holo_hash::HeaderAddress;
+use holo_hash::HeaderHash;
 use holo_hash::{hash_type, HashableContentBytes};
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_serialized_bytes::prelude::*;
@@ -60,7 +60,7 @@ impl ChainElement {
     }
 
     /// Access the header address
-    pub fn header_address(&self) -> &HeaderAddress {
+    pub fn header_address(&self) -> &HeaderHash {
         self.signed_header.header_address()
     }
 
@@ -236,7 +236,7 @@ impl SignedHeaderHashed {
     }
 
     /// Access the Header Hash.
-    pub fn header_address(&self) -> &HeaderAddress {
+    pub fn header_address(&self) -> &HeaderHash {
         self.header.as_hash()
     }
 

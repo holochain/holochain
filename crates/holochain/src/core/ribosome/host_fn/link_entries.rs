@@ -6,7 +6,7 @@ use crate::core::{
 };
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash::HeaderAddress;
+use holo_hash::HeaderHash;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::LinkEntriesInput;
 use holochain_zome_types::LinkEntriesOutput;
@@ -35,7 +35,7 @@ pub fn link_entries<'a>(
     // Construct the link add
     let header_builder = builder::LinkAdd::new(base_address, target_address, zome_id, tag);
 
-    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderAddress>> {
+    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
         async move {
             let source_chain = &mut workspace.source_chain;
             // push the header into the source chain

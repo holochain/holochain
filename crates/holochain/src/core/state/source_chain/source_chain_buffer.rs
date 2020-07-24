@@ -47,7 +47,7 @@ impl<'env> SourceChainBuf<'env> {
         })
     }
 
-    pub fn chain_head(&self) -> Option<&HeaderAddress> {
+    pub fn chain_head(&self) -> Option<&HeaderHash> {
         self.sequence.chain_head()
     }
 
@@ -69,14 +69,14 @@ impl<'env> SourceChainBuf<'env> {
         }
     }
 
-    pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
+    pub async fn get_element(&self, k: &HeaderHash) -> SourceChainResult<Option<ChainElement>> {
         debug!("GET {:?}", k);
         self.cas.get_element(k).await
     }
 
     pub async fn get_header(
         &self,
-        k: &HeaderAddress,
+        k: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         self.cas.get_header(k).await
     }
@@ -117,7 +117,7 @@ impl<'env> SourceChainBuf<'env> {
         &mut self,
         header: Header,
         maybe_entry: Option<Entry>,
-    ) -> SourceChainResult<HeaderAddress> {
+    ) -> SourceChainResult<HeaderHash> {
         let header = HeaderHashed::with_data(header).await?;
         let header_address = header.as_hash().to_owned();
         let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
@@ -174,7 +174,7 @@ impl<'env> SourceChainBuf<'env> {
         #[derive(Serialize, Deserialize)]
         struct JsonChainElement {
             pub signature: Signature,
-            pub header_address: HeaderAddress,
+            pub header_address: HeaderHash,
             pub header: Header,
             pub entry: Option<Entry>,
         }
@@ -269,7 +269,7 @@ impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
 /// starting with the head, moving back to the origin (Dna) header.
 pub struct SourceChainBackwardIterator<'env> {
     store: &'env SourceChainBuf<'env>,
-    current: Option<HeaderAddress>,
+    current: Option<HeaderHash>,
 }
 
 impl<'env> SourceChainBackwardIterator<'env> {

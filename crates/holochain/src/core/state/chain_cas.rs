@@ -8,7 +8,7 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
-use holo_hash::{EntryHash, HasHash, HeaderAddress, HeaderHash};
+use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
@@ -107,7 +107,7 @@ impl<'env> ChainCasBuf<'env> {
 
     pub async fn get_header(
         &self,
-        header_address: &HeaderAddress,
+        header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         Ok(self.headers.get(header_address).await?.map(Into::into))
     }
@@ -154,7 +154,7 @@ impl<'env> ChainCasBuf<'env> {
     /// given a header address return the full chain element for that address
     pub async fn get_element(
         &self,
-        header_address: &HeaderAddress,
+        header_address: &HeaderHash,
     ) -> SourceChainResult<Option<ChainElement>> {
         if let Some(signed_header) = self.get_header(header_address).await? {
             let maybe_entry = self.get_entry_from_header(signed_header.header()).await?;

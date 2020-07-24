@@ -98,7 +98,7 @@ mod tests {
     }
 
     async fn test_delete(
-        removes_address: HeaderAddress,
+        removes_address: HeaderHash,
         fx: &mut TestFixtures,
     ) -> (header::ElementDelete, HeaderHashed) {
         let builder = builder::ElementDelete { removes_address };
