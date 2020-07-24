@@ -235,7 +235,7 @@ where
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
     use crate::conductor::{
         api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
@@ -328,7 +328,7 @@ mod test {
         conductor_handle
     }
 
-    async fn setup_app(
+    pub async fn setup_app(
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {

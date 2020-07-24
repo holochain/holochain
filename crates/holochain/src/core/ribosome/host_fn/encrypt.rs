@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub fn encrypt(
     _ribosome: Arc<WasmRibosome>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     _input: EncryptInput,
 ) -> RibosomeResult<EncryptOutput> {
     unimplemented!();

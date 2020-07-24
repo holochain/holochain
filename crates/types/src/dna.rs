@@ -150,7 +150,6 @@ impl DnaFile {
     }
 
     /// The hash of the dna def
-    /// (this can be a full holo_hash because we never send a DnaFile to WASM)
     pub fn dna_hash(&self) -> &holo_hash::DnaHash {
         &self.dna_hash
     }

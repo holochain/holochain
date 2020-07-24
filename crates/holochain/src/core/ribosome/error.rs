@@ -62,6 +62,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     JoinError(#[from] JoinError),
+
+    /// ident
+    #[error(transparent)]
+    P2pError(#[from] holochain_p2p::HolochainP2pError),
 }
 
 /// Type alias
