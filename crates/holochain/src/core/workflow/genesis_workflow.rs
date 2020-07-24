@@ -115,8 +115,8 @@ pub mod tests {
     use holochain_types::{
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        Header,
     };
+    use holochain_zome_types::Header;
     use matches::assert_matches;
 
     pub async fn fake_genesis(source_chain: &mut SourceChain<'_>) -> SourceChainResult<()> {

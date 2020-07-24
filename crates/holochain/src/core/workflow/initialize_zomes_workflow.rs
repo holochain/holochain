@@ -15,7 +15,8 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::buffer::BufferedStore;
 use holochain_state::prelude::{GetDb, Reader, Writer};
-use holochain_types::{dna::DnaDef, header::builder};
+use holochain_types::dna::DnaDef;
+use holochain_zome_types::header::builder;
 
 #[derive(Constructor)]
 pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
@@ -98,7 +99,7 @@ pub mod tests {
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-    use holochain_types::Header;
+    use holochain_zome_types::Header;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
