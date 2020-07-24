@@ -31,7 +31,9 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId, element::WireElement};
+use holochain_types::{
+    autonomic::AutonomicProcess, cell::CellId, element::WireElement, metadata::MetadataSet,
+};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -265,6 +267,20 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
+            GetMeta {
+                span,
+                respond,
+                dht_hash,
+                options,
+                ..
+            } => {
+                let _g = span.enter();
+                let res = self
+                    .handle_get_meta(dht_hash, options)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
             GetLinks {
                 span,
                 respond,
@@ -395,6 +411,15 @@ impl Cell {
         _dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireElement> {
+        unimplemented!()
+    }
+
+    /// a remote node is asking us for metadata
+    async fn handle_get_meta(
+        &self,
+        _dht_hash: holo_hash::AnyDhtHash,
+        _options: holochain_p2p::event::GetMetaOptions,
+    ) -> CellResult<MetadataSet> {
         unimplemented!()
     }
 

@@ -65,6 +65,7 @@ assert_cmd = "1.0.1"
 criterion = "0.3"
 hdk3 = { path = "../hdk" }
 matches = "0.1.8"
+maplit = "1"
 pretty_assertions = "0.6.1"
 serial_test = "0.4.0"
 test-case = "1.0.0"

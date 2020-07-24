@@ -1,6 +1,6 @@
 use crate::capability::CapSecret;
 use crate::zome::ZomeName;
-use holo_hash_core::AgentPubKey;
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
