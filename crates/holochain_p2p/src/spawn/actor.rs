@@ -72,6 +72,27 @@ impl HolochainP2pActor {
         .into())
     }
 
+    /// receiving an incoming get_meta request from a remote node
+    fn handle_incoming_get_meta(
+        &mut self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: event::GetMetaOptions,
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let res = evt_sender
+                .get_meta(dna_hash, to_agent, dht_hash, options)
+                .await;
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
+                .map_err(kitsune_p2p::KitsuneP2pError::from)
+                .map(|res| UnsafeBytes::from(res).into())
+        }
+        .boxed()
+        .into())
+    }
+
     /// receiving an incoming get_links request from a remote node
     fn handle_incoming_get_links(
         &mut self,
@@ -167,6 +188,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::Get { dht_hash, options } => {
                 self.handle_incoming_get(space, agent, dht_hash, options)
             }
+            crate::wire::WireMessage::GetMeta { dht_hash, options } => {
+                self.handle_incoming_get_meta(space, agent, dht_hash, options)
+            }
             crate::wire::WireMessage::GetLinks { dht_hash, options } => {
                 self.handle_incoming_get_links(space, agent, dht_hash, options)
             }
@@ -199,6 +223,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             // error on these call type messages
             crate::wire::WireMessage::CallRemote { .. }
             | crate::wire::WireMessage::Get { .. }
+            | crate::wire::WireMessage::GetMeta { .. }
             | crate::wire::WireMessage::GetLinks { .. }
             | crate::wire::WireMessage::ValidationReceipt { .. } => {
                 return Err(HolochainP2pError::invalid_p2p_message(
@@ -364,6 +389,47 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let r_options: event::GetOptions = (&options).into();
 
         let payload = crate::wire::WireMessage::get(dht_hash, r_options).encode()?;
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            let result = kitsune_p2p
+                .rpc_multi(kitsune_p2p::actor::RpcMulti {
+                    space,
+                    from_agent,
+                    basis,
+                    remote_agent_count: options.remote_agent_count,
+                    timeout_ms: options.timeout_ms,
+                    as_race: options.as_race,
+                    race_timeout_ms: options.race_timeout_ms,
+                    payload,
+                })
+                .await?;
+
+            let mut out = Vec::new();
+            for item in result {
+                let kitsune_p2p::actor::RpcMultiResponse { response, .. } = item;
+                out.push(SerializedBytes::from(UnsafeBytes::from(response)).try_into()?);
+            }
+
+            Ok(out)
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_get_meta(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: actor::GetMetaOptions,
+    ) -> HolochainP2pHandlerResult<Vec<MetadataSet>> {
+        let space = dna_hash.into_kitsune();
+        let from_agent = from_agent.into_kitsune();
+        let basis = dht_hash.to_kitsune();
+        let r_options: event::GetMetaOptions = (&options).into();
+
+        let payload = crate::wire::WireMessage::get_meta(dht_hash, r_options).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {

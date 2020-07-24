@@ -1,7 +1,7 @@
 use super::Cascade;
 use crate::core::state::{
     chain_cas::ChainCasBuf,
-    metadata::{EntryDhtStatus, LinkMetaKey, MockMetadataBuf},
+    metadata::{LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use crate::{
@@ -16,6 +16,7 @@ use holochain_types::{
     element::SignedHeaderHashed,
     entry::EntryHashed,
     fixt::SignatureFixturator,
+    metadata::EntryDhtStatus,
     observability,
     prelude::*,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
@@ -108,7 +109,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         jimbo_header,
         jimbo_entry,
         mut mock_primary_meta,
-        mock_cache_meta,
+        mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
@@ -129,7 +130,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         &source_chain.cas(),
         &mock_primary_meta,
         &mut cache,
-        &mock_cache_meta,
+        &mut mock_cache_meta,
         cell_network,
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
@@ -155,7 +156,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         jimbo_header,
         jimbo_entry,
         mut mock_primary_meta,
-        mock_cache_meta,
+        mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
@@ -175,7 +176,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         &source_chain.cas(),
         &mock_primary_meta,
         &mut cache,
-        &mock_cache_meta,
+        &mut mock_cache_meta,
         cell_network,
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
@@ -221,7 +222,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         &source_chain.cas(),
         &mock_primary_meta,
         &mut cache,
-        &mock_cache_meta,
+        &mut mock_cache_meta,
         cell_network,
     );
     let _entry = cascade.dht_get(address.clone().into()).await?;
@@ -248,7 +249,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         jimbo_header: _,
         jimbo_entry,
         mock_primary_meta,
-        mock_cache_meta,
+        mut mock_cache_meta,
         ..
     } = setup_env(&reader, &dbs)?;
     let address = jimbo_entry.as_hash();
@@ -259,7 +260,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         &source_chain.cas(),
         &mock_primary_meta,
         &mut cache,
-        &mock_cache_meta,
+        &mut mock_cache_meta,
         cell_network,
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
@@ -289,7 +290,7 @@ async fn links_local_return() -> SourceChainResult<()> {
         jessy_header,
         jessy_entry,
         mut mock_primary_meta,
-        mock_cache_meta,
+        mut mock_cache_meta,
     } = setup_env(&reader, &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
@@ -335,7 +336,7 @@ async fn links_local_return() -> SourceChainResult<()> {
         &source_chain.cas(),
         &mock_primary_meta,
         &mut cache,
-        &mock_cache_meta,
+        &mut mock_cache_meta,
         cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;
@@ -430,7 +431,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
         &source_chain.cas(),
         &mock_primary_meta,
         &mut cache,
-        &mock_cache_meta,
+        &mut mock_cache_meta,
         cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;
@@ -500,7 +501,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         &source_chain.cas(),
         &mock_primary_meta,
         &mut cache,
-        &mock_cache_meta,
+        &mut mock_cache_meta,
         cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;

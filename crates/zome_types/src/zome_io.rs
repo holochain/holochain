@@ -31,9 +31,9 @@ wasm_io_types!(
     // as these are constant it makes sense for the zome dev or HDK to cache the return of this in
     // a lazy_static! or similar
     pub struct ZomeInfoInput(());
-    pub struct ZomeInfoOutput(crate::globals::ZomeInfo);
+    pub struct ZomeInfoOutput(crate::zome_info::ZomeInfo);
     pub struct AgentInfoInput(());
-    pub struct AgentInfoOutput(crate::globals::AgentInfo);
+    pub struct AgentInfoOutput(crate::agent_info::AgentInfo);
     // call is entirely arbitrary so we need to send and receive SerializedBytes
     pub struct CallInput(SerializedBytes);
     pub struct CallOutput(SerializedBytes);
@@ -62,8 +62,8 @@ wasm_io_types!(
     pub struct RandomBytesInput(u32);
     pub struct RandomBytesOutput(crate::bytes::Bytes);
     // @TODO
-    pub struct RemoteCallInput(());
-    pub struct RemoteCallOutput(());
+    pub struct CallRemoteInput(crate::call_remote::CallRemote);
+    pub struct CallRemoteOutput(SerializedBytes);
     // @TODO
     pub struct RemoveLinkInput(());
     pub struct RemoveLinkOutput(());

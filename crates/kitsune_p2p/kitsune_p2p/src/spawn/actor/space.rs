@@ -119,6 +119,7 @@ impl Space {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let internal_sender = self.internal_sender.clone();
+
         Ok(async move {
             let start = std::time::Instant::now();
 

@@ -25,6 +25,7 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     fixt::*,
     header::NewEntryHeader,
+    metadata::TimedHeaderHash,
     observability,
     validate::ValidationStatus,
     Entry, EntryHashed,
@@ -251,7 +252,8 @@ impl Db {
                     );
                 }
                 Db::MetaHeader(entry, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
                     let res = workspace
                         .meta
@@ -263,7 +265,8 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaActivity(header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
                         .get_activity(header.author().clone())
@@ -274,7 +277,8 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaUpdate(base, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
                         .get_updates(base)
@@ -285,7 +289,8 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaDelete(base, deleted_header_hash, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
+                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
                         .get_deletes_on_entry(base)
@@ -1110,7 +1115,7 @@ async fn test_wasm_api_without_integration_delete() {
             .unwrap()
             .unwrap();
         let delete = builder::ElementDelete {
-            removes_address: entry_header,
+            removes_address: entry_header.header_hash,
         };
         workspace.source_chain.put(delete, None).await.unwrap();
         env_ref
@@ -1342,9 +1347,9 @@ mod slow_tests {
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
-            let (cas, _metadata, mut cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+            let (cas, _metadata, mut cache, mut metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
             let (_n, _r, cell_network) = test_network().await;
-            let cascade = Cascade::new(&cas, &meta, &mut cache, &metadata_cache, cell_network);
+            let cascade = Cascade::new(&cas, &meta, &mut cache, &mut metadata_cache, cell_network);
 
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();

@@ -75,9 +75,9 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
-            let mut host_context = CallContextFixturator::new(Empty).next().unwrap();
-            host_context.zome_name = zome.into();
-            ribosome.module(host_context).unwrap();
+            let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
+            call_context.zome_name = zome.into();
+            ribosome.module(call_context).unwrap();
         }
 
         self.0.index += 1;

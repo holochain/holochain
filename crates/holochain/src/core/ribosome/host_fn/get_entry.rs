@@ -40,3 +40,6 @@ pub fn get_entry<'a>(
         })??;
     Ok(GetEntryOutput::new(maybe_entry))
 }
+
+// we are relying on the commit entry tests to show the commit/get round trip
+// @see commit_entry.rs
