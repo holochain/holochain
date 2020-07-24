@@ -34,11 +34,6 @@ pub type EntryHash = HoloHash<hash_type::Entry>;
 /// This is a composite of AgentPubKey, EntryContentHash, and HeaderHash
 pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
 
-// TODO: deprecate
-// #[deprecated = "alias for HeaderHash"]
-#[allow(missing_docs)]
-pub type HeaderAddress = HeaderHash;
-
 impl From<AgentPubKey> for EntryHash {
     fn from(hash: AgentPubKey) -> Self {
         hash.retype(hash_type::Entry::Agent)

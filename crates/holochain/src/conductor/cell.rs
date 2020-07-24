@@ -18,10 +18,10 @@ use crate::{
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
-            error::WorkflowError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
-            invoke_zome_workflow, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, InvokeZomeWorkflowArgs,
-            InvokeZomeWorkspace, ZomeCallInvocationResult,
+            call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
+            initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
+            GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
+            InitializeZomesWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -501,13 +501,13 @@ impl Cell {
         let keystore = arc.keystore().clone();
         let env = arc.guard().await;
         let reader = env.reader()?;
-        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
+        let workspace = CallZomeWorkspace::new(&reader, &env)?;
 
-        let args = InvokeZomeWorkflowArgs {
+        let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
             invocation,
         };
-        Ok(invoke_zome_workflow(
+        Ok(call_zome_workflow(
             workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
@@ -529,7 +529,7 @@ impl Cell {
         let env_ref = state_env.guard().await;
         let reader = env_ref.reader()?;
         // Create the workspace
-        let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)
+        let workspace = CallZomeWorkspace::new(&reader, &env_ref)
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);

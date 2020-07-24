@@ -3,7 +3,7 @@
 use crate::{prelude::*, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
-use holo_hash::HeaderAddress;
+use holo_hash::HeaderHash;
 use holo_hash::{hash_type, HashableContentBytes};
 use holochain_keystore::{KeystoreError, Signature};
 use holochain_serialized_bytes::prelude::*;
@@ -60,7 +60,7 @@ impl ChainElement {
     }
 
     /// Access the header address
-    pub fn header_address(&self) -> &HeaderAddress {
+    pub fn header_address(&self) -> &HeaderHash {
         self.signed_header.header_address()
     }
 
@@ -193,18 +193,16 @@ impl SignedHeaderHashed {
         self.header.as_hash()
     }
 
-    pub fn with_data(
-        signed_header: SignedHeader,
-    ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
+    pub fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, Self>
     where
         Self: Sized,
     {
         async move {
             let (header, signature) = signed_header.into();
-            Ok(Self {
-                header: HeaderHashed::with_data(header.clone()).await?,
+            Self {
+                header: HeaderHashed::from_content(header.clone()).await,
                 signed_header: SignedHeader(header, signature),
-            })
+            }
         }
         .boxed()
         .into()
@@ -236,7 +234,7 @@ impl SignedHeaderHashed {
     }
 
     /// Access the Header Hash.
-    pub fn header_address(&self) -> &HeaderAddress {
+    pub fn header_address(&self) -> &HeaderHash {
         self.header.as_hash()
     }
 
@@ -293,7 +291,7 @@ impl WireElement {
     /// Convert into a [ChainElement] when receiving from the network
     pub async fn into_element(self) -> Result<ChainElement, SerializedBytesError> {
         Ok(ChainElement::new(
-            SignedHeaderHashed::with_data(self.signed_header).await?,
+            SignedHeaderHashed::from_content(self.signed_header).await,
             self.maybe_entry,
         ))
     }

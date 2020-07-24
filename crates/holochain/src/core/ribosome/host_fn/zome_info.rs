@@ -40,9 +40,12 @@ pub mod test {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;

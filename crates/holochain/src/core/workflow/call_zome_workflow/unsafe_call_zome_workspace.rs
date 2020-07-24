@@ -27,7 +27,7 @@ use tracing::*;
 /// because of the single threaded nature.
 /// Default is used to avoid serde
 #[derive(Debug, Clone, Default)]
-pub struct UnsafeInvokeZomeWorkspace {
+pub struct UnsafeCallZomeWorkspace {
     workspace: std::sync::Weak<tokio::sync::RwLock<AtomicPtr<std::ffi::c_void>>>,
 }
 
@@ -37,19 +37,19 @@ pub struct UnsafeInvokeZomeWorkspace {
 /// ## Safety
 /// Don't use `mem::forget` on this type as it will
 /// break the checks.
-pub struct UnsafeInvokeZomeWorkspaceGuard<'env> {
+pub struct UnsafeCallZomeWorkspaceGuard<'env> {
     workspace: Option<Arc<tokio::sync::RwLock<AtomicPtr<std::ffi::c_void>>>>,
     phantom: PhantomData<&'env ()>,
 }
 
-impl UnsafeInvokeZomeWorkspace {
+impl UnsafeCallZomeWorkspace {
     pub fn from_mut<'env>(
-        workspace: &'env mut InvokeZomeWorkspace,
-    ) -> (UnsafeInvokeZomeWorkspaceGuard<'env>, Self) {
-        let raw_ptr = workspace as *mut InvokeZomeWorkspace as *mut std::ffi::c_void;
+        workspace: &'env mut CallZomeWorkspace,
+    ) -> (UnsafeCallZomeWorkspaceGuard<'env>, Self) {
+        let raw_ptr = workspace as *mut CallZomeWorkspace as *mut std::ffi::c_void;
         let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(raw_ptr)));
         let workspace = Arc::downgrade(&guard);
-        let guard = UnsafeInvokeZomeWorkspaceGuard {
+        let guard = UnsafeCallZomeWorkspaceGuard {
             workspace: Some(guard),
             phantom: PhantomData,
         };
@@ -72,11 +72,11 @@ impl UnsafeInvokeZomeWorkspace {
         'a,
         R,
         Fut: Future<Output = R> + 'a,
-        F: FnOnce(&'a InvokeZomeWorkspace) -> Fut,
+        F: FnOnce(&'a CallZomeWorkspace) -> Fut,
     >(
         &self,
         f: F,
-    ) -> Result<R, error::UnsafeInvokeZomeWorkspaceError> {
+    ) -> Result<R, error::UnsafeCallZomeWorkspaceError> {
         // Check it exists
         match self.workspace.upgrade() {
             // Check that no-one else can write
@@ -84,15 +84,15 @@ impl UnsafeInvokeZomeWorkspace {
                 let guard = lock.read().await;
                 let s = {
                     let sc = guard.load(Ordering::SeqCst);
-                    let sc = sc as *const InvokeZomeWorkspace;
+                    let sc = sc as *const CallZomeWorkspace;
                     match sc.as_ref() {
                         Some(s) => s,
-                        None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped)?,
+                        None => Err(error::UnsafeCallZomeWorkspaceError::GuardDropped)?,
                     }
                 };
                 Ok(f(s).await)
             }
-            None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
+            None => Err(error::UnsafeCallZomeWorkspaceError::GuardDropped),
         }
     }
 
@@ -100,11 +100,11 @@ impl UnsafeInvokeZomeWorkspace {
         'a,
         R,
         Fut: Future<Output = R> + 'a,
-        F: FnOnce(&'a mut InvokeZomeWorkspace) -> Fut,
+        F: FnOnce(&'a mut CallZomeWorkspace) -> Fut,
     >(
         &self,
         f: F,
-    ) -> Result<R, error::UnsafeInvokeZomeWorkspaceError> {
+    ) -> Result<R, error::UnsafeCallZomeWorkspaceError> {
         // Check it exists
         match self.workspace.upgrade() {
             // Check that no-one else can write
@@ -112,25 +112,25 @@ impl UnsafeInvokeZomeWorkspace {
                 let guard = lock.write().await;
                 let s = {
                     let sc = guard.load(Ordering::SeqCst);
-                    let sc = sc as *mut InvokeZomeWorkspace;
+                    let sc = sc as *mut CallZomeWorkspace;
                     match sc.as_mut() {
                         Some(s) => s,
-                        None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped)?,
+                        None => Err(error::UnsafeCallZomeWorkspaceError::GuardDropped)?,
                     }
                 };
                 Ok(f(s).await)
             }
-            None => Err(error::UnsafeInvokeZomeWorkspaceError::GuardDropped),
+            None => Err(error::UnsafeCallZomeWorkspaceError::GuardDropped),
         }
     }
 }
 
-impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
+impl Drop for UnsafeCallZomeWorkspaceGuard<'_> {
     fn drop(&mut self) {
         if let Err(arc) = Arc::try_unwrap(self.workspace.take().expect("BUG: This has to be here"))
         {
             warn!(
-                "Trying to drop UnsafeInvokeZomeWorkspace but there must be outstanding references"
+                "Trying to drop UnsafeCallZomeWorkspace but there must be outstanding references"
             );
             // Wait on the lock to check if others have it
             tokio_safe_block_on::tokio_safe_block_on(
@@ -140,7 +140,7 @@ impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
             .ok();
             // TODO: B-01648: Try to consume now hoping noone has taken a lock in the meantime
             Arc::try_unwrap(arc).expect(
-                "UnsafeInvokeZomeWorkspace still has live references when workflow is finished",
+                "UnsafeCallZomeWorkspace still has live references when workflow is finished",
             );
         }
     }
@@ -149,7 +149,7 @@ impl Drop for UnsafeInvokeZomeWorkspaceGuard<'_> {
 pub mod error {
     use thiserror::Error;
     #[derive(Error, Debug)]
-    pub enum UnsafeInvokeZomeWorkspaceError {
+    pub enum UnsafeCallZomeWorkspaceError {
         #[error(
             "The guard for this workspace has been dropped and this workspace is no loanger valid"
         )]

@@ -43,7 +43,7 @@ use super::{
     metadata::{LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use error::CascadeResult;
-use holo_hash::{hash_type, AnyDhtHash, EntryHash, HeaderAddress};
+use holo_hash::{hash_type, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_p2p::{
     actor::{GetMetaOptions, GetOptions},
     HolochainP2pCell,
@@ -68,11 +68,11 @@ where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    primary: &'a ChainCasBuf<'env>,
-    primary_meta: &'a M,
+    element_vault: &'a ChainCasBuf<'env>,
+    meta_vault: &'a M,
 
-    cache: &'a mut ChainCasBuf<'env>,
-    cache_meta: &'a mut C,
+    element_cache: &'a mut ChainCasBuf<'env>,
+    meta_cache: &'a mut C,
 
     network: HolochainP2pCell,
 }
@@ -98,19 +98,19 @@ where
     C: MetadataBufT,
     M: MetadataBufT,
 {
-    /// Constructs a [Cascade], taking references to a CAS and a cache
+    /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
-        primary: &'a ChainCasBuf<'env>,
-        primary_meta: &'a M,
-        cache: &'a mut ChainCasBuf<'env>,
-        cache_meta: &'a mut C,
+        element_vault: &'a ChainCasBuf<'env>,
+        meta_vault: &'a M,
+        element_cache: &'a mut ChainCasBuf<'env>,
+        meta_cache: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
         Cascade {
-            primary,
-            primary_meta,
-            cache,
-            cache_meta,
+            element_vault,
+            meta_vault,
+            element_cache,
+            meta_cache,
             network,
         }
     }
@@ -134,12 +134,12 @@ where
 
                 // Hash entry
                 let entry = match maybe_entry {
-                    Some(entry) => Some(EntryHashed::with_data(entry).await?),
+                    Some(entry) => Some(EntryHashed::from_content(entry).await),
                     None => None,
                 };
 
-                // Put in element cache
-                self.cache.put(signed_header, entry)?;
+                // Put in element element_cache
+                self.element_cache.put(signed_header, entry)?;
                 Some(element)
             }
             None => None,
@@ -156,10 +156,10 @@ where
     ) -> CascadeResult<Vec<MetadataSet>> {
         let all_metadata = self.network.get_meta(hash.clone(), options).await?;
 
-        // Only put raw meta data in cache and combine all results
+        // Only put raw meta data in element_cache and combine all results
         for metadata in all_metadata.iter().cloned() {
             let hash = hash.clone();
-            // Put in meta cache
+            // Put in meta element_cache
             let values = metadata
                 .headers
                 .into_iter()
@@ -170,13 +170,13 @@ where
                 hash_type::AnyDht::Entry(e) => {
                     let basis = hash.retype(e);
                     for v in values {
-                        self.cache_meta.register_raw_on_entry(basis.clone(), v)?;
+                        self.meta_cache.register_raw_on_entry(basis.clone(), v)?;
                     }
                 }
                 hash_type::AnyDht::Header => {
                     let basis = hash.retype(hash_type::Header);
                     for v in values {
-                        self.cache_meta.register_raw_on_header(basis.clone(), v);
+                        self.meta_cache.register_raw_on_header(basis.clone(), v);
                     }
                 }
             }
@@ -187,10 +187,10 @@ where
     /// Get a header without checking its metadata
     pub async fn dht_get_header_raw(
         &self,
-        header_address: &HeaderAddress,
+        header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
-        match self.primary.get_header(header_address).await? {
-            None => self.cache.get_header(header_address).await,
+        match self.element_vault.get_header(header_address).await? {
+            None => self.element_cache.get_header(header_address).await,
             r => Ok(r),
         }
     }
@@ -200,8 +200,8 @@ where
         &self,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<Option<EntryHashed>> {
-        match self.primary.get_entry(entry_hash).await? {
-            None => self.cache.get_entry(entry_hash).await,
+        match self.element_vault.get_entry(entry_hash).await? {
+            None => self.element_cache.get_entry(entry_hash).await,
             r => Ok(r),
         }
     }
@@ -209,47 +209,49 @@ where
     // TODO: dht_get_header -> Header
 
     #[instrument(skip(self))]
-    /// Gets an entry from the cas or cache depending on it's metadata
+    /// Gets an entry from the vault or cache depending on its metadata
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
     pub async fn dht_get(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
         // Cas
         let search = self
-            .primary
+            .element_vault
             .get_entry(entry_hash)
             .await?
             .and_then(|entry| {
-                self.primary_meta
-                    .get_dht_status(entry_hash)
-                    .ok()
-                    .map(|crud| {
-                        if let EntryDhtStatus::Live = crud {
-                            Search::Found(entry)
-                        } else {
-                            Search::NotInCascade
-                        }
-                    })
+                self.meta_vault.get_dht_status(entry_hash).ok().map(|crud| {
+                    if let EntryDhtStatus::Live = crud {
+                        Search::Found(entry)
+                    } else {
+                        Search::NotInCascade
+                    }
+                })
             })
             .unwrap_or_else(|| Search::Continue);
 
         // Cache
         match search {
-            Search::Continue => Ok(self.cache.get_entry(entry_hash).await?.and_then(|entry| {
-                self.cache_meta
-                    .get_dht_status(entry_hash)
-                    .ok()
-                    .and_then(|crud| match crud {
-                        EntryDhtStatus::Live => Some(entry),
-                        _ => None,
-                    })
-            })),
+            Search::Continue => {
+                Ok(self
+                    .element_cache
+                    .get_entry(entry_hash)
+                    .await?
+                    .and_then(|entry| {
+                        self.meta_cache.get_dht_status(entry_hash).ok().and_then(
+                            |crud| match crud {
+                                EntryDhtStatus::Live => Some(entry),
+                                _ => None,
+                            },
+                        )
+                    }))
+            }
             Search::Found(entry) => Ok(Some(entry)),
             Search::NotInCascade => Ok(None),
         }
     }
 
-    /// Gets an links from the cas or cache depending on it's metadata
+    /// Gets links from the vault or cache depending on its metadata
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
@@ -260,22 +262,22 @@ where
         // Am I an authority?
         // TODO: Not a good check for authority as the base could be in the cas because
         // you authored it.
-        let authority = self.primary.contains(&key.base()).await?;
+        let authority = self.element_vault.contains(&key.base()).await?;
         if authority {
             // Cas
-            let links = self.primary_meta.get_links(key)?;
+            let links = self.meta_vault.get_links(key)?;
 
-            // TODO: Why check cache if you are the authority?
+            // TODO: Why check element_cache if you are the authority?
             // Cache
             if links.is_empty() {
-                self.cache_meta.get_links(key)
+                self.meta_cache.get_links(key)
             } else {
                 Ok(links)
             }
         } else {
-            // TODO: Why check cache if you need to go to the authority?
+            // TODO: Why check element_cache if you need to go to the authority?
             // Cache
-            self.cache_meta.get_links(key)
+            self.meta_cache.get_links(key)
         }
     }
 }
@@ -291,9 +293,9 @@ pub fn test_dbs_and_mocks<'env>(
     ChainCasBuf<'env>,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ChainCasBuf::primary(&reader, dbs, true).unwrap();
-    let cache = ChainCasBuf::cache(&reader, dbs).unwrap();
+    let cas = ChainCasBuf::vault(&reader, dbs, true).unwrap();
+    let element_cache = ChainCasBuf::cache(&reader, dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
-    (cas, metadata, cache, metadata_cache)
+    (cas, metadata, element_cache, metadata_cache)
 }
