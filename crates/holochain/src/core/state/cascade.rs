@@ -39,7 +39,7 @@
 //! load_true loads the results into cache
 
 use super::{
-    chain_cas::ChainCasBuf,
+    chain_cas::ElementBuf,
     metadata::{LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use error::CascadeResult;
@@ -68,10 +68,10 @@ where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    element_vault: &'a ChainCasBuf<'env>,
+    element_vault: &'a ElementBuf<'env>,
     meta_vault: &'a M,
 
-    element_cache: &'a mut ChainCasBuf<'env>,
+    element_cache: &'a mut ElementBuf<'env>,
     meta_cache: &'a mut C,
 
     network: HolochainP2pCell,
@@ -100,9 +100,9 @@ where
 {
     /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
-        element_vault: &'a ChainCasBuf<'env>,
+        element_vault: &'a ElementBuf<'env>,
         meta_vault: &'a M,
-        element_cache: &'a mut ChainCasBuf<'env>,
+        element_cache: &'a mut ElementBuf<'env>,
         meta_cache: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
@@ -288,13 +288,13 @@ pub fn test_dbs_and_mocks<'env>(
     reader: &'env holochain_state::transaction::Reader<'env>,
     dbs: &impl holochain_state::db::GetDb,
 ) -> (
-    ChainCasBuf<'env>,
+    ElementBuf<'env>,
     super::metadata::MockMetadataBuf,
-    ChainCasBuf<'env>,
+    ElementBuf<'env>,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ChainCasBuf::vault(&reader, dbs, true).unwrap();
-    let element_cache = ChainCasBuf::cache(&reader, dbs).unwrap();
+    let cas = ElementBuf::vault(&reader, dbs, true).unwrap();
+    let element_cache = ElementBuf::cache(&reader, dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)

@@ -1,6 +1,6 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_cas::ChainCasBuf,
+    chain_cas::ElementBuf,
     metadata::{LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
@@ -29,7 +29,7 @@ use mockall::*;
 #[allow(dead_code)]
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env>,
-    cache: ChainCasBuf<'env>,
+    cache: ElementBuf<'env>,
     jimbo_id: AgentPubKey,
     jimbo_header: Header,
     jimbo_entry: EntryHashed,
@@ -75,7 +75,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     });
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
-    let cache = ChainCasBuf::cache(reader, dbs)?;
+    let cache = ElementBuf::cache(reader, dbs)?;
     let mock_meta_vault = MockMetadataBuf::new();
     let mock_meta_cache = MockMetadataBuf::new();
     Ok(Chains {

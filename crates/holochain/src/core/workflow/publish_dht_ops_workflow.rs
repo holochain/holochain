@@ -17,7 +17,7 @@ use super::{
 use crate::core::{
     queue_consumer::WorkComplete,
     state::{
-        chain_cas::ChainCasBuf,
+        chain_cas::ElementBuf,
         dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegratedDhtOpsValue},
     },
 };
@@ -45,7 +45,7 @@ pub struct PublishDhtOpsWorkspace<'env> {
     /// Database of authored [DhtOpHash]
     authored_dht_ops: AuthoredDhtOpsStore<'env>,
     /// Cas for looking up data to construct ops
-    cas: ChainCasBuf<'env>,
+    cas: ElementBuf<'env>,
     // Integrated Ops database for looking up [DhtOp]s
     integrated_dht_ops: IntegratedDhtOpsStore<'env>,
 }
@@ -131,7 +131,7 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBuf::new(reader, db)?;
         // Note that this must always be false as we don't want private entries being published
-        let cas = ChainCasBuf::vault(reader, dbs, false)?;
+        let cas = ElementBuf::vault(reader, dbs, false)?;
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBuf::new(reader, db)?;
         Ok(Self {
@@ -149,7 +149,7 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         &self.integrated_dht_ops
     }
 
-    fn cas(&self) -> &ChainCasBuf<'env> {
+    fn cas(&self) -> &ElementBuf<'env> {
         &self.cas
     }
 }
@@ -510,7 +510,7 @@ mod tests {
             {
                 let reader = env_ref.reader().unwrap();
 
-                let mut cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
+                let mut cas = ElementBuf::vault(&reader, &dbs, true).unwrap();
 
                 let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
 
@@ -535,7 +535,7 @@ mod tests {
             let (store_element, store_entry, register_replaced_by) = {
                 let reader = env_ref.reader().unwrap();
                 // Create easy way to create test cascade
-                let cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
+                let cas = ElementBuf::vault(&reader, &dbs, true).unwrap();
 
                 let op = DhtOp::StoreElement(
                     sig.clone(),

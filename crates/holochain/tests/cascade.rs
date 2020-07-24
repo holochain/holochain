@@ -1,7 +1,7 @@
 use ::fixt::prelude::*;
 use holochain::core::state::{
     cascade::Cascade,
-    chain_cas::ChainCasBuf,
+    chain_cas::ElementBuf,
     metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
@@ -74,7 +74,7 @@ async fn get_links() -> SourceChainResult<()> {
     let reader = env_ref.reader()?;
 
     let mut source_chain = SourceChainBuf::new(&reader, &dbs)?;
-    let mut cache = ChainCasBuf::cache(&reader, &dbs)?;
+    let mut cache = ElementBuf::cache(&reader, &dbs)?;
 
     // create a cache and a cas for store and meta
     let primary_meta = MetadataBuf::vault(&reader, &dbs)?;

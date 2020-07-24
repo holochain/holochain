@@ -9,7 +9,7 @@ use crate::core::state::workspace::Workspace;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender},
     state::{
-        cascade::Cascade, chain_cas::ChainCasBuf, metadata::MetadataBuf, source_chain::SourceChain,
+        cascade::Cascade, chain_cas::ElementBuf, metadata::MetadataBuf, source_chain::SourceChain,
         workspace::WorkspaceResult,
     },
     sys_validate_element,
@@ -164,7 +164,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
 pub struct CallZomeWorkspace<'env> {
     pub source_chain: SourceChain<'env>,
     pub meta: MetadataBuf<'env>,
-    pub cache_cas: ChainCasBuf<'env>,
+    pub cache_cas: ElementBuf<'env>,
     pub cache_meta: MetadataBuf<'env>,
 }
 
@@ -184,7 +184,7 @@ impl<'env> Workspace<'env> for CallZomeWorkspace<'env> {
     fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(reader, dbs)?;
 
-        let cache_cas = ChainCasBuf::cache(reader, dbs)?;
+        let cache_cas = ElementBuf::cache(reader, dbs)?;
         let meta = MetadataBuf::vault(reader, dbs)?;
         let cache_meta = MetadataBuf::cache(reader, dbs)?;
 

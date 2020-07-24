@@ -4,7 +4,7 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        chain_cas::ChainCasBuf,
+        chain_cas::ElementBuf,
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
             IntegrationQueueValue,
@@ -305,7 +305,7 @@ pub struct IntegrateDhtOpsWorkspace<'env> {
     // integrated ops
     pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing
-    pub cas: ChainCasBuf<'env>,
+    pub cas: ElementBuf<'env>,
     // metadata store
     pub meta: MetadataBuf<'env>,
 }
@@ -319,7 +319,7 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATION_QUEUE)?;
         let integration_queue = KvBuf::new(reader, db)?;
 
-        let cas = ChainCasBuf::vault(reader, dbs, true)?;
+        let cas = ElementBuf::vault(reader, dbs, true)?;
         let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {

@@ -1,4 +1,4 @@
-use crate::core::state::chain_cas::ChainCasBuf;
+use crate::core::state::chain_cas::ElementBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::Signature;
@@ -36,7 +36,7 @@ pub enum DhtOpLight {
 /// Convert a [DhtOp] to a [DhtOpLight] and basis
 pub async fn dht_op_to_light_basis(
     op: DhtOp,
-    cas: &ChainCasBuf<'_>,
+    cas: &ElementBuf<'_>,
 ) -> DhtOpConvertResult<(DhtOpLight, AnyDhtHash)> {
     let basis = dht_basis(&op, &cas).await?;
     match op {
@@ -81,7 +81,7 @@ pub async fn dht_op_to_light_basis(
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
 /// This only checks the cas so can only be used with ops that you are an authority
 // or author of.
-pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<DhtOp> {
+pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf<'_>) -> DhtOpConvertResult<DhtOp> {
     let op_name = format!("{:?}", op);
     match op {
         DhtOpLight::StoreElement(h, _) => {
@@ -208,7 +208,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
 async fn get_element_delete(
     header_hash: HeaderHash,
     op_name: String,
-    cas: &ChainCasBuf<'_>,
+    cas: &ElementBuf<'_>,
 ) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
     let (header, sig) = cas
         .get_element(&header_hash)
@@ -228,7 +228,7 @@ async fn get_element_delete(
 
 #[instrument(skip(op, cas))]
 /// Returns the basis hash which determines which agents will receive this DhtOp
-pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<AnyDhtHash> {
+pub async fn dht_basis(op: &DhtOp, cas: &ElementBuf<'_>) -> DhtOpConvertResult<AnyDhtHash> {
     Ok(match op {
         DhtOp::StoreElement(_, header, _) => {
             let (_, hash): (_, HeaderHash) =
@@ -257,7 +257,7 @@ pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<
 #[instrument(skip(cas))]
 async fn get_entry_hash_for_header(
     header_hash: &HeaderHash,
-    cas: &ChainCasBuf<'_>,
+    cas: &ElementBuf<'_>,
 ) -> DhtOpConvertResult<EntryHash> {
     debug!(%header_hash);
     let entry = cas

@@ -1,6 +1,6 @@
 use super::ChainInvalidReason;
 use crate::core::state::{
-    chain_cas::{ChainCasBuf, HeaderCas},
+    chain_cas::{ElementBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
     source_chain::{SourceChainError, SourceChainResult},
 };
@@ -22,7 +22,7 @@ use holochain_zome_types::{header, Entry, Header};
 use tracing::*;
 
 pub struct SourceChainBuf<'env> {
-    cas: ChainCasBuf<'env>,
+    cas: ElementBuf<'env>,
     sequence: ChainSequenceBuf<'env>,
     keystore: KeystoreSender,
 }
@@ -30,7 +30,7 @@ pub struct SourceChainBuf<'env> {
 impl<'env> SourceChainBuf<'env> {
     pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::vault(reader, dbs, true)?,
+            cas: ElementBuf::vault(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })
@@ -41,7 +41,7 @@ impl<'env> SourceChainBuf<'env> {
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
     pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::cache(reader, dbs)?,
+            cas: ElementBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })
@@ -101,7 +101,7 @@ impl<'env> SourceChainBuf<'env> {
         self.sequence.complete_dht_op(i)
     }
 
-    pub fn cas<'a>(&'a self) -> &'a ChainCasBuf<'env> {
+    pub fn cas<'a>(&'a self) -> &'a ElementBuf<'env> {
         &self.cas
     }
 
