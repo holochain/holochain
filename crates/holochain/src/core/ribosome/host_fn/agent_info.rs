@@ -1,20 +1,37 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::globals::AgentInfo;
+use crate::core::state::source_chain::SourceChainResult;
+use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
+use futures::future::FutureExt;
+use holo_hash::AgentPubKey;
+use holochain_zome_types::agent_info::AgentInfo;
 use holochain_zome_types::AgentInfoInput;
 use holochain_zome_types::AgentInfoOutput;
+use must_future::MustBoxFuture;
 use std::sync::Arc;
 
-pub fn agent_info(
+#[allow(clippy::extra_unused_lifetimes)]
+pub fn agent_info<'a>(
     _ribosome: Arc<impl RibosomeT>,
-    _host_context: Arc<CallContext>,
+    call_context: Arc<CallContext>,
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {
+    let call =
+        |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, SourceChainResult<AgentPubKey>> {
+            async move { Ok(workspace.source_chain.agent_pubkey().await?) }
+                .boxed()
+                .into()
+        };
+    let agent_pubkey: AgentPubKey =
+        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            unsafe { call_context.host_access.workspace().apply_ref(call).await }
+        })??;
     Ok(AgentInfoOutput::new(AgentInfo {
-        agent_address: "todo".into(),  // @TODO
-        agent_initial_hash: "".into(), // @TODO
-        agent_latest_hash: "".into(),  // @TODO
+        agent_pubkey: agent_pubkey.clone(),
+        // @todo these were in redux, what to do here?
+        agent_initial_pubkey: agent_pubkey.clone(),
+        agent_latest_pubkey: agent_pubkey,
     }))
 }
 
@@ -25,9 +42,10 @@ pub mod test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::AgentInfoInput;
-    use holochain_zome_types::{hash::HashString, AgentInfoOutput};
+    use holochain_zome_types::AgentInfoOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_agent_info_test() {
@@ -36,6 +54,10 @@ pub mod test {
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
@@ -48,9 +70,14 @@ pub mod test {
             "agent_info",
             AgentInfoInput::new(())
         );
+        assert_eq!(agent_info.inner_ref().agent_pubkey, fake_agent_pubkey_1(),);
         assert_eq!(
-            agent_info.inner_ref().agent_address,
-            HashString::from("todo")
+            agent_info.inner_ref().agent_initial_pubkey,
+            fake_agent_pubkey_1(),
+        );
+        assert_eq!(
+            agent_info.inner_ref().agent_latest_pubkey,
+            fake_agent_pubkey_1(),
         );
     }
 }

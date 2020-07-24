@@ -52,7 +52,7 @@ impl AsRef<Vec<u8>> for LinkTag {
 )]
 pub struct Link {
     /// The [Entry] being linked to
-    pub target: holo_hash_core::EntryHash,
+    pub target: holo_hash::EntryHash,
     /// When the link was added
     pub timestamp: std::time::SystemTime,
     /// A tag used to find this link

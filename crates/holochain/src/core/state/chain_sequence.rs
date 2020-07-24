@@ -8,7 +8,7 @@
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-use holo_hash_core::HeaderAddress;
+use holo_hash::HeaderAddress;
 use holochain_state::{
     buffer::{BufferedStore, IntKvBuf},
     db::{GetDb, CHAIN_SEQUENCE},
@@ -161,7 +161,7 @@ pub mod tests {
 
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
     use crate::core::state::source_chain::SourceChainResult;
-    use holo_hash_core::HeaderHash;
+    use holo_hash::HeaderHash;
     use holochain_state::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,

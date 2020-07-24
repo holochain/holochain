@@ -1,6 +1,6 @@
 //! Links interrelate entries in a source chain.
 
-use holo_hash_core::EntryHash;
+use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::link::LinkTag;
 use regex::Regex;

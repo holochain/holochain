@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub fn unreachable(
     _ribosome: Arc<impl RibosomeT>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     _input: UnreachableInput,
 ) -> RibosomeResult<UnreachableOutput> {
     unreachable!();

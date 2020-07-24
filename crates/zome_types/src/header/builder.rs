@@ -2,7 +2,7 @@ use super::{EntryType, Timestamp};
 use crate::header::{self, HeaderInner, IntendedFor, ZomeId};
 use crate::link::LinkTag;
 use header::Dna;
-use holo_hash_core::{AgentPubKey, DnaHash, EntryHash, HeaderAddress, HeaderHash};
+use holo_hash::{AgentPubKey, DnaHash, EntryHash, HeaderAddress, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 
 pub struct HeaderBuilderCommon {

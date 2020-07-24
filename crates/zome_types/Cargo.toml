@@ -12,7 +12,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-holo_hash_core = { path = "../holo_hash_core" }
+holo_hash = { path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.40"
 # TODO: remove and replace with HoloHash
 multihash = "0.8.0"

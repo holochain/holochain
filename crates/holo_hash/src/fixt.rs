@@ -1,16 +1,15 @@
 #![allow(missing_docs)]
 
-use ::fixt::prelude::*;
-use holo_hash_core::{
+use crate::{
     encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
     EntryContentHash, EntryHash, HeaderHash, NetIdHash, WasmHash,
 };
+use fixt::prelude::*;
 
 pub type HashTypeEntry = hash_type::Entry;
 pub type HashTypeAnyDht = hash_type::AnyDht;
 
-// FIXME: why doesn't this work?
-// failed to resolve: could not find `strum` in `{{root}}`
+// TODO: use strum to do this:
 //
 // fixturator!(
 //     HashTypeEntry;

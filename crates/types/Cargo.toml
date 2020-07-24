@@ -21,7 +21,6 @@ fixt = { path = "../fixt" }
 flate2 = "1.0.14"
 futures = "0.3"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
-holo_hash_core = { version = "0.0.1", path = "../holo_hash_core" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_serialized_bytes = "=0.0.40"

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 pub fn entry_hash(
     _ribosome: Arc<impl RibosomeT>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     input: EntryHashInput,
 ) -> RibosomeResult<EntryHashOutput> {
     let entry: Entry = input.into_inner();
@@ -48,14 +48,14 @@ pub mod wasm_test {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let host_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = EntryHashInput::new(entry);
 
         let output: EntryHashOutput =
-            entry_hash(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
+            entry_hash(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
     }

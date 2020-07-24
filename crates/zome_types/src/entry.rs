@@ -1,4 +1,4 @@
-//! An Entry is a unit of data in a Holochain Source Chain.	use holo_hash_core::AgentPubKey;
+//! An Entry is a unit of data in a Holochain Source Chain.	use holo_hash::AgentPubKey;
 //!
 //! This module contains all the necessary definitions for Entry, which broadly speaking
 //! refers to any data which will be written into the ContentAddressableStorage, or the EntityAttributeValueStorage.
@@ -8,7 +8,7 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
-use holo_hash_core::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
+use holo_hash::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 
 /// The data type written to the source chain when explicitly granting a capability.

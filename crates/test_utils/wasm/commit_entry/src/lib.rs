@@ -70,7 +70,7 @@ pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
     )));
 }
 
-fn _commit_entry() -> Result<holo_hash_core::HeaderHash, WasmError> {
+fn _commit_entry() -> Result<holo_hash::HeaderHash, WasmError> {
     let post = Post("foo".into());
     Ok(host_call!(
         __commit_entry,

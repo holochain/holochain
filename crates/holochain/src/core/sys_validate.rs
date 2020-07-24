@@ -1,5 +1,5 @@
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-pub use holo_hash_core::*;
+pub use holo_hash::*;
 pub use holochain_types::{element::ChainElement, HeaderHashed, Timestamp};
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.

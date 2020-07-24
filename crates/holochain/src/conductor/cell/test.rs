@@ -1,20 +1,26 @@
 use crate::{
     conductor::manager::spawn_task_manager,
-    core::state::{dht_op_integration::IntegrationQueueValue, workspace::Workspace},
+    core::{
+        state::{
+            dht_op_integration::{IntegratedDhtOpsValue, IntegrationQueueValue},
+            workspace::Workspace,
+        },
+        workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight,
+    },
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
+use holo_hash::HasHash;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_state::{
     env::ReadManager,
     test_utils::{test_conductor_env, TestEnvironment},
 };
 use holochain_types::{
-    dht_op::DhtOp,
+    dht_op::{DhtOp, DhtOpHashed},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
-    Timestamp,
+    HeaderHashed, Timestamp,
 };
 use holochain_zome_types::header;
 use std::sync::Arc;
@@ -65,8 +71,6 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let header_hash = fixt!(HeaderHash);
-    let op_hash = fixt!(DhtOpHash);
     let sig = fixt!(Signature);
     let header = header::Header::Dna(header::Dna {
         author: agent.clone(),
@@ -74,23 +78,26 @@ async fn test_cell_handle_publish() {
         hash: dna.clone(),
         header_seq: 42,
     });
-    let op = DhtOp::StoreElement(sig, header, None);
+    let op = DhtOp::StoreElement(sig, header.clone(), None);
+    let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
+    let header_hash = HeaderHashed::from_content(header.clone()).await.into_hash();
 
     cell.handle_publish(
         fake_agent_pubkey_2(),
         true,
-        header_hash.into(),
-        vec![(op_hash, op.clone())],
+        header_hash.clone().into(),
+        vec![(op_hash.clone(), op.clone())],
     )
     .await
     .unwrap();
 
     let env_ref = cell.state_env.guard().await;
     let reader = env_ref.reader().expect("Could not create LMDB reader");
-    let workspace = crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace::new(
-        &reader, &env_ref,
-    )
-    .expect("Could not create Workspace");
+    let workspace =
+        crate::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace::new(
+            &reader, &env_ref,
+        )
+        .expect("Could not create Workspace");
 
     let res = workspace
         .integration_queue
@@ -99,24 +106,43 @@ async fn test_cell_handle_publish() {
         .collect::<Vec<_>>()
         .unwrap();
 
-    let (_, last) = &res[res.len() - 1];
-
-    matches::assert_matches!(
-        last,
-        IntegrationQueueValue {
-            op: DhtOp::StoreElement(
-                _,
-                header::Header::Dna(
-                    header::Dna {
+    match res.last() {
+        Some((_, last)) => {
+            matches::assert_matches!(
+                last,
+                IntegrationQueueValue {
+                    op: DhtOp::StoreElement(
+                        _,
+                        header::Header::Dna(
+                            header::Dna {
+                                hash,
+                                ..
+                            }
+                        ),
+                        _,
+                    ),
+                    ..
+                } if hash == &dna
+            );
+        }
+        // Op may have already been integrated so check
+        // the integrated ops table.
+        // No easy way to prevent this race so best to just check
+        // both cases.
+        None => {
+            let res = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
+            matches::assert_matches!(
+                res,
+                IntegratedDhtOpsValue {
+                    op: DhtOpLight::StoreElement(
                         hash,
-                        ..
-                    }
-                ),
-                _,
-            ),
-            ..
-        } if hash == &dna
-    );
+                        _
+                    ),
+                    ..
+                } if hash == header_hash
+            );
+        }
+    }
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap();
 }

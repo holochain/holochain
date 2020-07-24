@@ -2,6 +2,7 @@ use holochain_types::dna::wasm::DnaWasm;
 pub extern crate strum;
 #[macro_use]
 extern crate strum_macros;
+use holochain_types::dna::zome::Zome;
 use holochain_zome_types::zome::ZomeName;
 
 #[derive(EnumIter, Clone, Copy)]
@@ -26,6 +27,7 @@ pub enum TestWasm {
     ValidateValid,
     ValidationPackageFail,
     ValidationPackageSuccess,
+    WhoAmI,
 }
 
 impl From<TestWasm> for ZomeName {
@@ -51,6 +53,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateValid => "validate_valid",
             TestWasm::ValidationPackageFail => "validation_package_fail",
             TestWasm::ValidationPackageSuccess => "validation_package_success",
+            TestWasm::WhoAmI => "whoami",
         })
     }
 }
@@ -158,6 +161,29 @@ impl From<TestWasm> for DnaWasm {
                 "/wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm"
             ))
             .to_vec(),
+            TestWasm::WhoAmI => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_whoami.wasm"
+            ))
+            .to_vec(),
         })
+    }
+}
+
+impl From<TestWasm> for Zome {
+    fn from(test_wasm: TestWasm) -> Self {
+        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            let dna_wasm: DnaWasm = test_wasm.into();
+            let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
+                .await
+                .into_inner();
+            Self { wasm_hash }
+        })
+    }
+}
+
+impl From<TestWasm> for (ZomeName, Zome) {
+    fn from(test_wasm: TestWasm) -> Self {
+        (test_wasm.into(), test_wasm.into())
     }
 }

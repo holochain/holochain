@@ -9,7 +9,7 @@ use tracing::*;
 
 pub fn debug(
     _ribosome: Arc<impl RibosomeT>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     input: DebugInput,
 ) -> RibosomeResult<DebugOutput> {
     let msg: DebugMsg = input.into_inner();
@@ -45,12 +45,12 @@ pub mod wasm_test {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
-        let host_context = CallContextFixturator::new(fixt::Unpredictable)
+        let call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         let input = DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")));
 
-        let output: DebugOutput = debug(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
+        let output: DebugOutput = debug(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         assert_eq!(DebugOutput::new(()), output);
     }

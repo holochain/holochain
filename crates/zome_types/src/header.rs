@@ -1,6 +1,6 @@
 use crate::{entry_def::EntryVisibility, link::LinkTag, timestamp::Timestamp};
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
-use holo_hash_core::{
+use holo_hash::{
     impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderAddress,
     HeaderHash,
 };

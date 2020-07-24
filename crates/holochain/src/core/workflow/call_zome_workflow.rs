@@ -174,7 +174,7 @@ impl<'env: 'a, 'a> InvokeZomeWorkspace<'env> {
             &self.source_chain.cas(),
             &self.meta,
             &mut self.cache_cas,
-            &self.cache_meta,
+            &mut self.cache_meta,
             network,
         )
     }

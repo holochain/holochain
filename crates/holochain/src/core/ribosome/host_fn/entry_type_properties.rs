@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub fn entry_type_properties(
     _ribosome: Arc<impl RibosomeT>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     _input: EntryTypePropertiesInput,
 ) -> RibosomeResult<EntryTypePropertiesOutput> {
     unimplemented!();

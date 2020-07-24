@@ -13,6 +13,7 @@ pub use types::*;
 
 mod spawn;
 use holochain_types::element::WireElement;
+use holochain_types::metadata::MetadataSet;
 pub use spawn::*;
 pub use test::HolochainP2pCellFixturator;
 
@@ -62,7 +63,7 @@ impl HolochainP2pCell {
             .await
     }
 
-    /// Publish data to the correct neigborhood.
+    /// Publish data to the correct neighborhood.
     pub async fn publish(
         &mut self,
         request_validation_receipt: bool,
@@ -100,6 +101,22 @@ impl HolochainP2pCell {
     ) -> actor::HolochainP2pResult<Vec<WireElement>> {
         self.sender
             .get(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                dht_hash,
+                options,
+            )
+            .await
+    }
+
+    /// Get metadata from the DHT.
+    pub async fn get_meta(
+        &mut self,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: actor::GetMetaOptions,
+    ) -> actor::HolochainP2pResult<Vec<MetadataSet>> {
+        self.sender
+            .get_meta(
                 (*self.dna_hash).clone(),
                 (*self.from_agent).clone(),
                 dht_hash,

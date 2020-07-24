@@ -40,6 +40,7 @@ fn main() {
         "validate_valid",
         "validation_package_fail",
         "validation_package_success",
+        "whoami",
     ]
     .iter()
     {

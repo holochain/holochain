@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub fn show_env(
     _ribosome: Arc<impl RibosomeT>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     _input: ShowEnvInput,
 ) -> RibosomeResult<ShowEnvOutput> {
     unimplemented!();

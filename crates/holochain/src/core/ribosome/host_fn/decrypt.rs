@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub fn decrypt(
     _ribosome: Arc<impl RibosomeT>,
-    _host_context: Arc<CallContext>,
+    _call_context: Arc<CallContext>,
     _input: DecryptInput,
 ) -> RibosomeResult<DecryptOutput> {
     unimplemented!();
