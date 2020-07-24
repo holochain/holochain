@@ -9,7 +9,11 @@
 
 #![deny(missing_docs)]
 
+#[allow(missing_docs)]
+pub mod agent_info;
 pub mod bytes;
+#[allow(missing_docs)]
+pub mod call_remote;
 pub mod capability;
 #[allow(missing_docs)]
 pub mod crdt;
@@ -17,8 +21,6 @@ pub mod debug;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
-pub mod globals;
-pub mod hash;
 #[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]
@@ -34,6 +36,8 @@ pub mod timestamp;
 pub mod validate;
 #[allow(missing_docs)]
 pub mod zome;
+#[allow(missing_docs)]
+pub mod zome_info;
 #[allow(missing_docs)]
 mod zome_io;
 

@@ -36,7 +36,7 @@ pub use grant::*;
 /// It is a random, unique identifier for the capability, which is shared by
 /// the Grantor to allow access to others.
 /// A capability CAN be updated (replaced with a new one) with the same secret.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CapSecret(String);
 
 impl From<String> for CapSecret {
