@@ -1,5 +1,4 @@
 use crate::{HashableContent, HoloHash, HoloHashOf, HoloHashed};
-use holochain_serialized_bytes::SerializedBytesError;
 
 impl<C> HoloHashed<C>
 where
@@ -9,11 +8,5 @@ where
     pub async fn from_content(content: C) -> Self {
         let hash: HoloHashOf<C> = HoloHash::with_data(&content).await;
         Self { content, hash }
-    }
-
-    /// Alias for with_content
-    #[deprecated = "alias for `from_content`"]
-    pub async fn with_data(content: C) -> Result<Self, SerializedBytesError> {
-        Ok(Self::from_content(content).await)
     }
 }
