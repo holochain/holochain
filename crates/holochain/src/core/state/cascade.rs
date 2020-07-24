@@ -40,14 +40,18 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
+    metadata::{LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use error::CascadeResult;
-use holo_hash_core::{AnyDhtHash, EntryHash, HeaderAddress};
-use holochain_p2p::{actor::GetOptions, HolochainP2pCell};
+use holo_hash_core::{hash_type, AnyDhtHash, EntryHash, HeaderAddress};
+use holochain_p2p::{
+    actor::{GetMetaOptions, GetOptions},
+    HolochainP2pCell,
+};
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
     element::{ChainElement, SignedHeaderHashed},
+    metadata::{EntryDhtStatus, MetadataSet},
     EntryHashed,
 };
 use tracing::*;
@@ -68,7 +72,7 @@ where
     primary_meta: &'a M,
 
     cache: &'a mut ChainCasBuf<'env>,
-    cache_meta: &'a C,
+    cache_meta: &'a mut C,
 
     network: HolochainP2pCell,
 }
@@ -99,7 +103,7 @@ where
         primary: &'a ChainCasBuf<'env>,
         primary_meta: &'a M,
         cache: &'a mut ChainCasBuf<'env>,
-        cache_meta: &'a C,
+        cache_meta: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
         Cascade {
@@ -141,6 +145,43 @@ where
             None => None,
         };
         Ok(element)
+    }
+
+    // TODO: Remove when used
+    #[allow(dead_code)]
+    async fn fetch_meta(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetMetaOptions,
+    ) -> CascadeResult<Vec<MetadataSet>> {
+        let all_metadata = self.network.get_meta(hash.clone(), options).await?;
+
+        // Only put raw meta data in cache and combine all results
+        for metadata in all_metadata.iter().cloned() {
+            let hash = hash.clone();
+            // Put in meta cache
+            let values = metadata
+                .headers
+                .into_iter()
+                .map(|h| SysMetaVal::NewEntry(h))
+                .chain(metadata.deletes.into_iter().map(|h| SysMetaVal::Delete(h)))
+                .chain(metadata.updates.into_iter().map(|h| SysMetaVal::Update(h)));
+            match *hash.hash_type() {
+                hash_type::AnyDht::Entry(e) => {
+                    let basis = hash.retype(e);
+                    for v in values {
+                        self.cache_meta.register_raw_on_entry(basis.clone(), v)?;
+                    }
+                }
+                hash_type::AnyDht::Header => {
+                    let basis = hash.retype(hash_type::Header);
+                    for v in values {
+                        self.cache_meta.register_raw_on_header(basis.clone(), v);
+                    }
+                }
+            }
+        }
+        Ok(all_metadata)
     }
 
     /// Get a header without checking its metadata

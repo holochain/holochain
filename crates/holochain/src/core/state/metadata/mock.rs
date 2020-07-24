@@ -18,33 +18,35 @@ mock! {
             delete: header::ElementDelete,
             entry_hash: EntryHash,
         ) -> DatabaseResult<()>;
+        fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
+        fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
         fn get_headers(
             &self,
             entry_hash: EntryHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_activity(
             &self,
             header_hash: AgentPubKey,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_updates(
             &self,
             hash: AnyDhtHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_deletes_on_header(
             &self,
             new_entry_header: HeaderHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_deletes_on_entry(
             &self,
             entry_hash: EntryHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_link_removes_on_link_add(
             &self,
             link_add: HeaderHash,
-        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
     }
 }
 
@@ -69,7 +71,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_headers(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_headers(entry_hash)
     }
@@ -77,7 +79,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_activity(
         &self,
         agent_pubkey: AgentPubKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_activity(agent_pubkey)
     }
@@ -85,7 +87,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_updates(hash)
     }
@@ -93,7 +95,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_deletes_on_header(
         &self,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_deletes_on_header(new_entry_header)
     }
@@ -101,7 +103,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_deletes_on_entry(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_deletes_on_entry(entry_hash)
     }
@@ -109,7 +111,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_link_removes_on_link_add(
         &self,
         link_add: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_link_removes_on_link_add(link_add)
     }
@@ -144,5 +146,17 @@ impl MetadataBufT for MockMetadataBuf {
         entry_hash: EntryHash,
     ) -> DatabaseResult<()> {
         self.sync_register_delete(delete, entry_hash)
+    }
+
+    fn register_raw_on_entry(
+        &mut self,
+        entry_hash: EntryHash,
+        value: SysMetaVal,
+    ) -> DatabaseResult<()> {
+        self.register_raw_on_entry(entry_hash, value)
+    }
+
+    fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
+        self.register_raw_on_header(header_hash, value)
     }
 }

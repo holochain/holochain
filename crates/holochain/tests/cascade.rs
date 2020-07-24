@@ -82,7 +82,7 @@ async fn get_links() -> SourceChainResult<()> {
 
     // create a cache and a cas for store and meta
     let primary_meta = MetadataBuf::primary(&reader, &dbs)?;
-    let cache_meta = MetadataBuf::cache(&reader, &dbs)?;
+    let mut cache_meta = MetadataBuf::cache(&reader, &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
@@ -101,7 +101,7 @@ async fn get_links() -> SourceChainResult<()> {
         &source_chain.cas(),
         &primary_meta,
         &mut cache,
-        &cache_meta,
+        &mut cache_meta,
         cell_network,
     );
     let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
