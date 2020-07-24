@@ -9,8 +9,7 @@ use fixt::prelude::*;
 pub type HashTypeEntry = hash_type::Entry;
 pub type HashTypeAnyDht = hash_type::AnyDht;
 
-// FIXME: why doesn't this work?
-// failed to resolve: could not find `strum` in `{{root}}`
+// TODO: use strum to do this:
 //
 // fixturator!(
 //     HashTypeEntry;
