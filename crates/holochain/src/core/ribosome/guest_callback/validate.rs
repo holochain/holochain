@@ -1,9 +1,8 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::fixt::EntryFixturator;
-use crate::fixt::ZomeNameFixturator;
-use fixt::prelude::*;
+use derive_more::Constructor;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
@@ -32,15 +31,22 @@ impl ValidateInvocation {
     }
 }
 
-fixturator!(
-    ValidateInvocation;
-    constructor fn new(ZomeName, Entry);
-);
+#[derive(Clone, Constructor)]
+pub struct ValidateHostAccess;
+
+impl From<ValidateHostAccess> for HostAccess {
+    fn from(validate_host_access: ValidateHostAccess) -> Self {
+        Self::Validate(validate_host_access)
+    }
+}
+
+impl From<&ValidateHostAccess> for HostFnAccess {
+    fn from(_: &ValidateHostAccess) -> Self {
+        Self::none()
+    }
+}
 
 impl Invocation for ValidateInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::none()
-    }
     fn zomes(&self) -> ZomesToInvoke {
         // entries are specific to zomes so only validate in the zome the entry is defined in
         // note that here it is possible there is a zome/entry mismatch
@@ -96,7 +102,7 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
                 // return unresolved dependencies if it's otherwise valid
                 ValidateCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Invalid(_) => acc,
-                    _ => Self::UnresolvedDependencies(ud.into_iter().map(|h| h.into()).collect()),
+                    _ => Self::UnresolvedDependencies(ud),
                 },
                 // valid x allows validation to continue
                 ValidateCallbackResult::Valid => acc,
@@ -106,29 +112,21 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::ValidateInvocationFixturator;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ValidateHostAccessFixturator;
+    use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
-    use fixt::prelude::*;
-    use holo_hash::AgentPubKeyFixturator;
-    use holo_hash_core::HoloHashCoreHash;
+    use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
-    use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::HostInput;
-    use matches::assert_matches;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -173,19 +171,12 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
+        let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_matches!(
-            validate_invocation.allowed_access(),
-            HostFnAccess {
-                side_effects: Deny,
-                agent_info: Deny,
-                read_workspace: Deny,
-                non_determinism: Deny,
-                conductor: Deny,
-            }
+        assert_eq!(
+            HostFnAccess::from(&validate_host_access),
+            HostFnAccess::none(),
         );
     }
 
@@ -266,13 +257,28 @@ mod test {
             HostInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::ValidateHostAccess;
+    use super::ValidateResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::ValidateInvocationFixturator;
+    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::CommitEntryOutput;
+    use holochain_zome_types::Entry;
+    use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_unimplemented() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
@@ -282,17 +288,13 @@ mod test {
         validate_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_implemented_valid() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
@@ -302,17 +304,13 @@ mod test {
         validate_invocation.zome_name = TestWasm::ValidateValid.into();
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_implemented_invalid() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
@@ -322,17 +320,13 @@ mod test {
         validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_validate_implemented_multi() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
@@ -350,7 +344,7 @@ mod test {
         validate_invocation.entry = Arc::new(entry);
 
         let result = ribosome
-            .run_validate(workspace, validate_invocation)
+            .run_validate(ValidateHostAccess, validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }
@@ -370,9 +364,11 @@ mod test {
             .unwrap();
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
 
         let output: CommitEntryOutput =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::Validate, "always_validates", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         assert_eq!(
             vec![
@@ -400,8 +396,11 @@ mod test {
 
         let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
 
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
+
         let output: CommitEntryOutput =
-            crate::call_test_ribosome!(raw_workspace, TestWasm::Validate, "never_validates", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         assert_eq!(
             vec![

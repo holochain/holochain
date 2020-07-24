@@ -4,8 +4,6 @@
 
 #![allow(missing_docs)]
 
-use crate::composite_hash::AnyDhtHash;
-use crate::composite_hash::EntryHash;
 use crate::dna::zome::Zome;
 use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
@@ -24,12 +22,15 @@ use crate::header::NewEntryHeader;
 use crate::header::{builder::HeaderBuilderCommon, AppEntryType, IntendedFor};
 use crate::header::{Dna, LinkRemove, ZomeId};
 use crate::Timestamp;
-use fixt::prelude::*;
-use holo_hash::AgentPubKeyFixturator;
-use holo_hash::DnaHashFixturator;
-use holo_hash::EntryContentHashFixturator;
-use holo_hash::HeaderHashFixturator;
-use holo_hash::WasmHashFixturator;
+use ::fixt::prelude::*;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
+
+use holo_hash::fixt::EntryHashFixturator;
+use holo_hash::fixt::HeaderHashFixturator;
+use holo_hash::fixt::WasmHashFixturator;
+
+use holo_hash_core::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::capability::CapAccess;
@@ -116,14 +117,6 @@ newtype_fixturator!(Signature<Bytes>);
 fixturator!(
     IntendedFor;
     unit variants [ Entry Header ] empty Entry;
-);
-
-fixturator!(
-    EntryHash;
-    variants [
-        Entry(EntryContentHash)
-        Agent(AgentPubKey)
-    ];
 );
 
 fixturator!(
@@ -487,15 +480,6 @@ fixturator!(
 );
 
 fixturator!(
-    AnyDhtHash;
-    variants [
-        EntryContent(EntryContentHash)
-        Agent(AgentPubKey)
-        Header(HeaderHash)
-    ];
-);
-
-fixturator!(
     EntryUpdate;
     constructor fn from_builder(HeaderBuilderCommon, IntendedFor, HeaderHash, EntryType, EntryHash);
 );
@@ -536,5 +520,5 @@ fixturator!(
 
 fixturator!(
     HostFnAccess;
-    constructor fn new(Permission, Permission, Permission, Permission, Permission);
+    constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission);
 );

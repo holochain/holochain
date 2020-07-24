@@ -42,11 +42,15 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{EntryDhtStatus, LinkMetaKey, MetadataBuf, MetadataBufT},
 };
+use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::HeaderHash;
+use holo_hash_core::{
+    hash_type::{self, AnyDht},
+    AnyDhtHash, EntryHash, HeaderAddress, HeaderHash,
+};
+use holochain_p2p::{actor::GetOptions, HolochainP2pCell};
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    composite_hash::{AnyDhtHash, EntryHash, HeaderAddress},
     element::{ChainElement, SignedHeaderHashed},
     EntryHashed,
 };
@@ -54,18 +58,24 @@ use holochain_zome_types::link::Link;
 use tracing::*;
 
 #[cfg(test)]
+mod network_tests;
+#[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
+mod error;
+
+pub struct Cascade<'env: 'a, 'a, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
 where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    primary: &'env ChainCasBuf<'env>,
-    primary_meta: &'env M,
+    primary: &'a ChainCasBuf<'env>,
+    primary_meta: &'a M,
 
-    cache: &'env ChainCasBuf<'env>,
-    cache_meta: &'env C,
+    cache: &'a mut ChainCasBuf<'env>,
+    cache_meta: &'a C,
+
+    network: HolochainP2pCell,
 }
 
 /// The state of the cascade search
@@ -84,24 +94,58 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'env, M, C> Cascade<'env, M, C>
+impl<'env: 'a, 'a, M, C> Cascade<'env, 'a, M, C>
 where
     C: MetadataBufT,
     M: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
-        primary: &'env ChainCasBuf<'env>,
-        primary_meta: &'env M,
-        cache: &'env ChainCasBuf<'env>,
-        cache_meta: &'env C,
+        primary: &'a ChainCasBuf<'env>,
+        primary_meta: &'a M,
+        cache: &'a mut ChainCasBuf<'env>,
+        cache_meta: &'a C,
+        network: HolochainP2pCell,
     ) -> Self {
         Cascade {
             primary,
             primary_meta,
             cache,
             cache_meta,
+            network,
         }
+    }
+
+    // TODO: Remove when used
+    #[allow(dead_code)]
+    async fn fetch_element(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<ChainElement>> {
+        let elements = self.network.get(hash, options).await?;
+
+        // TODO: handle case of multiple elements returned
+        // Get the first returned element
+        let element = match elements.into_iter().next() {
+            Some(chain_element_data) => {
+                // Deserialize to type and hash
+                let element = chain_element_data.into_element().await?;
+                let (signed_header, maybe_entry) = element.clone().into_inner();
+
+                // Hash entry
+                let entry = match maybe_entry {
+                    Some(entry) => Some(EntryHashed::with_data(entry).await?),
+                    None => None,
+                };
+
+                // Put in element cache
+                self.cache.put(signed_header, entry)?;
+                Some(element)
+            }
+            None => None,
+        };
+        Ok(element)
     }
 
     /// Get a header without checking its metadata
@@ -247,18 +291,26 @@ where
     // and returns what is in the cache.
     // This gives you the latest possible picture of the current dht state.
     // Data from your zome call is also added to the cache.
-    pub async fn dht_get(&self, hash: &AnyDhtHash) -> DatabaseResult<Option<ChainElement>> {
-        match hash.clone() {
-            AnyDhtHash::EntryContent(ec) => self.dht_get_entry(ec.into()).await,
-            AnyDhtHash::Agent(a) => self.dht_get_entry(a.into()).await,
-            AnyDhtHash::Header(header) => self.dht_get_header(header).await,
+    pub async fn dht_get(&self, hash: AnyDhtHash) -> DatabaseResult<Option<ChainElement>> {
+        match *hash.hash_type() {
+            AnyDht::Entry(e) => {
+                let hash = hash.retype(e);
+                self.dht_get_entry(hash).await
+            }
+            AnyDht::Header => {
+                let hash = hash.retype(hash_type::Header);
+                self.dht_get_header(hash).await
+            }
         }
     }
 
     /// Gets an links from the cas or cache depending on it's metadata
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<Link>> {
+    pub async fn dht_get_links<'link>(
+        &self,
+        key: &'link LinkMetaKey<'link>,
+    ) -> DatabaseResult<Vec<Link>> {
         // Meta Cache
         // Return any links from the meta cache that don't have removes.
         self.cache_meta

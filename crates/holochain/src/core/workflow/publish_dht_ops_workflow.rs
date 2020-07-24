@@ -22,7 +22,7 @@ use crate::core::{
     },
 };
 use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, HoloHashBaseExt};
+use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::KvBuf,
@@ -30,7 +30,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{GetDb, Reader},
 };
-use holochain_types::{composite_hash::AnyDhtHash, dht_op::DhtOp};
+use holochain_types::dht_op::DhtOp;
 use std::collections::HashMap;
 use tracing::*;
 
@@ -163,10 +163,10 @@ mod tests {
         },
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holo_hash::{AgentPubKeyFixturator, DnaHashFixturator, Hashable, Hashed};
+    use holo_hash::fixt::*;
     use holochain_p2p::{
         actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
         spawn_holochain_p2p,
@@ -184,7 +184,7 @@ mod tests {
         header::{EntryType, IntendedFor, NewEntryHeader},
         observability,
         validate::ValidationStatus,
-        EntryHashed, Header, HeaderHashed,
+        EntryHashed, Header, HeaderHashed, Timestamp,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use std::{
@@ -225,15 +225,14 @@ mod tests {
             // Create DhtOp
             let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
             // Get the hash from the op
-            let op_hashed = DhtOpHashed::with_data(op.clone()).await;
+            let op_hashed = DhtOpHashed::from_content(op.clone()).await;
             // Convert op to DhtOpLight
-            let header_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
-                .await
-                .unwrap();
+            let header_hash = HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).await;
             let light = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
                 op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
+                when_integrated: Timestamp::now(),
             };
             data.push((sig, op_hashed, light, header_hash));
         }
@@ -549,14 +548,14 @@ mod tests {
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
                 let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
-                let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let store_element = (op_hash, light, basis, expected_op);
 
                 // Create StoreEntry
                 let header = NewEntryHeader::Create(entry_create.clone());
                 let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
                 let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
-                let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let store_entry = (op_hash, light, basis);
 
                 // Create RegisterReplacedBy
@@ -569,7 +568,7 @@ mod tests {
                 let expected_op =
                     DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
                 let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
-                let op_hash = DhtOpHashed::with_data(op.clone()).await.into_hash();
+                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let register_replaced_by = (op_hash, light, basis, expected_op);
 
                 (store_element, store_entry, register_replaced_by)
@@ -603,6 +602,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
+                    when_integrated: Timestamp::now(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
@@ -616,6 +616,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
+                    when_integrated: Timestamp::now(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
@@ -629,6 +630,7 @@ mod tests {
                     validation_status: ValidationStatus::Valid,
                     op: light,
                     basis,
+                    when_integrated: Timestamp::now(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db

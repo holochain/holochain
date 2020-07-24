@@ -1,11 +1,15 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::fixt::DnaDefFixturator;
-use fixt::prelude::*;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use derive_more::Constructor;
 use holo_hash::EntryContentHash;
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{zome::HostFnAccess, DnaDef};
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::DnaDef;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -21,15 +25,26 @@ impl InitInvocation {
     }
 }
 
-fixturator!(
-    InitInvocation;
-    constructor fn new(DnaDef);
-);
+#[derive(Clone, Constructor)]
+pub struct InitHostAccess {
+    pub workspace: UnsafeInvokeZomeWorkspace,
+    pub keystore: KeystoreSender,
+    pub network: HolochainP2pCell,
+}
+
+impl From<InitHostAccess> for HostAccess {
+    fn from(init_host_access: InitHostAccess) -> Self {
+        Self::Init(init_host_access)
+    }
+}
+
+impl From<&InitHostAccess> for HostFnAccess {
+    fn from(_: &InitHostAccess) -> Self {
+        Self::all()
+    }
+}
 
 impl Invocation for InitInvocation {
-    fn allowed_access(&self) -> HostFnAccess {
-        HostFnAccess::all()
-    }
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::All
     }
@@ -73,10 +88,7 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
                 // unresolved deps overrides pass but not fail
                 InitCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Fail(_, _) => acc,
-                    _ => Self::UnresolvedDependencies(
-                        zome_name,
-                        ud.into_iter().map(|h| h.into()).collect(),
-                    ),
+                    _ => Self::UnresolvedDependencies(zome_name, ud.into_iter().collect()),
                 },
                 // passing callback allows the acc to carry forward
                 InitCallbackResult::Pass => acc,
@@ -85,28 +97,22 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
 mod test {
 
-    use super::InitInvocationFixturator;
     use super::InitResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::InitHostAccessFixturator;
+    use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
+    use fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::init::InitCallbackResult;
     use holochain_zome_types::HostInput;
-    use matches::assert_matches;
-    use rand::prelude::*;
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_callback_result_fold() {
+    #[test]
+    fn init_callback_result_fold() {
         let mut rng = thread_rng();
 
         let result_pass = || InitResult::Pass;
@@ -170,33 +176,23 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
-        let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
+    async fn init_access() {
+        let init_host_access = InitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_matches!(
-            init_invocation.allowed_access(),
-            HostFnAccess {
-                side_effects: Allow,
-                agent_info: Allow,
-                read_workspace: Allow,
-                non_determinism: Allow,
-                conductor: Allow,
-            }
-        );
+        assert_eq!(HostFnAccess::from(&init_host_access), HostFnAccess::all(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_zomes() {
+    #[test]
+    fn init_invocation_zomes() {
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
         assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_fn_components() {
+    #[test]
+    fn init_invocation_fn_components() {
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
@@ -207,8 +203,8 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn init_invocation_host_input() {
+    #[test]
+    fn init_invocation_host_input() {
         let init_invocation = InitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
@@ -220,52 +216,57 @@ mod test {
             HostInput::new(SerializedBytes::try_from(()).unwrap()),
         );
     }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+
+    use super::InitResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::InitHostAccessFixturator;
+    use crate::fixt::InitInvocationFixturator;
+    use crate::fixt::WasmRibosomeFixturator;
+    use fixt::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_unimplemented() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_implemented_pass() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(result, InitResult::Pass,);
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_implemented_fail() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
@@ -273,11 +274,7 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[serial_test::serial]
     async fn test_init_multi_implemented_fail() {
-        let workspace = UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
         let ribosome =
             WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))
                 .next()
@@ -285,7 +282,8 @@ mod test {
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
         init_invocation.dna_def = ribosome.dna_file.dna.clone();
 
-        let result = ribosome.run_init(workspace, init_invocation).unwrap();
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome.run_init(host_access, init_invocation).unwrap();
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),

@@ -11,21 +11,25 @@ pub struct Zome {
 }
 
 /// Access a call has to host functions
-#[derive(Debug, Copy, Clone, Constructor)]
+#[derive(Debug, Copy, Clone, Constructor, PartialEq)]
 pub struct HostFnAccess {
     /// Can access agent information
     pub agent_info: Permission,
     /// Can access the workspace
     pub read_workspace: Permission,
-    /// Can write to the network and workspace
-    pub side_effects: Permission,
+    /// Can write and workspace
+    pub write_workspace: Permission,
+    /// Can write to the network
+    pub write_network: Permission,
+    /// Can access dna and zome specific data
+    pub dna_bindings: Permission,
     /// All other non-deterministic functions
     pub non_determinism: Permission,
-    /// Access to functions that use the conductor
-    pub conductor: Permission,
+    /// Access to functions that use the keystore in the conductor
+    pub keystore: Permission,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 /// Permission granted to a call
 pub enum Permission {
     /// Host functions with this access will be included
@@ -37,9 +41,7 @@ pub enum Permission {
 impl Zome {
     /// create a Zome from a holo_hash WasmHash instead of a holo_hash_core one
     pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
-        Self {
-            wasm_hash: wasm_hash.into(),
-        }
+        Self { wasm_hash }
     }
 }
 
@@ -50,10 +52,12 @@ impl HostFnAccess {
     pub fn all() -> Self {
         HostFnAccess {
             read_workspace: Permission::Allow,
-            side_effects: Permission::Allow,
+            write_workspace: Permission::Allow,
             agent_info: Permission::Allow,
             non_determinism: Permission::Allow,
-            conductor: Permission::Allow,
+            write_network: Permission::Allow,
+            keystore: Permission::Allow,
+            dna_bindings: Permission::Allow,
         }
     }
 
@@ -61,10 +65,12 @@ impl HostFnAccess {
     pub fn none() -> Self {
         HostFnAccess {
             read_workspace: Permission::Deny,
-            side_effects: Permission::Deny,
+            write_workspace: Permission::Deny,
             agent_info: Permission::Deny,
             non_determinism: Permission::Deny,
-            conductor: Permission::Deny,
+            write_network: Permission::Deny,
+            keystore: Permission::Deny,
+            dna_bindings: Permission::Deny,
         }
     }
 }

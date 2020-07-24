@@ -1,8 +1,8 @@
+use ::fixt::prelude::*;
 use criterion::BenchmarkId;
 use criterion::Throughput;
 use criterion::{criterion_group, criterion_main, Criterion};
-use fixt::prelude::*;
-use holo_hash::AgentPubKeyFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::fixt::CapSecretFixturator;
@@ -33,7 +33,8 @@ pub fn wasm_call_n(c: &mut Criterion) {
             TestWasm::Bench.into(),
         ]));
     let mut cap_secret_fixturator = CapSecretFixturator::new(Unpredictable);
-    let mut workspace_fixturator = holochain::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspaceFixturator::new(fixt::Unpredictable);
+    let mut host_access_fixturator =
+        holochain::fixt::ZomeCallHostAccessFixturator::new(fixt::Unpredictable);
     let mut cell_id_fixturator = holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable);
     let mut agent_key_fixturator = AgentPubKeyFixturator::new(Unpredictable);
 
@@ -63,7 +64,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     // .build()
                     // .unwrap()
                     // .spawn(async {
-                    let w = workspace_fixturator.next().unwrap();
+                    let ca = host_access_fixturator.next().unwrap();
                     let r = ribosome_fixturator.next().unwrap();
                     let i = ZomeCallInvocation {
                         cell_id: cell_id_fixturator.next().unwrap(),
@@ -74,7 +75,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         provenance: agent_key_fixturator.next().unwrap(),
                     };
                     println!("{}", n);
-                    r.maybe_call(w, &i, &TestWasm::Bench.into(), "echo_bytes".into())
+                    r.maybe_call(ca.into(), &i, &TestWasm::Bench.into(), "echo_bytes".into())
                         .unwrap();
                 });
                 // });

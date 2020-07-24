@@ -1,9 +1,12 @@
 //! Defines a ChainElement, the basic unit of Holochain data.
 
-use crate::{composite_hash::HeaderAddress, prelude::*, Header, HeaderHashed};
+use crate::{prelude::*, Header, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
+use holo_hash::HeaderAddress;
+use holo_hash_core::{hash_type, HashableContentBytes};
 use holochain_keystore::{KeystoreError, Signature};
+use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryVisibility;
 use must_future::MustBoxFuture;
@@ -14,6 +17,15 @@ use must_future::MustBoxFuture;
 pub struct ChainElement {
     /// The signed header for this element
     signed_header: SignedHeaderHashed,
+    /// If there is an entry associated with this header it will be here
+    maybe_entry: Option<Entry>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+/// ChainElement without the hashes for sending across the network
+pub struct WireElement {
+    /// The signed header for this element
+    signed_header: SignedHeader,
     /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
 }
@@ -125,10 +137,26 @@ impl SignedHeader {
     }
 }
 
+impl HashableContent for SignedHeader {
+    type HashType = hash_type::Header;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::Header
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            (&self.0)
+                .try_into()
+                .expect("Could not serialize HashableContent"),
+        )
+    }
+}
+
 // HACK: In this representation, we have to clone the Header and store it twice,
 // once in the HeaderHashed, and once in the SignedHeader. The reason is that
 // the API currently requires references to both types, and it was easier to
-// to a simple clone than to refactor the entire struct and API to remove the
+// do a simple clone than to refactor the entire struct and API to remove the
 // need for one of those references. We probably SHOULD do that refactor at
 // some point.
 // FIXME: refactor so that HeaderHashed is not stored, and then remove the
@@ -137,37 +165,35 @@ impl SignedHeader {
 // - Having a lazily instantiable SignedHeader, so we only have to clone if needed
 // - Having HeaderHashed take AsRefs for its arguments, so you can have a
 //    HeaderHashed of references instead of values
-/// the header and the signature that signed it
+// FIXME: OR, even better yet, do away with this struct and just use
+// HoloHashed<SignedHeader> instead, if possible and expedient
+/// The header and the signature that signed it
 #[derive(Clone, Debug, PartialEq)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
     signed_header: SignedHeader,
 }
 
-impl Hashed for SignedHeaderHashed {
-    type Content = SignedHeader;
-    type HashType = HeaderHash;
-
+#[allow(missing_docs)]
+impl SignedHeaderHashed {
     /// Unwrap the complete contents of this "Hashed" wrapper.
-    fn into_inner(self) -> (Self::Content, Self::HashType) {
+    pub fn into_inner(self) -> (SignedHeader, HeaderHash) {
         let (header, hash) = self.header.into_inner();
         ((header, self.signed_header.1).into(), hash)
     }
 
     /// Access the main item stored in this wrapper type.
-    fn as_content(&self) -> &Self::Content {
+    pub fn as_content(&self) -> &SignedHeader {
         &self.signed_header
     }
 
     /// Access the already-calculated hash stored in this wrapper type.
-    fn as_hash(&self) -> &Self::HashType {
+    pub fn as_hash(&self) -> &HeaderHash {
         self.header.as_hash()
     }
-}
 
-impl Hashable for SignedHeaderHashed {
-    fn with_data(
-        signed_header: Self::Content,
+    pub fn with_data(
+        signed_header: SignedHeader,
     ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
     where
         Self: Sized,
@@ -242,5 +268,62 @@ impl SignedHeaderHashed {
             ));
         }
         Ok(())
+    }
+}
+
+impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
+    fn from(hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
+        let (signed_header, hash) = hashed.into_inner();
+        SignedHeaderHashed {
+            header: HeaderHashed::with_pre_hashed(signed_header.header().clone(), hash),
+            signed_header,
+        }
+    }
+}
+
+impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
+    fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
+        let hash = shh.header.into_hash();
+        HoloHashed::with_pre_hashed(shh.signed_header, hash)
+    }
+}
+
+impl WireElement {
+    /// Convert into a [ChainElement] when receiving from the network
+    pub async fn into_element(self) -> Result<ChainElement, SerializedBytesError> {
+        Ok(ChainElement::new(
+            SignedHeaderHashed::with_data(self.signed_header).await?,
+            self.maybe_entry,
+        ))
+    }
+    /// Convert from a [ChainElement] when sending to the network
+    pub fn from_element(e: ChainElement) -> Self {
+        Self {
+            signed_header: e.signed_header.signed_header,
+            maybe_entry: e.maybe_entry,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SignedHeader, SignedHeaderHashed};
+    use crate::fixt::*;
+    use ::fixt::prelude::*;
+    use holo_hash::{HasHash, HoloHashed};
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_signed_header_roundtrip() {
+        let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
+        let header = HeaderFixturator::new(Unpredictable).next().unwrap();
+        let signed_header = SignedHeader(header, signature);
+        let hashed: HoloHashed<SignedHeader> = HoloHashed::from_content(signed_header).await;
+        let shh: SignedHeaderHashed = hashed.clone().into();
+
+        assert_eq!(shh.header_address(), hashed.as_hash());
+
+        let round: HoloHashed<SignedHeader> = shh.into();
+
+        assert_eq!(hashed, round);
     }
 }

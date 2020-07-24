@@ -2,15 +2,13 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::HostContext;
+use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash::Hashable;
-use holo_hash::Hashed;
-use holochain_types::composite_hash::HeaderAddress;
+use holo_hash_core::{HasHash, HeaderAddress};
 use holochain_types::header::builder;
 use holochain_types::header::AppEntryType;
 use holochain_types::header::EntryType;
@@ -22,7 +20,7 @@ use std::sync::Arc;
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn commit_entry<'a>(
     ribosome: Arc<impl RibosomeT>,
-    host_context: Arc<HostContext>,
+    call_context: Arc<CallContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
     // destructure the args out into an app type def id and entry
@@ -41,19 +39,19 @@ pub fn commit_entry<'a>(
         .dna
         .zomes
         .iter()
-        .position(|(name, _)| name == &host_context.zome_name)
+        .position(|(name, _)| name == &call_context.zome_name)
     {
         Some(index) => holochain_types::header::ZomeId::from(index as u8),
-        None => Err(RibosomeError::ZomeNotExists(host_context.zome_name.clone()))?,
+        None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
     };
 
     // extract the entry defs for a zome
     let (header_entry_def_id, entry_visibility) = match match ribosome
-        .run_entry_defs(EntryDefsInvocation)?
+        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(&host_context.zome_name);
+            let maybe_entry_defs = defs.get(&call_context.zome_name);
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
@@ -71,7 +69,7 @@ pub fn commit_entry<'a>(
     } {
         Some(app_entry_type) => app_entry_type,
         None => Err(RibosomeError::EntryDefs(
-            host_context.zome_name.clone(),
+            call_context.zome_name.clone(),
             format!("entry def not found for {:?}", entry_def_id),
         ))?,
     };
@@ -92,14 +90,14 @@ pub fn commit_entry<'a>(
         .boxed()
     };
     tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-        unsafe { host_context.workspace.apply_mut(call).await }
+        unsafe { call_context.host_access.workspace().apply_mut(call).await }
     }))???;
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(CommitEntryOutput::new(entry_hash.into()))
+    Ok(CommitEntryOutput::new(entry_hash))
 }
 
 #[cfg(test)]
@@ -107,7 +105,6 @@ pub fn commit_entry<'a>(
 pub mod wasm_test {
     use super::commit_entry;
     use crate::core::ribosome::error::RibosomeError;
-    use crate::core::ribosome::HostContextFixturator;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::{
         queue_consumer::TriggerSender,
@@ -117,11 +114,12 @@ pub mod wasm_test {
             produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
         },
     };
+    use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use holo_hash::Hashable;
-    use holo_hash::Hashed;
-    use holo_hash_core::HoloHashCoreHash;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
+    use holo_hash::HasHash;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;
@@ -146,16 +144,18 @@ pub mod wasm_test {
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
                 .next()
                 .unwrap();
-        let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+        let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        host_context.zome_name = TestWasm::CommitEntry.into();
-        host_context.workspace = raw_workspace;
+        call_context.zome_name = TestWasm::CommitEntry.into();
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
+        call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
-        let output = commit_entry(Arc::new(ribosome), Arc::new(host_context), input);
+        let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input);
 
         assert_eq!(
             format!("{:?}", output.unwrap_err()),
@@ -189,16 +189,18 @@ pub mod wasm_test {
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
                 .next()
                 .unwrap();
-        let mut host_context = HostContextFixturator::new(fixt::Unpredictable)
+        let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        host_context.zome_name = TestWasm::CommitEntry.into();
-        host_context.workspace = raw_workspace;
+        call_context.zome_name = TestWasm::CommitEntry.into();
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
+        call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
-        let output = commit_entry(Arc::new(ribosome), Arc::new(host_context), input).unwrap();
+        let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         let app_entry_hash = holochain_types::entry::EntryHashed::with_data(app_entry.clone())
             .await
@@ -228,7 +230,9 @@ pub mod wasm_test {
             // get the result of a commit entry
             let output: CommitEntryOutput = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "commit_entry", ())
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "commit_entry", ())
             };
 
             // Write the database to file
@@ -280,7 +284,9 @@ pub mod wasm_test {
             let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
             let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
             let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-            crate::call_test_ribosome!(raw_workspace, TestWasm::CommitEntry, "get_entry", ())
+            let mut host_access = fixt!(ZomeCallHostAccess);
+            host_access.workspace = raw_workspace;
+            crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "get_entry", ())
         };
 
         let sb = match round.into_inner() {

@@ -8,13 +8,13 @@ pub enum MetaGetStatus<T> {
 #[cfg(test)]
 mod tests {
     use crate::core::state::metadata::{EntryDhtStatus, MetadataBuf, MetadataBufT};
+    use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use fixt::prelude::*;
     use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
+    use holo_hash::fixt::*;
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
-        composite_hash::{EntryHash, HeaderAddress},
         fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},
         header::{self, builder, EntryType, HeaderBuilder},
         Header, HeaderHashed,
@@ -127,7 +127,7 @@ mod tests {
             let original = update.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
-            assert_eq!(&canonical, expected.as_ref());
+            assert_eq!(&canonical, expected.as_hash());
         }
         Ok(())
     }
@@ -170,7 +170,7 @@ mod tests {
             let original = update1.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
-            assert_eq!(&canonical, expected.as_ref());
+            assert_eq!(&canonical, expected.as_hash());
         }
         Ok(())
     }
@@ -272,7 +272,7 @@ mod tests {
                 .1
                 .into_inner()
                 .1;
-            let (update_header, expected_header_hash) =
+            let (update_header, expected_header) =
                 test_update(header_hash, fx.entry_hash(), IntendedFor::Header, &mut fx).await;
 
             let original_entry_1 = fx.entry_hash();
@@ -295,7 +295,7 @@ mod tests {
                 buf.get_canonical_header_hash(original_header_hash.clone())?;
             let canonical_entry_hash = buf.get_canonical_entry_hash(original_entry_1)?;
 
-            assert_eq!(&canonical_header_hash, expected_header_hash.as_ref());
+            assert_eq!(&canonical_header_hash, expected_header.as_hash());
             assert_eq!(canonical_entry_hash, expected_entry_hash);
         }
         Ok(())

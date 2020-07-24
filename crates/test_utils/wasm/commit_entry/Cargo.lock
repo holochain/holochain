@@ -107,6 +107,7 @@ name = "holo_hash_core"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
+ "rmp-serde",
  "serde",
  "serde_bytes",
 ]

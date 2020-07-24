@@ -5,12 +5,14 @@ use super::{
 use crate::core::{
     queue_consumer::OneshotWriter,
     ribosome::{
-        guest_callback::init::{InitInvocation, InitResult},
+        guest_callback::init::{InitHostAccess, InitInvocation, InitResult},
         RibosomeT,
     },
     state::workspace::{Workspace, WorkspaceError, WorkspaceResult},
 };
 use derive_more::Constructor;
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::HolochainP2pCell;
 use holochain_state::buffer::BufferedStore;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use holochain_types::{dna::DnaDef, header::builder};
@@ -24,10 +26,12 @@ pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
 // TODO: #[instrument]
 pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
     mut workspace: InitializeZomesWorkspace<'env>,
+    network: HolochainP2pCell,
+    keystore: KeystoreSender,
     writer: OneshotWriter,
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult> {
-    let result = initialize_zomes_workflow_inner(&mut workspace, args).await?;
+    let result = initialize_zomes_workflow_inner(&mut workspace, network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -41,15 +45,18 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
 
 async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     workspace: &mut InitializeZomesWorkspace<'env>,
+    network: HolochainP2pCell,
+    keystore: KeystoreSender,
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult> {
     let InitializeZomesWorkflowArgs { dna_def, ribosome } = args;
     // Call the init callback
     let result = {
-        // TODO: We need a better solution then reusung the InvokeZomeWorkspace (i.e. ghost actor)
+        // TODO: We need a better solution then re-using the InvokeZomeWorkspace (i.e. ghost actor)
         let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace.0);
+        let host_access = InitHostAccess::new(raw_workspace, keystore, network);
         let invocation = InitInvocation { dna_def };
-        ribosome.run_init(raw_workspace, invocation)?
+        ribosome.run_init(host_access, invocation)?
     };
 
     // Insert the init marker
@@ -86,7 +93,10 @@ pub mod tests {
     use crate::core::ribosome::MockRibosomeT;
     use crate::core::workflow::fake_genesis;
     use crate::fixt::DnaDefFixturator;
+    use crate::fixt::KeystoreSenderFixturator;
+    use fixt::prelude::*;
     use fixt::Unpredictable;
+    use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
     use holochain_types::Header;
     use matches::assert_matches;
@@ -112,7 +122,9 @@ pub mod tests {
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
 
         let args = InitializeZomesWorkflowArgs { ribosome, dna_def };
-        initialize_zomes_workflow_inner(&mut workspace, args)
+        let keystore = fixt!(KeystoreSender);
+        let network = fixt!(HolochainP2pCell);
+        initialize_zomes_workflow_inner(&mut workspace, network, keystore, args)
             .await
             .unwrap();
 

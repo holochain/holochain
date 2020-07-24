@@ -1,12 +1,52 @@
+use crate::actor::HolochainP2pRefToCell;
+use crate::HolochainP2pCell;
+use fixt::prelude::*;
+use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
+
+fixturator!(
+    HolochainP2pCell;
+    curve Empty {
+        // TODO: Make this empty
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            holochain_p2p.to_cell(
+                DnaHashFixturator::new(Empty).next().unwrap(),
+                AgentPubKeyFixturator::new(Empty).next().unwrap(),
+            )
+        })
+    };
+    curve Unpredictable {
+        // TODO: Make this unpredictable
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            holochain_p2p.to_cell(
+                DnaHashFixturator::new(Unpredictable).next().unwrap(),
+                AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+            )
+        })
+    };
+    curve Predictable {
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            holochain_p2p.to_cell(
+                DnaHashFixturator::new(Predictable).next().unwrap(),
+                AgentPubKeyFixturator::new(Predictable).next().unwrap(),
+            )
+        })
+    };
+);
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use holochain_types::element::{ChainElement, SignedHeaderHashed};
+    use holochain_types::fixt::*;
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash::$p::from(crate::holo_hash_core::$p::new([$c as u8; 36].to_vec()))
+            holo_hash::$p::from_raw_bytes([$c as u8; 36].to_vec())
         };
     }
 
@@ -105,6 +145,11 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    // @TODO flakey test
+    // ---- test::tests::test_publish_workflow stdout ----
+    // thread 'test::tests::test_publish_workflow' panicked at 'assertion failed: `(left == right)`
+    //   left: `3`,
+    //  right: `0`', crates/holochain_p2p/src/test.rs:181:9
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
@@ -131,13 +176,12 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let entry_hash = holochain_types::composite_hash::AnyDhtHash::from(
-            holo_hash::EntryContentHash::from(crate::holo_hash_core::EntryContentHash::new(
-                b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            )),
+        let header_hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
+            holo_hash_core::hash_type::AnyDht::Header,
         );
 
-        p2p.publish(dna, a1, true, entry_hash, vec![], Some(20))
+        p2p.publish(dna, a1, true, header_hash, vec![], Some(20))
             .await
             .unwrap();
 
@@ -153,8 +197,20 @@ mod tests {
 
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        let test_1 = SerializedBytes::from(UnsafeBytes::from(b"resp-1".to_vec()));
-        let test_2 = SerializedBytes::from(UnsafeBytes::from(b"resp-2".to_vec()));
+        let test_1 = WireElement::from_element(ChainElement::new(
+            SignedHeaderHashed::with_presigned(
+                HoloHashed::from_content(fixt!(Header)).await,
+                fixt!(Signature),
+            ),
+            None,
+        ));
+        let test_2 = WireElement::from_element(ChainElement::new(
+            SignedHeaderHashed::with_presigned(
+                HoloHashed::from_content(fixt!(Header)).await,
+                fixt!(Signature),
+            ),
+            None,
+        ));
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
@@ -179,14 +235,13 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let entry_hash = holochain_types::composite_hash::AnyDhtHash::from(
-            holo_hash::EntryContentHash::from(crate::holo_hash_core::EntryContentHash::new(
-                b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            )),
+        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
+            holo_hash_core::hash_type::AnyDht::Header,
         );
 
         let res = p2p
-            .get(dna, a1, entry_hash, actor::GetOptions::default())
+            .get(dna, a1, hash, actor::GetOptions::default())
             .await
             .unwrap();
 
@@ -226,14 +281,13 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        let entry_hash = holochain_types::composite_hash::AnyDhtHash::from(
-            holo_hash::EntryContentHash::from(crate::holo_hash_core::EntryContentHash::new(
-                b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            )),
+        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
+            b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
+            holo_hash_core::hash_type::AnyDht::Header,
         );
 
         let res = p2p
-            .get_links(dna, a1, entry_hash, actor::GetLinksOptions::default())
+            .get_links(dna, a1, hash, actor::GetLinksOptions::default())
             .await
             .unwrap();
 

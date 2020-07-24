@@ -1,16 +1,33 @@
 pub mod curve;
 
+use crate::conductor::delete_me_create_test_keystore;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::init::InitHostAccess;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentHostAccess;
+use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
+use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostContextFixturator;
+use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::state::metadata::LinkMetaVal;
-use fixt::prelude::*;
-use holo_hash::DnaHashFixturator;
-use holo_hash::HeaderHashFixturator;
+use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use ::fixt::prelude::*;
+pub use holo_hash::fixt::*;
+use holo_hash::EntryHash;
 use holo_hash::HoloHashExt;
 use holo_hash::WasmHash;
 use holo_hash_core::HeaderHash;
-use holochain_types::composite_hash::EntryHash;
+use holochain_keystore::keystore_actor::KeystoreSender;
+use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
@@ -58,7 +75,7 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
-            let mut host_context = HostContextFixturator::new(Empty).next().unwrap();
+            let mut host_context = CallContextFixturator::new(Empty).next().unwrap();
             host_context.zome_name = zome.into();
             ribosome.module(host_context).unwrap();
         }
@@ -90,7 +107,7 @@ fixturator!(
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
-                    async { WasmHash::with_data(wasm.code().to_vec()).await },
+                    async { WasmHash::with_data(&wasm).await },
                 )
                 .into(),
                 wasm,
@@ -105,7 +122,7 @@ fixturator!(
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
-                    async { WasmHash::with_data(wasm.code().to_vec()).await },
+                    async { WasmHash::with_data(&wasm).await },
                 )
                 .into(),
                 wasm,
@@ -216,4 +233,127 @@ fixturator!(
         }
         hashes.into()
     }
+);
+
+fixturator!(
+    KeystoreSender;
+    curve Empty {
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let _ = holochain_crypto::crypto_init_sodium();
+            delete_me_create_test_keystore().await
+        })
+    };
+    curve Unpredictable {
+        // TODO: Make this unpredictable
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let _ = holochain_crypto::crypto_init_sodium();
+            delete_me_create_test_keystore().await
+        })
+    };
+    curve Predictable {
+        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            let _ = holochain_crypto::crypto_init_sodium();
+            delete_me_create_test_keystore().await
+        })
+    };
+);
+
+fixturator!(
+    UnsafeInvokeZomeWorkspace;
+    curve Empty {
+        UnsafeInvokeZomeWorkspace::null()
+    };
+    curve Unpredictable {
+        UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
+            .next()
+            .unwrap()
+    };
+    curve Predictable {
+        UnsafeInvokeZomeWorkspaceFixturator::new(Empty)
+            .next()
+            .unwrap()
+    };
+);
+
+fixturator!(
+    ZomeCallHostAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
+);
+
+fixturator!(
+    EntryDefsInvocation;
+    constructor fn new();
+);
+
+fixturator!(
+    EntryDefsHostAccess;
+    constructor fn new();
+);
+
+fixturator!(
+    InitInvocation;
+    constructor fn new(DnaDef);
+);
+
+fixturator!(
+    InitHostAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
+);
+
+fixturator!(
+    MigrateAgentInvocation;
+    constructor fn new(DnaDef, MigrateAgent);
+);
+
+fixturator!(
+    MigrateAgentHostAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace);
+);
+
+fixturator!(
+    PostCommitInvocation;
+    constructor fn new(ZomeName, HeaderHashes);
+);
+
+fixturator!(
+    PostCommitHostAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace, KeystoreSender, HolochainP2pCell);
+);
+
+fixturator!(
+    ValidateInvocation;
+    constructor fn new(ZomeName, Entry);
+);
+
+fixturator!(
+    ValidateHostAccess;
+    constructor fn new();
+);
+
+fixturator!(
+    ValidationPackageInvocation;
+    constructor fn new(ZomeName, AppEntryType);
+);
+
+fixturator!(
+    ValidationPackageHostAccess;
+    constructor fn new(UnsafeInvokeZomeWorkspace);
+);
+
+fixturator!(
+    HostAccess;
+    variants [
+        ZomeCall(ZomeCallHostAccess)
+        Validate(ValidateHostAccess)
+        Init(InitHostAccess)
+        EntryDefs(EntryDefsHostAccess)
+        MigrateAgent(MigrateAgentHostAccess)
+        ValidationPackage(ValidationPackageHostAccess)
+        PostCommit(PostCommitHostAccess)
+    ];
+);
+
+fixturator!(
+    CallContext;
+    constructor fn new(ZomeName, HostAccess);
 );

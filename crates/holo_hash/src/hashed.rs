@@ -1,104 +1,100 @@
-//! Traits and types for generating "Hashed" wrappers around `TryInto<SerializedBytes>` items.
+use crate::{HoloHashExt, HoloHashOf};
+use holo_hash_core::{HasHash, HashableContent, HoloHash};
+use holochain_serialized_bytes::SerializedBytesError;
 
-use crate::*;
-use must_future::MustBoxFuture;
-
-/// Trait representing a type that has been hashed.
-pub trait Hashed {
-    /// The item that has been hashed.
-    type Content: Sized + std::convert::TryInto<SerializedBytes>;
-
-    /// The hash type used by this "Hashed" wrapper type.
-    type HashType: Sized + HoloHashCoreHash;
-
-    /// Unwrap the complete contents of this "Hashed" wrapper.
-    fn into_inner(self) -> (Self::Content, Self::HashType);
-
-    /// Convert to the main item stored in this wrapper type.
-    fn into_content(self) -> Self::Content
-    where
-        Self: Sized,
-    {
-        self.into_inner().0
-    }
-
-    /// Convert to the already-calculated hash stored in this wrapper type.
-    fn into_hash(self) -> Self::HashType
-    where
-        Self: Sized,
-    {
-        self.into_inner().1
-    }
-
-    /// Access the main item stored in this wrapper type.
-    fn as_content(&self) -> &Self::Content;
-
-    /// Access the already-calculated hash stored in this wrapper type.
-    fn as_hash(&self) -> &Self::HashType;
+/// Represents some piece of content along with its hash representation, so that
+/// hashes need not be calculated multiple times.
+/// Provides an easy constructor which consumes the content.
+// TODO: consider making lazy with OnceCell
+pub struct HoloHashed<C: HashableContent> {
+    content: C,
+    hash: HoloHashOf<C>,
 }
 
-/// Trait representing a type that has been hashed,
-/// and knows how to hash its own content
-pub trait Hashable: Hashed + Sized {
-    /// Construct an instance from content
-    fn with_data(
-        content: Self::Content,
-    ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>;
+impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
+    fn as_hash(&self) -> &HoloHashOf<C> {
+        &self.hash
+    }
+
+    fn into_hash(self) -> HoloHashOf<C> {
+        self.hash
+    }
 }
 
-/// Generic based "Hashed" struct implementation.
-#[derive(Debug, Clone)]
-pub struct GenericHashed<C, H>(C, H)
+impl<C> HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash;
-
-impl<C, H> GenericHashed<C, H>
-where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent,
 {
-    /// Produce a "Hashed" wrapper with a provided hash.
-    pub fn with_pre_hashed(t: C, h: H) -> Self {
-        Self(t, h)
+    /// Compute the hash of this content and store it alongside
+    pub async fn from_content(content: C) -> Self {
+        let hash: HoloHashOf<C> = HoloHash::with_data(&content).await;
+        Self { content, hash }
+    }
+
+    /// Combine content with its precalculated hash
+    pub fn with_pre_hashed(content: C, hash: HoloHashOf<C>) -> Self {
+        Self { content, hash }
+    }
+
+    // NB: as_hash and into_hash are provided by the HasHash impl
+
+    /// Accessor for content
+    pub fn as_content(&self) -> &C {
+        &self.content
+    }
+
+    /// Convert to content
+    pub fn into_content(self) -> C {
+        self.content
+    }
+
+    /// Deconstruct as a tuple
+    pub fn into_inner(self) -> (C, HoloHashOf<C>) {
+        (self.content, self.hash)
+    }
+
+    /// Alias for with_content
+    // TODO: deprecate
+    // #[deprecated = "alias for `from_content`"]
+    pub async fn with_data(content: C) -> Result<Self, SerializedBytesError> {
+        Ok(Self::from_content(content).await)
     }
 }
 
-impl<C, H> Hashed for GenericHashed<C, H>
+impl<C> Clone for HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent + Clone,
 {
-    type Content = C;
-    type HashType = H;
-
-    fn into_inner(self) -> (Self::Content, Self::HashType) {
-        (self.0, self.1)
-    }
-
-    fn as_content(&self) -> &Self::Content {
-        &self.0
-    }
-
-    fn as_hash(&self) -> &Self::HashType {
-        &self.1
+    fn clone(&self) -> Self {
+        Self {
+            content: self.content.clone(),
+            hash: self.hash.clone(),
+        }
     }
 }
 
-impl<C, H> std::convert::From<GenericHashed<C, H>> for (C, H)
+impl<C> std::fmt::Debug for HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent + std::fmt::Debug,
 {
-    fn from(g: GenericHashed<C, H>) -> (C, H) {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("HoloHashed({:?})", self.content))?;
+        Ok(())
+    }
+}
+
+impl<C> std::convert::From<HoloHashed<C>> for (C, HoloHashOf<C>)
+where
+    C: HashableContent,
+{
+    fn from(g: HoloHashed<C>) -> (C, HoloHashOf<C>) {
         g.into_inner()
     }
 }
 
-impl<C, H> std::ops::Deref for GenericHashed<C, H>
+impl<C> std::ops::Deref for HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent,
 {
     type Target = C;
 
@@ -107,49 +103,40 @@ where
     }
 }
 
-impl<C, H> std::convert::AsRef<C> for GenericHashed<C, H>
+impl<C> std::convert::AsRef<C> for HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent,
 {
     fn as_ref(&self) -> &C {
         self.as_content()
     }
 }
 
-impl<C, H> std::borrow::Borrow<C> for GenericHashed<C, H>
+impl<C> std::borrow::Borrow<C> for HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent,
 {
     fn borrow(&self) -> &C {
         self.as_content()
     }
 }
 
-impl<C, H> std::cmp::PartialEq for GenericHashed<C, H>
+impl<C> std::cmp::PartialEq for HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.as_hash() == other.as_hash()
+        self.hash == other.hash
     }
 }
 
-impl<C, H> std::cmp::Eq for GenericHashed<C, H>
-where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
-{
-}
+impl<C> std::cmp::Eq for HoloHashed<C> where C: HashableContent {}
 
-impl<C, H> std::hash::Hash for GenericHashed<C, H>
+impl<C> std::hash::Hash for HoloHashed<C>
 where
-    C: Sized + std::convert::TryInto<SerializedBytes>,
-    H: Sized + HoloHashCoreHash,
+    C: HashableContent,
 {
     fn hash<StdH: std::hash::Hasher>(&self, state: &mut StdH) {
-        self.as_hash().hash(state)
+        std::hash::Hash::hash(&self.hash, state)
     }
 }

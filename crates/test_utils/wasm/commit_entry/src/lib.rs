@@ -1,13 +1,13 @@
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::crdt::CrdtType;
-use holochain_zome_types::entry_def::RequiredValidations;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::entry_def::EntryDefs;
 use holochain_wasmer_guest::*;
-use holochain_zome_types::*;
-use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use holochain_zome_types::crdt::CrdtType;
 use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::entry_def::RequiredValidations;
+use holochain_zome_types::*;
 
 holochain_wasmer_guest::holochain_externs!();
 
@@ -62,46 +62,43 @@ impl TryFrom<&Post> for Entry {
 
 #[no_mangle]
 pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
-    let defs: EntryDefs = vec![
-        (&Post::default()).into(),
-    ].into();
+    let defs: EntryDefs = vec![(&Post::default()).into()].into();
 
-    ret!(GuestOutput::new(try_result!(EntryDefsCallbackResult::Defs(
-        defs,
-    ).try_into(), "failed to serialize entry defs return value")));
+    ret!(GuestOutput::new(try_result!(
+        EntryDefsCallbackResult::Defs(defs,).try_into(),
+        "failed to serialize entry defs return value"
+    )));
 }
 
-fn _commit_entry() -> Result<holo_hash_core::HoloHashCore, WasmError> {
+fn _commit_entry() -> Result<holo_hash_core::EntryHash, WasmError> {
     let post = Post("foo".into());
-    Ok(host_call!(__commit_entry, CommitEntryInput::new(((&post).into(), (&post).try_into()?)))?)
+    Ok(host_call!(
+        __commit_entry,
+        CommitEntryInput::new(((&post).into(), (&post).try_into()?))
+    )?)
 }
 
 #[no_mangle]
 pub extern "C" fn commit_entry(_: GuestPtr) -> GuestPtr {
-    ret!(
-        GuestOutput::new(
-            try_result!(
-                try_result!(_commit_entry(), "failed to commit post").try_into(),
-                "failed to serialize commit post return"
-            )
-        )
-    );
+    ret!(GuestOutput::new(try_result!(
+        try_result!(_commit_entry(), "failed to commit post").try_into(),
+        "failed to serialize commit post return"
+    )));
 }
 
 fn _get_entry() -> Result<GetEntryOutput, WasmError> {
-    let hash = host_call!(__entry_hash, EntryHashInput::new((&Post("foo".into())).try_into()?))?;
+    let hash = host_call!(
+        __entry_hash,
+        EntryHashInput::new((&Post("foo".into())).try_into()?)
+    )?;
     let output: GetEntryOutput = host_call!(__get_entry, GetEntryInput::new((hash, GetOptions)))?;
     Ok(output)
 }
 
 #[no_mangle]
 pub extern "C" fn get_entry(_: GuestPtr) -> GuestPtr {
-    ret!(
-        GuestOutput::new(
-            try_result!(
-                try_result!(_get_entry(), "failed to get post").try_into(),
-                "failed to serialize get post return"
-            )
-        )
-    );
+    ret!(GuestOutput::new(try_result!(
+        try_result!(_get_entry(), "failed to get post").try_into(),
+        "failed to serialize get post return"
+    )));
 }

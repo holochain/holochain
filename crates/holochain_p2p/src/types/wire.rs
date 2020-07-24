@@ -13,7 +13,7 @@ pub(crate) enum WireMessage {
     Publish {
         from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     },
     ValidationReceipt {
@@ -21,11 +21,11 @@ pub(crate) enum WireMessage {
         receipt: Vec<u8>,
     },
     Get {
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: event::GetOptions,
     },
     GetLinks {
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: event::GetLinksOptions,
     },
 }
@@ -57,7 +57,7 @@ impl WireMessage {
     pub fn publish(
         from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> WireMessage {
         Self::Publish {
@@ -74,15 +74,12 @@ impl WireMessage {
         }
     }
 
-    pub fn get(
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
-        options: event::GetOptions,
-    ) -> WireMessage {
+    pub fn get(dht_hash: holo_hash::AnyDhtHash, options: event::GetOptions) -> WireMessage {
         Self::Get { dht_hash, options }
     }
 
     pub fn get_links(
-        dht_hash: holochain_types::composite_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         options: event::GetLinksOptions,
     ) -> WireMessage {
         Self::GetLinks { dht_hash, options }
