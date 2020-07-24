@@ -18,7 +18,7 @@ use fallible_iterator::FallibleIterator;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
-use holochain_types::element::ChainElement;
+use holochain_types::element::Element;
 use std::sync::Arc;
 use unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
 
@@ -87,7 +87,7 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     let chain_head_end = workspace.source_chain.chain_head()?;
 
     // collect all the elements we need to validate in wasm
-    let mut to_app_validate: Vec<ChainElement> = vec![];
+    let mut to_app_validate: Vec<Element> = vec![];
 
     // Has there been changes?
     if chain_head_start != *chain_head_end {
@@ -128,7 +128,7 @@ async fn invoke_zome_workflow_inner<'env, Ribosome: RibosomeT>(
 
     for chain_element in to_app_validate {
         match chain_element.entry() {
-            holochain_types::element::ChainElementEntry::Present(entry) => {
+            holochain_types::element::ElementEntry::Present(entry) => {
                 let validate: ValidateResult = ribosome.run_validate(
                     ValidateHostAccess,
                     ValidateInvocation {

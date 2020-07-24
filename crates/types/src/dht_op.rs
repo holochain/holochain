@@ -4,7 +4,7 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
-use crate::element::ChainElement;
+use crate::element::Element;
 use crate::{header::NewEntryHeader, prelude::*};
 use error::{DhtOpError, DhtOpResult};
 use holo_hash::{hash_type, HashableContentBytes};
@@ -113,7 +113,7 @@ enum UniqueForm<'a> {
 }
 
 /// Turn a chain element into a DhtOp
-pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
+pub fn ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtOp>> {
     // TODO: avoid cloning everything
 
     let (signed_header, maybe_entry) = element.clone().into_inner();

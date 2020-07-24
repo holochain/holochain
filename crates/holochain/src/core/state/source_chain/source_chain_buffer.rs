@@ -13,7 +13,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{ops_from_element, DhtOp},
-    element::{ChainElement, SignedHeaderHashed},
+    element::{Element, SignedHeaderHashed},
     entry::EntryHashed,
     prelude::*,
     HeaderHashed,
@@ -61,7 +61,7 @@ impl<'env> SourceChainBuf<'env> {
         self.sequence.len() >= 3
     }
 
-    pub async fn get_at_index(&self, i: u32) -> SourceChainResult<Option<ChainElement>> {
+    pub async fn get_at_index(&self, i: u32) -> SourceChainResult<Option<Element>> {
         if let Some(address) = self.sequence.get(i)? {
             self.get_element(&address).await
         } else {
@@ -69,7 +69,7 @@ impl<'env> SourceChainBuf<'env> {
         }
     }
 
-    pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<ChainElement>> {
+    pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<Element>> {
         debug!("GET {:?}", k);
         self.cas.get_element(k).await
     }
@@ -112,7 +112,7 @@ impl<'env> SourceChainBuf<'env> {
         &self.sequence
     }
 
-    /// Add a ChainElement to the source chain, using a fully-formed Header
+    /// Add a Element to the source chain, using a fully-formed Header
     pub async fn put_raw(
         &mut self,
         header: Header,
@@ -172,7 +172,7 @@ impl<'env> SourceChainBuf<'env> {
     /// dump the entire source chain as a pretty-printed json string
     pub async fn dump_as_json(&self) -> Result<String, SourceChainError> {
         #[derive(Serialize, Deserialize)]
-        struct JsonChainElement {
+        struct JsonElement {
             pub signature: Signature,
             pub header_address: HeaderAddress,
             pub header: Header,
@@ -183,7 +183,7 @@ impl<'env> SourceChainBuf<'env> {
         // show if the database is corrupted and doesn't have an element
         #[derive(Serialize, Deserialize)]
         struct JsonChainDump {
-            element: Option<JsonChainElement>,
+            element: Option<JsonElement>,
         }
 
         let mut iter = self.iter_back();
@@ -198,7 +198,7 @@ impl<'env> SourceChainBuf<'env> {
                     let (header, signature) = signed.into_header_and_signature();
                     let (header, header_address) = header.into_inner();
                     out.push(JsonChainDump {
-                        element: Some(JsonChainElement {
+                        element: Some(JsonElement {
                             signature,
                             header_address,
                             header,
