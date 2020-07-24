@@ -120,6 +120,7 @@ async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, Websock
 }
 
 #[tokio::test(threaded_scheduler)]
+#[cfg(feature = "slow_tests")]
 async fn call_admin() {
     observability::test_run().ok();
     // NOTE: This is a full integration test that
@@ -286,6 +287,7 @@ pub async fn retry_admin_interface(
 }
 
 #[tokio::test(threaded_scheduler)]
+#[cfg(feature = "slow_tests")]
 async fn call_zome() {
     observability::test_run().ok();
     // NOTE: This is a full integration test that

@@ -1,18 +1,4 @@
 #[macro_export]
-macro_rules! zome_info {
-    () => {{
-        $crate::api_call!(__zome_info, ZomeInfoInput::new(()), ZomeInfoOutput)
-    }};
-}
-
-#[macro_export]
-macro_rules! agent_info {
-    () => {{
-        $crate::api_call!(__agent_info, AgentInfoInput::new(()), AgentInfoOutput)
-    }};
-}
-
-#[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident ) => {
         #[no_mangle]
@@ -50,6 +36,31 @@ macro_rules! api_call {
         let result: Result<$outputt, $crate::prelude::SerializedBytesError> =
             $crate::prelude::host_call!($f, $input);
         result.map(|r| r.into_inner())
+    }};
+}
+
+#[macro_export]
+macro_rules! zome_info {
+    () => {{
+        $crate::api_call!(__zome_info, ZomeInfoInput::new(()), ZomeInfoOutput)
+    }};
+}
+
+#[macro_export]
+macro_rules! agent_info {
+    () => {{
+        $crate::api_call!(__agent_info, AgentInfoInput::new(()), AgentInfoOutput)
+    }};
+}
+
+#[macro_export]
+macro_rules! call_remote {
+    ( $agent:expr, $zome:expr, $fn_name:expr, $cap:expr, $request:expr ) => {{
+        $crate::api_call!(
+            __call_remote,
+            CallRemoteInput::new(CallRemote::new($agent, $zome, $fn_name, $cap, $request)),
+            CallRemoteOutput
+        )
     }};
 }
 

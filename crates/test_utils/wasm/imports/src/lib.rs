@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use holochain_wasmer_guest::*;
-use holochain_zome_types::globals::ZomeInfo;
+use holochain_zome_types::zome_info::ZomeInfo;
 use holochain_zome_types::*;
 
 // only the host functions we require in order to pull/push data across the host/guest boundary
