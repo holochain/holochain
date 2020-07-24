@@ -12,10 +12,10 @@ use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     element::{ChainElement, WireElement},
     fixt::*,
-    header::EntryType,
     metadata::TimedHeaderHash,
-    observability, Header, HeaderHashed, Timestamp,
+    observability, HeaderHashed, Timestamp,
 };
+use holochain_zome_types::header::*;
 use maplit::btreeset;
 use std::collections::BTreeMap;
 use std::convert::TryInto;

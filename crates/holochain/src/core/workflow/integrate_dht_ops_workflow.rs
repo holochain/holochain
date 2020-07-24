@@ -25,10 +25,10 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     element::SignedHeaderHashed,
-    header::IntendedFor,
     validate::ValidationStatus,
     EntryHashed, HeaderHashed, Timestamp, TimestampKey,
 };
+use holochain_zome_types::header::IntendedFor;
 use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
 use tracing::*;
 

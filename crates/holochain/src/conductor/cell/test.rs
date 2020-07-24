@@ -19,10 +19,10 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
-    header,
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
     HeaderHashed, Timestamp,
 };
+use holochain_zome_types::header;
 use std::sync::Arc;
 use tokio::sync;
 
@@ -74,7 +74,7 @@ async fn test_cell_handle_publish() {
     let sig = fixt!(Signature);
     let header = header::Header::Dna(header::Dna {
         author: agent.clone(),
-        timestamp: Timestamp::now(),
+        timestamp: Timestamp::now().into(),
         hash: dna.clone(),
         header_seq: 42,
     });

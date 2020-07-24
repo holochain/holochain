@@ -60,7 +60,7 @@ impl From<HeaderHashed> for TimedHeaderHash {
     fn from(h: HeaderHashed) -> Self {
         let (header, hash) = h.into_inner();
         TimedHeaderHash {
-            timestamp: header.timestamp(),
+            timestamp: header.timestamp().into(),
             header_hash: hash,
         }
     }

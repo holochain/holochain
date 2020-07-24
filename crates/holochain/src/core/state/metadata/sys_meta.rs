@@ -12,15 +12,16 @@ mod tests {
     };
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
     use holo_hash::fixt::*;
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
         fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},
-        header::{self, builder, EntryType, HeaderBuilder},
+        header::NewEntryHeader,
         HeaderHashed,
     };
+    use holochain_zome_types::header::{self, builder, EntryType, HeaderBuilder};
+    use holochain_zome_types::header::{ElementDelete, HeaderBuilderCommon, IntendedFor};
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,

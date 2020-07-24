@@ -17,19 +17,17 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::header;
-use holochain_types::{
-    header::{LinkAdd, LinkRemove, ZomeId},
-    metadata::{EntryDhtStatus, TimedHeaderHash},
-    Header, HeaderHashed, Timestamp,
-};
-use holochain_zome_types::link::LinkTag;
+use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
+use holochain_types::{HeaderHashed, Timestamp};
+use holochain_zome_types::header::{self, LinkAdd, LinkRemove, ZomeId};
+use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
 
 pub use sys_meta::*;
 use tracing::*;
 
-use header::NewEntryHeader;
+use holochain_types::header::NewEntryHeader;
+
 #[cfg(test)]
 pub use mock::MockMetadataBuf;
 #[cfg(test)]
@@ -283,7 +281,7 @@ impl EntryHeader {
         let (header, header_hash): (Header, HeaderHash) =
             HeaderHashed::with_data(header).await?.into();
         Ok(TimedHeaderHash {
-            timestamp: header.timestamp(),
+            timestamp: header.timestamp().into(),
             header_hash,
         })
     }
@@ -416,7 +414,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             LinkMetaVal {
                 link_add_hash,
                 target: link_add.target_address,
-                timestamp: link_add.timestamp,
+                timestamp: link_add.timestamp.into(),
                 zome_id: link_add.zome_id,
                 tag: link_add.tag,
             },

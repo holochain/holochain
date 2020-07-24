@@ -24,16 +24,19 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     fixt::*,
-    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, NewEntryHeader},
+    header::NewEntryHeader,
     metadata::TimedHeaderHash,
     observability,
     validate::ValidationStatus,
-    Entry, EntryHashed, Header,
+    Entry, EntryHashed,
 };
-use holochain_zome_types::link::{LinkTag, Links};
 use holochain_zome_types::{
-    entry::GetOptions, entry_def::EntryDefs, zome::ZomeName, CommitEntryInput, GetEntryInput,
-    GetLinksInput, LinkEntriesInput,
+    entry::GetOptions,
+    entry_def::EntryDefs,
+    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
+    link::{LinkTag, Links},
+    zome::ZomeName,
+    CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
@@ -197,7 +200,7 @@ impl Db {
                         validation_status: ValidationStatus::Valid,
                         basis,
                         op,
-                        when_integrated: Timestamp::now(),
+                        when_integrated: Timestamp::now().into(),
                     };
                     let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
                     r.when_integrated = value.when_integrated;
@@ -1185,12 +1188,12 @@ mod slow_tests {
     };
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload},
-        header::{builder, EntryType},
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
         Entry, EntryHashed,
     };
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::header::{builder, EntryType};
     use holochain_zome_types::HostInput;
     use matches::assert_matches;
     use unwrap_to::unwrap_to;
