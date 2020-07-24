@@ -39,7 +39,7 @@
 //! load_true loads the results into cache
 
 use super::{
-    chain_cas::ElementBuf,
+    element_buf::ElementBuf,
     metadata::{LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use error::CascadeResult;

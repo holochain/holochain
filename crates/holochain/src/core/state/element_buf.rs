@@ -32,7 +32,7 @@ pub type EntryCas<'env> = CasBuf<'env, Entry>;
 /// A CasBuf with SignedHeaders for values
 pub type HeaderCas<'env> = CasBuf<'env, SignedHeader>;
 
-/// The representation of a chain CAS, using two or three DB references
+/// The representation of an Element CAS, using two or three DB references
 pub struct ElementBuf<'env> {
     public_entries: EntryCas<'env>,
     private_entries: Option<EntryCas<'env>>,
@@ -58,7 +58,7 @@ impl<'env> ElementBuf<'env> {
         })
     }
 
-    /// Create a ElementBuf using the source chain databases.
+    /// Create a ElementBuf using the Vault databases.
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
     pub fn vault(
@@ -76,7 +76,7 @@ impl<'env> ElementBuf<'env> {
         Self::new(reader, entries, private_entries, headers)
     }
 
-    /// Create a ElementBuf using the cache databases.
+    /// Create a ElementBuf using the Cache databases.
     /// There is no cache for private entries, so private entries are disallowed
     pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let entries = dbs.get_db(&*ELEMENT_CACHE_ENTRIES)?;

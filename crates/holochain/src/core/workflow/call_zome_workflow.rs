@@ -9,8 +9,8 @@ use crate::core::state::workspace::Workspace;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender},
     state::{
-        cascade::Cascade, chain_cas::ElementBuf, metadata::MetadataBuf, source_chain::SourceChain,
-        workspace::WorkspaceResult,
+        cascade::Cascade, element_buf::ElementBuf, metadata::MetadataBuf,
+        source_chain::SourceChain, workspace::WorkspaceResult,
     },
     sys_validate_element,
 };
@@ -171,7 +171,7 @@ pub struct CallZomeWorkspace<'env> {
 impl<'env: 'a, 'a> CallZomeWorkspace<'env> {
     pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'env, 'a> {
         Cascade::new(
-            &self.source_chain.cas(),
+            &self.source_chain.elements(),
             &self.meta,
             &mut self.cache_cas,
             &mut self.cache_meta,

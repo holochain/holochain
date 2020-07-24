@@ -190,7 +190,7 @@ impl Db {
                 Db::Integrated(op) => {
                     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                     let (op, basis) =
-                        dht_op_to_light_basis(op, &workspace.cas)
+                        dht_op_to_light_basis(op, &workspace.elements)
                             .await
                             .expect(&format!(
                                 "Failed to generate light {} for {}",
@@ -225,11 +225,14 @@ impl Db {
                     let hash = HeaderHashed::from_content(header.clone()).await;
                     assert_eq!(
                         workspace
-                            .cas
+                            .elements
                             .get_header(hash.as_hash())
                             .await
                             .unwrap()
-                            .expect(&format!("Header {:?} not in cas for {}", header, here))
+                            .expect(&format!(
+                                "Header {:?} not in element CAS for {}",
+                                header, here
+                            ))
                             .header(),
                         &header,
                         "{}",
@@ -240,11 +243,14 @@ impl Db {
                     let hash = EntryHashed::from_content(entry.clone()).await.into_hash();
                     assert_eq!(
                         workspace
-                            .cas
+                            .elements
                             .get_entry(&hash)
                             .await
                             .unwrap()
-                            .expect(&format!("Entry {:?} not in cas for {}", entry, here))
+                            .expect(&format!(
+                                "Entry {:?} not in element CAS for {}",
+                                entry, here
+                            ))
                             .into_content(),
                         entry,
                         "{}",
@@ -427,14 +433,17 @@ impl Db {
                     debug!(header_hash = %header_hash.as_hash());
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
-                    workspace.cas.put(signed_header, None).unwrap();
+                    workspace.elements.put(signed_header, None).unwrap();
                 }
                 Db::CasEntry(entry, header, signature) => {
                     let header_hash = HeaderHashed::from_content(header.unwrap().clone()).await;
                     let entry_hash = EntryHashed::from_content(entry.clone()).await;
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
-                    workspace.cas.put(signed_header, Some(entry_hash)).unwrap();
+                    workspace
+                        .elements
+                        .put(signed_header, Some(entry_hash))
+                        .unwrap();
                 }
                 Db::MetaHeader(_, _) => {}
                 Db::MetaActivity(_) => {}
@@ -480,7 +489,7 @@ fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl Get
         .with_commit::<DatabaseError, _, _>(|writer| {
             workspace.integration_queue.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
-            workspace.cas.clear_all(writer)?;
+            workspace.elements.clear_all(writer)?;
             workspace.meta.clear_all(writer)?;
             Ok(())
         })
@@ -791,7 +800,9 @@ async fn commit_entry<'env>(
                 None
             }
             Db::CasEntry(entry, _, _) => Some(entry),
-            _ => unreachable!("This test only needs integration queue and an entry in the cas"),
+            _ => {
+                unreachable!("This test only needs integration queue and an entry in the elements")
+            }
         })
         .next()
         .unwrap();
@@ -1337,9 +1348,16 @@ mod slow_tests {
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
-            let (cas, _metadata, mut cache, mut metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+            let (elements, _metadata, mut cache, mut metadata_cache) =
+                test_dbs_and_mocks(&reader, &dbs);
             let (_n, _r, cell_network) = test_network().await;
-            let cascade = Cascade::new(&cas, &meta, &mut cache, &mut metadata_cache, cell_network);
+            let cascade = Cascade::new(
+                &elements,
+                &meta,
+                &mut cache,
+                &mut metadata_cache,
+                cell_network,
+            );
 
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();

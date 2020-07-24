@@ -1,6 +1,6 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_cas::ElementBuf,
+    element_buf::ElementBuf,
     metadata::{LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
@@ -123,7 +123,7 @@ async fn live_local_return() -> SourceChainResult<()> {
 
     // call dht_get with above address
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -170,7 +170,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -216,7 +216,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -254,7 +254,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -326,7 +326,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get_links with above base
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -409,7 +409,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get_links with above base
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -474,7 +474,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,

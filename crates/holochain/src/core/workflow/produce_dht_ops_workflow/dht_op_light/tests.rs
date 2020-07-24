@@ -1,6 +1,6 @@
 use super::dht_basis;
 use crate::{
-    core::state::chain_cas::ElementBuf,
+    core::state::element_buf::ElementBuf,
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
         EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,

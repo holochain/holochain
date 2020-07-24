@@ -110,7 +110,7 @@ impl<'env> SourceChain<'env> {
     ) -> SourceChainResult<Option<CapGrant>> {
         let hashes_n_grants: Vec<_> = self
             .0
-            .cas()
+            .elements()
             .private_entries()
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
@@ -154,7 +154,7 @@ impl<'env> SourceChain<'env> {
     ) -> SourceChainResult<Option<CapClaim>> {
         let hashes_n_claims: Vec<_> = self
             .0
-            .cas()
+            .elements()
             .private_entries()
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapClaims",

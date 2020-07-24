@@ -4,11 +4,11 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        chain_cas::ElementBuf,
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
             IntegrationQueueValue,
         },
+        element_buf::ElementBuf,
         metadata::{MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
     },
@@ -165,7 +165,7 @@ async fn integrate_single_dht_op(
                     None => None,
                 };
                 // Store the entry
-                workspace.cas.put(signed_header, entry_hashed)?;
+                workspace.elements.put(signed_header, entry_hashed)?;
             }
             DhtOp::StoreEntry(signature, new_entry_header, entry) => {
                 // Reference to headers
@@ -178,13 +178,13 @@ async fn integrate_single_dht_op(
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                 let entry = EntryHashed::from_content(*entry).await;
                 // Store Header and Entry
-                workspace.cas.put(signed_header, Some(entry))?;
+                workspace.elements.put(signed_header, Some(entry))?;
             }
             DhtOp::RegisterAgentActivity(signature, header) => {
                 // Store header
                 let header_hashed = HeaderHashed::from_content(header.clone()).await;
                 let signed_header = SignedHeaderHashed::with_presigned(header_hashed, signature);
-                workspace.cas.put(signed_header, None)?;
+                workspace.elements.put(signed_header, None)?;
 
                 // register agent activity on this agents pub key
                 workspace.meta.register_activity(header).await?;
@@ -194,7 +194,7 @@ async fn integrate_single_dht_op(
                     IntendedFor::Header => None,
                     IntendedFor::Entry => {
                         match workspace
-                            .cas
+                            .elements
                             .get_header(&entry_update.replaces_address)
                             .await?
                             // Handle missing old entry header. Same reason as below
@@ -215,7 +215,7 @@ async fn integrate_single_dht_op(
             DhtOp::RegisterDeletedEntryHeader(_, entry_delete)
             | DhtOp::RegisterDeletedBy(_, entry_delete) => {
                 let entry_hash = match workspace
-                    .cas
+                    .elements
                     .get_header(&entry_delete.removes_address)
                     .await?
                     // Handle missing entry header. Same reason as below
@@ -238,15 +238,19 @@ async fn integrate_single_dht_op(
                 let header = HeaderHashed::from_content(link_add.into()).await;
                 debug!(link_add = ?header.as_hash());
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                workspace.cas.put(signed_header, None)?;
+                workspace.elements.put(signed_header, None)?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                // Check whether they have the base address in the cas.
+                // Check whether they have the base address in the elements.
                 // If not then this should put the op back on the queue with a
                 // warning that it's unimplemented and later add this to the cache meta.
-                // TODO: Base might be in cas due to this agent being an authority for a
+                // TODO: Base might be in elements due to this agent being an authority for a
                 // header on the Base
-                if let None = workspace.cas.get_entry(&link_remove.base_address).await? {
+                if let None = workspace
+                    .elements
+                    .get_entry(&link_remove.base_address)
+                    .await?
+                {
                     warn!(
                         "Storing link data when not an author or authority requires the
                          cache metadata store.
@@ -258,7 +262,7 @@ async fn integrate_single_dht_op(
                 // Store link delete Header
                 let header = HeaderHashed::from_content(link_remove.clone().into()).await;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                workspace.cas.put(signed_header, None)?;
+                workspace.elements.put(signed_header, None)?;
 
                 // Remove the link
                 workspace.meta.remove_link(link_remove).await?;
@@ -266,7 +270,7 @@ async fn integrate_single_dht_op(
         }
 
         // TODO: PERF: Avoid this clone by returning the op on error
-        let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.cas).await {
+        let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.elements).await {
             Ok(l) => l,
             Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
                 return Outcome::deferred(op, validation_status)
@@ -305,7 +309,7 @@ pub struct IntegrateDhtOpsWorkspace<'env> {
     // integrated ops
     pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing
-    pub cas: ElementBuf<'env>,
+    pub elements: ElementBuf<'env>,
     // metadata store
     pub meta: MetadataBuf<'env>,
 }
@@ -319,19 +323,19 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATION_QUEUE)?;
         let integration_queue = KvBuf::new(reader, db)?;
 
-        let cas = ElementBuf::vault(reader, dbs, true)?;
+        let elements = ElementBuf::vault(reader, dbs, true)?;
         let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {
             integration_queue,
             integrated_dht_ops,
-            cas,
+            elements,
             meta,
         })
     }
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        // flush cas
-        self.cas.flush_to_txn(writer)?;
+        // flush elements
+        self.elements.flush_to_txn(writer)?;
         // flush metadata store
         self.meta.flush_to_txn(writer)?;
         // flush integrated

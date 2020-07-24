@@ -17,8 +17,8 @@ use super::{
 use crate::core::{
     queue_consumer::WorkComplete,
     state::{
-        chain_cas::ElementBuf,
         dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegratedDhtOpsValue},
+        element_buf::ElementBuf,
     },
 };
 use fallible_iterator::FallibleIterator;
@@ -44,8 +44,8 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 pub struct PublishDhtOpsWorkspace<'env> {
     /// Database of authored [DhtOpHash]
     authored_dht_ops: AuthoredDhtOpsStore<'env>,
-    /// Cas for looking up data to construct ops
-    cas: ElementBuf<'env>,
+    /// Element CAS for looking up data to construct ops
+    elements: ElementBuf<'env>,
     // Integrated Ops database for looking up [DhtOp]s
     integrated_dht_ops: IntegratedDhtOpsStore<'env>,
 }
@@ -108,7 +108,7 @@ pub async fn publish_dht_ops_workflow_inner(
             }
         };
         let IntegratedDhtOpsValue { basis, op, .. } = op;
-        let op = match light_to_op(op, workspace.cas()).await {
+        let op = match light_to_op(op, workspace.elements()).await {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
             r => r?,
@@ -131,12 +131,12 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBuf::new(reader, db)?;
         // Note that this must always be false as we don't want private entries being published
-        let cas = ElementBuf::vault(reader, dbs, false)?;
+        let elements = ElementBuf::vault(reader, dbs, false)?;
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBuf::new(reader, db)?;
         Ok(Self {
             authored_dht_ops,
-            cas,
+            elements,
             integrated_dht_ops,
         })
     }
@@ -149,8 +149,8 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         &self.integrated_dht_ops
     }
 
-    fn cas(&self) -> &ElementBuf<'env> {
-        &self.cas
+    fn elements(&self) -> &ElementBuf<'env> {
+        &self.elements
     }
 }
 
@@ -247,16 +247,16 @@ mod tests {
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
                 // Put DhtOpLight into the integrated db
                 workspace.integrated_dht_ops.put(op_hash, light).unwrap();
-                // Put data into cas
+                // Put data into elements
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig);
-                workspace.cas.put(signed_header, None).unwrap();
+                workspace.elements.put(signed_header, None).unwrap();
             }
             // Manually commit because this workspace doesn't commit to all dbs
             env_ref
                 .with_commit::<DatabaseError, _, _>(|writer| {
                     workspace.authored_dht_ops.flush_to_txn(writer)?;
                     workspace.integrated_dht_ops.flush_to_txn(writer)?;
-                    workspace.cas.flush_to_txn(writer)?;
+                    workspace.elements.flush_to_txn(writer)?;
                     Ok(())
                 })
                 .unwrap();
@@ -506,28 +506,30 @@ mod tests {
 
             let entry_create_header = Header::EntryCreate(entry_create.clone());
 
-            // Put data in cas
+            // Put data in elements
             {
                 let reader = env_ref.reader().unwrap();
 
-                let mut cas = ElementBuf::vault(&reader, &dbs, true).unwrap();
+                let mut elements = ElementBuf::vault(&reader, &dbs, true).unwrap();
 
                 let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
 
                 // Update the replaces to the header of the original
                 entry_update.replaces_address = header_hash.as_hash().clone();
 
-                // Put data into cas
+                // Put data into elements
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-                cas.put(signed_header, Some(original_entry_hashed)).unwrap();
+                elements
+                    .put(signed_header, Some(original_entry_hashed))
+                    .unwrap();
 
                 let entry_update_header = Header::EntryUpdate(entry_update.clone());
                 let header_hash = HeaderHashed::from_content(entry_update_header).await;
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-                cas.put(signed_header, Some(new_entry_hashed)).unwrap();
+                elements.put(signed_header, Some(new_entry_hashed)).unwrap();
                 env_ref
                     .with_commit::<DatabaseError, _, _>(|writer| {
-                        cas.flush_to_txn(writer)?;
+                        elements.flush_to_txn(writer)?;
                         Ok(())
                     })
                     .unwrap();
@@ -535,7 +537,7 @@ mod tests {
             let (store_element, store_entry, register_replaced_by) = {
                 let reader = env_ref.reader().unwrap();
                 // Create easy way to create test cascade
-                let cas = ElementBuf::vault(&reader, &dbs, true).unwrap();
+                let elements = ElementBuf::vault(&reader, &dbs, true).unwrap();
 
                 let op = DhtOp::StoreElement(
                     sig.clone(),
@@ -544,14 +546,14 @@ mod tests {
                 );
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &elements).await.unwrap();
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let store_element = (op_hash, light, basis, expected_op);
 
                 // Create StoreEntry
                 let header = NewEntryHeader::Create(entry_create.clone());
                 let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &elements).await.unwrap();
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let store_entry = (op_hash, light, basis);
 
@@ -564,7 +566,7 @@ mod tests {
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op =
                     DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
+                let (light, basis) = dht_op_to_light_basis(op.clone(), &elements).await.unwrap();
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let register_replaced_by = (op_hash, light, basis, expected_op);
 

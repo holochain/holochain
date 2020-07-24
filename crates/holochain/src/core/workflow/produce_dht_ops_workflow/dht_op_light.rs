@@ -1,4 +1,4 @@
-use crate::core::state::chain_cas::ElementBuf;
+use crate::core::state::element_buf::ElementBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::Signature;
@@ -79,8 +79,8 @@ pub async fn dht_op_to_light_basis(
 }
 
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
-/// This only checks the cas so can only be used with ops that you are an authority
-// or author of.
+/// This only checks the ElementVault so can only be used with ops that you are
+/// an authority or author of.
 pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf<'_>) -> DhtOpConvertResult<DhtOp> {
     let op_name = format!("{:?}", op);
     match op {
