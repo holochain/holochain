@@ -31,6 +31,7 @@ pub mod link;
 pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod post_commit;
+pub mod timestamp;
 #[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]
@@ -41,6 +42,7 @@ pub mod zome_info;
 mod zome_io;
 
 pub use entry::Entry;
+pub use header::Header;
 use holochain_serialized_bytes::prelude::*;
 pub use zome_io::*;
 

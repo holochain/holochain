@@ -6,10 +6,8 @@ use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspa
 use derive_more::Constructor;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::{
-    dna::zome::{HostFnAccess, Permission},
-    header::AppEntryType,
-};
+use holochain_types::dna::zome::{HostFnAccess, Permission};
+use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;

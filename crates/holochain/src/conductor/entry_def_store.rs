@@ -16,11 +16,9 @@ use holochain_state::{
     prelude::{BufferedStore, SingleStore},
     transaction::{Reader, Writer},
 };
-use holochain_types::{
-    dna::{zome::Zome, DnaFile},
-    header::EntryDefId,
-};
+use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::header::EntryDefId;
 use shrinkwraprs::Shrinkwrap;
 use std::{collections::HashMap, convert::TryInto};
 
