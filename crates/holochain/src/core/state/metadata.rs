@@ -11,8 +11,8 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{KvBuf, KvvBuf},
     db::{
-        CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, PRIMARY_LINKS_META,
-        PRIMARY_STATUS_META, PRIMARY_SYSTEM_META,
+        CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, META_VAULT_LINKS,
+        META_VAULT_STATUS, META_VAULT_SYS,
     },
     error::{DatabaseError, DatabaseResult},
     prelude::*,
@@ -325,11 +325,11 @@ impl<'env> MetadataBuf<'env> {
             status_meta: KvBuf::new(reader, status_meta)?,
         })
     }
-    /// Create a [MetadataBuf] with the primary databases
-    pub fn primary(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let system_meta = dbs.get_db(&*PRIMARY_SYSTEM_META)?;
-        let links_meta = dbs.get_db(&*PRIMARY_LINKS_META)?;
-        let status_meta = dbs.get_db(&*PRIMARY_STATUS_META)?;
+    /// Create a [MetadataBuf] with the vault databases
+    pub fn vault(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let system_meta = dbs.get_db(&*META_VAULT_SYS)?;
+        let links_meta = dbs.get_db(&*META_VAULT_LINKS)?;
+        let status_meta = dbs.get_db(&*META_VAULT_STATUS)?;
         Self::new(reader, system_meta, links_meta, status_meta)
     }
 

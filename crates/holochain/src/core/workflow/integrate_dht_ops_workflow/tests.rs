@@ -1331,7 +1331,7 @@ mod slow_tests {
             debug!(?ops);
             assert!(!ops.is_empty());
 
-            let meta = MetadataBuf::primary(&reader, &dbs).unwrap();
+            let meta = MetadataBuf::vault(&reader, &dbs).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta.get_links(&key).unwrap();
             let link = links[0].clone();

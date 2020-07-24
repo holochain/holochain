@@ -30,7 +30,7 @@ pub struct SourceChainBuf<'env> {
 impl<'env> SourceChainBuf<'env> {
     pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::primary(reader, dbs, true)?,
+            cas: ChainCasBuf::vault(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })

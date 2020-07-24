@@ -185,7 +185,7 @@ impl<'env> Workspace<'env> for CallZomeWorkspace<'env> {
         let source_chain = SourceChain::new(reader, dbs)?;
 
         let cache_cas = ChainCasBuf::cache(reader, dbs)?;
-        let meta = MetadataBuf::primary(reader, dbs)?;
+        let meta = MetadataBuf::vault(reader, dbs)?;
         let cache_meta = MetadataBuf::cache(reader, dbs)?;
 
         Ok(CallZomeWorkspace {

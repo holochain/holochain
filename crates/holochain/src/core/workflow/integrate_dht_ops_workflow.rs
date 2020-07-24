@@ -319,8 +319,8 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATION_QUEUE)?;
         let integration_queue = KvBuf::new(reader, db)?;
 
-        let cas = ChainCasBuf::primary(reader, dbs, true)?;
-        let meta = MetadataBuf::primary(reader, dbs)?;
+        let cas = ChainCasBuf::vault(reader, dbs, true)?;
+        let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {
             integration_queue,

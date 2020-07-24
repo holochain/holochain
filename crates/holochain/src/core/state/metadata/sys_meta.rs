@@ -112,7 +112,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(&reader, &env)?;
             let (update, expected) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -138,7 +138,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(&reader, &env)?;
             let (update1, header1) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -181,7 +181,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(&reader, &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -212,7 +212,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(&reader, &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -262,7 +262,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         {
             let reader = env.reader()?;
-            let mut buf = MetadataBuf::primary(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(&reader, &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -315,7 +315,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for create in entry_creates {
                 meta_buf
                     .register_header(NewEntryHeader::Create(create))
@@ -334,7 +334,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             let mut headers = meta_buf
                 .get_headers(entry_hash.clone())
                 .unwrap()
@@ -373,7 +373,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for update in entry_updates {
                 meta_buf
                     .register_update(update, Some(original_entry_hash.clone()))
@@ -392,7 +392,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             let mut headers = meta_buf
                 .get_updates(original_entry_hash.into())
                 .unwrap()
@@ -431,7 +431,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for update in entry_updates {
                 meta_buf.register_update(update, None).await.unwrap();
             }
@@ -447,7 +447,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             let mut headers = meta_buf
                 .get_updates(original_header_hash.into())
                 .unwrap()
@@ -476,7 +476,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for delete in entry_deletes {
                 meta_buf
                     .register_delete(delete, entry_hash.clone())
@@ -495,7 +495,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             let mut headers = meta_buf
                 .get_deletes_on_header(header_hash.clone().into())
                 .unwrap()
@@ -568,7 +568,7 @@ mod tests {
         .await;
 
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
@@ -691,7 +691,7 @@ mod tests {
         .await;
 
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
