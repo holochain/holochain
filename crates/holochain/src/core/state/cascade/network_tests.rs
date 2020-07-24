@@ -11,9 +11,9 @@ use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     element::{ChainElement, WireElement},
     fixt::*,
-    header::EntryType,
-    observability, Header, HeaderHashed,
+    observability, HeaderHashed,
 };
+use holochain_zome_types::header::*;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use tokio::{sync::oneshot, task::JoinHandle};

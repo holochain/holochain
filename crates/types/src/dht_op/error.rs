@@ -1,5 +1,5 @@
-use crate::Header;
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_zome_types::Header;
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error)]

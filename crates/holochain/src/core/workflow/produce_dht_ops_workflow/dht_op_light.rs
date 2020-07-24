@@ -1,10 +1,13 @@
 use crate::core::state::chain_cas::ChainCasBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
-use header::{IntendedFor, NewEntryHeader};
 use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::Signature;
-use holochain_types::{dht_op::DhtOp, header, Header};
+use holochain_types::{
+    dht_op::DhtOp,
+    header::{HeaderHashed, NewEntryHeader},
+};
 use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::header::{self, Header, IntendedFor};
 use serde::{Deserialize, Serialize};
 
 pub mod error;
@@ -39,37 +42,37 @@ pub async fn dht_op_to_light_basis(
     match op {
         DhtOp::StoreElement(_, h, _) => {
             let e = h.entry_data().map(|(e, _)| e.clone());
-            let (_, h) = header::HeaderHashed::with_data(h).await?.into();
+            let (_, h) = HeaderHashed::with_data(h).await?.into();
             Ok((DhtOpLight::StoreElement(h, e), basis))
         }
         DhtOp::StoreEntry(_, h, _) => {
             let e = h.entry().clone();
-            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            let (_, h) = HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::StoreEntry(h, e), basis))
         }
         DhtOp::RegisterAgentActivity(_, h) => {
-            let (_, h) = header::HeaderHashed::with_data(h).await?.into();
+            let (_, h) = HeaderHashed::with_data(h).await?.into();
             Ok((DhtOpLight::RegisterAgentActivity(h), basis))
         }
         DhtOp::RegisterReplacedBy(_, h, _) => {
             let e = h.entry_hash.clone();
-            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            let (_, h) = HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::RegisterReplacedBy(h, e), basis))
         }
         DhtOp::RegisterDeletedBy(_, h) => {
-            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            let (_, h) = HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::RegisterDeletedBy(h), basis))
         }
         DhtOp::RegisterDeletedEntryHeader(_, h) => {
-            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            let (_, h) = HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::RegisterDeletedEntryHeader(h), basis))
         }
         DhtOp::RegisterAddLink(_, h) => {
-            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            let (_, h) = HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::RegisterAddLink(h), basis))
         }
         DhtOp::RegisterRemoveLink(_, h) => {
-            let (_, h) = header::HeaderHashed::with_data(h.into()).await?.into();
+            let (_, h) = HeaderHashed::with_data(h.into()).await?.into();
             Ok((DhtOpLight::RegisterRemoveLink(h), basis))
         }
     }
@@ -228,9 +231,7 @@ async fn get_element_delete(
 pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<AnyDhtHash> {
     Ok(match op {
         DhtOp::StoreElement(_, header, _) => {
-            let (_, hash): (_, HeaderHash) = header::HeaderHashed::with_data(header.clone())
-                .await?
-                .into();
+            let (_, hash): (_, HeaderHash) = HeaderHashed::with_data(header.clone()).await?.into();
             hash.into()
         }
         DhtOp::StoreEntry(_, header, _) => header.entry().clone().into(),

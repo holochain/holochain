@@ -11,14 +11,11 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{Reader, Writer},
 };
-use holochain_types::{
-    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
-    prelude::*,
-    EntryHashed,
-};
+use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
     entry::{CapClaimEntry, CapGrantEntry, Entry},
+    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
 };
 use shrinkwraprs::Shrinkwrap;
 
@@ -64,7 +61,7 @@ impl<'env> SourceChain<'env> {
     ) -> SourceChainResult<HeaderAddress> {
         let common = HeaderBuilderCommon {
             author: self.agent_pubkey().await?,
-            timestamp: Timestamp::now(),
+            timestamp: Timestamp::now().into(),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
         };
