@@ -1,4 +1,4 @@
-use holo_hash_core::{EntryHash, HeaderAddress};
+use holo_hash::{EntryHash, HeaderAddress};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
 use holochain_types::dht_op::error::DhtOpError;

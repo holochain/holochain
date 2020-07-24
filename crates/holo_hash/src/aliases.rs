@@ -1,7 +1,6 @@
 //! Type aliases for the various concrete HoloHash types
 
 use crate::{hash_type, HoloHash};
-use holochain_serialized_bytes::prelude::*;
 
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support
@@ -40,12 +39,6 @@ pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
 #[allow(missing_docs)]
 pub type HeaderAddress = HeaderHash;
 
-/// A newtype for a collection of EntryHashes, needed for some wasm return types.
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[repr(transparent)]
-#[serde(transparent)]
-pub struct EntryHashes(pub Vec<EntryHash>);
-
 impl From<AgentPubKey> for EntryHash {
     fn from(hash: AgentPubKey) -> Self {
         hash.retype(hash_type::Entry::Agent)
@@ -76,3 +69,13 @@ impl From<AgentPubKey> for AnyDhtHash {
         hash.retype(hash_type::AnyDht::Entry(hash_type::Entry::Agent))
     }
 }
+
+#[cfg(feature = "serialized-bytes")]
+use holochain_serialized_bytes::prelude::*;
+
+/// A newtype for a collection of EntryHashes, needed for some wasm return types.
+#[cfg(feature = "serialized-bytes")]
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct EntryHashes(pub Vec<EntryHash>);

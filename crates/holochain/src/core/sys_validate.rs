@@ -1,6 +1,6 @@
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-pub use holo_hash_core::*;
-pub use holochain_types::{element::ChainElement, HeaderHashed};
+pub use holo_hash::*;
+pub use holochain_types::{element::ChainElement, HeaderHashed, Timestamp};
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
 ///
@@ -91,8 +91,8 @@ pub async fn sys_validate_header(
         if header.timestamp() < prev_header.timestamp() {
             return Err(SourceChainError::InvalidPreviousHeader(format!(
                 "expected timestamp < {}, received: {}",
-                header.timestamp().to_string(),
-                prev_header.timestamp().to_string(),
+                Timestamp::from(header.timestamp()).to_string(),
+                Timestamp::from(prev_header.timestamp()).to_string(),
             )));
         }
 
@@ -116,10 +116,10 @@ mod tests {
     use super::*;
     use holochain_types::{
         element::SignedHeaderHashed,
-        header::InitZomesComplete,
         test_utils::{fake_agent_pubkey_1, fake_header_hash},
         Timestamp,
     };
+    use holochain_zome_types::header::InitZomesComplete;
     use std::convert::TryInto;
 
     async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderAddress) -> ChainElement {
@@ -127,7 +127,7 @@ mod tests {
 
         let header = InitZomesComplete {
             author: fake_agent_pubkey_1(),
-            timestamp: ts,
+            timestamp: ts.into(),
             header_seq: seq,
             prev_header: prev,
         };

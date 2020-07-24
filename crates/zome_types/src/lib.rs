@@ -9,7 +9,11 @@
 
 #![deny(missing_docs)]
 
+#[allow(missing_docs)]
+pub mod agent_info;
 pub mod bytes;
+#[allow(missing_docs)]
+pub mod call_remote;
 pub mod capability;
 #[allow(missing_docs)]
 pub mod crdt;
@@ -17,8 +21,6 @@ pub mod debug;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
-pub mod globals;
-pub mod hash;
 #[allow(missing_docs)]
 pub mod header;
 #[allow(missing_docs)]
@@ -29,14 +31,20 @@ pub mod link;
 pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod post_commit;
+pub mod timestamp;
 #[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]
+pub mod zome_info;
+#[allow(missing_docs)]
 mod zome_io;
 
+pub mod request;
+
 pub use entry::Entry;
+pub use header::Header;
 use holochain_serialized_bytes::prelude::*;
 pub use zome_io::*;
 

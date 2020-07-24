@@ -31,7 +31,9 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
-use holochain_types::{autonomic::AutonomicProcess, cell::CellId};
+use holochain_types::{
+    autonomic::AutonomicProcess, cell::CellId, element::WireElement, metadata::MetadataSet,
+};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
@@ -265,6 +267,20 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
+            GetMeta {
+                span,
+                respond,
+                dht_hash,
+                options,
+                ..
+            } => {
+                let _g = span.enter();
+                let res = self
+                    .handle_get_meta(dht_hash, options)
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
             GetLinks {
                 span,
                 respond,
@@ -325,7 +341,7 @@ impl Cell {
         &self,
         from_agent: AgentPubKey,
         _request_validation_receipt: bool,
-        _dht_hash: holo_hash_core::AnyDhtHash,
+        _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         if from_agent == *self.id().agent_pubkey() {
@@ -392,16 +408,25 @@ impl Cell {
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
-        _dht_hash: holo_hash_core::AnyDhtHash,
+        _dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<SerializedBytes> {
+    ) -> CellResult<WireElement> {
+        unimplemented!()
+    }
+
+    /// a remote node is asking us for metadata
+    async fn handle_get_meta(
+        &self,
+        _dht_hash: holo_hash::AnyDhtHash,
+        _options: holochain_p2p::event::GetMetaOptions,
+    ) -> CellResult<MetadataSet> {
         unimplemented!()
     }
 
     /// a remote node is asking us for links
     async fn handle_get_links(
         &self,
-        _dht_hash: holo_hash_core::AnyDhtHash,
+        _dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<SerializedBytes> {
         tracing::warn!("handle get links is unimplemented");

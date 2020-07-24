@@ -16,12 +16,13 @@ use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},
-    header::{
-        builder::{self, HeaderBuilder},
-        AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate,
-        HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove, NewEntryHeader,
-    },
-    observability, Entry, EntryHashed, Header, HeaderHashed,
+    header::NewEntryHeader,
+    observability, Entry, EntryHashed, HeaderHashed,
+};
+use holochain_zome_types::header::{
+    builder::{self, HeaderBuilder},
+    AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate, Header,
+    HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove,
 };
 use pretty_assertions::assert_eq;
 use tracing::*;

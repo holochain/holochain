@@ -15,11 +15,10 @@ use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
-    header::{self},
     prelude::*,
-    Header, HeaderHashed,
+    HeaderHashed,
 };
-use holochain_zome_types::entry::Entry;
+use holochain_zome_types::{header, Entry, Header};
 use tracing::*;
 
 pub struct SourceChainBuf<'env> {
@@ -105,7 +104,7 @@ impl<'env> SourceChainBuf<'env> {
         self.sequence.complete_dht_op(i)
     }
 
-    pub fn cas(&self) -> &ChainCasBuf {
+    pub fn cas<'a>(&'a self) -> &'a ChainCasBuf<'env> {
         &self.cas
     }
 
@@ -224,7 +223,7 @@ impl<'env> SourceChainBuf<'env> {
         // create a DNA chain element and add it directly to the store
         let dna_header = Header::Dna(header::Dna {
             author: agent_pubkey.clone(),
-            timestamp: Timestamp::now(),
+            timestamp: Timestamp::now().into(),
             header_seq: 0,
             hash: dna_hash,
         });
@@ -233,7 +232,7 @@ impl<'env> SourceChainBuf<'env> {
         // create the agent validation entry and add it directly to the store
         let agent_validation_header = Header::AgentValidationPkg(header::AgentValidationPkg {
             author: agent_pubkey.clone(),
-            timestamp: Timestamp::now(),
+            timestamp: Timestamp::now().into(),
             header_seq: 1,
             prev_header: dna_header_address,
             membrane_proof,
@@ -243,7 +242,7 @@ impl<'env> SourceChainBuf<'env> {
         // create a agent chain element and add it directly to the store
         let agent_header = Header::EntryCreate(header::EntryCreate {
             author: agent_pubkey.clone(),
-            timestamp: Timestamp::now(),
+            timestamp: Timestamp::now().into(),
             header_seq: 2,
             prev_header: avh_addr,
             entry_type: header::EntryType::AgentPubKey,
@@ -315,12 +314,11 @@ pub mod tests {
     use fallible_iterator::FallibleIterator;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
-        header,
         prelude::*,
         test_utils::{fake_agent_pubkey_1, fake_dna_file},
-        Header, HeaderHashed,
+        HeaderHashed,
     };
-    use holochain_zome_types::entry::Entry;
+    use holochain_zome_types::{header, Entry, Header};
 
     fn fixtures() -> (
         AgentPubKey,
@@ -339,7 +337,7 @@ pub mod tests {
             async {
                 let dna_header = Header::Dna(header::Dna {
                     author: agent_pubkey.clone(),
-                    timestamp: Timestamp(0, 0),
+                    timestamp: Timestamp(0, 0).into(),
                     header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
@@ -347,7 +345,7 @@ pub mod tests {
 
                 let agent_header = Header::EntryCreate(header::EntryCreate {
                     author: agent_pubkey.clone(),
-                    timestamp: Timestamp(1, 0),
+                    timestamp: Timestamp(1, 0).into(),
                     header_seq: 1,
                     prev_header: dna_header.as_hash().to_owned().into(),
                     entry_type: header::EntryType::AgentPubKey,

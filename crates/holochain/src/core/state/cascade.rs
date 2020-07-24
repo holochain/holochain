@@ -40,26 +40,41 @@
 
 use super::{
     chain_cas::ChainCasBuf,
-    metadata::{EntryDhtStatus, LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT},
+    metadata::{LinkMetaKey, LinkMetaVal, MetadataBuf, MetadataBufT, SysMetaVal},
 };
-use holo_hash_core::{EntryHash, HeaderAddress};
+use error::CascadeResult;
+use holo_hash::{hash_type, AnyDhtHash, EntryHash, HeaderAddress};
+use holochain_p2p::{
+    actor::{GetMetaOptions, GetOptions},
+    HolochainP2pCell,
+};
 use holochain_state::error::DatabaseResult;
-use holochain_types::{element::SignedHeaderHashed, EntryHashed};
+use holochain_types::{
+    element::{ChainElement, SignedHeaderHashed},
+    metadata::{EntryDhtStatus, MetadataSet},
+    EntryHashed,
+};
 use tracing::*;
 
 #[cfg(test)]
+mod network_tests;
+#[cfg(test)]
 mod test;
 
-pub struct Cascade<'env, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
+mod error;
+
+pub struct Cascade<'env: 'a, 'a, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
 where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    primary: &'env ChainCasBuf<'env>,
-    primary_meta: &'env M,
+    primary: &'a ChainCasBuf<'env>,
+    primary_meta: &'a M,
 
-    cache: &'env ChainCasBuf<'env>,
-    cache_meta: &'env C,
+    cache: &'a mut ChainCasBuf<'env>,
+    cache_meta: &'a mut C,
+
+    network: HolochainP2pCell,
 }
 
 /// The state of the cascade search
@@ -78,24 +93,95 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'env, M, C> Cascade<'env, M, C>
+impl<'env: 'a, 'a, M, C> Cascade<'env, 'a, M, C>
 where
     C: MetadataBufT,
     M: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to a CAS and a cache
     pub fn new(
-        primary: &'env ChainCasBuf<'env>,
-        primary_meta: &'env M,
-        cache: &'env ChainCasBuf<'env>,
-        cache_meta: &'env C,
+        primary: &'a ChainCasBuf<'env>,
+        primary_meta: &'a M,
+        cache: &'a mut ChainCasBuf<'env>,
+        cache_meta: &'a mut C,
+        network: HolochainP2pCell,
     ) -> Self {
         Cascade {
             primary,
             primary_meta,
             cache,
             cache_meta,
+            network,
         }
+    }
+
+    // TODO: Remove when used
+    #[allow(dead_code)]
+    async fn fetch_element(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<ChainElement>> {
+        let elements = self.network.get(hash, options).await?;
+
+        // TODO: handle case of multiple elements returned
+        // Get the first returned element
+        let element = match elements.into_iter().next() {
+            Some(chain_element_data) => {
+                // Deserialize to type and hash
+                let element = chain_element_data.into_element().await?;
+                let (signed_header, maybe_entry) = element.clone().into_inner();
+
+                // Hash entry
+                let entry = match maybe_entry {
+                    Some(entry) => Some(EntryHashed::with_data(entry).await?),
+                    None => None,
+                };
+
+                // Put in element cache
+                self.cache.put(signed_header, entry)?;
+                Some(element)
+            }
+            None => None,
+        };
+        Ok(element)
+    }
+
+    // TODO: Remove when used
+    #[allow(dead_code)]
+    async fn fetch_meta(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetMetaOptions,
+    ) -> CascadeResult<Vec<MetadataSet>> {
+        let all_metadata = self.network.get_meta(hash.clone(), options).await?;
+
+        // Only put raw meta data in cache and combine all results
+        for metadata in all_metadata.iter().cloned() {
+            let hash = hash.clone();
+            // Put in meta cache
+            let values = metadata
+                .headers
+                .into_iter()
+                .map(|h| SysMetaVal::NewEntry(h))
+                .chain(metadata.deletes.into_iter().map(|h| SysMetaVal::Delete(h)))
+                .chain(metadata.updates.into_iter().map(|h| SysMetaVal::Update(h)));
+            match *hash.hash_type() {
+                hash_type::AnyDht::Entry(e) => {
+                    let basis = hash.retype(e);
+                    for v in values {
+                        self.cache_meta.register_raw_on_entry(basis.clone(), v)?;
+                    }
+                }
+                hash_type::AnyDht::Header => {
+                    let basis = hash.retype(hash_type::Header);
+                    for v in values {
+                        self.cache_meta.register_raw_on_header(basis.clone(), v);
+                    }
+                }
+            }
+        }
+        Ok(all_metadata)
     }
 
     /// Get a header without checking its metadata
@@ -167,9 +253,9 @@ where
     // TODO asyncify slow blocking functions here
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
-    pub async fn dht_get_links<'a>(
+    pub async fn dht_get_links<'link>(
         &self,
-        key: &'a LinkMetaKey<'a>,
+        key: &'link LinkMetaKey<'link>,
     ) -> DatabaseResult<Vec<LinkMetaVal>> {
         // Am I an authority?
         // TODO: Not a good check for authority as the base could be in the cas because

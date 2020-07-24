@@ -8,10 +8,10 @@ use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash_core::{HasHash, HeaderAddress};
-use holochain_types::header::builder;
-use holochain_types::header::AppEntryType;
-use holochain_types::header::EntryType;
+use holo_hash::{HasHash, HeaderAddress};
+use holochain_zome_types::header::builder;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::EntryType;
 use holochain_zome_types::CommitEntryInput;
 use holochain_zome_types::CommitEntryOutput;
 use std::sync::Arc;
@@ -34,14 +34,14 @@ pub fn commit_entry<'a>(
     .into_hash();
 
     // extract the zome position
-    let header_zome_id: holochain_types::header::ZomeId = match ribosome
+    let header_zome_id: holochain_zome_types::header::ZomeId = match ribosome
         .dna_file()
         .dna
         .zomes
         .iter()
         .position(|(name, _)| name == &call_context.zome_name)
     {
-        Some(index) => holochain_types::header::ZomeId::from(index as u8),
+        Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
         None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
     };
 
@@ -57,7 +57,7 @@ pub fn commit_entry<'a>(
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
                     // build an app entry type from the entry def at the found position
                     Some(index) => Some((
-                        holochain_types::header::EntryDefId::from(index as u8),
+                        holochain_zome_types::header::EntryDefId::from(index as u8),
                         entry_defs[index].visibility,
                     )),
                     None => None,

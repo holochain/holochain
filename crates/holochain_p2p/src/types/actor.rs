@@ -2,6 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::*;
+use holochain_zome_types::request::MetadataRequest;
 
 /// Request a validation package.
 pub struct GetValidationPackage {
@@ -59,6 +60,52 @@ impl Default for GetOptions {
     }
 }
 
+/// Get metadata from the DHT.
+/// Fields tagged with `[Network]` are network-level controls.
+/// Fields tagged with `[Remote]` are controls that will be forwarded to the
+/// remote agent processing this `GetLinks` request.
+pub struct GetMetaOptions {
+    /// [Network]
+    /// How many remote nodes should we make requests of / aggregate.
+    /// Set to `None` for a default "best-effort".
+    pub remote_agent_count: Option<u8>,
+
+    /// [Network]
+    /// Timeout to await responses for aggregation.
+    /// Set to `None` for a default "best-effort".
+    /// Note - if all requests time-out you will receive an empty result,
+    /// not a timeout error.
+    pub timeout_ms: Option<u64>,
+
+    /// [Network]
+    /// We are interested in speed. If `true` and we have any results
+    /// when `race_timeout_ms` is expired, those results will be returned.
+    /// After `race_timeout_ms` and before `timeout_ms` the first result
+    /// received will be returned.
+    pub as_race: bool,
+
+    /// [Network]
+    /// See `as_race` for details.
+    /// Set to `None` for a default "best-effort" race.
+    pub race_timeout_ms: Option<u64>,
+
+    /// [Remote]
+    /// Tells the remote-end which metadata to return
+    pub metadata_request: MetadataRequest,
+}
+
+impl Default for GetMetaOptions {
+    fn default() -> Self {
+        Self {
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: true,
+            race_timeout_ms: None,
+            metadata_request: MetadataRequest::default(),
+        }
+    }
+}
+
 /// Get links from the DHT.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
@@ -99,7 +146,7 @@ ghost_actor::ghost_chan! {
             request: SerializedBytes,
         ) -> SerializedBytes;
 
-        /// Publish data to the correct neigborhood.
+        /// Publish data to the correct neighborhood.
         fn publish(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
@@ -118,7 +165,15 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> Vec<SerializedBytes>;
+        ) -> Vec<WireElement>;
+
+        /// Get metadata from the DHT.
+        fn get_meta(
+            dna_hash: DnaHash,
+            from_agent: AgentPubKey,
+            dht_hash: holo_hash::AnyDhtHash,
+            options: GetMetaOptions,
+        ) -> Vec<MetadataSet>;
 
         /// Get links from the DHT.
         fn get_links(

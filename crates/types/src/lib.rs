@@ -16,6 +16,7 @@ pub mod entry;
 pub mod fixt;
 pub mod header;
 pub mod link;
+pub mod metadata;
 pub mod observability;
 pub mod prelude;
 pub mod timestamp;
@@ -34,6 +35,6 @@ pub mod test_utils;
 pub use entry::{Entry, EntryHashed};
 
 #[doc(inline)]
-pub use header::{Header, HeaderHashed};
+pub use header::HeaderHashed;
 
 pub use timestamp::{Timestamp, TimestampKey};

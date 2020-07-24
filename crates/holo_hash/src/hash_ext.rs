@@ -1,29 +1,17 @@
-use crate::HoloHashOf;
+use crate::{encode, HashType, HashableContent, HashableContentBytes, HoloHash, PrimitiveHashType};
 use futures::FutureExt;
-use holo_hash_core::{encode, HashableContent, HashableContentBytes, HoloHash, PrimitiveHashType};
 use must_future::MustBoxFuture;
 
-/// Extension trait for HoloHash, which allows instantiation with
-/// HashableContent rather than raw bytes
-pub trait HoloHashExt<C: HashableContent> {
+impl<T: HashType> HoloHash<T> {
     /// Hash the given content to produce a HoloHash
-    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHashOf<C>>;
-
-    /// Construct a HoloHash from a prehashed raw 32-byte slice, with given type.
-    /// The location bytes will be calculated.
-    fn with_pre_hashed_typed(hash: Vec<u8>, hash_type: C::HashType) -> Self;
-}
-
-impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
-    fn with_data<'a>(content: &'a C) -> MustBoxFuture<'a, HoloHashOf<C>> {
+    pub fn with_data<'a, C: HashableContent<HashType = T>>(
+        content: &'a C,
+    ) -> MustBoxFuture<'a, HoloHash<T>> {
         async move {
             match content.hashable_content() {
                 HashableContentBytes::Content(sb) => {
                     let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
-                    HoloHashExt::<C>::with_pre_hashed_typed(
-                        encode::blake2b_256(&bytes),
-                        content.hash_type(),
-                    )
+                    Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type())
                 }
                 HashableContentBytes::Prehashed36(bytes) => {
                     HoloHash::from_raw_bytes_and_type(bytes, content.hash_type())
@@ -34,7 +22,9 @@ impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
         .into()
     }
 
-    fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: C::HashType) -> Self {
+    /// Construct a HoloHash from a prehashed raw 32-byte slice, with given type.
+    /// The location bytes will be calculated.
+    pub fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: T) -> Self {
         // Assert the data size is relatively small so we are
         // comfortable executing this synchronously / blocking
         // tokio thread.
@@ -45,16 +35,10 @@ impl<C: HashableContent> HoloHashExt<C> for HoloHashOf<C> {
     }
 }
 
-/// Allows the HashType to be inferred when constructing a hash from raw bytes,
-/// if the HashType is primitive
-pub trait HoloHashPrimitiveExt<P: PrimitiveHashType> {
+impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
-    fn with_pre_hashed(hash: Vec<u8>) -> Self;
-}
-
-impl<P: PrimitiveHashType> HoloHashPrimitiveExt<P> for HoloHash<P> {
-    fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
+    pub fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
         // Assert the data size is relatively small so we are
         // comfortable executing this synchronously / blocking
         // tokio thread.

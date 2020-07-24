@@ -1,6 +1,6 @@
 use super::CapSecret;
 use crate::zome::ZomeName;
-use holo_hash_core::*;
+use holo_hash::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 

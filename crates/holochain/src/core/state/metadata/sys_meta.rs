@@ -7,18 +7,21 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::metadata::{EntryDhtStatus, MetadataBuf, MetadataBufT};
+    use crate::core::state::metadata::{
+        EntryDhtStatus, MetadataBuf, MetadataBufT, TimedHeaderHash,
+    };
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use header::{ElementDelete, HeaderBuilderCommon, IntendedFor, NewEntryHeader};
     use holo_hash::fixt::*;
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_types::{
         fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},
-        header::{self, builder, EntryType, HeaderBuilder},
-        Header, HeaderHashed,
+        header::NewEntryHeader,
+        HeaderHashed,
     };
+    use holochain_zome_types::header::{self, builder, EntryType, HeaderBuilder};
+    use holochain_zome_types::header::{ElementDelete, HeaderBuilderCommon, IntendedFor};
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
@@ -307,16 +310,15 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
-        let mut expected = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_creates = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_create(entry_hash.clone(), &mut fx).await;
-            let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(hash);
+            expected.push(hash.into());
             entry_creates.push(e)
         }
 
-        expected.sort_by_key(|h| h.clone());
+        expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -331,7 +333,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -344,7 +346,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
         }
     }
@@ -360,7 +362,7 @@ mod tests {
             .1
             .into_inner()
             .1;
-        let mut expected = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_updates = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_update(
@@ -370,12 +372,11 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(hash);
+            expected.push(hash.into());
             entry_updates.push(e)
         }
 
-        expected.sort_by_key(|h| h.clone());
+        expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -390,7 +391,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -403,7 +404,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
         }
     }
@@ -419,7 +420,7 @@ mod tests {
             .1
             .into_inner()
             .1;
-        let mut expected = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_updates = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_update(
@@ -429,12 +430,11 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(hash);
+            expected.push(hash.into());
             entry_updates.push(e)
         }
 
-        expected.sort_by_key(|h| h.clone());
+        expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -446,7 +446,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -459,7 +459,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
         }
     }
@@ -471,16 +471,15 @@ mod tests {
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
         let entry_hash = fx.entry_hash();
-        let mut expected = Vec::new();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_deletes = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_delete(header_hash.clone(), &mut fx).await;
-            let (_, hash) = <(Header, HeaderHash)>::from(hash);
-            expected.push(hash);
+            expected.push(hash.into());
             entry_deletes.push(e)
         }
 
-        expected.sort_by_key(|h| h.clone());
+        expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
@@ -495,7 +494,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
             env.with_commit(|writer| meta_buf.flush_to_txn(writer))
                 .unwrap();
@@ -508,7 +507,7 @@ mod tests {
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
-            headers.sort_by_key(|h| h.clone());
+            headers.sort_by_key(|h| h.header_hash.clone());
             assert_eq!(headers, expected);
         }
     }

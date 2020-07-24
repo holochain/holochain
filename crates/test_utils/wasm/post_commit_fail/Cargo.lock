@@ -92,7 +92,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "holo_hash_core"
+name = "holo_hash"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
@@ -152,7 +152,7 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.0.1"
 dependencies = [
- "holo_hash_core",
+ "holo_hash",
  "holochain_serialized_bytes",
  "multihash",
  "nanoid",
@@ -559,7 +559,7 @@ dependencies = [
 name = "test_wasm_post_commit_fail"
 version = "0.0.1"
 dependencies = [
- "holo_hash_core",
+ "holo_hash",
  "holochain_serialized_bytes",
  "holochain_wasmer_guest",
  "holochain_zome_types",

@@ -14,7 +14,7 @@ edition = "2018"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-holo_hash_core = { path = "../holo_hash_core" }
+holo_hash = { path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.36"
 holochain_zome_types = { path = "../zome_types" }
 serde = "=1.0.104"

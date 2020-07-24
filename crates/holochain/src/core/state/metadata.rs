@@ -5,6 +5,7 @@
 //! [Entry]: holochain_types::Entry
 
 use fallible_iterator::FallibleIterator;
+use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
@@ -16,18 +17,17 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::header;
-use holochain_types::{
-    header::{LinkAdd, LinkRemove, ZomeId},
-    Header, HeaderHashed, Timestamp,
-};
-use holochain_zome_types::link::LinkTag;
+use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
+use holochain_types::{HeaderHashed, Timestamp};
+use holochain_zome_types::header::{self, LinkAdd, LinkRemove, ZomeId};
+use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
 
 pub use sys_meta::*;
 use tracing::*;
 
-use header::NewEntryHeader;
+use holochain_types::header::NewEntryHeader;
+
 #[cfg(test)]
 pub use mock::MockMetadataBuf;
 #[cfg(test)]
@@ -40,27 +40,6 @@ mod sys_meta;
 #[allow(missing_docs)]
 #[cfg(test)]
 mod mock;
-
-/// The status of an [Entry] in the Dht
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EntryDhtStatus {
-    /// This [Entry] has active headers
-    Live,
-    /// This [Entry] has no headers that have not been deleted
-    Dead,
-    /// This [Entry] is awaiting validation
-    Pending,
-    /// This [Entry] has failed validation and will not be served by the DHT
-    Rejected,
-    /// This [Entry] has taken too long / too many resources to validate, so we gave up
-    Abandoned,
-    /// **not implemented** There has been a conflict when validating this [Entry]
-    Conflict,
-    /// **not implemented** The author has withdrawn their publication of this element.
-    Withdrawn,
-    /// **not implemented** We have agreed to drop this [Entry] content from the system. Header can stay with no entry
-    Purged,
-}
 
 /// The value stored in the links meta db
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -152,14 +131,21 @@ pub trait MetadataBufT {
     /// Add a link
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
-    /// Remove a link
-    fn remove_link(
+    /// Register a HeaderHash directly on an entry hash.
+    /// Also updates the entry dht status.
+    /// Useful when you only have hashes and not full types
+    fn register_raw_on_entry(
         &mut self,
-        link_remove: LinkRemove,
-        base: &EntryHash,
-        zome_id: ZomeId,
-        tag: LinkTag,
+        entry_hash: EntryHash,
+        value: SysMetaVal,
     ) -> DatabaseResult<()>;
+
+    /// Register a HeaderHash directly on a header hash.
+    /// Useful when you only have hashes and not full types
+    fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
+
+    /// Remove a link
+    async fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
 
     /// Registers a [Header::NewEntryHeader] on the referenced [Entry]
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
@@ -185,31 +171,31 @@ pub trait MetadataBufT {
     fn get_headers(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all headers registered on an agent's public key
     fn get_activity(
         &self,
         agent_pubkey: AgentPubKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [EntryUpdate] headers registered on an [Entry]
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [ElementDelete] headers registered on a Header
     fn get_deletes_on_header(
         &self,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [ElementDelete] headers registered on an Entry's header
     fn get_deletes_on_entry(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns the current [EntryDhtStatus] of an [Entry]
     fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -219,6 +205,12 @@ pub trait MetadataBufT {
 
     /// Finds the redirect path and returns the final [Header]
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
+
+    /// Returns all the link remove headers attached to a link add header
+    fn get_link_removes_on_link_add(
+        &self,
+        link_add: HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 }
 
 /// Values of [Header]s stored by the sys meta db
@@ -226,13 +218,15 @@ pub trait MetadataBufT {
 pub enum SysMetaVal {
     /// A header that results in a new entry
     /// Either a [EntryCreate] or [EntryUpdate]
-    NewEntry(HeaderHash),
+    NewEntry(TimedHeaderHash),
     /// An [EntryUpdate] [Header]
-    Update(HeaderHash),
+    Update(TimedHeaderHash),
     /// An [Header::ElementDelete]
-    Delete(HeaderHash),
+    Delete(TimedHeaderHash),
     /// Activity on an agent's public key
-    Activity(HeaderHash),
+    Activity(TimedHeaderHash),
+    /// Link remove on link add
+    LinkRemove(TimedHeaderHash),
 }
 
 /// Subset of headers for the sys meta db
@@ -270,21 +264,26 @@ impl From<SysMetaVal> for HeaderHash {
             SysMetaVal::NewEntry(h)
             | SysMetaVal::Update(h)
             | SysMetaVal::Delete(h)
-            | SysMetaVal::Activity(h) => h,
+            | SysMetaVal::LinkRemove(h)
+            | SysMetaVal::Activity(h) => h.header_hash,
         }
     }
 }
 
 impl EntryHeader {
-    async fn into_hash(self) -> Result<HeaderHash, SerializedBytesError> {
+    async fn into_hash(self) -> Result<TimedHeaderHash, SerializedBytesError> {
         let header = match self {
             EntryHeader::NewEntry(h)
             | EntryHeader::Update(h)
             | EntryHeader::Delete(h)
             | EntryHeader::Activity(h) => h,
         };
-        let (_, header_hash): (Header, HeaderHash) = HeaderHashed::with_data(header).await?.into();
-        Ok(header_hash)
+        let (header, header_hash): (Header, HeaderHash) =
+            HeaderHashed::with_data(header).await?.into();
+        Ok(TimedHeaderHash {
+            timestamp: header.timestamp().into(),
+            header_hash,
+        })
     }
 }
 
@@ -342,7 +341,7 @@ impl<'env> MetadataBuf<'env> {
         Self::new(reader, system_meta, links_meta, status_meta)
     }
 
-    async fn register_header_to_basis<K, H>(&mut self, header: H, key: K) -> DatabaseResult<()>
+    async fn register_header_on_basis<K, H>(&mut self, key: K, header: H) -> DatabaseResult<()>
     where
         H: Into<EntryHeader>,
         K: Into<SysMetaKey>,
@@ -362,11 +361,11 @@ impl<'env> MetadataBuf<'env> {
         let status = self
             .get_headers(basis.clone())?
             .find_map(|header| {
-                if self.get_deletes_on_header(header)?.count()? == 0 {
-                    debug!("found dead header");
+                if let None = self.get_deletes_on_header(header.header_hash)?.next()? {
+                    debug!("found live header");
                     Ok(Some(EntryDhtStatus::Live))
                 } else {
-                    debug!("found live header");
+                    debug!("found dead header");
                     Ok(None)
                 }
             })?
@@ -387,16 +386,27 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
         self.links_meta
             .iter_all_key_matches(key.to_key())?
-            .map(|(_, v)| Ok(v))
+            .filter_map(|(_, link)| {
+                // Check if link has been removed
+                match self
+                    .get_link_removes_on_link_add(link.link_add_hash.clone())?
+                    .next()?
+                {
+                    Some(_) => Ok(None),
+                    None => Ok(Some(link)),
+                }
+            })
             .collect()
     }
 
     #[allow(clippy::needless_lifetimes)]
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
-        let (_, link_add_hash): (Header, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
-                .await?
-                .into();
+        // Register the add link onto the base
+        let link_add_hash = HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
+            .await?
+            .into_hash();
+
+        // Put the link add to the links table
         let key = LinkMetaKey::from((&link_add, &link_add_hash));
 
         self.links_meta.put(
@@ -404,31 +414,38 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             LinkMetaVal {
                 link_add_hash,
                 target: link_add.target_address,
-                timestamp: link_add.timestamp,
+                timestamp: link_add.timestamp.into(),
                 zome_id: link_add.zome_id,
                 tag: link_add.tag,
             },
         )
     }
 
-    fn remove_link(
+    async fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+        let link_add_address = link_remove.link_add_address.clone();
+        // Register the link remove address to the link add address
+        let link_remove = HeaderHashed::with_data(Header::LinkRemove(link_remove)).await?;
+        let sys_val = SysMetaVal::LinkRemove(link_remove.into());
+        self.system_meta.insert(link_add_address.into(), sys_val);
+        Ok(())
+    }
+
+    fn register_raw_on_entry(
         &mut self,
-        link_remove: LinkRemove,
-        base: &EntryHash,
-        zome_id: ZomeId,
-        tag: LinkTag,
+        entry_hash: EntryHash,
+        value: SysMetaVal,
     ) -> DatabaseResult<()> {
-        let key = LinkMetaKey::Full(base, zome_id, &tag, &link_remove.link_add_address);
-        debug!(removing_key = ?key);
-        // TODO: It should be impossible to ever remove a LinkMetaVal that wasn't already added
-        // because of the validation dependency on LinkAdd from LinkRemove
-        // but do we want some kind of warning or panic here incase we messed up?
-        self.links_meta.delete(key.to_key())
+        self.system_meta.insert(entry_hash.clone().into(), value);
+        self.update_entry_dht_status(entry_hash)
+    }
+
+    fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
+        self.system_meta.insert(header_hash.into(), value);
     }
 
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         let basis = new_entry_header.entry().clone();
-        self.register_header_to_basis(new_entry_header, basis.clone())
+        self.register_header_on_basis(basis.clone(), new_entry_header)
             .await?;
         self.update_entry_dht_status(basis)?;
         Ok(())
@@ -440,8 +457,13 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         update: header::EntryUpdate,
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()> {
-        let basis: AnyDhtHash = match (&update.intended_for, entry) {
-            (header::IntendedFor::Header, None) => update.replaces_address.clone().into(),
+        match (&update.intended_for, entry) {
+            (header::IntendedFor::Header, None) => {
+                let basis: AnyDhtHash = update.replaces_address.clone().into();
+                self.register_header_on_basis(basis, update).await?;
+                // TODO: Can an update intended for a header also change an
+                // entries dht status?
+            }
             (header::IntendedFor::Header, Some(_)) => {
                 panic!("Can't update to entry when EntryUpdate points to header")
             }
@@ -449,13 +471,13 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
                 panic!("Can't update to entry with no entry hash")
             }
             (header::IntendedFor::Entry, Some(entry_hash)) => {
-                // TODO: Can an update intended for a header also change an
-                // entries dht status?
-                self.update_entry_dht_status(entry_hash.clone())?;
-                entry_hash.into()
+                self.register_header_on_basis(AnyDhtHash::from(entry_hash.clone()), update)
+                    .await?;
+                self.update_entry_dht_status(entry_hash)?;
+                return Ok(());
             }
-        };
-        self.register_header_to_basis(update, basis).await
+        }
+        Ok(())
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -465,9 +487,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         entry_hash: EntryHash,
     ) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
-        self.register_header_to_basis(delete.clone(), remove)
+        self.register_header_on_basis(remove, delete.clone())
             .await?;
-        self.register_header_to_basis(delete, entry_hash.clone())
+        self.register_header_on_basis(entry_hash.clone(), delete)
             .await?;
         self.update_entry_dht_status(entry_hash)
     }
@@ -475,14 +497,14 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     #[allow(clippy::needless_lifetimes)]
     async fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
         let author = header.author().clone();
-        self.register_header_to_basis(EntryHeader::Activity(header), author)
+        self.register_header_on_basis(author, EntryHeader::Activity(header))
             .await
     }
 
     fn get_headers(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?).filter_map(|h| {
@@ -497,7 +519,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_updates(
         &self,
         hash: AnyDhtHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&hash)?).filter_map(|h| {
@@ -512,7 +534,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_deletes_on_header(
         &self,
         new_entry_header: HeaderHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&new_entry_header.into())?).filter_map(
@@ -529,7 +551,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_deletes_on_entry(
         &self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&entry_hash.into())?).filter_map(|h| {
@@ -544,7 +566,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     fn get_activity(
         &self,
         agent_pubkey: AgentPubKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
             fallible_iterator::convert(self.system_meta.get(&agent_pubkey.into())?).filter_map(
@@ -573,6 +595,21 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     fn get_canonical_header_hash(&self, _header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {
         todo!()
+    }
+
+    fn get_link_removes_on_link_add(
+        &self,
+        link_add: HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            fallible_iterator::convert(self.system_meta.get(&link_add.into())?).filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::LinkRemove(h) => Some(h),
+                    _ => None,
+                })
+            }),
+        ))
     }
 }
 

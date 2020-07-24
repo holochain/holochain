@@ -1,19 +1,31 @@
-use super::EntryType;
-use crate::header;
-use crate::{fixt::*, Timestamp};
-use ::fixt::prelude::*;
-use derive_more::Constructor;
-use header::HeaderInner;
-use header::{IntendedFor, ZomeId};
-use holo_hash::{fixt::*, *};
-use holochain_zome_types::link::LinkTag;
+use super::{EntryType, Timestamp};
+use crate::header::{self, HeaderInner, IntendedFor, ZomeId};
+use crate::link::LinkTag;
+use header::Dna;
+use holo_hash::{AgentPubKey, DnaHash, EntryHash, HeaderAddress, HeaderHash};
+use holochain_serialized_bytes::SerializedBytes;
 
-#[derive(Constructor)]
 pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderAddress,
+}
+
+impl HeaderBuilderCommon {
+    pub fn new(
+        author: AgentPubKey,
+        timestamp: Timestamp,
+        header_seq: u32,
+        prev_header: HeaderAddress,
+    ) -> Self {
+        Self {
+            author,
+            timestamp,
+            header_seq,
+            prev_header,
+        }
+    }
 }
 
 /// Builder for non-genesis Headers
@@ -46,11 +58,6 @@ macro_rules! builder_variant {
                 }
             }
         }
-
-        fixturator!(
-            $name;
-            constructor fn new($($t),*);
-        );
 
         impl HeaderBuilder<header::$name> for $name {
             fn build(self, common: HeaderBuilderCommon) -> header::$name {
@@ -137,5 +144,18 @@ builder_variant!(ElementDelete {
 });
 
 builder_variant!(AgentValidationPkg {
-    membrane_proof: MaybeSerializedBytes, // needed for fixturator
+    membrane_proof: Option<SerializedBytes>,
 });
+
+impl Dna {
+    /// The Dna header can't implement HeaderBuilder because it lacks a
+    /// `prev_header` field, so this helper is provided as a special case
+    pub fn from_builder(hash: DnaHash, builder: HeaderBuilderCommon) -> Self {
+        Self {
+            author: builder.author,
+            timestamp: builder.timestamp,
+            header_seq: builder.header_seq,
+            hash,
+        }
+    }
+}

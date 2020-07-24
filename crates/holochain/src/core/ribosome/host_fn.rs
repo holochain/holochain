@@ -1,5 +1,6 @@
 pub mod agent_info;
 pub mod call;
+pub mod call_remote;
 pub mod capability;
 pub mod commit_entry;
 pub mod debug;
@@ -15,7 +16,6 @@ pub mod link_entries;
 pub mod property;
 pub mod query;
 pub mod random_bytes;
-pub mod remote_call;
 pub mod remove_entry;
 pub mod remove_link;
 pub mod schedule;

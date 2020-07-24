@@ -1,6 +1,6 @@
 use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
-use holo_hash_core::EntryContentHash;
+use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]

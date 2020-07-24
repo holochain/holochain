@@ -1,13 +1,15 @@
 //! Defines a ChainElement, the basic unit of Holochain data.
 
-use crate::{prelude::*, Header, HeaderHashed};
+use crate::{prelude::*, HeaderHashed};
 use derive_more::{From, Into};
 use futures::future::FutureExt;
 use holo_hash::HeaderAddress;
-use holo_hash_core::{hash_type, HashableContentBytes};
+use holo_hash::{hash_type, HashableContentBytes};
 use holochain_keystore::{KeystoreError, Signature};
+use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::header::Header;
 use must_future::MustBoxFuture;
 
 /// a chain element which is a triple containing the signature of the header along with the
@@ -16,6 +18,15 @@ use must_future::MustBoxFuture;
 pub struct ChainElement {
     /// The signed header for this element
     signed_header: SignedHeaderHashed,
+    /// If there is an entry associated with this header it will be here
+    maybe_entry: Option<Entry>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+/// ChainElement without the hashes for sending across the network
+pub struct WireElement {
+    /// The signed header for this element
+    signed_header: SignedHeader,
     /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
 }
@@ -275,6 +286,23 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
     fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
         let hash = shh.header.into_hash();
         HoloHashed::with_pre_hashed(shh.signed_header, hash)
+    }
+}
+
+impl WireElement {
+    /// Convert into a [ChainElement] when receiving from the network
+    pub async fn into_element(self) -> Result<ChainElement, SerializedBytesError> {
+        Ok(ChainElement::new(
+            SignedHeaderHashed::with_data(self.signed_header).await?,
+            self.maybe_entry,
+        ))
+    }
+    /// Convert from a [ChainElement] when sending to the network
+    pub fn from_element(e: ChainElement) -> Self {
+        Self {
+            signed_header: e.signed_header.signed_header,
+            maybe_entry: e.maybe_entry,
+        }
     }
 }
 

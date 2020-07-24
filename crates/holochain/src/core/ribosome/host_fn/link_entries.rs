@@ -6,8 +6,8 @@ use crate::core::{
 };
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash_core::HeaderAddress;
-use holochain_types::header::builder;
+use holo_hash::HeaderAddress;
+use holochain_zome_types::header::builder;
 use holochain_zome_types::LinkEntriesInput;
 use holochain_zome_types::LinkEntriesOutput;
 use std::sync::Arc;
@@ -21,14 +21,14 @@ pub fn link_entries<'a>(
     let (base_address, target_address, tag) = input.into_inner();
 
     // extract the zome position
-    let zome_id: holochain_types::header::ZomeId = match ribosome
+    let zome_id: holochain_zome_types::header::ZomeId = match ribosome
         .dna_file()
         .dna
         .zomes
         .iter()
         .position(|(name, _)| name == &call_context.zome_name)
     {
-        Some(index) => holochain_types::header::ZomeId::from(index as u8),
+        Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
         None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
     };
 

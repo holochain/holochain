@@ -168,13 +168,14 @@ pub struct InvokeZomeWorkspace<'env> {
     pub cache_meta: MetadataBuf<'env>,
 }
 
-impl<'env> InvokeZomeWorkspace<'env> {
-    pub fn cascade(&self) -> Cascade {
+impl<'env: 'a, 'a> InvokeZomeWorkspace<'env> {
+    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'env, 'a> {
         Cascade::new(
             &self.source_chain.cas(),
             &self.meta,
-            &self.cache_cas,
-            &self.cache_meta,
+            &mut self.cache_cas,
+            &mut self.cache_meta,
+            network,
         )
     }
 }

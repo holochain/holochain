@@ -31,11 +31,11 @@ pub enum HashableContentBytes {
 macro_rules! impl_hashable_content {
     ($n: ident, $t: ident) => {
         impl HashableContent for $n {
-            type HashType = holo_hash_core::hash_type::$t;
+            type HashType = holo_hash::hash_type::$t;
 
             fn hash_type(&self) -> Self::HashType {
-                use holo_hash_core::PrimitiveHashType;
-                holo_hash_core::hash_type::$t::new()
+                use holo_hash::PrimitiveHashType;
+                holo_hash::hash_type::$t::new()
             }
 
             fn hashable_content(&self) -> $crate::HashableContentBytes {

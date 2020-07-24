@@ -38,8 +38,11 @@ fixturator!(
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use holochain_types::element::{ChainElement, SignedHeaderHashed};
+    use holochain_types::fixt::*;
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
@@ -175,7 +178,7 @@ mod tests {
 
         let header_hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash_core::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Header,
         );
 
         p2p.publish(dna, a1, true, header_hash, vec![], Some(20))
@@ -194,8 +197,20 @@ mod tests {
 
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        let test_1 = SerializedBytes::from(UnsafeBytes::from(b"resp-1".to_vec()));
-        let test_2 = SerializedBytes::from(UnsafeBytes::from(b"resp-2".to_vec()));
+        let test_1 = WireElement::from_element(ChainElement::new(
+            SignedHeaderHashed::with_presigned(
+                HoloHashed::from_content(fixt!(Header)).await,
+                fixt!(Signature),
+            ),
+            None,
+        ));
+        let test_2 = WireElement::from_element(ChainElement::new(
+            SignedHeaderHashed::with_presigned(
+                HoloHashed::from_content(fixt!(Header)).await,
+                fixt!(Signature),
+            ),
+            None,
+        ));
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
@@ -222,7 +237,7 @@ mod tests {
 
         let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash_core::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Header,
         );
 
         let res = p2p
@@ -268,7 +283,7 @@ mod tests {
 
         let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash_core::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Header,
         );
 
         let res = p2p
