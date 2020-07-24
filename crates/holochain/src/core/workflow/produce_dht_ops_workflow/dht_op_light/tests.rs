@@ -13,7 +13,7 @@ use holo_hash::{fixt::HeaderHashFixturator, *};
 use holochain_keystore::Signature;
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    dht_op::{ops_from_element, DhtOp},
+    dht_op::{produce_ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},
     header::{
@@ -217,29 +217,29 @@ async fn test_all_ops() {
     observability::test_run().ok();
     let builder = ChainElementTest::new();
     let (element, expected) = builder.entry_create();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
     let (element, expected) = builder.entry_update();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
     let (element, expected) = builder.entry_delete();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
     let (element, expected) = builder.link_add();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
     let (element, expected) = builder.link_remove();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ChainElementTest::new();
     let elements = builder.others();
     for (element, expected) in elements {
         debug!(?element);
-        let result = ops_from_element(&element).unwrap();
+        let result = produce_ops_from_element(&element).unwrap();
         assert_eq!(result, expected);
     }
 }

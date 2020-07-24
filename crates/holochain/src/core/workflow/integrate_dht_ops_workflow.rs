@@ -23,9 +23,7 @@ use holochain_state::{
     prelude::{GetDb, Reader, Writer},
 };
 use holochain_types::{
-    dht_op::{
-        error::DhtOpResult, ops_from_element, DhtOp, DhtOpHashed, DhtOpIntegrationDestination,
-    },
+    dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed},
     element::{ChainElement, SignedHeaderHashed},
     header::IntendedFor,
     validate::ValidationStatus,
@@ -145,6 +143,16 @@ pub async fn integrate_dht_ops_workflow(
     Ok(result)
 }
 
+/// Integrate a single DhtOp to the specified stores.
+/// The stores are intended to be either the pair of Vaults, or the pair of Caches,
+/// never a mixture of the two.
+///
+/// NB: When integrating ops we have authored, we are repeating the storage of
+/// Element and Entry data.
+/// In particular, when integrating inline, we are writing data to the
+/// ElementCache that we already have in our ElementVault. Then later, when we
+/// do "real" integration, we are writing it again to our ElementVault!
+/// thus, FIXME.
 #[instrument(skip(element_store, meta_store, value))]
 async fn integrate_single_dht_op(
     element_store: &mut ChainCasBuf<'_>,
@@ -165,12 +173,12 @@ async fn integrate_single_dht_op(
             DhtOp::StoreElement(signature, header, maybe_entry) => {
                 let header = HeaderHashed::with_data(header).await?;
                 let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let entry_hashed = match maybe_entry {
+                let maybe_entry_hashed = match maybe_entry {
                     Some(entry) => Some(EntryHashed::with_data(*entry).await?),
                     None => None,
                 };
                 // Store the entry
-                element_store.put(signed_header, entry_hashed)?;
+                element_store.put(signed_header, maybe_entry_hashed)?;
             }
             DhtOp::StoreEntry(signature, new_entry_header, entry) => {
                 // Reference to headers
@@ -318,12 +326,22 @@ async fn integrate_single_dht_op(
 
 /// When writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the meta cache
-pub fn inline_integrate_meta(element: ChainElement) -> DhtOpResult<()> {
-    for op in ops_from_element(&element)?
-        .into_iter()
-        .filter(|op| op.integration_destination() == DhtOpIntegrationDestination::Meta)
-    {
-        todo!("integrate op")
+pub async fn inline_integrate_meta(
+    element: ChainElement,
+    element_store: &mut ChainCasBuf<'_>,
+    meta_store: &mut MetadataBuf<'_>,
+) -> WorkflowResult<()> {
+    for op in produce_ops_from_element(&element)? {
+        let value = IntegrationQueueValue {
+            op,
+            validation_status: ValidationStatus::Valid,
+        };
+        match integrate_single_dht_op(element_store, meta_store, value).await? {
+            Outcome::Integrated(_) => {}
+            Outcome::Deferred(v) => {
+                unreachable!("An inline-integrated DhtOp cannot be deferred: {:?}", v)
+            }
+        }
     }
     Ok(())
 }

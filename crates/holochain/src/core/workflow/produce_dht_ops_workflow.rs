@@ -45,6 +45,10 @@ async fn produce_dht_ops_workflow_inner(
         .get_incomplete_dht_ops()
         .await?;
 
+    // FIXME:
+    // we technically don't need to integrate StoreElement or StoreEntry
+    // DhtOps, because we already added that data to our ElementVault
+    // during authorship. However, we must publish them.
     for (index, ops) in all_ops {
         for op in ops {
             let (op, hash) = DhtOpHashed::with_data(op).await?.into_inner();
@@ -105,7 +109,7 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{ops_from_element, DhtOp, DhtOpHashed},
+        dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed},
         header::{builder, EntryType},
         observability, Entry, EntryHashed,
     };
@@ -148,7 +152,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            ops_from_element(&element).unwrap()
+            produce_ops_from_element(&element).unwrap()
         }
     }
 
@@ -176,7 +180,7 @@ mod tests {
             let mut all_ops = Vec::new();
             // Collect the ops from genesis
             for h in headers {
-                let ops = ops_from_element(
+                let ops = produce_ops_from_element(
                     &source_chain
                         .get_element(h.as_hash())
                         .await
