@@ -16,10 +16,14 @@ pub fn get_entry<'a>(
     input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
     let (hash, _options) = input.into_inner();
+
+    // Get the network from the context
+    let network = call_context.host_access.network().clone();
+
     let call =
-        |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
+        |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
             async move {
-                let cascade = workspace.cascade();
+                let cascade = workspace.cascade(network);
                 // safe block on
                 let maybe_entry = cascade.dht_get(&hash).await?.map(|e| e.into_content());
                 Ok(maybe_entry)
@@ -29,7 +33,7 @@ pub fn get_entry<'a>(
         };
     let maybe_entry: Option<Entry> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe { call_context.host_access.workspace().apply_ref(call).await }
+            unsafe { call_context.host_access.workspace().apply_mut(call).await }
         })??;
     Ok(GetEntryOutput::new(maybe_entry))
 }

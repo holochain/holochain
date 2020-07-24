@@ -1,10 +1,11 @@
 use ::fixt::prelude::*;
 use holochain::core::state::{
     cascade::Cascade,
+    chain_cas::ChainCasBuf,
     metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
-use holochain::fixt::ZomeIdFixturator;
+use holochain::{fixt::ZomeIdFixturator, test_utils::test_network};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
     entry::EntryHashed,
@@ -77,7 +78,7 @@ async fn get_links() -> SourceChainResult<()> {
     let reader = env_ref.reader()?;
 
     let mut source_chain = SourceChainBuf::new(&reader, &dbs)?;
-    let cache = SourceChainBuf::cache(&reader, &dbs)?;
+    let mut cache = ChainCasBuf::cache(&reader, &dbs)?;
 
     // create a cache and a cas for store and meta
     let primary_meta = MetadataBuf::primary(&reader, &dbs)?;
@@ -93,12 +94,15 @@ async fn get_links() -> SourceChainResult<()> {
         .put_raw(jessy_header, Some(jessy_entry.as_content().clone()))
         .await?;
 
+    let (_n, _r, cell_network) = test_network().await;
+
     // Pass in stores as references
     let cascade = Cascade::new(
         &source_chain.cas(),
         &primary_meta,
-        &cache.cas(),
+        &mut cache,
         &cache_meta,
+        cell_network,
     );
     let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());
     let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();

@@ -1172,6 +1172,10 @@ mod slow_tests {
         ConductorBuilder,
     };
     use crate::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
+    use crate::{
+        core::state::cascade::{test_dbs_and_mocks, Cascade},
+        test_utils::test_network,
+    };
     use holochain_state::{
         buffer::BufferedStore,
         env::{ReadManager, WriteManager},
@@ -1328,10 +1332,9 @@ mod slow_tests {
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
-            let (cas, _metadata, cache, metadata_cache) =
-                crate::core::state::cascade::test_dbs_and_mocks(&reader, &dbs);
-            let cascade =
-                crate::core::state::cascade::Cascade::new(&cas, &meta, &cache, &metadata_cache);
+            let (cas, _metadata, mut cache, metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+            let (_n, _r, cell_network) = test_network().await;
+            let cascade = Cascade::new(&cas, &meta, &mut cache, &metadata_cache, cell_network);
 
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();
