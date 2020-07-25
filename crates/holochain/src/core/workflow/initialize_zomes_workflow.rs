@@ -1,6 +1,5 @@
 use super::{
-    error::WorkflowResult, unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
-    InvokeZomeWorkspace,
+    error::WorkflowResult, unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace,
 };
 use crate::core::{
     queue_consumer::OneshotWriter,
@@ -53,8 +52,8 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     let InitializeZomesWorkflowArgs { dna_def, ribosome } = args;
     // Call the init callback
     let result = {
-        // TODO: We need a better solution then re-using the InvokeZomeWorkspace (i.e. ghost actor)
-        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace.0);
+        // TODO: We need a better solution then re-using the CallZomeWorkspace (i.e. ghost actor)
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace.0);
         let host_access = InitHostAccess::new(raw_workspace, keystore, network);
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?
@@ -70,13 +69,13 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-pub struct InitializeZomesWorkspace<'env>(pub(crate) InvokeZomeWorkspace<'env>);
+pub struct InitializeZomesWorkspace<'env>(pub(crate) CallZomeWorkspace<'env>);
 
 impl<'env> Workspace<'env> for InitializeZomesWorkspace<'env> {
     /// Constructor
     #[allow(dead_code)]
     fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        Ok(Self(InvokeZomeWorkspace::new(reader, dbs)?))
+        Ok(Self(CallZomeWorkspace::new(reader, dbs)?))
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> Result<(), WorkspaceError> {
@@ -109,7 +108,7 @@ pub mod tests {
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
         let mut workspace =
-            InitializeZomesWorkspace(InvokeZomeWorkspace::new(&reader, &dbs).unwrap());
+            InitializeZomesWorkspace(CallZomeWorkspace::new(&reader, &dbs).unwrap());
         let mut ribosome = MockRibosomeT::new();
 
         // Setup the ribosome mock

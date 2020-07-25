@@ -8,12 +8,12 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
-use holo_hash::{EntryHash, HasHash, HeaderAddress, HeaderHash};
+use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
     buffer::{BufferedStore, CasBuf},
     db::{
-        GetDb, CACHE_CHAIN_ENTRIES, CACHE_CHAIN_HEADERS, PRIMARY_CHAIN_HEADERS,
-        PRIMARY_CHAIN_PRIVATE_ENTRIES, PRIMARY_CHAIN_PUBLIC_ENTRIES,
+        GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
+        ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
     },
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
@@ -61,15 +61,15 @@ impl<'env> ChainCasBuf<'env> {
     /// Create a ChainCasBuf using the source chain databases.
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
-    pub fn primary(
+    pub fn vault(
         reader: &'env Reader<'env>,
         dbs: &impl GetDb,
         allow_private: bool,
     ) -> DatabaseResult<Self> {
-        let headers = dbs.get_db(&*PRIMARY_CHAIN_HEADERS)?;
-        let entries = dbs.get_db(&*PRIMARY_CHAIN_PUBLIC_ENTRIES)?;
+        let headers = dbs.get_db(&*ELEMENT_VAULT_HEADERS)?;
+        let entries = dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
         let private_entries = if allow_private {
-            Some(dbs.get_db(&*PRIMARY_CHAIN_PRIVATE_ENTRIES)?)
+            Some(dbs.get_db(&*ELEMENT_VAULT_PRIVATE_ENTRIES)?)
         } else {
             None
         };
@@ -79,8 +79,8 @@ impl<'env> ChainCasBuf<'env> {
     /// Create a ChainCasBuf using the cache databases.
     /// There is no cache for private entries, so private entries are disallowed
     pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let entries = dbs.get_db(&*CACHE_CHAIN_ENTRIES)?;
-        let headers = dbs.get_db(&*CACHE_CHAIN_HEADERS)?;
+        let entries = dbs.get_db(&*ELEMENT_CACHE_ENTRIES)?;
+        let headers = dbs.get_db(&*ELEMENT_CACHE_HEADERS)?;
         Self::new(reader, entries, None, headers)
     }
 
@@ -107,7 +107,7 @@ impl<'env> ChainCasBuf<'env> {
 
     pub async fn get_header(
         &self,
-        header_address: &HeaderAddress,
+        header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
         Ok(self.headers.get(header_address).await?.map(Into::into))
     }
@@ -154,7 +154,7 @@ impl<'env> ChainCasBuf<'env> {
     /// given a header address return the full chain element for that address
     pub async fn get_element(
         &self,
-        header_address: &HeaderAddress,
+        header_address: &HeaderHash,
     ) -> SourceChainResult<Option<ChainElement>> {
         if let Some(signed_header) = self.get_header(header_address).await? {
             let maybe_entry = self.get_entry_from_header(signed_header.header()).await?;
@@ -278,7 +278,7 @@ mod tests {
         // write one public-entry header and one private-entry header
         env.with_commit(|txn| {
             let reader = env.reader()?;
-            let mut store = ChainCasBuf::primary(&reader, &env, true)?;
+            let mut store = ChainCasBuf::vault(&reader, &env, true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -287,7 +287,7 @@ mod tests {
         // Can retrieve both entries when private entries are enabled
         {
             let reader = env.reader()?;
-            let store = ChainCasBuf::primary(&reader, &env, true)?;
+            let store = ChainCasBuf::vault(&reader, &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -301,7 +301,7 @@ mod tests {
         // Cannot retrieve private entry when disabled
         {
             let reader = env.reader()?;
-            let store = ChainCasBuf::primary(&reader, &env, false)?;
+            let store = ChainCasBuf::vault(&reader, &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -327,7 +327,7 @@ mod tests {
         // write one public-entry header and one private-entry header (which will be a noop)
         env.with_commit(|txn| {
             let reader = env.reader()?;
-            let mut store = ChainCasBuf::primary(&reader, &env, false)?;
+            let mut store = ChainCasBuf::vault(&reader, &env, false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -336,7 +336,7 @@ mod tests {
         // Can retrieve both entries when private entries are enabled
         {
             let reader = env.reader()?;
-            let store = ChainCasBuf::primary(&reader, &env, true)?;
+            let store = ChainCasBuf::vault(&reader, &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -347,7 +347,7 @@ mod tests {
         // Cannot retrieve private entry when disabled
         {
             let reader = env.reader()?;
-            let store = ChainCasBuf::primary(&reader, &env, false)?;
+            let store = ChainCasBuf::vault(&reader, &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub))

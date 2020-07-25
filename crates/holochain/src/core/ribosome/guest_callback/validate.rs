@@ -356,14 +356,17 @@ mod slow_tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
 
@@ -387,14 +390,17 @@ mod slow_tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;

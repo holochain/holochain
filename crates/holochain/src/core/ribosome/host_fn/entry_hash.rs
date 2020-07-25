@@ -15,8 +15,8 @@ pub fn entry_hash(
     let entry: Entry = input.into_inner();
 
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::with_data(entry).await
-    })?
+        holochain_types::entry::EntryHashed::from_content(entry).await
+    })
     .into_hash();
 
     Ok(EntryHashOutput::new(entry_hash))
@@ -67,9 +67,12 @@ pub mod wasm_test {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
 
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = EntryHashInput::new(entry);
@@ -87,9 +90,12 @@ pub mod wasm_test {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
@@ -100,12 +106,11 @@ pub mod wasm_test {
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            holochain_types::entry::EntryHashed::with_data(Entry::App(
+            holochain_types::entry::EntryHashed::from_content(Entry::App(
                 (&expected_path).try_into().unwrap(),
             ))
             .await
         })
-        .unwrap()
         .into_hash();
 
         assert_eq!(expected_hash.into_inner(), output.into_inner(),);

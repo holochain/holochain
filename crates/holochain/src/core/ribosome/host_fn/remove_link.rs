@@ -3,10 +3,10 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
-use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
+use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash::HeaderAddress;
+use holo_hash::HeaderHash;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::Header;
@@ -29,7 +29,7 @@ pub fn remove_link<'a>(
     // include it in the remove link header
     let network = call_context.host_access.network().clone();
     let address = link_add_address.clone();
-    let add_link_get_call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<Option<SignedHeaderHashed>>> {
+    let add_link_get_call = |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<Option<SignedHeaderHashed>>> {
         async move {
             let cascade = workspace.cascade(network);
             // @todo use .dht_get() once it supports header hashes
@@ -68,7 +68,7 @@ pub fn remove_link<'a>(
     }?;
 
     // add a LinkRemove to the source chain
-    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderAddress>> {
+    let call = |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
         async move {
             let source_chain = &mut workspace.source_chain;
             let header_builder = builder::LinkRemove {

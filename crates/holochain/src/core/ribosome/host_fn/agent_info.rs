@@ -2,8 +2,8 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
-use crate::core::workflow::call_zome_workflow::InvokeZomeWorkspace;
-use futures::future::FutureExt;
+use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+use futures::FutureExt;
 use holo_hash::AgentPubKey;
 use holochain_zome_types::agent_info::AgentInfo;
 use holochain_zome_types::AgentInfoInput;
@@ -18,7 +18,7 @@ pub fn agent_info<'a>(
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {
     let call =
-        |workspace: &'a InvokeZomeWorkspace| -> MustBoxFuture<'a, SourceChainResult<AgentPubKey>> {
+        |workspace: &'a CallZomeWorkspace| -> MustBoxFuture<'a, SourceChainResult<AgentPubKey>> {
             async move { Ok(workspace.source_chain.agent_pubkey().await?) }
                 .boxed()
                 .into()
@@ -53,13 +53,16 @@ pub mod test {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
