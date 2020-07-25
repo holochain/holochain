@@ -399,7 +399,7 @@ mod slow_tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn fail_validate_test() {
+    async fn fail_validate_test<'a>() {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
@@ -418,18 +418,28 @@ mod slow_tests {
             );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = raw_workspace.clone();
 
-        let _output: CommitEntryOutput =
+        let output: CommitEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
-        // assert_eq!(
-        //     vec![
-        //         76, 230, 153, 63, 221, 14, 217, 80, 6, 139, 12, 225, 82, 74, 160, 244, 168, 172,
-        //         79, 168, 122, 95, 86, 33, 1, 98, 133, 173, 215, 49, 252, 75, 200, 146, 2, 126
-        //     ]
-        //     .as_slice(),
-        //     output.into_inner().get_raw(),
-        // );
+        // the chain head should be the committed entry header
+        let call =
+            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+                async move {
+                    let source_chain = &mut workspace.source_chain;
+                    Ok(source_chain.chain_head()?.to_owned())
+                }
+                .boxed()
+            };
+        let chain_head =
+            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+                unsafe { raw_workspace.apply_mut(call).await }
+            }))
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(chain_head, output.into_inner(),);
     }
 }
