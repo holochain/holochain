@@ -90,9 +90,10 @@ pub fn commit_entry<'a>(
             }
             .boxed()
         };
-    let header_address = tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-        unsafe { call_context.host_access.workspace().apply_mut(call).await }
-    }))???;
+    let header_address =
+        tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+            unsafe { call_context.host_access.workspace().apply_mut(call).await }
+        }))???;
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
@@ -207,7 +208,9 @@ pub mod wasm_test {
         let entry_def_id = EntryDefId::from("post");
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
-        let _output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+        let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+
+        dbg!(&output);
 
         let _app_entry_hash = holochain_types::entry::EntryHashed::from_content(app_entry.clone())
             .await
