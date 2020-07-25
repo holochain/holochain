@@ -22,13 +22,17 @@ fn target() -> Result<EntryHash, WasmError> {
 }
 
 fn _link_entries(_: ()) -> Result<HeaderHash, WasmError> {
+    debug!("_link_entries")?;
     Ok(link_entries!(base()?, target()?)?)
 }
 
 fn _remove_link(input: RemoveLinkInput) -> Result<HeaderHash, WasmError> {
+    debug!("_remove_link")?;
+    debug!(&input)?;
     Ok(remove_link!(input.into_inner())?)
 }
 
 fn _get_links(_: ()) -> Result<Links, WasmError> {
+    debug!("_get_links")?;
     Ok(get_links!(base()?)?)
 }

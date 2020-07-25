@@ -137,7 +137,7 @@ macro_rules! link_entries {
 macro_rules! remove_link {
     ( $add_link_header:expr ) => {{
         $crate::api_call!(
-            __remove_entry,
+            __remove_link,
             RemoveLinkInput::new($add_link_header),
             RemoveLinkOutput
         )

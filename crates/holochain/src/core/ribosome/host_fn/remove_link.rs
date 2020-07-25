@@ -87,3 +87,240 @@ pub fn remove_link<'a>(
 
     Ok(RemoveLinkOutput::new(header_address))
 }
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+pub mod slow_tests {
+
+    use crate::core::queue_consumer::TriggerSender;
+    use crate::core::state::workspace::Workspace;
+    use crate::core::workflow::integrate_dht_ops_workflow::{
+        integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
+    };
+    use crate::core::workflow::produce_dht_ops_workflow::{
+        produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
+    };
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
+    use holo_hash::HeaderHash;
+    use holochain_state::env::ReadManager;
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::link::Links;
+    use holochain_zome_types::RemoveLinkInput;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_remove_link_add_remove() {
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+
+        let (link_one, link_two) = {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            // commits fail validation if we don't do genesis
+            crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+                .await
+                .unwrap();
+
+            // links should start empty
+            let links: Links = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ())
+            };
+
+            assert!(links.into_inner().len() == 0);
+
+            // add a couple of links
+            let link_one: HeaderHash = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(host_access, TestWasm::Link, "link_entries", ())
+            };
+
+            // add a couple of links
+            let link_two: HeaderHash = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(host_access, TestWasm::Link, "link_entries", ())
+            };
+
+            // Write the database to file
+            holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
+                crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
+            })
+            .unwrap();
+
+            (link_one, link_two)
+        };
+
+        // Needs metadata to return get
+        {
+            use crate::core::state::workspace::Workspace;
+            use holochain_state::env::ReadManager;
+
+            // Produce the ops
+            let (mut qt, mut rx) = TriggerSender::new();
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                // await the workflow finishing
+                rx.listen().await.unwrap();
+            }
+            // Integrate the ops
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                integrate_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                rx.listen().await.unwrap();
+            }
+        }
+
+        {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            let links: Links = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ())
+            };
+
+            assert!(links.into_inner().len() == 2);
+
+            // remove a link
+            let _: HeaderHash = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(
+                    host_access,
+                    TestWasm::Link,
+                    "remove_link",
+                    RemoveLinkInput::new(link_one)
+                )
+            };
+
+            // Write the database to file
+            holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
+                crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
+            })
+            .unwrap();
+        }
+
+        // Needs metadata to return get
+        {
+            use crate::core::state::workspace::Workspace;
+            use holochain_state::env::ReadManager;
+
+            // Produce the ops
+            let (mut qt, mut rx) = TriggerSender::new();
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                // await the workflow finishing
+                rx.listen().await.unwrap();
+            }
+            // Integrate the ops
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                integrate_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                rx.listen().await.unwrap();
+            }
+        }
+
+        {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            let links: Links = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ())
+            };
+
+            assert!(links.into_inner().len() == 1);
+
+            // remove a link
+            let _: HeaderHash = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(
+                    host_access,
+                    TestWasm::Link,
+                    "remove_link",
+                    RemoveLinkInput::new(link_two)
+                )
+            };
+
+            // Write the database to file
+            holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
+                crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
+            })
+            .unwrap();
+        }
+
+        // Needs metadata to return get
+        {
+            use crate::core::state::workspace::Workspace;
+            use holochain_state::env::ReadManager;
+
+            // Produce the ops
+            let (mut qt, mut rx) = TriggerSender::new();
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                // await the workflow finishing
+                rx.listen().await.unwrap();
+            }
+            // Integrate the ops
+            {
+                let reader = env_ref.reader().unwrap();
+                let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                integrate_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                    .await
+                    .unwrap();
+                rx.listen().await.unwrap();
+            }
+        }
+
+        {
+            let reader = env_ref.reader().unwrap();
+            let mut workspace =
+                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+
+            let links: Links = {
+                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+                let mut host_access = fixt!(ZomeCallHostAccess);
+                host_access.workspace = raw_workspace;
+                crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ())
+            };
+
+            assert!(links.into_inner().len() == 0);
+        }
+    }
+}
