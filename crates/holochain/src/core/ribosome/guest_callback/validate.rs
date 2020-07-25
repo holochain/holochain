@@ -266,12 +266,17 @@ mod slow_tests {
     use super::ValidateHostAccess;
     use super::ValidateResult;
     use crate::core::ribosome::RibosomeT;
+    use crate::core::state::source_chain::SourceChainResult;
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
+    use futures::future::BoxFuture;
+    use futures::future::FutureExt;
     use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::Entry;
@@ -350,7 +355,7 @@ mod slow_tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn pass_validate_test() {
+    async fn pass_validate_test<'a>() {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
@@ -368,19 +373,29 @@ mod slow_tests {
                 &mut workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = raw_workspace.clone();
 
-        let _output: CommitEntryOutput =
+        let output: CommitEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
-        // assert_eq!(
-        //     vec![
-        //         33, 8, 93, 245, 22, 184, 206, 61, 234, 210, 32, 136, 232, 123, 229, 154, 40, 35,
-        //         176, 133, 169, 195, 161, 90, 10, 221, 86, 6, 125, 30, 67, 195, 131, 202, 112, 103
-        //     ]
-        //     .as_slice(),
-        //     output.into_inner().get_raw(),
-        // );
+        // the chain head should be the committed entry header
+        let call =
+            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+                async move {
+                    let source_chain = &mut workspace.source_chain;
+                    Ok(source_chain.chain_head()?.to_owned())
+                }
+                .boxed()
+            };
+        let chain_head =
+            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+                unsafe { raw_workspace.apply_mut(call).await }
+            }))
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(chain_head, output.into_inner(),);
     }
 
     #[tokio::test(threaded_scheduler)]
