@@ -108,6 +108,8 @@ pub mod wasm_test {
     use super::commit_entry;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::state::source_chain::ChainInvalidReason;
+    use crate::core::state::source_chain::SourceChainResult;
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::core::{
         queue_consumer::TriggerSender,
         state::source_chain::SourceChainError,
@@ -121,7 +123,9 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holo_hash::HasHash;
+    use futures::future::BoxFuture;
+    use futures::future::FutureExt;
+    use holo_hash::HeaderHash;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;
@@ -175,7 +179,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly
-    async fn commit_entry_test() {
+    async fn commit_entry_test<'a>() {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
@@ -202,7 +206,7 @@ pub mod wasm_test {
             .unwrap();
         call_context.zome_name = TestWasm::CommitEntry.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = raw_workspace.clone();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
@@ -210,14 +214,24 @@ pub mod wasm_test {
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        dbg!(&output);
+        // the chain head should be the committed entry header
+        let call =
+            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+                async move {
+                    let source_chain = &mut workspace.source_chain;
+                    Ok(source_chain.chain_head()?.to_owned())
+                }
+                .boxed()
+            };
+        let chain_head =
+            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+                unsafe { raw_workspace.apply_mut(call).await }
+            }))
+            .unwrap()
+            .unwrap()
+            .unwrap();
 
-        let _app_entry_hash = holochain_types::entry::EntryHashed::from_content(app_entry.clone())
-            .await
-            .into_hash();
-
-        // this should be the hash of the newly committed entry
-        // assert_eq!(app_entry_hash.get_raw(), output.into_inner().get_raw(),);
+        assert_eq!(chain_head, output.into_inner(),);
     }
 
     #[tokio::test(threaded_scheduler)]
